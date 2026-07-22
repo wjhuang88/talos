@@ -539,6 +539,16 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             })
             .min(self.max_height);
         }
+        if self.menu.is_provider_wizard() {
+            let confirm = matches!(
+                self.menu.kind,
+                Some(crate::state::PanelKind::ProviderWizard {
+                    step: crate::state::WizardStep::Confirm,
+                    ..
+                })
+            );
+            return (if confirm { 6 } else { 3 }).min(self.max_height);
+        }
         let filtered = self.menu.filtered_items(self.query).len();
         let extra_header = if self.menu.is_variant_picker() || self.menu.is_model_list() {
             2
@@ -661,6 +671,88 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 )));
             }
 
+            frame.render_widget(Paragraph::new(lines).style(style), area);
+            return;
+        }
+
+        if self.menu.is_provider_wizard() {
+            let Some(crate::state::PanelKind::ProviderWizard {
+                step,
+                name,
+                protocol,
+                base_url,
+                api_key,
+                is_update,
+            }) = &self.menu.kind
+            else {
+                return;
+            };
+            let style = Style::default().bg(semantic::INPUT_BG);
+            let dim = Style::default().fg(semantic::DIM_TEXT);
+            let primary = Style::default().fg(semantic::TEXT_PRIMARY);
+            let title = if *is_update {
+                " Update custom provider"
+            } else {
+                " Add custom provider"
+            };
+            let (step_number, step_label, instruction, value) = match step {
+                crate::state::WizardStep::Name => (
+                    1,
+                    "Name",
+                    " Enter a provider slug (Esc to cancel).",
+                    if name.is_empty() {
+                        "(required)".to_string()
+                    } else {
+                        name.clone()
+                    },
+                ),
+                crate::state::WizardStep::Protocol => (
+                    2,
+                    "Protocol",
+                    " Up/Down selects a protocol; Enter continues.",
+                    protocol.clone(),
+                ),
+                crate::state::WizardStep::BaseUrl => (
+                    3,
+                    "Base URL",
+                    " Enter the provider base URL (Esc to cancel).",
+                    if base_url.is_empty() {
+                        "(required)".to_string()
+                    } else {
+                        base_url.clone()
+                    },
+                ),
+                crate::state::WizardStep::ApiKey => (
+                    4,
+                    "API key",
+                    " Enter the API key; it is masked (Esc to cancel).",
+                    credential_display_text(api_key).into_owned(),
+                ),
+                crate::state::WizardStep::Confirm => (
+                    5,
+                    "Confirm",
+                    " Review the values below, then press Enter to save (Esc to cancel).",
+                    String::new(),
+                ),
+            };
+            let mut lines = vec![Line::from(Span::styled(
+                format!("{title} — Step {step_number}/5: {step_label}"),
+                Style::default().fg(crate::nord::NORD8).bold(),
+            ))];
+            lines.push(Line::from(Span::styled(instruction, dim)));
+            if *step == crate::state::WizardStep::Confirm {
+                lines.extend([
+                    Line::from(Span::styled(format!(" Name: {name}"), primary)),
+                    Line::from(Span::styled(format!(" Protocol: {protocol}"), primary)),
+                    Line::from(Span::styled(format!(" Base URL: {base_url}"), primary)),
+                    Line::from(Span::styled(
+                        format!(" API key: {}", credential_display_text(api_key)),
+                        primary,
+                    )),
+                ]);
+            } else {
+                lines.push(Line::from(Span::styled(format!(" ▸ {value}"), primary)));
+            }
             frame.render_widget(Paragraph::new(lines).style(style), area);
             return;
         }

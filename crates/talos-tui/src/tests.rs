@@ -751,6 +751,30 @@ mod tests {
     }
 
     #[test]
+    fn parameterized_model_command_leaves_slash_menu_for_bridge_correction() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "model gpt-4o".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        assert_eq!(state.input_buffer, "/model gpt-4o");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn pasted_parameterized_connect_command_leaves_slash_menu_for_bridge_correction() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        state.input_paste("connect openai");
+
+        assert_eq!(state.input_buffer, "/connect openai");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
     fn test_slash_menu_uses_registry_execution_mode() {
         let registry = talos_conversation::command_registry();
         let menu = BottomPanelState::open_slash(registry);
@@ -1071,6 +1095,32 @@ mod tests {
         };
         assert!(full.height_hint(80) > 3);
         assert_eq!(capped.height_hint(80), 3);
+    }
+
+    #[test]
+    fn provider_wizard_renders_steps_instead_of_no_matches() {
+        use ratatui::{buffer::Buffer, layout::Rect};
+
+        let menu = BottomPanelState::open_provider_wizard();
+        let component = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        assert_eq!(component.height_hint(80), 3);
+
+        let area = Rect::new(0, 0, 80, 3);
+        let mut buffer = Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buffer);
+        component.render(&mut frame, area);
+        let rendered: String = buffer
+            .content()
+            .iter()
+            .flat_map(|cell| cell.symbol().chars())
+            .collect();
+        assert!(rendered.contains("Add custom provider"), "{rendered:?}");
+        assert!(rendered.contains("Step 1/5: Name"), "{rendered:?}");
+        assert!(!rendered.contains("No matches"), "{rendered:?}");
     }
 
     #[test]

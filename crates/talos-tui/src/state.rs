@@ -101,8 +101,7 @@ impl TuiState {
             }
         } else if self.slash_menu.is_open {
             self.input_append_str(text);
-            let query = self.panel_query().to_string();
-            self.slash_menu.reset_selection_for_query(&query);
+            self.refresh_slash_menu_after_input();
         } else {
             self.input_append_str(text);
         }
@@ -438,6 +437,26 @@ impl TuiState {
 
     pub(crate) fn append_slash_query_char(&mut self, ch: char) {
         self.input_append_char(ch);
+        self.refresh_slash_menu_after_input();
+    }
+
+    /// Updates slash-menu filtering after text entry. `/model` and `/connect`
+    /// are direct-execution commands, but an argument-bearing form must still
+    /// reach the bridge so it can show its corrective picker message. Once a
+    /// separator follows either command, leave the command menu and preserve
+    /// the composer text verbatim for normal submission.
+    fn refresh_slash_menu_after_input(&mut self) {
+        if self.slash_menu.is_slash()
+            && matches!(
+                self.input_buffer
+                    .split_once(char::is_whitespace)
+                    .map(|(command, _)| command),
+                Some("/model" | "/connect")
+            )
+        {
+            self.slash_menu.close();
+            return;
+        }
         let query = self.panel_query().to_string();
         self.slash_menu.reset_selection_for_query(&query);
     }
