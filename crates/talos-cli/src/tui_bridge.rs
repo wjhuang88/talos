@@ -218,9 +218,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                             Ok(content_part) => {
                                                 let summary = match &content_part {
                                                     talos_core::message::ContentPart::Image { path, mime, byte_count, .. } =>
-                                                        format!("{} ({} bytes, {})",
-                                                            escape_markdown_filename(&path.file_name().unwrap_or_default().to_string_lossy()),
-                                                            byte_count, mime),
+                                                        attachment_summary(path, mime, *byte_count),
                                                     _ => String::new(),
                                                 };
                                                 engine.pending_image_attachments.push(content_part);
@@ -333,13 +331,17 @@ async fn submit_session_message(
     sq_tx.send(op).await.map_err(|_| ())
 }
 
-/// Preserves a basename in a Markdown-rendered system message.
+/// Produces the user-visible, path-safe summary for a pending image attachment.
 ///
-/// The filename remains only a UI summary, but it must not be interpreted as
-/// formatting (for example, underscores must remain visible). The zero-width
-/// separator is display-only and never reaches the path or provider payload.
-fn escape_markdown_filename(filename: &str) -> String {
-    filename.replace('_', "_\u{200B}")
+/// The basename is deliberately fenced so the scrollback Markdown renderer does
+/// not interpret underscores or other filename characters as formatting.
+fn attachment_summary(path: &std::path::Path, mime: &str, byte_count: u64) -> String {
+    format!(
+        "```{}``` ({} bytes, {})",
+        path.file_name().unwrap_or_default().to_string_lossy(),
+        byte_count,
+        mime
+    )
 }
 
 /// P1-A: evaluates an image attachment path against the SEC-001
@@ -531,10 +533,14 @@ mod attachment_authorization_tests {
     }
 
     #[test]
-    fn attachment_filename_escapes_markdown_without_changing_visible_text() {
+    fn attachment_summary_fences_filename_without_mutating_it() {
         assert_eq!(
-            escape_markdown_filename("ScreenShot_2026-07-22_140448_800.png"),
-            "ScreenShot_\u{200B}2026-07-22_\u{200B}140448_\u{200B}800.png"
+            attachment_summary(
+                std::path::Path::new("/tmp/ScreenShot_2026-07-22_151225_812.png"),
+                "image/png",
+                246_943,
+            ),
+            "```ScreenShot_2026-07-22_151225_812.png``` (246943 bytes, image/png)"
         );
     }
 
