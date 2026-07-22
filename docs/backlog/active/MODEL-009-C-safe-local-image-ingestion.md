@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-C |
 | Type | Product / Security Story |
 | Priority | P2 |
-| Status | Review — code-level Owner acceptance (2026-07-22); real-terminal evidence pending |
+| Status | Complete — maintainer terminal acceptance (2026-07-22); Completion Commit: `17e3fef` |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-B (I150) typed content + capability semantics + persistence boundary |

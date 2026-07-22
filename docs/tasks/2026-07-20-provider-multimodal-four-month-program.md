@@ -5,7 +5,7 @@
 | Task ID | 2026-07-20-provider-multimodal-four-month-program |
 | Owner | Senior agent (single executor; no subagent delegation) |
 | Created | 2026-07-20 |
-| Status | In Progress — I146/I147/I150-I153 Review; I148 Partial; I154 Blocked |
+| Status | In Progress — I146/I147/I150/I151 Complete; I148/I152/I153 Review; I154 Blocked |
 | Branch | `main` (direct commits, no feature branches) |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
 | Confirmation | Maintainer confirmation covers the original I146-I153 cycle and the accepted 2026-07-21 MODEL-009-E/I154 scope addition; no per-phase re-confirmation except at hard-stop conditions. |
@@ -620,6 +620,14 @@ On a hard stop:
   space; Enter executes the direct command and opens its menu.
 - This is an in-scope clarification of the published completion wording, not a feature or API
   change; the I146 objective and implementation scope are unchanged.
+
+### I151 Maintainer Terminal Acceptance — 2026-07-22
+
+- I151 is Complete after the maintainer accepted both a valid image attachment and invalid
+  non-image rejection in a real terminal. The already-recorded external-path approval,
+  capability gate, safe summary, and text-only regressions provide the combined packet context.
+- Completion Commit: `17e3fef` (origin/main). This is the final security-rework implementation
+  evidence for canonical authorization, bounded byte snapshots, and digest verification.
 
 ## Related Documents
 

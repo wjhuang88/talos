@@ -37,7 +37,8 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
 | I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
 | I150 / MODEL-009-B | Complete — maintainer combined terminal acceptance (2026-07-22) | Completion Commit: `b3cc943`. |
-| I151 / I152 | Review, code-level security acceptance | Preserve status pending real-terminal evidence; I154 must reuse their proven controls rather than recreate a parallel path. |
+| I151 / MODEL-009-C | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `17e3fef`. I154 must reuse its proven controls rather than recreate a parallel path. |
+| I152 / MODEL-009-D | Review, code-level security acceptance | The local terminal packet passed except for the maintainer-owned live Anthropic-compatible Provider check, which is unavailable in the current environment. |
 | I153 | Review | Refresh automated evidence and checklist; it remains Review until maintainer walkthrough evidence exists. |
 | I154 / MODEL-009-E | Planned / Blocked | May activate only after Phase P2 records that its code-level prerequisites and evidence-refresh gate are satisfied. |
 | TUI-034 | Refinement | Must pass its rendering-boundary refinement gate before a new I155 implementation baseline is created. |
@@ -267,7 +268,7 @@ cite this packet only after an already-existing evidence or repair commit is nam
 | Parameterless menus | **Complete.** Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab completes without execution or trailing space; Enter opens the menu; Escape cancels. `/mo` shows only `/model`. Completion Commit: `7f6972a`. | I146 |
 | Wizard | `/connect` → Add custom provider runs Name → Protocol → Base URL → API key → Confirm; key remains masked, Esc causes no save, and duplicate name shows the explicit update path. | I147 |
 | Discovery and activation | A mock/disposable provider discovers IDs. Select an ID containing `/` or `@`; the provider/model status changes and the current session rebuilds once. Discovery failure retains the old active session and permits manual configuration. | I148 |
-| Capability and attachment | Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/cancel work; history shows only a safe summary; a text-only turn still works. | I150, I151, I152 |
+| Capability and attachment | **I150/I151 Complete.** Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/send work; history shows only a safe summary; a text-only turn still works. I152 remains Review only for its live Anthropic-compatible Provider check. | I150, I151, I152 |
 | Provider mapping | With a maintainer-owned disposable configured endpoint, one accepted image produces the expected compatible request or a safe, actionable provider failure; no path/data URL/API key appears in TUI history. | I152, I153 |
 
 Do not run I154 `read_image` steps here: it remains Planned/Blocked and is a distinct future
@@ -284,8 +285,8 @@ The final report must ask the maintainer to execute and record:
 3. I148: use a disposable/mock provider endpoint; discover, choose a model, verify immediate
    status/session transition, then verify a discovery failure retains the old session and offers
    manual entry.
-4. I151/I152/I154: Supported/Unknown/Unsupported gating, in-workspace and external-path approval,
-   invalid image rejection, attach/remove/cancel/send, explicit model `read_image`, and assurance
-   that a normal pasted image path is never auto-read.
+4. I152: a maintainer-owned live Anthropic-compatible Provider check remains. I154 is still
+   Planned/Blocked and must not be included in this terminal packet; normal pasted paths remain
+   non-readable unless a future explicit tool is authorized.
 5. I155: long `bash`/diagnostic output at narrow and wide widths in Alacritty plus a second terminal;
    inspect ASCII, CJK, emoji, and head-tail output for usable width and correct rows.
