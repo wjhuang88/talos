@@ -1596,7 +1596,11 @@ api_key_env = "ANTHROPIC_API_KEY"
 #[cfg(test)]
 mod steering_snapshot_tests {
     use super::*;
-    use talos_conversation::{ConversationEngine, SteeringQueueSnapshot, UiOutput};
+    use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
+    use talos_conversation::{
+        ConversationEngine, ModelInfo, ModelSwitchRequest, SteeringQueueSnapshot, UiOutput,
+        UserInput,
+    };
 
     fn new_engine() -> ConversationEngine {
         ConversationEngine::new("test-model".to_string(), "test-provider".to_string())
@@ -2081,6 +2085,136 @@ mod steering_snapshot_tests {
         assert!(
             text.contains("Attached image"),
             "supported capability must allow attachment, got: {text}"
+        );
+    }
+
+    /// P1-fix2: Verify that UserInput::SwitchModel produces a
+    /// SessionLifecycleRequest::ModelSwitch carrying the provider_hint.
+    /// This proves the bridge forwards structured identity — the
+    /// provider is not dropped.
+    #[tokio::test]
+    async fn bridge_switch_model_forwards_provider_hint() {
+        let engine = ConversationEngine::new("old-model".to_string(), "old-provider".to_string());
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, mut session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+                permission_engine: None,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::SwitchModel {
+                provider: "custom-gw".to_string(),
+                model_id: "discovered-model".to_string(),
+                variant: None,
+            })
+            .unwrap();
+
+        let request = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match session_rx.recv().await {
+                    Some(SessionLifecycleRequest::ModelSwitch(req)) => return req,
+                    Some(_) => continue,
+                    None => return panic!("channel closed"),
+                }
+            }
+        })
+        .await
+        .expect("must receive ModelSwitch within timeout");
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        assert_eq!(request.model_id, "discovered-model");
+        assert_eq!(
+            request.provider_hint.as_deref(),
+            Some("custom-gw"),
+            "provider_hint must carry the picker-selected provider"
+        );
+    }
+
+    /// P1-fix2: When the provider is empty (bare /model command from
+    /// engine), provider_hint must be None so handle_session_model
+    /// falls back to bare model_id resolution.
+    #[tokio::test]
+    async fn bridge_switch_model_empty_provider_yields_none_hint() {
+        let engine = ConversationEngine::new("old-model".to_string(), "old-provider".to_string());
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, mut session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+                permission_engine: None,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::SwitchModel {
+                provider: String::new(),
+                model_id: "some-model".to_string(),
+                variant: None,
+            })
+            .unwrap();
+
+        let request = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match session_rx.recv().await {
+                    Some(SessionLifecycleRequest::ModelSwitch(req)) => return req,
+                    Some(_) => continue,
+                    None => return panic!("channel closed"),
+                }
+            }
+        })
+        .await
+        .expect("must receive ModelSwitch within timeout");
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        assert_eq!(request.model_id, "some-model");
+        assert!(
+            request.provider_hint.is_none(),
+            "empty provider must yield None hint"
         );
     }
 }
