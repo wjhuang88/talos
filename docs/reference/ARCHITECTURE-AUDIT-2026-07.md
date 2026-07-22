@@ -281,7 +281,7 @@ cargo clippy --workspace --all-targets --locked 2>&1 | grep "^ *-->" | sed 's|.*
 
 | ID | Sev | Title | Disposition |
 |----|-----|-------|-------------|
-| F01 | P1 | Tool registration 5-7 touch points | Proposed (R01) |
+| F01 | P1 | Tool registration 5-7 touch points | Refinement (ARCH-034-R01; ADR-gated) |
 | F02 | P1 | Permission facet 31 impls / 16 files | Proposed (R02) |
 | F03 | P2 | scheduler.rs 3,230 lines | Deferred (watch) |
 | F04 | P2 | clippy --all-targets 806 warnings (predominantly test-target) | Deferred |
@@ -306,8 +306,10 @@ cargo clippy --workspace --all-targets --locked 2>&1 | grep "^ *-->" | sed 's|.*
 
 ## 10. Proposed Stories
 
-### ARCH-034-R01: Tool Registration Consolidation
-Declarative registration macro or ToolRegistryBuilder. Effort M. **Proposed, not Ready.**
+### ARCH-034-R01: Tool Registration Composition Consolidation
+Explicit crate-owned tool contributions plus outer composition profiles; `talos-core` retains only
+generic registry contracts. The detailed story rejects implicit/global registration and requires an
+ADR before implementation. Effort M. **Refinement, not Ready.**
 
 ### ARCH-034-R02: Permission Facet Builder
 ToolPermissionFacetBuilder in talos-core. Effort S. **Proposed, not Ready.**

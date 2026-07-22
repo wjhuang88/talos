@@ -34,6 +34,8 @@ fitness checks that prevent uncontrolled code accumulation.
    blocked on accepted A findings; one behavior-preserving story per root/seam.
 3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement,
    introduces only evidence-backed prevention checks after A/B.
+4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Refinement,
+   turns accepted finding F01 into an ADR-gated, behavior-preserving tool-composition story.
 
 ## Audit Dimensions
 

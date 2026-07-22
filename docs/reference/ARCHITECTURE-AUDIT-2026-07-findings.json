@@ -8,9 +8,9 @@
     "affected_seams": ["talos-tools", "talos-cli/src/registry.rs"],
     "proof": "Adding a tool requires new AgentTool impl + registration in 3 builder functions (build_print_tool_registry, build_tui_tool_registry, build_mcp_tool_registry) at registry.rs:623-928, each with 2 call sites.",
     "counterevidence": "AgentTool trait has sensible defaults for most methods. Duplication is structural.",
-    "recommended_action": "Declarative registration macro or ToolRegistryBuilder. See R01.",
-    "disposition": "Proposed Story",
-    "disposition_detail": "R01 proposed. Not Ready."
+    "recommended_action": "Explicit crate-owned tool contributions plus outer composition profiles; ADR-gated. See ARCH-034-R01.",
+    "disposition": "Refinement Story",
+    "disposition_detail": "ARCH-034-R01 created 2026-07-22. ADR required before Ready."
   },
   {
     "id": "ARCH-034-F02",
