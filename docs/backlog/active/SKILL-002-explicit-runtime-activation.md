@@ -4,9 +4,11 @@
 |---|---|
 | Type | State/Product Story |
 | Priority | P1 |
-| Status | Review (implemented in I058) |
+| Status | Complete (I058 runtime evidence accepted 2026-06-29; reconciled 2026-07-22) |
 | Depends On | I033 review closure; CMD-001 first-class BuiltinCommand registry |
 | Decision Links | ADR-006; prompt cache constraints recorded by ARCH-006 |
+
+> Completion Commit: `2495855` — `feat(cli): implement explicit runtime skill activation (#I058)`
 
 ## User Goal And Value
 

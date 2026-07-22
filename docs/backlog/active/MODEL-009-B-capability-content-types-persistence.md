@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-B |
 | Type | Product / API / State Story |
 | Priority | P2 |
-| Status | Refinement — selected into I150 (2026-07-20) |
+| Status | Review — implemented in I150 (`b3cc943`); combined I151/I152 real-terminal evidence pending |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-A (I149) ADR Accepted |

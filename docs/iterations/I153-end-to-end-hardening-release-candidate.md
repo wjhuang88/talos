@@ -19,6 +19,7 @@
 | 2026-07-20 | Documentation | BOARD.md updated to Active status with I146-I152 progress. Iteration docs I146-I152 created. README EN/zh-CN updated for parameterless commands and wizard. |
 | 2026-07-20 | Safety review | catch_unwind at every file-read boundary in provider adapters. No new unsafe blocks. No new native/C dependencies beyond base64 (pure Rust). |
 | 2026-07-21 | Change control | Maintainer added agent-mediated image inspection. It is a new MODEL-009-E / I154 objective, not an I152 correction; I153's published release-candidate baseline is unchanged. |
+| 2026-07-22 | Post-baseline hardening | I151/I152 received capability fail-closed gating, SEC-001 exact-path authorization, decoder/pixel validation, canonical-path plus digest revalidation, attachment list/detach UX, print-mode `--attach`, and safe multimodal scrollback. Evidence commits: `52068ee`, `6b04c12`, `5edd8b9`, `17e3fef`. These repairs are included in the combined terminal packet; no release action is implied. |
 
 ## Validation Results (I153 Final Ladder)
 
@@ -47,9 +48,9 @@
 - [x] Iteration docs I146-I152 created
 - [x] README EN/zh-CN updated for parameterless commands and wizard
 - [x] ADR-050 + security review documented
-- [ ] TUI attachment UX (attach/list/remove/cancel) — implementation plumbing
-- [ ] CLI `--attach` parameter or safe rejection — implementation plumbing
-- [ ] Real-terminal walkthrough — requires human verifier (not a hard-stop condition)
+- [x] TUI attachment UX (attach/list/remove/cancel) — delivered in `60a7064` and retained through the security rework
+- [x] CLI `--attach` parameter with capability/authorization gate — delivered in `09c5096` and hardened in `6b04c12`
+- [ ] Combined real-terminal walkthrough — requires human verifier; tracked in the 2026-07-22 unified Review closure packet
 - [ ] End-to-end mock fixtures for full image flow — implementation plumbing
 - [ ] Full site/ documentation sync — implementation plumbing
 

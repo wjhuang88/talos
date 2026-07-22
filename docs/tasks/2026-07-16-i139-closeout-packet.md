@@ -1,7 +1,7 @@
 # I139: Four-Month Reliability Closeout — Final Acceptance Packet
 
 **Date**: 2026-07-16
-**Status**: Review after superseding corrective acceptance (2026-07-17)
+**Status**: Superseded by I139 Complete (2026-07-17); retained as a historical acceptance packet.
 
 ## Package Summary
 

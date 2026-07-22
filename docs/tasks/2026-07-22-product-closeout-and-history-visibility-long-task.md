@@ -35,7 +35,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | I145 / TUI-026 | Review | Do not change to Complete without maintainer terminal evidence. Include its walkthrough in the final packet only. |
 | I146 / TUI-033 | Review | Do not change to Complete without maintainer terminal evidence. No feature changes unless a regression is found while executing another phase. |
 | I147 / MODEL-008-A | Review | Do not change to Complete without maintainer terminal evidence. |
-| I148 / MODEL-008-B | Partial | Frontline-owned implementation residual: discovery → picker selection → immediate activation/session rebuild. |
+| I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
 | I150 / MODEL-009-B | Review | Preserve status; run regressions when affected by I154. |
 | I151 / I152 | Review, code-level security acceptance | Preserve status pending real-terminal evidence; I154 must reuse their proven controls rather than recreate a parallel path. |
 | I153 | Review | Refresh automated evidence and checklist; it remains Review until maintainer walkthrough evidence exists. |
@@ -69,7 +69,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | ID | Task | Expected output | Depends on | Completion gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | P0 | Establish this successor task and reconcile scope | This owner record, original-program change-control link, Board entry, and current-state evidence | None | Governance + diff checks; explicit inventory above remains true | If current owner docs conflict, stop and report file/line evidence | Complete on creation |
-| P1 | I148 discovery activation closeout | Mock-proven discover → select → `apply` model → rebuild current session → status/picker reflects the active identity; failure retains current session/config and exposes manual fallback | P0 | Two protocol fixtures; picker/bridge/session lifecycle tests; atomicity/redaction tests; full locked ladder | Keep discovery persistence and manual fallback; leave I148 Partial with a precise blocker | Planned |
+| P1 | I148 discovery activation closeout | Mock-proven discover → select → `apply` model → rebuild current session → status/picker reflects the active identity; failure retains current session/config and exposes manual fallback | P0 | Two protocol fixtures; picker/bridge/session lifecycle tests; atomicity/redaction tests; full locked ladder | Keep discovery persistence and manual fallback; leave I148 Review with its terminal-only gate | Complete — evidence commits `23db287`, `187f13d`, `4d5f8d7`, `834400b`, `a01edc5` |
 | P2 | I153 prerequisite/evidence refresh and I154 activation decision | Append-only evidence update stating whether I154's code prerequisites are met; an I154 activation record only if they are | P1, I151/I152 accepted code state | Security-boundary inventory, I153 regression replay, no unresolved critical path; no false real-terminal Complete claim | Keep I154 Blocked and provide exact missing condition | Planned |
 | P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Planned |
 | P4 | TUI-034 rendering refinement | Fixed-cap inventory, active-vs-legacy `ToolCallBubble` reachability evidence, chosen continuation-row representation, width/height contract, and TUI-034 changed to Ready or explicitly left Refinement | P0; must not overlap an Active I154 | Actual `Buffer`/`InlineFrame` or active-renderer spike at 80/120/160 columns; CJK/emoji/newline observations; no terminal-autowrap assumption | Keep TUI-034 Refinement and record the smallest unresolved rendering boundary | Planned |
@@ -192,7 +192,11 @@ not permission to change unrelated scopes.
 ### Checkpoint P1 — 2026-07-22
 
 - Completed task items: P1 — I148 discovery → selection → immediate activation closeout.
-- Commit pushed: `23db287` on `origin/main` (code+tests); docs commit pending.
+- Completion Commit: `a01edc5` — final P1-fix4 review closure; the preceding implementation and
+  evidence commits are `23db287`, `187f13d`, `4d5f8d7`, and `834400b`.
+- Commit pushed: `23db287` on `origin/main` (P1 tests), followed by `187f13d`,
+  `4d5f8d7`, `834400b`, and `a01edc5` to close provider-identity, bridge,
+  lifecycle, semver, and test-safety review findings.
 - Changed owner artifacts: I148 iteration doc (execution record appended, status → Review);
   iterations README (I148 row → Review); BOARD (program row updated).
 - Commands and exit results:
@@ -237,6 +241,37 @@ Stop, append the checkpoint, and request maintainer direction when any applies:
 - Before P6, inspect the selected owner docs for a source GitHub issue. If one exists, comment with
   the new status, commit, and summary; close it only when the owner story is Complete or Cancelled.
   No GitHub issue is currently mapped to TUI-034.
+
+## Unified Review Closure Packet (Not Delegable To Automation)
+
+Run the following in one clean, disposable Talos profile after building the current binary. A
+single observed defect keeps only its owning iteration in Review; it must not block recording
+independent passing cases. Record terminal, platform, binary commit, each case result, and any
+redacted screenshot/transcript in the owner iteration documents. A later status-only commit may
+cite this packet only after an already-existing evidence or repair commit is named.
+
+### Setup
+
+1. Start from clean `main`, build `target/debug/talos`, and use a temporary HOME/config; never put
+   a real production credential in a transcript.
+2. Use the built-in/mock path for deterministic checks. A disposable local compatible endpoint is
+   acceptable for discovery; a paid provider is not required.
+3. Before testing, confirm the status bar has a known active model. After testing, remove the
+   temporary profile and any generated fixture image.
+
+### Cases and owning Reviews
+
+| Case | Expected observable result | Owner(s) |
+|---|---|---|
+| Steering queue | During a tool-running turn, enqueue at least seven messages. FIFO preview appears, `+N more` is accurate, and it disappears after drain. | I145 |
+| Parameterless menus | Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab/Enter leave no trailing argument space; Escape cancels. | I146 |
+| Wizard | `/connect` → Add custom provider runs Name → Protocol → Base URL → API key → Confirm; key remains masked, Esc causes no save, and duplicate name shows the explicit update path. | I147 |
+| Discovery and activation | A mock/disposable provider discovers IDs. Select an ID containing `/` or `@`; the provider/model status changes and the current session rebuilds once. Discovery failure retains the old active session and permits manual configuration. | I148 |
+| Capability and attachment | Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/cancel work; history shows only a safe summary; a text-only turn still works. | I150, I151, I152 |
+| Provider mapping | With a maintainer-owned disposable configured endpoint, one accepted image produces the expected compatible request or a safe, actionable provider failure; no path/data URL/API key appears in TUI history. | I152, I153 |
+
+Do not run I154 `read_image` steps here: it remains Planned/Blocked and is a distinct future
+iteration.
 
 ## Maintainer Real-Terminal Packet (Not Delegable To Automation)
 
