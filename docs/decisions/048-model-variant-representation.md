@@ -153,3 +153,34 @@ adapter or a major-version bump at that time.
 
 Revisit if a provider requires variant data that cannot be expressed as a
 projection of existing `ModelConfig`/`ReasoningOptions` fields.
+
+## Amendment (2026-07-22): ModelSwitchRequest.provider_hint
+
+### Context
+
+P1-fix for MODEL-008-B / I148 added `provider_hint: Option<String>` to the
+public `talos_conversation::ModelSwitchRequest` struct. Without this field,
+the TUI bridge dropped the provider identity from `UserInput::SwitchModel`,
+causing cross-provider duplicate model ID ambiguity in
+`Config::set_active_model`.
+
+### Decision
+
+`ModelSwitchRequest` now has three public fields: `model_id`,
+`provider_needs_credential`, and `provider_hint`. This is a pre-1.0
+struct-literal breaking change in the same class as the
+`StatusSnapshot` additions in ADR-049 and the `ContentPart::Image`
+additions in ADR-050.
+
+### Migration
+
+Downstream Rust consumers constructing `ModelSwitchRequest { ... }` via
+struct literal must add `provider_hint: None` (or `Some("provider")` if
+they know the provider). Pattern matches are unaffected because the field
+is additive to the struct (not an enum variant). Consumers that only
+receive `ModelSwitchRequest` from the bridge need no change.
+
+### Related
+
+- MODEL-008-B: Model Discovery, Manual Fallback, And Immediate Activation
+- I148: Discovery → selection → immediate activation closeout

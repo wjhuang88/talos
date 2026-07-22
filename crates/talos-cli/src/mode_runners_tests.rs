@@ -1,5 +1,8 @@
+use crate::mode_runners::session_handlers::handle_session_model;
+use crate::session_transition::SessionTransition;
 use crate::test_support::HOME_ENV_MUTEX;
 use talos_config::ProviderConfig;
+use talos_plugin::HookRegistry;
 
 /// Runs `f` with `HOME` redirected to a fresh temp directory, restoring
 /// the original `HOME` afterward. Must be called under `HOME_ENV_MUTEX`
@@ -1140,5 +1143,199 @@ fn p1fix_activation_failure_preserves_old_config() {
     assert_eq!(
         config.provider, original_provider,
         "old provider must be unchanged"
+    );
+}
+
+/// P1-fix3: real handle_session_model integration — success path.
+/// Verifies that:
+/// - rebuild_session_for_model is called (bridge_rx_update_tx receives
+///   exactly one update with a new session).
+/// - handle_session_model returns Some(config) with the new model.
+/// - The config reflects the switched model/provider.
+#[tokio::test]
+async fn p1fix3_handle_session_model_success_rebuilds_once() {
+    use std::sync::Arc;
+    use talos_config::ProviderProtocol;
+
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let original_home = std::env::var("HOME").ok();
+    unsafe { std::env::set_var("HOME", home.path()) };
+
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.model = "original-model".to_string();
+    config.provider = "original-gw".to_string();
+    config.providers.insert(
+        "original-gw".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: Some("https://mock.example.com/v1".to_string()),
+            api_key: Some("orig-key".to_string()),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "target-gw".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: Some("https://mock.example.com/v1".to_string()),
+            api_key: Some("target-key".to_string()),
+            ..Default::default()
+        },
+    );
+    config
+        .providers
+        .get_mut("target-gw")
+        .unwrap()
+        .models
+        .insert("target-model".to_string(), Default::default());
+
+    let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
+    let hooks = Arc::new(HookRegistry::new());
+    let session_manager =
+        talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
+    let session = session_manager
+        .create_session("p1fix3-success", "test-ws")
+        .unwrap();
+    let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
+    let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
+    let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
+    let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
+    )>();
+    let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
+        sq_tx,
+        session.clone(),
+    )));
+    let mcp_config = talos_config::McpConfig::default();
+
+    let result = handle_session_model(
+        &transition,
+        &ui_tx,
+        &config,
+        &hooks,
+        workspace.path(),
+        &mcp_config,
+        &session_watch_tx,
+        &sq_tx_watch_tx,
+        &bridge_tx,
+        &session_watch_rx,
+        &session_manager,
+        "target-model".to_string(),
+        Some("target-gw".to_string()),
+        true,
+    )
+    .await;
+
+    match original_home {
+        Some(v) => unsafe { std::env::set_var("HOME", v) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    let new_config = result.expect("model switch to mock must succeed");
+    assert_eq!(new_config.model, "target-model");
+    assert_eq!(new_config.provider, "target-gw");
+
+    let bridge_update = bridge_rx.try_recv();
+    assert!(
+        bridge_update.is_ok(),
+        "bridge_rx_update_tx must receive exactly one update after successful rebuild"
+    );
+    assert!(
+        bridge_rx.try_recv().is_err(),
+        "bridge_rx_update_tx must receive exactly ONE update, not more"
+    );
+}
+
+/// P1-fix3: real handle_session_model integration — failure path.
+/// When the model is unknown, handle_session_model must return None
+/// and NOT send any bridge_rx_update or change the session/config.
+#[tokio::test]
+async fn p1fix3_handle_session_model_failure_no_rebuild() {
+    use std::sync::Arc;
+    use talos_config::ProviderProtocol;
+
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let original_home = std::env::var("HOME").ok();
+    unsafe { std::env::set_var("HOME", home.path()) };
+
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.model = "original-model".to_string();
+    config.provider = "original-gw".to_string();
+    config.providers.insert(
+        "original-gw".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: Some("https://mock.example.com/v1".to_string()),
+            api_key: Some("orig-key".to_string()),
+            ..Default::default()
+        },
+    );
+
+    let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
+    let hooks = Arc::new(HookRegistry::new());
+    let session_manager =
+        talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
+    let session = session_manager
+        .create_session("p1fix3-fail", "test-ws")
+        .unwrap();
+    let original_session_id = session.id;
+    let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
+    let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
+    let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
+    let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
+    )>();
+    let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
+        sq_tx,
+        session.clone(),
+    )));
+    let mcp_config = talos_config::McpConfig::default();
+
+    let result = handle_session_model(
+        &transition,
+        &ui_tx,
+        &config,
+        &hooks,
+        workspace.path(),
+        &mcp_config,
+        &session_watch_tx,
+        &sq_tx_watch_tx,
+        &bridge_tx,
+        &session_watch_rx,
+        &session_manager,
+        "nonexistent-model".to_string(),
+        Some("nonexistent-provider".to_string()),
+        true,
+    )
+    .await;
+
+    match original_home {
+        Some(v) => unsafe { std::env::set_var("HOME", v) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    assert!(
+        result.is_none(),
+        "activation of unknown model must return None"
+    );
+    assert!(
+        bridge_rx.try_recv().is_err(),
+        "bridge_rx_update_tx must NOT receive any update on failure"
+    );
+    assert_eq!(
+        config.model, "original-model",
+        "old config must be unchanged"
+    );
+    assert_eq!(config.provider, "original-gw");
+    assert_eq!(
+        session_watch_rx.borrow().id,
+        original_session_id,
+        "session watch must still point to the old session"
     );
 }
