@@ -228,6 +228,12 @@ jobs:
               echo
             fi
 
+            NOTES_FILE="docs/releases/${TAG}.md"
+            if [ -f "$NOTES_FILE" ]; then
+              cat "$NOTES_FILE"
+              echo
+            fi
+
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "## Changes since [\`$PREVIOUS_TAG\`](${TAG_URL_BASE}/${PREVIOUS_TAG})"
               echo

@@ -14,7 +14,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { version = "0.4.0", path = "../talos-core" }
+talos-core = { version = "0.5.0", path = "../talos-core" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

@@ -9,14 +9,14 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { version = "0.4.0", path = "../talos-core" }
-talos-tools = { version = "0.4.0", path = "../talos-tools" }
-talos-permission = { version = "0.4.0", path = "../talos-permission" }
-talos-sandbox = { version = "0.4.0", path = "../talos-sandbox" }
-talos-skill = { version = "0.4.0", path = "../talos-skill" }
-talos-plugin = { version = "0.4.0", path = "../talos-plugin" }
-talos-memory = { version = "0.4.0", path = "../talos-memory" }
-talos-session = { version = "0.4.0", path = "../talos-session" }
+talos-core = { version = "0.5.0", path = "../talos-core" }
+talos-tools = { version = "0.5.0", path = "../talos-tools" }
+talos-permission = { version = "0.5.0", path = "../talos-permission" }
+talos-sandbox = { version = "0.5.0", path = "../talos-sandbox" }
+talos-skill = { version = "0.5.0", path = "../talos-skill" }
+talos-plugin = { version = "0.5.0", path = "../talos-plugin" }
+talos-memory = { version = "0.5.0", path = "../talos-memory" }
+talos-session = { version = "0.5.0", path = "../talos-session" }
 async-trait = "0.1"
 futures-util = "0.3"
 serde_json = "1"
