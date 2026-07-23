@@ -152,3 +152,138 @@ impl AgentTool for ReadImageTool {
         &["path"]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization};
+
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(".")
+    }
+
+    #[tokio::test]
+    async fn execute_returns_error_without_authorization() {
+        let tool = ReadImageTool::new(workspace_root());
+        let result = tool.execute(serde_json::json!({"path": "test.png"})).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("requires authorized execution"));
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_returns_image_part_for_valid_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read_image",
+                ToolNature::Read,
+                dir.path(),
+                "test.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": img_path.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(output.next_provider_parts.len(), 1);
+        match &output.next_provider_parts[0] {
+            ContentPart::Image {
+                mime, byte_count, ..
+            } => {
+                assert_eq!(*mime, "image/png");
+                assert_eq!(*byte_count, MINIMAL_PNG.len() as u64);
+            }
+            _ => panic!("expected Image content part"),
+        }
+        assert!(output.result.content.contains("test.png"));
+        assert!(output.result.content.contains("image/png"));
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_path_escape() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let output = tool
+            .execute_authorized_with_output(serde_json::json!({"path": "/etc/passwd"}), &[])
+            .await;
+
+        assert!(output.result.is_error);
+        assert!(output.result.content.contains("Permission denied"));
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_nonexistent_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let output = tool
+            .execute_authorized_with_output(serde_json::json!({"path": "no_such_file.png"}), &[])
+            .await;
+
+        assert!(output.result.is_error);
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let subdir = dir.path().join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let output = tool
+            .execute_authorized_with_output(serde_json::json!({"path": "subdir"}), &[])
+            .await;
+
+        assert!(output.result.is_error);
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[test]
+    fn tool_metadata() {
+        let tool = ReadImageTool::new(workspace_root());
+        assert_eq!(tool.name(), "read_image");
+        assert!(tool.is_read_only());
+        assert_eq!(tool.nature(), ToolNature::Read);
+        assert_eq!(tool.family(), ToolFamily::File);
+        assert_eq!(tool.summary_fields(), &["path"]);
+    }
+
+    #[tokio::test]
+    async fn execute_with_output_default_delegates_to_execute() {
+        let tool = ReadImageTool::new(workspace_root());
+        let output = tool
+            .execute_with_output(serde_json::json!({"path": "x.png"}))
+            .await;
+        assert!(output.result.is_error);
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    /// Minimal valid 1×1 white PNG (67 bytes).
+    const MINIMAL_PNG: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
+        0x00, 0x00, 0x00, 0x0d, // IHDR length
+        0x49, 0x48, 0x44, 0x52, // "IHDR"
+        0x00, 0x00, 0x00, 0x01, // width=1
+        0x00, 0x00, 0x00, 0x01, // height=1
+        0x08, 0x02, 0x00, 0x00, 0x00, // bitdepth=8, colortype=RGB
+        0x90, 0x77, 0x53, 0xde, // CRC
+        0x00, 0x00, 0x00, 0x0c, // IDAT length
+        0x49, 0x44, 0x41, 0x54, // "IDAT"
+        0x78, 0x9c, 0x63, 0xf8, 0xff, 0xff, 0x3f, 0x00, 0x05, 0xfe, 0x02, 0xfe, 0xa3, 0x35, 0x81,
+        0x84, // compressed data + CRC
+        0x00, 0x00, 0x00, 0x00, // IEND length
+        0x49, 0x45, 0x4e, 0x44, // "IEND"
+        0xae, 0x42, 0x60, 0x82, // IEND CRC
+    ];
+}
