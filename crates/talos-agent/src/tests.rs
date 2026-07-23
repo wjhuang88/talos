@@ -5,13 +5,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::message::{
-    AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, StopReason,
-    ToolCall, Usage,
+    AgentEvent, AssistantReasoning, ContentDigest, ContentPart, Message, MessageToolResult,
+    ReasoningBlock, StopReason, ToolCall, Usage,
 };
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::{
-    AgentTool, ToolBackend, ToolContinuation, ToolFamily, ToolNature, ToolPermissionFacet,
-    ToolPresentationPolicy, ToolRegistry, ToolResourceKind, ToolResult as ToolExecutionResult,
+    AgentTool, ToolBackend, ToolContinuation, ToolExecutionOutput, ToolFamily, ToolNature,
+    ToolPermissionFacet, ToolPresentationPolicy, ToolRegistry, ToolResourceKind,
+    ToolResult as ToolExecutionResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
@@ -3500,4 +3501,230 @@ fn test_build_stable_prefix_and_dynamic_suffix() {
     };
     let full = builder.build();
     assert_eq!(combined, full);
+}
+
+struct CapturingMockModel {
+    responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,
+    captured_messages: Arc<Mutex<Vec<Vec<Message>>>>,
+}
+
+impl CapturingMockModel {
+    fn new(responses: Vec<Vec<AgentEvent>>) -> (Self, Arc<Mutex<Vec<Vec<Message>>>>) {
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let model = Self {
+            responses: Arc::new(Mutex::new(responses)),
+            captured_messages: captured.clone(),
+        };
+        (model, captured)
+    }
+}
+
+#[async_trait]
+impl LanguageModel for CapturingMockModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured_messages.lock().await.push(messages.to_vec());
+        let (tx, rx) = mpsc::channel(64);
+        let responses = self.responses.clone();
+        tokio::spawn(async move {
+            let mut responses = responses.lock().await;
+            let events = responses.pop_front().unwrap_or_default();
+            for event in events {
+                tx.send(event).await.expect("receiver dropped");
+            }
+        });
+        Ok(rx)
+    }
+}
+
+struct TestReadImageTool;
+
+#[async_trait]
+impl AgentTool for TestReadImageTool {
+    fn name(&self) -> &str {
+        "read_image"
+    }
+    fn description(&self) -> &str {
+        "test read_image"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}}})
+    }
+    fn is_read_only(&self) -> bool {
+        true
+    }
+    fn nature(&self) -> ToolNature {
+        ToolNature::Read
+    }
+    fn family(&self) -> ToolFamily {
+        ToolFamily::File
+    }
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        match input.get("path").and_then(Value::as_str) {
+            Some(path) => vec![ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                path,
+                ToolResourceKind::Path,
+            )],
+            None => vec![ToolPermissionFacet::new(ToolNature::Read)],
+        }
+    }
+    async fn execute(&self, _input: Value) -> ToolExecutionResult {
+        ToolExecutionResult::success("[Image read: test.png]")
+    }
+    async fn execute_with_output(&self, _input: Value) -> ToolExecutionOutput {
+        ToolExecutionOutput {
+            result: ToolExecutionResult::success("[Image read: test.png (8 bytes, image/png)]"),
+            next_provider_parts: vec![ContentPart::Image {
+                path: PathBuf::from("test.png"),
+                mime: "image/png".to_string(),
+                byte_count: 8,
+                content_digest: ContentDigest::default(),
+            }],
+        }
+    }
+}
+
+fn image_continuation_events() -> Vec<AgentEvent> {
+    vec![
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_1".into(),
+                name: "read_image".into(),
+                input: serde_json::json!({"path": "test.png"}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec!["path".into()],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: Usage::default(),
+        },
+    ]
+}
+
+fn text_done_events(text: &str) -> Vec<AgentEvent> {
+    vec![
+        AgentEvent::TextDelta { delta: text.into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ]
+}
+
+#[tokio::test]
+async fn continuation_image_appears_once_in_next_provider_request() {
+    let (model, captured) = CapturingMockModel::new(vec![
+        image_continuation_events(),
+        text_done_events("described the image"),
+    ]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let result = agent
+        .run_streaming("read the image".into(), vec![], event_tx)
+        .await;
+    assert!(result.is_ok());
+
+    let calls = captured.lock().await;
+    assert_eq!(calls.len(), 2, "exactly 2 provider calls");
+
+    // First call: no image
+    let first = &calls[0];
+    assert!(
+        !first
+            .iter()
+            .any(|m| matches!(m, Message::Multimodal { .. })),
+        "first provider call must not contain Multimodal"
+    );
+
+    // Second call: image present as last message
+    let second = &calls[1];
+    assert!(
+        second
+            .iter()
+            .any(|m| matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))),
+        "second provider call must contain Multimodal with Image"
+    );
+}
+
+#[tokio::test]
+async fn continuation_image_consumed_after_second_call() {
+    let (model, captured) = CapturingMockModel::new(vec![
+        image_continuation_events(),
+        text_done_events("described"),
+    ]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let _ = agent
+        .run_streaming("read the image".into(), vec![], event_tx)
+        .await;
+
+    let calls = captured.lock().await;
+    if calls.len() >= 2 {
+        let second = &calls[1];
+        let has_image = second.iter().any(|m| {
+            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+        });
+        assert!(has_image, "second call must have the image (one-shot)");
+    }
+    if calls.len() >= 3 {
+        let third = &calls[2];
+        let has_image = third.iter().any(|m| {
+            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+        });
+        assert!(!has_image, "third call must NOT have the image (consumed)");
+    }
+}
+
+#[tokio::test]
+async fn continuation_image_not_in_persisted_messages() {
+    let (model, _captured) =
+        CapturingMockModel::new(vec![image_continuation_events(), text_done_events("done")]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let (result, messages) = agent
+        .run_for_session_turn("read the image".into(), vec![], event_tx)
+        .await;
+
+    assert!(result.is_ok());
+    // The persisted messages must NOT contain any Multimodal with Image parts
+    assert!(
+        !messages.iter().any(|m| {
+            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+        }),
+        "persisted messages must not contain image continuation parts"
+    );
 }
