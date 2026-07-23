@@ -122,13 +122,14 @@ impl Agent {
             all_parts.extend(parts);
         }
 
-        Ok((
-            results
-                .into_iter()
-                .map(|r| r.expect("all results should be populated"))
-                .collect(),
-            all_parts,
-        ))
+        let final_results: Vec<ToolExecutionResult> = results
+            .into_iter()
+            .map(|r| r.expect("all results should be populated"))
+            .collect();
+        let (final_results, all_parts) =
+            Self::enforce_read_image_batch_limit(final_results, all_parts, calls);
+
+        Ok((final_results, all_parts))
     }
     pub(crate) fn tool_call_event(
         &self,
@@ -334,7 +335,43 @@ impl Agent {
             results.push(observed.result);
         }
 
-        Ok((results, all_parts))
+        Ok(Self::enforce_read_image_batch_limit(
+            results,
+            all_parts,
+            &[],
+        ))
+    }
+
+    fn enforce_read_image_batch_limit(
+        results: Vec<ToolExecutionResult>,
+        mut parts: Vec<ContentPart>,
+        _calls: &[ToolCall],
+    ) -> (Vec<ToolExecutionResult>, Vec<ContentPart>) {
+        let image_count = parts
+            .iter()
+            .filter(|p| matches!(p, ContentPart::Image { .. }))
+            .count();
+        if image_count <= 1 {
+            return (results, parts);
+        }
+        // ADR-051 MVP: at most one image artifact per tool batch.
+        // Keep the first image part; drop subsequent ones. Tool result
+        // summaries remain unchanged — only the provider continuation
+        // is limited.
+        let mut kept = false;
+        parts.retain(|p| {
+            if matches!(p, ContentPart::Image { .. }) {
+                if kept {
+                    false
+                } else {
+                    kept = true;
+                    true
+                }
+            } else {
+                true
+            }
+        });
+        (results, parts)
     }
 
     async fn execute_single_tool_with_presentation(
@@ -460,6 +497,16 @@ impl Agent {
         if let Err(e) = registry.validate_input(&call.name, &call.input) {
             return Ok((
                 ToolExecutionResult::error(format!("invalid input for {e}")),
+                Vec::new(),
+            ));
+        }
+
+        if call.name == "read_image" && !self.image_input_supported {
+            return Ok((
+                ToolExecutionResult::error(
+                    "read_image is not available for the current model; image input is not supported."
+                        .to_string(),
+                ),
                 Vec::new(),
             ));
         }

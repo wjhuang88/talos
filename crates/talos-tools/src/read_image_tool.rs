@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use talos_core::message::ContentPart;
 use talos_core::tool::{
-    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature, ToolResult,
+    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
+    ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
 
@@ -67,14 +68,15 @@ impl AgentTool for ReadImageTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        let parsed: ReadImageInput = match serde_json::from_value(input) {
+        let _parsed: ReadImageInput = match serde_json::from_value(input) {
             Ok(p) => p,
             Err(e) => return ToolResult::error(format!("Invalid input: {e}")),
         };
-        ToolResult::error(format!(
-            "read_image requires authorized execution. Path: {}",
-            parsed.path
-        ))
+        ToolResult::error(
+            "read_image requires authorized execution; the path was not read. \
+             Use the tool through a permission-aware execution path."
+                .to_string(),
+        )
     }
 
     async fn execute_authorized_with_output(
@@ -98,10 +100,9 @@ impl AgentTool for ReadImageTool {
         ) {
             Ok(p) => p,
             Err(FileToolError::PathEscape(_)) => {
-                return ToolExecutionOutput::error(format!(
-                    "Permission denied: path '{}' is outside the workspace and no matching authorization was provided.",
-                    parsed.path
-                ));
+                return ToolExecutionOutput::error(
+                    "Permission denied: path is outside the workspace and no matching authorization was provided.".to_string(),
+                );
             }
             Err(e) => {
                 return ToolExecutionOutput::error(format!("Path resolution failed: {e}"));
@@ -151,6 +152,16 @@ impl AgentTool for ReadImageTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["path"]
     }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        match input.get("path").and_then(Value::as_str) {
+            Some(path) => vec![
+                ToolPermissionFacet::with_resource(ToolNature::Read, path, ToolResourceKind::Path)
+                    .with_description("image read"),
+            ],
+            None => vec![ToolPermissionFacet::new(ToolNature::Read)],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +179,8 @@ mod tests {
         let result = tool.execute(serde_json::json!({"path": "test.png"})).await;
         assert!(result.is_error);
         assert!(result.content.contains("requires authorized execution"));
+        // Path must NOT appear in the error message
+        assert!(!result.content.contains("test.png"));
     }
 
     #[tokio::test]
@@ -219,6 +232,8 @@ mod tests {
 
         assert!(output.result.is_error);
         assert!(output.result.content.contains("Permission denied"));
+        // Raw path must NOT appear in the error message
+        assert!(!output.result.content.contains("/etc/passwd"));
         assert!(output.next_provider_parts.is_empty());
     }
 
@@ -257,6 +272,25 @@ mod tests {
         assert_eq!(tool.nature(), ToolNature::Read);
         assert_eq!(tool.family(), ToolFamily::File);
         assert_eq!(tool.summary_fields(), &["path"]);
+    }
+
+    #[test]
+    fn permission_profile_returns_path_facet() {
+        let tool = ReadImageTool::new(workspace_root());
+        let profile = tool.permission_profile(&serde_json::json!({"path": "img.png"}));
+        assert_eq!(profile.len(), 1);
+        assert_eq!(profile[0].nature, ToolNature::Read);
+        assert_eq!(profile[0].resource.as_deref(), Some("img.png"));
+        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Path));
+    }
+
+    #[test]
+    fn permission_profile_without_path_returns_bare_read_facet() {
+        let tool = ReadImageTool::new(workspace_root());
+        let profile = tool.permission_profile(&serde_json::json!({}));
+        assert_eq!(profile.len(), 1);
+        assert_eq!(profile[0].nature, ToolNature::Read);
+        assert!(profile[0].resource.is_none());
     }
 
     #[tokio::test]

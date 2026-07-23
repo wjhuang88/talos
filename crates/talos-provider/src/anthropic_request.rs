@@ -177,6 +177,12 @@ pub(crate) fn build_request_body(
         })
         .collect();
 
+    // ADR-051: Anthropic requires consecutive user-role messages to be
+    // coalesced into a single message with a combined content array.
+    // This is necessary when a tool_result (role: user) is immediately
+    // followed by a Multimodal continuation overlay (role: user).
+    let anthropic_messages = coalesce_consecutive_user_messages(anthropic_messages);
+
     let mut body = json!({
         "model": model,
         "messages": anthropic_messages,
@@ -334,6 +340,49 @@ pub(crate) fn redact_secret(secret: &str) -> String {
         .rev()
         .collect();
     format!("{prefix}...{suffix}")
+}
+
+fn coalesce_consecutive_user_messages(messages: Vec<Value>) -> Vec<Value> {
+    let mut result: Vec<Value> = Vec::with_capacity(messages.len());
+    let mut iter = messages.into_iter().peekable();
+    while let Some(mut msg) = iter.next() {
+        if msg.get("role").and_then(Value::as_str) != Some("user") {
+            result.push(msg);
+            continue;
+        }
+        while let Some(next) =
+            iter.next_if(|v| v.get("role").and_then(Value::as_str) == Some("user"))
+        {
+            let merged = merge_user_content(
+                msg.get("content").cloned().unwrap_or(Value::Null),
+                next.get("content").cloned().unwrap_or(Value::Null),
+            );
+            msg["content"] = merged;
+        }
+        result.push(msg);
+    }
+    result
+}
+
+fn merge_user_content(a: Value, b: Value) -> Value {
+    let mut blocks = Vec::new();
+    flatten_content_into(&a, &mut blocks);
+    flatten_content_into(&b, &mut blocks);
+    Value::Array(blocks)
+}
+
+fn flatten_content_into(content: &Value, blocks: &mut Vec<Value>) {
+    match content {
+        Value::String(s) => {
+            if !s.is_empty() {
+                blocks.push(json!({"type": "text", "text": s}));
+            }
+        }
+        Value::Array(arr) => {
+            blocks.extend(arr.iter().cloned());
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -669,5 +718,60 @@ mod tests {
         assert_eq!(content[1]["source"]["type"], "base64");
         assert_eq!(content[1]["source"]["media_type"], "image/png");
         assert!(!content[1]["source"]["data"].as_str().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tool_result_then_multimodal_coalesces_into_single_user_message() {
+        use talos_core::message::{ContentDigest, ContentPart, MessageToolResult};
+
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("shot.png");
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&img_path, &png_header).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "read_image".into(),
+                    input: serde_json::json!({"path": "shot.png"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "[Image read: `shot.png` (8 bytes, image/png)]".into(),
+                    is_error: false,
+                },
+            },
+            Message::Multimodal {
+                parts: vec![ContentPart::Image {
+                    path: canonical,
+                    mime: "image/png".into(),
+                    byte_count: 8,
+                    content_digest: ContentDigest::default(),
+                }],
+            },
+        ];
+
+        let body = build_request_body("claude-sonnet-4-5-20250514", &messages, &[], None, None);
+        let msgs = body["messages"].as_array().unwrap();
+
+        // Assistant message + 1 coalesced user message (tool_result + image merged)
+        assert_eq!(msgs.len(), 2, "tool_result + multimodal must coalesce");
+        assert_eq!(msgs[1]["role"], "user");
+
+        let content = msgs[1]["content"].as_array().unwrap();
+        assert_eq!(
+            content.len(),
+            2,
+            "merged content must have tool_result + image"
+        );
+        assert_eq!(content[0]["type"], "tool_result");
+        assert_eq!(content[0]["tool_use_id"], "call_1");
+        assert_eq!(content[1]["type"], "image");
     }
 }
