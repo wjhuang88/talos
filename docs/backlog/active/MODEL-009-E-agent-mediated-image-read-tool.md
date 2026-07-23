@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-E |
 | Type | Product / Tool / Security Story |
 | Priority | P2 |
-| Status | Ready — I154 P2 activation accepted (2026-07-22); P3 implementation not started |
+| Status | Active — P3 implementation in progress (2026-07-23); commits `6d4677e`–`bacf292` pushed; all automated gates green |
 | Source | Maintainer requirement, 2026-07-21 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-C safe image ingestion; MODEL-009-D attachment capability gate and provider pipeline; SEC-001; ADR-050; ADR-051 |

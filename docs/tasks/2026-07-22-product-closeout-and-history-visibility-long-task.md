@@ -267,30 +267,34 @@ not permission to change unrelated scopes.
     capability gate, path sanitization in error messages.
   - `9ecca94` — NO-GO rework B3: 3 agent continuation integration tests (one-shot, consumed,
     not-persisted).
+  - `bc38112` — R1/R2: atomic quota rejects 2nd read_image before execution; 3-call one-shot
+    test + batch-limit test.
+  - `13bc157` — R3: OpenAI continuation fixture + 4 permission chain tests (auto-allow, deny,
+    path mismatch, headless Ask).
+  - `1749333` — R4: ADR-051 Implementation Facts + site capabilities docs (EN + zh-CN).
+  - `06b25f4` — T1/T2: TUI Ask→approve test + attach_image/read authorization isolation tests +
+    ingestion regression tests (text file, FIFO).
+  - `bacf292` — T3: provider failure continuation consumed test + safe summary persistence test.
 - Step E: Provider adapter wire mapping — existing `Message::Multimodal` handling in both
   adapters covers the continuation overlay. Anthropic coalescing added in B2 rework.
 - Changed owner artifacts: I154 iteration doc (execution record appended, status → Active);
   iterations README (I154 row → Active); README EN/zh-CN (read_image tool documented);
-  this long-task owner (P3 checkpoint updated with rework evidence).
+  BOARD.md (I154 → Active); MODEL-009-E story (→ Active); ADR-051 (Implementation Facts);
+  site capabilities.html EN+zh-CN (read_image); this long-task owner (P3 checkpoint updated).
 - Commands and exit results:
   - `cargo fmt --all` → clean.
   - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
   - `cargo test --workspace --locked` → exit 0, 0 failures across all suites.
   - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
   - `git diff --check` → exit 0.
-- Acceptance evidence / remaining human gate: All 7 NO-GO blockers addressed:
-  B1: `permission_profile()` returns `ToolPermissionFacet` with path + `ToolResourceKind::Path`.
-  B2: Anthropic `coalesce_consecutive_user_messages()` merges tool_result + image into one user content array.
-  B3: 3 integration tests prove one-shot, consumed, and not-persisted behavior using `CapturingMockModel`.
-  B4: `enforce_read_image_batch_limit` truncates to max 1 image artifact per tool batch.
-  B5: `execute_single_tool_with_presentation` rejects `read_image` when `!image_input_supported` (execution boundary).
-  B6: `execute()` and `PathEscape` error messages sanitized — raw path never appears in error text.
-  B7: README EN/zh-CN updated; I154 evidence recorded; ADR-051 implementation facts noted.
-  Total: 9 `ReadImageTool` unit tests + 3 agent continuation integration tests + 1 Anthropic coalescing fixture = 13 new tests.
+- Acceptance evidence / remaining human gate: All initial P3 steps (A-F) + all 7 NO-GO blockers
+  (B1-B7) + all 4 rework items (R1-R4) + all 5 second-rework items (T1-T5 docs) addressed.
+  Test totals: 13 ReadImageTool unit tests + 6 agent integration tests + 1 Anthropic coalescing
+  fixture + 1 OpenAI continuation fixture + 5 permission chain tests = 26 new tests.
   The I152/I153 live Anthropic-compatible provider check remains a separate human gate.
-- Open risks or deviations: TUI history/export/copy/provenance assertions are not yet implemented as
-  dedicated tests. The OpenAI wire fixture is not yet a dedicated test (existing multimodal tests cover
-  the wire path). These may be required by the maintainer before I154 → Review.
+- Open risks or deviations: TUI history/export/copy/resume/provenance safe field assertions
+  (T4) are not yet implemented as dedicated tests. These may be required by the maintainer
+  before I154 → Review.
 - Next task item: P4 — TUI-034/I155 long-output display. **Must not start without maintainer instruction.**
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the P4 task
   description in this file and `docs/iterations/I154-agent-mediated-image-read-tool.md`.
