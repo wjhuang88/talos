@@ -403,15 +403,115 @@ mod tests {
         let fifo_path = dir.path().join("pipe.png");
         #[cfg(unix)]
         {
-            use std::os::unix::fs::FileTypeExt;
-            std::os::unix::fs::symlink("/dev/null", dir.path().join("pipe.png")).ok();
+            std::process::Command::new("mkfifo")
+                .arg(&fifo_path)
+                .status()
+                .expect("mkfifo failed");
+            assert!(fifo_path.exists(), "FIFO fixture must exist");
+            let tool = ReadImageTool::new(dir.path().to_path_buf());
+            let auth = vec![
+                ToolExecutionAuthorization::for_path(
+                    "read_image",
+                    ToolNature::Read,
+                    dir.path(),
+                    "pipe.png",
+                    ToolAuthorizationScope::Once,
+                )
+                .unwrap(),
+            ];
+            let output = tool
+                .execute_authorized_with_output(
+                    serde_json::json!({"path": fifo_path.to_string_lossy()}),
+                    &auth,
+                )
+                .await;
+            assert!(output.result.is_error, "FIFO must be rejected");
+            assert!(output.next_provider_parts.is_empty());
         }
+        #[cfg(not(unix))]
+        {
+            let _ = fifo_path;
+        }
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_symlink_retarget() {
+        let dir = tempfile::tempdir().unwrap();
+        let real_png = dir.path().join("real.png");
+        std::fs::write(&real_png, MINIMAL_PNG).unwrap();
+        let link = dir.path().join("link.png");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&real_png, &link).unwrap();
+
         let tool = ReadImageTool::new(dir.path().to_path_buf());
-        let output = tool
-            .execute_authorized_with_output(serde_json::json!({"path": "pipe.png"}), &[])
+        let auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read_image",
+                ToolNature::Read,
+                dir.path(),
+                "link.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(&link).unwrap();
+            std::os::unix::fs::symlink(dir.path().join("not_a_file.txt"), &link).unwrap();
+            let output = tool
+                .execute_authorized_with_output(
+                    serde_json::json!({"path": link.to_string_lossy()}),
+                    &auth,
+                )
+                .await;
+            assert!(output.result.is_error, "symlink retarget must be rejected");
+            assert!(output.next_provider_parts.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_replaced_file_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read_image",
+                ToolNature::Read,
+                dir.path(),
+                "test.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+
+        let output1 = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": img_path.to_string_lossy()}),
+                &auth,
+            )
             .await;
-        assert!(output.result.is_error);
-        assert!(output.next_provider_parts.is_empty());
+        assert!(
+            !output1.result.is_error,
+            "first read should succeed: {}",
+            output1.result.content
+        );
+
+        std::fs::write(&img_path, b"replaced with text").unwrap();
+        let output2 = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": img_path.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+        assert!(
+            output2.result.is_error,
+            "replaced non-image content must be rejected"
+        );
+        assert!(output2.next_provider_parts.is_empty());
     }
 
     /// Minimal valid 1×1 white PNG (67 bytes).

@@ -1634,14 +1634,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn read_image_ask_then_approve_executes_via_tui_handler() {
-        let dir = tempfile::tempdir().unwrap();
-        let img_path = dir.path().join("test.png");
+    async fn read_image_ask_then_approve_external_path_executes_via_tui_handler() {
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let img_path = external.path().join("external.png");
         std::fs::write(&img_path, MINIMAL_PNG).unwrap();
         let canonical = img_path.canonicalize().unwrap();
 
         let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
-        let handler = Arc::new(TuiApprovalHandler::new(ui_tx, dir.path().to_path_buf()));
+        let handler = Arc::new(TuiApprovalHandler::new(
+            ui_tx,
+            workspace.path().to_path_buf(),
+        ));
         {
             let engine = handler.shared_engine();
             let mut guard = engine.lock().expect("engine lock");
@@ -1652,7 +1656,7 @@ mod tests {
                 .unwrap();
         }
         let wrapped = TuiPermissionAwareTool {
-            inner: Arc::new(ReadImageTool::new(dir.path().to_path_buf())),
+            inner: Arc::new(ReadImageTool::new(workspace.path().to_path_buf())),
             approval: handler,
         };
 
@@ -1671,13 +1675,35 @@ mod tests {
         let _ = approve_task.await;
         assert!(
             !output.result.is_error,
-            "approved read_image should succeed: {}",
+            "approved external-path read_image should succeed: {}",
             output.result.content
         );
         assert_eq!(
             output.next_provider_parts.len(),
             1,
             "should produce 1 image content part"
+        );
+    }
+
+    #[test]
+    fn read_image_not_in_presented_tools_by_default() {
+        let registry = build_print_tool_registry(Vec::new());
+        assert!(
+            registry.get("read_image").is_some(),
+            "read_image must be registered"
+        );
+    }
+
+    #[test]
+    fn read_tool_still_registered_alongside_read_image() {
+        let registry = build_print_tool_registry(Vec::new());
+        assert!(
+            registry.get("read").is_some(),
+            "text read tool must still be registered"
+        );
+        assert!(
+            registry.get("read_image").is_some(),
+            "read_image must be registered alongside read"
         );
     }
 
