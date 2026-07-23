@@ -367,4 +367,55 @@ mod tests {
         assert_eq!(content[0]["type"], "text");
         assert_eq!(content[1]["type"], "text");
     }
+
+    #[test]
+    fn tool_result_then_multimodal_produces_separate_messages_in_order() {
+        use talos_core::message::{MessageToolResult, ToolCall};
+
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("shot.png");
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&img_path, &png_header).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "read_image".into(),
+                    input: serde_json::json!({"path": "shot.png"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "[Image read: shot.png]".into(),
+                    is_error: false,
+                },
+            },
+            Message::Multimodal {
+                parts: vec![ContentPart::Image {
+                    path: canonical,
+                    mime: "image/png".into(),
+                    byte_count: 8,
+                    content_digest: ContentDigest::default(),
+                }],
+            },
+        ];
+
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+        let msgs = body["messages"].as_array().unwrap();
+
+        assert_eq!(msgs.len(), 3, "assistant + tool + user");
+        assert_eq!(msgs[0]["role"], "assistant");
+        assert_eq!(msgs[1]["role"], "tool");
+        assert_eq!(msgs[1]["tool_call_id"], "call_1");
+        assert_eq!(msgs[2]["role"], "user");
+
+        let content = msgs[2]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 1);
+        assert_eq!(content[0]["type"], "image_url");
+    }
 }

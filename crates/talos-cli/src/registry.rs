@@ -1507,4 +1507,146 @@ mod tests {
             result.content
         );
     }
+
+    #[tokio::test]
+    async fn read_image_auto_allowed_for_read_nature() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let engine = PermissionEngine::with_workspace_root(dir.path().to_path_buf());
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: Arc::new(ReadImageTool::new(dir.path().to_path_buf())),
+            approval,
+            print_mode: true,
+        };
+
+        let auth = vec![
+            talos_core::tool::ToolExecutionAuthorization::for_path(
+                "read_image",
+                talos_core::tool::ToolNature::Read,
+                dir.path(),
+                "test.png",
+                talos_core::tool::ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+
+        let output = wrapped
+            .execute_authorized_with_output(
+                serde_json::json!({"path": canonical.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+    }
+
+    #[tokio::test]
+    async fn read_image_denied_by_nature_rule() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": { "Deny": "read_image blocked by test" },
+                    "nature": "Read"
+                }]
+            }))
+            .unwrap();
+
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: Arc::new(ReadImageTool::new(PathBuf::from("."))),
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({"path": "test.png"}))
+            .await;
+        assert!(result.is_error);
+        assert!(result.content.contains("read_image blocked"));
+        assert!(!result.content.contains("test.png"));
+    }
+
+    #[tokio::test]
+    async fn read_image_path_mismatch_rejected_in_authorized_execution() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_a = dir.path().join("a.png");
+        std::fs::write(&img_a, &[0x89, 0x50, 0x4E, 0x47]).unwrap();
+        let img_b = dir.path().join("b.png");
+        std::fs::write(&img_b, &[0x89, 0x50, 0x4E, 0x47]).unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let auth = vec![
+            talos_core::tool::ToolExecutionAuthorization::for_path(
+                "read_image",
+                talos_core::tool::ToolNature::Read,
+                dir.path(),
+                "a.png",
+                talos_core::tool::ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+
+        let output = tool
+            .execute_authorized_with_output(serde_json::json!({"path": "b.png"}), &auth)
+            .await;
+
+        assert!(output.result.is_error, "path mismatch must be rejected");
+        assert!(output.next_provider_parts.is_empty());
+        assert!(
+            !output.result.content.contains("b.png"),
+            "rejected path must not appear in error text"
+        );
+    }
+
+    #[tokio::test]
+    async fn read_image_ask_in_print_mode_auto_denies() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": "Ask",
+                    "nature": "Read"
+                }]
+            }))
+            .unwrap();
+
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: Arc::new(ReadImageTool::new(PathBuf::from("."))),
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({"path": "test.png"}))
+            .await;
+        assert!(result.is_error);
+        assert!(
+            result.content.to_lowercase().contains("unavailable")
+                || result.content.to_lowercase().contains("print mode"),
+            "Ask in print mode should auto-deny: {}",
+            result.content
+        );
+    }
+
+    const MINIMAL_PNG: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
+        0x00, 0x00, 0x00, 0x0d, // IHDR length
+        0x49, 0x48, 0x44, 0x52, // "IHDR"
+        0x00, 0x00, 0x00, 0x01, // width=1
+        0x00, 0x00, 0x00, 0x01, // height=1
+        0x08, 0x02, 0x00, 0x00, 0x00, // bitdepth=8, colortype=RGB
+        0x90, 0x77, 0x53, 0xde, // CRC
+        0x00, 0x00, 0x00, 0x0c, // IDAT length
+        0x49, 0x44, 0x41, 0x54, // "IDAT"
+        0x78, 0x9c, 0x63, 0xf8, 0xff, 0xff, 0x3f, 0x00, 0x05, 0xfe, 0x02, 0xfe, 0xa3, 0x35, 0x81,
+        0x84, // compressed data + CRC
+        0x00, 0x00, 0x00, 0x00, // IEND length
+        0x49, 0x45, 0x4e, 0x44, // "IEND"
+        0xae, 0x42, 0x60, 0x82, // IEND CRC
+    ];
 }
