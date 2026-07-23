@@ -48,6 +48,7 @@ impl Agent {
 
         let mut results: Vec<Option<ToolExecutionResult>> = vec![None; calls.len()];
         let mut all_parts: Vec<ContentPart> = Vec::new();
+        let read_image_quota = std::sync::atomic::AtomicUsize::new(0);
 
         let read_only_indices: Vec<usize> = calls
             .iter()
@@ -84,6 +85,7 @@ impl Agent {
                     let sem = semaphore.clone();
                     let agent = self;
                     let ctx = hook_ctx.clone();
+                    let quota = &read_image_quota;
                     async move {
                         let _permit = sem.acquire().await.expect("semaphore closed");
                         let result = agent
@@ -93,6 +95,7 @@ impl Agent {
                                 call,
                                 policy,
                                 presented_tool_names,
+                                quota,
                             )
                             .await;
                         (idx, result)
@@ -116,20 +119,20 @@ impl Agent {
                     call,
                     policy,
                     presented_tool_names,
+                    &read_image_quota,
                 )
                 .await?;
             results[idx] = Some(result);
             all_parts.extend(parts);
         }
 
-        let final_results: Vec<ToolExecutionResult> = results
-            .into_iter()
-            .map(|r| r.expect("all results should be populated"))
-            .collect();
-        let (final_results, all_parts) =
-            Self::enforce_read_image_batch_limit(final_results, all_parts, calls);
-
-        Ok((final_results, all_parts))
+        Ok((
+            results
+                .into_iter()
+                .map(|r| r.expect("all results should be populated"))
+                .collect(),
+            all_parts,
+        ))
     }
     pub(crate) fn tool_call_event(
         &self,
@@ -250,6 +253,7 @@ impl Agent {
 
         let mut results = Vec::with_capacity(deduped.len());
         let mut all_parts: Vec<ContentPart> = Vec::new();
+        let read_image_quota = std::sync::atomic::AtomicUsize::new(0);
         for pending in deduped {
             let _ = event_tx.send(self.tool_call_event(&pending.call, &pending.provenance));
 
@@ -260,6 +264,7 @@ impl Agent {
                     &pending.call,
                     policy,
                     presented_tool_names,
+                    &read_image_quota,
                 )
                 .await?;
             all_parts.extend(parts);
@@ -335,43 +340,7 @@ impl Agent {
             results.push(observed.result);
         }
 
-        Ok(Self::enforce_read_image_batch_limit(
-            results,
-            all_parts,
-            &[],
-        ))
-    }
-
-    fn enforce_read_image_batch_limit(
-        results: Vec<ToolExecutionResult>,
-        mut parts: Vec<ContentPart>,
-        _calls: &[ToolCall],
-    ) -> (Vec<ToolExecutionResult>, Vec<ContentPart>) {
-        let image_count = parts
-            .iter()
-            .filter(|p| matches!(p, ContentPart::Image { .. }))
-            .count();
-        if image_count <= 1 {
-            return (results, parts);
-        }
-        // ADR-051 MVP: at most one image artifact per tool batch.
-        // Keep the first image part; drop subsequent ones. Tool result
-        // summaries remain unchanged — only the provider continuation
-        // is limited.
-        let mut kept = false;
-        parts.retain(|p| {
-            if matches!(p, ContentPart::Image { .. }) {
-                if kept {
-                    false
-                } else {
-                    kept = true;
-                    true
-                }
-            } else {
-                true
-            }
-        });
-        (results, parts)
+        Ok((results, all_parts))
     }
 
     async fn execute_single_tool_with_presentation(
@@ -381,6 +350,7 @@ impl Agent {
         call: &ToolCall,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
+        read_image_quota: &std::sync::atomic::AtomicUsize,
     ) -> AgentResult<(ToolExecutionResult, Vec<ContentPart>)> {
         let original_call = call.clone();
         let projected_call = self.project_tool_call(call);
@@ -509,6 +479,20 @@ impl Agent {
                 ),
                 Vec::new(),
             ));
+        }
+
+        if call.name == "read_image" {
+            let prev = read_image_quota.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if prev > 0 {
+                return Ok((
+                    ToolExecutionResult::error(
+                        "Only one image can be read per tool batch; \
+                         a previous read_image already produced an image artifact."
+                            .to_string(),
+                    ),
+                    Vec::new(),
+                ));
+            }
         }
 
         let normalized_input = crate::helpers::normalize_tool_input(&call.name, call.input.clone());

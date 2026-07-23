@@ -3660,10 +3660,100 @@ async fn continuation_image_appears_once_in_next_provider_request() {
 
 #[tokio::test]
 async fn continuation_image_consumed_after_second_call() {
+    let read_tool_call = vec![
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_read".into(),
+                name: "read".into(),
+                input: serde_json::json!({"path": "file.txt"}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: Usage::default(),
+        },
+    ];
+
     let (model, captured) = CapturingMockModel::new(vec![
         image_continuation_events(),
-        text_done_events("described"),
+        read_tool_call,
+        text_done_events("done"),
     ]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "read".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("file content"),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let result = agent
+        .run_streaming("read the image then the file".into(), vec![], event_tx)
+        .await;
+    assert!(result.is_ok());
+
+    let calls = captured.lock().await;
+    assert_eq!(calls.len(), 3, "exactly 3 provider calls");
+
+    assert!(
+        !calls[0]
+            .iter()
+            .any(|m| matches!(m, Message::Multimodal { .. })),
+        "first call must not have image"
+    );
+    assert!(
+        calls[1].iter().any(|m| matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))),
+        "second call must have image (one-shot)"
+    );
+    assert!(
+        !calls[2].iter().any(|m| matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))),
+        "third call must NOT have image (consumed)"
+    );
+}
+
+#[tokio::test]
+async fn batch_limit_rejects_second_read_image_before_execution() {
+    let two_read_image_events = vec![
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_1".into(),
+                name: "read_image".into(),
+                input: serde_json::json!({"path": "a.png"}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec!["path".into()],
+        },
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_2".into(),
+                name: "read_image".into(),
+                input: serde_json::json!({"path": "b.png"}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec!["path".into()],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: Usage::default(),
+        },
+    ];
+
+    let (model, captured) =
+        CapturingMockModel::new(vec![two_read_image_events, text_done_events("done")]);
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(TestReadImageTool));
     let mut agent = Agent::with_security_and_hooks(
@@ -3677,24 +3767,35 @@ async fn continuation_image_consumed_after_second_call() {
     agent.set_image_input_supported(true);
 
     let (event_tx, _event_rx) = mpsc::unbounded_channel();
-    let _ = agent
-        .run_streaming("read the image".into(), vec![], event_tx)
+    let result = agent
+        .run_streaming("read both images".into(), vec![], event_tx)
         .await;
+    assert!(result.is_ok());
 
     let calls = captured.lock().await;
     if calls.len() >= 2 {
         let second = &calls[1];
-        let has_image = second.iter().any(|m| {
-            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
-        });
-        assert!(has_image, "second call must have the image (one-shot)");
-    }
-    if calls.len() >= 3 {
-        let third = &calls[2];
-        let has_image = third.iter().any(|m| {
-            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
-        });
-        assert!(!has_image, "third call must NOT have the image (consumed)");
+        let image_msgs: Vec<_> = second
+            .iter()
+            .filter(|m| matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. }))))
+            .collect();
+        assert_eq!(image_msgs.len(), 1, "only 1 image in second call");
+
+        let tool_results: Vec<_> = second
+            .iter()
+            .filter_map(|m| match m {
+                Message::Tool { result } => Some(result.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(tool_results.len(), 2, "2 tool results");
+        assert!(!tool_results[0].is_error, "first read_image succeeds");
+        assert!(tool_results[1].is_error, "second read_image rejected");
+        assert!(
+            tool_results[1].content.contains("Only one image"),
+            "second result must explain batch limit: {}",
+            tool_results[1].content
+        );
     }
 }
 
