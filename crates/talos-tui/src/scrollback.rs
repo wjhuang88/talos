@@ -1574,4 +1574,50 @@ mod r10_tests {
             "error result must not leak any path component: {content}"
         );
     }
+
+    /// I154: The tool provenance for a read_image result is preserved
+    /// as MessageSource::Tool with the tool_use_id. This feeds
+    /// scrollback rendering, export, and copy paths.
+    #[test]
+    fn read_image_tool_result_preserves_tool_provenance() {
+        let msg = Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "call_read_img".into(),
+                content: "[Image read: `shot.png` (512 bytes, image/png)]".into(),
+                is_error: false,
+            },
+        };
+        let (source, _) = history_message_parts(&msg).expect("must render");
+        match source {
+            MessageSource::Tool { name } => {
+                assert_eq!(name, "call_read_img", "tool_use_id must be preserved");
+            }
+            _ => panic!("source must be MessageSource::Tool"),
+        }
+    }
+
+    /// I154: The export path uses the same history_message_parts output.
+    /// This test verifies the content string produced for a read_image
+    /// tool result is safe to write to an export file — no raw path,
+    /// no data URL, no base64.
+    #[test]
+    fn read_image_tool_result_export_content_is_safe() {
+        let msg = Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "call_x".into(),
+                content: "[Image read: `diagram.png` (4096 bytes, image/png); attached to next provider request]".into(),
+                is_error: false,
+            },
+        };
+        let (_, content) = history_message_parts(&msg).expect("must render");
+        assert!(content.contains("diagram.png"), "basename present");
+        assert!(content.contains("image/png"), "MIME present");
+        assert!(content.contains("4096"), "byte count present");
+        assert!(!content.contains("data:"), "no data URL");
+        assert!(!content.contains("base64"), "no base64");
+        assert!(
+            !content.contains("/Users/") && !content.contains("/tmp/"),
+            "no raw path: {content}"
+        );
+    }
 }
