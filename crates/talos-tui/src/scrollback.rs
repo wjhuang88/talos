@@ -1518,4 +1518,60 @@ mod r10_tests {
         let msg = Message::Multimodal { parts: vec![] };
         assert!(history_message_parts(&msg).is_none());
     }
+
+    /// I154: A read_image tool result renders only the safe summary
+    /// (basename, MIME, byte count) — no raw path, data URL, or base64.
+    #[test]
+    fn read_image_tool_result_renders_safe_summary() {
+        let msg = Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "call_1".into(),
+                content: "[Image read: `screenshot.png` (1024 bytes, image/png); attached to next provider request]".into(),
+                is_error: false,
+            },
+        };
+        let (source, content) = history_message_parts(&msg).expect("tool result must render");
+        assert!(
+            matches!(source, MessageSource::Tool { .. }),
+            "source must be Tool"
+        );
+        assert!(
+            content.contains("screenshot.png"),
+            "must contain basename: {content}"
+        );
+        assert!(
+            content.contains("image/png"),
+            "must contain MIME: {content}"
+        );
+        assert!(
+            content.contains("1024"),
+            "must contain byte count: {content}"
+        );
+        assert!(
+            !content.contains("data:"),
+            "must not contain data URL: {content}"
+        );
+        assert!(
+            !content.contains("base64"),
+            "must not contain base64: {content}"
+        );
+    }
+
+    /// I154: A read_image tool result marked as error renders the
+    /// error text without leaking the raw input path.
+    #[test]
+    fn read_image_error_result_does_not_leak_path() {
+        let msg = Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "call_2".into(),
+                content: "Permission denied: path is outside the workspace and no matching authorization was provided.".into(),
+                is_error: true,
+            },
+        };
+        let (_, content) = history_message_parts(&msg).expect("error tool result must render");
+        assert!(
+            !content.contains("/"),
+            "error result must not leak any path component: {content}"
+        );
+    }
 }
