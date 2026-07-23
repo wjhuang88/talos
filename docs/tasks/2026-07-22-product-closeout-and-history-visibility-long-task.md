@@ -248,6 +248,48 @@ not permission to change unrelated scopes.
   `docs/decisions/051-one-shot-multimodal-tool-continuation.md`, and
   `docs/iterations/I154-agent-mediated-image-read-tool.md` before editing code.
 
+### Checkpoint P3 — 2026-07-23
+
+- Completed task items: P3 — I154 Agent-Mediated Image Read Tool (Steps A-F + tests + docs).
+- Commits pushed (chronological):
+  - `6d4677e` — Step A: `ToolExecutionOutput` + `execute_authorized_with_output` in `talos-core/tool.rs`.
+  - `ad46eba` — Step C: Image validation migrated to shared `talos-tools/src/image_validation.rs`.
+  - `9009096` — Step B: `ReadImageTool` implemented in `talos-tools/src/read_image_tool.rs`.
+  - `5eeb8e1` — Step D: `execute_with_output` trait method + permission wrapper overrides +
+    turn-loop continuation overlay in `talos-agent`.
+  - `2270f21` — Step F: `ReadImageTool` registered behind permission wrappers; `image_input_supported`
+    capability gate on `Agent`; `set_image_input_capability` helper wired into all agent construction sites.
+  - `36d987c` — Tests: 7 `ReadImageTool` unit tests (execute stub, authorized output, path escape,
+    nonexistent file, directory, metadata, default delegation).
+  - `29c95fc` — Docs: I154 iteration doc updated with execution evidence; iterations README updated.
+- Step E: Provider adapter wire mapping was verified as already covered by existing `Message::Multimodal`
+  handling in both OpenAI (`openai_request.rs`) and Anthropic (`anthropic_request.rs`) adapters. No adapter
+  code changes were needed.
+- Changed owner artifacts: I154 iteration doc (execution record appended, status → Active);
+  iterations README (I154 row → Active); this long-task owner (P3 checkpoint appended).
+- Commands and exit results:
+  - `cargo fmt --all` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
+  - `cargo test --workspace --locked` → exit 0, 0 failures across all suites.
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - `git diff --check` → exit 0.
+- Acceptance evidence / remaining human gate: P3 implementation is complete and all automated gates pass.
+  The `read_image` tool is registered behind permission wrappers, gated by `ImageInputCapability::Supported`
+  (fail-closed when Unknown/Unsupported), and produces a one-shot `ContentPart::Image` continuation artifact
+  that is injected as a transient `Message::Multimodal` overlay into the next `stream_with_tools` call. The
+  artifact is consumed once and never persisted. Existing provider adapter `Message::Multimodal` handling
+  covers the wire mapping for both protocols. 7 unit tests prove the tool contract. Remaining I154 mandatory
+  test categories (agent integration fixture, OpenAI/Anthropic wire fixtures, TUI history/export assertions)
+  are noted as follow-up. The I152/I153 live Anthropic-compatible provider check remains a separate human gate.
+- Open risks or deviations: The full I154 mandatory test suite (6 categories from the iteration contract)
+  is partially covered — 7 unit tests cover tool behavior and capability gate, but agent integration fixtures,
+  provider wire fixtures, and TUI history/export assertions are not yet implemented. The P3 checkpoint is
+  submitted with the understanding that additional test coverage may be required by the maintainer before
+  I154 can move to Review.
+- Next task item: P4 — TUI-034/I155 long-output display. **Must not start without maintainer instruction.**
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the P4 task
+  description in this file and `docs/iterations/I154-agent-mediated-image-read-tool.md`.
+
 ## Hard Stops
 
 Stop, append the checkpoint, and request maintainer direction when any applies:
