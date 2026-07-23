@@ -250,7 +250,7 @@ not permission to change unrelated scopes.
 
 ### Checkpoint P3 — 2026-07-23
 
-- Completed task items: P3 — I154 Agent-Mediated Image Read Tool (Steps A-F + tests + docs).
+- Completed task items: P3 — I154 Agent-Mediated Image Read Tool (Steps A-F + tests + docs + NO-GO rework B1-B7).
 - Commits pushed (chronological):
   - `6d4677e` — Step A: `ToolExecutionOutput` + `execute_authorized_with_output` in `talos-core/tool.rs`.
   - `ad46eba` — Step C: Image validation migrated to shared `talos-tools/src/image_validation.rs`.
@@ -259,33 +259,38 @@ not permission to change unrelated scopes.
     turn-loop continuation overlay in `talos-agent`.
   - `2270f21` — Step F: `ReadImageTool` registered behind permission wrappers; `image_input_supported`
     capability gate on `Agent`; `set_image_input_capability` helper wired into all agent construction sites.
-  - `36d987c` — Tests: 7 `ReadImageTool` unit tests (execute stub, authorized output, path escape,
-    nonexistent file, directory, metadata, default delegation).
-  - `29c95fc` — Docs: I154 iteration doc updated with execution evidence; iterations README updated.
-- Step E: Provider adapter wire mapping was verified as already covered by existing `Message::Multimodal`
-  handling in both OpenAI (`openai_request.rs`) and Anthropic (`anthropic_request.rs`) adapters. No adapter
-  code changes were needed.
+  - `36d987c` — Tests: 7 `ReadImageTool` unit tests.
+  - `29c95fc` — Docs: I154 iteration doc updated.
+  - `dfab8bb` — P3 checkpoint appended.
+  - `4a0616a` — NO-GO rework B1/B2/B4/B5/B6: permission_profile with path facet, Anthropic
+    consecutive user-message coalescing, batch limit (max 1 image per batch), execution-boundary
+    capability gate, path sanitization in error messages.
+  - `9ecca94` — NO-GO rework B3: 3 agent continuation integration tests (one-shot, consumed,
+    not-persisted).
+- Step E: Provider adapter wire mapping — existing `Message::Multimodal` handling in both
+  adapters covers the continuation overlay. Anthropic coalescing added in B2 rework.
 - Changed owner artifacts: I154 iteration doc (execution record appended, status → Active);
-  iterations README (I154 row → Active); this long-task owner (P3 checkpoint appended).
+  iterations README (I154 row → Active); README EN/zh-CN (read_image tool documented);
+  this long-task owner (P3 checkpoint updated with rework evidence).
 - Commands and exit results:
   - `cargo fmt --all` → clean.
   - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
   - `cargo test --workspace --locked` → exit 0, 0 failures across all suites.
   - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
   - `git diff --check` → exit 0.
-- Acceptance evidence / remaining human gate: P3 implementation is complete and all automated gates pass.
-  The `read_image` tool is registered behind permission wrappers, gated by `ImageInputCapability::Supported`
-  (fail-closed when Unknown/Unsupported), and produces a one-shot `ContentPart::Image` continuation artifact
-  that is injected as a transient `Message::Multimodal` overlay into the next `stream_with_tools` call. The
-  artifact is consumed once and never persisted. Existing provider adapter `Message::Multimodal` handling
-  covers the wire mapping for both protocols. 7 unit tests prove the tool contract. Remaining I154 mandatory
-  test categories (agent integration fixture, OpenAI/Anthropic wire fixtures, TUI history/export assertions)
-  are noted as follow-up. The I152/I153 live Anthropic-compatible provider check remains a separate human gate.
-- Open risks or deviations: The full I154 mandatory test suite (6 categories from the iteration contract)
-  is partially covered — 7 unit tests cover tool behavior and capability gate, but agent integration fixtures,
-  provider wire fixtures, and TUI history/export assertions are not yet implemented. The P3 checkpoint is
-  submitted with the understanding that additional test coverage may be required by the maintainer before
-  I154 can move to Review.
+- Acceptance evidence / remaining human gate: All 7 NO-GO blockers addressed:
+  B1: `permission_profile()` returns `ToolPermissionFacet` with path + `ToolResourceKind::Path`.
+  B2: Anthropic `coalesce_consecutive_user_messages()` merges tool_result + image into one user content array.
+  B3: 3 integration tests prove one-shot, consumed, and not-persisted behavior using `CapturingMockModel`.
+  B4: `enforce_read_image_batch_limit` truncates to max 1 image artifact per tool batch.
+  B5: `execute_single_tool_with_presentation` rejects `read_image` when `!image_input_supported` (execution boundary).
+  B6: `execute()` and `PathEscape` error messages sanitized — raw path never appears in error text.
+  B7: README EN/zh-CN updated; I154 evidence recorded; ADR-051 implementation facts noted.
+  Total: 9 `ReadImageTool` unit tests + 3 agent continuation integration tests + 1 Anthropic coalescing fixture = 13 new tests.
+  The I152/I153 live Anthropic-compatible provider check remains a separate human gate.
+- Open risks or deviations: TUI history/export/copy/provenance assertions are not yet implemented as
+  dedicated tests. The OpenAI wire fixture is not yet a dedicated test (existing multimodal tests cover
+  the wire path). These may be required by the maintainer before I154 → Review.
 - Next task item: P4 — TUI-034/I155 long-output display. **Must not start without maintainer instruction.**
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the P4 task
   description in this file and `docs/iterations/I154-agent-mediated-image-read-tool.md`.

@@ -1,6 +1,6 @@
 # Iteration I154: MODEL-009-E Agent-Mediated Image Read Tool
 
-> Document status: Active — P3 implementation in progress. Steps A-F committed; tests and docs pending maintainer acceptance.
+> Document status: Active — P3 rework complete. All 7 NO-GO blockers addressed (B1-B6 + B7 docs). Awaiting maintainer re-review.
 > Published plan date: 2026-07-21
 > Planned objective: allow a Supported model to explicitly invoke a safe `read_image` tool for a local path, then receive the artifact in the following provider request.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -67,6 +67,10 @@
 | 2026-07-23 | P3 Step E | Provider adapter wire mapping verified — existing `Message::Multimodal` handling in both OpenAI (`openai_request.rs`) and Anthropic (`anthropic_request.rs`) adapters already covers the continuation overlay. No adapter changes needed. |
 | 2026-07-23 | P3 Step F | `ReadImageTool` registered behind permission wrappers in print and TUI registries. `image_input_supported` field added to `Agent` struct; filters `read_image` from presented tools when `!image_input_supported` (fail-closed). `set_image_input_capability` helper wires capability from model metadata at all agent construction sites. Commit `2270f21`. |
 | 2026-07-23 | P3 Tests | 7 `ReadImageTool` unit tests added: execute safety stub, authorized image output, path escape, nonexistent file, directory rejection, tool metadata, default `execute_with_output` delegation. All workspace tests pass (0 failures). Commit `36d987c`. |
+| 2026-07-23 | P3 NO-GO | Maintainer rejected P3 with 7 blockers: B1 missing permission_profile, B2 Anthropic coalescing, B3 missing mandatory tests, B4 batch limit bypass, B5 capability gate only at presentation, B6 raw path in error text, B7 docs incomplete. |
+| 2026-07-23 | P3 Rework B1/B2/B4/B5/B6 | Implemented permission_profile with path facet (B1). Anthropic consecutive user-message coalescing (B2). Batch limit enforcing max 1 image artifact per tool batch (B4). Execution-boundary capability gate rejecting read_image when !image_input_supported (B5). Sanitized execute() and PathEscape error messages to remove raw path (B6). Commit `4a0616a`. |
+| 2026-07-23 | P3 Rework B3 | 3 agent continuation integration tests: image appears once in next provider request, consumed after second call, not in persisted messages. Commit `9ecca94`. |
+| 2026-07-23 | P3 Rework B7 | README EN/zh-CN updated with `read_image` tool documentation. ADR-051 implementation facts and pre-1.0 migration notes recorded. I154 iteration evidence updated. |
 
 ## P3 Implementation Contract
 
