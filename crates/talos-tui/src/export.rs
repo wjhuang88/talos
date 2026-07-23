@@ -157,4 +157,27 @@ mod tests {
         let read_back = std::fs::read_to_string(&path).expect("read back");
         assert_eq!(read_back, content);
     }
+
+    /// I154 H3: Export a transcript containing a read_image tool result
+    /// safe summary. Verify the exported file contains only basename,
+    /// MIME, and byte count — no raw path, data URL, or base64.
+    #[test]
+    fn export_transcript_with_read_image_summary_is_safe() {
+        let engine = engine_allowing_write();
+        let (_dir, path) = temp_path("read_image_export.md");
+        let content = "[Image read: `screenshot.png` (4096 bytes, image/png); attached to next provider request]";
+
+        export_transcript(&engine, &path, content).expect("export ok");
+
+        let read_back = std::fs::read_to_string(&path).expect("read back");
+        assert!(read_back.contains("screenshot.png"), "basename present");
+        assert!(read_back.contains("image/png"), "MIME present");
+        assert!(read_back.contains("4096"), "byte count present");
+        assert!(!read_back.contains("data:"), "no data URL in export");
+        assert!(!read_back.contains("base64"), "no base64 in export");
+        assert!(
+            !read_back.contains("/Users/") && !read_back.contains("/tmp/"),
+            "no raw path in export: {read_back}"
+        );
+    }
 }

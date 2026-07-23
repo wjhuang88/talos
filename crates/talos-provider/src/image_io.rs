@@ -274,4 +274,48 @@ mod tests {
             ImageRead::Omit => panic!("zero sentinel must skip digest verification"),
         }
     }
+
+    /// I154 H1: Simulates the full read_image → ContentPart → provider
+    /// guard flow. Creates a valid PNG, computes its digest (as
+    /// `image_validation::create_image_content_part` does), builds a
+    /// ContentPart::Image with that path+digest, replaces the file at
+    /// the same canonical path with a DIFFERENT valid PNG, then calls
+    /// `read_image_with_toctou_guard` with the ContentPart's stored
+    /// path and digest. Asserts `ImageRead::Omit`.
+    #[test]
+    fn read_image_content_part_replaced_file_rejected_by_guard() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("grant.png");
+        write_real_png(&path);
+        let canonical = path.canonicalize().unwrap();
+        let grant_digest = digest_of(&canonical);
+
+        let content_part = talos_core::message::ContentPart::Image {
+            path: canonical.clone(),
+            mime: "image/png".to_string(),
+            byte_count: std::fs::metadata(&canonical).unwrap().len(),
+            content_digest: grant_digest,
+        };
+
+        let replacement = dir.path().join("replaced.png");
+        let other = image::RgbaImage::new(16, 16);
+        other
+            .save_with_format(&replacement, image::ImageFormat::Png)
+            .unwrap();
+        std::fs::rename(&replacement, &canonical).unwrap();
+
+        match &content_part {
+            talos_core::message::ContentPart::Image {
+                path: stored_path,
+                content_digest,
+                ..
+            } => match read_image_with_toctou_guard(stored_path, content_digest) {
+                ImageRead::Omit => {}
+                ImageRead::Bytes(_) => {
+                    panic!("guard must reject replaced file via digest mismatch")
+                }
+            },
+            _ => panic!("expected Image content part"),
+        }
+    }
 }

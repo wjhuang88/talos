@@ -207,8 +207,26 @@ impl Agent {
     }
 
     /// Sets image input capability on an existing agent (ADR-051 / I154).
+    /// Rebuilds `presented_tool_names` and `tool_definitions` to reflect
+    /// the new capability state.
     pub fn set_image_input_supported(&mut self, supported: bool) {
         self.image_input_supported = supported;
+        let (descs, defs, names) =
+            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
+        let descs: Vec<_> = descs
+            .into_iter()
+            .filter(|d| supported || d.name != "read_image")
+            .collect();
+        self.tool_definitions = defs
+            .into_iter()
+            .filter(|td| supported || td.name != "read_image")
+            .collect();
+        self.presented_tool_names = names
+            .into_iter()
+            .filter(|n| supported || n != "read_image")
+            .collect();
+        self.enforce_tool_presentation_policy = true;
+        self.update_prompt_builder(true, |builder| builder.with_tools(descs));
     }
 
     /// Sets the tool descriptions for the system prompt builder.

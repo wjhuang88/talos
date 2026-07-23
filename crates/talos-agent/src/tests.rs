@@ -3993,6 +3993,93 @@ async fn continuation_not_resent_in_separate_turn_messages() {
     );
 }
 
+/// H2: Real cancellation test. A model that returns read_image tool
+/// call on 1st call, immediately closes the channel on 2nd call
+/// (simulating cancellation), then returns text on 3rd call. Verifies
+/// the 3rd call has no image.
+struct CancellationMockModel {
+    responses: Vec<Vec<AgentEvent>>,
+    call: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    captured: std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+}
+
+impl CancellationMockModel {
+    fn new(
+        responses: Vec<Vec<AgentEvent>>,
+    ) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<Vec<Message>>>>) {
+        let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let model = Self {
+            responses,
+            call: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            captured: captured.clone(),
+        };
+        (model, captured)
+    }
+}
+
+#[async_trait]
+impl LanguageModel for CancellationMockModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let n = self.call.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        {
+            let mut guard = self.captured.lock().unwrap();
+            guard.push(messages.to_vec());
+        }
+        let (tx, rx) = mpsc::channel(64);
+        if n < self.responses.len() {
+            let events = self.responses[n].clone();
+            tokio::spawn(async move {
+                for event in events {
+                    let _ = tx.send(event).await;
+                }
+            });
+        }
+        Ok(rx)
+    }
+}
+
+#[tokio::test]
+async fn continuation_not_resent_after_stream_interruption() {
+    let empty: Vec<AgentEvent> = vec![];
+    let (model, captured) = CancellationMockModel::new(vec![
+        image_continuation_events(),
+        empty,
+        text_done_events("follow up answer"),
+    ]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (tx1, _rx1) = mpsc::unbounded_channel();
+    let _ = agent
+        .run_streaming("read the image".into(), vec![], tx1)
+        .await;
+
+    let (tx2, _rx2) = mpsc::unbounded_channel();
+    let result2 = agent.run_streaming("follow up".into(), vec![], tx2).await;
+
+    assert!(result2.is_ok(), "second turn should complete");
+    let calls = captured.lock().unwrap();
+    assert!(calls.len() >= 3, "at least 3 provider calls");
+    if calls.len() >= 3 {
+        let third = &calls[2];
+        assert!(
+            !third.iter().any(|m| {
+                matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+            }),
+            "third call (after interruption) must NOT have image"
+        );
+    }
+}
+
 /// G4: read_image is excluded from presented tools when
 /// !image_input_supported, and included when image_input_supported.
 /// The text `read` tool is always presented regardless.
@@ -4045,14 +4132,25 @@ async fn capability_gate_hides_read_image_when_unsupported() {
     );
 
     agent.set_image_input_supported(true);
-    let (_, defs2, _) =
-        crate::describe_presented_tools(&agent.tools, &ToolPresentationPolicy::full());
     assert!(
-        defs2.iter().any(|d| d.name == "read_image"),
-        "read_image must be in describe_presented_tools after capability enabled"
+        agent.presented_tool_names.contains("read_image"),
+        "after set_image_input_supported(true), read_image must be in presented_tool_names"
     );
     assert!(
-        defs2.iter().any(|d| d.name == "read"),
-        "text read must still be in describe_presented_tools"
+        agent
+            .tool_definitions
+            .iter()
+            .any(|td| td.name == "read_image"),
+        "after set_image_input_supported(true), read_image must be in tool_definitions"
     );
+    assert!(
+        agent.presented_tool_names.contains("read"),
+        "text read must remain in presented_tool_names after capability change"
+    );
+    let read_def: Vec<_> = agent
+        .tool_definitions
+        .iter()
+        .filter(|td| td.name == "read")
+        .collect();
+    assert_eq!(read_def.len(), 1, "exactly one read tool definition");
 }
