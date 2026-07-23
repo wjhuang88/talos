@@ -1,6 +1,6 @@
 # Iteration I154: MODEL-009-E Agent-Mediated Image Read Tool
 
-> Document status: Ready — P2 activation evidence and ADR-051 were accepted on 2026-07-22. Implementation remains unstarted until dispatched as P3.
+> Document status: Active — P3 implementation in progress. Steps A-F committed; tests and docs pending maintainer acceptance.
 > Published plan date: 2026-07-21
 > Planned objective: allow a Supported model to explicitly invoke a safe `read_image` tool for a local path, then receive the artifact in the following provider request.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -60,6 +60,13 @@
 |---|---|---|
 | 2026-07-21 | Planning | Created from maintainer request. No implementation was authorized by this plan alone; I154 remained Planned. |
 | 2026-07-22 | P2 activation | Code prerequisites were inventoried against current `main`. Existing tool authorization can bind `read_image` to its exact canonical path; existing provider adapters already perform final canonical-path/digest revalidation. ADR-051 closes the missing continuation contract without changing code. I152/I153 remain Review for the unavailable maintainer-owned live Anthropic check; that external check is not an I154 code prerequisite and cannot be claimed complete. I154 is Ready for a separately dispatched P3 implementation phase. |
+| 2026-07-23 | P3 Step A | `ToolExecutionOutput` struct + `execute_authorized_with_output` method added to `AgentTool` trait in `talos-core/tool.rs`. Permission wrappers in `registry.rs` updated to forward. Commit `6d4677e`. |
+| 2026-07-23 | P3 Step C | Image validation migrated from `talos-cli` to shared `talos-tools/src/image_validation.rs` module. `talos-cli` re-exports from `talos-tools`. Commit `ad46eba`. |
+| 2026-07-23 | P3 Step B | `ReadImageTool` implemented in `talos-tools/src/read_image_tool.rs`: `read_image` tool, `ToolNature::Read`, `ToolFamily::File`, overrides `execute_authorized_with_output` to return safe summary + `ContentPart::Image` in `next_provider_parts`. Commit `9009096`. |
+| 2026-07-23 | P3 Step D | `execute_with_output` method added to `AgentTool` trait (default delegates to `execute`). Overridden in `TuiPermissionAwareTool` and `PermissionAwareTool` to return full `ToolExecutionOutput`. `execute_single_tool_with_presentation` changed to call `execute_with_output` and return `(ToolExecutionResult, Vec<ContentPart>)`. Batch functions collect continuation parts. Turn loop in `lib.rs` injects parts as transient `Message::Multimodal` overlay before next `stream_with_tools` call; consumed once, never persisted. Commit `5eeb8e1`. |
+| 2026-07-23 | P3 Step E | Provider adapter wire mapping verified — existing `Message::Multimodal` handling in both OpenAI (`openai_request.rs`) and Anthropic (`anthropic_request.rs`) adapters already covers the continuation overlay. No adapter changes needed. |
+| 2026-07-23 | P3 Step F | `ReadImageTool` registered behind permission wrappers in print and TUI registries. `image_input_supported` field added to `Agent` struct; filters `read_image` from presented tools when `!image_input_supported` (fail-closed). `set_image_input_capability` helper wires capability from model metadata at all agent construction sites. Commit `2270f21`. |
+| 2026-07-23 | P3 Tests | 7 `ReadImageTool` unit tests added: execute safety stub, authorized image output, path escape, nonexistent file, directory rejection, tool metadata, default `execute_with_output` delegation. All workspace tests pass (0 failures). Commit `36d987c`. |
 
 ## P3 Implementation Contract
 
