@@ -139,3 +139,18 @@ silently broadening I154.
 - ADR-047: External-Path Tool Authorization
 - ADR-050: Multimodal Image Input Architecture And Security Boundary
 - MODEL-009-E / I154
+
+## Implementation Facts
+
+Implemented 2026-07-23 across commits `6d4677e`–`13bc157`. All automated gates pass.
+
+| Decision point | Implementation | Evidence |
+| --- | --- | --- |
+| 1. Additive `ToolExecutionOutput` + `execute_authorized_with_output` + `execute_with_output` | `talos-core/src/tool.rs`: `ToolExecutionOutput` struct with `result` + `next_provider_parts`; trait methods with default impls preserving source compatibility. Both `PermissionAwareTool` and `TuiPermissionAwareTool` override `execute_with_output` to perform the same approval flow and return the full output. | Commit `6d4677e`, `5eeb8e1` |
+| 2. `read_image` is a separately authorized file tool | `talos-tools/src/read_image_tool.rs`: name `read_image`, `ToolNature::Read`, `ToolFamily::File`, `permission_profile` returns `ToolPermissionFacet::with_resource(Read, path, Path)`. `execute()` is a safety stub that returns an error without reading the file. `execute_authorized_with_output` calls `resolve_authorized_path` for exact-path authorization. | Commit `9009096`, `4a0616a` |
+| 3. Shared ingestion moved to `talos-tools` | `talos-tools/src/image_validation.rs`: shared module with `create_image_content_part`. `talos-cli` re-exports it. Provider-side `image_io::read_image_with_toctou_guard` remains in `talos-provider` with no `talos-tools` dependency. | Commit `ad46eba` |
+| 4. One-shot overlay | `talos-agent/src/lib.rs`: `pending_continuation_parts` collected from tool execution, injected as `Message::Multimodal` via `std::mem::take` before `stream_with_tools`. Never persisted. `execute_single_tool_with_presentation` calls `execute_with_output` instead of `execute`. Batch limit: `AtomicUsize` quota rejects 2nd `read_image` before execution. | Commit `5eeb8e1`, `bc38112` |
+| 5. Protocol ordering | OpenAI: tool result (`tool` role) then multimodal (`user` role) as separate messages — fixture test proves order. Anthropic: `coalesce_consecutive_user_messages` merges consecutive user messages into one content array — fixture test proves coalescing. | Commit `4a0616a`, `13bc157` |
+| Capability gate | `Agent.image_input_supported` field; filtered from `presented_tool_names` and `tool_definitions` at construction and in `run_inner`. Execution-boundary check in `execute_single_tool_with_presentation` rejects `read_image` when `!image_input_supported`. `set_image_input_capability` helper wires from model metadata at all construction sites. | Commit `2270f21`, `4a0616a` |
+| Path sanitization | `execute()` and `PathEscape` error messages contain no raw path. Tests assert path non-disclosure. | Commit `4a0616a` |
+| Tests | 9 tool unit tests + 4 agent integration tests + 1 Anthropic coalescing fixture + 1 OpenAI continuation fixture + 4 permission chain tests = 19 new tests. | Commits `36d987c`, `9ecca94`, `4a0616a`, `13bc157` |
