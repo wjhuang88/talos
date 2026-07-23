@@ -739,6 +739,18 @@ pub trait AgentTool: Send + Sync {
         ToolExecutionOutput::from_result(self.execute_authorized(input, authorizations).await)
     }
 
+    /// Executes the tool and returns an output that may carry a
+    /// provider-neutral continuation artifact (ADR-051).
+    ///
+    /// The default implementation delegates to [`execute`] and returns
+    /// no continuation parts. Permission wrappers override this to
+    /// perform the same approval flow as [`execute`] and return the
+    /// full [`ToolExecutionOutput`] including any continuation parts
+    /// produced by the inner tool's [`execute_authorized_with_output`].
+    async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
+        ToolExecutionOutput::from_result(self.execute(input).await)
+    }
+
     /// Returns the observer-safe form of a tool input.
     ///
     /// Execution and permission evaluation always receive the original input.

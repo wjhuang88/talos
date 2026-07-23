@@ -12,8 +12,8 @@ use serde_json::Value;
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
-    AgentTool, ToolAuthorizationScope, ToolBackend, ToolExecutionAuthorization, ToolFamily,
-    ToolPermissionFacet, ToolRegistry, ToolResult,
+    AgentTool, ToolAuthorizationScope, ToolBackend, ToolExecutionAuthorization,
+    ToolExecutionOutput, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
@@ -307,6 +307,71 @@ impl AgentTool for TuiPermissionAwareTool {
         }
     }
 
+    async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
+        let tool_name = self.inner.name().to_owned();
+        let summary_fields = self
+            .inner
+            .summary_fields()
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect();
+        let profile = self.inner.permission_profile(&input);
+        let choice = self
+            .approval
+            .request_approval(
+                &tool_name,
+                &profile,
+                &input,
+                &self.inner.project_input(&input),
+                summary_fields,
+            )
+            .await;
+
+        match choice {
+            ApprovalChoice::ApproveOnce => {
+                let authorizations = match self.approval.execution_authorizations(
+                    &tool_name,
+                    &profile,
+                    &input,
+                    ToolAuthorizationScope::Once,
+                ) {
+                    Ok(authorizations) => authorizations,
+                    Err(error) => {
+                        return ToolExecutionOutput::error(format!(
+                            "Permission denied: invalid execution authorization: {error}"
+                        ));
+                    }
+                };
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+            }
+            ApprovalChoice::AlwaysApprove => {
+                self.approval
+                    .add_always_allow_rules(&tool_name, &profile, &input);
+                let authorizations = match self.approval.execution_authorizations(
+                    &tool_name,
+                    &profile,
+                    &input,
+                    ToolAuthorizationScope::Persisted,
+                ) {
+                    Ok(authorizations) => authorizations,
+                    Err(error) => {
+                        return ToolExecutionOutput::error(format!(
+                            "Permission denied: invalid execution authorization: {error}"
+                        ));
+                    }
+                };
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+            }
+            ApprovalChoice::Deny => {
+                ToolExecutionOutput::error("Permission denied: User denied".to_string())
+            }
+        }
+    }
+
     fn is_read_only(&self) -> bool {
         self.inner.is_read_only()
     }
@@ -441,6 +506,74 @@ impl AgentTool for PermissionAwareTool {
             }
             PermissionDecision::Deny(reason) => {
                 ToolResult::error(format!("Permission denied: {reason}"))
+            }
+            PermissionDecision::Ask => {
+                unreachable!(
+                    "Ask decision should have been resolved by prompt or print-mode default"
+                )
+            }
+        }
+    }
+
+    async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
+        let tool_name = self.inner.name().to_owned();
+        let profile = self.inner.permission_profile(&input);
+        let decision = {
+            let mut approval = self.approval.lock().expect("approval lock poisoned");
+            let engine_decision = approval
+                .engine()
+                .evaluate_profile(&tool_name, &profile, &input);
+
+            match engine_decision {
+                PermissionDecision::Allow => PermissionDecision::Allow,
+                PermissionDecision::Deny(reason) => PermissionDecision::Deny(reason),
+                PermissionDecision::Ask => {
+                    if self.print_mode {
+                        PermissionDecision::Deny(
+                            "Print mode: interactive approval unavailable".to_string(),
+                        )
+                    } else {
+                        let presentation_input = self.inner.project_input(&input);
+                        match approval.prompt_profile(&tool_name, &profile, &presentation_input) {
+                            Ok(decision) => decision,
+                            Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
+                        }
+                    }
+                }
+            }
+        };
+
+        match decision {
+            PermissionDecision::Allow => {
+                let authorizations = {
+                    let approval = match self.approval.lock() {
+                        Ok(approval) => approval,
+                        Err(_) => {
+                            return ToolExecutionOutput::error(
+                                "Permission denied: approval lock poisoned",
+                            );
+                        }
+                    };
+                    match approval.engine().execution_authorizations(
+                        &tool_name,
+                        &profile,
+                        &input,
+                        ToolAuthorizationScope::Persisted,
+                    ) {
+                        Ok(authorizations) => authorizations,
+                        Err(error) => {
+                            return ToolExecutionOutput::error(format!(
+                                "Permission denied: invalid execution authorization: {error}"
+                            ));
+                        }
+                    }
+                };
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+            }
+            PermissionDecision::Deny(reason) => {
+                ToolExecutionOutput::error(format!("Permission denied: {reason}"))
             }
             PermissionDecision::Ask => {
                 unreachable!(

@@ -444,6 +444,12 @@ impl Agent {
         let (_, mut active_tool_definitions, mut active_presented_tool_names) =
             describe_presented_tools(&self.tools, &active_tool_presentation_policy);
 
+        // Transient continuation parts collected from tool execution (ADR-051).
+        // Consumed once by the next stream_with_tools call as a
+        // Message::Multimodal overlay; never persisted. If the provider
+        // call fails or the turn ends, the parts are discarded.
+        let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
+
         if let Err(error) = self
             .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
             .await
@@ -500,6 +506,18 @@ impl Agent {
                     })
                     .collect::<Vec<_>>();
                 filtered_provider_messages.as_slice()
+            };
+
+            let continuation_overlay: Vec<Message>;
+            let provider_messages = if pending_continuation_parts.is_empty() {
+                provider_messages
+            } else {
+                let mut msgs = provider_messages.to_vec();
+                msgs.push(Message::Multimodal {
+                    parts: std::mem::take(&mut pending_continuation_parts),
+                });
+                continuation_overlay = msgs;
+                continuation_overlay.as_slice()
             };
 
             let mut rx = match self
@@ -824,13 +842,16 @@ impl Agent {
                     )
                     .await
                 {
-                    Ok(results) => results,
+                    Ok((results, parts)) => {
+                        pending_continuation_parts.extend(parts);
+                        results
+                    }
                     Err(error) => {
                         break 'turn_loop (Err(error), TurnStatus::Denied);
                     }
                 }
             } else {
-                let tool_results = match self
+                let (tool_results, parts) = match self
                     .execute_tools_with_presentation(
                         &hook_ctx,
                         &effective_tool_calls,
@@ -839,11 +860,12 @@ impl Agent {
                     )
                     .await
                 {
-                    Ok(results) => results,
+                    Ok((results, parts)) => (results, parts),
                     Err(error) => {
                         break 'turn_loop (Err(error), TurnStatus::Denied);
                     }
                 };
+                pending_continuation_parts.extend(parts);
 
                 for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
                     let projected_call = self.project_tool_call(call);

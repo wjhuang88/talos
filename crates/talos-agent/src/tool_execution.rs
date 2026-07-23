@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use futures_util::future::join_all;
-use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall};
+use talos_core::message::{
+    AgentEvent, ContentPart, Message, MessageToolResult, StopReason, ToolCall,
+};
 use talos_core::tool::{
     ToolPresentationPolicy, ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult,
 };
@@ -30,9 +32,9 @@ impl Agent {
         calls: &[ToolCall],
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
-    ) -> AgentResult<Vec<ToolExecutionResult>> {
+    ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
         if calls.is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), Vec::new()));
         }
 
         let mut seen: std::collections::HashSet<(String, String)> =
@@ -45,6 +47,7 @@ impl Agent {
         let calls: &[ToolCall] = &deduped;
 
         let mut results: Vec<Option<ToolExecutionResult>> = vec![None; calls.len()];
+        let mut all_parts: Vec<ContentPart> = Vec::new();
 
         let read_only_indices: Vec<usize> = calls
             .iter()
@@ -98,13 +101,15 @@ impl Agent {
                 .collect();
 
             for (idx, result) in join_all(futures).await {
-                results[idx] = Some(result?);
+                let (result, parts) = result?;
+                results[idx] = Some(result);
+                all_parts.extend(parts);
             }
         }
 
         for idx in write_indices {
             let call = &calls[idx];
-            let result = self
+            let (result, parts) = self
                 .execute_single_tool_with_presentation(
                     hook_ctx,
                     &self.tools,
@@ -114,12 +119,16 @@ impl Agent {
                 )
                 .await?;
             results[idx] = Some(result);
+            all_parts.extend(parts);
         }
 
-        Ok(results
-            .into_iter()
-            .map(|r| r.expect("all results should be populated"))
-            .collect())
+        Ok((
+            results
+                .into_iter()
+                .map(|r| r.expect("all results should be populated"))
+                .collect(),
+            all_parts,
+        ))
     }
     pub(crate) fn tool_call_event(
         &self,
@@ -227,7 +236,7 @@ impl Agent {
         messages: &mut Vec<Message>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
-    ) -> AgentResult<Vec<ToolExecutionResult>> {
+    ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
         let mut seen: std::collections::HashSet<(String, String)> =
             std::collections::HashSet::new();
         let deduped: Vec<PendingToolCall> = calls
@@ -239,10 +248,11 @@ impl Agent {
             .collect();
 
         let mut results = Vec::with_capacity(deduped.len());
+        let mut all_parts: Vec<ContentPart> = Vec::new();
         for pending in deduped {
             let _ = event_tx.send(self.tool_call_event(&pending.call, &pending.provenance));
 
-            let result = self
+            let (result, parts) = self
                 .execute_single_tool_with_presentation(
                     hook_ctx,
                     &self.tools,
@@ -251,6 +261,7 @@ impl Agent {
                     presented_tool_names,
                 )
                 .await?;
+            all_parts.extend(parts);
             let projected_call = self.project_tool_call(&pending.call);
             let projected_result = self.project_tool_result(&pending.call.name, &result);
             let observation = ToolObservation {
@@ -323,7 +334,7 @@ impl Agent {
             results.push(observed.result);
         }
 
-        Ok(results)
+        Ok((results, all_parts))
     }
 
     async fn execute_single_tool_with_presentation(
@@ -333,7 +344,7 @@ impl Agent {
         call: &ToolCall,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
-    ) -> AgentResult<ToolExecutionResult> {
+    ) -> AgentResult<(ToolExecutionResult, Vec<ContentPart>)> {
         let original_call = call.clone();
         let projected_call = self.project_tool_call(call);
         let effective_call = match self
@@ -352,7 +363,9 @@ impl Agent {
                 &projected_call,
                 observed_call,
             )),
-            Ok(HookOutcome::Skip(_)) => return Ok(ToolExecutionResult::success(String::new())),
+            Ok(HookOutcome::Skip(_)) => {
+                return Ok((ToolExecutionResult::success(String::new()), Vec::new()));
+            }
             Ok(_) => Some(original_call),
             Err(error) => return Err(error),
         };
@@ -361,26 +374,32 @@ impl Agent {
         let tool = match registry.get(&call.name) {
             Some(t) => t,
             None => {
-                return Ok(ToolExecutionResult::error(format!(
-                    "tool not found: {}",
-                    call.name
-                )));
+                return Ok((
+                    ToolExecutionResult::error(format!("tool not found: {}", call.name)),
+                    Vec::new(),
+                ));
             }
         };
         if self.enforce_tool_presentation_policy && !presented_tool_names.contains(&call.name) {
-            return Ok(ToolExecutionResult::error(format!(
-                "tool family not loaded for '{}'; continue with a presented tool or request the relevant tool family",
-                call.name
-            )));
+            return Ok((
+                ToolExecutionResult::error(format!(
+                    "tool family not loaded for '{}'; continue with a presented tool or request the relevant tool family",
+                    call.name
+                )),
+                Vec::new(),
+            ));
         }
         if self.enforce_tool_presentation_policy
             && let Some(backend) = tool.backend_for_input(&call.input)
             && !policy.allows_backend(&call.name, &backend)
         {
-            return Ok(ToolExecutionResult::error(format!(
-                "tool backend '{backend}' for '{}' is not loaded; continue with a disclosed backend or retry the base tool path",
-                call.name
-            )));
+            return Ok((
+                ToolExecutionResult::error(format!(
+                    "tool backend '{backend}' for '{}' is not loaded; continue with a disclosed backend or retry the base tool path",
+                    call.name
+                )),
+                Vec::new(),
+            ));
         }
 
         if let Some(engine) = self.permission_engine.as_deref() {
@@ -425,9 +444,10 @@ impl Agent {
             match decision {
                 PermissionDecision::Allow => {}
                 PermissionDecision::Deny(reason) => {
-                    return Ok(ToolExecutionResult::error(format!(
-                        "permission denied: {reason}"
-                    )));
+                    return Ok((
+                        ToolExecutionResult::error(format!("permission denied: {reason}")),
+                        Vec::new(),
+                    ));
                 }
                 PermissionDecision::Ask => {}
             }
@@ -438,24 +458,33 @@ impl Agent {
         }
 
         if let Err(e) = registry.validate_input(&call.name, &call.input) {
-            return Ok(ToolExecutionResult::error(format!("invalid input for {e}")));
+            return Ok((
+                ToolExecutionResult::error(format!("invalid input for {e}")),
+                Vec::new(),
+            ));
         }
 
         let normalized_input = crate::helpers::normalize_tool_input(&call.name, call.input.clone());
 
-        let result = if call.name == "bash" {
+        let (result, parts) = if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
-                    self.execute_bash_in_sandbox(hook_ctx, sb, &normalized_input)
-                        .await
+                    (
+                        self.execute_bash_in_sandbox(hook_ctx, sb, &normalized_input)
+                            .await,
+                        Vec::new(),
+                    )
                 } else {
-                    tool.execute(normalized_input).await
+                    let output = tool.execute_with_output(normalized_input).await;
+                    (output.result, output.next_provider_parts)
                 }
             } else {
-                tool.execute(normalized_input).await
+                let output = tool.execute_with_output(normalized_input).await;
+                (output.result, output.next_provider_parts)
             }
         } else {
-            tool.execute(normalized_input).await
+            let output = tool.execute_with_output(normalized_input).await;
+            (output.result, output.next_provider_parts)
         };
 
         let projected_call = self.project_tool_call(&call);
@@ -487,7 +516,7 @@ impl Agent {
             Err(error) => return Err(error),
         };
 
-        Ok(result)
+        Ok((result, parts))
     }
 
     /// Executes a bash command through the sandbox provider.
