@@ -514,6 +514,79 @@ mod tests {
         assert!(output2.next_provider_parts.is_empty());
     }
 
+    /// Verifies that the ContentPart produced by ReadImageTool carries
+    /// a real (non-zero) content digest. The provider's TOCTOU guard
+    /// (talos-provider/src/image_io.rs) uses this digest to detect
+    /// same-path replacement with different valid PNG content.
+    /// See image_io tests: same_path_replacement_detected_via_digest_mismatch.
+    #[tokio::test]
+    async fn execute_authorized_produces_non_zero_content_digest() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read_image",
+                ToolNature::Read,
+                dir.path(),
+                "test.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": canonical.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+
+        assert!(!output.result.is_error);
+        let part = &output.next_provider_parts[0];
+        match part {
+            ContentPart::Image {
+                content_digest,
+                path,
+                ..
+            } => {
+                let bytes = content_digest.as_bytes();
+                assert!(
+                    bytes.iter().any(|b| *b != 0),
+                    "content digest must be a real SHA-256, not the zero sentinel"
+                );
+                let file_bytes = std::fs::read(path).unwrap();
+                use sha2::Digest;
+                let mut hasher = sha2::Sha256::new();
+                hasher.update(&file_bytes);
+                let computed: [u8; 32] = hasher.finalize().into();
+                assert_eq!(
+                    bytes, &computed,
+                    "stored digest must match the file's SHA-256"
+                );
+
+                let replacement = dir.path().join("other.png");
+                let other = image::RgbaImage::new(8, 8);
+                other
+                    .save_with_format(&replacement, image::ImageFormat::Png)
+                    .unwrap();
+                std::fs::rename(&replacement, path).unwrap();
+                let new_bytes = std::fs::read(path).unwrap();
+                let mut hasher2 = sha2::Sha256::new();
+                hasher2.update(&new_bytes);
+                let new_digest: [u8; 32] = hasher2.finalize().into();
+                assert_ne!(
+                    bytes, &new_digest,
+                    "replaced valid PNG must have a different digest — the provider TOCTOU guard will reject it"
+                );
+            }
+            _ => panic!("expected Image content part"),
+        }
+    }
+
     /// Minimal valid 1×1 white PNG (67 bytes).
     const MINIMAL_PNG: &[u8] = &[
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature

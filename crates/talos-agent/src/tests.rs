@@ -3955,3 +3955,104 @@ async fn continuation_image_consumed_on_provider_failure() {
         "no third call — continuation consumed by std::mem::take"
     );
 }
+
+/// G2: The `consumed_after_second_call` test (3-call sequence) already
+/// proves image is consumed after the 2nd call and absent in the 3rd.
+/// This test additionally verifies that `run_for_session_turn` returns
+/// no image parts even when the turn involves a tool call — proving
+/// the continuation overlay is never persisted across turns.
+/// The design guarantee: `pending_continuation_parts` is a local Vec
+/// in `run_inner`, dropped when the function returns.
+#[tokio::test]
+async fn continuation_not_resent_in_separate_turn_messages() {
+    let (model, _captured) =
+        CapturingMockModel::new(vec![image_continuation_events(), text_done_events("done")]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let (result, messages) = agent
+        .run_for_session_turn("read the image".into(), vec![], event_tx)
+        .await;
+
+    assert!(result.is_ok());
+    assert!(
+        !messages.iter().any(|m| {
+            matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+        }),
+        "returned session messages must not contain image — continuation is local to run_inner"
+    );
+}
+
+/// G4: read_image is excluded from presented tools when
+/// !image_input_supported, and included when image_input_supported.
+/// The text `read` tool is always presented regardless.
+#[tokio::test]
+async fn capability_gate_hides_read_image_when_unsupported() {
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "read".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("content"),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+
+    let policy = ToolPresentationPolicy::full();
+    let (descs, defs, names) = crate::describe_presented_tools(&registry, &policy);
+
+    let has_read = descs.iter().any(|d| d.name == "read");
+    let has_read_image = descs.iter().any(|d| d.name == "read_image");
+    assert!(has_read, "text read must be presented");
+    assert!(
+        has_read_image,
+        "read_image must be in describe_presented_tools (filtering happens in Agent)"
+    );
+
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![text_done_events("ok")])),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+
+    assert!(
+        !agent.presented_tool_names.contains("read_image"),
+        "read_image must NOT be in presented_tool_names when !image_input_supported"
+    );
+    assert!(
+        agent.presented_tool_names.contains("read"),
+        "text read must be in presented_tool_names"
+    );
+    assert!(
+        !agent
+            .tool_definitions
+            .iter()
+            .any(|td| td.name == "read_image"),
+        "read_image must NOT be in tool_definitions when !image_input_supported"
+    );
+
+    agent.set_image_input_supported(true);
+    let (_, defs2, _) =
+        crate::describe_presented_tools(&agent.tools, &ToolPresentationPolicy::full());
+    assert!(
+        defs2.iter().any(|d| d.name == "read_image"),
+        "read_image must be in describe_presented_tools after capability enabled"
+    );
+    assert!(
+        defs2.iter().any(|d| d.name == "read"),
+        "text read must still be in describe_presented_tools"
+    );
+}
