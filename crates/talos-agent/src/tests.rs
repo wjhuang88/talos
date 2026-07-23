@@ -3821,11 +3821,137 @@ async fn continuation_image_not_in_persisted_messages() {
         .await;
 
     assert!(result.is_ok());
-    // The persisted messages must NOT contain any Multimodal with Image parts
     assert!(
         !messages.iter().any(|m| {
             matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
         }),
         "persisted messages must not contain image continuation parts"
+    );
+}
+
+#[tokio::test]
+async fn continuation_image_safe_summary_persisted_in_tool_result() {
+    let (model, _captured) =
+        CapturingMockModel::new(vec![image_continuation_events(), text_done_events("done")]);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let (result, messages) = agent
+        .run_for_session_turn("read the image".into(), vec![], event_tx)
+        .await;
+
+    assert!(result.is_ok());
+    let tool_msg = messages.iter().find_map(|m| match m {
+        Message::Tool { result } if result.tool_use_id == "call_1" => Some(result),
+        _ => None,
+    });
+    assert!(
+        tool_msg.is_some(),
+        "persisted messages must contain the read_image tool result"
+    );
+    let content = &tool_msg.unwrap().content;
+    assert!(
+        content.contains("Image read") && content.contains("image/png"),
+        "tool result must contain safe summary: {content}"
+    );
+    assert!(
+        !content.contains("data:") && !content.contains("base64"),
+        "tool result must not contain data URL or base64: {content}"
+    );
+}
+
+struct CapturingFailModel {
+    first_events: Vec<AgentEvent>,
+    captured_messages: Arc<Mutex<Vec<Vec<Message>>>>,
+    call_count: Arc<Mutex<usize>>,
+}
+
+impl CapturingFailModel {
+    fn new(first_events: Vec<AgentEvent>) -> (Self, Arc<Mutex<Vec<Vec<Message>>>>) {
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let count = Arc::new(Mutex::new(0usize));
+        let model = Self {
+            first_events,
+            captured_messages: captured.clone(),
+            call_count: count,
+        };
+        (model, captured)
+    }
+}
+
+#[async_trait]
+impl LanguageModel for CapturingFailModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let mut count = self.call_count.lock().await;
+        *count += 1;
+        let call_num = *count;
+        drop(count);
+
+        self.captured_messages.lock().await.push(messages.to_vec());
+
+        if call_num >= 2 {
+            return Err(ProviderError::NetworkError(
+                "simulated provider failure".into(),
+            ));
+        }
+
+        let (tx, rx) = mpsc::channel(64);
+        let events = self.first_events.clone();
+        tokio::spawn(async move {
+            for event in events {
+                tx.send(event).await.expect("receiver dropped");
+            }
+        });
+        Ok(rx)
+    }
+}
+
+#[tokio::test]
+async fn continuation_image_consumed_on_provider_failure() {
+    let (model, captured) = CapturingFailModel::new(image_continuation_events());
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestReadImageTool));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+
+    let (event_tx, _event_rx) = mpsc::unbounded_channel();
+    let result = agent
+        .run_streaming("read the image".into(), vec![], event_tx)
+        .await;
+
+    assert!(result.is_err(), "provider failure should produce an error");
+
+    let calls = captured.lock().await;
+    assert_eq!(calls.len(), 2, "exactly 2 provider calls before failure");
+
+    let second = &calls[1];
+    let has_image = second.iter().any(|m| {
+        matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))
+    });
+    assert!(
+        has_image,
+        "second call must have image (injected before failure)"
+    );
+    assert_eq!(
+        calls.len(),
+        2,
+        "no third call — continuation consumed by std::mem::take"
     );
 }
