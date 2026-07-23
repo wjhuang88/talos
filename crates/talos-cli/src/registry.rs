@@ -1633,6 +1633,54 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn read_image_ask_then_approve_executes_via_tui_handler() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+        let handler = Arc::new(TuiApprovalHandler::new(ui_tx, dir.path().to_path_buf()));
+        {
+            let engine = handler.shared_engine();
+            let mut guard = engine.lock().expect("engine lock");
+            guard
+                .load_from_config(&serde_json::json!({
+                    "rules": [{"decision": "Ask", "nature": "Read"}]
+                }))
+                .unwrap();
+        }
+        let wrapped = TuiPermissionAwareTool {
+            inner: Arc::new(ReadImageTool::new(dir.path().to_path_buf())),
+            approval: handler,
+        };
+
+        let approve_task = tokio::spawn(async move {
+            if let Some(talos_conversation::UiOutput::ToolApprovalRequest { response, .. }) =
+                ui_rx.recv().await
+            {
+                let _ = response.send(ApprovalChoice::ApproveOnce);
+            }
+        });
+
+        let output = wrapped
+            .execute_with_output(serde_json::json!({"path": canonical.to_string_lossy()}))
+            .await;
+
+        let _ = approve_task.await;
+        assert!(
+            !output.result.is_error,
+            "approved read_image should succeed: {}",
+            output.result.content
+        );
+        assert_eq!(
+            output.next_provider_parts.len(),
+            1,
+            "should produce 1 image content part"
+        );
+    }
+
     const MINIMAL_PNG: &[u8] = &[
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
         0x00, 0x00, 0x00, 0x0d, // IHDR length

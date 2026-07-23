@@ -303,6 +303,117 @@ mod tests {
         assert!(output.next_provider_parts.is_empty());
     }
 
+    #[tokio::test]
+    async fn execute_authorized_rejects_text_file_with_png_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let fake_png = dir.path().join("fake.png");
+        std::fs::write(&fake_png, b"not a png file").unwrap();
+
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read_image",
+                ToolNature::Read,
+                dir.path(),
+                "fake.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": fake_png.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+
+        assert!(output.result.is_error, "non-image file must be rejected");
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_attach_image_authorization() {
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let img_path = external.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let tool = ReadImageTool::new(workspace.path().to_path_buf());
+        let attach_auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "attach_image",
+                ToolNature::Read,
+                external.path(),
+                "test.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": canonical.to_string_lossy()}),
+                &attach_auth,
+            )
+            .await;
+
+        assert!(
+            output.result.is_error,
+            "attach_image authorization must not authorize read_image"
+        );
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_read_authorization() {
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let img_path = external.path().join("test.png");
+        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        let canonical = img_path.canonicalize().unwrap();
+
+        let tool = ReadImageTool::new(workspace.path().to_path_buf());
+        let read_auth = vec![
+            ToolExecutionAuthorization::for_path(
+                "read",
+                ToolNature::Read,
+                external.path(),
+                "test.png",
+                ToolAuthorizationScope::Once,
+            )
+            .unwrap(),
+        ];
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": canonical.to_string_lossy()}),
+                &read_auth,
+            )
+            .await;
+
+        assert!(
+            output.result.is_error,
+            "read authorization must not authorize read_image"
+        );
+        assert!(output.next_provider_parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_authorized_rejects_fifo() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo_path = dir.path().join("pipe.png");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::FileTypeExt;
+            std::os::unix::fs::symlink("/dev/null", dir.path().join("pipe.png")).ok();
+        }
+        let tool = ReadImageTool::new(dir.path().to_path_buf());
+        let output = tool
+            .execute_authorized_with_output(serde_json::json!({"path": "pipe.png"}), &[])
+            .await;
+        assert!(output.result.is_error);
+        assert!(output.next_provider_parts.is_empty());
+    }
+
     /// Minimal valid 1×1 white PNG (67 bytes).
     const MINIMAL_PNG: &[u8] = &[
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
