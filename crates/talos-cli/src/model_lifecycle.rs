@@ -379,6 +379,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         hooks.clone(),
     );
     agent.set_tool_protocol(runtime_model_config.tool_protocol());
+    crate::mode_runtime::set_image_input_capability(&mut agent, &runtime_model_config);
     if let Ok(skills) =
         discover_runtime_skills(workspace_root, runtime_model_config.skills.discover_shared)
     {

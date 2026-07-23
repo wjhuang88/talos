@@ -190,6 +190,10 @@ pub struct Agent {
     /// before entering model context. Default: false.
     bash_compression_enabled: bool,
     tool_output_threshold: usize,
+    /// Whether the active model supports image input. When false, the
+    /// `read_image` tool is registered but not presented to the model
+    /// (ADR-051 / I154 capability gate).
+    image_input_supported: bool,
 }
 impl Agent {
     pub fn provider(&self) -> &dyn LanguageModel {
@@ -443,6 +447,11 @@ impl Agent {
         let mut active_tool_presentation_policy = self.tool_presentation_policy.clone();
         let (_, mut active_tool_definitions, mut active_presented_tool_names) =
             describe_presented_tools(&self.tools, &active_tool_presentation_policy);
+
+        if !self.image_input_supported {
+            active_tool_definitions.retain(|td| td.name != "read_image");
+            active_presented_tool_names.retain(|n| n != "read_image");
+        }
 
         // Transient continuation parts collected from tool execution (ADR-051).
         // Consumed once by the next stream_with_tools call as a

@@ -37,6 +37,7 @@ pub use file_tools::{
 };
 pub use git::{GitToolError, git_dirty_count};
 pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
+pub use read_image_tool::ReadImageTool;
 pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 pub use tree::TreeTool;

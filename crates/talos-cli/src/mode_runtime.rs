@@ -119,6 +119,14 @@ pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
     agent.set_memory_provider(provider);
 }
 
+pub(crate) fn set_image_input_capability(agent: &mut Agent, config: &Config) {
+    let all_models = config.all_models();
+    let meta =
+        talos_config::model::find_model_by_provider(&all_models, &config.provider, &config.model);
+    let cap = talos_core::model::ImageInputCapability::from_metadata(meta);
+    agent.set_image_input_supported(cap.allows_attachment());
+}
+
 pub(crate) fn set_todo_prompt_provider(
     agent: &mut Agent,
     session_manager: &SessionManager,

@@ -58,6 +58,7 @@ impl Agent {
             replay_reasoning: true,
             bash_compression_enabled: false,
             tool_output_threshold: 4000,
+            image_input_supported: false,
         }
     }
 
@@ -105,6 +106,22 @@ impl Agent {
         let (descriptions, tool_definitions, presented_tool_names) =
             describe_presented_tools(&tools, &tool_presentation_policy);
 
+        // read_image is registered but gated by image_input_supported;
+        // filter it from the initial presentation until a caller enables
+        // it via with_image_input_supported(true) (ADR-051 / I154).
+        let descriptions: Vec<_> = descriptions
+            .into_iter()
+            .filter(|d| d.name != "read_image")
+            .collect();
+        let tool_definitions: Vec<_> = tool_definitions
+            .into_iter()
+            .filter(|td| td.name != "read_image")
+            .collect();
+        let presented_tool_names: HashSet<_> = presented_tool_names
+            .into_iter()
+            .filter(|n| n != "read_image")
+            .collect();
+
         let prompt_builder = SystemPromptBuilder::new()
             .with_workspace_info(format!("Workspace root: {}", workspace_root.display()))
             .with_tools(descriptions.clone());
@@ -130,6 +147,7 @@ impl Agent {
             replay_reasoning: true,
             bash_compression_enabled: false,
             tool_output_threshold: 4000,
+            image_input_supported: false,
         }
     }
 
@@ -174,6 +192,23 @@ impl Agent {
     pub fn with_bash_compression(mut self, enabled: bool) -> Self {
         self.bash_compression_enabled = enabled;
         self
+    }
+
+    /// Enables or disables the `read_image` tool presentation based on the
+    /// active model's image input capability (ADR-051 / I154).
+    ///
+    /// When `true`, `read_image` is included in the tool definitions sent to
+    /// the provider. When `false` (default), the tool is registered but not
+    /// presented — model calls to it are rejected by the presentation policy.
+    #[must_use]
+    pub fn with_image_input_supported(mut self, supported: bool) -> Self {
+        self.image_input_supported = supported;
+        self
+    }
+
+    /// Sets image input capability on an existing agent (ADR-051 / I154).
+    pub fn set_image_input_supported(&mut self, supported: bool) {
+        self.image_input_supported = supported;
     }
 
     /// Sets the tool descriptions for the system prompt builder.

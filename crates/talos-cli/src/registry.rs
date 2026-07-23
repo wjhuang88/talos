@@ -29,8 +29,8 @@ use talos_tools::git::{
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
-    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
-    WebSearchTool, WriteTool, snapshot_aware_file_tools,
+    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadImageTool, ReadTool, SaveUrlTool, StatTool,
+    TreeTool, WebSearchTool, WriteTool, snapshot_aware_file_tools,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -794,6 +794,11 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadImageTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(DocumentExtractTool::new(PathBuf::from("."))),
         approval: approval.clone(),
         print_mode: true,
@@ -930,6 +935,10 @@ pub(crate) fn build_tui_tool_registry(
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(read_tool),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(ReadImageTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {

@@ -124,6 +124,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
         for capability in loaded_plugin_packages
@@ -298,6 +299,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
+    crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
         for capability in loaded_plugin_packages

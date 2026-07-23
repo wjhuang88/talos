@@ -109,6 +109,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
         for capability in loaded_plugin_packages
