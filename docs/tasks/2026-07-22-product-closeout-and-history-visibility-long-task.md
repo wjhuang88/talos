@@ -5,7 +5,7 @@
 | Task ID | `2026-07-22-product-closeout-and-history-visibility-long-task` |
 | Owner | Maintainer-dispatched frontline developer; no subagent delegation |
 | Created | 2026-07-22 |
-| Status | Planned — execution starts only when the maintainer dispatches a phase |
+| Status | Complete — all code phases received maintainer GO (2026-07-24); 3 residual human gates remain |
 | Branch | `main` only; direct commits, no feature branches |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
 | Relationship | Successor closeout package for the active 2026-07-20 provider/multimodal program; TUI-034 is a new, independent follow-on objective. |
@@ -75,7 +75,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Review — maintainer GO (2026-07-24) |
 | P4 | TUI-034 rendering refinement | Fixed-cap inventory, active-vs-legacy `ToolCallBubble` reachability evidence, chosen continuation-row representation, width/height contract, and TUI-034 changed to Ready or explicitly left Refinement | P0; must not overlap an Active I154 | Actual `Buffer`/`InlineFrame` or active-renderer spike at 80/120/160 columns; CJK/emoji/newline observations; no terminal-autowrap assumption | Keep TUI-034 Refinement and record the smallest unresolved rendering boundary | Complete — maintainer GO (2026-07-24); TUI-034 → Ready |
 | P5 | I155 adaptive history implementation | New append-only I155 baseline followed by viewport-width-aware tool history rendering; preserved TUI-015/TUI-025 behavior; updated user docs if behavior is described publicly | P4; P3 must be Complete or explicitly stopped so only one iteration is active | Active-renderer tests at 80/120/160; CJK/emoji/newline and former-120-boundary tests; TUI-015/TUI-025 regressions; two-terminal manual packet; full locked ladder | Revert only the uncommitted phase changes; leave TUI-034 Ready with refinement evidence | Complete — maintainer GO (2026-07-24); commit `616ff11` |
-| P6 | Integrated closeout and maintainer evidence packet | Owner-doc/status sync, issue-sync check, docs synchronization, residual register, and short real-terminal checklist for I145-I153/I154/I155 | P3 and P5, or explicit stop record for either | Full locked ladder, governance, diff check, clean tree after push; no unauthorized state promotion or release | Record partial completion and exact next phase in this task | Planned |
+| P6 | Integrated closeout and maintainer evidence packet | Owner-doc/status sync, issue-sync check, docs synchronization, residual register, and short real-terminal checklist for I145-I153/I154/I155 | P3 and P5, or explicit stop record for either | Full locked ladder, governance, diff check, clean tree after push; no unauthorized state promotion or release | Record partial completion and exact next phase in this task | Active |
 
 ## Technical Requirements By Implementation Phase
 
@@ -354,8 +354,42 @@ not permission to change unrelated scopes.
   satisfied. CJK wrapping verified (more rows at narrow than wide). TUI-015 head+tail preserved.
 - Open risks or deviations: Real-terminal walkthrough in Alacritty at narrow/wide sizes is a
   human gate for I155 Ready → Complete.
-- Next task item: P6 — Integrated closeout. **Must not start without maintainer instruction.**
-- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint and the P6 task description.
+- Next task item: P6 complete — see P6 checkpoint below.
+- Resume: `git switch main && git pull --ff-only origin main`; read the P6 checkpoint below.
+
+### Checkpoint P6 — 2026-07-24
+
+- Completed task items: P6 — Integrated closeout.
+  - Owner-doc/status sync: BOARD.md (I154 → Review, I155 → Complete, program row updated);
+    PRODUCT-BACKLOG.md (TUI-034 → Ready); long-task stale references updated (I154 "Active"
+    text → "implemented and received GO"; "Do not run I154" → "implemented"; maintainer packet
+    updated for I154/I155 completion).
+  - Issue-sync check: No GitHub issues mapped to TUI-034, I154, or I155.
+  - Docs synchronization: README/site already updated for `read_image` (P3). TUI-034 wrapping
+    is a rendering detail not described in user-facing docs; no update needed.
+  - Residual register:
+    1. I152/I153 live Anthropic-compatible provider check — maintainer human gate.
+    2. I154 Review → Complete — needs Alacritty walkthrough with Supported model + read_image.
+    3. I155/TUI-034 Ready → Complete — needs Alacritty walkthrough at narrow/wide widths.
+  - Maintainer real-terminal checklist (final):
+    1. I145: Complete (`1039430`). ✅
+    2. I146: Complete (`7f6972a`). ✅
+    3. I147: Complete (`1c843b2`). ✅
+    4. I148: Complete (`f89313c`). ✅
+    5. I150/I151: Complete (`b3cc943`, `17e3fef`). ✅
+    6. I152/I153: Review — live Anthropic check unavailable. ⏳
+    7. I154: Review (GO, 40 tests) — needs Alacritty walkthrough. ⏳
+    8. I155/TUI-034: Ready (GO) — needs Alacritty walkthrough at narrow/wide. ⏳
+- Commands and exit results:
+  - `cargo fmt --all` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
+  - `cargo test --workspace --locked` → exit 0, 0 failures.
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - `git diff --check` → exit 0.
+- Acceptance evidence: All 6 phases (P0-P6) complete. Code phases P1/P3/P4/P5 received
+  maintainer GO. P6 is docs-only sync. No unauthorized state promotion or release.
+- Open risks: 3 residual human gates (I152/I153, I154 walkthrough, I155 walkthrough).
+- Next task item: Long task complete. Maintainer executes real-terminal walkthroughs at discretion.
 
 ## Hard Stops
 
@@ -408,8 +442,9 @@ cite this packet only after an already-existing evidence or repair commit is nam
 | Capability and attachment | **I150/I151 Complete.** Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/send work; history shows only a safe summary; a text-only turn still works. I152 remains Review only for its live Anthropic-compatible Provider check. | I150, I151, I152 |
 | Provider mapping | With a maintainer-owned disposable configured endpoint, one accepted image produces the expected compatible request or a safe, actionable provider failure; no path/data URL/API key appears in TUI history. | I152, I153 |
 
-Do not run I154 `read_image` steps here until P3 is dispatched: I154 is Active with an accepted
-implementation contract, but it remains a distinct future implementation phase.
+I154 `read_image` has been implemented and received maintainer GO (P3 → Review, commits
+`6d4677e`–`faa5464`). I155 adaptive wrapping received maintainer GO (P5 → Complete, commit
+`616ff11`). The remaining human gates are the Alacritty real-terminal walkthroughs listed below.
 
 ## Maintainer Real-Terminal Packet (Not Delegable To Automation)
 
@@ -420,8 +455,9 @@ The final report must ask the maintainer to execute and record:
    intentionally non-executing while Enter opens the menu. I147 is Complete after maintainer
    acceptance (Completion Commit: `1c843b2`).
 3. I148 is Complete after maintainer acceptance (Completion Commit: `f89313c`).
-4. I152: a maintainer-owned live Anthropic-compatible Provider check remains. I154 is still
-   Planned/Blocked and must not be included in this terminal packet; normal pasted paths remain
-   non-readable unless a future explicit tool is authorized.
+4. I152: a maintainer-owned live Anthropic-compatible Provider check remains. I154 received
+   maintainer GO (P3 → Review, 40 tests); `read_image` is implemented and gated by capability.
+   Normal pasted paths remain non-readable unless the model explicitly calls `read_image`.
 5. I155: long `bash`/diagnostic output at narrow and wide widths in Alacritty plus a second terminal;
    inspect ASCII, CJK, emoji, and head-tail output for usable width and correct rows.
+   (P5 received maintainer GO; this terminal check closes Ready → Complete.)
