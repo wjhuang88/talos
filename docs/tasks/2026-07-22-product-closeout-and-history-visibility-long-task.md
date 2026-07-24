@@ -74,7 +74,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | P2 | I153 prerequisite/evidence refresh and I154 activation decision | Append-only evidence update stating whether I154's code prerequisites are met; an I154 activation record only if they are | P1, I151/I152 accepted code state | Security-boundary inventory, I153 regression replay, no unresolved critical path; no false real-terminal Complete claim | Keep I154 Blocked and provide exact missing condition | Complete — Completion Commit: `ba90c02` |
 | P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Review — maintainer GO (2026-07-24) |
 | P4 | TUI-034 rendering refinement | Fixed-cap inventory, active-vs-legacy `ToolCallBubble` reachability evidence, chosen continuation-row representation, width/height contract, and TUI-034 changed to Ready or explicitly left Refinement | P0; must not overlap an Active I154 | Actual `Buffer`/`InlineFrame` or active-renderer spike at 80/120/160 columns; CJK/emoji/newline observations; no terminal-autowrap assumption | Keep TUI-034 Refinement and record the smallest unresolved rendering boundary | Complete — maintainer GO (2026-07-24); TUI-034 → Ready |
-| P5 | I155 adaptive history implementation | New append-only I155 baseline followed by viewport-width-aware tool history rendering; preserved TUI-015/TUI-025 behavior; updated user docs if behavior is described publicly | P4; P3 must be Complete or explicitly stopped so only one iteration is active | Active-renderer tests at 80/120/160; CJK/emoji/newline and former-120-boundary tests; TUI-015/TUI-025 regressions; two-terminal manual packet; full locked ladder | Revert only the uncommitted phase changes; leave TUI-034 Ready with refinement evidence | Planned |
+| P5 | I155 adaptive history implementation | New append-only I155 baseline followed by viewport-width-aware tool history rendering; preserved TUI-015/TUI-025 behavior; updated user docs if behavior is described publicly | P4; P3 must be Complete or explicitly stopped so only one iteration is active | Active-renderer tests at 80/120/160; CJK/emoji/newline and former-120-boundary tests; TUI-015/TUI-025 regressions; two-terminal manual packet; full locked ladder | Revert only the uncommitted phase changes; leave TUI-034 Ready with refinement evidence | Review — commit `616ff11` |
 | P6 | Integrated closeout and maintainer evidence packet | Owner-doc/status sync, issue-sync check, docs synchronization, residual register, and short real-terminal checklist for I145-I153/I154/I155 | P3 and P5, or explicit stop record for either | Full locked ladder, governance, diff check, clean tree after push; no unauthorized state promotion or release | Record partial completion and exact next phase in this task | Planned |
 
 ## Technical Requirements By Implementation Phase
@@ -331,8 +331,31 @@ not permission to change unrelated scopes.
   TUI-015 head+tail and TUI-025 one-line semantics unchanged.
 - Open risks or deviations: Real-terminal walkthrough in Alacritty at narrow/wide sizes is a
   human gate for TUI-034 Ready → Complete.
-- Next task item: P5 — I155 adaptive history implementation. **Must not start without maintainer instruction.**
-- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the P5 task description.
+- Next task item: P6 — Integrated closeout. **Must not start without maintainer instruction.**
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint and the P6 task description.
+
+### Checkpoint P5 — 2026-07-24
+
+- Completed task items: P5 — I155 viewport-width-aware tool history wrapping.
+- Commit pushed: `616ff11` — Added `wrap_to_display_width` in scrollback.rs (returns Vec<String>,
+  each line fits within max_width display cells, CJK-aware). Replaced `truncate_to_display_width`
+  (ellipsis) with `wrap_to_display_width` (continuation rows) in `build_tool_result_scrollback_lines`
+  and `build_head_tail_scrollback_lines`. Continuation rows inherit same color/style and use
+  non-first-line prefix indent. Updated 3 tests for wrap behavior.
+- Changed owner artifacts: this long-task owner (P5 checkpoint appended, P5 row → Review).
+- Commands and exit results:
+  - `cargo fmt --all` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
+  - `cargo test --workspace --locked` → exit 0, 0 failures.
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - `git diff --check` → exit 0.
+- Acceptance evidence: TUI-034 acceptance criterion "width overflow creates renderer-accounted
+  continuation rows with stable tool-result styling, not terminal-autowrap-dependent rows" now
+  satisfied. CJK wrapping verified (more rows at narrow than wide). TUI-015 head+tail preserved.
+- Open risks or deviations: Real-terminal walkthrough in Alacritty at narrow/wide sizes is a
+  human gate for I155 Ready → Complete.
+- Next task item: P6 — Integrated closeout. **Must not start without maintainer instruction.**
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint and the P6 task description.
 
 ## Hard Stops
 
