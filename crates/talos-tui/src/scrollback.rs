@@ -408,6 +408,35 @@ pub(crate) fn truncate_to_display_width(text: &str, max_width: usize) -> String 
     result
 }
 
+/// Wraps text to multiple lines based on display width, preserving
+/// each character's display width (CJK = 2 cells, etc). Returns a
+/// Vec of wrapped lines, each fitting within `max_width` display cells.
+/// Unlike `truncate_to_display_width` which appends `…`, this function
+/// produces continuation rows that together contain the full text.
+pub(crate) fn wrap_to_display_width(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
+    }
+    use unicode_width::UnicodeWidthChar;
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut current_w = 0usize;
+
+    for ch in text.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current_w + w > max_width && !current.is_empty() {
+            lines.push(std::mem::take(&mut current));
+            current_w = 0;
+        }
+        current.push(ch);
+        current_w += w;
+    }
+    if !current.is_empty() || lines.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
 pub(crate) struct TipsComponent<'a> {
     pub(crate) tip: Option<&'a crate::state::Tip>,
 }

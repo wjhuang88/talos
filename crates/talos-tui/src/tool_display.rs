@@ -288,20 +288,27 @@ pub(crate) fn build_tool_result_scrollback_lines(
     let diff_aware = is_diff_content(&display.content, display.tool_name.as_deref());
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
-        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
+        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
         let (line_color, attrs) = if diff_aware {
             diff_line_style(line).unwrap_or_else(|| result_line_style(display, idx, color))
         } else {
             result_line_style(display, idx, color)
         };
-        lines.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                format!("{}{truncated}", result_line_prefix(icon, idx == 0)),
-                line_color,
-                attrs,
-            )],
-            None,
-        ));
+        for (sub_idx, sub_line) in wrapped.iter().enumerate() {
+            let prefix = if sub_idx == 0 {
+                result_line_prefix(icon, idx == 0)
+            } else {
+                result_line_prefix(icon, false)
+            };
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("{prefix}{sub_line}"),
+                    line_color,
+                    attrs,
+                )],
+                None,
+            ));
+        }
     }
 
     lines
@@ -320,16 +327,18 @@ fn build_head_tail_scrollback_lines(
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
-        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
+        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
         let (line_color, attrs) = result_line_style(display, idx, color);
-        lines.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                format!("{}{truncated}", result_line_prefix(icon, idx == 0)),
-                line_color,
-                attrs,
-            )],
-            None,
-        ));
+        for sub_line in &wrapped {
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("{}{sub_line}", result_line_prefix(icon, idx == 0)),
+                    line_color,
+                    attrs,
+                )],
+                None,
+            ));
+        }
     }
 
     let omitted = all_lines
@@ -347,20 +356,22 @@ fn build_head_tail_scrollback_lines(
 
     let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
     for line in all_lines.iter().skip(tail_start) {
-        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
+        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
         let (line_color, attrs) = if display.is_error {
             (color, primary_result_attrs())
         } else {
             (secondary, secondary_result_attrs())
         };
-        lines.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                format!("{}{truncated}", result_line_prefix(icon, false)),
-                line_color,
-                attrs,
-            )],
-            None,
-        ));
+        for sub_line in &wrapped {
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("{}{sub_line}", result_line_prefix(icon, false)),
+                    line_color,
+                    attrs,
+                )],
+                None,
+            ));
+        }
     }
 
     lines
@@ -820,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn long_line_truncated_at_narrow_viewport_with_ellipsis() {
+    fn long_line_wraps_to_continuation_rows_at_narrow_viewport() {
         let long = "a".repeat(200);
         let display = ToolResultDisplay {
             tool_name: Some("bash".to_string()),
@@ -828,15 +839,20 @@ mod tests {
             is_error: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 40);
-        assert_eq!(lines.len(), 1);
         assert!(
-            lines[0].text.contains('…'),
-            "at 40 cols a 200-char line must be ellipsized"
+            lines.len() > 1,
+            "at 40 cols a 200-char line must wrap to multiple rows, got {} rows",
+            lines.len()
+        );
+        let total_content: String = lines.iter().flat_map(|l| l.text.chars()).collect();
+        assert!(
+            total_content.chars().filter(|c| *c == 'a').count() >= 30,
+            "wrapped content must retain visible 'a' characters across rows"
         );
     }
 
     #[test]
-    fn cjk_output_uses_display_width_not_char_count() {
+    fn cjk_output_wraps_at_display_width_boundary() {
         let display = ToolResultDisplay {
             tool_name: Some("bash".to_string()),
             content: "你好".repeat(50),
@@ -845,12 +861,12 @@ mod tests {
         let lines_narrow = build_tool_result_scrollback_lines(&display, "", None, 40);
         let lines_wide = build_tool_result_scrollback_lines(&display, "", None, 160);
         assert!(
-            lines_narrow[0].text.contains('…'),
-            "CJK at 40 cols must be truncated"
+            lines_narrow.len() > lines_wide.len(),
+            "CJK at 40 cols must produce more rows than at 160 cols"
         );
         assert!(
-            lines_wide[0].text.chars().count() > lines_narrow[0].text.chars().count(),
-            "CJK at 160 cols must show more content than at 40 cols"
+            lines_wide.len() >= 1,
+            "CJK at 160 cols must produce at least 1 row"
         );
     }
 
