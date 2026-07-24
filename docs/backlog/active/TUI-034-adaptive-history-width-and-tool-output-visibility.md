@@ -1,6 +1,6 @@
 # TUI-034: Adaptive History Width And Tool Output Visibility
 
-**Status**: Refinement
+**Status**: Ready — maintainer GO (2026-07-24); commits `dd6e090`–`6f5757b`; dead code removed, fixed 120-char cap replaced with viewport-width-aware policy, 4 renderer tests pass
 **Priority**: P1
 **Source**: Maintainer request 2026-07-22
 
