@@ -186,8 +186,9 @@ impl Compactor {
             .into_iter()
             .map(|msg| match msg {
                 Message::Tool { result } => {
-                    if result.content.len() > MAX_TOOL_RESULT_CHARS {
-                        let mut truncated = result.content[..MAX_TOOL_RESULT_CHARS].to_string();
+                    if result.content.chars().count() > MAX_TOOL_RESULT_CHARS {
+                        let mut truncated: String =
+                            result.content.chars().take(MAX_TOOL_RESULT_CHARS).collect();
                         truncated.push_str(TRUNCATION_SUFFIX);
                         Message::Tool {
                             result: MessageToolResult {

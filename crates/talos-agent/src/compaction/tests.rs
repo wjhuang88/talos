@@ -149,6 +149,44 @@ fn test_layer1_budget_preserves_short_tool_result() {
 }
 
 #[test]
+fn test_layer1_budget_truncates_multibyte_content_on_char_boundary() {
+    // Regression: byte-slicing at index 4000 panicked when the boundary
+    // fell inside a 3-byte char like '责'. Truncation must count chars.
+    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+    let long_content = "责".repeat(5000);
+    let messages = vec![tool_msg("call_1", &long_content)];
+
+    let result = compactor.apply_budget(messages);
+
+    assert_eq!(result.len(), 1);
+    if let Message::Tool { result: tr } = &result[0] {
+        let body = tr.content.strip_suffix(TRUNCATION_SUFFIX).unwrap();
+        assert_eq!(body.chars().count(), MAX_TOOL_RESULT_CHARS);
+        assert!(tr.content.ends_with(TRUNCATION_SUFFIX));
+    } else {
+        panic!("expected Tool message");
+    }
+}
+
+#[test]
+fn test_layer1_budget_preserves_short_multibyte_result() {
+    // 3000 CJK chars = 9000 bytes: over the byte count but under the char
+    // threshold, so it must survive untouched (threshold is char-based).
+    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+    let short_content = "责".repeat(3000);
+    let messages = vec![tool_msg("call_1", &short_content)];
+
+    let result = compactor.apply_budget(messages);
+
+    assert_eq!(result.len(), 1);
+    if let Message::Tool { result: tr } = &result[0] {
+        assert_eq!(tr.content, short_content);
+    } else {
+        panic!("expected Tool message");
+    }
+}
+
+#[test]
 fn test_layer1_budget_does_not_affect_other_messages() {
     let compactor = Compactor::new(TokenEstimator::new(), 100_000);
     let messages = vec![
