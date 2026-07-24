@@ -234,8 +234,10 @@ pub(crate) fn build_tool_result_scrollback_lines(
     display: &ToolResultDisplay,
     icon: &str,
     color: Option<CColor>,
+    viewport_width: u16,
 ) -> Vec<ScrollbackLine> {
-    const MAX_RESULT_LINE_CHARS: usize = 120;
+    let prefix_len = result_line_prefix(icon, true).len();
+    let budget = (viewport_width as usize).saturating_sub(prefix_len).max(20);
 
     if should_suppress_tool_result_content(display) {
         let (line_color, attrs) = if display.is_error {
@@ -280,13 +282,13 @@ pub(crate) fn build_tool_result_scrollback_lines(
     // counter in between. This is scrollback-display only; `/export` writes the
     // raw `ToolResultDisplay::content` and never enters this path.
     if all_lines.len() > SUMMARIZE_OUTPUT_THRESHOLD_LINES {
-        return build_head_tail_scrollback_lines(display, &all_lines, icon, color);
+        return build_head_tail_scrollback_lines(display, &all_lines, icon, color, viewport_width);
     }
 
     let diff_aware = is_diff_content(&display.content, display.tool_name.as_deref());
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
-        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
         let (line_color, attrs) = if diff_aware {
             diff_line_style(line).unwrap_or_else(|| result_line_style(display, idx, color))
         } else {
@@ -310,13 +312,15 @@ fn build_head_tail_scrollback_lines(
     all_lines: &[&str],
     icon: &str,
     color: Option<CColor>,
+    viewport_width: u16,
 ) -> Vec<ScrollbackLine> {
-    const MAX_RESULT_LINE_CHARS: usize = 120;
+    let prefix_len = result_line_prefix(icon, true).len();
+    let budget = (viewport_width as usize).saturating_sub(prefix_len).max(20);
     let secondary = secondary_result_color();
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
-        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
         let (line_color, attrs) = result_line_style(display, idx, color);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
@@ -343,7 +347,7 @@ fn build_head_tail_scrollback_lines(
 
     let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
     for line in all_lines.iter().skip(tail_start) {
-        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let truncated = crate::scrollback::truncate_to_display_width(line, budget);
         let (line_color, attrs) = if display.is_error {
             (color, primary_result_attrs())
         } else {
@@ -532,7 +536,7 @@ mod tests {
             content: "output line".to_string(),
             is_error: false,
         };
-        let lines = build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+        let lines = build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
         assert_eq!(lines.len(), 1);
 
         assert!(!lines[0].text.contains('✓'));
@@ -549,7 +553,7 @@ mod tests {
             content: "error line".to_string(),
             is_error: true,
         };
-        let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+        let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red), 120);
         assert_eq!(lines.len(), 1);
 
         assert!(lines[0].text.contains('✗'));
@@ -566,7 +570,7 @@ mod tests {
             is_error: false,
         };
         let lines_empty =
-            build_tool_result_scrollback_lines(&display_empty, "", Some(CColor::Green));
+            build_tool_result_scrollback_lines(&display_empty, "", Some(CColor::Green), 120);
         assert_eq!(lines_empty.len(), 1);
         assert!(!lines_empty[0].text.contains('✓'));
         assert_eq!(lines_empty[0].text, "   (no output)");
@@ -579,7 +583,7 @@ mod tests {
             is_error: false,
         };
         let lines_suppressed =
-            build_tool_result_scrollback_lines(&display_suppressed, "", Some(CColor::Green));
+            build_tool_result_scrollback_lines(&display_suppressed, "", Some(CColor::Green), 120);
         assert_eq!(lines_suppressed.len(), 1);
         assert!(!lines_suppressed[0].text.contains('✓'));
         assert!(lines_suppressed[0].text.starts_with("   read 2 lines"));
@@ -594,7 +598,7 @@ mod tests {
             content: "edited src/main.rs\ndiff:\n- old line\n+ new line".to_string(),
             is_error: false,
         };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 4);
 
         // "edited src/main.rs" — not a diff line, default styling
@@ -623,7 +627,7 @@ mod tests {
             content: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n context line".to_string(),
             is_error: false,
         };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 7);
 
         // "-old" — removed
@@ -647,7 +651,7 @@ mod tests {
             content: "- this is a bullet\n+ another bullet\nnormal text".to_string(),
             is_error: false,
         };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 3);
 
         // All lines use default styling — no diff markers present and tool is not edit/diff
@@ -662,7 +666,7 @@ mod tests {
         display: &ToolResultDisplay,
         width: u16,
     ) -> (ratatui::buffer::Buffer, u16) {
-        let lines = build_tool_result_scrollback_lines(display, "", None);
+        let lines = build_tool_result_scrollback_lines(display, "", None, 120);
         let text = lines
             .iter()
             .map(|line| line.text.as_str())

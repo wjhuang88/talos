@@ -266,6 +266,7 @@ pub(crate) mod semantic {
 
     pub(crate) const TEXT_PRIMARY: Color = THEME.text_primary;
     pub(crate) const TEXT_ACCENT: Color = THEME.text_accent;
+    #[allow(dead_code)]
     pub(crate) const TEXT_SECONDARY_ACCENT: Color = THEME.text_secondary_accent;
     pub(crate) const TEXT_SUCCESS: Color = THEME.text_success;
     pub(crate) const TEXT_ERROR: Color = THEME.text_error;
@@ -305,7 +306,9 @@ pub(crate) mod semantic {
     #[allow(dead_code)]
     pub(crate) const APPROVAL_BUTTON_BG: Color = THEME.approval_button_bg;
     pub(crate) const APPROVAL_PROMPT: Color = THEME.approval_prompt;
+    #[allow(dead_code)]
     pub(crate) const DIFF_ADDED_BG: Color = THEME.diff_added_bg;
+    #[allow(dead_code)]
     pub(crate) const DIFF_REMOVED_BG: Color = THEME.diff_removed_bg;
     pub(crate) const LOGO_GRADIENT: [Color; 6] = THEME.logo_gradient;
     pub(crate) const LOGO_BADGE_1: Color = THEME.logo_badge_1;

@@ -1283,6 +1283,7 @@ pub(crate) fn summary_fields_for(tool_name: &str) -> Vec<String> {
 pub(crate) fn render_history_messages(
     stream_count: &mut usize,
     history: &[Message],
+    viewport_width: u16,
 ) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
     let mut pending_tool_names: Vec<String> = Vec::new();
@@ -1307,7 +1308,10 @@ pub(crate) fn render_history_messages(
                     content,
                 };
                 lines.extend(crate::tool_display::build_tool_result_scrollback_lines(
-                    &display, icon, color,
+                    &display,
+                    icon,
+                    color,
+                    viewport_width,
                 ));
             }
             Message::Assistant {

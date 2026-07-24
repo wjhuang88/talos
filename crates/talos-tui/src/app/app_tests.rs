@@ -116,7 +116,8 @@ fn tool_result_scrollback_keeps_multiple_lines() {
         is_error: false,
         content: "├── backend/\n├── frontend/\n└── docs/".to_string(),
     };
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
 
     assert_eq!(lines.len(), 3);
     assert_eq!(lines[0].text, "   ├── backend/");
@@ -183,7 +184,8 @@ fn read_tool_result_hides_content_from_scrollback() {
         content: "secret line\nanother line\n".to_string(),
     };
 
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
 
     assert_eq!(lines.len(), 1);
     assert!(lines[0].text.contains("2 lines"));
@@ -198,7 +200,8 @@ fn read_tool_error_result_remains_visible() {
         content: "file not found".to_string(),
     };
 
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red), 120);
 
     assert_eq!(lines.len(), 1);
     assert!(lines[0].text.contains("file not found"));
@@ -611,6 +614,7 @@ fn hydrate_history_preserves_prefixes_and_stream_count() {
                 reasoning: None,
             },
         ],
+        120,
     );
 
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
@@ -807,7 +811,8 @@ fn grep_under_threshold_renders_inline() {
         content: "src/main.rs:\n  10: foo\nsrc/lib.rs:\n  5: bar\n".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
     assert_eq!(lines.len(), 4);
     assert!(lines[0].text.contains("src/main.rs:"));
     assert!(lines[3].text.contains("bar"));
@@ -830,7 +835,8 @@ fn grep_over_threshold_renders_summary() {
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
     assert_eq!(lines.len(), 1);
     let summary = tool_display::suppressed_tool_result_summary(&display);
     assert!(summary.contains("grep matched"));
@@ -858,7 +864,8 @@ fn bash_under_threshold_renders_full() {
         is_error: false,
         content,
     };
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
     assert_eq!(lines.len(), 10);
     assert!(lines[0].text.contains("line 0"));
     assert!(lines[9].text.contains("line 9"));
@@ -876,7 +883,8 @@ fn bash_over_threshold_renders_head_and_tail() {
         is_error: false,
         content,
     };
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
     assert_eq!(lines.len(), 7);
     assert!(lines[0].text.contains("line 0"));
     assert!(lines[2].text.contains("line 2"));
@@ -894,7 +902,8 @@ fn tool_result_scrollback_styles_primary_and_detail_lines() {
         is_error: false,
         content: "wrote 11 bytes to new.txt\npreview:\nhello world".to_string(),
     };
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
 
     assert_eq!(lines.len(), 3);
     assert!(!lines[0].segments[0].attrs.bold);
@@ -935,7 +944,8 @@ fn tool_result_error_detail_lines_keep_error_style() {
         is_error: true,
         content: "failed\npermission denied".to_string(),
     };
-    let lines = tool_display::build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red), 120);
 
     assert_eq!(lines.len(), 2);
     assert!(lines[0].segments[0].attrs.bold);
@@ -956,8 +966,12 @@ fn head_tail_omitted_count_is_correct() {
             is_error: false,
             content,
         };
-        let lines =
-            tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+        let lines = tool_display::build_tool_result_scrollback_lines(
+            &display,
+            "",
+            Some(CColor::Green),
+            120,
+        );
         let expected_omitted = total - 3 - 3;
         assert!(
             lines[3]
@@ -986,7 +1000,8 @@ fn head_tail_truncation_does_not_affect_export_content() {
         is_error: false,
         content,
     };
-    let _ = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+    let _ =
+        tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
     assert_eq!(display.content, original);
     assert!(display.content.contains("line 25"));
 }

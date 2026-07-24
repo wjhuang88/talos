@@ -25,7 +25,7 @@ pub use app::Tui;
 pub use sidebar::{SkillInfo, SkillSidebar};
 pub use state::ApprovalState;
 pub use theme::nord;
-pub use widgets::{ApprovalOverlay, ToolCallBubble};
+pub use widgets::ApprovalOverlay;
 
 #[cfg(test)]
 pub(crate) use theme::{contrast_ratio, rgb_components};

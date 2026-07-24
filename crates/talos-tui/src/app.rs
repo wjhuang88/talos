@@ -629,7 +629,12 @@ impl Tui {
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
                 self.pending_scrollback.extend(
-                    crate::tool_display::build_tool_result_scrollback_lines(&display, icon, color),
+                    crate::tool_display::build_tool_result_scrollback_lines(
+                        &display,
+                        icon,
+                        color,
+                        self.terminal.screen_size().width,
+                    ),
                 );
             }
             UiOutput::TodoPanel(data) => {
