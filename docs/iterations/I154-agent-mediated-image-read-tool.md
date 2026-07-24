@@ -1,6 +1,6 @@
 # Iteration I154: MODEL-009-E Agent-Mediated Image Read Tool
 
-> Document status: Active — P3 rework complete. All 7 NO-GO blockers addressed (B1-B6 + B7 docs). Awaiting maintainer re-review.
+> Document status: Review — P3 implementation complete. Maintainer GO received 2026-07-24 after independent verification of all gates and ADR-051 contracts. 40 new tests pass.
 > Published plan date: 2026-07-21
 > Planned objective: allow a Supported model to explicitly invoke a safe `read_image` tool for a local path, then receive the artifact in the following provider request.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.

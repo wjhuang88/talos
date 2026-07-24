@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-E |
 | Type | Product / Tool / Security Story |
 | Priority | P2 |
-| Status | Active — P3 implementation in progress (2026-07-23); commits `6d4677e`–`bacf292` pushed; all automated gates green |
+| Status | Review — P3 complete, maintainer GO received (2026-07-24); commits `6d4677e`–`faa5464`; 40 new tests pass |
 | Source | Maintainer requirement, 2026-07-21 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-C safe image ingestion; MODEL-009-D attachment capability gate and provider pipeline; SEC-001; ADR-050; ADR-051 |

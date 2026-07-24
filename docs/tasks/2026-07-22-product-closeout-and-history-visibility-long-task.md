@@ -40,7 +40,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | I151 / MODEL-009-C | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `17e3fef`. I154 must reuse its proven controls rather than recreate a parallel path. |
 | I152 / MODEL-009-D | Review, code-level security acceptance | The local terminal packet passed except for the maintainer-owned live Anthropic-compatible Provider check, which is unavailable in the current environment. |
 | I153 | Review | Refresh automated evidence and checklist; it remains Review until maintainer walkthrough evidence exists. |
-| I154 / MODEL-009-E | Active — P3 implementation in progress (2026-07-23) | P2 inventoried code-level prerequisites and accepted ADR-051. P3 implementation is in progress (commits `6d4677e`–`4856f75`); 26 new tests pass; ADR-051 Implementation Facts recorded. I152/I153's live Anthropic review gate remains independent. |
+| I154 / MODEL-009-E | Review — maintainer GO (2026-07-24) | P2 inventoried code-level prerequisites and accepted ADR-051. P3 implementation complete (commits `6d4677e`–`faa5464`); 40 new tests pass; ADR-051 Implementation Facts recorded. Maintainer independently verified all gates and contracts. I152/I153's live Anthropic review gate remains independent. |
 | TUI-034 | Refinement | Must pass its rendering-boundary refinement gate before a new I155 implementation baseline is created. |
 
 ## In Scope
@@ -72,7 +72,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | P0 | Establish this successor task and reconcile scope | This owner record, original-program change-control link, Board entry, and current-state evidence | None | Governance + diff checks; explicit inventory above remains true | If current owner docs conflict, stop and report file/line evidence | Complete on creation |
 | P1 | I148 discovery activation closeout | Mock-proven discover → select → `apply` model → rebuild current session → status/picker reflects the active identity; failure retains current session/config and exposes manual fallback | P0 | Two protocol fixtures; picker/bridge/session lifecycle tests; atomicity/redaction tests; full locked ladder | Keep discovery persistence and manual fallback; leave I148 Review with its terminal-only gate | Complete — evidence commits `23db287`, `187f13d`, `4d5f8d7`, `834400b`, `a01edc5` |
 | P2 | I153 prerequisite/evidence refresh and I154 activation decision | Append-only evidence update stating whether I154's code prerequisites are met; an I154 activation record only if they are | P1, I151/I152 accepted code state | Security-boundary inventory, I153 regression replay, no unresolved critical path; no false real-terminal Complete claim | Keep I154 Blocked and provide exact missing condition | Complete — Completion Commit: `ba90c02` |
-| P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Active |
+| P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Review — maintainer GO (2026-07-24) |
 | P4 | TUI-034 rendering refinement | Fixed-cap inventory, active-vs-legacy `ToolCallBubble` reachability evidence, chosen continuation-row representation, width/height contract, and TUI-034 changed to Ready or explicitly left Refinement | P0; must not overlap an Active I154 | Actual `Buffer`/`InlineFrame` or active-renderer spike at 80/120/160 columns; CJK/emoji/newline observations; no terminal-autowrap assumption | Keep TUI-034 Refinement and record the smallest unresolved rendering boundary | Planned |
 | P5 | I155 adaptive history implementation | New append-only I155 baseline followed by viewport-width-aware tool history rendering; preserved TUI-015/TUI-025 behavior; updated user docs if behavior is described publicly | P4; P3 must be Complete or explicitly stopped so only one iteration is active | Active-renderer tests at 80/120/160; CJK/emoji/newline and former-120-boundary tests; TUI-015/TUI-025 regressions; two-terminal manual packet; full locked ladder | Revert only the uncommitted phase changes; leave TUI-034 Ready with refinement evidence | Planned |
 | P6 | Integrated closeout and maintainer evidence packet | Owner-doc/status sync, issue-sync check, docs synchronization, residual register, and short real-terminal checklist for I145-I153/I154/I155 | P3 and P5, or explicit stop record for either | Full locked ladder, governance, diff check, clean tree after push; no unauthorized state promotion or release | Record partial completion and exact next phase in this task | Planned |
@@ -288,13 +288,18 @@ not permission to change unrelated scopes.
   - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
   - `git diff --check` → exit 0.
 - Acceptance evidence / remaining human gate: All initial P3 steps (A-F) + all 7 NO-GO blockers
-  (B1-B7) + all 4 rework items (R1-R4) + all 5 second-rework items (T1-T5 docs) addressed.
-  Test totals: 13 ReadImageTool unit tests + 6 agent integration tests + 1 Anthropic coalescing
-  fixture + 1 OpenAI continuation fixture + 5 permission chain tests = 26 new tests.
+  (B1-B7) + all 4 rework items (R1-R4) + all 5 second-rework items (T1-T5 docs) + all 5
+  third-rework items (F1-F5) + all 4 fourth-rework items (G1-G4) + all 4 fifth-rework items
+  (H1-H4) addressed.
+  Test totals: 16 ReadImageTool unit tests + 9 agent integration tests + 7 permission chain
+  tests + 4 TUI scrollback tests + 1 export test + 1 provider TOCTOU guard test +
+  1 Anthropic coalescing fixture + 1 OpenAI continuation fixture = 40 new tests.
+  Maintainer independently verified all gates (fmt/clippy/test/governance/diff) and ADR-051
+  contracts; GO received 2026-07-24.
   The I152/I153 live Anthropic-compatible provider check remains a separate human gate.
-- Open risks or deviations: TUI history/export/copy/resume/provenance safe field assertions
-  (T4) are not yet implemented as dedicated tests. These may be required by the maintainer
-  before I154 → Review.
+- Open risks or deviations: copy/resume safe projection covered indirectly via
+  `history_message_parts` (export has direct file-level assertion). I152/I153 live
+  Anthropic provider check is a separate human gate.
 - Next task item: P4 — TUI-034/I155 long-output display. **Must not start without maintainer instruction.**
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the P4 task
   description in this file and `docs/iterations/I154-agent-mediated-image-read-tool.md`.
