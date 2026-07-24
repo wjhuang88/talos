@@ -414,6 +414,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                         context_limit: Some(202_752),
                         output_limit: Some(4096),
                         reasoning: None,
+                        image_input: None,
                     },
                 )]),
                 timeout: Default::default(),
@@ -735,6 +736,7 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
                         context_limit: Some(150_000),
                         output_limit: Some(8000),
                         reasoning: None,
+                        image_input: None,
                     },
                 )]),
                 ..Default::default()
@@ -816,6 +818,7 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
                         context_limit: Some(100_000),
                         output_limit: None,
                         reasoning: None,
+                        image_input: None,
                     },
                 )]),
                 ..Default::default()
@@ -1214,6 +1217,7 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
                         context_limit: Some(50_000),
                         output_limit: Some(1000),
                         reasoning: None,
+                        image_input: None,
                     },
                 )]),
                 ..Default::default()
@@ -1424,6 +1428,7 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
                     context_limit: Some(42_000),
                     output_limit: Some(4_200),
                     reasoning: None,
+                    image_input: None,
                 },
             )]),
             ..Default::default()
@@ -1496,6 +1501,7 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
                     context_limit: Some(111_000),
                     output_limit: Some(11_100),
                     reasoning: None,
+                    image_input: None,
                 },
             )]),
             ..Default::default()
@@ -1551,4 +1557,122 @@ fn test_resolve_model_limits_with_empty_catalog_does_not_block() {
     let empty_catalog: Vec<model::ModelMetadata> = vec![];
     let (ctx, _) = config.resolve_model_limits_with_catalog(Some(&empty_catalog));
     assert!(ctx > 0, "should fall back to builtin, not block");
+}
+
+#[test]
+fn test_custom_model_image_input_override_enables_capability() {
+    use talos_core::model::ImageInputCapability;
+
+    let mut config = Config::default();
+    config.provider = "my-gateway".to_string();
+    config.model = "custom-vision-model".to_string();
+
+    config.providers.insert(
+        "my-gateway".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::AnthropicMessages,
+            ..Default::default()
+        },
+    );
+
+    let provider = config.providers.get_mut("my-gateway").unwrap();
+    provider.models.insert(
+        "custom-vision-model".to_string(),
+        ModelConfig {
+            image_input: Some(true),
+            ..Default::default()
+        },
+    );
+
+    let all = config.all_models();
+    let meta = model::find_model_by_provider(&all, "my-gateway", "custom-vision-model");
+    assert!(meta.is_some());
+    assert!(meta.unwrap().capabilities.image_input);
+
+    let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
+        &all,
+        "my-gateway",
+        "custom-vision-model",
+    ));
+    assert_eq!(cap, ImageInputCapability::Supported);
+    assert!(cap.allows_attachment());
+}
+
+#[test]
+fn test_custom_model_without_image_input_override_is_unknown() {
+    use talos_core::model::ImageInputCapability;
+
+    let mut config = Config::default();
+    config.provider = "my-gateway".to_string();
+    config.model = "custom-model".to_string();
+
+    config.providers.insert(
+        "my-gateway".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::AnthropicMessages,
+            ..Default::default()
+        },
+    );
+
+    config
+        .providers
+        .get_mut("my-gateway")
+        .unwrap()
+        .models
+        .insert("custom-model".to_string(), ModelConfig::default());
+
+    let all = config.all_models();
+    let meta = model::find_model_by_provider(&all, "my-gateway", "custom-model");
+    assert!(meta.is_some());
+    assert!(!meta.unwrap().capabilities.image_input);
+
+    let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
+        &all,
+        "my-gateway",
+        "custom-model",
+    ));
+    assert_eq!(cap, ImageInputCapability::Unsupported);
+    assert!(!cap.allows_attachment());
+}
+
+#[test]
+fn test_image_input_override_on_existing_catalog_model() {
+    use talos_core::model::ImageInputCapability;
+
+    let mut config = Config::default();
+    config.provider = "anthropic".to_string();
+    config.model = "claude-sonnet-4-5".to_string();
+
+    config.providers.insert(
+        "anthropic".to_string(),
+        ProviderConfig {
+            ..Default::default()
+        },
+    );
+
+    config
+        .providers
+        .get_mut("anthropic")
+        .unwrap()
+        .models
+        .insert(
+            "claude-sonnet-4-5".to_string(),
+            ModelConfig {
+                image_input: Some(false),
+                ..Default::default()
+            },
+        );
+
+    let all = config.all_models();
+    let meta = model::find_model_by_provider(&all, "anthropic", "claude-sonnet-4-5");
+    assert!(meta.is_some());
+    assert!(!meta.unwrap().capabilities.image_input);
+
+    let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
+        &all,
+        "anthropic",
+        "claude-sonnet-4-5",
+    ));
+    assert_eq!(cap, ImageInputCapability::Unsupported);
+    assert!(!cap.allows_attachment());
 }

@@ -411,6 +411,9 @@ impl Config {
                     if cfg.output_limit.is_some() {
                         existing.output_limit = cfg.output_limit;
                     }
+                    if let Some(image_input) = cfg.image_input {
+                        existing.capabilities.image_input = image_input;
+                    }
                     existing.source = model::ModelSource::Manual;
                 } else {
                     models.push(model::ModelMetadata {
@@ -419,7 +422,10 @@ impl Config {
                         context_limit: cfg.context_limit,
                         output_limit: cfg.output_limit,
                         pricing: None,
-                        capabilities: model::ModelCapabilities::default(),
+                        capabilities: model::ModelCapabilities {
+                            image_input: cfg.image_input.unwrap_or(false),
+                            ..Default::default()
+                        },
                         release_date: None,
                         variants: vec![],
                         source: model::ModelSource::Manual,

@@ -81,6 +81,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                         context_limit: Some(999_000),
                         output_limit: None,
                         reasoning: None,
+                        image_input: None,
                     },
                 )]),
                 ..Default::default()

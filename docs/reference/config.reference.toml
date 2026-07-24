@@ -80,6 +80,9 @@ model = "claude-sonnet-4-20250514"
 #   context_limit  Max input context tokens
 #   output_limit   Max output tokens
 #   reasoning      Per-model thinking/reasoning config (see below)
+#   image_input    Optional bool: Some(true) marks a custom/discovered model as
+#                  vision-capable so /attach and read_image work. Some(false)
+#                  explicitly disables. None (default) uses catalog metadata.
 #
 # Reasoning options (ADR-034):
 #   effort         "low" | "medium" | "high" (OpenAI o-series)
@@ -119,6 +122,7 @@ model = "claude-sonnet-4-20250514"
 # context_limit = 202752
 # output_limit = 4096
 # reasoning = { budget_tokens = 8192 }
+# image_input = true                     # enable /attach + read_image for custom models
 
 # ── Example: ZhipuAI (Anthropic Messages protocol) ───────────────────────────
 # provider = "zhipuai"

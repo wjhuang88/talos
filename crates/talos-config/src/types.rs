@@ -19,7 +19,7 @@ pub enum ProviderProtocol {
     OpenAIChat,
 }
 
-/// Per-model runtime limits.
+/// Per-model runtime limits and capability overrides.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ModelConfig {
     /// Maximum provider input context accepted by this model.
@@ -31,6 +31,16 @@ pub struct ModelConfig {
     /// Per-model reasoning/thinking configuration (ADR-034).
     #[serde(default)]
     pub reasoning: Option<ReasoningOptions>,
+    /// Whether this model accepts image input.
+    ///
+    /// When `Some(true)`, overrides the catalog default so that
+    /// `image_input` capability is `Supported` for custom/discovered models
+    /// that are absent from the builtin catalog. When `Some(false)`,
+    /// explicitly marks the model as non-vision. When `None` (default),
+    /// the capability is resolved from catalog metadata or falls back to
+    /// `Unknown` for models not in the catalog.
+    #[serde(default)]
+    pub image_input: Option<bool>,
 }
 
 /// Per-model reasoning/thinking options.
