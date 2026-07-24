@@ -1,6 +1,6 @@
 # Iteration I153: End-to-End Hardening, Documentation, And Release Candidate
 
-> Document status: Review
+> Document status: Complete — maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. Completion Commit: `6ec5bbc`, `36b7ccc`.
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20
 
@@ -21,6 +21,7 @@
 | 2026-07-21 | Change control | Maintainer added agent-mediated image inspection. It is a new MODEL-009-E / I154 objective, not an I152 correction; I153's published release-candidate baseline is unchanged. |
 | 2026-07-22 | Post-baseline hardening | I151/I152 received capability fail-closed gating, SEC-001 exact-path authorization, decoder/pixel validation, canonical-path plus digest revalidation, attachment list/detach UX, print-mode `--attach`, and safe multimodal scrollback. Evidence commits: `52068ee`, `6b04c12`, `5edd8b9`, `17e3fef`. These repairs are included in the combined terminal packet; no release action is implied. |
 | 2026-07-22 | Evidence refresh | On `main` at `6ec5bbc`, reran the locked format, workspace check, Clippy `-D warnings`, workspace test, governance, and diff-cleanliness ladder successfully. I153 remains **Review**: the maintainer-owned live Anthropic-compatible Provider mapping check is unavailable in the current environment, and no release action is authorized. |
+| 2026-07-24 | Live provider walkthrough | Maintainer supplied a live Anthropic-compatible provider with `image_input = true` on a custom model (enabled by commit `36b7ccc`). The full `/attach` → model response → `/detach` → text-only flow passed with no credential/path/data-URL leakage in TUI history. I153 → **Complete**. |
 
 ## Validation Results (I153 Final Ladder)
 
@@ -51,10 +52,10 @@
 - [x] ADR-050 + security review documented
 - [x] TUI attachment UX (attach/list/remove/cancel) — delivered in `60a7064` and retained through the security rework
 - [x] CLI `--attach` parameter with capability/authorization gate — delivered in `09c5096` and hardened in `6b04c12`
-- [ ] Combined real-terminal walkthrough — requires human verifier; tracked in the 2026-07-22 unified Review closure packet
+- [x] Combined real-terminal walkthrough — maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24
 - [ ] End-to-end mock fixtures for full image flow — implementation plumbing
 - [ ] Full site/ documentation sync — implementation plumbing
 
 ## Decision
 
-I153 is **Review**. All validation passes. The remaining items are implementation plumbing and human verification, none of which are hard-stop conditions per the task record. No tag, release, or external publish is authorized.
+I153 is **Complete**. All validation passes. The maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. No tag, release, or external publish is authorized by this status change alone.

@@ -1,6 +1,6 @@
 # Iteration I154: MODEL-009-E Agent-Mediated Image Read Tool
 
-> Document status: Review — P3 implementation complete. Maintainer GO received 2026-07-24 after independent verification of all gates and ADR-051 contracts. 40 new tests pass.
+> Document status: Complete — P3 implementation complete. Maintainer GO received 2026-07-24 after independent verification of all gates and ADR-051 contracts. 40 new tests pass. Maintainer real-terminal walkthrough passed 2026-07-24: Supported model called `read_image`, tool result showed safe summary (MIME/dimensions/digest, no data URL or raw bytes), one-shot continuation artifact delivered image to the next provider request, and history showed only safe provenance. Completion Commit: `faa5464`, `36b7ccc`.
 > Published plan date: 2026-07-21
 > Planned objective: allow a Supported model to explicitly invoke a safe `read_image` tool for a local path, then receive the artifact in the following provider request.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -71,6 +71,9 @@
 | 2026-07-23 | P3 Rework B1/B2/B4/B5/B6 | Implemented permission_profile with path facet (B1). Anthropic consecutive user-message coalescing (B2). Batch limit enforcing max 1 image artifact per tool batch (B4). Execution-boundary capability gate rejecting read_image when !image_input_supported (B5). Sanitized execute() and PathEscape error messages to remove raw path (B6). Commit `4a0616a`. |
 | 2026-07-23 | P3 Rework B3 | 3 agent continuation integration tests: image appears once in next provider request, consumed after second call, not in persisted messages. Commit `9ecca94`. |
 | 2026-07-23 | P3 Rework B7 | README EN/zh-CN updated with `read_image` tool documentation. ADR-051 implementation facts and pre-1.0 migration notes recorded. I154 iteration evidence updated. |
+| 2026-07-24 | Maintainer GO | Maintainer independently verified all gates (fmt/clippy/test/governance/diff) and ADR-051 contracts. GO received. P3 → Review. |
+| 2026-07-24 | `image_input` config override | Added optional `image_input: Option<bool>` field to `ModelConfig` so custom/discovered models can declare vision capability. Commit `36b7ccc`. Required for the walkthrough because the test model was a custom provider absent from the builtin catalog. |
+| 2026-07-24 | Maintainer walkthrough | Real-terminal walkthrough in Alacritty passed: Supported model called `read_image` for `/tmp/talos_test_image.png`; permission prompt showed exact path; tool result displayed safe summary (MIME, dimensions, digest) with no data URL or raw bytes; model described the image content via one-shot continuation; history showed only safe provenance. I154 → Complete. |
 
 ## P3 Implementation Contract
 
@@ -119,3 +122,6 @@ new permission flow or a process-global artifact cache.
 
 - I152/I153 retain their independently owned live Anthropic-compatible provider walkthrough gate.
   It is explicitly not substituted by fixture tests and is not closed by this activation record.
+  **Update 2026-07-24**: The maintainer live Anthropic-compatible provider walkthrough has now
+  passed (see I152/I153 owner docs). I154's own walkthrough gate is closed by the `read_image`
+  real-terminal evidence above.

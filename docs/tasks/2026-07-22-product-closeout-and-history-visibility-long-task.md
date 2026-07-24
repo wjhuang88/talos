@@ -5,7 +5,7 @@
 | Task ID | `2026-07-22-product-closeout-and-history-visibility-long-task` |
 | Owner | Maintainer-dispatched frontline developer; no subagent delegation |
 | Created | 2026-07-22 |
-| Status | Complete — all code phases received maintainer GO (2026-07-24); 3 residual human gates remain |
+| Status | Complete — all code phases and all 3 human gates passed (2026-07-24) |
 | Branch | `main` only; direct commits, no feature branches |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
 | Relationship | Successor closeout package for the active 2026-07-20 provider/multimodal program; TUI-034 is a new, independent follow-on objective. |
@@ -367,19 +367,19 @@ not permission to change unrelated scopes.
   - Issue-sync check: No GitHub issues mapped to TUI-034, I154, or I155.
   - Docs synchronization: README/site already updated for `read_image` (P3). TUI-034 wrapping
     is a rendering detail not described in user-facing docs; no update needed.
-  - Residual register:
-    1. I152/I153 live Anthropic-compatible provider check — maintainer human gate.
-    2. I154 Review → Complete — needs Alacritty walkthrough with Supported model + read_image.
-    3. I155/TUI-034 Ready → Complete — needs Alacritty walkthrough at narrow/wide widths.
+  - Residual register: All closed (2026-07-24).
+    1. I152/I153 live Anthropic-compatible provider check — PASSED.
+    2. I154 Review → Complete — PASSED (Alacritty walkthrough with Supported model + read_image).
+    3. I155/TUI-034 Ready → Complete — PASSED (Alacritty walkthrough at narrow/wide widths).
   - Maintainer real-terminal checklist (final):
     1. I145: Complete (`1039430`). ✅
     2. I146: Complete (`7f6972a`). ✅
     3. I147: Complete (`1c843b2`). ✅
     4. I148: Complete (`f89313c`). ✅
     5. I150/I151: Complete (`b3cc943`, `17e3fef`). ✅
-    6. I152/I153: Review — live Anthropic check unavailable. ⏳
-    7. I154: Review (GO, 40 tests) — needs Alacritty walkthrough. ⏳
-    8. I155/TUI-034: Ready (GO) — needs Alacritty walkthrough at narrow/wide. ⏳
+    6. I152/I153: Complete — live Anthropic walkthrough passed (`17e3fef`, `65eb108`, `6ec5bbc`). ✅
+    7. I154: Complete — `read_image` Alacritty walkthrough passed (`faa5464`, `36b7ccc`). ✅
+    8. I155/TUI-034: Complete — wrapping Alacritty walkthrough passed (`616ff11`). ✅
 - Commands and exit results:
   - `cargo fmt --all` → clean.
   - `cargo clippy --workspace --locked -- -D warnings` → exit 0, 0 warnings.
@@ -388,8 +388,17 @@ not permission to change unrelated scopes.
   - `git diff --check` → exit 0.
 - Acceptance evidence: All 6 phases (P0-P6) complete. Code phases P1/P3/P4/P5 received
   maintainer GO. P6 is docs-only sync. No unauthorized state promotion or release.
-- Open risks: 3 residual human gates (I152/I153, I154 walkthrough, I155 walkthrough).
-- Next task item: Long task complete. Maintainer executes real-terminal walkthroughs at discretion.
+  All 3 human gates passed 2026-07-24:
+    1. I152/I153: live Anthropic-compatible provider walkthrough passed — `/attach` flow
+       produced valid provider request, no credential/path/data-URL leakage in history.
+    2. I154: `read_image` Alacritty walkthrough passed — Supported model called `read_image`,
+       safe summary in history, one-shot continuation to provider.
+    3. I155/TUI-034: wrapping Alacritty walkthrough passed — long output wraps at narrow/wide
+       widths, CJK display-width-aware, head+tail preserved.
+  Additional fix: `image_input` config override added (`36b7ccc`) so custom/discovered models
+  can declare vision capability.
+- Open risks: None. Long task fully closed.
+- Next task item: Long task complete. All human gates passed.
 
 ## Hard Stops
 

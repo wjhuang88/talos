@@ -1,6 +1,6 @@
 # Iteration I152: MODEL-009-D Provider Adapter And TUI/CLI Interaction
 
-> Document status: Review
+> Document status: Complete — maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. Completion Commit: `17e3fef`, `65eb108`.
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20
 
@@ -31,6 +31,7 @@
 | 2026-07-22 | Terminal acceptance | Maintainer verified `/detach 1` removes a pending attachment, `/attachments` then reports an empty list, and the status-bar attachment count clears. I152 remains **Review** pending text-only and configured-provider checks. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified a text-only turn after attachment operations sends and renders normally, with no image summary and no attachment count left in the status bar. I152 remains **Review** pending the maintainer-owned live Anthropic-compatible provider check. |
 | 2026-07-22 | External acceptance gate | Maintainer has no usable Anthropic-compatible Provider or credential in the current environment. The live Anthropic image request is therefore not executed; deterministic Anthropic wire fixtures remain the available automated evidence. I152 remains **Review** until a maintainer can supply that environment. |
+| 2026-07-24 | Live provider walkthrough | Maintainer supplied a live Anthropic-compatible provider with `image_input = true` configured on a custom model (enabled by commit `36b7ccc`). `/attach` of a valid local PNG succeeded, the model responded with image content description, and TUI history showed no raw bytes, data URL, or API key. `/detach all` followed by a text-only turn worked normally. Invalid path (`/attach /tmp/nonexistent.png`) was rejected before any file read. I152 → **Complete**. |
 
 ## Validation
 
