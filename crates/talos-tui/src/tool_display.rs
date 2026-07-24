@@ -799,4 +799,90 @@ mod tests {
             );
         }
     }
+
+    // TUI-034: Adaptive width tests
+
+    #[test]
+    fn long_line_visible_at_wide_viewport_without_ellipsis() {
+        let long = "a".repeat(140);
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: long.clone(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 160);
+        assert_eq!(lines.len(), 1);
+        assert!(
+            !lines[0].text.contains('…'),
+            "at 160 cols a 140-char line should not be ellipsized: {}",
+            lines[0].text.len()
+        );
+    }
+
+    #[test]
+    fn long_line_truncated_at_narrow_viewport_with_ellipsis() {
+        let long = "a".repeat(200);
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: long,
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 40);
+        assert_eq!(lines.len(), 1);
+        assert!(
+            lines[0].text.contains('…'),
+            "at 40 cols a 200-char line must be ellipsized"
+        );
+    }
+
+    #[test]
+    fn cjk_output_uses_display_width_not_char_count() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: "你好".repeat(50),
+            is_error: false,
+        };
+        let lines_narrow = build_tool_result_scrollback_lines(&display, "", None, 40);
+        let lines_wide = build_tool_result_scrollback_lines(&display, "", None, 160);
+        assert!(
+            lines_narrow[0].text.contains('…'),
+            "CJK at 40 cols must be truncated"
+        );
+        assert!(
+            lines_wide[0].text.chars().count() > lines_narrow[0].text.chars().count(),
+            "CJK at 160 cols must show more content than at 40 cols"
+        );
+    }
+
+    #[test]
+    fn head_tail_behavior_preserved_at_all_widths() {
+        let content: String = (1..=40)
+            .map(|i| format!("line {i:02}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content,
+            is_error: false,
+        };
+        for width in [40u16, 80, 120, 160] {
+            let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+            assert!(
+                lines.len() >= HEAD_LINES + 1 + TAIL_LINES,
+                "head+tail+omitted must be present at {width} cols"
+            );
+            assert!(
+                lines.iter().any(|l| l.text.contains("lines omitted")),
+                "omitted counter must appear at {width} cols"
+            );
+            assert!(
+                lines[0].text.contains("line 01"),
+                "first head line must be present at {width} cols"
+            );
+            assert!(
+                lines.last().unwrap().text.contains("line 40"),
+                "last tail line must be present at {width} cols"
+            );
+        }
+    }
 }
