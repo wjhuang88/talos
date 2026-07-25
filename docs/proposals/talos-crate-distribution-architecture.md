@@ -70,7 +70,7 @@ not the reverse.
 | Runtime composition | `talos-runtime` | Public SDK facade; depends on implementation crates without exposing their internals as stable API. |
 | Runtime implementation | `talos-agent` | Publishable as an implementation crate, but not the primary SDK entrypoint. Public docs must mark lower-level surfaces as advanced/transitional. |
 | Capability crates | `talos-provider`, `talos-tools`, `talos-skill`, `talos-session`, `talos-memory`, `talos-exploration` | Publishable libraries with narrow feature flags and no CLI/TUI dependency. |
-| Extension and transport | `talos-plugin`, `talos-mcp`, `talos-rpc`, `talos-conversation` | Publish after protocol boundaries stabilize; useful for external integrations and alternate UIs. |
+| Extension and transport | `talos-plugin`, `talos-mcp`, `talos-rpc`, `talos-conversation` | Publish after protocol boundaries stabilize. `talos-conversation` is a **published experimental/product-oriented integration layer**; it is **not a supported general-purpose alternate-UI SDK**. This description is superseded and constrained by ADR-052. |
 | Product assembly | `talos-cli`, `talos-tui` | May be published for binary/UI reuse, but they are product surfaces, not required dependencies for embedders. `talos-cli` may become the crates.io binary package that supports `cargo install talos-cli --bin talos`. |
 
 ### Publishable Crate Contract
@@ -115,6 +115,13 @@ should be:
 
 This matches ripgrep's lesson without creating premature crate sprawl.
 
+> **Direction superseded by ADR-052 (2026-07-24):** the `talos-tools` default-feature direction is
+> now decided — a **read-only default** (file-read + search) with write/shell/git/network/image/
+> code-intelligence behind opt-in features or an explicit preset. The split-into-sibling-crates
+> idea above remains only a future reversal option. **Implementation has NOT started**: as of
+> 2026-07-26 `talos-tools` still has no Cargo feature gates and all heavy deps are hard
+> `[dependencies]`.
+
 ## Implementation Phases
 
 1. **Publication inventory**
@@ -145,7 +152,9 @@ This matches ripgrep's lesson without creating premature crate sprawl.
      talos`, because the top-level `talos` package name is already taken by an unrelated crate.
    - Keep `talos-cli`'s library API unsupported unless a future story intentionally exposes one;
      the supported crates.io surface is the `talos` binary target and install metadata.
-   - Decide whether `talos-tui` should remain product-only or become a reusable UI library.
+    - ~~Decide whether `talos-tui` should remain product-only or become a reusable UI library.~~
+      **Resolved/Superseded by ADR-052:** `talos-tui` remains product-only and no general-purpose
+      UI SDK is committed.
    - Keep release archives and install scripts as separate distribution channels from library
      crates.
 

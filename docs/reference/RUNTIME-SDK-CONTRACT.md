@@ -7,10 +7,14 @@ pre-1.0 contract: the surface is usable but not yet semver-stable. REL-002 gates
 
 ## Supported Embedding Surface
 
-Embedders should depend on **`talos-runtime`** and the types it re-exports from `talos-core`.
-These are the only types covered by this contract.
+Embedders should depend on **`talos-runtime`**. This contract covers `talos-runtime`'s own public
+API plus the types it explicitly `pub use`-re-exports. Lower-level crate types that appear in
+builder signatures but are NOT re-exported by the facade require a direct dependency on their
+origin crate and are governed by that crate's own independent pre-1.0 support boundary (see
+"Lower-level extension types requiring direct dependencies" below). Using a type from an external
+project does not imply it is exported by the runtime facade.
 
-### Builder and Handle
+### Builder and Handle (defined in `talos-runtime`)
 
 | Type | Role | Stability |
 |---|---|---|
@@ -18,42 +22,56 @@ These are the only types covered by this contract.
 | `RuntimeHandle` | Interact with a running runtime (submit, events, shutdown) | Pre-1.0 stable shape; method set may grow |
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
+| `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
 
-### Re-exported Protocol Types (from `talos-core`)
+### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
-| Type | Purpose |
-|---|---|
-| `AgentEvent` | Streaming events during a turn (text delta, tool call, tool result, turn end) |
-| `ToolCall` | A tool call request from the model |
-| `MessageToolResult` | A tool execution result |
-| `StopReason` | Why the model stopped generating |
-| `Usage` | Token usage statistics |
-| `TurnCompletionStatus` | Turn outcome: `Success`, `Cancelled`, or `Error` |
-| `ToolNature` | Risk classification: Read / Write / Execute / Network |
-| `ToolProvenance` | Tool origin: `Native`, `McpRemote { server }`, or `Plugin { name, version, carrier }` (ADR-028) |
-| `ApprovalChoice` | User decision: `ApproveOnce`, `AlwaysApprove`, `Deny` |
-| `Message` | Conversation message types |
-| `ToolDefinition` | Provider-facing tool schema |
+These are the types `talos-runtime` currently re-exports. The list is the public re-export set;
+verify against `crates/talos-runtime/src/lib.rs` if the surface may have changed.
 
-### Traits Embedders Implement
-
-| Trait | Crate | Purpose |
+| Re-exported name | Source | Purpose |
 |---|---|---|
-| `LanguageModel` | `talos-core` | Provider adapter for LLM streaming |
-| `AgentTool` | `talos-core` | Custom tool definition |
-| `ApprovalHandler` | `talos-runtime` | Permission-gated tool approval |
-| `PermissionRule` | `talos-permission` | Allow/deny/ask rules |
-| `SandboxProvider` | `talos-sandbox` | Optional sandbox for isolation |
+| `AgentEvent` | `talos_core::message` | Streaming events during a turn (text delta, tool call, tool result, turn end) |
+| `ToolCall` | `talos_core::message` | A tool call request from the model |
+| `MessageToolResult` | `talos_core::message` | A tool execution result |
+| `StopReason` | `talos_core::message` | Why the model stopped generating |
+| `Usage` | `talos_core::message` | Token usage statistics |
+| `ProviderError` | `talos_core::provider` | Provider error type |
+| `ToolDefinition` | `talos_core::provider` | Provider-facing tool schema |
+| `RuntimeTurnCompletionStatus` | `talos_core::session::TurnCompletionStatus` (re-exported under this alias) | Turn outcome: `Success`, `Cancelled`, or `Error`. NOTE: the public name is `RuntimeTurnCompletionStatus`; the underlying `TurnCompletionStatus` is not re-exported under that bare name. |
+| `ToolNature` | `talos_core::tool` | Risk classification: Read / Write / Execute / Network |
+| `ToolProvenance` | `talos_core::tool` | Tool origin: `Native`, `McpRemote { server }`, or `Plugin { name, version, carrier }` (ADR-028) |
+| `RuntimeHookRegistry` | `talos_plugin::HookRegistry` (re-exported under this alias) | Hook registry used by `RuntimeBuilder::hook_registry` |
+| `RuntimeSkillIndex` | `talos_skill::SkillIndex` (re-exported under this alias) | Skill index used by `RuntimeBuilder::skill_index` |
 
-### Re-export boundary
+### Lower-level extension types requiring direct dependencies
 
-Only the types re-exported **by `talos-runtime` itself** (plus the `talos-core` protocol types it
-re-exports) are covered by this SDK contract. The extension traits above are listed for orientation:
-`LanguageModel` and `AgentTool` live in `talos-core` and ARE reached through the facade; but
-`PermissionRule` and `SandboxProvider` require depending on `talos-permission` / `talos-sandbox`
-directly when an embedder implements them. Those lower-level published crates have their own
-independent pre-1.0 public APIs; depending on them directly is supported by those crates' own
-support boundaries, not by this runtime SDK contract.
+These types appear in `RuntimeBuilder`/`ApprovalHandler` signatures but are **NOT** re-exported by
+`talos-runtime`. An embedder who implements or constructs them must add a direct dependency on the
+origin crate; that crate's own pre-1.0 support boundary applies, not this runtime SDK contract.
+
+| Type / Trait | Direct crate dependency | Runtime SDK contract coverage |
+|---|---|---|
+| `LanguageModel` | `talos-core` | Trait; accepted by `RuntimeBuilder::provider`; not re-exported by the facade |
+| `AgentTool` | `talos-core` | Trait; accepted by `RuntimeBuilder::tool`; not re-exported by the facade |
+| `Message` | `talos-core` | Used by `RuntimeBuilder::initial_history`; not re-exported unless later added |
+| `ApprovalChoice` | `talos-core` | Enum returned by `ApprovalHandler::request_approval`; not re-exported |
+| `PermissionRule` | `talos-permission` | A rule type (not a trait); accepted by `RuntimeBuilder::permission_rule` |
+| `SandboxProvider` | `talos-sandbox` | Trait; accepted by `RuntimeBuilder::sandbox` |
+
+### Extension types and traits used by embedders
+
+Embedders typically implement or supply the following. Only `ApprovalHandler` is defined in
+`talos-runtime` itself; the rest are lower-level types listed for orientation and require the direct
+dependencies above.
+
+| Type / Trait | Defined in | Supplied via |
+|---|---|---|
+| `LanguageModel` | `talos-core` | `RuntimeBuilder::provider` |
+| `AgentTool` | `talos-core` | `RuntimeBuilder::tool` |
+| `ApprovalHandler` | `talos-runtime` | `RuntimeBuilder::approval_handler` |
+| `PermissionRule` | `talos-permission` | `RuntimeBuilder::permission_rule` (rule, not a trait) |
+| `SandboxProvider` | `talos-sandbox` | `RuntimeBuilder::sandbox` |
 
 ## Implementation Surface (NOT Supported)
 
@@ -79,9 +97,9 @@ If an embedder has a compelling reason to use `talos-agent` directly (bypassing 
    `talos-runtime` with a proper API. File an issue before depending on an internal constructor.
 4. **Permission boundary.** Direct `talos-agent` use bypasses the `RuntimeBuilder` permission
    wrapping. The embedder is responsible for installing permission rules and approval handlers.
-5. **Publication gate.** `talos-agent` is a gate-before-publish crate (see
-   [CRATE-PUBLICATION-MATRIX](CRATE-PUBLICATION-MATRIX.md) row 13). It is not on crates.io and may
-   not be published until sandbox/tools dependency gates clear. Per
+5. **Publication gate.** `talos-agent` is a gate-before-publish crate (see the `talos-agent` entry
+   in [CRATE-PUBLICATION-MATRIX](CRATE-PUBLICATION-MATRIX.md)). It is not on crates.io and may not
+   be published until sandbox/tools dependency gates clear. Per
    [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) it will be published as
    an **implementation dependency only** (route A: `talos-sandbox` → `talos-tools` → `talos-agent`
    → `talos-runtime`), never promoted to a second supported SDK entrypoint.

@@ -99,6 +99,9 @@ Decoupling (route B) remains only a reversal path if route A produces unacceptab
 
 ## Publication Gates (why each gate crate is not published yet)
 
+Only the true gate-before-publish crates appear here. Quarantined and product-only crates are NOT
+gate crates; they are hard-blocked from publication in the next section.
+
 | Crate | Required gate before publish |
 |---|---|
 | `talos-sandbox` | Security review against escape vectors; platform behavior docs; ADR-007/ADR-008/ADR-020 dependency boundary check; targeted sandbox tests. Per ADR-052: route-A step; stays policy-neutral (typed availability/errors); fallback policy owned by the SDK caller. |
@@ -106,11 +109,19 @@ Decoupling (route B) remains only a reversal path if route A produces unacceptab
 | `talos-agent` | Publish only after sandbox/tools dependency gates clear. Per ADR-052: published as an **implementation dependency only**, not a supported SDK; crate docs must carry direct-use caveats. |
 | `talos-runtime` | Publish after the full 0.5.0 dependency closure resolves. Per ADR-052: adds caller-selected `SandboxFallbackPolicy` (planned) and an explicit `RuntimePreset::coding()` (planned). |
 | `talos-mcp` | MCP support boundary ADR or equivalent; server opt-in/conflict policy; transport/auth non-goals; dry-run after `talos-tools`. |
-| `talos-models` | Quarantined — intentionally `publish = false`; no publication planned unless a new decision reactivates runtime catalog DB usage (superseded by MC-002). |
 
-Product-only crates (`talos-cli`, `talos-tui`, `talos-evolution`, `talos-dashboard`) stay
-`publish = false` unless a future story changes their distribution model. `talos-cli` is a binary
-package candidate whose guard removal requires a dedicated install-package gate.
+## Product-only and quarantined non-publication guards
+
+These crates are NOT gate-before-publish crates. They are hard-blocked from publication by
+`publish = false`; there is no "remaining gate to clear" for them.
+
+| Crate | Classification | Guard |
+|---|---|---|
+| `talos-cli` | Binary/product surface | `publish = false` until a dedicated Cargo-install gate authorizes removal |
+| `talos-tui` | Product-only | `publish = false` |
+| `talos-evolution` | Product-only | `publish = false` |
+| `talos-dashboard` | Product-only | `publish = false` |
+| `talos-models` | Quarantined | `publish = false`; **no publish gate exists because publication is not planned**. Only a new requirement, owner story, and ADR/maintainer decision can lift quarantine. MC-002 remains in force: `talos-models` is a non-runtime SQLite catalog store; runtime uses packaged `models.toml`. It must NOT be wired into any CLI/TUI/runtime path. |
 
 ## Name Availability Snapshot
 
