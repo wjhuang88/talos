@@ -6,9 +6,34 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current Four-Month Reliability, Extensibility, And Memory Quality Plan (2026-07-16)
+## Current v0.6 Runtime Productization Program (2026-07-26)
 
-The current one-pass unattended program is
+The current execution owner is:
+
+[`2026-07-26-v0.6-runtime-productization-program`](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
+
+The sequential execution chain is:
+
+```text
+I156
+  → I157
+  → ADR-053 architecture/maintainer review
+  → I158
+  → I159
+  → I160
+  → I161
+  → I162
+```
+
+I156 is the next activation candidate. No iteration is activated by this roadmap entry.
+ADR-053 remains Proposed, therefore I158-I162 remain Blocked.
+This program does not authorize publish, tag, release, Desktop work, v1.0, or a new composition crate.
+
+## Completed Four-Month Reliability, Extensibility, And Memory Quality Plan (2026-07-16)
+
+This section is retained as historical execution evidence and is no longer the current selection owner.
+
+The one-pass unattended program was
 [`2026-07-16-four-month-reliability-extensibility-plan`](../tasks/2026-07-16-four-month-reliability-extensibility-plan.md),
 with its durable execution owner at
 [`2026-07-16-reliability-extensibility-execution-package`](../tasks/2026-07-16-reliability-extensibility-execution-package.md).
@@ -65,9 +90,11 @@ I019 "Memory Foundation" four-layer memory foundation               分层记忆
 I020 "Research Library"  exploration + local library storage        探索与研究
 ```
 
-## Near-Term Execution Sequence
+## Historical Near-Term Execution Sequence
 
-This sequence records the current execution plan after the R0 remediation gate. It does not add
+This section is retained as historical execution evidence and is no longer the current selection owner.
+
+This sequence records the execution plan after the R0 remediation gate. It does not add
 speculative scope; it orders existing backlog so extension work, polish, and portability do not
 block or duplicate each other.
 

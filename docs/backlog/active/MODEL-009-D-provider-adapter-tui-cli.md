@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-D |
 | Type | Product / API / UX Story |
 | Priority | P2 |
-| Status | Review — code-level Owner acceptance (2026-07-22); real-terminal evidence pending |
+| Status | Complete — maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. I152 Complete. Completion Commit: `17e3fef`, `65eb108`. |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-C (I151) safe local image ingestion |

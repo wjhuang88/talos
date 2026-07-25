@@ -5,7 +5,7 @@
 | Story ID | MODEL-009 |
 | Type | Product / API / State Story (Epic) |
 | Priority | P2 |
-| Status | Active — MODEL-009-A/B/C Complete; D in Review; E Ready for I154 implementation (2026-07-22) |
+| Status | Complete — MODEL-009-A/B/C/D/E all Complete (2026-07-24). ADR-050 Accepted; I149-I154 Complete with maintainer terminal walkthroughs. Epic closed. Completion Commit: `9332f2a`, `b3cc943`, `17e3fef`, `65eb108`, `faa5464`, `36b7ccc`. |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | Catalog capability metadata; provider protocol boundary; session persistence boundary |
 | Blocks | MODEL-009-E agent-mediated image read tool |

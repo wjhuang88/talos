@@ -52,7 +52,7 @@ docs/iterations/
 | I015 | Provider Schema | **Complete** (2026-06-08) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import (`talos-config::opencode`) with 9 unit tests landed 2026-06-08. `cargo test -p talos-config -p talos-provider -p talos-cli` passes. See `I015-provider-schema.md`; `PROV-001-provider-schema.md`; ADR-013. |
 | I016 | Portable File And Search Tools | **Superseded** by I025 | Native tool outcome delivered through I025/TOOL-003; residual portability/index work remains TOOL-001. |
 | I017 | Embedded Git Tools | **Superseded** by I026 | P0-P2 Git outcome delivered through I026/GIT-001; advanced/fallback residuals remain GIT-001. |
-| I018 | Observability and Prompt Assets | Planned | Bounded file-log retention and compile-time embedded prompt assets. See `I018-observability-prompt-assets.md`. |
+| I018 | Observability and Prompt Assets | Complete — fulfilled by I047 | Bounded file-log retention and compile-time embedded prompt assets, delivered under ADR-014/015 via I047. See `I018-observability-prompt-assets.md`. |
 | I021 | Evolution MenteDB Realignment | **Complete** (2026-06-06) | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits (#I021-S1..S5): Signal/TurnObservation restructure, `find_marker + capture_window`, Pattern MenteDB fields, hard-reset migration, lesson #19 annotation. 615 tests pass; runtime evidence recorded (model responds normally to `cargo run -p talos-cli -- -p "你好"`). Defense layer (commit `7470ac5`) preserved as belt-and-suspenders. See `I021-evolution-mentedb-realignment.md`; EVOLUTION.md lessons #19 and #20. |
 | I022 | TUI Inline-by-Default | **Complete** (2026-06-08) | Codex-style inline-by-default TUI: viewport at cursor y, finalized turns push to scrollback, fixed 4-line viewport (input+status only), real-time scrollback flush, status bar tips with TTL, diff+force_clear rendering. 127 TUI tests pass; workspace clean. State model refactor deferred to I023. See `I022-tui-inline-default.md`; `docs/proposals/tui-codex-overhaul.md`; ADR-018. |
 | I023 | TUI State Model | **Complete** (2026-06-12) | Event-driven architecture: `talos-conversation` + `talos-tui` separation. Codex-style single-row history insertion with styled scrollback, 3-column prefix padding, multiline user messages with Nord bg color + top/bottom padding, one-row preview with Markdown block classifier, conservative styled Markdown rendering, animated braille spinner, native cursor sync. Review remediation closed: non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback, engine-owned mutation verified. 114 focused tests pass (61 TUI + 53 conversation). See `I023-tui-state-model.md`. |
@@ -183,7 +183,7 @@ docs/iterations/
 | I153 | End-to-End Hardening And Release Candidate | **Complete** (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Full locked validation is green; release candidate checklist documented. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. No tag is authorized by this status change. See `I153-end-to-end-hardening-release-candidate.md`. |
 | I154 | Agent-Mediated Image Read Tool | **Complete** (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | MODEL-009-E adds a separate `read_image` tool for Supported models only. ADR-051 fixes the one-shot provider-continuation contract. P3 complete: `ToolExecutionOutput`/`execute_with_output` trait API, shared image validation, `ReadImageTool` implementation, turn-loop continuation overlay, capability-gated registration, Anthropic coalescing, atomic batch limit, execution-boundary capability gate, path sanitization. 40 new tests pass across 4 crates. Maintainer real-terminal walkthrough passed: Supported model called `read_image`, safe summary in history, one-shot continuation to provider. See `I154-agent-mediated-image-read-tool.md`. |
 | I156 | TUI Narrow-Viewport And Resize Robustness | Planned — next activation | TUI-035. Tool-call summaries remain visible at narrow widths; resize never leaks viewport-fixed UI into scrollback. Activate only when no conflicting implementation iteration is active; complete requires automated width/resize tests and maintainer Alacritty walkthrough. See `I156-tui-narrow-viewport-resize.md`. |
-| I157 | Provider Removal And Credential Clear | Planned | MODEL-009. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I156 Complete; MODEL-009 Ready. See `I157-provider-removal-credential-clear.md`. |
+| I157 | Provider Removal And Credential Clear | Planned | MODEL-010. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I156 Complete; MODEL-010 Ready. See `I157-provider-removal-credential-clear.md`. |
 | I158 | Tool Registration Composition Consolidation | Blocked | ARCH-034-R01. One explicit tool registration composition model with preserved print/TUI/MCP behavior. Blocked until ADR-053 is Accepted and ARCH-034-R01 is Ready. See `I158-tool-registration-composition.md`. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
@@ -193,7 +193,7 @@ docs/iterations/
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
 
-## Non-Terminal Inventory (2026-07-20 Refresh)
+## Non-Terminal Inventory (2026-07-26 Refresh)
 
 This inventory is the required disposition before selecting or activating more work. It does not
 rewrite published iteration baselines.
@@ -230,8 +230,6 @@ rewrite published iteration baselines.
 | I149 | Complete (2026-07-20) | MODEL-009-A image input ADR and security spike. ADR-050 Accepted on all 10 points. Security review complete. No production image sending. I150 may proceed. Removed from non-terminal inventory. |
 | I150 | Complete (maintainer combined terminal acceptance 2026-07-22; `b3cc943`) | MODEL-009-B capability/content/persistence foundation. Supported/Unknown/Unsupported gating, successful attachment, safe history summary, and text-only regression accepted. Completion Commit: `b3cc943`. |
 | I151 | Complete (maintainer terminal acceptance 2026-07-22; `17e3fef`) | MODEL-009-C safe local image ingestion. Valid image attach and invalid non-image rejection were accepted in a real terminal; authorization, validation, decoder/pixel, digest, and adversarial evidence remain recorded. Completion Commit: `17e3fef`. |
-| I150 | Review (2026-07-20) | MODEL-009-B capability model, content types, and persistence foundation. `ContentPart` + `Message::Multimodal` + `ImageInputCapability` implemented. All exhaustive matches updated. Tests added. |
-| I151 | Review (code-level Owner acceptance 2026-07-22) | Safe local image ingestion security remediation is accepted in code; real-terminal evidence remains pending. |
 | I152 | Complete (maintainer walkthrough 2026-07-24; `17e3fef`, `65eb108`) | Provider/TUI/CLI image flow security remediation accepted. Live Anthropic-compatible provider walkthrough passed. Removed from non-terminal inventory. |
 | I153 | Complete (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Release-candidate evidence packet complete. Live Anthropic-compatible provider walkthrough passed. Removed from non-terminal inventory. |
 | I154 | Complete (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | P3 complete. Maintainer GO after independent verification. Commits `6d4677e`–`faa5464`; 40 new tests pass. Real-terminal walkthrough passed: `read_image` called by Supported model, safe summary in history, one-shot continuation. `image_input` config override added in `36b7ccc`. Removed from non-terminal inventory. |
@@ -286,6 +284,18 @@ rewrite published iteration baselines.
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.
+
+### v0.6 Runtime Productization Program (2026-07-26)
+
+| Iteration | Current State | Disposition Before Next Activation |
+|---|---|---|
+| I156 | Planned — next activation candidate | TUI-035. Activate only when no conflicting Active iteration exists and the activation inventory + Activation Record are complete. |
+| I157 | Planned — defer until I156 Complete | MODEL-010. CLI-only `config unset`; activation gate: I156 Complete. |
+| I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
+| I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
+| I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
+| I161 | Blocked — I160 incomplete and security reviewer not assigned | ARCH-031-C. Blocked until I160 Complete and an independent security review is scheduled. |
+| I162 | Blocked — I161 incomplete and version/readiness gate not authorized | ARCH-031-D. Blocked until I161 Complete and the version/readiness maintainer gate is authorized. Readiness only; no real publish. |
 
 ## Next Execution Rounds
 

@@ -13,18 +13,21 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `MODEL-009` | `None` | `Ready` | `I156` Complete; provider config baseline unchanged | A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML. |
+| `MODEL-010` | `None` | `Ready` | `I156` Complete; provider config baseline unchanged | A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML. |
 
 ### Start Here
 
 Read in order:
 
 1. `AGENTS.md`
-2. `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
-3. this iteration
-4. the selected Story
-5. governing ADRs/specifications in Required Reads
-6. the exact source files named by the Story
+2. `docs/sop/START-ITERATION.md`
+3. `docs/sop/ITERATION-WORKFLOW.md`
+4. `docs/sop/CHANGE-CONTROL.md`
+5. `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+6. this iteration
+7. the selected Story
+8. governing ADRs/specifications in Required Reads
+9. the exact source files named by the Story
 
 The selected Story owns scope and acceptance. This iteration owns activation, execution evidence,
 variance, and completion state.
@@ -60,13 +63,13 @@ variance, and completion state.
 3. **Minimum implementation**
    - implement the smallest change satisfying the selected Story.
 4. **Runtime wiring**
-   - prove the real binary/TUI/SDK path, not library-only behavior.
+   - prove the real `talos config unset` CLI path and the subsequent startup/model-picker recovery path.
 5. **Documentation and owner sync**
    - update Story, iteration, parent, Board, and user/reference docs named by the Story.
 6. **Validation and commit**
    - run focused and full validation;
    - inspect staged diff;
-   - create one logical commit referencing `MODEL-009` and `I157`.
+   - create one logical commit referencing `MODEL-010` and `I157`.
 
 ### Non-Goals
 
@@ -80,7 +83,7 @@ variance, and completion state.
 
 ### Acceptance
 
-All unchecked Acceptance items in `MODEL-009` that belong to this iteration must be satisfied. Do not
+All unchecked Acceptance items in `MODEL-010` that belong to this iteration must be satisfied. Do not
 invent acceptance criteria here.
 
 ### Planned Validation

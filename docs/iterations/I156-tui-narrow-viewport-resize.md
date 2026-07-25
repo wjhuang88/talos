@@ -20,11 +20,14 @@
 Read in order:
 
 1. `AGENTS.md`
-2. `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
-3. this iteration
-4. the selected Story
-5. governing ADRs/specifications in Required Reads
-6. the exact source files named by the Story
+2. `docs/sop/START-ITERATION.md`
+3. `docs/sop/ITERATION-WORKFLOW.md`
+4. `docs/sop/CHANGE-CONTROL.md`
+5. `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+6. this iteration
+7. the selected Story
+8. governing ADRs/specifications in Required Reads
+9. the exact source files named by the Story
 
 The selected Story owns scope and acceptance. This iteration owns activation, execution evidence,
 variance, and completion state.
@@ -58,7 +61,7 @@ variance, and completion state.
 3. **Minimum implementation**
    - implement the smallest change satisfying the selected Story.
 4. **Runtime wiring**
-   - prove the real binary/TUI/SDK path, not library-only behavior.
+   - prove the real Talos inline TUI path, including narrow width and live resize behavior.
 5. **Documentation and owner sync**
    - update Story, iteration, parent, Board, and user/reference docs named by the Story.
 6. **Validation and commit**

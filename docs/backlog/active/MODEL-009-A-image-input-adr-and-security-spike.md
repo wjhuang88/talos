@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-A |
 | Type | Spike / Decision Story |
 | Priority | P2 |
-| Status | Refinement — selected into I149 (2026-07-20) |
+| Status | Complete — ADR-050 Accepted on all 10 safety-critical points (2026-07-20); security review complete. I149 Complete. No production image sending. Completion Commit: `9332f2a`. |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-008-B (I148) custom provider + model discovery; ADR-013 provider config; ADR-023 credential boundary; SEC-001/ADR-047 external-path authorization |

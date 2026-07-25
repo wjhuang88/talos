@@ -1,8 +1,8 @@
-# MODEL-009: Provider Removal And Credential Clear
+# MODEL-010: Provider Removal And Credential Clear
 
 | Field | Value |
 | --- | --- |
-| Story ID | MODEL-009 |
+| Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
 | Status | Ready (2026-07-24; 4 open questions resolved below) |

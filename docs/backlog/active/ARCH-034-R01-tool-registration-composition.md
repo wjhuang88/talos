@@ -10,7 +10,7 @@
 | Source | ARCH-034-F01 audit finding; maintainer requirement, 2026-07-22 |
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
-| Blocks | Future tool additions, including follow-on registration of I154 `read_image` |
+| Blocks | Future built-in tool additions and ARCH-031-A feature-boundary work |
 | Selected Iteration | I158 (Blocked — gated on ADR-053 Accepted; not yet Ready) |
 
 ## Problem
@@ -61,7 +61,10 @@ Create one explicit, testable registration composition model:
   presentation, MCP protocol, or runtime tool execution.
 - No generic “tool configuration DSL,” dynamic loading redesign, plugin protocol expansion, or
   broad tool-list product changes.
-- No implementation of I154 `read_image` as part of this story; I154 remains independently scoped.
+- Migrate the already-delivered I154 `read_image` registration into exactly one authoritative
+  contribution declaration.
+- Preserve its Supported-model capability gate, permission boundary, presentation filtering, safe
+  result projection, and one-shot provider continuation behavior.
 
 ## Design Direction To Validate In ADR
 
@@ -141,8 +144,11 @@ stays Blocked. The Accepted ADR must record:
       load/collision behavior.
 - [ ] `ToolPresentationPolicy` continues to filter the final executable registry; a registered
       but unpresented tool remains non-executable to a model as it is today.
-- [ ] I154 `read_image` can be added by one contribution declaration plus an explicit
-      capability-gated composition rule, without copying a registration list.
+- [ ] The existing I154 `read_image` registration is represented by one authoritative contribution
+      declaration and one explicit capability-gated composition rule, with no duplicated
+      registration list.
+- [ ] Existing I154 permission, Supported-model gating, presentation filtering, safe projection, and
+      one-shot continuation tests remain green.
 
 ### Regression / validation
 

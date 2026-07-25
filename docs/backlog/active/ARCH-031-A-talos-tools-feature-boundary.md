@@ -40,6 +40,42 @@ Before implementation, the developer must record:
 
 Do not trust this Story's candidate names if current code has changed. Record any mismatch before editing.
 
+## Feature Ownership Matrix
+
+Based on `crates/talos-tools/src/lib.rs` and `crates/talos-tools/Cargo.toml` (verified 2026-07-26).
+Cells marked "Decision required before Ready" must be resolved before this Story can leave
+Refinement. This section documents ownership; it does NOT implement any feature.
+
+| Module / Public Export | Proposed Feature | Optional Dependencies | Default | Notes |
+|---|---|---|---|---|
+| `file_tools` (`read`, `ls`) | `file-read` | (none beyond core) | on | `tree` shares read-only file access; see below |
+| `file_tools` (`write`, `edit`, `delete`) | `file-write` | (none beyond core) | off | mutating; permission-gated |
+| `search_tools` (`glob`, `grep`) | `search` | `grep-searcher`, `grep-regex`, `grep-matcher`, `ignore`, `walkdir`, `regex`, `glob` | on | ripgrep library crates (ADR-025) |
+| `tree` | `search` (or `file-read`) | `walkdir` | on | Decision required before Ready: group with `search` or `file-read` |
+| `diff_stat` (`DiffTool`, `StatTool`) | `git` (or `file-write`) | `similar` | off | Decision required before Ready: diff engine is `similar`; currently grouped with git display but usable without git |
+| `bash_tool` | `shell` | `libc` (unix), `talos-sandbox` | off | process/sandbox; security-sensitive |
+| `exec_tool` | `shell` | `talos-sandbox` | off | shares the `shell` feature with `bash_tool` |
+| `git` | `git` | `gix` | off | heavy native-ish dep; write tools route through permission |
+| `fetch_url` | `network` | `reqwest`, `scraper` | off | network + HTML parse |
+| `http_request` | `network` | `reqwest` | off | advanced HTTP; shares `network` with `fetch_url` |
+| `save_url` | `network` (+ `file-write`) | `reqwest` | off | dual network+write; both features required |
+| `web_search` | `network` (or `web-search`) | `rust-websearch` | off | Decision required before Ready: separate `web-search` alias or fold into `network` |
+| `search_engine` | `network` (or `web-search`) | (supports web_search) | off | grouped with `web_search` |
+| `browser_page` | `network` (or dedicated) | (lightweight) | off | Decision required before Ready: connector/link model; currently no heavy dep |
+| `document_extract` | `document` (or `file-read`) | (text/HTML/JSON/CSV/MD/XML only) | Decision required before Ready | local text extraction; no native dep; default-on candidate |
+| `symbol` | `code-intelligence` | `arborium` (25 langs) | off | heaviest dep; tree-sitter via arborium (ADR-020) |
+| `read_image_tool` | `image` | `image`, `sha2` | off | image decode; capability-gated (ADR-050/051); shares `image` with `image_validation` |
+| `image_validation` | `image` | `image`, `sha2` | off | shared ingestion/validation; same gate as `read_image_tool` |
+
+Feature combination rule: a tool requiring multiple features (e.g. `save_url` =
+`network` + `file-write`) is enabled only when ALL listed features are enabled. The default
+feature set is `file-read` + `search` only. Alias features (`coding`, `network`, `full`) are
+documented in the Required Feature Model below and resolve to explicit feature unions.
+
+Open ownership decisions (block Ready until resolved): `tree`, `diff_stat`, `web_search`/
+`search_engine`, `browser_page`, and `document_extract` grouping. These are recorded here, not
+guessed.
+
 ## Required Feature Model
 
 Use these stable public feature groups unless the baseline proves a concrete incompatibility. Any
