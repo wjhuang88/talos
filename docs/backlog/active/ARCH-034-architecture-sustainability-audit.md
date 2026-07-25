@@ -36,6 +36,10 @@ fitness checks that prevent uncontrolled code accumulation.
    introduces only evidence-backed prevention checks after A/B.
 4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Refinement,
    turns accepted finding F01 into an ADR-gated, behavior-preserving tool-composition story.
+   Gated by [ADR-053](../../decisions/053-tool-registration-composition.md) (Proposed): the story
+   cannot become Ready and [I158](../../iterations/I158-tool-registration-composition.md) cannot be
+   activated until ADR-053 is Accepted by architecture/maintainer review. Status unchanged until
+   then.
 
 ## Audit Dimensions
 

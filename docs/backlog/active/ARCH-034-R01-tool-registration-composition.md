@@ -11,6 +11,7 @@
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
 | Blocks | Future tool additions, including follow-on registration of I154 `read_image` |
+| Selected Iteration | I158 (Blocked — gated on ADR-053 Accepted; not yet Ready) |
 
 ## Problem
 
@@ -96,6 +97,8 @@ and reject any approach that relies on hidden global initialization.
 
 ## Required Reads
 
+- `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+- `docs/decisions/053-tool-registration-composition.md` (Proposed — required gate)
 - `docs/reference/ARCHITECTURE.md` — Tool Presentation and crate boundaries
 - `docs/reference/ARCHITECTURE-AUDIT-2026-07.md` — F01 and R01
 - `docs/reference/ARCHITECTURE-AUDIT-2026-07-findings.json` — ARCH-034-F01
@@ -110,7 +113,10 @@ and reject any approach that relies on hidden global initialization.
 
 ## Readiness Gate
 
-This story becomes Ready only after a dedicated ADR records:
+This story becomes Ready only after [ADR-053](../../decisions/053-tool-registration-composition.md)
+is **Accepted**. ADR-053 is currently Proposed; until it is accepted by architecture/maintainer
+review, this story stays Refinement and [I158](../../iterations/I158-tool-registration-composition.md)
+stays Blocked. The Accepted ADR must record:
 
 1. the additive core API and downstream migration path;
 2. ownership of built-in factories/descriptors versus mode composition;

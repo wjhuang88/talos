@@ -10,6 +10,7 @@
 | Parent Epic | None (follow-up to TUI-034 adaptive-width work) |
 | Depends on | TUI-034 (adaptive history width; shipped the tool-RESULT wrap but missed tool-CALL lines and resize); TUI-025 (tool argument one-line fit); ADR-035 |
 | Blocks | None |
+| Selected Iteration | I156 (Planned — next activation; not yet In Progress) |
 
 ## Problem
 
@@ -233,6 +234,8 @@ Technical / governance:
 
 ## Required Reads
 
+- `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+- `docs/iterations/I156-tui-narrow-viewport-resize.md`
 - `docs/backlog/active/TUI-034-adaptive-history-width-and-tool-output-visibility.md`
 - `docs/backlog/active/TUI-025-tool-argument-line-fit-display.md`
 - `docs/backlog/active/TUI-015-head-tail-truncation.md`

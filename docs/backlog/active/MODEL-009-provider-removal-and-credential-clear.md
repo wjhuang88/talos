@@ -10,6 +10,7 @@
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
+| Selected Iteration | I157 (Planned; activation gate: I156 Complete; not yet In Progress) |
 
 ## Problem
 
@@ -180,6 +181,8 @@ Technical / governance:
 
 ## Required Reads
 
+- `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+- `docs/iterations/I157-provider-removal-credential-clear.md`
 - `docs/backlog/active/MODEL-008-interactive-custom-provider-registration.md`
 - `docs/backlog/active/MODEL-008-A-interactive-custom-provider-wizard.md`
 - `docs/decisions/013-provider-config-schema-boundary.md`

@@ -73,8 +73,27 @@ unclear and lets product-layer coupling hide inside internal dependencies.
    - Treat `talos-cli` as a binary package candidate, not a reusable library crate.
    - Plan the supported install command as `cargo install talos-cli --bin talos` because the
      top-level `talos` package name is already taken on crates.io.
-   - Before removing `publish = false`, verify package metadata/readme, included binary target,
-     install from local path, publish dry-run, and README install instructions.
+    - Before removing `publish = false`, verify package metadata/readme, included binary target,
+      install from local path, publish dry-run, and README install instructions.
+
+## Child Stories / Execution Slices
+
+The v0.6 runtime productization program converts the Candidate Slices above into bounded,
+sequenced child stories. Each child story owns its own acceptance; ARCH-031 remains the parent
+and stays `In Progress`. See
+[program](../../tasks/2026-07-26-v0.6-runtime-productization-program.md) for the activation order
+and gates.
+
+| Child Story | Owns Candidate Slice | Selected Iteration | Initial State | Activation Gate |
+|---|---|---|---|---|
+| [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Refinement — blocked on I158 | I158 Complete (which requires ADR-053 Accepted) |
+| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Refinement — blocked on ARCH-031-A | I159 Complete |
+| [ARCH-031-C](ARCH-031-C-sandbox-fallback-and-coding-preset.md) | (new) `SandboxFallbackPolicy` + `RuntimePreset::coding()` (ADR-052) | I161 | Refinement — blocked on ARCH-031-B + security review | I160 Complete; independent security review scheduled |
+| [ARCH-031-D](ARCH-031-D-v0.6-sdk-publication-readiness.md) | 1/3/5 (matrix, dry-run, docs/release gate) at v0.6 alignment | I162 | Refinement — blocked on ARCH-031-C | I161 Complete; workspace green |
+
+Candidate Slices 2 (Manifest readiness) and 6 (Cargo install path) remain open acceptance items
+under ARCH-031 directly and are not yet satisfied (see Acceptance Criteria). None of the child
+stories is activated by this staging; their gates are sequential and ADR-053-gated.
 
 ## Acceptance Criteria
 
@@ -229,6 +248,13 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 
 ## Required Reads
 
+- `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+- `docs/decisions/052-sdk-publication-and-composition-boundary.md`
+- `docs/decisions/053-tool-registration-composition.md` (Proposed — gates ARCH-034-R01/I158, not ARCH-031 directly)
+- `docs/backlog/active/ARCH-031-A-talos-tools-feature-boundary.md`
+- `docs/backlog/active/ARCH-031-B-shared-cli-runtime-composition.md`
+- `docs/backlog/active/ARCH-031-C-sandbox-fallback-and-coding-preset.md`
+- `docs/backlog/active/ARCH-031-D-v0.6-sdk-publication-readiness.md`
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
 - `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
 - `docs/iterations/I045-product-readiness-model-lifecycle-observability.md`
