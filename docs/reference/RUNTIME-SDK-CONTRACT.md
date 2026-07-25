@@ -71,7 +71,10 @@ If an embedder has a compelling reason to use `talos-agent` directly (bypassing 
    wrapping. The embedder is responsible for installing permission rules and approval handlers.
 5. **Publication gate.** `talos-agent` is a gate-before-publish crate (see
    [CRATE-PUBLICATION-MATRIX](CRATE-PUBLICATION-MATRIX.md) row 13). It is not on crates.io and may
-   not be published until sandbox/tools dependency gates clear.
+   not be published until sandbox/tools dependency gates clear. Per
+   [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) it will be published as
+   an **implementation dependency only** (route A: `talos-sandbox` → `talos-tools` → `talos-agent`
+   → `talos-runtime`), never promoted to a second supported SDK entrypoint.
 
 ## Embedding Patterns
 
@@ -154,6 +157,60 @@ handle.preview_request("What would you send for this?")?;
 
 `PermissionRule` entries are evaluated before the engine's default fallback. Rules can `Allow`,
 `Deny`, or `Ask` for specific tools, paths, or operation types.
+
+## Planned Additions (ADR-052 — Not Yet Implemented)
+
+[ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) decided the following SDK
+surface additions. They are **design commitments, not shipped APIs**; this section is a forward
+contract and MUST NOT be read as "already available." Each lands through ARCH-031 slices under
+iteration governance, and this document is updated to the "Supported" tables above only when the
+implementation commit exists.
+
+### Caller-selected sandbox fallback
+
+When sandbox isolation is unavailable, the SDK will expose an explicit, caller-selected policy
+instead of silently choosing a product default:
+
+```rust,ignore
+pub enum SandboxFallbackPolicy {
+    Deny,             // reject sandbox-required execution when isolation is unavailable (default)
+    Ask,              // route the unsandboxed fallback decision through the approval mechanism
+    AllowUnsandboxed, // caller explicitly accepts direct execution for that runtime
+}
+```
+
+- Default is `Deny` (omission is fail-closed).
+- `talos-sandbox` remains policy-neutral (typed availability/errors only; no runtime/UI policy).
+- Replacing any existing sandbox boolean/implicit fallback follows the pre-1.0 change policy below,
+  with a migration note and, where practical, one minor cycle of deprecated compatibility.
+
+### Official coding preset
+
+`RuntimeBuilder::new()` stays minimal and composition-first; an explicit, overridable preset will
+reproduce Talos-owned coding defaults without copying internal registry construction:
+
+```rust,ignore
+let runtime = RuntimeBuilder::new()
+    .preset(RuntimePreset::coding())
+    .provider(provider)
+    .workspace_root(workspace)
+    .sandbox_fallback(SandboxFallbackPolicy::Ask)
+    .build()?;
+```
+
+- The preset is explicit, inspectable, and overridable; it never hides write/execute/network
+  actions from the permission pipeline.
+- It must construct through the same shared registry and safety pipeline as the product CLI so CLI
+  and SDK share tool registration, permission defaults, and session semantics (verified by tests,
+  not documentation alone).
+
+### `talos-tools` default surface
+
+Under ADR-052 the SDK's default tool surface is **local read-only** (file-read + search). Write,
+shell, git, network/web, image, and heavy code-intelligence families are opt-in via explicit
+features or the coding preset. Embedders that need the former broad set must select features or the
+preset explicitly. This changes default transitive dependency/capability behavior and will be listed
+in release notes when it lands.
 
 ## Pre-1.0 Change Policy
 

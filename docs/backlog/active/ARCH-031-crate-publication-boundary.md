@@ -1,11 +1,11 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: In Progress (publication classification enforced)
+**Status**: In Progress (publication classification enforced; SDK/composition boundary decided by ADR-052)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
 not only available through `talos-runtime`
-**Depends on**: `RUNTIME-001`; ADR-024; `TOOL-012`; `TOOL-013`; `DIST-001`; `REL-002`
+**Depends on**: `RUNTIME-001`; ADR-024; ADR-052; `TOOL-012`; `TOOL-013`; `DIST-001`; `REL-002`
 
 ## Problem
 
@@ -172,7 +172,30 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   `publish = false` crate.
 - No crate was published, no `publish = false` guard was removed, and no release tag was created.
 
-## Required Reads
+2026-07-24:
+
+- ADR-052 (SDK Publication And Runtime Composition Boundary) was accepted, deciding the SDK and
+  composition questions this story had left open:
+  - Publication proceeds via **route A** in dependency order
+    `talos-sandbox` → `talos-tools` → `talos-agent` → `talos-runtime`; the ADR is architecture and
+    sequencing only and is **not** authorization to publish.
+  - `talos-agent` is publishable as an **implementation dependency only**, not a supported SDK
+    entrypoint; embedders continue to use `talos-runtime` (resolves Acceptance item
+    "implementation crates document direct-use caveats").
+  - Sandbox fallback becomes an explicit caller choice: `SandboxFallbackPolicy`
+    (`Deny`/`Ask`/`AllowUnsandboxed`, default `Deny`); `talos-sandbox` stays policy-neutral.
+  - `talos-tools` gets **lightweight read-only defaults**; write/shell/git/network/web/image and
+    heavy code-intelligence families are opt-in or enabled via an explicit preset (feeds Candidate
+    Slice 4 and the `talos-tools` gate).
+  - `talos-runtime` gains an explicit overridable `RuntimePreset::coding()` that never bypasses the
+    permission pipeline.
+  - CLI and SDK keep **separate public entrypoints sharing one internal composition**; a new
+    `talos-runtime-core`-style crate is **not** authorized until a later demonstrated need.
+  - A general-purpose third-party UI SDK is **deferred**; `talos-conversation` remains experimental
+    and product-oriented (docs must not market it as a supported UI framework).
+- No crate was published, no `publish = false` guard was removed, and no release tag was created.
+  Implementation is activated through ARCH-031 slices under normal iteration governance; ADR-052
+  Phases 1–5 map onto the Candidate Slices and remaining Acceptance items.
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
 - `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
@@ -190,6 +213,7 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`
 - `docs/decisions/024-embeddable-runtime-api-boundary.md`
 - `docs/decisions/025-ripgrep-library-search-engine.md`
+- `docs/decisions/052-sdk-publication-and-composition-boundary.md`
 - `Cargo.toml`
 - `crates/*/Cargo.toml`
 
@@ -197,7 +221,10 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 
 1. Should the first real publish happen before or after the 1.0 self-bootstrap gate?
 2. Which crate names should be reserved on crates.io before APIs are fully stable?
-3. Should `talos-tui` be a reusable UI library package or product-only implementation detail?
+3. ~~Should `talos-tui` be a reusable UI library package or product-only implementation detail?~~
+   **Resolved by ADR-052**: no general-purpose UI SDK is committed now; `talos-tui` stays
+   product-only and `talos-conversation` remains experimental/product-oriented. Revisit only when a
+   real second external frontend needs a stable contract.
 4. Should post-1.0 crates move to independent versions, or stay lockstep for user simplicity?
 5. Should the CLI Cargo package remain `talos-cli`, or should a later release choose another
    available package name for product branding while still shipping the `talos` binary?

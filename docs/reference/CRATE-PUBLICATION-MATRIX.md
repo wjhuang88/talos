@@ -131,15 +131,43 @@ These crates are intentionally not published yet:
 
 | Crate | Current decision | Required gate before publish |
 |---|---|---|
-| `talos-sandbox` | Candidate, high risk | Security review against escape vectors, platform behavior docs, ADR-007/ADR-008/ADR-020 dependency boundary check, targeted sandbox tests. |
-| `talos-tools` | Candidate, high risk | Feature-gate plan for heavy/default tools, permission profile audit, network/write/execute tool boundary docs, dry-run after `talos-sandbox` decision. |
-| `talos-agent` | Candidate, transitional | Decide whether public consumers should depend on `talos-agent` directly or only through `talos-runtime`; publish only after sandbox/tools/memory/session dependency support is clear. |
-| `talos-runtime` | Candidate, SDK facade | Resolve dependency closure: either publish required implementation crates or decouple runtime from unpublished implementation surfaces; document pre-1.0 SDK support contract. |
+| `talos-sandbox` | Candidate, high risk | Security review against escape vectors, platform behavior docs, ADR-007/ADR-008/ADR-020 dependency boundary check, targeted sandbox tests. Per ADR-052: route-A step 1; stays policy-neutral (typed availability/errors), fallback policy owned by the SDK caller. |
+| `talos-tools` | Candidate, high risk | Feature-gate plan for heavy/default tools, permission profile audit, network/write/execute tool boundary docs, dry-run after `talos-sandbox` decision. Per ADR-052: route-A step 2; lightweight read-only defaults, opt-in write/shell/git/network/image/code-intelligence. |
+| `talos-agent` | Candidate, transitional | Decide whether public consumers should depend on `talos-agent` directly or only through `talos-runtime`; publish only after sandbox/tools/memory/session dependency support is clear. Per ADR-052: route-A step 3; published as an **implementation dependency only**, not a supported SDK; crate docs must carry direct-use caveats. |
+| `talos-runtime` | Candidate, SDK facade | Resolve dependency closure: either publish required implementation crates or decouple runtime from unpublished implementation surfaces; document pre-1.0 SDK support contract. Per ADR-052: route-A step 4 (final); adds caller-selected `SandboxFallbackPolicy` and an explicit `RuntimePreset::coding()`. |
 | `talos-mcp` | Candidate, protocol sensitive | MCP support boundary ADR or equivalent doc, server opt-in/conflict policy, transport/auth non-goals, dry-run after `talos-tools` decision. |
 | `talos-dashboard` | Product-only now | Keep `publish = false`; no remote/control-surface package publication without a new dashboard distribution decision. |
 | `talos-evolution` | Product-only now | Prove an external reusable API; remove `publish = false` only through a new story/decision. |
 | `talos-tui` | Product-only now | Decide to offer reusable TUI library; otherwise keep product UI out of crates.io. |
 | `talos-cli` | Binary package candidate | Add package metadata/readme for crates.io, ensure the `talos` bin target is included, verify `cargo install --path crates/talos-cli --bin talos` and `cargo publish --dry-run -p talos-cli`, document that only the binary is supported, then remove `publish = false` through an explicit release gate. |
+
+## ADR-052 Route-A Publication Order (2026-07-24)
+
+[ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) selected **route A** to
+complete `talos-runtime` publication: harden and publish the required dependency closure in
+dependency order rather than redesigning the runtime first. This ADR decides architecture and
+sequencing only; it is **not** authorization to run `cargo publish`, and it does not remove any
+`publish = false` guard.
+
+Route-A order (each step still passes its own gate-before-publish review above):
+
+```text
+talos-sandbox → talos-tools → talos-agent → talos-runtime
+```
+
+Boundary decisions carried into the gate table:
+
+- `talos-agent` is a published **implementation dependency only**; embedders use `talos-runtime`.
+- `talos-sandbox` stays policy-neutral; sandbox fallback is a caller-selected
+  `SandboxFallbackPolicy` (`Deny` default) in the SDK.
+- `talos-tools` ships lightweight read-only defaults; heavier families are opt-in or enabled by an
+  explicit `RuntimePreset::coding()`.
+- CLI and SDK keep separate public entrypoints sharing one internal composition; no new
+  composition crate is authorized yet.
+- No general-purpose UI SDK is committed; `talos-conversation` stays experimental/product-oriented
+  and `talos-tui` stays product-only (`publish = false`).
+
+No crate was published and no guard was removed by recording this decision.
 
 ## Name Reservation Plan
 

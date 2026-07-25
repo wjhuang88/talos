@@ -6,6 +6,15 @@ Accepted as the implementation baseline on 2026-06-29 for publication-readiness 
 release/ADR gate is still required before any real crates.io publish or placeholder name
 reservation.
 
+**Superseded for decision authority by [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md)
+(2026-07-24).** ADR-052 converts this proposal's direction into an accepted decision: route-A
+dependency-order publication (`talos-sandbox` → `talos-tools` → `talos-agent` → `talos-runtime`),
+`talos-agent` as an implementation dependency only, caller-selected `SandboxFallbackPolicy`,
+lightweight read-only `talos-tools` defaults, an explicit `RuntimePreset::coding()`, shared
+CLI/SDK internal composition, and a deferred general-purpose UI SDK. This document is retained as
+background/rationale; ADR-052 governs the boundary going forward and neither authorizes a real
+publish.
+
 Created 2026-06-28 from the requirement that Talos-owned capabilities should be distributable as
 crates, not only as the `talos` binary or the `talos-runtime` SDK facade.
 
