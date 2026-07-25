@@ -3,6 +3,22 @@
 //! This crate provides implementations of the [`AgentTool`] trait for common
 //! agent operations such as shell command execution, file operations, and
 //! AST-aware symbol queries.
+//!
+//! # Current state
+//!
+//! Today this crate aggregates the full tool family — file/search, Git (`gix`),
+//! shell (`bash`/`exec`), HTTP/web (`reqwest`/`scraper`/`rust-websearch`),
+//! image (`image`), and code intelligence (`arborium`) — as **hard
+//! dependencies**. There are currently NO Cargo feature gates: a default build
+//! resolves and compiles all of these heavy families.
+//!
+//! Under
+//! [ADR-052](../../docs/decisions/052-sdk-publication-and-composition-boundary.md)
+//! the intended direction is a lightweight **read-only default** (file-read +
+//! search) with write/shell/git/network/image/code-intelligence behind opt-in
+//! features or an explicit preset. That feature-gating is **not yet
+//! implemented**; until it lands, this crate's default dependency weight is
+//! the full set above.
 
 pub mod bash_tool;
 pub mod browser_page;

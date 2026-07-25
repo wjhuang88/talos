@@ -8,7 +8,7 @@ Talos is a Rust-based agent runtime, starting as a CLI tool and evolving into a 
 platform.
 
 **Language**: Rust (stable, edition 2024)
-**Workspace**: Cargo workspace with 16 crates under `crates/`
+**Workspace**: Cargo workspace with crates under `crates/`; `Cargo.toml` is the source of truth for membership.
 **Architecture**: See `docs/reference/ARCHITECTURE.md`
 
 ## Hard Constraints

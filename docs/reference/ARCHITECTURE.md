@@ -43,8 +43,29 @@ Talos crates are introduced progressively across iterations (see Implementation 
 | `talos-plugin` | I009 | Plugin runtime for third-party extensions (hook-based first, WASM as option). |
 | `talos-mcp` | I009 | Model Context Protocol implementation for external tool and resource access. |
 | `talos-rpc` | I009 | API layer for remote interaction and frontend integration. |
-| `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. |
+| `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. Experimental, product-oriented (ADR-052). |
 | `talos-runtime` | RUNTIME-001 | Embeddable SDK facade for other Rust projects. Wraps `talos-agent` behind safe runtime construction and typed session handles without depending on CLI/TUI. |
+| `talos-memory` | I019 | Layered agent memory (episodic/semantic/procedural) and consolidation over `talos-session` storage. |
+| `talos-exploration` | I054 | Research-library ingestion and SQLite/FTS-backed search over local sources. |
+| `talos-dashboard` | WEB-001 | Product-only loopback control/dashboard surface (ADR-031); not wired into the SDK. |
+| `talos-models` | (quarantined) | Non-runtime SQLite catalog store (historical/foundation only); runtime uses packaged `models.toml`. Quarantined by MC-002; must not be wired into any CLI/TUI/runtime path. |
+
+### Crate Distribution Boundary (ADR-052)
+
+The full workspace membership is defined by root `Cargo.toml` (source of truth). Per
+[ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) the current distribution
+boundary is:
+
+- `talos-runtime` — supported SDK facade (embedders use `RuntimeBuilder` / `RuntimeHandle`).
+- `talos-agent` — implementation dependency; published only to satisfy the runtime closure, NOT a
+  supported SDK entrypoint.
+- `talos-conversation` — experimental, product-oriented; published but NOT a general-purpose UI SDK.
+- `talos-cli` and `talos-runtime` — share internal composition direction (single Agent/session/tool
+  assembly), but this shared layer is NOT yet extracted; no new composition crate is authorized.
+- Product-only (`talos-cli`, `talos-tui`, `talos-evolution`, `talos-dashboard`) and quarantined
+  (`talos-models`) crates carry `publish = false`.
+
+See `CRATE-PUBLICATION-MATRIX.md` for per-crate publication/readiness state.
 
 ### Session Persistence Boundary
 

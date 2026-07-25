@@ -12,8 +12,29 @@
 //! 3. **Execute** — the tool is invoked directly
 //! 4. **Retry on denial** — denied calls return an error result
 //!
-//! The `Ask` decision defaults to `Deny` at the agent level; interactive
-//! approval is handled by the CLI layer.
+//! The `Ask` decision defaults to `Deny` at the agent level. Both the CLI layer
+//! and an embedded runtime may bridge `Ask` to an interactive approval handler;
+//! with no approval handler configured, `Ask` still fails closed (`Deny`).
+//!
+//! # Support Boundary
+//!
+//! This crate owns the **turn-loop implementation**. It may be published to
+//! crates.io only to satisfy the `talos-runtime` dependency closure under
+//! [ADR-052](../../docs/decisions/052-sdk-publication-and-composition-boundary.md)
+//! (route A). It is **not** a recommended or supported SDK entrypoint.
+//!
+//! - Embedders should use `talos_runtime::RuntimeBuilder` (in the `talos-runtime`
+//!   facade crate) to construct a safe runtime that wraps permission, approval,
+//!   and sandbox policy.
+//! - Direct users of `talos-agent` bypass that wrapping and are themselves
+//!   responsible for installing equivalent permission rules, an approval
+//!   handler, and a sandbox policy.
+//! - Its public constructors and configuration methods are NOT covered by the
+//!   runtime SDK contract and may change more frequently than the facade
+//!   surface during the pre-1.0 period.
+//!
+//! See `docs/reference/RUNTIME-SDK-CONTRACT.md` for the supported embedding
+//! surface.
 
 pub mod compaction;
 pub mod compression;

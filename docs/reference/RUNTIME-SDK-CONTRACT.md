@@ -30,7 +30,7 @@ These are the only types covered by this contract.
 | `Usage` | Token usage statistics |
 | `TurnCompletionStatus` | Turn outcome: `Success`, `Cancelled`, or `Error` |
 | `ToolNature` | Risk classification: Read / Write / Execute / Network |
-| `ToolProvenance` | Tool origin: Native or McpRemote |
+| `ToolProvenance` | Tool origin: `Native`, `McpRemote { server }`, or `Plugin { name, version, carrier }` (ADR-028) |
 | `ApprovalChoice` | User decision: `ApproveOnce`, `AlwaysApprove`, `Deny` |
 | `Message` | Conversation message types |
 | `ToolDefinition` | Provider-facing tool schema |
@@ -45,6 +45,16 @@ These are the only types covered by this contract.
 | `PermissionRule` | `talos-permission` | Allow/deny/ask rules |
 | `SandboxProvider` | `talos-sandbox` | Optional sandbox for isolation |
 
+### Re-export boundary
+
+Only the types re-exported **by `talos-runtime` itself** (plus the `talos-core` protocol types it
+re-exports) are covered by this SDK contract. The extension traits above are listed for orientation:
+`LanguageModel` and `AgentTool` live in `talos-core` and ARE reached through the facade; but
+`PermissionRule` and `SandboxProvider` require depending on `talos-permission` / `talos-sandbox`
+directly when an embedder implements them. Those lower-level published crates have their own
+independent pre-1.0 public APIs; depending on them directly is supported by those crates' own
+support boundaries, not by this runtime SDK contract.
+
 ## Implementation Surface (NOT Supported)
 
 The following are internal implementation details. Embedders should NOT depend on them directly:
@@ -52,7 +62,7 @@ The following are internal implementation details. Embedders should NOT depend o
 | Crate / Type | Why Not Supported |
 |---|---|
 | `talos-agent` constructors | The turn-loop implementation crate; its API may change without notice. Use `RuntimeBuilder` instead. |
-| `talos-session` internals | Session storage and JSONL management; not a public embedding API. |
+| `talos-session` internals | Session storage internals (TLOG durable format, archival, SQLite index) are not a public embedding API. This excludes only session INTERNALS — the published `talos-session` crate retains its own independent pre-1.0 public API. |
 | `AppServerSession` | The actor that drives the conversation loop; managed by `RuntimeHandle`. |
 | `talos-tui` | Product UI; not a reusable library. |
 | `talos-cli` library types | Binary package; library API is explicitly unsupported (binary-only per T06). |
@@ -181,6 +191,14 @@ pub enum SandboxFallbackPolicy {
 
 - Default is `Deny` (omission is fail-closed).
 - `talos-sandbox` remains policy-neutral (typed availability/errors only; no runtime/UI policy).
+- **Orthogonal to permission policy:** `AllowUnsandboxed` never grants any tool/path/execute/network
+  permission. Normal permission evaluation (rules, tool natures, `Deny` precedence) still runs in
+  full; the fallback only decides whether execution may continue when isolation is unavailable.
+- **`Ask` is a distinct, scoped approval:** it MUST carry an identifiable sandbox-fallback
+  reason/context to the approval layer (not the same meaning as a normal tool-permission approval);
+  authorization is scoped to at least the current invocation/runtime (never an implicit permanent
+  allowance); with no approval handler it MUST fail closed (equivalent to `Deny`); a normal
+  `AlwaysApprove` tool-permission rule MUST NOT auto-permanently-allow unsandboxed execution.
 - Replacing any existing sandbox boolean/implicit fallback follows the pre-1.0 change policy below,
   with a migration note and, where practical, one minor cycle of deprecated compatibility.
 
@@ -200,6 +218,10 @@ let runtime = RuntimeBuilder::new()
 
 - The preset is explicit, inspectable, and overridable; it never hides write/execute/network
   actions from the permission pipeline.
+- **Precedence:** explicit caller configuration (permission rules, sandbox policy, tool selection)
+  overrides preset defaults. A preset MUST NOT override or weaken an explicit `Deny`, a permission
+  rule, or a sandbox requirement. A preset only provides default composition and gains NO additional
+  authorization capability.
 - It must construct through the same shared registry and safety pipeline as the product CLI so CLI
   and SDK share tool registration, permission defaults, and session semantics (verified by tests,
   not documentation alone).

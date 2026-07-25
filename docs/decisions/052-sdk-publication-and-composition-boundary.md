@@ -268,6 +268,59 @@ single-direction session -> conversation projection -> UI architecture remains i
    - Do not promise third-party UI compatibility or stability.
    - Preserve the existing conversation/TUI separation and ordered session-event architecture.
 
+## Clarifying Amendments (2026-07-26)
+
+These amendments refine, and do not change, the main Decision above. They were added after a
+documentation/governance drift audit to remove ambiguity in how the decision is read.
+
+1. **The four-gate order is logical, not a release command sequence.**
+   `talos-sandbox → talos-tools → talos-agent → talos-runtime` is the logical order of the **remaining
+   gate crates only**. It is not the complete, directly-executable release command sequence. The real
+   `talos-runtime` publication closure is wider — it includes already-published foundation crates
+   (`talos-core`, `talos-permission`, `talos-skill`, `talos-plugin`, `talos-memory`, `talos-session`)
+   in addition to the four gate crates. The actual release order MUST be generated from the current
+   `cargo metadata` dependency graph, and every closure crate must ship a version compatible with the
+   current workspace version before `talos-runtime` can resolve. The four-item list is a gate-ordering
+   shorthand, not a publish script.
+
+2. **`SandboxFallbackPolicy` is orthogonal to permission policy.**
+   `AllowUnsandboxed` NEVER implies that any tool, path, execute, or network permission has been
+   granted. Normal permission evaluation (permission rules, tool natures, `Deny` precedence) still
+   runs in full. The fallback policy ONLY decides whether execution may continue when sandbox
+   isolation is unavailable — it never authorizes an action that the permission pipeline would
+   otherwise reject.
+
+3. **`Ask` fallback is a distinct, scoped approval, not a tool-permission approval.**
+   - The runtime MUST present an identifiable sandbox-fallback reason/context to the approval layer,
+     distinct from a normal tool-permission approval.
+   - A sandbox-fallback approval MUST NOT be conflated with a tool permission approval; granting one
+     does not grant the other.
+   - Authorization MUST be scoped to at least the current invocation/runtime; it MUST NOT silently
+     become a process-wide or permanent allowance.
+   - With no approval handler, `Ask` MUST fail closed (equivalent to `Deny`).
+   - A normal `AlwaysApprove` tool-permission rule MUST NOT auto-permanently-allow unsandboxed
+     execution. Tool permission scope and sandbox-fallback scope are independent.
+
+4. **Preset precedence is explicit-over-implicit and cannot weaken security.**
+   - Explicit caller configuration (permission rules, sandbox policy, tool selection) overrides preset
+     defaults.
+   - A preset MUST NOT override or weaken an explicit `Deny`, a permission rule, or a sandbox
+     requirement.
+   - A preset only provides a default composition; it gains NO additional authorization capability
+     beyond what the caller could configure directly.
+
+5. **`talos-tools` lightweight-default acceptance requires real optional dependencies, not hidden registration.**
+   - Heavy dependencies (`gix`, `arborium`, `reqwest`/`scraper`/`rust-websearch`, `image`, shell/process
+     native bindings) MUST become truly OPTIONAL Cargo dependencies gated behind features.
+   - The corresponding modules AND their public re-exports MUST be behind feature gates.
+   - A default build MUST NOT resolve or compile shell, network, Git, image, or code-intelligence
+     heavy dependencies. Merely hiding tool registration while still compiling the dependency is NOT
+     sufficient for acceptance.
+
+These amendments describe target semantics. `SandboxFallbackPolicy`, `RuntimePreset`, and the
+`talos-tools` feature gates remain **not yet implemented** until their implementation commits land
+through ARCH-031 slices.
+
 ## Implementation Plan
 
 Implementation must be activated through ARCH-031 and normal iteration governance.

@@ -3,17 +3,27 @@
 //! Owns all conversation state and event processing, sitting between the
 //! Agent Loop and the UI Loop. Communicates via typed async channels.
 //!
-//! This crate is the reusable state/command layer for Talos-style interfaces. Its pre-1.0 support
-//! boundary is:
+//! # Support Boundary (experimental, product-oriented)
+//!
+//! This crate is currently Talos's product-level, UI-independent state and
+//! projection layer. It is published on crates.io, but being published does
+//! NOT constitute a general-purpose UI SDK support commitment. The API is
+//! experimental pre-1.0, and external direct users should NOT assume
+//! Talos-independent UI compatibility.
+//!
+//! Under [ADR-052](../../docs/decisions/052-sdk-publication-and-composition-boundary.md) a
+//! general-purpose third-party UI SDK remains deferred; this crate is not
+//! marketed as a supported UI framework. The existing conversation/TUI
+//! layering (single-direction session → conversation → UI projection) is
+//! preserved and must not be broken.
+//!
+//! Within that boundary, the pre-1.0 integration surface is:
 //!
 //! - typed conversation inputs and UI outputs are public integration surfaces;
 //! - terminal rendering, keyboard handling, and visual layout are owned by `talos-tui`;
 //! - provider execution and tool execution are owned by the runtime/agent layers;
 //! - command registration is reusable, but built-in command semantics may still evolve before 1.0;
-//! - consumers should expect additive events and fields while the external UI contract settles.
-//!
-//! Alternate UIs can depend on this crate to share conversation state transitions without pulling
-//! in the Talos terminal UI.
+//! - consumers should expect additive events and fields while the external contract settles.
 
 mod command_registry;
 mod engine;

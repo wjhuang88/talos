@@ -79,16 +79,28 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 ## Acceptance Criteria
 
 - [x] `docs/proposals/talos-crate-distribution-architecture.md` is accepted, superseded, or
-      converted into an ADR before implementation begins.
-- [x] A publication matrix covers all workspace crates and classifies each crate's intended
-      support level.
-- [x] Publishable crates have complete Cargo package metadata and publish-compatible internal
-      dependency specs.
-- [x] The first selected wave passes `cargo publish --dry-run` in dependency order, or failures are
-      recorded with owning follow-up items.
-- [ ] `talos-runtime` remains the documented SDK facade; implementation crates document direct-use
-      caveats.
-- [x] Heavy optional capabilities have feature gates or recorded split triggers.
+      converted into an ADR before implementation begins. (Superseded for decision authority by
+      ADR-052 on 2026-07-24; retained as background.)
+- [ ] A publication matrix covers **all current workspace crates** (all 21 members, including
+      `talos-models`) and classifies each crate's intended support level, with current workspace
+      version, latest published registry version, support classification, and readiness state kept
+      as distinct columns/sections. (Matrix is being repaired; stale `0.2.0` policy and a missing
+      `talos-models` row are the open gaps.)
+- [ ] Publishable crates have complete Cargo package metadata: `description`, license, `repository`,
+      crate-level `//!` docs / readme target, and a stated support boundary. `keywords`/`categories`
+      are explicitly NON-mandatory and are not part of this acceptance item. (Several published
+      crates still lack crate-level `//!` docs per the A1 audit; this item cannot close until each
+      target crate meets the real minimum above.)
+- [x] The first selected wave passed `cargo publish --dry-run` in dependency order at the then-0.2.0
+      baseline, and real publishes succeeded (see Historical Evidence). Subsequent waves are recorded
+      with owning follow-up items.
+- [ ] `talos-runtime` remains the documented SDK facade; implementation crates (`talos-agent`)
+      document direct-use caveats at the crate level. (Crate-level caveat is being added this pass;
+      the facade contract itself is documented in `RUNTIME-SDK-CONTRACT.md`.)
+- [ ] Heavy optional capabilities have REAL feature gates (optional dependencies + gated
+      modules/re-exports) or a recorded split trigger. (`talos-tools` currently has NO Cargo feature
+      gates and all heavy deps are hard `[dependencies]`; only a recorded direction under ADR-052
+      exists. This item cannot close until the gates are implemented.)
 - [ ] README, README.zh-CN, and architecture docs explain crate distribution when the first
       implementation slice lands.
 - [ ] The publish plan defines and validates the Cargo install path for the CLI binary.
@@ -180,8 +192,10 @@ unclear and lets product-layer coupling hide inside internal dependencies.
     `talos-sandbox` → `talos-tools` → `talos-agent` → `talos-runtime`; the ADR is architecture and
     sequencing only and is **not** authorization to publish.
   - `talos-agent` is publishable as an **implementation dependency only**, not a supported SDK
-    entrypoint; embedders continue to use `talos-runtime` (resolves Acceptance item
-    "implementation crates document direct-use caveats").
+    entrypoint; embedders continue to use `talos-runtime`. The Acceptance item "implementation
+    crates document direct-use caveats" is only satisfied when `crates/talos-agent/src/lib.rs`
+    actually carries the implementation-only caveat at the crate level — the caveat doc is being
+    added in the 2026-07-26 drift-repair pass; until that lands it remains open.
   - Sandbox fallback becomes an explicit caller choice: `SandboxFallbackPolicy`
     (`Deny`/`Ask`/`AllowUnsandboxed`, default `Deny`); `talos-sandbox` stays policy-neutral.
   - `talos-tools` gets **lightweight read-only defaults**; write/shell/git/network/web/image and
@@ -196,6 +210,8 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - No crate was published, no `publish = false` guard was removed, and no release tag was created.
   Implementation is activated through ARCH-031 slices under normal iteration governance; ADR-052
   Phases 1–5 map onto the Candidate Slices and remaining Acceptance items.
+
+## Required Reads
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
 - `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
@@ -219,8 +235,13 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 
 ## Open Questions
 
-1. Should the first real publish happen before or after the 1.0 self-bootstrap gate?
-2. Which crate names should be reserved on crates.io before APIs are fully stable?
+1. ~~Should the first real publish happen before or after the 1.0 self-bootstrap gate?~~
+   **Resolved by historical fact**: the first real publishes already occurred at the 0.2.0 baseline
+   on 2026-06-29 (see Historical Evidence in `CRATE-PUBLICATION-MATRIX.md`). Future publishes at the
+   current 0.5.0 workspace line still require the maintainer gate.
+2. Which crate names should be reserved on crates.io before APIs are fully stable? (Partially
+   answered: the 0.2.0 first/second/integration waves already reserved core library names; remaining
+   gate crates — sandbox/tools/agent/runtime/mcp — are not yet reserved.)
 3. ~~Should `talos-tui` be a reusable UI library package or product-only implementation detail?~~
    **Resolved by ADR-052**: no general-purpose UI SDK is committed now; `talos-tui` stays
    product-only and `talos-conversation` remains experimental/product-oriented. Revisit only when a

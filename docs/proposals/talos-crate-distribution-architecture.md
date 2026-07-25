@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted as the implementation baseline on 2026-06-29 for publication-readiness work. A separate
-release/ADR gate is still required before any real crates.io publish or placeholder name
-reservation.
+Accepted as the implementation baseline on 2026-06-29 for publication-readiness work. The first
+real publishes HAVE occurred at the 0.2.0 baseline (2026-06-29; see Historical Evidence in
+`CRATE-PUBLICATION-MATRIX.md`). Future publishes at the current 0.5.0 workspace line, and any
+remaining gate-crate publication, still require the maintainer gate.
 
 **Superseded for decision authority by [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md)
 (2026-07-24).** ADR-052 converts this proposal's direction into an accepted decision: route-A
@@ -174,15 +175,32 @@ This matches ripgrep's lesson without creating premature crate sprawl.
 
 ## Open Questions
 
-- Which crate names on crates.io are available and should be reserved early?
-- Should `talos-tui` be treated as reusable UI infrastructure or product-only UI?
+- Which crate names on crates.io are available and should be reserved early? (Partially resolved:
+  the 0.2.0 waves reserved core library names; gate crates remain unpublished.)
+- ~~Should `talos-tui` be treated as reusable UI infrastructure or product-only UI?~~
+  **Resolved/Superseded by ADR-052**: product-only; no general-purpose UI SDK is committed.
 - Should the first `cargo install` path publish `talos-cli` as package `talos-cli` with binary
   `talos`, or pursue an alternate package name such as `talos-ai` if product naming becomes more
   important than package-name consistency?
-- Which crates are allowed to publish before the 1.0 self-bootstrap gate?
+- Which crates are allowed to publish before the 1.0 self-bootstrap gate? (Partially resolved by
+  historical fact: the 0.2.0 waves already published; remaining gate crates still gated.)
 - Should public package docs use one shared root README or one crate-specific README per crate?
 - Which optional features should be default-on for developer convenience versus default-off for
-  lean embedders?
+  lean embedders? (Direction set by ADR-052 for `talos-tools`: read-only default, opt-in heavy
+  families — implementation pending.)
+
+## Decisions Resolved by ADR-052 (superseded here)
+
+The following items in this proposal are now governed by ADR-052, not by this document:
+
+- `talos-tui` as a reusable UI library → product-only (ADR-052 defers a general-purpose UI SDK).
+- general-purpose UI SDK direction → deferred; `talos-conversation` is experimental/product-oriented.
+- `talos-tools` default-feature direction → read-only default with opt-in heavy families (unimplemented).
+- `talos-agent` support boundary → implementation dependency only, not a supported SDK.
+- Route A vs Route B → Route A (dependency-order closure); Route B is only a reversal path.
+
+All "alternate UI" descriptions in this proposal should be read with an
+"experimental/product-oriented" qualifier per ADR-052.
 
 ## Dependencies
 
