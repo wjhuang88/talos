@@ -694,7 +694,6 @@ mod tests {
         let lines = vec![styled_line("AAA"), styled_line("你好"), styled_line("CCC")];
         let prep = prepare_history_rows(lines, 1);
         let rt = ready_texts(&prep);
-        let dt = deferred_texts(&prep);
         assert!(!rt.is_empty(), "ready prefix exists");
         assert!(
             rt.iter().all(|s| s == "A"),
@@ -890,7 +889,7 @@ mod tests {
     #[test]
     fn fill_bearing_overflow_defers() {
         let line = ScrollbackLine::styled_with_fill(
-            vec![HistorySegment::raw(&"x".repeat(100))],
+            vec![HistorySegment::raw("x".repeat(100))],
             None,
             Some(HistorySegment::raw(" ")),
         );
@@ -1080,7 +1079,7 @@ mod tests {
         let prep1 = prepare_history_rows(lines.clone(), 80);
 
         let mut writer1 = MockWriter::new().fail_on(2);
-        let (mut pending, result1) = flush_prepared_with_writer(prep1, &mut writer1);
+        let (pending, result1) = flush_prepared_with_writer(prep1, &mut writer1);
         assert!(result1.is_err());
         assert_eq!(writer1.inserted, vec!["A"]);
 
@@ -1120,7 +1119,7 @@ mod tests {
         let next = styled_line("after");
         let prep = prepare_history_rows(vec![long.clone(), next.clone()], 4);
 
-        assert!(prep.ready_prefix.len() >= 1);
+        assert!(!prep.ready_prefix.is_empty());
         let physical_count_0 = prep.ready_prefix[0].physical_rows.len();
         assert!(
             physical_count_0 >= 2,
