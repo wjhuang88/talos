@@ -59,18 +59,25 @@ Refinement. This section documents ownership; it does NOT implement any feature.
 | `fetch_url` | `network` | `reqwest`, `scraper` | off | network + HTML parse |
 | `http_request` | `network` | `reqwest` | off | advanced HTTP; shares `network` with `fetch_url` |
 | `save_url` | `network` (+ `file-write`) | `reqwest` | off | dual network+write; both features required |
-| `web_search` | `network` (or `web-search`) | `rust-websearch` | off | Decision required before Ready: separate `web-search` alias or fold into `network` |
-| `search_engine` | `network` (or `web-search`) | (supports web_search) | off | grouped with `web_search` |
+| `web_search` | `network` (or unresolved `web-search` candidate) | `rust-websearch` | off | Decision required before Ready: separate `web-search` feature or fold into `network` |
+| `search_engine` | `network` (or unresolved `web-search` candidate) | (supports web_search) | off | grouped with `web_search` |
 | `browser_page` | `network` (or dedicated) | (lightweight) | off | Decision required before Ready: connector/link model; currently no heavy dep |
-| `document_extract` | `document` (or `file-read`) | (text/HTML/JSON/CSV/MD/XML only) | Decision required before Ready | local text extraction; no native dep; default-on candidate |
+| `document_extract` | `file-read` (or unresolved `document` candidate) | (text/HTML/JSON/CSV/MD/XML only) | off | Decision required before Ready: local text extraction, no native dep; default-on candidate |
 | `symbol` | `code-intelligence` | `arborium` (25 langs) | off | heaviest dep; tree-sitter via arborium (ADR-020) |
 | `read_image_tool` | `image` | `image`, `sha2` | off | image decode; capability-gated (ADR-050/051); shares `image` with `image_validation` |
 | `image_validation` | `image` | `image`, `sha2` | off | shared ingestion/validation; same gate as `read_image_tool` |
 
-Feature combination rule: a tool requiring multiple features (e.g. `save_url` =
-`network` + `file-write`) is enabled only when ALL listed features are enabled. The default
-feature set is `file-read` + `search` only. Alias features (`coding`, `network`, `full`) are
-documented in the Required Feature Model below and resolve to explicit feature unions.
+Feature combination rule: a tool requiring multiple features (for example `save_url` requiring
+`network` + `file-write`) is enabled only when all required features are enabled.
+
+The approved candidate default remains `file-read` + `search`.
+
+`coding` is the only currently proposed aggregate convenience feature in the Required Feature Model
+below. `network` is a normal capability feature, not an alias.
+
+`document`, `web-search`, `full`, or any additional aggregate/group feature is not approved by this
+Story. Such names may appear only as unresolved alternatives in the ownership matrix above and must
+be resolved before the Story becomes Ready.
 
 Open ownership decisions (block Ready until resolved): `tree`, `diff_stat`, `web_search`/
 `search_engine`, `browser_page`, and `document_extract` grouping. These are recorded here, not

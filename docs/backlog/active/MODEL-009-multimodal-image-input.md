@@ -8,8 +8,8 @@
 | Status | Complete — MODEL-009-A/B/C/D/E all Complete (2026-07-24). ADR-050 Accepted; I149-I154 Complete with maintainer terminal walkthroughs. Epic closed. Completion Commit: `9332f2a`, `b3cc943`, `17e3fef`, `65eb108`, `faa5464`, `36b7ccc`. |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | Catalog capability metadata; provider protocol boundary; session persistence boundary |
-| Blocks | MODEL-009-E agent-mediated image read tool |
-| Child Stories | [MODEL-009-A](MODEL-009-A-image-input-adr-and-security-spike.md) (I149 ADR + security spike) · [MODEL-009-B](MODEL-009-B-capability-content-types-persistence.md) (I150 capability + content + persistence) · [MODEL-009-C](MODEL-009-C-safe-local-image-ingestion.md) (I151 safe ingestion) · [MODEL-009-D](MODEL-009-D-provider-adapter-tui-cli.md) (I152 adapter + TUI/CLI) |
+| Blocks | None — all planned child stories delivered |
+| Child Stories | [MODEL-009-A](MODEL-009-A-image-input-adr-and-security-spike.md) (I149 ADR + security spike) · [MODEL-009-B](MODEL-009-B-capability-content-types-persistence.md) (I150 capability + content + persistence) · [MODEL-009-C](MODEL-009-C-safe-local-image-ingestion.md) (I151 safe ingestion) · [MODEL-009-D](MODEL-009-D-provider-adapter-tui-cli.md) (I152 adapter + TUI/CLI) · [MODEL-009-E](MODEL-009-E-agent-mediated-image-read-tool.md) (I154 agent-mediated `read_image`) |
 
 ## Problem
 

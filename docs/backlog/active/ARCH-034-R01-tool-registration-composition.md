@@ -50,6 +50,10 @@ Create one explicit, testable registration composition model:
   silently replace an existing tool.
 - Add equivalence tests for the existing mode-specific registry sets and wrapper/permission
   behavior; document the extension path for a future built-in tool.
+- Migrate the already-delivered I154 `read_image` registration into exactly one authoritative
+  contribution declaration and one explicit capability-gated composition rule.
+- Preserve the existing I154 Supported-model gate, permission boundary, presentation filtering,
+  safe result projection, and one-shot provider continuation behavior.
 
 ## Explicit Exclusions
 
@@ -61,10 +65,10 @@ Create one explicit, testable registration composition model:
   presentation, MCP protocol, or runtime tool execution.
 - No generic “tool configuration DSL,” dynamic loading redesign, plugin protocol expansion, or
   broad tool-list product changes.
-- Migrate the already-delivered I154 `read_image` registration into exactly one authoritative
-  contribution declaration.
-- Preserve its Supported-model capability gate, permission boundary, presentation filtering, safe
-  result projection, and one-shot provider continuation behavior.
+- No new `read_image` behavior is added; this story only migrates its existing registration into
+  the accepted composition model.
+- No feature gate, runtime preset, sandbox fallback policy, crate split, publish, tag, or release
+  is introduced by this story.
 
 ## Design Direction To Validate In ADR
 

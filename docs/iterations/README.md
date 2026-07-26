@@ -297,10 +297,15 @@ Complete/Superseded dispositions without erasing their published objectives.
 | I161 | Blocked — I160 incomplete and security reviewer not assigned | ARCH-031-C. Blocked until I160 Complete and an independent security review is scheduled. |
 | I162 | Blocked — I161 incomplete and version/readiness gate not authorized | ARCH-031-D. Blocked until I161 Complete and the version/readiness maintainer gate is authorized. Readiness only; no real publish. |
 
-## Next Execution Rounds
+## Historical Execution Rounds
 
-These rounds are the current operating plan for entering the next iterations. They reference
-existing backlog stories only; new ideas still go through `docs/proposals/` or requirement intake.
+These rounds are retained as historical execution evidence. They are not a current selection,
+planning, or activation owner.
+
+The current execution sequence is the
+[v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
+listed above. I156 is the next activation candidate; no iteration is activated by this historical
+table.
 
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|
@@ -309,7 +314,7 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R2: I010 Architecture Slice | ✅ Done (2026-06-03) | `I010-polished-agent.md` / Slice R2 | AppServerSession seam, TUI approval, inline mode. 532 tests |
 | R3: I010 Product Polish | ✅ Done (2026-06-04) | `I010-polished-agent.md` / Slice R3 | All 5 stories done (S1-S5); 567 tests; move I010 to Review/Complete |
 | R4: I013 Boundary Control | ✅ Done (2026-06-05) | `I013-boundary-control.md` | High-risk permission/provider boundaries have ADRs; logging R1 implemented |
-| R5: I014 TUI Completion | Next product-facing slice | `I014-tui-completion.md` | TUI provenance, `/plugins`, copy, and export workflows verified |
+| R5: I014 TUI Completion | Done / Historical | `I014-tui-completion.md` | TUI provenance, `/plugins`, copy, and export workflows verified |
 | R6: I015 Provider Schema | After I014 or explicit provider priority | `I015-provider-schema.md` | Schema-only provider config foundation lands under ADR-013 |
 | R7: I016 Portable File And Search Tools | When environment-dependency reduction becomes release-critical | `I016-portable-file-search.md` | Native POSIX subset and search tools work on a minimal `PATH` |
 | R8: I017 Embedded Git Tools | After I016 or explicit Git priority | `I017-embedded-git-tools.md` | Git read-only tools target `gix` per ADR-010 |

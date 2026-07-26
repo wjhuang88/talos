@@ -49,7 +49,7 @@ The 2026-07-15 P100-P150 product/risk program is Complete and remains preserved 
 
 ## Completed Four-Month Scheduled Follow-Ups Sequence (2026-07-13)
 
-The completed I120-I123 reliability sequence is preserved in its owner docs. The current planning owner is
+The completed I124-I127 scheduled-follow-up sequence is preserved in its owner docs. The historical planning owner was
 [`2026-07-13-four-month-scheduled-followups-plan`](../tasks/2026-07-13-four-month-scheduled-followups-plan.md).
 The single resumable long-task owner is
 [`2026-07-13-scheduled-followups-execution-package`](../tasks/2026-07-13-scheduled-followups-execution-package.md).
@@ -62,8 +62,7 @@ It preserves I028 as a superseded historical baseline and defines four corrected
 | 3 | I126 Schedule Inspection And Control | List/cancel plus narrow-terminal readable results |
 | 4 | I127 Scheduler Reliability Closeout | Shutdown/backpressure proof and second-operator clean-HOME replay |
 
-No iteration is Active at publication. The assignee activates I124 only after the long-task Gate 0;
-later iterations activate sequentially. SF100-SF133 are stories, not iterations. The long task does
+At publication time no iteration was Active. I124-I127 were later activated sequentially and are now Complete. SF100-SF133 are stories, not iterations. The long task does
 not authorize persistent/cron scheduling, direct scheduled tool calls, permission changes, remote
 control, push, tag, publish, or release actions.
 
