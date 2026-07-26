@@ -534,6 +534,28 @@ pub(crate) fn build_tool_call_scrollback_lines(
 }
 
 #[cfg(test)]
+pub(crate) fn test_display_with_long_args() -> ToolCallDisplay {
+    ToolCallDisplay {
+        tool_name: "bash".to_string(),
+        arguments: serde_json::json!({
+            "command": "for i in $(seq 1 100); do echo $i; done".repeat(6)
+        }),
+        provenance: ToolProvenance::Native,
+        summary_fields: vec!["command".to_string()],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn test_display_with_args(args: &str) -> ToolCallDisplay {
+    ToolCallDisplay {
+        tool_name: "bash".to_string(),
+        arguments: serde_json::json!({ "command": args }),
+        provenance: ToolProvenance::Native,
+        summary_fields: vec!["command".to_string()],
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use talos_conversation::ToolCallDisplay;

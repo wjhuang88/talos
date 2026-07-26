@@ -790,10 +790,7 @@ impl Tui {
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
         let history_width = self.terminal.screen_size().width;
-        for line in lines
-            .into_iter()
-            .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, history_width))
-        {
+        for line in crate::app_stream::prepare_history_rows(lines, history_width) {
             if line.has_plain_segments_only() {
                 self.terminal.insert_history(&line.text, line.bg)?;
             } else {

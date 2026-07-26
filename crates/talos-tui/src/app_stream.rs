@@ -73,17 +73,11 @@ impl ScrollbackLine {
 /// a logical line occupied several rows. This helper makes every occupied row
 /// explicit, preserves segment styling/backgrounds, and aligns continuations
 /// beneath the standard three-column history prefix.
-// Below this width the continuation-indent model cannot fit a 3-cell prefix plus any
-// content cell, so wrapping would shred a line into dozens of empty/prefix-only rows.
-// Degrade to returning the line as-is (full content preserved, terminal handles display)
-// instead of fragmenting. Mirrors the width==0 safety already in place.
-const MIN_WRAP_WIDTH: u16 = 4;
-
 pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
-    if width < MIN_WRAP_WIDTH
-        || line.fill.is_some()
-        || UnicodeWidthStr::width(line.text.as_str()) <= width as usize
-    {
+    if width == 0 {
+        return vec![];
+    }
+    if line.fill.is_some() || UnicodeWidthStr::width(line.text.as_str()) <= width as usize {
         return vec![line];
     }
 
@@ -102,27 +96,43 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
             })
         });
 
+    let w_cap = width as usize;
     let mut rows = Vec::new();
     let mut current = Vec::new();
     let mut used = 0usize;
 
     for segment in line.segments {
         for ch in segment.text.chars() {
-            let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
-            if used > 0 && used.saturating_add(char_width) > width as usize {
+            let raw_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+            // A character whose display width exceeds the viewport (e.g. CJK
+            // width 2 at viewport width 1) cannot fit without splitting a
+            // Unicode scalar. Substitute with a 1-cell marker so the row
+            // count and width constraint remain exact.
+            let (effective_ch, effective_width) = if raw_width > w_cap {
+                ('.', 1usize)
+            } else {
+                (ch, raw_width)
+            };
+
+            if used > 0 && used.saturating_add(effective_width) > w_cap {
                 rows.push(ScrollbackLine::styled(
                     std::mem::take(&mut current),
                     line.bg,
                 ));
                 used = 0;
                 if let Some(prefix) = continuation.as_ref() {
-                    used = UnicodeWidthStr::width(prefix.text.as_str());
-                    current.push(prefix.clone());
+                    let prefix_w = UnicodeWidthStr::width(prefix.text.as_str());
+                    // Only add continuation indent if it leaves room for the
+                    // current character; prevents prefix-only rows.
+                    if prefix_w.saturating_add(effective_width) <= w_cap {
+                        used = prefix_w;
+                        current.push(prefix.clone());
+                    }
                 }
             }
 
-            append_styled_char(&mut current, ch, &segment);
-            used = used.saturating_add(char_width);
+            append_styled_char(&mut current, effective_ch, &segment);
+            used = used.saturating_add(effective_width);
         }
     }
 
@@ -130,6 +140,16 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
         rows.push(ScrollbackLine::styled(current, line.bg));
     }
     rows
+}
+
+pub(crate) fn prepare_history_rows(
+    lines: Vec<ScrollbackLine>,
+    viewport_width: u16,
+) -> Vec<ScrollbackLine> {
+    lines
+        .into_iter()
+        .flat_map(|line| wrap_scrollback_line(line, viewport_width))
+        .collect()
 }
 
 fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &HistorySegment) {
@@ -540,27 +560,52 @@ mod tests {
     }
 
     #[test]
-    fn narrow_widths_0_through_3_return_single_row_without_panic() {
+    fn width_0_returns_empty_to_skip_history_insertion() {
         let line = styled_line(&"x".repeat(50));
-        for w in [0u16, 1, 2, 3] {
+        let out = wrap_scrollback_line(line, 0);
+        assert!(
+            out.is_empty(),
+            "width 0 must return empty to avoid terminal autowrap"
+        );
+    }
+
+    #[test]
+    fn narrow_widths_split_into_rows_within_viewport() {
+        let line = styled_line(&"x".repeat(50));
+        for w in [1u16, 2, 3] {
             let out = wrap_scrollback_line(line.clone(), w);
-            assert_eq!(out.len(), 1, "width {w} must not shred into many rows");
-            assert_eq!(out[0].text, line.text, "width {w} preserves full content");
+            assert!(!out.is_empty(), "width {w} must produce rows");
+            for (i, row) in out.iter().enumerate() {
+                let rw = width_of(&row.text);
+                assert!(
+                    rw <= w as usize,
+                    "width {w} row {i} is {rw} cells, exceeds viewport"
+                );
+            }
+            assert!(
+                !out[0].text.trim().is_empty(),
+                "width {w} first row not blank"
+            );
+            assert!(
+                out.len() <= 50,
+                "width {w} row count bounded (got {})",
+                out.len()
+            );
         }
     }
 
     #[test]
-    fn width_4_does_not_shred_unbounded() {
+    fn width_4_wraps_with_bounded_rows_and_preserved_content() {
         let line = styled_line(&"a".repeat(200));
-        let out = wrap_scrollback_line(line.clone(), 4);
-        assert!(
-            out.len() <= 200,
-            "width 4 must produce a bounded number of rows"
-        );
+        let out = wrap_scrollback_line(line, 4);
+        assert!(out.len() <= 200, "width 4 bounded row count");
+        for (i, row) in out.iter().enumerate() {
+            assert!(width_of(&row.text) <= 4, "width 4 row {i} within viewport");
+        }
         let joined: String = out.iter().map(|l| l.text.as_str()).collect();
         assert!(
             joined.matches('a').count() >= 100,
-            "content is not discarded at width 4"
+            "content preserved at width 4"
         );
     }
 
@@ -568,7 +613,10 @@ mod tests {
     fn three_cell_prefix_continues_indent_at_width_4() {
         let line = line_with_prefix(" → ", &"a".repeat(40));
         let out = wrap_scrollback_line(line, 4);
-        assert!(out.len() > 1, "must wrap a long line at width 4");
+        assert!(out.len() > 1, "must wrap at width 4");
+        for row in &out {
+            assert!(width_of(&row.text) <= 4, "each row within width 4");
+        }
         if let Some(cont) = out.get(1) {
             assert_eq!(
                 width_of(cont.text.trim_end_matches('a')),
@@ -579,39 +627,89 @@ mod tests {
     }
 
     #[test]
-    fn cjk_line_safe_at_narrow_widths() {
-        let line = styled_line(&"你".repeat(30));
-        for w in [0u16, 1, 2, 3] {
-            let out = wrap_scrollback_line(line.clone(), w);
-            assert_eq!(out.len(), 1, "CJK width {w} must not shred");
+    fn cjk_at_narrow_widths_respects_viewport_constraint() {
+        let cjk = styled_line(&"你".repeat(30));
+        // width 0: empty
+        assert!(wrap_scrollback_line(cjk.clone(), 0).is_empty());
+        // width 1: CJK (width 2) exceeds viewport → substitution marker
+        let out1 = wrap_scrollback_line(cjk.clone(), 1);
+        assert!(!out1.is_empty(), "width 1 produces rows");
+        for row in &out1 {
+            assert!(width_of(&row.text) <= 1, "width 1 row within viewport");
         }
-        let out = wrap_scrollback_line(line.clone(), 10);
-        assert!(out.len() >= 1, "CJK wraps safely at width 10");
+        // width 2: CJK fits (2 cells = 2 width)
+        let out2 = wrap_scrollback_line(cjk.clone(), 2);
+        assert!(!out2.is_empty(), "width 2 produces rows");
+        for row in &out2 {
+            assert!(width_of(&row.text) <= 2, "width 2 row within viewport");
+        }
+        // width 3-5: safe
+        for w in [3u16, 4, 5] {
+            let out = wrap_scrollback_line(cjk.clone(), w);
+            assert!(!out.is_empty(), "width {w} produces rows");
+            for row in &out {
+                assert!(
+                    width_of(&row.text) <= w as usize,
+                    "width {w} row within viewport"
+                );
+            }
+        }
     }
 
     #[test]
-    fn empty_and_long_args_are_safe() {
+    fn cjk_width_1_uses_substitution_marker_not_half_char() {
+        let cjk = styled_line("你好");
+        let out = wrap_scrollback_line(cjk, 1);
+        assert!(!out.is_empty());
+        for row in &out {
+            assert!(width_of(&row.text) <= 1, "width 1 row is 1 cell");
+            assert!(
+                !row.text.contains('你') && !row.text.contains('好'),
+                "CJK scalar not split — substitution used instead"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_line_safe_at_all_widths() {
         let empty = styled_line("");
-        assert_eq!(wrap_scrollback_line(empty, 0).len(), 1);
-
-        let long = styled_line(&"z".repeat(500));
-        let out = wrap_scrollback_line(long.clone(), 2);
-        assert_eq!(out.len(), 1, "width 2 returns as-is (below MIN_WRAP_WIDTH)");
-        assert_eq!(out[0].text, long.text);
+        assert!(
+            wrap_scrollback_line(empty.clone(), 0).is_empty(),
+            "width 0 empty"
+        );
+        for w in [1u16, 2, 3, 4, 80] {
+            let out = wrap_scrollback_line(empty.clone(), w);
+            assert_eq!(out.len(), 1, "width {w} empty line → 1 row");
+            assert!(out[0].text.is_empty());
+        }
     }
 
     #[test]
-    fn fill_bearing_line_is_returned_unchanged_at_any_width() {
+    fn long_line_at_width_2_splits_into_2_cell_rows() {
+        let long = styled_line(&"z".repeat(500));
+        let out = wrap_scrollback_line(long, 2);
+        assert!(out.len() > 1, "width 2 must split a 500-char line");
+        for (i, row) in out.iter().enumerate() {
+            assert!(width_of(&row.text) <= 2, "width 2 row {i} within viewport");
+        }
+    }
+
+    #[test]
+    fn fill_bearing_line_passes_through_at_positive_width() {
         let line = ScrollbackLine::styled_with_fill(
             vec![HistorySegment::raw("hint")],
             None,
             Some(HistorySegment::raw(" ")),
         );
-        for w in [0u16, 1, 3, 4, 80] {
+        for w in [1u16, 3, 4, 80] {
             let out = wrap_scrollback_line(line.clone(), w);
             assert_eq!(out.len(), 1, "fill-bearing line not wrapped at width {w}");
             assert!(out[0].fill.is_some());
         }
+        assert!(
+            wrap_scrollback_line(line, 0).is_empty(),
+            "width 0 skips fill line too"
+        );
     }
 
     #[test]
@@ -623,6 +721,78 @@ mod tests {
             assert!(
                 width_of(row.text.trim()) <= 20,
                 "each row fits within width 20"
+            );
+        }
+    }
+
+    #[test]
+    fn no_prefix_only_continuation_rows() {
+        let line = line_with_prefix(" → ", &"a".repeat(40));
+        let out = wrap_scrollback_line(line, 4);
+        for (i, row) in out.iter().enumerate() {
+            let trimmed = row.text.trim();
+            assert!(
+                !trimmed.is_empty(),
+                "row {i} is prefix-only (all whitespace)"
+            );
+        }
+    }
+
+    #[test]
+    fn builder_to_renderer_chain_respects_viewport_width() {
+        let display = crate::tool_display::test_display_with_long_args();
+        for w in [1u16, 2, 3, 4] {
+            let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
+            let rows = prepare_history_rows(built, w);
+            assert!(!rows.is_empty(), "width {w} chain produces rows");
+            for (i, row) in rows.iter().enumerate() {
+                let rw = width_of(&row.text);
+                assert!(
+                    rw <= w as usize,
+                    "width {w}: builder→renderer row {i} is {rw} cells, exceeds viewport"
+                );
+            }
+            assert!(
+                rows.iter().any(|r| !r.text.trim().is_empty()),
+                "width {w}: at least one row has visible content"
+            );
+        }
+    }
+
+    #[test]
+    fn ascii_content_preserved_through_extreme_widths() {
+        let args = "abcdefghij".repeat(10);
+        let display = crate::tool_display::test_display_with_args(&args);
+        for w in [1u16, 2, 3] {
+            let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
+            let rows = prepare_history_rows(built, w);
+            let combined: String = rows
+                .iter()
+                .flat_map(|r| r.text.chars())
+                .filter(|c| c.is_ascii_alphabetic())
+                .collect();
+            for ch in args.chars() {
+                let before = combined.matches(ch).count();
+                let expected = args.matches(ch).count();
+                assert!(
+                    before >= expected,
+                    "width {w}: char '{ch}' count {before} < expected {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn physical_row_count_is_bounded_and_nonzero() {
+        let display = crate::tool_display::test_display_with_long_args();
+        for w in [1u16, 2, 3, 4, 40] {
+            let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
+            let rows = prepare_history_rows(built, w);
+            assert!(!rows.is_empty(), "width {w} produces rows");
+            assert!(
+                rows.len() <= 500,
+                "width {w} row count bounded (got {})",
+                rows.len()
             );
         }
     }
