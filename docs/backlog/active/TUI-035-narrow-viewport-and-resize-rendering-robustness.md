@@ -184,13 +184,13 @@ Behavior:
 
 Technical / governance:
 
-- [ ] `cargo test --workspace --locked` includes: tool-call wrap at 40/80/120/160;
+- [x] `cargo test --workspace --locked` includes: tool-call wrap at 40/80/120/160;
       tool-call render at width 1/2/3 (bounded, no panic); CJK tool-call wrap;
       a resize/shrink test asserting the hint bar is not committed to scrollback
       and no fill-bearing viewport line enters history; height-shrink regression.
-- [ ] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
+- [x] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
       `scripts/validate_project_governance.sh .`, and `git diff --check` clean.
-- [ ] Owner status here and the Board mirror synchronized.
+- [x] Owner status here and the Board mirror synchronized.
 - [ ] Manual Alacritty walkthrough (wide→narrow drag, and a width-1..3 extreme)
       recorded as the Ready→Complete human gate, consistent with TUI-034's
       real-terminal acceptance requirement.

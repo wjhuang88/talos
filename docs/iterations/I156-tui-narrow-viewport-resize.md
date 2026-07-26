@@ -174,10 +174,23 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
-- Focused tests: pending
-- Full locked validation: pending
-- Runtime evidence: pending
-- Governance validation: pending
+- Focused tests: passed — `cargo test --locked -p talos-tui` → 404 passed, 0 failed (added tool-call width matrix 40/80/120/160, CJK wrap, continuation alignment, styling preservation; wrap edge 0/1/2/3/4; `resize_clear_action` decision matrix incl. zero-height safety).
+- Full locked validation: passed — `cargo fmt --all -- --check` clean; `cargo check --workspace --locked` clean; `cargo clippy --workspace --locked -- -D warnings` clean; `cargo test --workspace --locked` → 2431 passed, 0 failed.
+- Runtime evidence: automated gates green; real Alacritty walkthrough PENDING (human gate, not yet performed).
+- Governance validation: passed — `scripts/validate_project_governance.sh .` 0 warnings; `git diff --check` clean.
+
+## Implementation Record
+
+- Implementation baseline: `2f9de9f` (ancestor `065d801` activation baseline).
+- Implementation Commit: `2f9de9f` — `fix(tui): harden narrow viewport and resize rendering (#TUI-035)`.
+- Files changed: `crates/talos-tui/src/{tool_display,app,app_stream,inline_terminal,scrollback}.rs`.
+- Decisions:
+  - Fix 1: `build_tool_call_scrollback_line` → `build_tool_call_scrollback_lines(display, viewport_width)`, reuses `wrap_to_display_width`; styled prefix on row 0, dim continuation indent on subsequent rows; `MIN_TOOL_CALL_ARGS_BUDGET=20` floor mirrors tool-result.
+  - Fix 2: `wrap_scrollback_line` returns the line as-is below `MIN_WRAP_WIDTH=4` (covers width 0/1/2/3) instead of shredding; content preserved, no panic, no runaway rows.
+  - Fix 3: `Event::Resize` → `InlineTerminal::notify_resize()` (forces full clear+repaint on next draw); new pure `resize_clear_action(previous, next)` clears viewport rows on width-shrink so stale wide bottom-pane content cannot remain or leak into scrollback.
+- Invariant: the viewport-fixed bottom hint/status/composer pane is rendered only via `terminal.draw()`, never via `insert_history` — confirmed structurally; Fix 3 strengthens resize cleanup.
+- Maintainer Alacritty walkthrough: pending.
+- Completion status: NOT YET ELIGIBLE — automated gates passed, human gate pending; no Completion Commit recorded.
 
 ## Completion Evidence
 
@@ -187,14 +200,15 @@ If a stop condition occurs:
 
 ## Variance And Residuals
 
-- None recorded at planning time.
+- The real-terminal resize walkthrough (continuous wide→narrow drag, width 1/2/3 extreme, height-only shrink, widen) remains the mandatory human gate before I156 can move to Complete.
+- `resize_clear_action` is tested as a pure decision function; the full end-to-end "no history duplication during drag" is structurally guaranteed (bottom pane never calls `insert_history`) plus the resize-triggered full repaint, but final visual confirmation belongs to the human gate.
 
 ## REL-002 Execution Record
 
-- Primary executor/runtime: pending
-- External assistance: pending
-- Planning/editing/testing/docs/commit/push ownership: pending
-- Qualification verdict: pending; do not assume qualification.
+- Primary executor/runtime: `glm-5.2` (Sisyphus orchestrator) — pre-recorded at activation; implementation performed by the same runtime.
+- External assistance: none.
+- Planning/editing/testing/docs/commit/push ownership: Sisyphus orchestrator (`glm-5.2`); push authorized separately by maintainer.
+- Qualification verdict: pending; this iteration is not automatically REL-002-qualifying.
 
 ## Retrospective
 
