@@ -618,8 +618,11 @@ impl Tui {
                 }
             }
             UiOutput::ToolCall(display) => {
-                let line = crate::tool_display::build_tool_call_scrollback_line(&display);
-                self.pending_scrollback.push(line);
+                let lines = crate::tool_display::build_tool_call_scrollback_lines(
+                    &display,
+                    self.terminal.screen_size().width,
+                );
+                self.pending_scrollback.extend(lines);
             }
             UiOutput::ToolResult(display) => {
                 let icon = if display.is_error { "✗" } else { "" };
@@ -1250,7 +1253,9 @@ impl Tui {
             Event::Paste(text) => {
                 self.state.input_paste(text);
             }
-            Event::Resize(_, _) => {}
+            Event::Resize(_, _) => {
+                self.terminal.notify_resize();
+            }
             _ => {}
         }
         false

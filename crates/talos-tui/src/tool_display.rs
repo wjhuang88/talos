@@ -451,7 +451,14 @@ pub(crate) fn secondary_result_color() -> Option<CColor> {
     })
 }
 
-pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
+// Floor mirroring the tool-result budget so narrow viewports wrap into bounded
+// continuation rows instead of single-character fragments.
+const MIN_TOOL_CALL_ARGS_BUDGET: usize = 20;
+
+pub(crate) fn build_tool_call_scrollback_lines(
+    tool_call: &ToolCallDisplay,
+    viewport_width: u16,
+) -> Vec<ScrollbackLine> {
     let args_str = serde_json::to_string_pretty(&tool_call.arguments)
         .unwrap_or_else(|_| tool_call.arguments.to_string());
     let args_summary =
@@ -468,7 +475,8 @@ pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> Sc
     let accent = to_crossterm_color(semantic::TEXT_ACCENT);
     let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
     let dim = to_crossterm_color(semantic::DIM_TEXT);
-    let mut segments = vec![
+
+    let mut prefix_segments = vec![
         HistorySegment::styled(
             " → ",
             prefix_color,
@@ -487,15 +495,42 @@ pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> Sc
         ),
     ];
     if let Some(marker) = provenance_marker {
-        segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
+        prefix_segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
     }
-    segments.push(HistorySegment::raw(", "));
-    segments.push(HistorySegment::styled(
-        args_summary,
-        dim,
-        HistoryAttrs::default(),
-    ));
-    ScrollbackLine::styled(segments, None)
+    prefix_segments.push(HistorySegment::raw(", "));
+
+    let prefix_width: usize = prefix_segments
+        .iter()
+        .map(|s| unicode_width::UnicodeWidthStr::width(s.text.as_str()))
+        .sum();
+    let budget = (viewport_width as usize)
+        .saturating_sub(prefix_width)
+        .max(MIN_TOOL_CALL_ARGS_BUDGET);
+
+    let wrapped = crate::scrollback::wrap_to_display_width(&args_summary, budget);
+
+    let mut lines = Vec::with_capacity(wrapped.len());
+    for (idx, chunk) in wrapped.iter().enumerate() {
+        let mut segments = Vec::with_capacity(prefix_segments.len() + 1);
+        if idx == 0 {
+            segments.extend(prefix_segments.iter().cloned());
+        } else {
+            // Continuation rows indent by the prefix display width so they align under
+            // the argument summary without repeating the tool name.
+            segments.push(HistorySegment::styled(
+                " ".repeat(prefix_width),
+                dim,
+                HistoryAttrs::default(),
+            ));
+        }
+        segments.push(HistorySegment::styled(
+            chunk.to_string(),
+            dim,
+            HistoryAttrs::default(),
+        ));
+        lines.push(ScrollbackLine::styled(segments, None));
+    }
+    lines
 }
 
 #[cfg(test)]
@@ -519,16 +554,16 @@ mod tests {
             version: "0.1.0".to_string(),
             carrier: "wasm".to_string(),
         });
-        let line = build_tool_call_scrollback_line(&display);
-        assert!(line.text.contains("[plugin:my-plugin@0.1.0/wasm]"));
+        let lines = build_tool_call_scrollback_lines(&display, 160);
+        assert!(lines[0].text.contains("[plugin:my-plugin@0.1.0/wasm]"));
     }
 
     #[test]
     fn native_provenance_has_no_marker() {
         let display = make_display(ToolProvenance::Native);
-        let line = build_tool_call_scrollback_line(&display);
-        assert!(!line.text.contains("[mcp:"));
-        assert!(!line.text.contains("[plugin:"));
+        let lines = build_tool_call_scrollback_lines(&display, 160);
+        assert!(!lines[0].text.contains("[mcp:"));
+        assert!(!lines[0].text.contains("[plugin:"));
     }
 
     #[test]
@@ -536,8 +571,8 @@ mod tests {
         let display = make_display(ToolProvenance::McpRemote {
             server: "github".to_string(),
         });
-        let line = build_tool_call_scrollback_line(&display);
-        assert!(line.text.contains("[mcp:github]"));
+        let lines = build_tool_call_scrollback_lines(&display, 160);
+        assert!(lines[0].text.contains("[mcp:github]"));
     }
 
     #[test]
@@ -900,5 +935,111 @@ mod tests {
                 "last tail line must be present at {width} cols"
             );
         }
+    }
+
+    // TUI-035 Fix 1: tool-call summary is viewport-width-aware.
+
+    fn long_call_display() -> ToolCallDisplay {
+        ToolCallDisplay {
+            tool_name: "bash".to_string(),
+            arguments: serde_json::json!({
+                "command": "for i in $(seq 1 100); do echo $i; done".repeat(6)
+            }),
+            provenance: ToolProvenance::Native,
+            summary_fields: vec!["command".to_string()],
+        }
+    }
+
+    fn display_width(s: &str) -> usize {
+        unicode_width::UnicodeWidthStr::width(s)
+    }
+
+    #[test]
+    fn tool_call_wraps_across_widths_without_blank_first_row() {
+        for width in [40u16, 80, 120, 160] {
+            let lines = build_tool_call_scrollback_lines(&long_call_display(), width);
+            assert!(!lines.is_empty(), "must produce rows at {width}");
+            let first = &lines[0].text;
+            assert!(!first.trim().is_empty(), "first row not blank at {width}");
+            assert!(
+                first.starts_with(" → bash"),
+                "first row keeps prefix at {width}"
+            );
+        }
+    }
+
+    #[test]
+    fn tool_call_narrow_width_produces_more_rows_than_wide() {
+        let display = long_call_display();
+        let narrow = build_tool_call_scrollback_lines(&display, 40);
+        let wide = build_tool_call_scrollback_lines(&display, 160);
+        assert!(
+            narrow.len() > wide.len(),
+            "narrow must yield more continuation rows"
+        );
+        assert!(wide.len() >= 1);
+    }
+
+    #[test]
+    fn tool_call_continuation_rows_align_under_prefix_width() {
+        let lines = build_tool_call_scrollback_lines(&long_call_display(), 40);
+        if lines.len() > 1 {
+            // Row 0 is [prefix segments..., args_chunk]; continuation rows are
+            // [indent, chunk]. The indent width must equal the row-0 prefix width.
+            let prefix_segments = &lines[0].segments[..lines[0].segments.len() - 1];
+            let expected: usize = prefix_segments
+                .iter()
+                .map(|s| display_width(s.text.as_str()))
+                .sum();
+            for cont in &lines[1..] {
+                let indent_width = display_width(cont.segments[0].text.as_str());
+                assert_eq!(
+                    indent_width, expected,
+                    "continuation indent matches first-row prefix width"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tool_call_preserves_full_summary_text_across_rows() {
+        let display = long_call_display();
+        let args_str = serde_json::to_string_pretty(&display.arguments).unwrap_or_default();
+        let summary = summarize_tool_args(&display.tool_name, &args_str, &display.summary_fields);
+        let lines = build_tool_call_scrollback_lines(&display, 40);
+        let combined: String = lines.iter().flat_map(|l| l.text.chars()).collect();
+        for word in summary.split_whitespace() {
+            assert!(
+                combined.contains(word),
+                "wrapped rows must retain summary token '{word}'"
+            );
+        }
+    }
+
+    #[test]
+    fn tool_call_cjk_arguments_wrap_at_display_cells() {
+        let display = ToolCallDisplay {
+            tool_name: "bash".to_string(),
+            arguments: serde_json::json!({ "command": "你好".repeat(40) }),
+            provenance: ToolProvenance::Native,
+            summary_fields: vec!["command".to_string()],
+        };
+        let narrow = build_tool_call_scrollback_lines(&display, 40);
+        let wide = build_tool_call_scrollback_lines(&display, 160);
+        assert!(
+            narrow.len() > wide.len(),
+            "CJK must produce more rows at narrow width (display-cell aware)"
+        );
+        assert!(!narrow[0].text.is_empty());
+    }
+
+    #[test]
+    fn tool_call_preserves_tool_name_styling_on_first_row() {
+        let lines = build_tool_call_scrollback_lines(&long_call_display(), 80);
+        let first = &lines[0];
+        // The first segment is the " → " prefix; the second is the bold tool name.
+        assert!(first.segments.len() >= 2);
+        assert!(first.segments[1].attrs.bold);
+        assert_eq!(first.segments[1].text, "bash");
     }
 }

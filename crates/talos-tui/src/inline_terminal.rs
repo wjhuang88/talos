@@ -63,6 +63,30 @@ fn viewport_change_requires_clear(previous: Rect, next: Rect) -> bool {
     previous != next
 }
 
+// TUI-035 Fix 3: pure decision describing what terminal cleanup a viewport-area change
+// requires. Height-shrink must clear below the new viewport (existing behavior); width-
+// shrink must clear the previously-drawn viewport rows so stale wide content (e.g. the
+// bottom hint/status pane rendered at the old width) cannot remain on the grid or get
+// pushed into scrollback by a later DECSTBM scroll. Pure so it can be unit-tested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResizeClearAction {
+    None,
+    ClearFromCursorDown,
+    ClearViewportRows,
+    ClearFromCursorDownAndRows,
+}
+
+fn resize_clear_action(previous: Rect, next: Rect) -> ResizeClearAction {
+    let height_shrunk = next.height < previous.height && previous.height > 0;
+    let width_shrunk = next.width < previous.width && previous.width > 0;
+    match (height_shrunk, width_shrunk) {
+        (false, false) => ResizeClearAction::None,
+        (true, false) => ResizeClearAction::ClearFromCursorDown,
+        (false, true) => ResizeClearAction::ClearViewportRows,
+        (true, true) => ResizeClearAction::ClearFromCursorDownAndRows,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct HistoryAttrs {
     pub(crate) bold: bool,
@@ -233,16 +257,42 @@ impl InlineTerminal {
             return;
         }
 
-        if area.height < self.viewport_area.height && self.viewport_area.height > 0 {
+        let action = resize_clear_action(self.viewport_area, area);
+        if action != ResizeClearAction::None {
+            let prev_top = self.viewport_area.y;
+            let prev_bottom = self.viewport_area.bottom();
             let writer = self.backend_mut();
-            let _ = queue!(writer, MoveTo(0, area.bottom()));
-            let _ = queue!(writer, Clear(ClearType::FromCursorDown));
+            match action {
+                ResizeClearAction::None => {}
+                ResizeClearAction::ClearFromCursorDown => {
+                    let _ = queue!(writer, MoveTo(0, area.bottom()));
+                    let _ = queue!(writer, Clear(ClearType::FromCursorDown));
+                }
+                ResizeClearAction::ClearViewportRows => {
+                    for y in prev_top..prev_bottom {
+                        let _ = queue!(writer, MoveTo(0, y));
+                        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
+                    }
+                }
+                ResizeClearAction::ClearFromCursorDownAndRows => {
+                    for y in prev_top..prev_bottom {
+                        let _ = queue!(writer, MoveTo(0, y));
+                        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
+                    }
+                    let _ = queue!(writer, MoveTo(0, area.bottom()));
+                    let _ = queue!(writer, Clear(ClearType::FromCursorDown));
+                }
+            }
             let _ = std::io::Write::flush(writer);
         }
 
         self.viewport_area = area;
         self.buffers[1 - self.current] = Buffer::empty(area);
         self.buffers[self.current] = Buffer::empty(area);
+    }
+
+    pub fn notify_resize(&mut self) {
+        self.needs_clear = true;
     }
 
     #[allow(dead_code)]
@@ -547,5 +597,70 @@ mod tests {
 
         assert!(viewport_change_requires_clear(previous, expanded));
         assert!(!viewport_change_requires_clear(expanded, expanded));
+    }
+
+    #[test]
+    fn resize_clear_action_width_shrink_clears_viewport_rows() {
+        let previous = Rect::new(0, 0, 80, 24);
+        let narrower = Rect::new(0, 0, 40, 24);
+        assert_eq!(
+            resize_clear_action(previous, narrower),
+            ResizeClearAction::ClearViewportRows
+        );
+    }
+
+    #[test]
+    fn resize_clear_action_height_shrink_clears_below() {
+        let previous = Rect::new(0, 0, 80, 24);
+        let shorter = Rect::new(0, 0, 80, 12);
+        assert_eq!(
+            resize_clear_action(previous, shorter),
+            ResizeClearAction::ClearFromCursorDown
+        );
+    }
+
+    #[test]
+    fn resize_clear_action_both_shrink_clears_rows_and_below() {
+        let previous = Rect::new(0, 0, 80, 24);
+        let smaller = Rect::new(0, 0, 40, 12);
+        assert_eq!(
+            resize_clear_action(previous, smaller),
+            ResizeClearAction::ClearFromCursorDownAndRows
+        );
+    }
+
+    #[test]
+    fn resize_clear_action_width_or_height_grow_is_none() {
+        let previous = Rect::new(0, 0, 40, 12);
+        assert_eq!(
+            resize_clear_action(previous, Rect::new(0, 0, 80, 12)),
+            ResizeClearAction::None
+        );
+        assert_eq!(
+            resize_clear_action(previous, Rect::new(0, 0, 40, 24)),
+            ResizeClearAction::None
+        );
+    }
+
+    #[test]
+    fn resize_clear_action_unchanged_is_none() {
+        let area = Rect::new(0, 0, 80, 24);
+        assert_eq!(resize_clear_action(area, area), ResizeClearAction::None);
+    }
+
+    #[test]
+    fn resize_clear_action_zero_previous_height_is_safe() {
+        let zero_height = Rect::new(0, 0, 80, 0);
+        // Height-shrink guard requires previous.height > 0, so this is None.
+        assert_eq!(
+            resize_clear_action(zero_height, Rect::new(0, 0, 80, 0)),
+            ResizeClearAction::None
+        );
+        // A width-shrink is still classified as a row clear; with zero previous height the
+        // row loop is empty, so it is a harmless no-op (no panic, no underflow).
+        assert_eq!(
+            resize_clear_action(zero_height, Rect::new(0, 0, 40, 0)),
+            ResizeClearAction::ClearViewportRows
+        );
     }
 }

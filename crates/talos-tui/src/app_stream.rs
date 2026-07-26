@@ -73,8 +73,14 @@ impl ScrollbackLine {
 /// a logical line occupied several rows. This helper makes every occupied row
 /// explicit, preserves segment styling/backgrounds, and aligns continuations
 /// beneath the standard three-column history prefix.
+// Below this width the continuation-indent model cannot fit a 3-cell prefix plus any
+// content cell, so wrapping would shred a line into dozens of empty/prefix-only rows.
+// Degrade to returning the line as-is (full content preserved, terminal handles display)
+// instead of fragmenting. Mirrors the width==0 safety already in place.
+const MIN_WRAP_WIDTH: u16 = 4;
+
 pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
-    if width == 0
+    if width < MIN_WRAP_WIDTH
         || line.fill.is_some()
         || UnicodeWidthStr::width(line.text.as_str()) <= width as usize
     {
@@ -510,5 +516,114 @@ impl StreamRenderState {
         self.held_lines.clear();
         self.block_classifier.reset();
         self.hold_status = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inline_terminal::HistorySegment;
+
+    fn styled_line(text: &str) -> ScrollbackLine {
+        ScrollbackLine::styled(vec![HistorySegment::raw(text)], None)
+    }
+
+    fn line_with_prefix(prefix: &str, body: &str) -> ScrollbackLine {
+        ScrollbackLine::styled(
+            vec![HistorySegment::raw(prefix), HistorySegment::raw(body)],
+            None,
+        )
+    }
+
+    fn width_of(s: &str) -> usize {
+        unicode_width::UnicodeWidthStr::width(s)
+    }
+
+    #[test]
+    fn narrow_widths_0_through_3_return_single_row_without_panic() {
+        let line = styled_line(&"x".repeat(50));
+        for w in [0u16, 1, 2, 3] {
+            let out = wrap_scrollback_line(line.clone(), w);
+            assert_eq!(out.len(), 1, "width {w} must not shred into many rows");
+            assert_eq!(out[0].text, line.text, "width {w} preserves full content");
+        }
+    }
+
+    #[test]
+    fn width_4_does_not_shred_unbounded() {
+        let line = styled_line(&"a".repeat(200));
+        let out = wrap_scrollback_line(line.clone(), 4);
+        assert!(
+            out.len() <= 200,
+            "width 4 must produce a bounded number of rows"
+        );
+        let joined: String = out.iter().map(|l| l.text.as_str()).collect();
+        assert!(
+            joined.matches('a').count() >= 100,
+            "content is not discarded at width 4"
+        );
+    }
+
+    #[test]
+    fn three_cell_prefix_continues_indent_at_width_4() {
+        let line = line_with_prefix(" → ", &"a".repeat(40));
+        let out = wrap_scrollback_line(line, 4);
+        assert!(out.len() > 1, "must wrap a long line at width 4");
+        if let Some(cont) = out.get(1) {
+            assert_eq!(
+                width_of(cont.text.trim_end_matches('a')),
+                3,
+                "continuation indent matches the 3-cell prefix"
+            );
+        }
+    }
+
+    #[test]
+    fn cjk_line_safe_at_narrow_widths() {
+        let line = styled_line(&"你".repeat(30));
+        for w in [0u16, 1, 2, 3] {
+            let out = wrap_scrollback_line(line.clone(), w);
+            assert_eq!(out.len(), 1, "CJK width {w} must not shred");
+        }
+        let out = wrap_scrollback_line(line.clone(), 10);
+        assert!(out.len() >= 1, "CJK wraps safely at width 10");
+    }
+
+    #[test]
+    fn empty_and_long_args_are_safe() {
+        let empty = styled_line("");
+        assert_eq!(wrap_scrollback_line(empty, 0).len(), 1);
+
+        let long = styled_line(&"z".repeat(500));
+        let out = wrap_scrollback_line(long.clone(), 2);
+        assert_eq!(out.len(), 1, "width 2 returns as-is (below MIN_WRAP_WIDTH)");
+        assert_eq!(out[0].text, long.text);
+    }
+
+    #[test]
+    fn fill_bearing_line_is_returned_unchanged_at_any_width() {
+        let line = ScrollbackLine::styled_with_fill(
+            vec![HistorySegment::raw("hint")],
+            None,
+            Some(HistorySegment::raw(" ")),
+        );
+        for w in [0u16, 1, 3, 4, 80] {
+            let out = wrap_scrollback_line(line.clone(), w);
+            assert_eq!(out.len(), 1, "fill-bearing line not wrapped at width {w}");
+            assert!(out[0].fill.is_some());
+        }
+    }
+
+    #[test]
+    fn normal_width_wrapping_still_works() {
+        let line = styled_line(&"a".repeat(40));
+        let out = wrap_scrollback_line(line, 20);
+        assert!(out.len() > 1, "width 20 wraps a 40-char line");
+        for row in &out {
+            assert!(
+                width_of(row.text.trim()) <= 20,
+                "each row fits within width 20"
+            );
+        }
     }
 }

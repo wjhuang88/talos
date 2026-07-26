@@ -1393,7 +1393,10 @@ pub(crate) fn render_history_messages(
                 };
 
                 for call in &calls {
-                    lines.push(crate::tool_display::build_tool_call_scrollback_line(call));
+                    lines.extend(crate::tool_display::build_tool_call_scrollback_lines(
+                        call,
+                        viewport_width,
+                    ));
                 }
             }
             _ => {
