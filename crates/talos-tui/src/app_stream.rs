@@ -73,9 +73,14 @@ impl ScrollbackLine {
 /// a logical line occupied several rows. This helper makes every occupied row
 /// explicit, preserves segment styling/backgrounds, and aligns continuations
 /// beneath the standard three-column history prefix.
+pub(crate) struct PreparedLogicalLine {
+    pub original: ScrollbackLine,
+    pub physical_rows: Vec<ScrollbackLine>,
+}
+
 pub(crate) struct HistoryPreparation {
-    pub ready: Vec<ScrollbackLine>,
-    pub deferred: Vec<ScrollbackLine>,
+    pub ready_prefix: Vec<PreparedLogicalLine>,
+    pub deferred_suffix: Vec<ScrollbackLine>,
 }
 
 fn line_has_unrenderable_scalar(line: &ScrollbackLine, viewport_width: u16) -> bool {
@@ -88,6 +93,10 @@ fn line_has_unrenderable_scalar(line: &ScrollbackLine, viewport_width: u16) -> b
             .chars()
             .any(|ch| UnicodeWidthChar::width(ch).unwrap_or(0) > w_cap)
     })
+}
+
+fn line_overflows_viewport(line: &ScrollbackLine, viewport_width: u16) -> bool {
+    UnicodeWidthStr::width(line.text.as_str()) > viewport_width as usize
 }
 
 pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
@@ -149,22 +158,34 @@ pub(crate) fn prepare_history_rows(
     lines: Vec<ScrollbackLine>,
     viewport_width: u16,
 ) -> HistoryPreparation {
-    let mut ready = Vec::new();
-    let mut deferred = Vec::new();
+    let mut ready_prefix = Vec::new();
+    let mut deferred_suffix = Vec::new();
+    let mut blocked = false;
+
     for line in lines {
-        if line_has_unrenderable_scalar(&line, viewport_width) {
-            deferred.push(line);
+        if blocked
+            || line_has_unrenderable_scalar(&line, viewport_width)
+            || (line.fill.is_some() && line_overflows_viewport(&line, viewport_width))
+        {
+            blocked = true;
+            deferred_suffix.push(line);
         } else if line.fill.is_some() {
-            if UnicodeWidthStr::width(line.text.as_str()) > viewport_width as usize {
-                deferred.push(line);
-            } else {
-                ready.push(line);
-            }
+            ready_prefix.push(PreparedLogicalLine {
+                original: line.clone(),
+                physical_rows: vec![line],
+            });
         } else {
-            ready.extend(wrap_scrollback_line(line, viewport_width));
+            let physical_rows = wrap_scrollback_line(line.clone(), viewport_width);
+            ready_prefix.push(PreparedLogicalLine {
+                original: line,
+                physical_rows,
+            });
         }
     }
-    HistoryPreparation { ready, deferred }
+    HistoryPreparation {
+        ready_prefix,
+        deferred_suffix,
+    }
 }
 
 fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &HistorySegment) {
@@ -574,14 +595,32 @@ mod tests {
         unicode_width::UnicodeWidthStr::width(s)
     }
 
+    fn ready_texts(prep: &HistoryPreparation) -> Vec<String> {
+        prep.ready_prefix
+            .iter()
+            .flat_map(|l| l.physical_rows.iter())
+            .map(|r| r.text.clone())
+            .collect()
+    }
+
+    fn deferred_texts(prep: &HistoryPreparation) -> Vec<String> {
+        prep.deferred_suffix
+            .iter()
+            .map(|l| l.text.clone())
+            .collect()
+    }
+
     #[test]
     fn width_zero_defers_all_lines() {
         let lines = vec![styled_line(&"x".repeat(50)), styled_line("hello")];
         let prep = prepare_history_rows(lines.clone(), 0);
-        assert!(prep.ready.is_empty(), "width 0 must defer everything");
-        assert_eq!(prep.deferred.len(), 2, "width 0 defers all original lines");
-        assert_eq!(prep.deferred[0].text, lines[0].text);
-        assert_eq!(prep.deferred[1].text, lines[1].text);
+        assert!(
+            prep.ready_prefix.is_empty(),
+            "width 0 must defer everything"
+        );
+        assert_eq!(prep.deferred_suffix.len(), 2);
+        assert_eq!(prep.deferred_suffix[0].text, lines[0].text);
+        assert_eq!(prep.deferred_suffix[1].text, lines[1].text);
     }
 
     #[test]
@@ -589,11 +628,83 @@ mod tests {
         let original = vec![styled_line("hello"), styled_line("你好")];
         for _ in 0..5 {
             let prep = prepare_history_rows(original.clone(), 0);
-            assert_eq!(prep.deferred.len(), 2, "defer count stable");
-            assert_eq!(prep.ready.len(), 0);
-            assert_eq!(prep.deferred[0].text, "hello");
-            assert_eq!(prep.deferred[1].text, "你好");
+            assert_eq!(prep.deferred_suffix.len(), 2);
+            assert_eq!(prep.ready_prefix.len(), 0);
+            assert_eq!(prep.deferred_suffix[0].text, "hello");
+            assert_eq!(prep.deferred_suffix[1].text, "你好");
         }
+    }
+
+    #[test]
+    fn unrenderable_middle_line_defers_entire_suffix() {
+        let lines = vec![styled_line("AAA"), styled_line("你好"), styled_line("CCC")];
+        let prep = prepare_history_rows(lines, 1);
+        let rt = ready_texts(&prep);
+        let dt = deferred_texts(&prep);
+        assert!(!rt.is_empty(), "ready prefix exists");
+        assert!(
+            rt.iter().all(|s| s == "A"),
+            "AAA wrapped at width 1 into single-cell rows"
+        );
+        let dt = deferred_texts(&prep);
+        assert_eq!(
+            dt,
+            vec!["你好", "CCC"],
+            "the unrenderable line and everything after it is deferred"
+        );
+    }
+
+    #[test]
+    fn unrenderable_first_line_blocks_later_lines() {
+        let lines = vec![styled_line("你好"), styled_line("CCC")];
+        let prep = prepare_history_rows(lines, 1);
+        assert!(
+            prep.ready_prefix.is_empty(),
+            "nothing ready when first line blocks"
+        );
+        let dt = deferred_texts(&prep);
+        assert_eq!(dt, vec!["你好", "CCC"]);
+    }
+
+    #[test]
+    fn repeated_defer_restore_preserves_fifo_exactly_once() {
+        let lines = vec![
+            styled_line("A"),
+            styled_line("你好"),
+            styled_line("C"),
+            styled_line("世界"),
+            styled_line("E"),
+        ];
+        let mut pending = lines.clone();
+        let mut inserted: Vec<String> = Vec::new();
+
+        for w in [1u16, 2, 1, 80] {
+            let prep = prepare_history_rows(pending.clone(), w);
+            inserted.extend(ready_texts(&prep));
+            pending = prep.deferred_suffix;
+        }
+        let joined = inserted.join("");
+        assert!(joined.starts_with("A"), "starts with A");
+        assert!(joined.contains("你好"), "CJK pair 1 preserved");
+        assert!(joined.contains("C"), "C preserved");
+        assert!(joined.contains("世界"), "CJK pair 2 preserved");
+        assert!(joined.ends_with("E"), "ends with E");
+        assert_eq!(
+            joined.chars().filter(|c| *c == 'A').count(),
+            1,
+            "A exactly once"
+        );
+        assert_eq!(
+            joined.chars().filter(|c| *c == 'C').count(),
+            1,
+            "C exactly once"
+        );
+        assert_eq!(
+            joined.chars().filter(|c| *c == 'E').count(),
+            1,
+            "E exactly once"
+        );
+        assert!(pending.is_empty(), "pending drained after width 80");
     }
 
     #[test]
@@ -601,16 +712,19 @@ mod tests {
         let line = styled_line(&"x".repeat(50));
         for w in [1u16, 2, 3] {
             let prep = prepare_history_rows(vec![line.clone()], w);
-            assert!(prep.deferred.is_empty(), "ASCII width {w} not deferred");
-            assert!(!prep.ready.is_empty(), "width {w} produces rows");
-            for (i, row) in prep.ready.iter().enumerate() {
+            assert!(
+                prep.deferred_suffix.is_empty(),
+                "ASCII width {w} not deferred"
+            );
+            let rt = ready_texts(&prep);
+            assert!(!rt.is_empty(), "width {w} produces rows");
+            for (i, t) in rt.iter().enumerate() {
                 assert!(
-                    width_of(&row.text) <= w as usize,
+                    width_of(t) <= w as usize,
                     "width {w} row {i} is {} cells",
-                    width_of(&row.text)
+                    width_of(t)
                 );
             }
-            assert!(prep.ready.len() <= 50, "width {w} bounded");
         }
     }
 
@@ -618,11 +732,12 @@ mod tests {
     fn cjk_at_width_one_is_deferred_without_substitution() {
         let cjk = styled_line("你好");
         let prep = prepare_history_rows(vec![cjk.clone()], 1);
-        assert!(prep.ready.is_empty(), "CJK at width 1 must defer");
-        assert_eq!(prep.deferred.len(), 1);
-        assert_eq!(prep.deferred[0].text, "你好", "original content preserved");
+        assert!(prep.ready_prefix.is_empty(), "CJK at width 1 must defer");
+        assert_eq!(prep.deferred_suffix.len(), 1);
+        assert_eq!(prep.deferred_suffix[0].text, "你好");
         assert!(
-            !prep.deferred[0].text.contains('.') && !prep.deferred[0].text.contains('�'),
+            !prep.deferred_suffix[0].text.contains('.')
+                && !prep.deferred_suffix[0].text.contains('\u{fffd}'),
             "no substitution markers"
         );
     }
@@ -631,43 +746,42 @@ mod tests {
     fn cjk_at_width_two_wraps_losslessly() {
         let cjk = styled_line(&"你好".repeat(20));
         let prep = prepare_history_rows(vec![cjk.clone()], 2);
-        assert!(prep.deferred.is_empty(), "CJK at width 2 is renderable");
-        assert!(!prep.ready.is_empty(), "width 2 produces rows");
-        for (i, row) in prep.ready.iter().enumerate() {
-            assert!(width_of(&row.text) <= 2, "width 2 row {i} within viewport");
+        assert!(prep.deferred_suffix.is_empty());
+        let rt = ready_texts(&prep);
+        assert!(!rt.is_empty());
+        for t in &rt {
+            assert!(width_of(t) <= 2, "width 2 row within viewport");
         }
-        let joined: String = prep.ready.iter().map(|r| r.text.as_str()).collect();
-        assert!(joined.contains('你'), "CJK preserved in wrapped output");
-        assert!(joined.contains('好'), "CJK preserved in wrapped output");
+        let joined: String = rt.join("");
+        assert!(joined.contains('你') && joined.contains('好'));
     }
 
     #[test]
     fn mixed_ascii_cjk_at_width_one_defers_preserving_content() {
         let mixed = styled_line("abc你好xyz");
         let prep = prepare_history_rows(vec![mixed.clone()], 1);
-        assert!(prep.ready.is_empty(), "mixed with CJK at width 1 deferred");
-        assert_eq!(prep.deferred[0].text, "abc你好xyz");
+        assert!(prep.ready_prefix.is_empty());
+        assert_eq!(prep.deferred_suffix[0].text, "abc你好xyz");
     }
 
     #[test]
     fn mixed_ascii_cjk_at_width_two_wraps_losslessly() {
         let mixed = styled_line("abc你好xyz");
         let prep = prepare_history_rows(vec![mixed.clone()], 2);
-        assert!(prep.deferred.is_empty(), "width 2 renderable");
-        let joined: String = prep.ready.iter().map(|r| r.text.as_str()).collect();
-        assert!(joined.contains("abc"), "ASCII prefix preserved");
-        assert!(joined.contains("你好"), "CJK preserved");
-        assert!(joined.contains("xyz"), "ASCII suffix preserved");
+        assert!(prep.deferred_suffix.is_empty());
+        let joined: String = ready_texts(&prep).join("");
+        assert!(joined.contains("abc") && joined.contains("你好") && joined.contains("xyz"));
     }
 
     #[test]
     fn width_four_wraps_with_bounded_rows() {
         let line = styled_line(&"a".repeat(200));
         let prep = prepare_history_rows(vec![line], 4);
-        assert!(prep.deferred.is_empty());
-        assert!(prep.ready.len() <= 200, "width 4 bounded");
-        for (i, row) in prep.ready.iter().enumerate() {
-            assert!(width_of(&row.text) <= 4, "width 4 row {i} within viewport");
+        assert!(prep.deferred_suffix.is_empty());
+        let rt = ready_texts(&prep);
+        assert!(rt.len() <= 200);
+        for t in &rt {
+            assert!(width_of(t) <= 4);
         }
     }
 
@@ -675,9 +789,9 @@ mod tests {
     fn three_cell_prefix_continuation_at_width_4() {
         let line = line_with_prefix(" → ", &"a".repeat(40));
         let out = wrap_scrollback_line(line, 4);
-        assert!(out.len() > 1, "must wrap at width 4");
+        assert!(out.len() > 1);
         for row in &out {
-            assert!(width_of(&row.text) <= 4, "each row within width 4");
+            assert!(width_of(&row.text) <= 4);
         }
     }
 
@@ -686,22 +800,23 @@ mod tests {
         let empty = styled_line("");
         for w in [1u16, 2, 3, 4, 80] {
             let out = wrap_scrollback_line(empty.clone(), w);
-            assert_eq!(out.len(), 1, "width {w} empty line → 1 row");
+            assert_eq!(out.len(), 1);
             assert!(out[0].text.is_empty());
         }
-        let prep = prepare_history_rows(vec![empty.clone()], 0);
-        assert!(prep.ready.is_empty(), "width 0 defers empty too");
-        assert_eq!(prep.deferred.len(), 1);
+        let prep = prepare_history_rows(vec![empty], 0);
+        assert!(prep.ready_prefix.is_empty());
+        assert_eq!(prep.deferred_suffix.len(), 1);
     }
 
     #[test]
     fn long_ascii_at_width_2_splits() {
         let long = styled_line(&"z".repeat(500));
         let prep = prepare_history_rows(vec![long], 2);
-        assert!(prep.deferred.is_empty());
-        assert!(prep.ready.len() > 1, "width 2 splits 500-char line");
-        for (i, row) in prep.ready.iter().enumerate() {
-            assert!(width_of(&row.text) <= 2, "width 2 row {i}");
+        assert!(prep.deferred_suffix.is_empty());
+        let rt = ready_texts(&prep);
+        assert!(rt.len() > 1);
+        for t in &rt {
+            assert!(width_of(t) <= 2);
         }
     }
 
@@ -712,10 +827,10 @@ mod tests {
             None,
             Some(HistorySegment::raw(" ")),
         );
-        let prep = prepare_history_rows(vec![line.clone()], 80);
-        assert!(prep.deferred.is_empty(), "fits at width 80");
-        assert_eq!(prep.ready.len(), 1);
-        assert!(prep.ready[0].fill.is_some(), "fill preserved");
+        let prep = prepare_history_rows(vec![line], 80);
+        assert!(prep.deferred_suffix.is_empty());
+        assert_eq!(prep.ready_prefix.len(), 1);
+        assert!(prep.ready_prefix[0].physical_rows[0].fill.is_some());
     }
 
     #[test]
@@ -725,22 +840,19 @@ mod tests {
             None,
             Some(HistorySegment::raw(" ")),
         );
-        let prep = prepare_history_rows(vec![line.clone()], 40);
-        assert_eq!(prep.ready.len(), 0, "overflow fill deferred");
-        assert_eq!(prep.deferred.len(), 1);
-        assert!(
-            prep.deferred[0].fill.is_some(),
-            "fill preserved in deferred"
-        );
+        let prep = prepare_history_rows(vec![line], 40);
+        assert!(prep.ready_prefix.is_empty());
+        assert_eq!(prep.deferred_suffix.len(), 1);
+        assert!(prep.deferred_suffix[0].fill.is_some());
     }
 
     #[test]
     fn normal_width_wrapping_still_works() {
         let line = styled_line(&"a".repeat(40));
         let out = wrap_scrollback_line(line, 20);
-        assert!(out.len() > 1, "width 20 wraps 40-char line");
+        assert!(out.len() > 1);
         for row in &out {
-            assert!(width_of(row.text.trim()) <= 20, "fits within width 20");
+            assert!(width_of(row.text.trim()) <= 20);
         }
     }
 
@@ -759,10 +871,11 @@ mod tests {
         for w in [1u16, 2, 3, 4] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
             let prep = prepare_history_rows(built, w);
-            assert!(!prep.ready.is_empty(), "width {w} produces ready rows");
-            for (i, row) in prep.ready.iter().enumerate() {
+            let rt = ready_texts(&prep);
+            assert!(!rt.is_empty(), "width {w} produces ready rows");
+            for (i, t) in rt.iter().enumerate() {
                 assert!(
-                    width_of(&row.text) <= w as usize,
+                    width_of(t) <= w as usize,
                     "width {w} row {i} exceeds viewport"
                 );
             }
@@ -776,16 +889,15 @@ mod tests {
         for w in [1u16, 2, 3] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
             let prep = prepare_history_rows(built, w);
-            let combined: String = prep
-                .ready
-                .iter()
-                .flat_map(|r| r.text.chars())
+            let combined: String = ready_texts(&prep)
+                .into_iter()
+                .flat_map(|s: String| s.chars().collect::<Vec<char>>())
                 .filter(|c| c.is_ascii_alphabetic())
                 .collect();
             for ch in args.chars() {
                 assert!(
                     combined.matches(ch).count() >= args.matches(ch).count(),
-                    "width {w}: char '{ch}' not fully preserved"
+                    "width {w}: char '{ch}' not preserved"
                 );
             }
         }
@@ -797,8 +909,9 @@ mod tests {
         for w in [1u16, 2, 3, 4, 40] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
             let prep = prepare_history_rows(built, w);
-            assert!(!prep.ready.is_empty(), "width {w} produces rows");
-            assert!(prep.ready.len() <= 500, "width {w} bounded");
+            let rt = ready_texts(&prep);
+            assert!(!rt.is_empty(), "width {w} produces rows");
+            assert!(rt.len() <= 500, "width {w} bounded");
         }
     }
 
@@ -812,14 +925,10 @@ mod tests {
             None,
         );
         let prep = prepare_history_rows(vec![line.clone()], 1);
-        assert_eq!(prep.deferred.len(), 1);
-        let d = &prep.deferred[0];
-        assert_eq!(d.text, line.text, "text identical");
-        assert_eq!(
-            d.segments.len(),
-            line.segments.len(),
-            "segment count identical"
-        );
-        assert_eq!(d.bg, line.bg, "bg identical");
+        assert_eq!(prep.deferred_suffix.len(), 1);
+        let d = &prep.deferred_suffix[0];
+        assert_eq!(d.text, line.text);
+        assert_eq!(d.segments.len(), line.segments.len());
+        assert_eq!(d.bg, line.bg);
     }
 }

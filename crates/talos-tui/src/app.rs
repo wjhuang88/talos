@@ -794,27 +794,47 @@ impl Tui {
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
         let prepared = crate::app_stream::prepare_history_rows(lines, history_width);
-        for line in prepared.ready {
-            if line.has_plain_segments_only() {
-                self.terminal.insert_history(&line.text, line.bg)?;
-            } else {
-                let mut segments = line.segments;
-                if let Some(fill) = line.fill {
-                    let trailing = segments
-                        .first()
-                        .map(|s| unicode_width::UnicodeWidthStr::width(s.text.as_str()))
-                        .unwrap_or(0);
-                    crate::scrollback::append_fill_segment(
-                        &mut segments,
-                        fill,
-                        self.terminal.screen_size().width,
-                        trailing,
-                    );
+
+        let mut remaining_ready = prepared.ready_prefix.into_iter();
+        let deferred = prepared.deferred_suffix;
+
+        while let Some(logical) = remaining_ready.next() {
+            let result: io::Result<()> = (|| {
+                for physical in &logical.physical_rows {
+                    if physical.has_plain_segments_only() {
+                        self.terminal.insert_history(&physical.text, physical.bg)?;
+                    } else {
+                        let mut segments = physical.segments.clone();
+                        if let Some(fill) = &physical.fill {
+                            let trailing = segments
+                                .first()
+                                .map(|s| unicode_width::UnicodeWidthStr::width(s.text.as_str()))
+                                .unwrap_or(0);
+                            crate::scrollback::append_fill_segment(
+                                &mut segments,
+                                fill.clone(),
+                                self.terminal.screen_size().width,
+                                trailing,
+                            );
+                        }
+                        self.terminal
+                            .insert_styled_history(&segments, physical.bg)?;
+                    }
                 }
-                self.terminal.insert_styled_history(&segments, line.bg)?;
+                Ok(())
+            })();
+
+            if let Err(err) = result {
+                let mut restored = Vec::new();
+                restored.push(logical.original);
+                restored.extend(remaining_ready.map(|item| item.original));
+                restored.extend(deferred);
+                self.pending_scrollback = restored;
+                return Err(err);
             }
         }
-        self.pending_scrollback = prepared.deferred;
+
+        self.pending_scrollback = deferred;
         Ok(())
     }
 
