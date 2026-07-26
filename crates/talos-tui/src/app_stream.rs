@@ -239,12 +239,7 @@ pub(crate) fn flush_prepared_with_writer<W: HistoryWriter>(
         if let Err(err) = result {
             let mut restored = Vec::new();
             if committed_count > 0 {
-                let uncommitted: Vec<ScrollbackLine> = physical_rows[committed_count..]
-                    .iter()
-                    .filter(|r| !r.text.is_empty())
-                    .cloned()
-                    .collect();
-                restored.extend(uncommitted);
+                restored.extend(physical_rows[committed_count..].iter().cloned());
             } else {
                 restored.push(logical.original);
             }
@@ -1169,5 +1164,150 @@ mod tests {
             long_text.matches('a').count(),
             "total 'a' count across committed + restored equals original"
         );
+    }
+
+    #[test]
+    fn empty_physical_row_is_preserved_on_failure_recovery() {
+        let logical = PreparedLogicalLine {
+            original: styled_line("ABC"),
+            physical_rows: vec![styled_line("A"), styled_line(""), styled_line("B")],
+        };
+        let prepared = HistoryPreparation {
+            ready_prefix: vec![logical],
+            deferred_suffix: vec![],
+        };
+        let mut writer = MockWriter::new().fail_on(2);
+        let (restored, result) = flush_prepared_with_writer(prepared, &mut writer);
+        assert!(result.is_err());
+        assert_eq!(writer.inserted, vec!["A"]);
+        assert_eq!(
+            restored.iter().map(|l| l.text.clone()).collect::<Vec<_>>(),
+            vec!["", "B"],
+            "empty physical row must be preserved without filtering"
+        );
+    }
+
+    #[test]
+    fn fill_only_row_is_preserved_on_failure_recovery() {
+        let fill_line = ScrollbackLine::styled_with_fill(
+            vec![HistorySegment::raw("")],
+            Some(CColor::Blue),
+            Some(HistorySegment::raw("─")),
+        );
+        let logical = PreparedLogicalLine {
+            original: fill_line.clone(),
+            physical_rows: vec![styled_line("first"), fill_line.clone()],
+        };
+        let prepared = HistoryPreparation {
+            ready_prefix: vec![logical],
+            deferred_suffix: vec![],
+        };
+        let mut writer = MockWriter::new().fail_on(2);
+        let (restored, result) = flush_prepared_with_writer(prepared, &mut writer);
+        assert!(result.is_err());
+        assert_eq!(writer.inserted.len(), 1);
+        assert_eq!(restored.len(), 1, "fill-only row preserved");
+        assert_eq!(restored[0].text, "");
+        assert_eq!(restored[0].fill.as_ref().unwrap().text, "─");
+        assert_eq!(restored[0].bg, Some(CColor::Blue));
+    }
+
+    #[test]
+    fn styled_empty_row_is_preserved_on_failure_recovery() {
+        let styled_empty = ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                "",
+                Some(CColor::Red),
+                HistoryAttrs {
+                    bold: true,
+                    ..Default::default()
+                },
+            )],
+            Some(CColor::Green),
+        );
+        let logical = PreparedLogicalLine {
+            original: styled_empty.clone(),
+            physical_rows: vec![styled_empty],
+        };
+        let prepared = HistoryPreparation {
+            ready_prefix: vec![logical],
+            deferred_suffix: vec![],
+        };
+        let mut writer = MockWriter::new().fail_on(1);
+        let (restored, result) = flush_prepared_with_writer(prepared, &mut writer);
+        assert!(result.is_err());
+        assert_eq!(restored.len(), 1, "styled-empty row not filtered");
+        assert_eq!(restored[0].text, "");
+        assert_eq!(restored[0].bg, Some(CColor::Green));
+        assert_eq!(restored[0].segments.len(), 1);
+        assert!(restored[0].segments[0].fg == Some(CColor::Red));
+        assert!(restored[0].segments[0].attrs.bold);
+    }
+
+    #[test]
+    fn retry_with_empty_semantic_row_is_exactly_once() {
+        let logical = PreparedLogicalLine {
+            original: styled_line("A__B"),
+            physical_rows: vec![styled_line("A"), styled_line(""), styled_line("B")],
+        };
+        let prepared1 = HistoryPreparation {
+            ready_prefix: vec![logical],
+            deferred_suffix: vec![],
+        };
+        let mut w1 = MockWriter::new().fail_on(2);
+        let (pending, r1) = flush_prepared_with_writer(prepared1, &mut w1);
+        assert!(r1.is_err());
+        assert_eq!(w1.inserted, vec!["A"]);
+
+        let prepared2 = prepare_history_rows(pending.clone(), 80);
+        let mut w2 = MockWriter::new();
+        let (pending2, r2) = flush_prepared_with_writer(prepared2, &mut w2);
+        assert!(r2.is_ok());
+
+        let prepared3 = prepare_history_rows(pending2, 80);
+        let mut w3 = MockWriter::new();
+        let (_, r3) = flush_prepared_with_writer(prepared3, &mut w3);
+        assert!(r3.is_ok());
+        assert!(w3.inserted.is_empty(), "third flush: nothing");
+
+        let mut all = w1.inserted.clone();
+        all.extend(w2.inserted.iter().cloned());
+        assert_eq!(
+            all,
+            vec!["A", "", "B"],
+            "exact FIFO order, empty row preserved, each once"
+        );
+    }
+
+    #[test]
+    fn recovered_physical_suffix_can_rewrap_at_narrower_width() {
+        let long = styled_line(&"a".repeat(40));
+        let prep = prepare_history_rows(vec![long], 4);
+        let physical_count = prep.ready_prefix[0].physical_rows.len();
+        assert!(physical_count >= 2);
+
+        let mut w1 = MockWriter::new().fail_on(2);
+        let (restored, r1) = flush_prepared_with_writer(
+            prepare_history_rows(vec![styled_line(&"a".repeat(40))], 4),
+            &mut w1,
+        );
+        assert!(r1.is_err());
+        assert_eq!(w1.inserted.len(), 1, "one row committed");
+
+        let prep2 = prepare_history_rows(restored, 2);
+        let mut w2 = MockWriter::new();
+        let (restored2, r2) = flush_prepared_with_writer(prep2, &mut w2);
+        assert!(r2.is_ok());
+
+        let committed = w1.inserted.iter().map(|s| s.chars().count()).sum::<usize>();
+        let retry_committed = w2.inserted.iter().map(|s| s.chars().count()).sum::<usize>();
+        assert_eq!(
+            committed + retry_committed,
+            40,
+            "total 'a' count across original commit + retry = original"
+        );
+        for t in &w2.inserted {
+            assert!(width_of(t) <= 2, "rewrapped row within width 2");
+        }
     }
 }

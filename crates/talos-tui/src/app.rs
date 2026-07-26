@@ -831,12 +831,7 @@ impl Tui {
             if let Err(err) = result {
                 let mut restored = Vec::new();
                 if committed_count > 0 {
-                    let uncommitted: Vec<ScrollbackLine> = physical_rows[committed_count..]
-                        .iter()
-                        .filter(|r| !r.text.is_empty())
-                        .cloned()
-                        .collect();
-                    restored.extend(uncommitted);
+                    restored.extend(physical_rows[committed_count..].iter().cloned());
                 } else {
                     restored.push(logical.original);
                 }
