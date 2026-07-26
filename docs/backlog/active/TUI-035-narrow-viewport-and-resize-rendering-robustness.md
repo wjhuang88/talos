@@ -186,8 +186,14 @@ Technical / governance:
 
 - [x] `cargo test --workspace --locked` includes: tool-call wrap at 40/80/120/160;
       tool-call render at width 1/2/3 (bounded, no panic); CJK tool-call wrap;
-      a resize/shrink test asserting the hint bar is not committed to scrollback
-      and no fill-bearing viewport line enters history; height-shrink regression.
+      the `resize_clear_action` decision matrix (width-shrink → ClearViewportRows,
+      height-shrink → ClearFromCursorDown, grow → None, zero-height safety).
+- [ ] A resize/shrink end-to-end test asserting the hint bar is not committed to
+      scrollback and no fill-bearing viewport line enters history; height-shrink
+      rendering regression. NOT yet automated: the no-leak guarantee is
+      architectural (the bottom pane renders via `terminal.draw()`/InlineFrame and
+      never calls `insert_history`) plus the `resize_clear_action` unit tests; the
+      full PTY/buffer e2e assertion is deferred to the manual Alacritty gate below.
 - [x] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
       `scripts/validate_project_governance.sh .`, and `git diff --check` clean.
 - [x] Owner status here and the Board mirror synchronized.

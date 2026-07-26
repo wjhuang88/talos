@@ -1037,9 +1037,22 @@ mod tests {
     fn tool_call_preserves_tool_name_styling_on_first_row() {
         let lines = build_tool_call_scrollback_lines(&long_call_display(), 80);
         let first = &lines[0];
-        // The first segment is the " → " prefix; the second is the bold tool name.
         assert!(first.segments.len() >= 2);
         assert!(first.segments[1].attrs.bold);
         assert_eq!(first.segments[1].text, "bash");
+    }
+
+    #[test]
+    fn tool_call_safe_at_extreme_narrow_widths() {
+        let display = long_call_display();
+        for w in [1u16, 2, 3] {
+            let lines = build_tool_call_scrollback_lines(&display, w);
+            assert!(!lines.is_empty(), "width {w} must produce rows");
+            assert!(
+                !lines[0].text.trim().is_empty(),
+                "width {w} first row not blank"
+            );
+            assert!(lines.len() <= 200, "width {w} must keep row count bounded");
+        }
     }
 }
