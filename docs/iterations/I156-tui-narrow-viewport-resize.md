@@ -1,6 +1,6 @@
 # Iteration I156: TUI Narrow-Viewport And Resize Robustness
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-26
 > Planned objective: Tool-call summaries remain visible at narrow widths and resize never leaks viewport-fixed UI into scrollback.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -141,7 +141,36 @@ If a stop condition occurs:
 
 | Date | Type | Record |
 |---|---|---|
-| YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-07-26 | Activation | Baseline `065d801`. Full Active/Review/Planned/Blocked inventory completed. No conflicting Active iteration exists. All Review and prior Planned items have explicit dispositions. TUI-035 is Ready. TUI-034 Complete (`616ff11`), TUI-025 Complete, ADR-035 Accepted dependency evidence verified. Source-path baseline remains compatible with Fix 1/2/3. Activation decision: GO. Primary activation executor/runtime: `glm-5.2` (Sisyphus orchestrator). Activation-only work does not qualify as REL-002 implementation evidence. |
+
+### Activation Inventory — 2026-07-26
+
+| Category | Items | Disposition |
+|---|---|---|
+| Active | None before activation | I156 may become the sole Active iteration |
+| Review | None | No unresolved Review iteration |
+| Planned | I156, I157 | I156 activate; I157 remain Planned (defer until I156 Complete) |
+| Blocked | I158, I159, I160, I161, I162 | Blockers: I158 on ADR-053 Proposed; I159 on I158; I160 on I159; I161 on I160 + security review; I162 on I161 + readiness gate |
+| Paused/Partial | None | — |
+| Ambiguous | None | All owner states resolved |
+
+- Baseline SHA: `065d801`
+- Selected Story: `TUI-035`
+- Story status before activation: `Ready`
+- Dependencies:
+  - TUI-034: Complete — maintainer Alacritty walkthrough 2026-07-24; Completion Commit `616ff11` (P4 `dd6e090`)
+  - TUI-025: Complete (2026-07-04)
+  - ADR-035: Accepted (2026-07-03)
+- Source baseline (all present, no architectural rewrite):
+  - `crates/talos-tui/src/tool_display.rs`: `build_tool_call_scrollback_line` (L454), `build_tool_result_scrollback_lines` (L233)
+  - `crates/talos-tui/src/app.rs`: tool-call site (L621), tool-result site (L632), `wrap_scrollback_line` flush (L792), `Event::Resize(_, _) => {}` no-op (L1253)
+  - `crates/talos-tui/src/app_stream.rs`: `wrap_scrollback_line` (L76)
+  - `crates/talos-tui/src/inline_terminal.rs`: `set_viewport_area` (L231), `insert_styled_history` (L338)
+  - `crates/talos-tui/src/scrollback_markdown.rs`: `append_fill_segment` (L336)
+- Primary activation executor/runtime: `glm-5.2` (Sisyphus orchestrator)
+- Intended implementation executor/runtime: pending (recorded when implementation begins)
+- External assistance: none
+- Decision: `GO`
 
 ## Verification Evidence
 

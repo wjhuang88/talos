@@ -25,7 +25,7 @@ I156
   → I162
 ```
 
-I156 is the next activation candidate. No iteration is activated by this roadmap entry.
+I156 is Active (activated 2026-07-26; sole implementation iteration).
 ADR-053 remains Proposed, therefore I158-I162 remain Blocked.
 This program does not authorize publish, tag, release, Desktop work, v1.0, or a new composition crate.
 

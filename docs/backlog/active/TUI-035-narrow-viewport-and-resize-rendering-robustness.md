@@ -5,12 +5,12 @@
 | Story ID | TUI-035 |
 | Type | Product / Rendering Story |
 | Priority | P1 |
-| Status | Ready (2026-07-24) |
+| Status | In Progress (2026-07-26; I156 Active) |
 | Source | Maintainer bug reports 2026-07-24: (A) tool-call summary line renders blank at very small width; (B) shrinking a wide window duplicates the bottom hint bar into scrollback with staircase fill bars |
 | Parent Epic | None (follow-up to TUI-034 adaptive-width work) |
 | Depends on | TUI-034 (adaptive history width; shipped the tool-RESULT wrap but missed tool-CALL lines and resize); TUI-025 (tool argument one-line fit); ADR-035 |
 | Blocks | None |
-| Selected Iteration | I156 (Planned — next activation; not yet In Progress) |
+| Selected Iteration | I156 (Active) |
 
 ## Problem
 
