@@ -799,8 +799,11 @@ impl Tui {
         let deferred = prepared.deferred_suffix;
 
         while let Some(logical) = remaining_ready.next() {
+            let physical_rows = &logical.physical_rows;
+            let mut committed_count = 0usize;
+
             let result: io::Result<()> = (|| {
-                for physical in &logical.physical_rows {
+                for physical in physical_rows {
                     if physical.has_plain_segments_only() {
                         self.terminal.insert_history(&physical.text, physical.bg)?;
                     } else {
@@ -820,13 +823,23 @@ impl Tui {
                         self.terminal
                             .insert_styled_history(&segments, physical.bg)?;
                     }
+                    committed_count += 1;
                 }
                 Ok(())
             })();
 
             if let Err(err) = result {
                 let mut restored = Vec::new();
-                restored.push(logical.original);
+                if committed_count > 0 {
+                    let uncommitted: Vec<ScrollbackLine> = physical_rows[committed_count..]
+                        .iter()
+                        .filter(|r| !r.text.is_empty())
+                        .cloned()
+                        .collect();
+                    restored.extend(uncommitted);
+                } else {
+                    restored.push(logical.original);
+                }
                 restored.extend(remaining_ready.map(|item| item.original));
                 restored.extend(deferred);
                 self.pending_scrollback = restored;

@@ -1,3 +1,6 @@
+#[cfg(test)]
+use std::io;
+
 use crossterm::style::Color as CColor;
 use talos_conversation::MessageSource;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -201,6 +204,57 @@ fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &His
         source.fg,
         source.attrs,
     ));
+}
+
+#[cfg(test)]
+pub(crate) trait HistoryWriter {
+    fn insert_plain(&mut self, text: &str, bg: Option<CColor>) -> io::Result<()>;
+    fn insert_styled(&mut self, segments: &[HistorySegment], bg: Option<CColor>) -> io::Result<()>;
+}
+
+#[cfg(test)]
+pub(crate) fn flush_prepared_with_writer<W: HistoryWriter>(
+    prepared: HistoryPreparation,
+    writer: &mut W,
+) -> (Vec<ScrollbackLine>, io::Result<()>) {
+    let mut remaining_ready = prepared.ready_prefix.into_iter();
+    let deferred = prepared.deferred_suffix;
+
+    while let Some(logical) = remaining_ready.next() {
+        let physical_rows = &logical.physical_rows;
+        let mut committed_count = 0usize;
+
+        let result: io::Result<()> = (|| {
+            for physical in physical_rows {
+                if physical.has_plain_segments_only() {
+                    writer.insert_plain(&physical.text, physical.bg)?;
+                } else {
+                    writer.insert_styled(&physical.segments, physical.bg)?;
+                }
+                committed_count += 1;
+            }
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            let mut restored = Vec::new();
+            if committed_count > 0 {
+                let uncommitted: Vec<ScrollbackLine> = physical_rows[committed_count..]
+                    .iter()
+                    .filter(|r| !r.text.is_empty())
+                    .cloned()
+                    .collect();
+                restored.extend(uncommitted);
+            } else {
+                restored.push(logical.original);
+            }
+            restored.extend(remaining_ready.map(|item| item.original));
+            restored.extend(deferred);
+            return (restored, Err(err));
+        }
+    }
+
+    (Vec::new(), Ok(()))
 }
 
 #[derive(Default)]
@@ -930,5 +984,191 @@ mod tests {
         assert_eq!(d.text, line.text);
         assert_eq!(d.segments.len(), line.segments.len());
         assert_eq!(d.bg, line.bg);
+    }
+
+    // --- Failure recovery tests using flush_prepared_with_writer ---
+
+    struct MockWriter {
+        inserted: Vec<String>,
+        fail_on_nth: Option<usize>,
+        call_count: usize,
+    }
+
+    impl MockWriter {
+        fn new() -> Self {
+            Self {
+                inserted: Vec::new(),
+                fail_on_nth: None,
+                call_count: 0,
+            }
+        }
+        fn fail_on(mut self, n: usize) -> Self {
+            self.fail_on_nth = Some(n);
+            self
+        }
+    }
+
+    impl HistoryWriter for MockWriter {
+        fn insert_plain(&mut self, text: &str, _bg: Option<CColor>) -> io::Result<()> {
+            self.call_count += 1;
+            if self.fail_on_nth == Some(self.call_count) {
+                return Err(io::Error::other("mock failure"));
+            }
+            self.inserted.push(text.to_string());
+            Ok(())
+        }
+        fn insert_styled(
+            &mut self,
+            segments: &[HistorySegment],
+            _bg: Option<CColor>,
+        ) -> io::Result<()> {
+            self.call_count += 1;
+            if self.fail_on_nth == Some(self.call_count) {
+                return Err(io::Error::other("mock failure"));
+            }
+            let text: String = segments.iter().map(|s| s.text.as_str()).collect();
+            self.inserted.push(text);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn plain_insert_failure_restores_uncommitted_suffix() {
+        let lines = vec![styled_line("A"), styled_line("B"), styled_line("C")];
+        let prep = prepare_history_rows(lines, 80);
+        assert!(prep.deferred_suffix.is_empty());
+
+        let mut writer = MockWriter::new().fail_on(2);
+        let (restored, result) = flush_prepared_with_writer(prep, &mut writer);
+
+        assert!(result.is_err());
+        assert_eq!(writer.inserted, vec!["A"], "A was committed, B failed");
+        assert_eq!(
+            restored.iter().map(|l| l.text.clone()).collect::<Vec<_>>(),
+            vec!["B", "C"],
+            "B (failed) and C (uncommitted) restored in FIFO order"
+        );
+    }
+
+    #[test]
+    fn styled_insert_failure_restores_uncommitted_suffix() {
+        let styled = ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                "cmd",
+                Some(CColor::Green),
+                HistoryAttrs::default(),
+            )],
+            None,
+        );
+        let plain = styled_line("plain_line");
+        let lines = vec![styled, plain];
+        let prep = prepare_history_rows(lines, 80);
+
+        let mut writer = MockWriter::new().fail_on(1);
+        let (restored, result) = flush_prepared_with_writer(prep, &mut writer);
+
+        assert!(result.is_err());
+        assert!(writer.inserted.is_empty(), "nothing committed");
+        assert_eq!(restored.len(), 2, "both logical lines restored");
+        assert_eq!(restored[0].text, "cmd");
+        assert_eq!(restored[1].text, "plain_line");
+    }
+
+    #[test]
+    fn retry_after_failure_is_exactly_once() {
+        let lines = vec![styled_line("A"), styled_line("B"), styled_line("C")];
+        let prep1 = prepare_history_rows(lines.clone(), 80);
+
+        let mut writer1 = MockWriter::new().fail_on(2);
+        let (mut pending, result1) = flush_prepared_with_writer(prep1, &mut writer1);
+        assert!(result1.is_err());
+        assert_eq!(writer1.inserted, vec!["A"]);
+
+        let prep2 = prepare_history_rows(pending.clone(), 80);
+        let mut writer2 = MockWriter::new();
+        let (pending2, result2) = flush_prepared_with_writer(prep2, &mut writer2);
+        assert!(result2.is_ok());
+        assert_eq!(
+            writer2.inserted,
+            vec!["B", "C"],
+            "B and C inserted on retry"
+        );
+        assert!(pending2.is_empty(), "nothing left");
+
+        let mut writer3 = MockWriter::new();
+        let prep3 = prepare_history_rows(pending2, 80);
+        let (_, result3) = flush_prepared_with_writer(prep3, &mut writer3);
+        assert!(result3.is_ok());
+        assert!(
+            writer3.inserted.is_empty(),
+            "third flush: nothing to insert"
+        );
+
+        let mut all = writer1.inserted.clone();
+        all.extend(writer2.inserted.iter().cloned());
+        assert_eq!(
+            all,
+            vec!["A", "B", "C"],
+            "total: each line exactly once across retries"
+        );
+    }
+
+    #[test]
+    fn partial_physical_row_failure_does_not_duplicate_committed_rows() {
+        let long_text = "a".repeat(200);
+        let long = styled_line(&long_text);
+        let next = styled_line("after");
+        let prep = prepare_history_rows(vec![long.clone(), next.clone()], 4);
+
+        assert!(prep.ready_prefix.len() >= 1);
+        let physical_count_0 = prep.ready_prefix[0].physical_rows.len();
+        assert!(
+            physical_count_0 >= 2,
+            "long line wraps to many physical rows at width 4"
+        );
+
+        let fail_at = 2;
+        let mut writer = MockWriter::new().fail_on(fail_at);
+        let (restored, result) = flush_prepared_with_writer(
+            prepare_history_rows(vec![long.clone(), next.clone()], 4),
+            &mut writer,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(
+            writer.inserted.len(),
+            1,
+            "exactly one physical row committed before failure"
+        );
+
+        let committed_text = &writer.inserted[0];
+        for r in &restored {
+            assert!(
+                !r.text.contains(committed_text.as_str())
+                    || r.text == committed_text.as_str()
+                    || r.text == "after",
+                "restored row should not contain committed text as a prefix"
+            );
+        }
+        let restored_texts: Vec<String> = restored.iter().map(|l| l.text.clone()).collect();
+        assert!(
+            restored_texts.iter().any(|t| t == "after"),
+            "uncommitted logical line restored"
+        );
+        let committed_a_count = writer
+            .inserted
+            .iter()
+            .map(|t| t.matches('a').count())
+            .sum::<usize>();
+        let restored_a_count = restored_texts
+            .iter()
+            .filter(|t| *t != "after")
+            .map(|t| t.matches('a').count())
+            .sum::<usize>();
+        assert_eq!(
+            committed_a_count + restored_a_count,
+            long_text.matches('a').count(),
+            "total 'a' count across committed + restored equals original"
+        );
     }
 }
