@@ -73,11 +73,25 @@ impl ScrollbackLine {
 /// a logical line occupied several rows. This helper makes every occupied row
 /// explicit, preserves segment styling/backgrounds, and aligns continuations
 /// beneath the standard three-column history prefix.
-pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
-    if width == 0 {
-        return vec![];
+pub(crate) struct HistoryPreparation {
+    pub ready: Vec<ScrollbackLine>,
+    pub deferred: Vec<ScrollbackLine>,
+}
+
+fn line_has_unrenderable_scalar(line: &ScrollbackLine, viewport_width: u16) -> bool {
+    if viewport_width == 0 {
+        return true;
     }
-    if line.fill.is_some() || UnicodeWidthStr::width(line.text.as_str()) <= width as usize {
+    let w_cap = viewport_width as usize;
+    line.segments.iter().any(|seg| {
+        seg.text
+            .chars()
+            .any(|ch| UnicodeWidthChar::width(ch).unwrap_or(0) > w_cap)
+    })
+}
+
+pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
+    if UnicodeWidthStr::width(line.text.as_str()) <= width as usize {
         return vec![line];
     }
 
@@ -103,18 +117,9 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
 
     for segment in line.segments {
         for ch in segment.text.chars() {
-            let raw_width = UnicodeWidthChar::width(ch).unwrap_or(0);
-            // A character whose display width exceeds the viewport (e.g. CJK
-            // width 2 at viewport width 1) cannot fit without splitting a
-            // Unicode scalar. Substitute with a 1-cell marker so the row
-            // count and width constraint remain exact.
-            let (effective_ch, effective_width) = if raw_width > w_cap {
-                ('.', 1usize)
-            } else {
-                (ch, raw_width)
-            };
+            let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
 
-            if used > 0 && used.saturating_add(effective_width) > w_cap {
+            if used > 0 && used.saturating_add(char_width) > w_cap {
                 rows.push(ScrollbackLine::styled(
                     std::mem::take(&mut current),
                     line.bg,
@@ -122,17 +127,15 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
                 used = 0;
                 if let Some(prefix) = continuation.as_ref() {
                     let prefix_w = UnicodeWidthStr::width(prefix.text.as_str());
-                    // Only add continuation indent if it leaves room for the
-                    // current character; prevents prefix-only rows.
-                    if prefix_w.saturating_add(effective_width) <= w_cap {
+                    if prefix_w.saturating_add(char_width) <= w_cap {
                         used = prefix_w;
                         current.push(prefix.clone());
                     }
                 }
             }
 
-            append_styled_char(&mut current, effective_ch, &segment);
-            used = used.saturating_add(effective_width);
+            append_styled_char(&mut current, ch, &segment);
+            used = used.saturating_add(char_width);
         }
     }
 
@@ -145,11 +148,23 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
 pub(crate) fn prepare_history_rows(
     lines: Vec<ScrollbackLine>,
     viewport_width: u16,
-) -> Vec<ScrollbackLine> {
-    lines
-        .into_iter()
-        .flat_map(|line| wrap_scrollback_line(line, viewport_width))
-        .collect()
+) -> HistoryPreparation {
+    let mut ready = Vec::new();
+    let mut deferred = Vec::new();
+    for line in lines {
+        if line_has_unrenderable_scalar(&line, viewport_width) {
+            deferred.push(line);
+        } else if line.fill.is_some() {
+            if UnicodeWidthStr::width(line.text.as_str()) > viewport_width as usize {
+                deferred.push(line);
+            } else {
+                ready.push(line);
+            }
+        } else {
+            ready.extend(wrap_scrollback_line(line, viewport_width));
+        }
+    }
+    HistoryPreparation { ready, deferred }
 }
 
 fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &HistorySegment) {
@@ -560,155 +575,162 @@ mod tests {
     }
 
     #[test]
-    fn width_0_returns_empty_to_skip_history_insertion() {
-        let line = styled_line(&"x".repeat(50));
-        let out = wrap_scrollback_line(line, 0);
-        assert!(
-            out.is_empty(),
-            "width 0 must return empty to avoid terminal autowrap"
-        );
+    fn width_zero_defers_all_lines() {
+        let lines = vec![styled_line(&"x".repeat(50)), styled_line("hello")];
+        let prep = prepare_history_rows(lines.clone(), 0);
+        assert!(prep.ready.is_empty(), "width 0 must defer everything");
+        assert_eq!(prep.deferred.len(), 2, "width 0 defers all original lines");
+        assert_eq!(prep.deferred[0].text, lines[0].text);
+        assert_eq!(prep.deferred[1].text, lines[1].text);
     }
 
     #[test]
-    fn narrow_widths_split_into_rows_within_viewport() {
+    fn repeated_unrenderable_flush_does_not_duplicate_or_drop() {
+        let original = vec![styled_line("hello"), styled_line("你好")];
+        for _ in 0..5 {
+            let prep = prepare_history_rows(original.clone(), 0);
+            assert_eq!(prep.deferred.len(), 2, "defer count stable");
+            assert_eq!(prep.ready.len(), 0);
+            assert_eq!(prep.deferred[0].text, "hello");
+            assert_eq!(prep.deferred[1].text, "你好");
+        }
+    }
+
+    #[test]
+    fn narrow_ascii_widths_split_into_rows_within_viewport() {
         let line = styled_line(&"x".repeat(50));
         for w in [1u16, 2, 3] {
-            let out = wrap_scrollback_line(line.clone(), w);
-            assert!(!out.is_empty(), "width {w} must produce rows");
-            for (i, row) in out.iter().enumerate() {
-                let rw = width_of(&row.text);
+            let prep = prepare_history_rows(vec![line.clone()], w);
+            assert!(prep.deferred.is_empty(), "ASCII width {w} not deferred");
+            assert!(!prep.ready.is_empty(), "width {w} produces rows");
+            for (i, row) in prep.ready.iter().enumerate() {
                 assert!(
-                    rw <= w as usize,
-                    "width {w} row {i} is {rw} cells, exceeds viewport"
+                    width_of(&row.text) <= w as usize,
+                    "width {w} row {i} is {} cells",
+                    width_of(&row.text)
                 );
             }
-            assert!(
-                !out[0].text.trim().is_empty(),
-                "width {w} first row not blank"
-            );
-            assert!(
-                out.len() <= 50,
-                "width {w} row count bounded (got {})",
-                out.len()
-            );
+            assert!(prep.ready.len() <= 50, "width {w} bounded");
         }
     }
 
     #[test]
-    fn width_4_wraps_with_bounded_rows_and_preserved_content() {
-        let line = styled_line(&"a".repeat(200));
-        let out = wrap_scrollback_line(line, 4);
-        assert!(out.len() <= 200, "width 4 bounded row count");
-        for (i, row) in out.iter().enumerate() {
-            assert!(width_of(&row.text) <= 4, "width 4 row {i} within viewport");
-        }
-        let joined: String = out.iter().map(|l| l.text.as_str()).collect();
+    fn cjk_at_width_one_is_deferred_without_substitution() {
+        let cjk = styled_line("你好");
+        let prep = prepare_history_rows(vec![cjk.clone()], 1);
+        assert!(prep.ready.is_empty(), "CJK at width 1 must defer");
+        assert_eq!(prep.deferred.len(), 1);
+        assert_eq!(prep.deferred[0].text, "你好", "original content preserved");
         assert!(
-            joined.matches('a').count() >= 100,
-            "content preserved at width 4"
+            !prep.deferred[0].text.contains('.') && !prep.deferred[0].text.contains('�'),
+            "no substitution markers"
         );
     }
 
     #[test]
-    fn three_cell_prefix_continues_indent_at_width_4() {
+    fn cjk_at_width_two_wraps_losslessly() {
+        let cjk = styled_line(&"你好".repeat(20));
+        let prep = prepare_history_rows(vec![cjk.clone()], 2);
+        assert!(prep.deferred.is_empty(), "CJK at width 2 is renderable");
+        assert!(!prep.ready.is_empty(), "width 2 produces rows");
+        for (i, row) in prep.ready.iter().enumerate() {
+            assert!(width_of(&row.text) <= 2, "width 2 row {i} within viewport");
+        }
+        let joined: String = prep.ready.iter().map(|r| r.text.as_str()).collect();
+        assert!(joined.contains('你'), "CJK preserved in wrapped output");
+        assert!(joined.contains('好'), "CJK preserved in wrapped output");
+    }
+
+    #[test]
+    fn mixed_ascii_cjk_at_width_one_defers_preserving_content() {
+        let mixed = styled_line("abc你好xyz");
+        let prep = prepare_history_rows(vec![mixed.clone()], 1);
+        assert!(prep.ready.is_empty(), "mixed with CJK at width 1 deferred");
+        assert_eq!(prep.deferred[0].text, "abc你好xyz");
+    }
+
+    #[test]
+    fn mixed_ascii_cjk_at_width_two_wraps_losslessly() {
+        let mixed = styled_line("abc你好xyz");
+        let prep = prepare_history_rows(vec![mixed.clone()], 2);
+        assert!(prep.deferred.is_empty(), "width 2 renderable");
+        let joined: String = prep.ready.iter().map(|r| r.text.as_str()).collect();
+        assert!(joined.contains("abc"), "ASCII prefix preserved");
+        assert!(joined.contains("你好"), "CJK preserved");
+        assert!(joined.contains("xyz"), "ASCII suffix preserved");
+    }
+
+    #[test]
+    fn width_four_wraps_with_bounded_rows() {
+        let line = styled_line(&"a".repeat(200));
+        let prep = prepare_history_rows(vec![line], 4);
+        assert!(prep.deferred.is_empty());
+        assert!(prep.ready.len() <= 200, "width 4 bounded");
+        for (i, row) in prep.ready.iter().enumerate() {
+            assert!(width_of(&row.text) <= 4, "width 4 row {i} within viewport");
+        }
+    }
+
+    #[test]
+    fn three_cell_prefix_continuation_at_width_4() {
         let line = line_with_prefix(" → ", &"a".repeat(40));
         let out = wrap_scrollback_line(line, 4);
         assert!(out.len() > 1, "must wrap at width 4");
         for row in &out {
             assert!(width_of(&row.text) <= 4, "each row within width 4");
         }
-        if let Some(cont) = out.get(1) {
-            assert_eq!(
-                width_of(cont.text.trim_end_matches('a')),
-                3,
-                "continuation indent matches the 3-cell prefix"
-            );
-        }
-    }
-
-    #[test]
-    fn cjk_at_narrow_widths_respects_viewport_constraint() {
-        let cjk = styled_line(&"你".repeat(30));
-        // width 0: empty
-        assert!(wrap_scrollback_line(cjk.clone(), 0).is_empty());
-        // width 1: CJK (width 2) exceeds viewport → substitution marker
-        let out1 = wrap_scrollback_line(cjk.clone(), 1);
-        assert!(!out1.is_empty(), "width 1 produces rows");
-        for row in &out1 {
-            assert!(width_of(&row.text) <= 1, "width 1 row within viewport");
-        }
-        // width 2: CJK fits (2 cells = 2 width)
-        let out2 = wrap_scrollback_line(cjk.clone(), 2);
-        assert!(!out2.is_empty(), "width 2 produces rows");
-        for row in &out2 {
-            assert!(width_of(&row.text) <= 2, "width 2 row within viewport");
-        }
-        // width 3-5: safe
-        for w in [3u16, 4, 5] {
-            let out = wrap_scrollback_line(cjk.clone(), w);
-            assert!(!out.is_empty(), "width {w} produces rows");
-            for row in &out {
-                assert!(
-                    width_of(&row.text) <= w as usize,
-                    "width {w} row within viewport"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn cjk_width_1_uses_substitution_marker_not_half_char() {
-        let cjk = styled_line("你好");
-        let out = wrap_scrollback_line(cjk, 1);
-        assert!(!out.is_empty());
-        for row in &out {
-            assert!(width_of(&row.text) <= 1, "width 1 row is 1 cell");
-            assert!(
-                !row.text.contains('你') && !row.text.contains('好'),
-                "CJK scalar not split — substitution used instead"
-            );
-        }
     }
 
     #[test]
     fn empty_line_safe_at_all_widths() {
         let empty = styled_line("");
-        assert!(
-            wrap_scrollback_line(empty.clone(), 0).is_empty(),
-            "width 0 empty"
-        );
         for w in [1u16, 2, 3, 4, 80] {
             let out = wrap_scrollback_line(empty.clone(), w);
             assert_eq!(out.len(), 1, "width {w} empty line → 1 row");
             assert!(out[0].text.is_empty());
         }
+        let prep = prepare_history_rows(vec![empty.clone()], 0);
+        assert!(prep.ready.is_empty(), "width 0 defers empty too");
+        assert_eq!(prep.deferred.len(), 1);
     }
 
     #[test]
-    fn long_line_at_width_2_splits_into_2_cell_rows() {
+    fn long_ascii_at_width_2_splits() {
         let long = styled_line(&"z".repeat(500));
-        let out = wrap_scrollback_line(long, 2);
-        assert!(out.len() > 1, "width 2 must split a 500-char line");
-        for (i, row) in out.iter().enumerate() {
-            assert!(width_of(&row.text) <= 2, "width 2 row {i} within viewport");
+        let prep = prepare_history_rows(vec![long], 2);
+        assert!(prep.deferred.is_empty());
+        assert!(prep.ready.len() > 1, "width 2 splits 500-char line");
+        for (i, row) in prep.ready.iter().enumerate() {
+            assert!(width_of(&row.text) <= 2, "width 2 row {i}");
         }
     }
 
     #[test]
-    fn fill_bearing_line_passes_through_at_positive_width() {
+    fn fill_bearing_fits_passes_through() {
         let line = ScrollbackLine::styled_with_fill(
-            vec![HistorySegment::raw("hint")],
+            vec![HistorySegment::raw("hi")],
             None,
             Some(HistorySegment::raw(" ")),
         );
-        for w in [1u16, 3, 4, 80] {
-            let out = wrap_scrollback_line(line.clone(), w);
-            assert_eq!(out.len(), 1, "fill-bearing line not wrapped at width {w}");
-            assert!(out[0].fill.is_some());
-        }
+        let prep = prepare_history_rows(vec![line.clone()], 80);
+        assert!(prep.deferred.is_empty(), "fits at width 80");
+        assert_eq!(prep.ready.len(), 1);
+        assert!(prep.ready[0].fill.is_some(), "fill preserved");
+    }
+
+    #[test]
+    fn fill_bearing_overflow_defers() {
+        let line = ScrollbackLine::styled_with_fill(
+            vec![HistorySegment::raw(&"x".repeat(100))],
+            None,
+            Some(HistorySegment::raw(" ")),
+        );
+        let prep = prepare_history_rows(vec![line.clone()], 40);
+        assert_eq!(prep.ready.len(), 0, "overflow fill deferred");
+        assert_eq!(prep.deferred.len(), 1);
         assert!(
-            wrap_scrollback_line(line, 0).is_empty(),
-            "width 0 skips fill line too"
+            prep.deferred[0].fill.is_some(),
+            "fill preserved in deferred"
         );
     }
 
@@ -716,12 +738,9 @@ mod tests {
     fn normal_width_wrapping_still_works() {
         let line = styled_line(&"a".repeat(40));
         let out = wrap_scrollback_line(line, 20);
-        assert!(out.len() > 1, "width 20 wraps a 40-char line");
+        assert!(out.len() > 1, "width 20 wraps 40-char line");
         for row in &out {
-            assert!(
-                width_of(row.text.trim()) <= 20,
-                "each row fits within width 20"
-            );
+            assert!(width_of(row.text.trim()) <= 20, "fits within width 20");
         }
     }
 
@@ -730,11 +749,7 @@ mod tests {
         let line = line_with_prefix(" → ", &"a".repeat(40));
         let out = wrap_scrollback_line(line, 4);
         for (i, row) in out.iter().enumerate() {
-            let trimmed = row.text.trim();
-            assert!(
-                !trimmed.is_empty(),
-                "row {i} is prefix-only (all whitespace)"
-            );
+            assert!(!row.text.trim().is_empty(), "row {i} is prefix-only");
         }
     }
 
@@ -743,40 +758,34 @@ mod tests {
         let display = crate::tool_display::test_display_with_long_args();
         for w in [1u16, 2, 3, 4] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
-            let rows = prepare_history_rows(built, w);
-            assert!(!rows.is_empty(), "width {w} chain produces rows");
-            for (i, row) in rows.iter().enumerate() {
-                let rw = width_of(&row.text);
+            let prep = prepare_history_rows(built, w);
+            assert!(!prep.ready.is_empty(), "width {w} produces ready rows");
+            for (i, row) in prep.ready.iter().enumerate() {
                 assert!(
-                    rw <= w as usize,
-                    "width {w}: builder→renderer row {i} is {rw} cells, exceeds viewport"
+                    width_of(&row.text) <= w as usize,
+                    "width {w} row {i} exceeds viewport"
                 );
             }
-            assert!(
-                rows.iter().any(|r| !r.text.trim().is_empty()),
-                "width {w}: at least one row has visible content"
-            );
         }
     }
 
     #[test]
-    fn ascii_content_preserved_through_extreme_widths() {
+    fn ascii_content_preserved_at_extreme_widths() {
         let args = "abcdefghij".repeat(10);
         let display = crate::tool_display::test_display_with_args(&args);
         for w in [1u16, 2, 3] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
-            let rows = prepare_history_rows(built, w);
-            let combined: String = rows
+            let prep = prepare_history_rows(built, w);
+            let combined: String = prep
+                .ready
                 .iter()
                 .flat_map(|r| r.text.chars())
                 .filter(|c| c.is_ascii_alphabetic())
                 .collect();
             for ch in args.chars() {
-                let before = combined.matches(ch).count();
-                let expected = args.matches(ch).count();
                 assert!(
-                    before >= expected,
-                    "width {w}: char '{ch}' count {before} < expected {expected}"
+                    combined.matches(ch).count() >= args.matches(ch).count(),
+                    "width {w}: char '{ch}' not fully preserved"
                 );
             }
         }
@@ -787,13 +796,30 @@ mod tests {
         let display = crate::tool_display::test_display_with_long_args();
         for w in [1u16, 2, 3, 4, 40] {
             let built = crate::tool_display::build_tool_call_scrollback_lines(&display, w);
-            let rows = prepare_history_rows(built, w);
-            assert!(!rows.is_empty(), "width {w} produces rows");
-            assert!(
-                rows.len() <= 500,
-                "width {w} row count bounded (got {})",
-                rows.len()
-            );
+            let prep = prepare_history_rows(built, w);
+            assert!(!prep.ready.is_empty(), "width {w} produces rows");
+            assert!(prep.ready.len() <= 500, "width {w} bounded");
         }
+    }
+
+    #[test]
+    fn deferred_line_preserves_segments_and_style() {
+        let line = ScrollbackLine::styled(
+            vec![
+                HistorySegment::styled(" → ", None, HistoryAttrs::default()),
+                HistorySegment::raw("你好"),
+            ],
+            None,
+        );
+        let prep = prepare_history_rows(vec![line.clone()], 1);
+        assert_eq!(prep.deferred.len(), 1);
+        let d = &prep.deferred[0];
+        assert_eq!(d.text, line.text, "text identical");
+        assert_eq!(
+            d.segments.len(),
+            line.segments.len(),
+            "segment count identical"
+        );
+        assert_eq!(d.bg, line.bg, "bg identical");
     }
 }

@@ -788,9 +788,13 @@ impl Tui {
         if self.pending_scrollback.is_empty() {
             return Ok(());
         }
-        let lines = std::mem::take(&mut self.pending_scrollback);
         let history_width = self.terminal.screen_size().width;
-        for line in crate::app_stream::prepare_history_rows(lines, history_width) {
+        if history_width == 0 {
+            return Ok(());
+        }
+        let lines = std::mem::take(&mut self.pending_scrollback);
+        let prepared = crate::app_stream::prepare_history_rows(lines, history_width);
+        for line in prepared.ready {
             if line.has_plain_segments_only() {
                 self.terminal.insert_history(&line.text, line.bg)?;
             } else {
@@ -810,6 +814,7 @@ impl Tui {
                 self.terminal.insert_styled_history(&segments, line.bg)?;
             }
         }
+        self.pending_scrollback = prepared.deferred;
         Ok(())
     }
 
