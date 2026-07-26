@@ -185,9 +185,12 @@ Behavior:
 Technical / governance:
 
 - [x] `cargo test --workspace --locked` includes: tool-call wrap at 40/80/120/160;
-      tool-call render at width 1/2/3 (bounded, no panic); CJK tool-call wrap;
-      the `resize_clear_action` decision matrix (width-shrink → ClearViewportRows,
-      height-shrink → ClearFromCursorDown, grow → None, zero-height safety).
+      tool-call render at width 1/2/3 renderer-accounted (each output row display
+      width ≤ viewport, no terminal-autowrap dependency); CJK tool-call wrap with
+      1-cell substitution at width 1; builder→renderer chain width-constraint test;
+      physical row accounting via `prepare_history_rows`; the `resize_clear_action`
+      decision matrix (width-shrink → ClearViewportRows, height-shrink →
+      ClearFromCursorDown, grow → None, zero-height safety).
 - [ ] A resize/shrink end-to-end test asserting the hint bar is not committed to
       scrollback and no fill-bearing viewport line enters history; height-shrink
       rendering regression. NOT yet automated: the no-leak guarantee is

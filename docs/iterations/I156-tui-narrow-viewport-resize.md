@@ -183,6 +183,7 @@ If a stop condition occurs:
 
 - Implementation baseline: `2f9de9f` (ancestor `065d801` activation baseline).
 - Implementation Commit: `2f9de9f` — `fix(tui): harden narrow viewport and resize rendering (#TUI-035)`.
+- Correction Commit: `5d11926` — `fix(tui): make extreme-width rendering renderer-accounted (#TUI-035)`. Removed terminal-autowrap dependency at viewport widths 1/2/3: `wrap_scrollback_line` now splits every line to fit the viewport (width 0 → empty; width > 0 → each row ≤ viewport), with CJK substitution marker at width 1 and anti-prefix-only continuation. Added `prepare_history_rows` helper for testability. Builder→renderer chain and physical row accounting regressions added.
 - Files changed: `crates/talos-tui/src/{tool_display,app,app_stream,inline_terminal,scrollback}.rs`.
 - Decisions:
   - Fix 1: `build_tool_call_scrollback_line` → `build_tool_call_scrollback_lines(display, viewport_width)`, reuses `wrap_to_display_width`; styled prefix on row 0, dim continuation indent on subsequent rows; `MIN_TOOL_CALL_ARGS_BUDGET=20` floor mirrors tool-result.
