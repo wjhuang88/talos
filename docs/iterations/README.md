@@ -304,8 +304,10 @@ planning, or activation owner.
 
 The current execution sequence is the
 [v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
-listed above. I156 is the next activation candidate; no iteration is activated by this historical
-table.
+listed above.
+
+I156 is Active as the sole implementation iteration, and TUI-035 is In Progress. This historical
+table is not a current selection, planning, status, or activation owner.
 
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|
