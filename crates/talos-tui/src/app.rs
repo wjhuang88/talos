@@ -557,7 +557,7 @@ impl Tui {
         }
 
         let elapsed = session_start.elapsed();
-        self.restore();
+        self.restore()?;
         self.print_exit_summary(elapsed);
         Ok(())
     }
@@ -1108,18 +1108,25 @@ impl Tui {
                 }
                 match key.code {
                     KeyCode::PageUp => {
-                        if let Some(row) = self.last_history_projection.rows.first() {
-                            self.history_scroll.anchor(row.anchor, 0);
+                        let height = self.last_history_projection.rows.len() as u16;
+                        if let Some(anchor) = self.last_history_projection.page_up(height) {
+                            self.history_scroll.anchor(anchor, 0);
                         }
                         return false;
                     }
                     KeyCode::PageDown => {
-                        self.history_scroll.jump_to_end();
+                        let height = self.last_history_projection.rows.len() as u16;
+                        if self.last_history_projection.page_down_reaches_tail(height) {
+                            self.history_scroll.jump_to_end();
+                        } else if let Some(anchor) = self.last_history_projection.page_down(height)
+                        {
+                            self.history_scroll.anchor(anchor, 0);
+                        }
                         return false;
                     }
                     KeyCode::Home if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        if let Some(row) = self.last_history_projection.rows.first() {
-                            self.history_scroll.anchor(row.anchor, 0);
+                        if let Some(anchor) = self.last_history_projection.first_anchor() {
+                            self.history_scroll.anchor(anchor, 0);
                         }
                         return false;
                     }
@@ -1326,8 +1333,8 @@ impl Tui {
         false
     }
 
-    fn restore(&mut self) {
-        let _ = self.terminal.restore();
+    fn restore(&mut self) -> io::Result<()> {
+        self.terminal.restore()
     }
 }
 
@@ -1517,7 +1524,7 @@ pub(crate) fn tip_ttl(kind: &TipKind) -> Duration {
 
 impl Drop for Tui {
     fn drop(&mut self) {
-        self.restore();
+        let _ = self.restore();
     }
 }
 

@@ -7,16 +7,17 @@ use crate::inline_terminal::HistorySegment;
 use crate::transcript::{TranscriptBlock, TranscriptEntryId, TranscriptStore};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct LogicalRowAnchor {
+pub(crate) struct LogicalContentAnchor {
     pub(crate) entry_id: TranscriptEntryId,
-    pub(crate) block_row: usize,
+    pub(crate) logical_line: usize,
+    pub(crate) scalar_offset: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum HistoryScrollMode {
     FollowTail,
     Anchored {
-        anchor: LogicalRowAnchor,
+        anchor: LogicalContentAnchor,
         screen_row: u16,
     },
 }
@@ -33,7 +34,7 @@ impl HistoryScrollState {
         }
     }
 
-    pub(crate) fn anchor(&mut self, anchor: LogicalRowAnchor, screen_row: u16) {
+    pub(crate) fn anchor(&mut self, anchor: LogicalContentAnchor, screen_row: u16) {
         self.mode = HistoryScrollMode::Anchored { anchor, screen_row };
     }
 
@@ -44,7 +45,8 @@ impl HistoryScrollState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
-    pub(crate) anchor: LogicalRowAnchor,
+    pub(crate) start_anchor: LogicalContentAnchor,
+    pub(crate) end_anchor: LogicalContentAnchor,
     pub(crate) line: ScrollbackLine,
 }
 
@@ -52,6 +54,35 @@ pub(crate) struct RenderedHistoryRow {
 pub(crate) struct HistoryProjection {
     pub(crate) rows: Vec<RenderedHistoryRow>,
     pub(crate) total_rows: usize,
+    pub(crate) visible_start: usize,
+    all_rows: Vec<RenderedHistoryRow>,
+}
+
+impl HistoryProjection {
+    pub(crate) fn first_anchor(&self) -> Option<LogicalContentAnchor> {
+        self.all_rows.first().map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_up(&self, height: u16) -> Option<LogicalContentAnchor> {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        self.all_rows
+            .get(self.visible_start.saturating_sub(page))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_down(&self, height: u16) -> Option<LogicalContentAnchor> {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        let max_start = self.total_rows.saturating_sub(usize::from(height));
+        self.all_rows
+            .get((self.visible_start + page).min(max_start))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_down_reaches_tail(&self, height: u16) -> bool {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        self.visible_start.saturating_add(page)
+            >= self.total_rows.saturating_sub(usize::from(height))
+    }
 }
 
 /// Projects logical transcript lines without changing their stored content.
@@ -67,14 +98,28 @@ pub(crate) fn project_history(
 
     let mut all = Vec::new();
     for entry in transcript.entries() {
-        for (block_row, line) in project_block(&entry.block, width).into_iter().enumerate() {
-            all.push(RenderedHistoryRow {
-                anchor: LogicalRowAnchor {
-                    entry_id: entry.id,
-                    block_row,
-                },
-                line,
-            });
+        for (logical_line, line) in logical_lines(&entry.block).into_iter().enumerate() {
+            all.extend(
+                project_line(&line, width)
+                    .into_iter()
+                    .scan(0usize, |offset, line| {
+                        let start = *offset;
+                        *offset += line.text.chars().count();
+                        Some(RenderedHistoryRow {
+                            start_anchor: LogicalContentAnchor {
+                                entry_id: entry.id,
+                                logical_line,
+                                scalar_offset: start,
+                            },
+                            end_anchor: LogicalContentAnchor {
+                                entry_id: entry.id,
+                                logical_line,
+                                scalar_offset: *offset,
+                            },
+                            line,
+                        })
+                    }),
+            );
         }
     }
     let total_rows = all.len();
@@ -85,10 +130,15 @@ pub(crate) fn project_history(
             // if none survives, clamp at the end. This keeps the anchor logical.
             let index = all
                 .iter()
-                .position(|row| row.anchor == anchor)
+                .position(|row| {
+                    row.start_anchor.entry_id == anchor.entry_id
+                        && row.start_anchor.logical_line == anchor.logical_line
+                        && row.start_anchor.scalar_offset <= anchor.scalar_offset
+                        && anchor.scalar_offset <= row.end_anchor.scalar_offset
+                })
                 .unwrap_or_else(|| {
                     all.iter()
-                        .position(|row| row.anchor.entry_id >= anchor.entry_id)
+                        .position(|row| row.start_anchor.entry_id >= anchor.entry_id)
                         .unwrap_or(total_rows)
                 });
             index.saturating_sub(usize::from(screen_row))
@@ -98,17 +148,18 @@ pub(crate) fn project_history(
     HistoryProjection {
         rows: all[start..end].to_vec(),
         total_rows,
+        visible_start: start,
+        all_rows: all,
     }
 }
 
-fn project_block(block: &TranscriptBlock, width: u16) -> Vec<ScrollbackLine> {
+/// Stable semantic lines. Tool display is formatted once at an effectively
+/// unbounded width; only `project_line` performs current-viewport wrapping.
+fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
     match block {
-        TranscriptBlock::StyledLine(line) => project_line(line, width),
+        TranscriptBlock::StyledLine(line) => vec![line.clone()],
         TranscriptBlock::ToolCall(display) => {
-            crate::tool_display::build_tool_call_scrollback_lines(display, width)
-                .into_iter()
-                .flat_map(|line| project_line(&line, width))
-                .collect()
+            crate::tool_display::build_tool_call_scrollback_lines(display, u16::MAX)
         }
         TranscriptBlock::ToolResult(display) => {
             let icon = if display.is_error { "✗" } else { "" };
@@ -117,10 +168,7 @@ fn project_block(block: &TranscriptBlock, width: u16) -> Vec<ScrollbackLine> {
             } else {
                 crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_SUCCESS)
             };
-            crate::tool_display::build_tool_result_scrollback_lines(display, icon, color, width)
-                .into_iter()
-                .flat_map(|line| project_line(&line, width))
-                .collect()
+            crate::tool_display::build_tool_result_scrollback_lines(display, icon, color, u16::MAX)
         }
     }
 }
@@ -292,7 +340,7 @@ mod tests {
             )));
         }
         let tail = project_history(&transcript, 80, 10, &HistoryScrollState::follow_tail());
-        let anchor = tail.rows[3].anchor;
+        let anchor = tail.rows[3].start_anchor;
         let mut scroll = HistoryScrollState::follow_tail();
         scroll.anchor(anchor, 3);
         let before = project_history(&transcript, 80, 10, &scroll);
@@ -300,8 +348,8 @@ mod tests {
             "new", None,
         )));
         let after = project_history(&transcript, 80, 10, &scroll);
-        assert_eq!(before.rows[3].anchor, anchor);
-        assert_eq!(after.rows[3].anchor, anchor);
+        assert_eq!(before.rows[3].start_anchor, anchor);
+        assert_eq!(after.rows[3].start_anchor, anchor);
     }
 
     #[test]
@@ -312,21 +360,43 @@ mod tests {
             None,
         )));
         let wide = project_history(&transcript, 80, 8, &HistoryScrollState::follow_tail());
-        let anchor = wide.rows[0].anchor;
+        let anchor = wide.rows[0].start_anchor;
         let mut scroll = HistoryScrollState::follow_tail();
         scroll.anchor(anchor, 0);
         assert_eq!(
             project_history(&transcript, 40, 8, &scroll).rows[0]
-                .anchor
+                .start_anchor
                 .entry_id,
             anchor.entry_id
         );
         assert_eq!(
             project_history(&transcript, 120, 8, &scroll).rows[0]
-                .anchor
+                .start_anchor
                 .entry_id,
             anchor.entry_id
         );
+    }
+
+    #[test]
+    fn resize_preserves_anchor_inside_multiline_entry() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "0123456789abcdefghijklmnopqrstuvwxyz你好世界",
+            None,
+        )));
+        let wide = project_history(&transcript, 10, 20, &HistoryScrollState::follow_tail());
+        let anchor = wide.rows[2].start_anchor;
+        assert!(anchor.scalar_offset > 0);
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        for width in [40, 1, 80] {
+            let projection = project_history(&transcript, width, 20, &scroll);
+            let row = &projection.rows[0];
+            assert!(
+                row.start_anchor.scalar_offset <= anchor.scalar_offset
+                    && anchor.scalar_offset <= row.end_anchor.scalar_offset
+            );
+        }
     }
 
     #[test]
@@ -389,14 +459,15 @@ mod tests {
         )));
         let mut scroll = HistoryScrollState::follow_tail();
         scroll.anchor(
-            LogicalRowAnchor {
+            LogicalContentAnchor {
                 entry_id: second,
-                block_row: 99,
+                logical_line: 0,
+                scalar_offset: 99,
             },
             0,
         );
         let projection = project_history(&transcript, 80, 2, &scroll);
-        assert_eq!(projection.rows[0].anchor.entry_id, second);
+        assert_eq!(projection.rows[0].start_anchor.entry_id, second);
     }
 
     #[test]

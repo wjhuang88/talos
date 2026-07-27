@@ -314,6 +314,13 @@ impl TerminalSession {
         Ok(())
     }
 
+    #[allow(dead_code)]
+    pub fn hide_cursor(&mut self) -> io::Result<()> {
+        let writer = self.backend_mut();
+        queue!(writer, Hide)?;
+        io::Write::flush(writer)
+    }
+
     pub fn restore(&mut self) -> io::Result<()> {
         restore_lifecycle(&mut self.lifecycle, execute_stdout_action)
     }
@@ -333,8 +340,7 @@ fn initialize_lifecycle(
     lifecycle.raw_mode = true;
     if keyboard_enabled {
         if let Err(error) = run(TerminalAction::PushKeyboardEnhancement) {
-            rollback_lifecycle(&mut lifecycle, &mut run);
-            return Err(error);
+            return Err(setup_error(error, &mut lifecycle, &mut run));
         }
         lifecycle.keyboard_enhancement = true;
     }
@@ -344,8 +350,7 @@ fn initialize_lifecycle(
         TerminalAction::EnableBracketedPaste,
     ] {
         if let Err(error) = run(action) {
-            rollback_lifecycle(&mut lifecycle, &mut run);
-            return Err(error);
+            return Err(setup_error(error, &mut lifecycle, &mut run));
         }
         match action {
             TerminalAction::EnterAlternateScreen => lifecycle.alternate_screen = true,
@@ -355,45 +360,84 @@ fn initialize_lifecycle(
         }
     }
     if let Err(error) = run(TerminalAction::ClearFrame) {
-        rollback_lifecycle(&mut lifecycle, &mut run);
-        return Err(error);
+        return Err(setup_error(error, &mut lifecycle, &mut run));
     }
     Ok(lifecycle)
+}
+
+fn setup_error(
+    setup: io::Error,
+    lifecycle: &mut TerminalLifecycleState,
+    run: &mut impl FnMut(TerminalAction) -> io::Result<()>,
+) -> io::Error {
+    match rollback_lifecycle(lifecycle, run) {
+        Ok(()) => setup,
+        Err(cleanup) => {
+            io::Error::new(setup.kind(), format!("{setup}; rollback failed: {cleanup}"))
+        }
+    }
 }
 
 fn rollback_lifecycle(
     lifecycle: &mut TerminalLifecycleState,
     run: &mut impl FnMut(TerminalAction) -> io::Result<()>,
-) {
-    // Preserve the setup error: rollback is best-effort, but only actions that completed are run.
-    let _ = restore_lifecycle(lifecycle, run);
+) -> io::Result<()> {
+    // Preserve the setup error: rollback attempts every completed transition.
+    restore_lifecycle(lifecycle, run)
 }
 
 fn restore_lifecycle(
     lifecycle: &mut TerminalLifecycleState,
     mut run: impl FnMut(TerminalAction) -> io::Result<()>,
 ) -> io::Result<()> {
-    if lifecycle.bracketed_paste {
-        run(TerminalAction::DisableBracketedPaste)?;
-        lifecycle.bracketed_paste = false;
+    let mut first_error = None;
+    attempt_restore(
+        &mut lifecycle.bracketed_paste,
+        TerminalAction::DisableBracketedPaste,
+        &mut run,
+        &mut first_error,
+    );
+    attempt_restore(
+        &mut lifecycle.cursor_hidden,
+        TerminalAction::ShowCursor,
+        &mut run,
+        &mut first_error,
+    );
+    attempt_restore(
+        &mut lifecycle.alternate_screen,
+        TerminalAction::LeaveAlternateScreen,
+        &mut run,
+        &mut first_error,
+    );
+    attempt_restore(
+        &mut lifecycle.keyboard_enhancement,
+        TerminalAction::PopKeyboardEnhancement,
+        &mut run,
+        &mut first_error,
+    );
+    attempt_restore(
+        &mut lifecycle.raw_mode,
+        TerminalAction::DisableRawMode,
+        &mut run,
+        &mut first_error,
+    );
+    first_error.map_or(Ok(()), Err)
+}
+
+fn attempt_restore(
+    enabled: &mut bool,
+    action: TerminalAction,
+    run: &mut impl FnMut(TerminalAction) -> io::Result<()>,
+    first_error: &mut Option<io::Error>,
+) {
+    if !*enabled {
+        return;
     }
-    if lifecycle.cursor_hidden {
-        run(TerminalAction::ShowCursor)?;
-        lifecycle.cursor_hidden = false;
+    match run(action) {
+        Ok(()) => *enabled = false,
+        Err(error) if first_error.is_none() => *first_error = Some(error),
+        Err(_) => {}
     }
-    if lifecycle.alternate_screen {
-        run(TerminalAction::LeaveAlternateScreen)?;
-        lifecycle.alternate_screen = false;
-    }
-    if lifecycle.keyboard_enhancement {
-        run(TerminalAction::PopKeyboardEnhancement)?;
-        lifecycle.keyboard_enhancement = false;
-    }
-    if lifecycle.raw_mode {
-        run(TerminalAction::DisableRawMode)?;
-        lifecycle.raw_mode = false;
-    }
-    Ok(())
 }
 
 fn execute_backend_action(
@@ -609,5 +653,36 @@ mod tests {
                 TerminalAction::ShowCursor
             ]
         );
+    }
+
+    #[test]
+    fn restore_attempts_all_enabled_states_and_retries_only_failures() {
+        let mut lifecycle = TerminalLifecycleState {
+            raw_mode: true,
+            alternate_screen: true,
+            cursor_hidden: true,
+            bracketed_paste: true,
+            keyboard_enhancement: true,
+        };
+        let mut first = Vec::new();
+        assert!(
+            restore_lifecycle(&mut lifecycle, |action| {
+                first.push(action);
+                (action != TerminalAction::DisableBracketedPaste)
+                    .then_some(())
+                    .ok_or_else(|| io::Error::other("paste failure"))
+            })
+            .is_err()
+        );
+        assert_eq!(first.len(), 5);
+        assert!(lifecycle.bracketed_paste);
+        assert!(!lifecycle.cursor_hidden && !lifecycle.alternate_screen);
+        let mut retry = Vec::new();
+        restore_lifecycle(&mut lifecycle, |action| {
+            retry.push(action);
+            Ok(())
+        })
+        .expect("retry succeeds");
+        assert_eq!(retry, vec![TerminalAction::DisableBracketedPaste]);
     }
 }
