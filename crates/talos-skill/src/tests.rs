@@ -1140,44 +1140,8 @@ fn discover_follows_symlinked_skills_root() {
     assert_eq!(skills[0].name, "symlinked-skill");
 }
 
-#[cfg(unix)]
 #[test]
-fn discover_symlink_cycle_does_not_loop_forever() {
-    use std::os::unix::fs::symlink;
-
-    let dir = tempfile::tempdir().expect("temp dir");
-    let skills_dir = dir.path().join("skills");
-    let sub_a = skills_dir.join("a");
-    let sub_b = skills_dir.join("b");
-
-    fs::create_dir_all(&sub_a).expect("create a");
-    fs::create_dir_all(&sub_b).expect("create b");
-
-    symlink(&sub_b, sub_a.join("link-to-b")).expect("a -> b");
-    symlink(&sub_a, sub_b.join("link-to-a")).expect("b -> a");
-
-    fs::write(sub_a.join("SKILL.md"), valid_skill_content()).expect("write skill in a");
-
-    let mut loader = SkillLoader {
-        skills: Vec::new(),
-        search_paths: vec![skills_dir],
-        discover_shared: false,
-        workspace_root: None,
-        discovery_policy: SkillDiscoveryPolicy::default(),
-        discovery_warnings: Vec::new(),
-    };
-
-    let skills = loader
-        .discover()
-        .expect("discovery completes without infinite loop");
-    assert!(
-        skills.len() >= 1,
-        "at least the real skill is found despite cycle"
-    );
-}
-
-#[test]
-fn discover_follows_nested_symlink_chain_to_skill() {
+fn discover_finds_regular_nested_skill() {
     let dir = tempfile::tempdir().expect("temp dir");
     let skills_dir = dir.path().join("skills");
     let nested_dir = skills_dir.join("level1").join("level2");
@@ -1505,14 +1469,17 @@ fn external_target_denied_by_default_when_following_links() {
 }
 
 #[test]
-fn entry_budget_stops_scan_and_warns() {
+fn entry_budget_uses_unique_skill_names() {
     let dir = tempfile::tempdir().expect("temp");
     let skills_dir = dir.path().join("skills");
     fs::create_dir_all(&skills_dir).expect("create");
     for i in 0..50 {
-        let sub = skills_dir.join(format!("skill-{i}"));
+        let sub = skills_dir.join(format!("skill-{i:03}"));
         fs::create_dir_all(&sub).expect("create sub");
-        fs::write(sub.join("SKILL.md"), valid_skill_content()).expect("write");
+        let content = format!(
+            "---\nname: skill-{i:03}\ndescription: Skill number {i}\ntriggers:\n  - skill{i}\n---\n\nBody {i}.\n"
+        );
+        fs::write(sub.join("SKILL.md"), content).expect("write");
     }
 
     let policy = SkillDiscoveryPolicy {
@@ -1533,11 +1500,23 @@ fn entry_budget_stops_scan_and_warns() {
             .discovery_warnings
             .iter()
             .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
-        "EntryBudgetReached warning present"
+        "EntryBudgetReached warning present: {:?}",
+        loader.discovery_warnings
     );
+    let budget_count = loader
+        .discovery_warnings
+        .iter()
+        .filter(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached)
+        .count();
+    assert_eq!(budget_count, 1, "EntryBudgetReached emitted exactly once");
     assert!(
         loader.skills.len() < 50,
-        "not all skills found due to budget"
+        "not all skills found due to budget, got {}",
+        loader.skills.len()
+    );
+    assert!(
+        loader.skills.iter().all(|s| s.name.starts_with("skill-")),
+        "all discovered skills have unique names"
     );
 }
 
@@ -1589,7 +1568,7 @@ fn default_policy_does_not_follow_links() {
 
 #[cfg(unix)]
 #[test]
-fn symlink_cycle_reports_warning_and_does_not_duplicate() {
+fn symlink_cycle_reports_link_loop_and_discovers_once() {
     use std::os::unix::fs::symlink;
 
     let dir = tempfile::tempdir().expect("temp");
@@ -1623,4 +1602,619 @@ fn symlink_cycle_reports_warning_and_does_not_duplicate() {
         .filter(|s| s.name == "test-skill")
         .count();
     assert_eq!(count, 1, "skill found exactly once despite cycle");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::LinkLoop),
+        "LinkLoop warning present: {:?}",
+        loader.discovery_warnings
+    );
+    assert!(
+        !loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
+        "cycle must not trigger entry budget"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Real two-link chain, root-link policy, pre-descent rejection,
+// alias subtree single descent, root-level SKILL.md, direct file links,
+// depth boundary, global budget
+// -----------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn discover_follows_actual_two_link_chain() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let intermediate = dir.path().join("intermediate");
+    let final_dir = dir.path().join("final");
+
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&intermediate).expect("create intermediate");
+    fs::create_dir_all(&final_dir).expect("create final");
+    fs::write(final_dir.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+
+    symlink(&intermediate, skills_dir.join("link-a")).expect("link-a -> intermediate");
+    symlink(&final_dir, intermediate.join("link-b")).expect("link-b -> final");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        1,
+        "skill found through real two-link chain"
+    );
+    assert_eq!(loader.skills[0].name, "test-skill");
+}
+
+#[cfg(unix)]
+#[test]
+fn default_policy_rejects_symlinked_project_skills_root() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let real_root = dir.path().join("real-root");
+    let linked_root = dir.path().join("linked-root");
+
+    fs::create_dir_all(real_root.join("my-skill")).expect("create skill dir");
+    fs::write(
+        real_root.join("my-skill").join("SKILL.md"),
+        "---\nname: linked-root-skill\ndescription: Found via symlink\ntriggers:\n  - sym\n---\n\nBody.\n",
+    )
+    .expect("write SKILL.md");
+    symlink(&real_root, &linked_root).expect("create symlink to skills root");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![linked_root],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        0,
+        "symlinked project root rejected by default"
+    );
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::RootLinkDenied),
+        "RootLinkDenied warning present: {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn default_policy_rejects_symlinked_shared_skills_root() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let real_shared = dir.path().join("real-shared");
+    let linked_shared = dir.path().join(".agents").join("skills");
+
+    fs::create_dir_all(&real_shared).expect("create real shared");
+    fs::create_dir_all(real_shared.join("shared-skill")).expect("create skill dir");
+    fs::write(
+        real_shared.join("shared-skill").join("SKILL.md"),
+        "---\nname: shared-via-symlink\ndescription: Shared\ntriggers:\n  - sym\n---\n\nBody.\n",
+    )
+    .expect("write SKILL.md");
+    fs::create_dir_all(dir.path().join(".agents")).expect("create .agents");
+    symlink(&real_shared, &linked_shared).expect("create symlink to shared root");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![linked_shared],
+        discover_shared: true,
+        workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        0,
+        "symlinked shared root rejected by default"
+    );
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::RootLinkDenied),
+        "RootLinkDenied warning present even for shared root: {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn explicit_allow_any_permits_symlinked_root() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let real_root = dir.path().join("real-root");
+    let linked_root = dir.path().join("linked-root");
+
+    fs::create_dir_all(real_root.join("my-skill")).expect("create skill dir");
+    fs::write(
+        real_root.join("my-skill").join("SKILL.md"),
+        "---\nname: allow-any-skill\ndescription: Allowed\ntriggers:\n  - allow\n---\n\nBody.\n",
+    )
+    .expect("write SKILL.md");
+    symlink(&real_root, &linked_root).expect("create symlink to skills root");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![linked_root],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        1,
+        "symlinked root permitted with AllowAnyReadable"
+    );
+    assert_eq!(loader.skills[0].name, "allow-any-skill");
+}
+
+#[cfg(unix)]
+#[test]
+fn external_directory_is_rejected_before_descent() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let outside = dir.path().join("outside");
+
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("SKILL.md"), "no frontmatter").expect("write invalid SKILL.md");
+    for i in 0..20 {
+        fs::create_dir_all(outside.join(format!("sub-{i}"))).expect("create sub");
+    }
+    symlink(&outside, skills_dir.join("external-link")).expect("symlink to outside");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::DenyOutsideSearchRoot,
+        max_entries: 5,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::ExternalTargetDenied),
+        "ExternalTargetDenied present: {:?}",
+        loader.discovery_warnings
+    );
+    assert!(
+        !loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::InvalidSkill),
+        "external tree must not be traversed (no InvalidSkill): {:?}",
+        loader.discovery_warnings
+    );
+    assert!(
+        !loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
+        "external tree must not consume budget: {:?}",
+        loader.discovery_warnings
+    );
+    assert_eq!(loader.skills.len(), 0, "no skills from external tree");
+}
+
+#[cfg(unix)]
+#[test]
+fn canonical_alias_subtree_is_descended_once() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let real_tree = dir.path().join("real-tree");
+
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&real_tree).expect("create real tree");
+    fs::write(real_tree.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+    symlink(&real_tree, skills_dir.join("alias-a")).expect("alias-a");
+    symlink(&real_tree, skills_dir.join("alias-b")).expect("alias-b");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        max_entries: 4,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(loader.skills.len(), 1, "skill loaded once");
+    assert!(
+        !loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
+        "physical subtree traversed once (budget not exhausted): {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[test]
+fn root_level_skill_is_loaded_when_link_following_is_enabled() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::write(skills_dir.join("SKILL.md"), valid_skill_content()).expect("write root SKILL.md");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::DenyOutsideSearchRoot,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        1,
+        "root-level SKILL.md parsed when link following enabled"
+    );
+    assert_eq!(loader.skills[0].name, "test-skill");
+    let dup_count = loader
+        .discovery_warnings
+        .iter()
+        .filter(|w| w.kind == SkillDiscoveryWarningKind::InvalidSkill)
+        .count();
+    assert_eq!(
+        dup_count, 0,
+        "no duplicate parse warning for root-level SKILL.md"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn external_skill_file_symlink_is_denied_before_read() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let outside = dir.path().join("outside");
+
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("SKILL.md"), valid_skill_content()).expect("write external SKILL.md");
+    symlink(outside.join("SKILL.md"), skills_dir.join("SKILL.md")).expect("file symlink");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::DenyOutsideSearchRoot,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(loader.skills.len(), 0, "external file symlink not read");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::ExternalTargetDenied),
+        "ExternalTargetDenied for external file symlink: {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn same_skill_file_via_two_links_is_parsed_once() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let real_dir = skills_dir.join("real");
+    let link_a = skills_dir.join("link-a");
+    let link_b = skills_dir.join("link-b");
+
+    fs::create_dir_all(&real_dir).expect("create real");
+    fs::write(real_dir.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+    fs::create_dir_all(&link_a).expect("create link-a");
+    fs::create_dir_all(&link_b).expect("create link-b");
+    symlink(real_dir.join("SKILL.md"), link_a.join("SKILL.md")).expect("link-a SKILL.md");
+    symlink(real_dir.join("SKILL.md"), link_b.join("SKILL.md")).expect("link-b SKILL.md");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    let count = loader
+        .skills
+        .iter()
+        .filter(|s| s.name == "test-skill")
+        .count();
+    assert_eq!(count, 1, "same skill file via two links parsed once");
+}
+
+#[cfg(unix)]
+#[test]
+fn internal_skill_file_symlink_is_followed_only_when_enabled() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::write(skills_dir.join("real.md"), valid_skill_content()).expect("write real");
+    symlink(skills_dir.join("real.md"), skills_dir.join("SKILL.md"))
+        .expect("symlink SKILL.md -> real.md");
+
+    let policy_off = SkillDiscoveryPolicy {
+        follow_directory_links: false,
+        ..Default::default()
+    };
+    let mut loader_off = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir.clone()],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy_off,
+        discovery_warnings: Vec::new(),
+    };
+    loader_off.discover().expect("discover off");
+    assert_eq!(
+        loader_off.skills.len(),
+        0,
+        "symlinked SKILL.md not read when follow=false"
+    );
+    assert!(
+        loader_off
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::RootLinkDenied),
+        "RootLinkDenied for symlinked SKILL.md when follow=false: {:?}",
+        loader_off.discovery_warnings
+    );
+
+    let policy_on = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader_on = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy_on,
+        discovery_warnings: Vec::new(),
+    };
+    loader_on.discover().expect("discover on");
+    assert_eq!(
+        loader_on.skills.len(),
+        1,
+        "symlinked SKILL.md read when follow=true"
+    );
+    assert_eq!(loader_on.skills[0].name, "test-skill");
+}
+
+#[test]
+fn skill_at_exact_max_depth_is_discovered() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let nested = skills_dir.join("nested");
+    fs::create_dir_all(&nested).expect("create nested");
+    fs::write(nested.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+
+    let policy = SkillDiscoveryPolicy {
+        max_depth: 2,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        1,
+        "skill at exact max_depth is discovered"
+    );
+}
+
+#[test]
+fn skill_beyond_max_depth_is_not_discovered() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let nested = skills_dir.join("nested").join("nested");
+    fs::create_dir_all(&nested).expect("create nested");
+    fs::write(nested.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+
+    let policy = SkillDiscoveryPolicy {
+        max_depth: 2,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(
+        loader.skills.len(),
+        0,
+        "skill beyond max_depth not discovered"
+    );
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::DepthLimitReached),
+        "DepthLimitReached warning present: {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[test]
+fn depth_limit_produces_single_warning() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let mut current = skills_dir.clone();
+    fs::create_dir_all(&current).expect("create");
+    for _ in 0..5 {
+        let next = current.join("nested");
+        fs::create_dir_all(&next).expect("create nested");
+        current = next;
+    }
+    fs::write(current.join("SKILL.md"), valid_skill_content()).expect("write");
+
+    let policy = SkillDiscoveryPolicy {
+        max_depth: 2,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    let depth_count = loader
+        .discovery_warnings
+        .iter()
+        .filter(|w| w.kind == SkillDiscoveryWarningKind::DepthLimitReached)
+        .count();
+    assert_eq!(
+        depth_count, 1,
+        "DepthLimitReached emitted exactly once per root"
+    );
+}
+
+#[test]
+fn entry_budget_is_global_across_search_roots() {
+    let dir1 = tempfile::tempdir().expect("temp");
+    let dir2 = tempfile::tempdir().expect("temp");
+    let skills1 = dir1.path().join("skills");
+    let skills2 = dir2.path().join("skills");
+    fs::create_dir_all(&skills1).expect("create 1");
+    fs::create_dir_all(&skills2).expect("create 2");
+    for i in 0..20 {
+        let sub = skills1.join(format!("skill-{i:03}"));
+        fs::create_dir_all(&sub).expect("create sub");
+        fs::write(
+            sub.join("SKILL.md"),
+            format!("---\nname: first-{i:03}\ndescription: First {i}\ntriggers:\n  - first{i}\n---\n\nBody.\n"),
+        )
+        .expect("write");
+    }
+    fs::write(
+        skills2.join("SKILL.md"),
+        "---\nname: sentinel-from-second-root\ndescription: Sentinel\ntriggers:\n  - sentinel\n---\n\nBody.\n",
+    )
+    .expect("write sentinel");
+
+    let policy = SkillDiscoveryPolicy {
+        max_entries: 5,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills1, skills2],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
+        "EntryBudgetReached present"
+    );
+    assert!(
+        !loader
+            .skills
+            .iter()
+            .any(|s| s.name == "sentinel-from-second-root"),
+        "later root sentinel must not be discovered after budget exhaustion"
+    );
 }
