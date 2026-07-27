@@ -5,7 +5,8 @@
 | Story ID | SKILL-003 |
 | Type | Product / Security Story |
 | Priority | P2 |
-| Status | Refinement — initial implementation from commit `1f5e451` needs correction |
+| Status | Refinement → I163 Active (2026-07-27) |
+| Selected Iteration | I163 (Active) |
 | Source | Commit `1f5e451` introduced unconditional `follow_links(true)` to `SkillLoader::discover` under incorrect `#TUI-035` tag; this Story owns all subsequent corrections |
 | Parent Epic | None |
 | Depends on | ADR-022 (agent config compatibility boundary) |

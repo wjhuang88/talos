@@ -9,11 +9,13 @@ use walkdir::WalkDir;
 const DEFAULT_MAX_SKILL_DISCOVERY_DEPTH: usize = 32;
 const DEFAULT_MAX_SKILL_DISCOVERY_ENTRIES: usize = 10_000;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalTargetPolicy {
     DenyOutsideSearchRoot,
     AllowAnyReadable,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillDiscoveryPolicy {
     pub follow_directory_links: bool,
     pub external_target_policy: ExternalTargetPolicy,
@@ -143,6 +145,7 @@ impl SkillLoader {
             let walker = WalkDir::new(search_root)
                 .follow_links(follow)
                 .max_depth(max_depth)
+                .sort_by_file_name()
                 .into_iter();
 
             for result in walker {
@@ -152,10 +155,10 @@ impl SkillLoader {
                         kind: SkillDiscoveryWarningKind::EntryBudgetReached,
                         path: search_root.clone(),
                         message: format!(
-                            "entry budget {max_entries} reached; remaining entries skipped"
+                            "entry budget {max_entries} reached; all remaining roots skipped"
                         ),
                     });
-                    break;
+                    return Ok(&self.skills);
                 }
 
                 let entry = match result {
@@ -163,8 +166,12 @@ impl SkillLoader {
                     Err(e) => {
                         let kind = if e.loop_ancestor().is_some() {
                             SkillDiscoveryWarningKind::LinkLoop
-                        } else if e.depth() > max_depth {
-                            SkillDiscoveryWarningKind::DepthLimitReached
+                        } else if e
+                            .io_error()
+                            .map(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
+                            .unwrap_or(false)
+                        {
+                            SkillDiscoveryWarningKind::PermissionDenied
                         } else if e
                             .path()
                             .map(|p| {
