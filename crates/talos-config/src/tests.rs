@@ -1321,6 +1321,66 @@ fn test_skill_config_serializes() {
 }
 
 #[test]
+fn skill_config_defaults_shared_on_when_section_missing() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        config.skills.discover_shared,
+        "missing [skills] section must default to true"
+    );
+}
+
+#[test]
+fn skill_config_defaults_shared_on_for_empty_section() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[skills]
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        config.skills.discover_shared,
+        "empty [skills] section must default to true"
+    );
+}
+
+#[test]
+fn skill_config_explicit_false_is_preserved() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[skills]
+discover_shared = false
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        !config.skills.discover_shared,
+        "explicit false must be preserved"
+    );
+}
+
+#[test]
+fn skill_config_explicit_true_is_preserved() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[skills]
+discover_shared = true
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        config.skills.discover_shared,
+        "explicit true must be preserved"
+    );
+}
+
+#[test]
 fn test_provider_timeout_config_defaults() {
     let timeout = ProviderTimeoutConfig::default();
     assert_eq!(timeout.first_packet_timeout_secs, 30);

@@ -55,7 +55,7 @@ Currently shipped:
 - Explicit local-image attachments for catalog-confirmed vision-capable models, with exact-path authorization and safe history summaries. Anthropic-compatible wire behavior is covered by fixtures; live-provider validation depends on operator credentials.
 - Built-in coding tools with permission gating.
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
-- Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
+- Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, inherited parent `.talos/skills/`, and shared `~/.agents/skills/` (enabled by default; set `[skills] discover_shared = false` to disable). Symbolic-link traversal remains disabled by default and is governed separately by `SkillDiscoveryPolicy`.
 - MCP tools via stdio, SSE, and Streamable HTTP transports.
 - Explicit local read-only WASM packages via repeatable `--plugin DIRECTORY`; packages remain
   confined, permission-wrapped, provenance-bearing, and absent unless selected by the operator.
@@ -64,7 +64,6 @@ Currently shipped:
 Not shipped yet:
 
 - Stable 1.0 SDK guarantees for the embedded runtime facade.
-- `~/.agents/skills/` discovery from the dotagents shared directory (enabled by default).
 - Remote web control, browser automation, web approvals, and web write/action routes.
 - Plugin marketplace, remote install, automatic discovery, host calls, and write-capable plugins.
 - PDF/Office document extraction beyond the current web/fetch foundations.
@@ -559,6 +558,11 @@ Skill search paths, in priority order:
 - `~/.talos/skills/`
 - parent `.talos/skills/` directories up to the Git root
 - `~/.agents/skills/` (shared, enabled by default; set `[skills] discover_shared = false` to disable)
+
+Talos application configuration defaults to shared discovery. Low-level `SkillLoader`
+constructors do not implicitly opt embedders into HOME-based shared discovery unless the
+caller passes the application configuration. Symbolic-link following remains disabled by
+default; linked targets are controlled separately by `SkillDiscoveryPolicy`.
 
 Use `/skills` in the TUI or inline mode to list runtime-discovered skills. Use
 `/skills activate <name>` to explicitly load one Skill body into provider

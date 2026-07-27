@@ -180,9 +180,16 @@ mod tests {
     use super::*;
     use std::fs;
     use std::sync::Arc;
+    use std::sync::{Mutex, OnceLock};
     use talos_agent::Agent;
+    use talos_config::Config;
     use talos_core::tool::ToolRegistry;
     use talos_provider::mock::MockProvider;
+
+    fn home_guard() -> &'static Mutex<()> {
+        static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+        GUARD.get_or_init(|| Mutex::new(()))
+    }
 
     fn write_skill(path: &Path, name: &str, description: &str) {
         fs::create_dir_all(path).unwrap();
@@ -358,5 +365,109 @@ mod tests {
 
         assert!(bounded.starts_with("你好"));
         assert!(bounded.contains("[truncated:"));
+    }
+
+    #[test]
+    fn application_default_adds_shared_skill_root() {
+        let _guard = home_guard().lock().unwrap();
+        let temp_home = tempfile::tempdir().unwrap();
+        let shared_skills = temp_home.path().join(".agents/skills");
+        fs::create_dir_all(&shared_skills).unwrap();
+        let orig_home = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", temp_home.path()) };
+
+        let workspace = tempfile::tempdir().unwrap();
+        let config = Config::default();
+        assert!(config.skills.discover_shared);
+
+        let runtime =
+            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+        assert!(
+            runtime
+                .search_paths()
+                .iter()
+                .any(|p| p.ends_with(".agents/skills")),
+            "shared skill root must be in search paths when application default is used"
+        );
+
+        let last = runtime.search_paths().last().unwrap();
+        assert!(
+            last.ends_with(".agents/skills"),
+            "shared root must be lowest priority (last)"
+        );
+
+        match orig_home {
+            Some(h) => unsafe { std::env::set_var("HOME", h) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+    }
+
+    #[test]
+    fn application_explicit_false_excludes_shared_skill_root() {
+        let _guard = home_guard().lock().unwrap();
+        let temp_home = tempfile::tempdir().unwrap();
+        let shared_skills = temp_home.path().join(".agents/skills");
+        fs::create_dir_all(&shared_skills).unwrap();
+        let orig_home = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", temp_home.path()) };
+
+        let workspace = tempfile::tempdir().unwrap();
+        let config = Config {
+            skills: talos_config::SkillConfig {
+                discover_shared: false,
+            },
+            ..Default::default()
+        };
+        assert!(!config.skills.discover_shared);
+
+        let runtime =
+            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+        assert!(
+            !runtime
+                .search_paths()
+                .iter()
+                .any(|p| p.ends_with(".agents/skills")),
+            "shared skill root must NOT be in search paths when explicitly disabled"
+        );
+
+        match orig_home {
+            Some(h) => unsafe { std::env::set_var("HOME", h) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+    }
+
+    #[test]
+    fn shared_skill_is_lowest_priority_end_to_end() {
+        let _guard = home_guard().lock().unwrap();
+        let temp_home = tempfile::tempdir().unwrap();
+        let shared_dir = temp_home.path().join(".agents/skills/dup-skill");
+        write_skill(&shared_dir, "dup-skill", "Shared version");
+        let orig_home = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", temp_home.path()) };
+
+        let workspace = tempfile::tempdir().unwrap();
+        let proj_dir = workspace.path().join(".talos/skills/dup-skill");
+        write_skill(&proj_dir, "dup-skill", "Project version");
+
+        let config = Config::default();
+        let runtime =
+            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+
+        let dup: Vec<_> = runtime
+            .index
+            .iter()
+            .filter(|s| s.name == "dup-skill")
+            .collect();
+        assert_eq!(dup.len(), 1, "dup-skill should appear exactly once");
+        assert_eq!(
+            dup[0].description, "Project version",
+            "workspace skill must shadow shared skill"
+        );
+        assert_eq!(dup[0].source.to_string(), "project");
+
+        match orig_home {
+            Some(h) => unsafe { std::env::set_var("HOME", h) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
     }
 }
