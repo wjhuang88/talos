@@ -445,10 +445,7 @@ mod tests {
         for width in [40, 1, 80] {
             let projection = project_history(&transcript, width, 20, &scroll);
             let row = &projection.rows[0];
-            assert!(
-                row.start_anchor.scalar_offset <= anchor.scalar_offset
-                    && anchor.scalar_offset <= row.end_anchor.scalar_offset
-            );
+            assert!(row_contains_anchor(row, anchor));
         }
     }
 
