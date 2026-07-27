@@ -313,6 +313,17 @@ app-owned full-frame renderer is current authority.
 
 ## Variance And Residuals
 
+### Deferred Scope Addition — CTX-001 Bounded Runtime Meta Context — 2026-07-27
+
+**Classification:** maintainer-requested scope addition.
+
+The request to add current-session Meta information, including remaining context
+window, to provider context has an independent objective and acceptance target.
+It affects prompt construction, token accounting, compaction, and cache
+stability rather than TUI-035 resize rendering. It is therefore deferred as
+`CTX-001` and does not alter I156's published scope, validation, or human
+terminal gate.
+
 ### Logo-Prefix Wheel Coordinate Correction — 2026-07-27
 
 **Classification:** maintainer-reported real-terminal interaction defect.
