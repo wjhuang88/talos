@@ -4,11 +4,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, EventStream, KeyCode, KeyEventKind};
 use futures::{Stream, StreamExt};
-use ratatui::{
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::Paragraph,
-};
+use ratatui::layout::Size;
 use talos_conversation::{
     ContentOutput, CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput, UserInput,
 };
@@ -19,7 +15,7 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
-use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
+use crate::history_projection::project_native_history;
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
@@ -27,65 +23,6 @@ use crate::theme::{semantic, to_crossterm_color};
 use crate::transcript::{TranscriptBlock, TranscriptStore};
 
 pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState};
-
-fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'static> {
-    let mut style = Style::default();
-    if let Some(bg) = row.line.bg {
-        style = style.bg(ratatui_color(bg));
-    }
-    let spans = row
-        .line
-        .segments
-        .iter()
-        .map(|segment| {
-            let mut segment_style = style;
-            if let Some(fg) = segment.fg {
-                segment_style = segment_style.fg(ratatui_color(fg));
-            }
-            let mut modifiers = Modifier::empty();
-            if segment.attrs.bold {
-                modifiers |= Modifier::BOLD;
-            }
-            if segment.attrs.italic {
-                modifiers |= Modifier::ITALIC;
-            }
-            if segment.attrs.underlined {
-                modifiers |= Modifier::UNDERLINED;
-            }
-            if segment.attrs.dim {
-                modifiers |= Modifier::DIM;
-            }
-            Span::styled(segment.text.clone(), segment_style.add_modifier(modifiers))
-        })
-        .collect::<Vec<_>>();
-    Line::from(spans).style(style)
-}
-
-fn ratatui_color(color: crossterm::style::Color) -> ratatui::style::Color {
-    use crossterm::style::Color as C;
-    use ratatui::style::Color as R;
-    match color {
-        C::Reset => R::Reset,
-        C::Black => R::Black,
-        C::DarkGrey => R::DarkGray,
-        C::Grey => R::Gray,
-        C::White => R::White,
-        C::Red => R::Red,
-        C::DarkRed => R::Indexed(1),
-        C::Green => R::Green,
-        C::DarkGreen => R::Indexed(2),
-        C::Yellow => R::Yellow,
-        C::DarkYellow => R::Indexed(3),
-        C::Blue => R::Blue,
-        C::DarkBlue => R::Indexed(4),
-        C::Magenta => R::Magenta,
-        C::DarkMagenta => R::Indexed(5),
-        C::Cyan => R::Cyan,
-        C::DarkCyan => R::Indexed(6),
-        C::Rgb { r, g, b } => R::Rgb(r, g, b),
-        C::AnsiValue(value) => R::Indexed(value),
-    }
-}
 
 const PROCESSING_FRAME_INTERVAL: Duration = Duration::from_millis(150);
 const IME_ENTER_WINDOW: Duration = Duration::from_millis(50);
@@ -100,9 +37,7 @@ pub struct Tui {
     /// Logical output awaiting the next application-owned transcript commit.
     pending_transcript: Vec<TranscriptBlock>,
     transcript: TranscriptStore,
-    history_scroll: HistoryScrollState,
-    last_history_projection: HistoryProjection,
-    last_history_viewport_height: u16,
+    native_history_flushed: usize,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -142,9 +77,7 @@ impl Tui {
             user_input_tx: None,
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
-            history_scroll: HistoryScrollState::follow_tail(),
-            last_history_projection: HistoryProjection::default(),
-            last_history_viewport_height: 0,
+            native_history_flushed: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -174,9 +107,7 @@ impl Tui {
             user_input_tx,
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
-            history_scroll: HistoryScrollState::follow_tail(),
-            last_history_projection: HistoryProjection::default(),
-            last_history_viewport_height: 0,
+            native_history_flushed: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -963,65 +894,66 @@ impl Tui {
             modal_natural,
         );
 
-        let app_layout = compute_app_layout(
-            screen_size,
-            ComponentMetrics {
-                preview: preview.height_hint(width),
-                queue: queue.height_hint(width),
-                tips: tips.height_hint(width),
-                panel_required: if state.slash_menu.is_credential_input()
-                    || state.slash_menu.is_provider_wizard()
-                    || !matches!(state.approval_state, ApprovalState::Hidden)
-                {
-                    bottom_panel.height_hint(width).min(4)
-                } else {
-                    0
-                },
-                panel_preferred: bottom_panel.height_hint(width),
-                composer: actual_input_h,
+        let metrics = ComponentMetrics {
+            preview: preview.height_hint(width),
+            queue: queue.height_hint(width),
+            tips: tips.height_hint(width),
+            panel_required: if state.slash_menu.is_credential_input()
+                || state.slash_menu.is_provider_wizard()
+                || !matches!(state.approval_state, ApprovalState::Hidden)
+            {
+                bottom_panel.height_hint(width).min(4)
+            } else {
+                0
             },
-            menu_placement,
-        );
-        let history_height = app_layout.history.map_or(0, |rect| rect.height);
-        self.last_history_viewport_height = history_height;
-        let history = project_history(
-            &self.transcript,
+            panel_preferred: bottom_panel.height_hint(width),
+            composer: actual_input_h,
+        };
+        let frame_height = compute_app_layout(screen_size, metrics, menu_placement).fixed_height();
+        let pending_rows = project_native_history(
+            &self.transcript.entries()[self.native_history_flushed..],
             screen_size.width,
-            history_height,
-            &self.history_scroll,
         );
-        self.last_history_projection = history.clone();
+        let frame_area =
+            self.terminal
+                .append_native_history(screen_size, frame_height, &pending_rows)?;
+        if screen_size.width > 0 {
+            self.native_history_flushed = self.transcript.entries().len();
+        }
+        let app_layout = compute_app_layout(
+            Size::new(screen_size.width, frame_height),
+            metrics,
+            menu_placement,
+        )
+        .translated_y(frame_area.y);
 
-        self.terminal.draw(screen_size, |frame| {
-            let history_text = history.rows.iter().map(history_line).collect::<Vec<_>>();
-            if let Some(area) = app_layout.history {
-                frame.render_widget(Paragraph::new(history_text), area);
-            }
-            if let Some(area) = app_layout.preview {
-                preview.render(frame, area);
-            }
-            if let Some(area) = app_layout.queue {
-                queue.render(frame, area);
-            }
-            if let Some(area) = app_layout.tips {
-                tips.render(frame, area);
-            }
-            if let Some(area) = app_layout.panel {
-                bottom_panel.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer_top_pad {
-                input_pad_top.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer {
-                input.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer_bottom_pad {
-                input_pad_bot.render(frame, area);
-            }
-            if let Some(area) = app_layout.status {
-                status_comp.render(frame, area);
-            }
-        })?;
+        self.terminal
+            .draw_region(screen_size, frame_area, |frame| {
+                if let Some(area) = app_layout.preview {
+                    preview.render(frame, area);
+                }
+                if let Some(area) = app_layout.queue {
+                    queue.render(frame, area);
+                }
+                if let Some(area) = app_layout.tips {
+                    tips.render(frame, area);
+                }
+                if let Some(area) = app_layout.panel {
+                    bottom_panel.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer_top_pad {
+                    input_pad_top.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer {
+                    input.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer_bottom_pad {
+                    input_pad_bot.render(frame, area);
+                }
+                if let Some(area) = app_layout.status {
+                    status_comp.render(frame, area);
+                }
+            })?;
 
         {
             let screen_w = screen_size.width;
@@ -1080,42 +1012,6 @@ impl Tui {
             Event::Key(key) => {
                 if key.kind != KeyEventKind::Press {
                     return false;
-                }
-                match key.code {
-                    KeyCode::PageUp => {
-                        let height = self.last_history_viewport_height;
-                        if height == 0 {
-                            return false;
-                        }
-                        if let Some(anchor) = self.last_history_projection.page_up(height) {
-                            self.history_scroll.anchor(anchor, 0);
-                        }
-                        return false;
-                    }
-                    KeyCode::PageDown => {
-                        let height = self.last_history_viewport_height;
-                        if height == 0 {
-                            return false;
-                        }
-                        if self.last_history_projection.page_down_reaches_tail(height) {
-                            self.history_scroll.jump_to_end();
-                        } else if let Some(anchor) = self.last_history_projection.page_down(height)
-                        {
-                            self.history_scroll.anchor(anchor, 0);
-                        }
-                        return false;
-                    }
-                    KeyCode::Home if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        if let Some(anchor) = self.last_history_projection.first_anchor() {
-                            self.history_scroll.anchor(anchor, 0);
-                        }
-                        return false;
-                    }
-                    KeyCode::End if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        self.history_scroll.jump_to_end();
-                        return false;
-                    }
-                    _ => {}
                 }
                 if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                     self.handle_pending_approval_input(key.code);

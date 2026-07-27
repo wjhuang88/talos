@@ -41,6 +41,35 @@ pub(crate) struct AppLayout {
     pub(crate) status: Option<Rect>,
 }
 
+impl AppLayout {
+    pub(crate) fn translated_y(mut self, offset: u16) -> Self {
+        self.root.y = self.root.y.saturating_add(offset);
+        for rect in [
+            &mut self.history,
+            &mut self.preview,
+            &mut self.queue,
+            &mut self.tips,
+            &mut self.panel,
+            &mut self.composer_top_pad,
+            &mut self.composer,
+            &mut self.composer_bottom_pad,
+            &mut self.status,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            rect.y = rect.y.saturating_add(offset);
+        }
+        self
+    }
+
+    pub(crate) fn fixed_height(self) -> u16 {
+        self.root
+            .height
+            .saturating_sub(self.history.map_or(0, |rect| rect.height))
+    }
+}
+
 pub(crate) fn compute_app_layout(
     size: Size,
     metrics: ComponentMetrics,

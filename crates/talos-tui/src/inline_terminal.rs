@@ -1,4 +1,4 @@
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
@@ -7,10 +7,10 @@ use crossterm::{
         PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute, queue,
-    style::Color as CColor,
-    terminal::{
-        self, Clear, ClearType, EnableLineWrap, EnterAlternateScreen, LeaveAlternateScreen,
+    style::{
+        Attribute, Color as CColor, Print, SetAttribute, SetBackgroundColor, SetForegroundColor,
     },
+    terminal::{self, Clear, ClearType},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -18,6 +18,8 @@ use ratatui::{
     layout::{Position, Rect, Size},
     widgets::{StatefulWidget, Widget},
 };
+
+use crate::app_stream::ScrollbackLine;
 
 pub struct InlineFrame<'a> {
     #[allow(dead_code)]
@@ -141,7 +143,6 @@ pub struct TerminalSession {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct TerminalLifecycleState {
     raw_mode: bool,
-    alternate_screen: bool,
     cursor_hidden: bool,
     bracketed_paste: bool,
     keyboard_enhancement: bool,
@@ -151,13 +152,10 @@ struct TerminalLifecycleState {
 enum TerminalAction {
     EnableRawMode,
     PushKeyboardEnhancement,
-    EnterAlternateScreen,
     HideCursor,
     EnableBracketedPaste,
-    ClearFrame,
     DisableBracketedPaste,
     ShowCursor,
-    LeaveAlternateScreen,
     PopKeyboardEnhancement,
     DisableRawMode,
 }
@@ -178,13 +176,14 @@ impl TerminalSession {
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
+        let cursor = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
         let keyboard_enabled =
             keyboard_enhancement_supported(terminal::supports_keyboard_enhancement());
         let lifecycle = initialize_lifecycle(keyboard_enabled, |action| {
             execute_backend_action(&mut backend, action)
         })?;
-        let frame_area = Rect::new(0, 0, screen_size.width, screen_size.height);
+        let frame_area = Rect::new(0, cursor.y, screen_size.width, 0);
 
         let buffers = [Buffer::empty(frame_area), Buffer::empty(frame_area)];
 
@@ -194,7 +193,7 @@ impl TerminalSession {
             current: 0,
             frame_area,
             screen_size,
-            last_known_cursor_pos: Position::new(0, 0),
+            last_known_cursor_pos: cursor,
             lifecycle,
             #[cfg(test)]
             test_mode: false,
@@ -261,14 +260,88 @@ impl TerminalSession {
         Ok(size)
     }
 
-    pub fn draw(&mut self, size: Size, draw_fn: impl FnOnce(&mut InlineFrame)) -> io::Result<()> {
+    pub fn draw_region(
+        &mut self,
+        size: Size,
+        area: Rect,
+        draw_fn: impl FnOnce(&mut InlineFrame),
+    ) -> io::Result<()> {
         self.screen_size = size;
-        let area = Rect::new(0, 0, size.width, size.height);
         let changed = self.frame_area != area;
+        let previous = self.frame_area;
+        #[cfg(test)]
+        let test_mode = self.test_mode;
+        #[cfg(not(test))]
+        let test_mode = false;
+        if changed && !test_mode && previous.height > 0 {
+            let screen_bottom = size.height;
+            let writer = self.backend_mut();
+            for y in previous.y..previous.bottom().min(screen_bottom) {
+                queue!(writer, MoveTo(0, y), Clear(ClearType::UntilNewLine))?;
+            }
+            Write::flush(writer)?;
+        }
         self.frame_area = area;
         self.buffers[0].resize(area);
         self.buffers[1].resize(area);
-        self.draw_inner(draw_fn, changed, size.height)
+        self.draw_inner(draw_fn, changed, area.height)
+    }
+
+    pub fn frame_area(&mut self, size: Size, height: u16) -> Rect {
+        self.screen_size = size;
+        let height = height.min(size.height);
+        let max_y = size.height.saturating_sub(height);
+        Rect::new(0, self.frame_area.y.min(max_y), size.width, height)
+    }
+
+    /// Appends committed transcript rows to the primary screen and reserves
+    /// the current inline frame beneath them using ordinary newlines.
+    ///
+    /// No scroll region or reverse-index command is used. The terminal's
+    /// native scrollback receives an append-only projection while the logical
+    /// transcript remains application-owned.
+    pub fn append_native_history(
+        &mut self,
+        size: Size,
+        frame_height: u16,
+        rows: &[ScrollbackLine],
+    ) -> io::Result<Rect> {
+        let mut area = self.frame_area(size, frame_height);
+        if rows.is_empty() {
+            return Ok(area);
+        }
+
+        #[cfg(test)]
+        if self.test_mode {
+            area.y = area
+                .y
+                .saturating_add(u16::try_from(rows.len()).unwrap_or(u16::MAX))
+                .min(size.height.saturating_sub(area.height));
+            self.frame_area = area;
+            self.buffers[0].resize(area);
+            self.buffers[1].resize(area);
+            return Ok(area);
+        }
+
+        let writer = self.backend_mut();
+        queue!(writer, MoveTo(0, area.y), Clear(ClearType::FromCursorDown))?;
+        for row in rows {
+            print_history_row(writer, row, size.width)?;
+            queue!(writer, Print("\r\n"))?;
+        }
+        for _ in 0..area.height.saturating_sub(1) {
+            queue!(writer, Print("\r\n"))?;
+        }
+        Write::flush(writer)?;
+
+        area.y = area
+            .y
+            .saturating_add(u16::try_from(rows.len()).unwrap_or(u16::MAX))
+            .min(size.height.saturating_sub(area.height));
+        self.frame_area = area;
+        self.buffers[0] = Buffer::empty(area);
+        self.buffers[1] = Buffer::empty(area);
+        Ok(area)
     }
 
     fn draw_inner(
@@ -395,12 +468,37 @@ impl TerminalSession {
     }
 
     pub fn restore(&mut self) -> io::Result<()> {
-        restore_lifecycle(&mut self.lifecycle, execute_stdout_action)
+        #[cfg(test)]
+        let clear_result = if self.test_mode {
+            Ok(())
+        } else {
+            self.clear_inline_frame()
+        };
+        #[cfg(not(test))]
+        let clear_result = self.clear_inline_frame();
+
+        let lifecycle_result = restore_lifecycle(&mut self.lifecycle, execute_stdout_action);
+        clear_result.and(lifecycle_result)
     }
 
     #[allow(dead_code)]
     pub fn get_frame_area(&self) -> Rect {
         self.frame_area
+    }
+
+    fn clear_inline_frame(&mut self) -> io::Result<()> {
+        if self.frame_area.height == 0 {
+            return Ok(());
+        }
+        let area = self.frame_area;
+        let writer = self.backend_mut();
+        queue!(
+            writer,
+            MoveTo(0, area.y),
+            Clear(ClearType::FromCursorDown),
+            MoveTo(0, area.y)
+        )?;
+        Write::flush(writer)
     }
 }
 
@@ -429,7 +527,6 @@ fn initialize_lifecycle(
         lifecycle.keyboard_enhancement = true;
     }
     for action in [
-        TerminalAction::EnterAlternateScreen,
         TerminalAction::HideCursor,
         TerminalAction::EnableBracketedPaste,
     ] {
@@ -437,14 +534,10 @@ fn initialize_lifecycle(
             return Err(setup_error(error, &mut lifecycle, &mut run));
         }
         match action {
-            TerminalAction::EnterAlternateScreen => lifecycle.alternate_screen = true,
             TerminalAction::HideCursor => lifecycle.cursor_hidden = true,
             TerminalAction::EnableBracketedPaste => lifecycle.bracketed_paste = true,
             _ => unreachable!("only setup actions are listed above"),
         }
-    }
-    if let Err(error) = run(TerminalAction::ClearFrame) {
-        return Err(setup_error(error, &mut lifecycle, &mut run));
     }
     Ok(lifecycle)
 }
@@ -484,12 +577,6 @@ fn restore_lifecycle(
     attempt_restore(
         &mut lifecycle.cursor_hidden,
         TerminalAction::ShowCursor,
-        &mut run,
-        &mut first_error,
-    );
-    attempt_restore(
-        &mut lifecycle.alternate_screen,
-        TerminalAction::LeaveAlternateScreen,
         &mut run,
         &mut first_error,
     );
@@ -536,10 +623,8 @@ fn execute_backend_action(
                 PushKeyboardEnhancementFlags(keyboard_enhancement_flags())
             )
         }
-        TerminalAction::EnterAlternateScreen => execute!(backend, EnterAlternateScreen),
         TerminalAction::HideCursor => execute!(backend, Hide),
         TerminalAction::EnableBracketedPaste => execute!(backend, EnableBracketedPaste),
-        TerminalAction::ClearFrame => execute!(backend, Clear(ClearType::All), MoveTo(0, 0)),
         action => execute_stdout_action(action),
     }
 }
@@ -549,16 +634,113 @@ fn execute_stdout_action(action: TerminalAction) -> io::Result<()> {
     match action {
         TerminalAction::DisableBracketedPaste => execute!(stdout, DisableBracketedPaste),
         TerminalAction::ShowCursor => execute!(stdout, SetCursorStyle::DefaultUserShape, Show),
-        TerminalAction::LeaveAlternateScreen => execute!(
-            stdout,
-            crossterm::style::ResetColor,
-            EnableLineWrap,
-            LeaveAlternateScreen
-        ),
         TerminalAction::PopKeyboardEnhancement => execute!(stdout, PopKeyboardEnhancementFlags),
         TerminalAction::DisableRawMode => terminal::disable_raw_mode(),
         _ => Err(io::Error::other("invalid terminal restore action")),
     }
+}
+
+fn print_history_row(
+    writer: &mut CrosstermBackend<Stdout>,
+    row: &ScrollbackLine,
+    width: u16,
+) -> io::Result<()> {
+    if let Some(color) = row.bg {
+        queue!(writer, SetBackgroundColor(color))?;
+    }
+    for segment in &row.segments {
+        if let Some(color) = segment.fg {
+            queue!(writer, SetForegroundColor(color))?;
+        }
+        set_history_attrs(writer, segment.attrs)?;
+        queue!(writer, Print(&segment.text))?;
+        clear_history_attrs(writer)?;
+        queue!(writer, SetForegroundColor(CColor::Reset))?;
+    }
+
+    let mut used = row
+        .segments
+        .iter()
+        .map(|segment| unicode_width::UnicodeWidthStr::width(segment.text.as_str()))
+        .sum::<usize>();
+    if let Some(fill) = &row.fill {
+        let available = usize::from(width).saturating_sub(used);
+        if available > 0 {
+            let projected = project_fill_text(&fill.text, available);
+            if !projected.is_empty() {
+                if let Some(color) = fill.fg {
+                    queue!(writer, SetForegroundColor(color))?;
+                }
+                set_history_attrs(writer, fill.attrs)?;
+                queue!(writer, Print(&projected))?;
+                clear_history_attrs(writer)?;
+                queue!(writer, SetForegroundColor(CColor::Reset))?;
+                used =
+                    used.saturating_add(unicode_width::UnicodeWidthStr::width(projected.as_str()));
+            }
+        }
+    }
+    if row.bg.is_some() && used < usize::from(width) {
+        queue!(writer, Print(" ".repeat(usize::from(width) - used)))?;
+    }
+    if row.bg.is_some() {
+        queue!(
+            writer,
+            SetForegroundColor(CColor::Reset),
+            SetBackgroundColor(CColor::Reset)
+        )?;
+    }
+    Ok(())
+}
+
+fn project_fill_text(fill: &str, available: usize) -> String {
+    use unicode_width::UnicodeWidthChar;
+
+    if fill.is_empty() || available == 0 {
+        return String::new();
+    }
+    let mut output = String::new();
+    let mut used = 0;
+    'fill: loop {
+        let before = used;
+        for scalar in fill.chars() {
+            let scalar_width = scalar.width().unwrap_or(0);
+            if scalar_width > available.saturating_sub(used) {
+                break 'fill;
+            }
+            output.push(scalar);
+            used = used.saturating_add(scalar_width);
+        }
+        if used == before {
+            break;
+        }
+    }
+    output
+}
+
+fn set_history_attrs(writer: &mut CrosstermBackend<Stdout>, attrs: HistoryAttrs) -> io::Result<()> {
+    if attrs.bold {
+        queue!(writer, SetAttribute(Attribute::Bold))?;
+    }
+    if attrs.italic {
+        queue!(writer, SetAttribute(Attribute::Italic))?;
+    }
+    if attrs.underlined {
+        queue!(writer, SetAttribute(Attribute::Underlined))?;
+    }
+    if attrs.dim {
+        queue!(writer, SetAttribute(Attribute::Dim))?;
+    }
+    Ok(())
+}
+
+fn clear_history_attrs(writer: &mut CrosstermBackend<Stdout>) -> io::Result<()> {
+    queue!(
+        writer,
+        SetAttribute(Attribute::NormalIntensity),
+        SetAttribute(Attribute::NoItalic),
+        SetAttribute(Attribute::NoUnderline)
+    )
 }
 
 pub(crate) fn clamp_cursor(position: Position, size: Size) -> Option<Position> {
@@ -657,15 +839,50 @@ mod tests {
     }
 
     #[test]
-    fn alternate_screen_entry_failure_aborts_terminal_session() {
-        let (result, actions) = initialize_with_failure(TerminalAction::EnterAlternateScreen);
-        assert!(result.is_err());
+    fn native_history_advances_inline_frame_without_terminal_geometry_state() {
+        let mut session = TerminalSession::test_instance();
+        session.frame_area = Rect::new(0, 4, 20, 3);
+        let rows = [
+            ScrollbackLine::plain("first", None),
+            ScrollbackLine::plain("second", None),
+        ];
+
+        let area = session
+            .append_native_history(Size::new(20, 10), 3, &rows)
+            .expect("native append succeeds");
+        assert_eq!(area, Rect::new(0, 6, 20, 3));
+
+        let unchanged = session
+            .append_native_history(Size::new(20, 10), 3, &[])
+            .expect("empty append succeeds");
+        assert_eq!(unchanged, area);
+    }
+
+    #[test]
+    fn native_history_frame_clamps_at_screen_bottom() {
+        let mut session = TerminalSession::test_instance();
+        session.frame_area = Rect::new(0, 7, 20, 3);
+        let rows = vec![ScrollbackLine::plain("line", None); 20];
+        let area = session
+            .append_native_history(Size::new(20, 10), 3, &rows)
+            .expect("native append succeeds");
+        assert_eq!(area, Rect::new(0, 7, 20, 3));
+    }
+
+    #[test]
+    fn primary_screen_initialization_never_enters_or_clears_an_alternate_screen() {
+        let mut actions = Vec::new();
+        let result = initialize_lifecycle(false, |action| {
+            actions.push(action);
+            Ok(())
+        });
+        assert!(result.is_ok());
         assert_eq!(
             actions,
             vec![
                 TerminalAction::EnableRawMode,
-                TerminalAction::EnterAlternateScreen,
-                TerminalAction::DisableRawMode,
+                TerminalAction::HideCursor,
+                TerminalAction::EnableBracketedPaste,
             ]
         );
     }
@@ -678,27 +895,23 @@ mod tests {
             actions,
             vec![
                 TerminalAction::EnableRawMode,
-                TerminalAction::EnterAlternateScreen,
                 TerminalAction::HideCursor,
                 TerminalAction::EnableBracketedPaste,
                 TerminalAction::ShowCursor,
-                TerminalAction::LeaveAlternateScreen,
                 TerminalAction::DisableRawMode,
             ]
         );
     }
 
     #[test]
-    fn cursor_hide_failure_rolls_back_alternate_screen() {
+    fn cursor_hide_failure_rolls_back_raw_mode() {
         let (result, actions) = initialize_with_failure(TerminalAction::HideCursor);
         assert!(result.is_err());
         assert_eq!(
             actions,
             vec![
                 TerminalAction::EnableRawMode,
-                TerminalAction::EnterAlternateScreen,
                 TerminalAction::HideCursor,
-                TerminalAction::LeaveAlternateScreen,
                 TerminalAction::DisableRawMode,
             ]
         );
@@ -708,7 +921,6 @@ mod tests {
     fn restore_is_idempotent_after_partial_initialization() {
         let mut lifecycle = TerminalLifecycleState {
             raw_mode: true,
-            alternate_screen: true,
             ..TerminalLifecycleState::default()
         };
         let mut actions = Vec::new();
@@ -722,27 +934,6 @@ mod tests {
             Ok(())
         })
         .expect("second restore succeeds");
-        assert_eq!(
-            actions,
-            vec![
-                TerminalAction::LeaveAlternateScreen,
-                TerminalAction::DisableRawMode
-            ]
-        );
-    }
-
-    #[test]
-    fn leave_alternate_screen_runs_only_if_enter_succeeded() {
-        let mut lifecycle = TerminalLifecycleState {
-            raw_mode: true,
-            ..TerminalLifecycleState::default()
-        };
-        let mut actions = Vec::new();
-        restore_lifecycle(&mut lifecycle, |action| {
-            actions.push(action);
-            Ok(())
-        })
-        .expect("restore succeeds");
         assert_eq!(actions, vec![TerminalAction::DisableRawMode]);
     }
 
@@ -772,7 +963,6 @@ mod tests {
     fn restore_attempts_all_enabled_states_and_retries_only_failures() {
         let mut lifecycle = TerminalLifecycleState {
             raw_mode: true,
-            alternate_screen: true,
             cursor_hidden: true,
             bracketed_paste: true,
             keyboard_enhancement: true,
@@ -787,9 +977,9 @@ mod tests {
             })
             .is_err()
         );
-        assert_eq!(first.len(), 5);
+        assert_eq!(first.len(), 4);
         assert!(lifecycle.bracketed_paste);
-        assert!(!lifecycle.cursor_hidden && !lifecycle.alternate_screen);
+        assert!(!lifecycle.cursor_hidden);
         let mut retry = Vec::new();
         restore_lifecycle(&mut lifecycle, |action| {
             retry.push(action);
