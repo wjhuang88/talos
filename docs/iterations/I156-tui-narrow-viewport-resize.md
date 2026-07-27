@@ -174,8 +174,8 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
-- Full-frame invariant correction automated evidence (2026-07-27, pending
-  commit): transcript tool blocks are geometry-free; projection reflows them
+- Full-frame invariant correction automated evidence (2026-07-27, implementation
+  commit `8b7a272`): transcript tool blocks are geometry-free; projection reflows them
   at the current width; anchored history retains a logical entry/row across
   append and resize; fill-only and multi-cell fills remain bounded; `AppLayout`
   and cursor placement are safe for zero/narrow/short sizes; alternate-screen
