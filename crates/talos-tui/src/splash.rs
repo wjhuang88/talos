@@ -91,7 +91,9 @@ pub(crate) fn viewport_splash_lines(width: u16) -> Vec<Line<'static>> {
         LogoRenderMode::UnicodeBlock => talos_wordmark_compact(),
     };
 
-    let mut lines = Vec::new();
+    // Keep the wordmark off the terminal's top edge without coupling its
+    // placement to transcript/history geometry.
+    let mut lines = vec![Line::default()];
     let gradient = wordmark_gradient(wordmark.len());
     for (line, color) in wordmark.iter().zip(gradient.iter()) {
         lines.push(Line::from(vec![
@@ -279,6 +281,21 @@ mod tests {
 
         assert!(rendered.contains("████████"));
         assert!(rendered.contains(SUBTITLE));
+    }
+
+    #[test]
+    fn alternate_screen_splash_leaves_one_blank_row_above_logo() {
+        let rendered = viewport_splash_lines(80);
+
+        assert_eq!(rendered.first().map(line_text).as_deref(), Some(""));
+        assert!(
+            rendered
+                .get(1)
+                .map(line_text)
+                .as_deref()
+                .is_some_and(|line| line.contains("████████")),
+            "the wide wordmark should start immediately after the top spacer"
+        );
     }
 
     #[test]
