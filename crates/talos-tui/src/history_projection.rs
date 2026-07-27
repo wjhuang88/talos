@@ -4,11 +4,8 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app_stream::ScrollbackLine;
 use crate::inline_terminal::HistorySegment;
-use crate::transcript::{TranscriptBlock, TranscriptEntry};
-#[cfg(test)]
-use crate::transcript::{TranscriptEntryId, TranscriptStore};
+use crate::transcript::{TranscriptBlock, TranscriptEntryId, TranscriptStore};
 
-#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct LogicalContentAnchor {
     pub(crate) entry_id: TranscriptEntryId,
@@ -16,7 +13,6 @@ pub(crate) struct LogicalContentAnchor {
     pub(crate) scalar_offset: usize,
 }
 
-#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum HistoryScrollMode {
     FollowTail,
@@ -26,13 +22,11 @@ pub(crate) enum HistoryScrollMode {
     },
 }
 
-#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct HistoryScrollState {
     pub(crate) mode: HistoryScrollMode,
 }
 
-#[cfg(test)]
 impl HistoryScrollState {
     pub(crate) const fn follow_tail() -> Self {
         Self {
@@ -43,9 +37,12 @@ impl HistoryScrollState {
     pub(crate) fn anchor(&mut self, anchor: LogicalContentAnchor, screen_row: u16) {
         self.mode = HistoryScrollMode::Anchored { anchor, screen_row };
     }
+
+    pub(crate) fn jump_to_end(&mut self) {
+        *self = Self::follow_tail();
+    }
 }
 
-#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
     pub(crate) start_anchor: LogicalContentAnchor,
@@ -55,15 +52,41 @@ pub(crate) struct RenderedHistoryRow {
     pub(crate) line: ScrollbackLine,
 }
 
-#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct HistoryProjection {
     pub(crate) rows: Vec<RenderedHistoryRow>,
     pub(crate) total_rows: usize,
     pub(crate) visible_start: usize,
+    all_rows: Vec<RenderedHistoryRow>,
 }
 
-#[cfg(test)]
+impl HistoryProjection {
+    pub(crate) fn first_anchor(&self) -> Option<LogicalContentAnchor> {
+        self.all_rows.first().map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_up(&self, height: u16) -> Option<LogicalContentAnchor> {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        self.all_rows
+            .get(self.visible_start.saturating_sub(page))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_down(&self, height: u16) -> Option<LogicalContentAnchor> {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        let max_start = self.total_rows.saturating_sub(usize::from(height));
+        self.all_rows
+            .get((self.visible_start + page).min(max_start))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn page_down_reaches_tail(&self, height: u16) -> bool {
+        let page = usize::from(height.saturating_sub(1).max(1));
+        self.visible_start.saturating_add(page)
+            >= self.total_rows.saturating_sub(usize::from(height))
+    }
+}
+
 /// Projects logical transcript lines without changing their stored content.
 pub(crate) fn project_history(
     transcript: &TranscriptStore,
@@ -124,37 +147,10 @@ pub(crate) fn project_history(
         rows: all[start..end].to_vec(),
         total_rows,
         visible_start: start,
+        all_rows: all,
     }
 }
 
-/// Projects committed logical entries for append-only primary-screen output.
-///
-/// Unlike [`project_history`], this projection has no viewport or scroll
-/// state. The returned rows are written once to terminal-native scrollback;
-/// `TranscriptStore` remains the authoritative history.
-pub(crate) fn project_native_history(
-    entries: &[TranscriptEntry],
-    width: u16,
-) -> Vec<ScrollbackLine> {
-    if width == 0 {
-        return Vec::new();
-    }
-
-    entries
-        .iter()
-        .flat_map(|entry| {
-            logical_lines(&entry.block)
-                .into_iter()
-                .flat_map(move |line| {
-                    project_line_chunks(&line, width)
-                        .into_iter()
-                        .map(|chunk| chunk.line)
-                })
-        })
-        .collect()
-}
-
-#[cfg(test)]
 fn row_contains_anchor(row: &RenderedHistoryRow, anchor: LogicalContentAnchor) -> bool {
     if row.start_anchor.entry_id != anchor.entry_id
         || row.start_anchor.logical_line != anchor.logical_line
@@ -193,13 +189,10 @@ fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
 
 struct ProjectedLineChunk {
     line: ScrollbackLine,
-    #[cfg(test)]
     logical_start: usize,
-    #[cfg(test)]
     logical_end: usize,
 }
 
-#[cfg_attr(not(test), allow(unused_variables, unused_assignments))]
 fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineChunk> {
     let capacity = usize::from(width);
     let mut rows = Vec::new();
@@ -217,18 +210,14 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
                 if !current.is_empty() {
                     rows.push(ProjectedLineChunk {
                         line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
-                        #[cfg(test)]
                         logical_start: row_start,
-                        #[cfg(test)]
                         logical_end: logical_offset,
                     });
                     used = 0;
                 }
                 rows.push(ProjectedLineChunk {
                     line: ScrollbackLine::plain("…", line.bg),
-                    #[cfg(test)]
                     logical_start: logical_offset,
-                    #[cfg(test)]
                     logical_end: logical_offset + 1,
                 });
                 logical_offset += 1;
@@ -238,9 +227,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             if used > 0 && used.saturating_add(char_width) > capacity {
                 rows.push(ProjectedLineChunk {
                     line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
-                    #[cfg(test)]
                     logical_start: row_start,
-                    #[cfg(test)]
                     logical_end: logical_offset,
                 });
                 used = 0;
@@ -265,27 +252,21 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     if !current.is_empty() {
         rows.push(ProjectedLineChunk {
             line: ScrollbackLine::styled(current, line.bg),
-            #[cfg(test)]
             logical_start: row_start,
-            #[cfg(test)]
             logical_end: logical_offset,
         });
     }
     if rows.is_empty() && line.fill.is_none() {
         return vec![ProjectedLineChunk {
             line: line.clone(),
-            #[cfg(test)]
             logical_start: 0,
-            #[cfg(test)]
             logical_end: logical_offset,
         }];
     }
     if rows.is_empty() {
         rows.push(ProjectedLineChunk {
             line: ScrollbackLine::styled(Vec::new(), line.bg),
-            #[cfg(test)]
             logical_start: 0,
-            #[cfg(test)]
             logical_end: 0,
         });
     }
@@ -376,33 +357,6 @@ mod tests {
             }));
         }
         assert_eq!(project_history(&transcript, 160, 100, &scroll), initial);
-    }
-
-    #[test]
-    fn native_history_projection_preserves_entry_order_without_mutation() {
-        let mut transcript = TranscriptStore::default();
-        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
-            "first logical line",
-            None,
-        )));
-        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
-            "second logical line",
-            None,
-        )));
-        let before = transcript.entries().to_vec();
-
-        let rows = project_native_history(transcript.entries(), 8);
-
-        assert_eq!(transcript.entries().len(), before.len());
-        assert_eq!(
-            rows.first().map(|line| line.text.as_str()),
-            Some("first lo")
-        );
-        let joined = rows
-            .iter()
-            .map(|line| line.text.as_str())
-            .collect::<String>();
-        assert_eq!(joined, "first logical linesecond logical line");
     }
 
     #[test]

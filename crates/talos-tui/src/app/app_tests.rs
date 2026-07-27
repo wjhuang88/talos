@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
+use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
 use crate::scrollback;
 use crate::state::{ApprovalState, CredentialField, PanelKind, TuiState, WizardStep};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
@@ -1383,6 +1384,85 @@ fn entry_point_full_roundtrip_multiline_draft() {
     assert!(tui.state.history_cursor.is_none());
 }
 
+fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crate::app::Tui {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for index in 0..30 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("row-{index:02}"),
+                None,
+            )));
+    }
+    tui.last_history_projection = project_history(
+        &tui.transcript,
+        80,
+        visible_height,
+        &HistoryScrollState::follow_tail(),
+    );
+    tui.last_history_viewport_height = viewport_height;
+    tui
+}
+
+#[test]
+fn entry_point_page_up_uses_history_rect_height() {
+    let mut tui = tui_with_projected_history(4, 10);
+    assert_eq!(tui.last_history_projection.visible_start, 26);
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    let after = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(after.visible_start, 17);
+}
+
+#[test]
+fn entry_point_page_down_uses_history_rect_height_and_end_returns_follow_tail() {
+    let mut tui = tui_with_projected_history(4, 10);
+    let first = tui.last_history_projection.first_anchor().unwrap();
+    tui.history_scroll.anchor(first, 0);
+    tui.last_history_projection = project_history(&tui.transcript, 80, 4, &tui.history_scroll);
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    let after = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(after.visible_start, 9);
+
+    tui.last_history_projection = after;
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::End,
+        KeyModifiers::CONTROL,
+    ));
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+}
+
+#[test]
+fn entry_point_page_down_at_tail_remains_follow_tail() {
+    let mut tui = tui_with_projected_history(4, 10);
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+}
+
+#[test]
+fn entry_point_ctrl_home_moves_to_start_and_empty_navigation_is_safe() {
+    let mut tui = tui_with_projected_history(4, 10);
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Home,
+        KeyModifiers::CONTROL,
+    ));
+    let at_start = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(at_start.visible_start, 0);
+
+    let mut empty = crate::app::Tui::for_test(TuiState::new(), None);
+    for code in [KeyCode::PageUp, KeyCode::PageDown] {
+        empty.handle_input_event(&key_press(code));
+    }
+    empty.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Home,
+        KeyModifiers::CONTROL,
+    ));
+    empty.handle_input_event(&key_press_with_modifiers(
+        KeyCode::End,
+        KeyModifiers::CONTROL,
+    ));
+    assert_eq!(empty.history_scroll, HistoryScrollState::follow_tail());
+}
+
 #[test]
 fn fixed_components_are_never_appended_to_transcript() {
     let mut state = TuiState::new();
@@ -1426,7 +1506,7 @@ fn fixed_components_are_never_appended_to_transcript() {
 }
 
 #[test]
-fn inline_frame_renderer_handles_extreme_terminal_sizes() {
+fn full_frame_renderer_handles_extreme_terminal_sizes() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
     for (width, height) in [
         (0, 0),
@@ -1446,25 +1526,28 @@ fn inline_frame_renderer_handles_extreme_terminal_sizes() {
 }
 
 #[test]
-fn committed_transcript_is_flushed_to_native_history_exactly_once() {
+fn alternate_screen_first_frame_renders_logo_without_transcript_pollution() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
     tui.terminal
-        .set_test_size(ratatui::layout::Size::new(40, 10));
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+
+    tui.draw_frame().expect("first alternate-screen frame");
+    let first_frame = tui.terminal.test_rendered_text();
+    assert!(first_frame.contains("████████"));
+    assert!(first_frame.contains("The watchman never sleeps"));
+    assert!(tui.transcript.entries().is_empty());
+
     tui.handle_ui_output(talos_conversation::UiOutput::Content(
         talos_conversation::ContentOutput::Block {
             source: MessageSource::Assistant,
-            text: "native history line".into(),
+            text: "conversation replaces startup logo".into(),
         },
     ));
     tui.commit_pending_transcript().expect("commit transcript");
-
-    tui.draw_frame().expect("first native flush");
-    assert_eq!(tui.native_history_flushed, tui.transcript.entries().len());
-    let after_first = tui.terminal.get_frame_area();
-
-    tui.draw_frame().expect("second frame redraw");
-    assert_eq!(tui.native_history_flushed, tui.transcript.entries().len());
-    assert_eq!(tui.terminal.get_frame_area(), after_first);
+    tui.draw_frame().expect("conversation frame");
+    let conversation_frame = tui.terminal.test_rendered_text();
+    assert!(conversation_frame.contains("conversation replaces startup logo"));
+    assert!(!conversation_frame.contains("The watchman never sleeps"));
 }
 
 #[test]

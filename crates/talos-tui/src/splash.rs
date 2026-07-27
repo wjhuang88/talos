@@ -1,20 +1,11 @@
-//! Splash screen module — styled ANSI scrollback output.
-//!
-//! `print_splash_scrollback()` prints the styled splash to stdout BEFORE raw mode.
-//! All rendering respects the inline-by-default model (ADR-018) — no alt-screen.
-//! Per ADR-019, the splash is scrollback-only; no viewport overlay is provided.
+//! Splash content for the first alternate-screen application frame.
 
-use std::io::{self, Write};
-
-use crossterm::{
-    cursor::MoveToColumn,
-    execute,
-    style::{Attribute, Color as CColor, Print, SetAttribute, SetForegroundColor},
-    terminal,
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
 };
-use ratatui::style::Color;
 
-use crate::theme::{semantic, to_crossterm_color};
+use crate::theme::semantic;
 
 /// Left margin applied to every splash row for a consistent left-aligned layout.
 const INDENT: &str = "  ";
@@ -91,114 +82,61 @@ fn badges() -> [(Color, &'static str); 3] {
     ]
 }
 
-/// Phase 1: print the styled splash to stdout before raw mode is enabled.
-///
-/// This is a best-effort cosmetic output; failures are intentionally ignored
-/// because the splash is purely decorative and should not block TUI startup.
-pub fn print_splash_scrollback() {
-    let width = terminal::size().map(|(w, _)| w).unwrap_or(80);
-    let mut stdout = io::stdout();
-    let _ = write_splash_scrollback(&mut stdout, width);
-    let _ = stdout.flush();
-}
-
-fn write_splash_scrollback<W: Write>(writer: &mut W, width: u16) -> io::Result<()> {
+/// Builds the one authoritative splash representation used by the first
+/// alternate-screen frame. It is display-only and never enters TranscriptStore.
+pub(crate) fn viewport_splash_lines(width: u16) -> Vec<Line<'static>> {
     let mode = select_render_mode(width);
-
     let wordmark = match mode {
         LogoRenderMode::Canvas => talos_wordmark(),
         LogoRenderMode::UnicodeBlock => talos_wordmark_compact(),
     };
 
+    let mut lines = Vec::new();
     let gradient = wordmark_gradient(wordmark.len());
     for (line, color) in wordmark.iter().zip(gradient.iter()) {
-        print_styled_line(writer, line, *color, &[Attribute::Bold])?;
+        lines.push(Line::from(vec![
+            Span::raw(INDENT),
+            Span::styled(
+                (*line).to_string(),
+                Style::default().fg(*color).add_modifier(Modifier::BOLD),
+            ),
+        ]));
     }
 
     let wordmark_width = wordmark[0].chars().count();
-    print_right_aligned_version(writer, wordmark_width)?;
-
-    print_styled_line(
-        writer,
-        SUBTITLE,
-        semantic::LOGO_SUBTITLE,
-        &[Attribute::Italic],
-    )?;
-
-    print_badge_line(writer)?;
-
-    execute!(writer, Print("\r\n\r\n"))
-}
-
-fn print_right_aligned_version<W: Write>(writer: &mut W, wordmark_width: usize) -> io::Result<()> {
     let version = version_line();
     let version_width = version.chars().count();
-    let version_col = (INDENT.len() + wordmark_width - version_width) as u16;
+    let version_padding = wordmark_width.saturating_sub(version_width);
+    lines.push(Line::from(Span::styled(
+        format!("{INDENT}{}{version}", " ".repeat(version_padding)),
+        Style::default().fg(semantic::LOGO_VERSION),
+    )));
+    lines.push(Line::from(vec![
+        Span::raw(INDENT),
+        Span::styled(
+            SUBTITLE,
+            Style::default()
+                .fg(semantic::LOGO_SUBTITLE)
+                .add_modifier(Modifier::ITALIC),
+        ),
+    ]));
 
-    execute!(
-        writer,
-        Print("\r\n"),
-        MoveToColumn(version_col),
-        SetForegroundColor(to_crossterm_color(semantic::LOGO_VERSION).unwrap_or(CColor::Reset)),
-        Print(version),
-        SetForegroundColor(CColor::Reset)
-    )
-}
-
-fn print_styled_line<W: Write>(
-    writer: &mut W,
-    text: &str,
-    color: Color,
-    attrs: &[Attribute],
-) -> io::Result<()> {
-    execute!(
-        writer,
-        Print("\r\n"),
-        MoveToColumn(0),
-        Print(INDENT),
-        SetForegroundColor(to_crossterm_color(color).unwrap_or(CColor::Reset))
-    )?;
-    for attr in attrs {
-        execute!(writer, SetAttribute(*attr))?;
-    }
-
-    execute!(writer, Print(text))?;
-
-    execute!(
-        writer,
-        SetAttribute(Attribute::NormalIntensity),
-        SetAttribute(Attribute::NoItalic),
-        SetForegroundColor(CColor::Reset)
-    )
-}
-
-fn print_badge_line<W: Write>(writer: &mut W) -> io::Result<()> {
-    execute!(writer, Print("\r\n"), MoveToColumn(0), Print(INDENT))?;
-
+    let mut badge_spans = vec![Span::raw(INDENT)];
     for (i, (color, label)) in badges().iter().enumerate() {
         if i > 0 {
-            execute!(
-                writer,
-                SetForegroundColor(
-                    to_crossterm_color(semantic::LOGO_SEPARATOR).unwrap_or(CColor::Reset)
-                )
-            )?;
-            execute!(writer, Print("  ·  "))?;
+            badge_spans.push(Span::styled(
+                "  ·  ",
+                Style::default().fg(semantic::LOGO_SEPARATOR),
+            ));
         }
-        execute!(
-            writer,
-            SetForegroundColor(to_crossterm_color(*color).unwrap_or(CColor::Reset))
-        )?;
-        execute!(writer, SetAttribute(Attribute::Bold))?;
-        execute!(writer, Print(*label))?;
-        execute!(
-            writer,
-            SetAttribute(Attribute::NormalIntensity),
-            SetForegroundColor(CColor::Reset)
-        )?;
+        badge_spans.push(Span::styled(
+            *label,
+            Style::default().fg(*color).add_modifier(Modifier::BOLD),
+        ));
     }
-
-    Ok(())
+    lines.push(Line::from(badge_spans));
+    lines.push(Line::default());
+    lines
 }
 
 #[cfg(test)]
@@ -324,28 +262,34 @@ mod tests {
         assert!(!all.contains('\u{25c9}'), "splash must not use ◉ (todo)");
     }
 
-    #[test]
-    fn rendered_splash_starts_with_crlf() {
-        let mut output = Vec::new();
-        write_splash_scrollback(&mut output, 80).expect("render splash");
-        let output = String::from_utf8(output).expect("utf8 splash");
-
-        assert!(output.starts_with("\r\n"), "splash must start with CRLF");
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
     }
 
     #[test]
-    fn rendered_splash_contains_wordmark_content() {
-        let mut output = Vec::new();
-        write_splash_scrollback(&mut output, 80).expect("render splash");
-        let output = String::from_utf8(output).expect("utf8 splash");
+    fn alternate_screen_splash_lines_contain_wordmark_and_subtitle() {
+        let rendered = viewport_splash_lines(80)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
 
-        assert!(
-            output.contains("████████"),
-            "splash must contain the wordmark"
-        );
-        assert!(
-            output.contains(SUBTITLE),
-            "splash must contain the subtitle"
-        );
+        assert!(rendered.contains("████████"));
+        assert!(rendered.contains(SUBTITLE));
+    }
+
+    #[test]
+    fn alternate_screen_splash_uses_compact_wordmark_when_narrow() {
+        let rendered = viewport_splash_lines(40)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("_____"));
+        assert!(!rendered.contains("████████"));
     }
 }

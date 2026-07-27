@@ -21,7 +21,6 @@ pub(crate) enum TranscriptBlock {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TranscriptEntry {
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) id: TranscriptEntryId,
     pub(crate) block: TranscriptBlock,
 }
