@@ -75,6 +75,10 @@ impl SkillLoader {
     ///
     /// Returns a vector of all successfully parsed skills. Files that fail to
     /// parse are silently skipped (errors are logged but not propagated).
+    ///
+    /// Symbolic links and Windows junctions are followed to allow skill
+    /// directories to be shared across projects via symlinks. The walker
+    /// has built-in cycle detection to prevent infinite loops.
     pub fn discover(&mut self) -> Result<&Vec<Skill>> {
         self.skills.clear();
 
@@ -86,7 +90,8 @@ impl SkillLoader {
             let source = self.classify_source(path);
 
             for entry in WalkDir::new(path)
-                .follow_links(false)
+                .follow_links(true)
+                .max_depth(32)
                 .into_iter()
                 .filter_map(|e| e.ok())
             {

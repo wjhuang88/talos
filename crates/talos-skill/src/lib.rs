@@ -11,6 +11,10 @@
 //! 2. `~/.talos/skills/` — user-global skills
 //! 3. Parent directories up to git root — inherited skills
 //!
+//! Symbolic links and Windows junctions are followed during discovery,
+//! allowing skill directories to be shared across projects. The walker
+//! has built-in cycle detection (max depth 32) to prevent infinite loops.
+//!
 //! # SKILL.md Format
 //!
 //! ```markdown

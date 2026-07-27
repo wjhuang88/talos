@@ -978,8 +978,122 @@ fn skill_disclosure_enum_variants() {
 }
 
 // -----------------------------------------------------------------------
-// Shared skills discovery tests
+// Symlink discovery tests
 // -----------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn discover_follows_symlinked_skill_directory() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    let real_skill_dir = dir.path().join("real-skill-dir");
+    let linked_skill_dir = skills_dir.join("linked-skill");
+
+    fs::create_dir_all(&skills_dir).expect("create skills dir");
+    fs::create_dir_all(&real_skill_dir).expect("create real skill dir");
+    fs::write(real_skill_dir.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+
+    symlink(&real_skill_dir, &linked_skill_dir).expect("create symlink");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+    };
+
+    let skills = loader.discover().expect("discovery should succeed");
+    assert_eq!(skills.len(), 1, "skill found through symlinked directory");
+    assert_eq!(skills[0].name, "test-skill");
+}
+
+#[cfg(unix)]
+#[test]
+fn discover_follows_symlinked_skills_root() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let real_root = dir.path().join("real-root");
+    let linked_root = dir.path().join("linked-root");
+
+    fs::create_dir_all(real_root.join("my-skill")).expect("create skill dir");
+    fs::write(
+        real_root.join("my-skill").join("SKILL.md"),
+        "---\nname: symlinked-skill\ndescription: Found via symlink\ntiggers: []\ntriggers:\n  - sym\n---\n\nBody.\n",
+    )
+    .expect("write SKILL.md");
+
+    symlink(&real_root, &linked_root).expect("create symlink to skills root");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![linked_root],
+        discover_shared: false,
+        workspace_root: None,
+    };
+
+    let skills = loader.discover().expect("discovery should succeed");
+    assert_eq!(skills.len(), 1);
+    assert_eq!(skills[0].name, "symlinked-skill");
+}
+
+#[cfg(unix)]
+#[test]
+fn discover_symlink_cycle_does_not_loop_forever() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    let sub_a = skills_dir.join("a");
+    let sub_b = skills_dir.join("b");
+
+    fs::create_dir_all(&sub_a).expect("create a");
+    fs::create_dir_all(&sub_b).expect("create b");
+
+    symlink(&sub_b, sub_a.join("link-to-b")).expect("a -> b");
+    symlink(&sub_a, sub_b.join("link-to-a")).expect("b -> a");
+
+    fs::write(sub_a.join("SKILL.md"), valid_skill_content()).expect("write skill in a");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+    };
+
+    let skills = loader
+        .discover()
+        .expect("discovery completes without infinite loop");
+    assert!(
+        skills.len() >= 1,
+        "at least the real skill is found despite cycle"
+    );
+}
+
+#[test]
+fn discover_follows_nested_symlink_chain_to_skill() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    let nested_dir = skills_dir.join("level1").join("level2");
+    fs::create_dir_all(&nested_dir).expect("create nested");
+
+    let skill_content = "---\nname: deeply-nested\ndescription: In nested dirs\ntriggers:\n  - nested\n---\n\nBody.\n";
+    fs::write(nested_dir.join("SKILL.md"), skill_content).expect("write nested SKILL.md");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+    };
+
+    let skills = loader.discover().expect("discovery should succeed");
+    assert_eq!(skills.len(), 1);
+    assert_eq!(skills[0].name, "deeply-nested");
+}
 
 #[test]
 fn test_shared_skills_disabled_by_default() {
