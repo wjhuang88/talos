@@ -74,3 +74,9 @@ transcript into primary scrollback during interactive execution.
 - The old primary-screen insertion recovery helpers and their test-only writer
   seam have been removed. This ADR remains Proposed pending real-terminal
   acceptance.
+- Logical history anchors identify `(entry_id, logical_line, scalar_offset)`;
+  rendered rows carry a stable range rather than a width-specific row number.
+- Final component rectangles are assigned by `AppLayout`, with composer/status
+  reserved before optional preview, queue, tips, and panels.
+- Terminal restoration attempts every enabled cleanup action, retains failed
+  state for retry, and propagates failure before any primary-screen summary.
