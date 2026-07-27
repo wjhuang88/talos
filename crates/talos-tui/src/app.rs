@@ -20,15 +20,16 @@ use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
 use tokio::{sync::mpsc, time::MissedTickBehavior};
 
+use crate::app_layout::compute_app_layout;
 use crate::evolution::{self, EvolutionPanel};
-use crate::history_projection::{HistoryScrollState, project_history};
+use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
 use crate::inline_terminal::{
     ComponentStack, HistoryAttrs, HistorySegment, InlineTerminal, ViewportComponent,
 };
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
 use crate::theme::{semantic, to_crossterm_color};
-use crate::transcript::TranscriptStore;
+use crate::transcript::{TranscriptBlock, TranscriptStore};
 
 pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState};
 
@@ -102,9 +103,13 @@ pub struct Tui {
     ui_output_rx: Option<mpsc::UnboundedReceiver<UiOutput>>,
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     /// Logical output awaiting the next application-owned transcript commit.
+    pending_transcript: Vec<TranscriptBlock>,
+    /// Transitional producers still yield styled logical lines; these are moved
+    /// into `pending_transcript` before every frame and never reach a terminal.
     pending_scrollback: Vec<ScrollbackLine>,
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
+    last_history_projection: HistoryProjection,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -143,9 +148,11 @@ impl Tui {
             evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
             user_input_tx: None,
+            pending_transcript: Vec::new(),
             pending_scrollback: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
+            last_history_projection: HistoryProjection::default(),
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -173,9 +180,11 @@ impl Tui {
             evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
             user_input_tx,
+            pending_transcript: Vec::new(),
             pending_scrollback: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
+            last_history_projection: HistoryProjection::default(),
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -687,11 +696,8 @@ impl Tui {
                 }
             }
             UiOutput::ToolCall(display) => {
-                let lines = crate::tool_display::build_tool_call_scrollback_lines(
-                    &display,
-                    self.terminal.screen_size().width,
-                );
-                self.pending_scrollback.extend(lines);
+                self.pending_transcript
+                    .push(TranscriptBlock::ToolCall(display));
             }
             UiOutput::ToolResult(display) => {
                 let icon = if display.is_error { "✗" } else { "" };
@@ -700,14 +706,9 @@ impl Tui {
                 } else {
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
-                self.pending_scrollback.extend(
-                    crate::tool_display::build_tool_result_scrollback_lines(
-                        &display,
-                        icon,
-                        color,
-                        self.terminal.screen_size().width,
-                    ),
-                );
+                let _ = (icon, color);
+                self.pending_transcript
+                    .push(TranscriptBlock::ToolResult(display));
             }
             UiOutput::TodoPanel(data) => {
                 self.pending_scrollback
@@ -854,8 +855,13 @@ impl Tui {
     }
 
     fn flush_pending_scrollback(&mut self) -> io::Result<()> {
-        self.transcript
-            .extend(std::mem::take(&mut self.pending_scrollback));
+        for line in std::mem::take(&mut self.pending_scrollback) {
+            self.pending_transcript
+                .push(TranscriptBlock::StyledLine(line));
+        }
+        for block in std::mem::take(&mut self.pending_transcript) {
+            self.transcript.append(block);
+        }
         Ok(())
     }
 
@@ -990,23 +996,20 @@ impl Tui {
         let total_height = stack
             .total_height(screen_size.width)
             .min(screen_size.height);
-        let history_height = screen_size.height.saturating_sub(total_height);
+        let app_layout = compute_app_layout(screen_size, total_height);
+        let history_height = app_layout.history.height;
         let history = project_history(
             &self.transcript,
             screen_size.width,
             history_height,
             &self.history_scroll,
         );
+        self.last_history_projection = history.clone();
 
         self.terminal.draw(screen_size, |frame| {
             let history_text = history.rows.iter().map(history_line).collect::<Vec<_>>();
-            frame.render_widget(
-                Paragraph::new(history_text),
-                ratatui::layout::Rect::new(0, 0, screen_size.width, history_height),
-            );
-            let bottom =
-                ratatui::layout::Rect::new(0, history_height, screen_size.width, total_height);
-            let layout = stack.layout(bottom, screen_size.width);
+            frame.render_widget(Paragraph::new(history_text), app_layout.history);
+            let layout = stack.layout(app_layout.bottom, screen_size.width);
             for (component, area) in layout {
                 component.render(frame, area);
             }
@@ -1114,15 +1117,19 @@ impl Tui {
                 }
                 match key.code {
                     KeyCode::PageUp => {
-                        self.history_scroll.page_up(10);
+                        if let Some(row) = self.last_history_projection.rows.first() {
+                            self.history_scroll.anchor(row.anchor, 0);
+                        }
                         return false;
                     }
                     KeyCode::PageDown => {
-                        self.history_scroll.page_down(10);
+                        self.history_scroll.jump_to_end();
                         return false;
                     }
                     KeyCode::Home if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        self.history_scroll.jump_to_start(usize::MAX);
+                        if let Some(row) = self.last_history_projection.rows.first() {
+                            self.history_scroll.anchor(row.anchor, 0);
+                        }
                         return false;
                     }
                     KeyCode::End if key.modifiers.contains(event::KeyModifiers::CONTROL) => {

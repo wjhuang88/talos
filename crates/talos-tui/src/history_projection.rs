@@ -4,35 +4,37 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app_stream::ScrollbackLine;
 use crate::inline_terminal::HistorySegment;
-use crate::transcript::{TranscriptEntryId, TranscriptStore};
+use crate::transcript::{TranscriptBlock, TranscriptEntryId, TranscriptStore};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct LogicalRowAnchor {
+    pub(crate) entry_id: TranscriptEntryId,
+    pub(crate) block_row: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum HistoryScrollMode {
+    FollowTail,
+    Anchored {
+        anchor: LogicalRowAnchor,
+        screen_row: u16,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct HistoryScrollState {
-    pub(crate) follow_tail: bool,
-    pub(crate) bottom_offset_rows: usize,
+    pub(crate) mode: HistoryScrollMode,
 }
 
 impl HistoryScrollState {
     pub(crate) const fn follow_tail() -> Self {
         Self {
-            follow_tail: true,
-            bottom_offset_rows: 0,
+            mode: HistoryScrollMode::FollowTail,
         }
     }
 
-    pub(crate) fn page_up(&mut self, rows: usize) {
-        self.follow_tail = false;
-        self.bottom_offset_rows = self.bottom_offset_rows.saturating_add(rows);
-    }
-
-    pub(crate) fn page_down(&mut self, rows: usize) {
-        self.bottom_offset_rows = self.bottom_offset_rows.saturating_sub(rows);
-        self.follow_tail = self.bottom_offset_rows == 0;
-    }
-
-    pub(crate) fn jump_to_start(&mut self, total_rows: usize) {
-        self.follow_tail = false;
-        self.bottom_offset_rows = total_rows;
+    pub(crate) fn anchor(&mut self, anchor: LogicalRowAnchor, screen_row: u16) {
+        self.mode = HistoryScrollMode::Anchored { anchor, screen_row };
     }
 
     pub(crate) fn jump_to_end(&mut self) {
@@ -42,7 +44,7 @@ impl HistoryScrollState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
-    pub(crate) entry_id: TranscriptEntryId,
+    pub(crate) anchor: LogicalRowAnchor,
     pub(crate) line: ScrollbackLine,
 }
 
@@ -65,26 +67,63 @@ pub(crate) fn project_history(
 
     let mut all = Vec::new();
     for entry in transcript.entries() {
-        for line in project_line(&entry.line, width) {
+        for (block_row, line) in project_block(&entry.block, width).into_iter().enumerate() {
             all.push(RenderedHistoryRow {
-                entry_id: entry.id,
+                anchor: LogicalRowAnchor {
+                    entry_id: entry.id,
+                    block_row,
+                },
                 line,
             });
         }
     }
     let total_rows = all.len();
-    let end = total_rows.saturating_sub(_scroll.bottom_offset_rows);
-    let start = end.saturating_sub(height as usize);
+    let start = match _scroll.mode {
+        HistoryScrollMode::FollowTail => total_rows.saturating_sub(height as usize),
+        HistoryScrollMode::Anchored { anchor, screen_row } => {
+            let index = all
+                .iter()
+                .position(|row| row.anchor == anchor)
+                .unwrap_or_else(|| {
+                    all.iter()
+                        .position(|row| row.anchor.entry_id >= anchor.entry_id)
+                        .unwrap_or(total_rows)
+                });
+            index.saturating_sub(usize::from(screen_row))
+        }
+    };
+    let end = (start + usize::from(height)).min(total_rows);
     HistoryProjection {
         rows: all[start..end].to_vec(),
         total_rows,
     }
 }
 
-fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
-    if line.text.is_empty() {
-        return vec![line.clone()];
+fn project_block(block: &TranscriptBlock, width: u16) -> Vec<ScrollbackLine> {
+    match block {
+        TranscriptBlock::StyledLine(line) => project_line(line, width),
+        TranscriptBlock::ToolCall(display) => {
+            crate::tool_display::build_tool_call_scrollback_lines(display, width)
+                .into_iter()
+                .flat_map(|line| project_line(&line, width))
+                .collect()
+        }
+        TranscriptBlock::ToolResult(display) => {
+            let icon = if display.is_error { "✗" } else { "" };
+            let color = if display.is_error {
+                crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_ERROR)
+            } else {
+                crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_SUCCESS)
+            };
+            crate::tool_display::build_tool_result_scrollback_lines(display, icon, color, width)
+                .into_iter()
+                .flat_map(|line| project_line(&line, width))
+                .collect()
+        }
     }
+}
+
+fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
     let capacity = usize::from(width);
     let mut rows = Vec::new();
     let mut current = Vec::<HistorySegment>::new();
@@ -131,18 +170,17 @@ fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
     if !current.is_empty() {
         rows.push(ScrollbackLine::styled(current, line.bg));
     }
-    if rows.is_empty() {
+    if rows.is_empty() && line.fill.is_none() {
         return vec![line.clone()];
+    }
+    if rows.is_empty() {
+        rows.push(ScrollbackLine::styled(Vec::new(), line.bg));
     }
     if let Some(fill) = &line.fill
         && let Some(last) = rows.last_mut()
     {
         let used = UnicodeWidthStr::width(last.text.as_str());
-        let fill_width = UnicodeWidthStr::width(fill.text.as_str()).max(1);
-        let repeat = capacity.saturating_sub(used).div_ceil(fill_width);
-        if repeat > 0 {
-            let mut fill = fill.clone();
-            fill.text = fill.text.repeat(repeat);
+        if let Some(fill) = project_fill_segment(fill, capacity.saturating_sub(used)) {
             last.segments.push(fill);
             last.text = last
                 .segments
@@ -154,16 +192,53 @@ fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
     rows
 }
 
+/// Repeats a fill token only up to the available display cells. The loop is by
+/// Unicode scalar, so no scalar is split even when a multi-cell token cannot
+/// fill the final cell exactly.
+fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option<HistorySegment> {
+    if available_cells == 0 || fill.text.is_empty() {
+        return None;
+    }
+    let mut text = String::new();
+    let mut used = 0usize;
+    let scalars: Vec<char> = fill.text.chars().collect();
+    if scalars.is_empty() {
+        return None;
+    }
+    while used < available_cells {
+        let mut progressed = false;
+        for ch in &scalars {
+            let width = UnicodeWidthChar::width(*ch).unwrap_or(0);
+            if used.saturating_add(width) > available_cells {
+                continue;
+            }
+            text.push(*ch);
+            used = used.saturating_add(width);
+            progressed = true;
+            if used == available_cells {
+                break;
+            }
+        }
+        if !progressed {
+            break;
+        }
+    }
+    (!text.is_empty()).then(|| HistorySegment::styled(text, fill.fg, fill.attrs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inline_terminal::HistoryAttrs;
 
     #[test]
     fn repeated_resize_projection_is_reversible() {
         let mut transcript = TranscriptStore::default();
-        transcript.append(ScrollbackLine::plain("abc你好xyz", None));
-        transcript.append(ScrollbackLine::plain("", None));
-        let before = transcript.clone();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "abc你好xyz",
+            None,
+        )));
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain("", None)));
         let scroll = HistoryScrollState::follow_tail();
         let initial = project_history(&transcript, 160, 100, &scroll);
         for width in [120, 80, 40, 3, 2, 1, 40, 160] {
@@ -175,14 +250,15 @@ mod tests {
                     .all(|ch| UnicodeWidthChar::width(ch).unwrap_or(0) <= usize::from(width))
             }));
         }
-        assert_eq!(transcript, before);
         assert_eq!(project_history(&transcript, 160, 100, &scroll), initial);
     }
 
     #[test]
     fn width_one_degrades_without_mutating_cjk() {
         let mut transcript = TranscriptStore::default();
-        transcript.append(ScrollbackLine::plain("你", None));
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "你", None,
+        )));
         let scroll = HistoryScrollState::follow_tail();
         assert_eq!(
             project_history(&transcript, 1, 1, &scroll).rows[0]
@@ -190,12 +266,96 @@ mod tests {
                 .text,
             "…"
         );
-        assert_eq!(transcript.entries()[0].line.text, "你");
+        assert!(
+            matches!(&transcript.entries()[0].block, TranscriptBlock::StyledLine(line) if line.text == "你")
+        );
         assert_eq!(
             project_history(&transcript, 2, 1, &scroll).rows[0]
                 .line
                 .text,
             "你"
         );
+    }
+
+    #[test]
+    fn new_content_does_not_move_anchored_history() {
+        let mut transcript = TranscriptStore::default();
+        for index in 0..100 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                index.to_string(),
+                None,
+            )));
+        }
+        let tail = project_history(&transcript, 80, 10, &HistoryScrollState::follow_tail());
+        let anchor = tail.rows[3].anchor;
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 3);
+        let before = project_history(&transcript, 80, 10, &scroll);
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "new", None,
+        )));
+        let after = project_history(&transcript, 80, 10, &scroll);
+        assert_eq!(before.rows[3].anchor, anchor);
+        assert_eq!(after.rows[3].anchor, anchor);
+    }
+
+    #[test]
+    fn resize_preserves_logical_scroll_anchor() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "anchor content with enough words to wrap on narrow width",
+            None,
+        )));
+        let wide = project_history(&transcript, 80, 8, &HistoryScrollState::follow_tail());
+        let anchor = wide.rows[0].anchor;
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        assert_eq!(
+            project_history(&transcript, 40, 8, &scroll).rows[0]
+                .anchor
+                .entry_id,
+            anchor.entry_id
+        );
+        assert_eq!(
+            project_history(&transcript, 120, 8, &scroll).rows[0]
+                .anchor
+                .entry_id,
+            anchor.entry_id
+        );
+    }
+
+    #[test]
+    fn fill_only_line_projects_to_current_width() {
+        let line = ScrollbackLine::styled_with_fill(
+            Vec::new(),
+            Some(crossterm::style::Color::Blue),
+            Some(HistorySegment::styled(
+                "─",
+                Some(crossterm::style::Color::Cyan),
+                HistoryAttrs::default(),
+            )),
+        );
+        for width in [1, 2, 3, 40] {
+            let rows = project_line(&line, width);
+            assert_eq!(rows.len(), 1);
+            assert!(!rows[0].text.is_empty());
+            assert!(UnicodeWidthStr::width(rows[0].text.as_str()) <= usize::from(width));
+            assert_eq!(rows[0].bg, line.bg);
+            assert_eq!(rows[0].segments[0].fg, Some(crossterm::style::Color::Cyan));
+        }
+    }
+
+    #[test]
+    fn multi_cell_fill_never_exceeds_viewport() {
+        let fill = HistorySegment::raw("你好");
+        for width in [1_u16, 2, 3, 4, 5, 40] {
+            let projected = project_fill_segment(&fill, usize::from(width));
+            assert!(
+                projected
+                    .as_ref()
+                    .is_none_or(|segment| UnicodeWidthStr::width(segment.text.as_str())
+                        <= usize::from(width))
+            );
+        }
     }
 }

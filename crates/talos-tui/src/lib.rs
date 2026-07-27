@@ -1,4 +1,5 @@
 mod app;
+mod app_layout;
 mod app_stream;
 mod app_summary;
 mod clipboard;

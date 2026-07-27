@@ -114,7 +114,8 @@ impl<'a> ComponentStack<'a> {
         let mut y = area.y;
 
         for component in &self.components {
-            let h = component.height_hint(available_width);
+            let remaining = area.bottom().saturating_sub(y);
+            let h = component.height_hint(available_width).min(remaining);
             if h == 0 {
                 continue;
             }
@@ -308,9 +309,12 @@ impl InlineTerminal {
     }
 
     pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
-        self.last_known_cursor_pos = Position::new(col, row);
+        let Some(position) = clamp_cursor(Position::new(col, row), self.screen_size) else {
+            return Ok(());
+        };
+        self.last_known_cursor_pos = position;
         let writer = self.backend_mut();
-        queue!(writer, MoveTo(col, row))?;
+        queue!(writer, MoveTo(position.x, position.y))?;
         queue!(writer, Show)?;
         io::Write::flush(writer)?;
         Ok(())
@@ -341,6 +345,15 @@ impl InlineTerminal {
     pub fn get_frame_area(&self) -> Rect {
         self.frame_area
     }
+}
+
+pub(crate) fn clamp_cursor(position: Position, size: Size) -> Option<Position> {
+    (size.width > 0 && size.height > 0).then(|| {
+        Position::new(
+            position.x.min(size.width.saturating_sub(1)),
+            position.y.min(size.height.saturating_sub(1)),
+        )
+    })
 }
 
 impl Drop for InlineTerminal {
@@ -375,5 +388,15 @@ mod tests {
         assert!(!keyboard_enhancement_supported(Err(io::Error::other(
             "probe failed"
         ))));
+    }
+
+    #[test]
+    fn cursor_is_clamped_to_terminal_bounds() {
+        assert_eq!(
+            clamp_cursor(Position::new(9, 9), Size::new(2, 3)),
+            Some(Position::new(1, 2))
+        );
+        assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(0, 1)), None);
+        assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(1, 0)), None);
     }
 }
