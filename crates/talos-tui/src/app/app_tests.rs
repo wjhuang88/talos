@@ -1229,51 +1229,6 @@ fn entry_point_ctrl_j_inserts_newline_without_sending() {
     assert!(rx.try_recv().is_err());
 }
 
-#[test]
-fn history_user_message_wraps_to_terminal_width_with_continuation_indent() {
-    let mut stream_count = 0;
-    let lines = scrollback::render_history_message(
-        &mut stream_count,
-        MessageSource::User,
-        "12345678901234567890",
-    );
-    let wrapped = lines
-        .into_iter()
-        .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, 12))
-        .filter(|line| !line.text.is_empty())
-        .collect::<Vec<_>>();
-
-    assert_eq!(wrapped.len(), 3);
-    assert_eq!(wrapped[0].text, " > 123456789");
-    assert_eq!(wrapped[1].text, "   012345678");
-    assert_eq!(wrapped[2].text, "   90");
-    assert!(
-        wrapped
-            .iter()
-            .all(|line| { unicode_width::UnicodeWidthStr::width(line.text.as_str()) <= 12 })
-    );
-}
-
-#[test]
-fn history_user_message_wrap_does_not_split_cjk_cells() {
-    let mut stream_count = 0;
-    let lines =
-        scrollback::render_history_message(&mut stream_count, MessageSource::User, "你好世界你好");
-    let wrapped = lines
-        .into_iter()
-        .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, 10))
-        .filter(|line| !line.text.is_empty())
-        .collect::<Vec<_>>();
-
-    assert_eq!(wrapped[0].text, " > 你好世");
-    assert_eq!(wrapped[1].text, "   界你好");
-    assert!(
-        wrapped
-            .iter()
-            .all(|line| { unicode_width::UnicodeWidthStr::width(line.text.as_str()) <= 10 })
-    );
-}
-
 /// Entry-point test: Up/Down through the actual `handle_input_event` method.
 #[test]
 fn entry_point_up_down_history_navigation() {

@@ -59,3 +59,18 @@ Costs:
 Default: restore primary screen and print a compact session summary. An optional
 explicit mode may print the transcript on exit. Talos never mirrors the live
 transcript into primary scrollback during interactive execution.
+
+## Implementation Notes
+
+- `TranscriptBlock` stores tool calls and results as logical display facts; only
+  `HistoryProjection` applies a current-frame width.
+- History scrolling uses a logical entry/row anchor, with a documented nearest
+  surviving-entry fallback after reflow.
+- `AppLayout` bounds history and the bottom frame allocation for zero and
+  short terminal sizes; cursor placement is clamped to that frame.
+- Fill tokens are projected scalar-by-scalar and never exceed the viewport.
+- `TerminalSession` records each terminal mode transition and rolls back only
+  transitions that completed when initialization fails.
+- The old primary-screen insertion recovery helpers and their test-only writer
+  seam have been removed. This ADR remains Proposed pending real-terminal
+  acceptance.

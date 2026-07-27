@@ -174,6 +174,17 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
+- Full-frame invariant correction automated evidence (2026-07-27, pending
+  commit): transcript tool blocks are geometry-free; projection reflows them
+  at the current width; anchored history retains a logical entry/row across
+  append and resize; fill-only and multi-cell fills remain bounded; `AppLayout`
+  and cursor placement are safe for zero/narrow/short sizes; alternate-screen
+  setup rolls back partial lifecycle transitions. The old `PreparedLogicalLine`,
+  `HistoryPreparation`, terminal insertion writer, and recovery tests were
+  removed rather than retained behind `#[cfg(test)]`. This supersedes the
+  remaining inline-recovery assumptions below, but does not satisfy the
+  real-terminal acceptance gate.
+
 - Architecture-correction automated evidence (2026-07-27): `a3074ad` replaces the interactive
   primary-screen history path with an alternate-screen full-frame renderer, logical
   `TranscriptStore`, width-dependent `HistoryProjection`, application-owned history scroll

@@ -273,6 +273,19 @@ Technical / governance:
 
 ## Minimum Validation
 
+## Automated Full-Frame Invariant Evidence — 2026-07-27
+
+- Tool calls and results are stored as logical `TranscriptBlock` facts and are
+  formatted only by the current-frame history projection.
+- Anchored history tracks a logical transcript row, rather than a physical
+  bottom offset, across append and resize.
+- Fill-only rows, multi-cell fills, and CJK width-one degradation are projection
+  concerns and do not mutate the transcript.
+- Bounded layout/cursor and transactional alternate-screen lifecycle tests pass.
+- The test-only DECSTBM insertion recovery architecture was removed.
+
+TUI-035 remains **In Progress** until the real-terminal matrix is complete.
+
 - Unit tests for tool-call wrap at 40/80/120/160 and extreme widths 1/2/3.
 - CJK tool-call wrap boundary test.
 - Resize/shrink test: assert bottom hint bar text is not present in committed

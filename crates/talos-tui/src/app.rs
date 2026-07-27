@@ -2,10 +2,7 @@ use std::io;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
-use crossterm::{
-    event::{self, Event, EventStream, KeyCode, KeyEventKind},
-    terminal::enable_raw_mode,
-};
+use crossterm::event::{self, Event, EventStream, KeyCode, KeyEventKind};
 use futures::{Stream, StreamExt};
 use ratatui::{
     style::{Modifier, Style},
@@ -24,7 +21,7 @@ use crate::app_layout::compute_app_layout;
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
 use crate::inline_terminal::{
-    ComponentStack, HistoryAttrs, HistorySegment, InlineTerminal, ViewportComponent,
+    ComponentStack, HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent,
 };
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
@@ -97,16 +94,13 @@ const IME_ENTER_WINDOW: Duration = Duration::from_millis(50);
 
 pub struct Tui {
     state: TuiState,
-    terminal: InlineTerminal,
+    terminal: TerminalSession,
     skill_sidebar: SkillSidebar,
     evolution_panel: EvolutionPanel,
     ui_output_rx: Option<mpsc::UnboundedReceiver<UiOutput>>,
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     /// Logical output awaiting the next application-owned transcript commit.
     pending_transcript: Vec<TranscriptBlock>,
-    /// Transitional producers still yield styled logical lines; these are moved
-    /// into `pending_transcript` before every frame and never reach a terminal.
-    pending_scrollback: Vec<ScrollbackLine>,
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
     last_history_projection: HistoryProjection,
@@ -138,8 +132,7 @@ impl Tui {
             }
         }
 
-        enable_raw_mode()?;
-        let terminal = InlineTerminal::new()?;
+        let terminal = TerminalSession::new()?;
 
         Ok(Self {
             state: TuiState::new(),
@@ -149,7 +142,6 @@ impl Tui {
             ui_output_rx: None,
             user_input_tx: None,
             pending_transcript: Vec::new(),
-            pending_scrollback: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
@@ -175,13 +167,12 @@ impl Tui {
     ) -> Self {
         Self {
             state,
-            terminal: InlineTerminal::test_instance(),
+            terminal: TerminalSession::test_instance(),
             skill_sidebar: SkillSidebar::new(),
             evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
             user_input_tx,
             pending_transcript: Vec::new(),
-            pending_scrollback: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
@@ -480,15 +471,16 @@ impl Tui {
                 "denied",
             ),
         };
-        self.pending_scrollback.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                format!("   {icon} {msg}"),
-                color,
-                HistoryAttrs::default(),
-            )],
-            None,
-        ));
-        let _ = self.flush_pending_scrollback();
+        self.pending_transcript
+            .push(TranscriptBlock::StyledLine(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("   {icon} {msg}"),
+                    color,
+                    HistoryAttrs::default(),
+                )],
+                None,
+            )));
+        let _ = self.commit_pending_transcript();
 
         if let Some(response_tx) = self.state.pending_approval_response.take() {
             let _ = response_tx.send(choice);
@@ -514,7 +506,7 @@ impl Tui {
 
         loop {
             self.state.expire_tip();
-            self.flush_pending_scrollback()?;
+            self.commit_pending_transcript()?;
             self.draw_frame()?;
 
             tokio::select! {
@@ -534,7 +526,7 @@ impl Tui {
                                 break;
                             }
                             if is_tool {
-                                self.flush_pending_scrollback()?;
+                                self.commit_pending_transcript()?;
                                 self.draw_frame()?;
                             }
                         }
@@ -549,7 +541,7 @@ impl Tui {
                             break;
                         }
                         if is_tool {
-                            self.flush_pending_scrollback()?;
+                            self.commit_pending_transcript()?;
                             self.draw_frame()?;
                         }
                     }
@@ -600,7 +592,7 @@ impl Tui {
             self.stream_opening_pending = false;
             self.pending_stream_opening.clear();
         } else {
-            self.pending_scrollback.extend(lines);
+            self.append_styled_lines(lines);
         }
         self.active_stream = None;
     }
@@ -614,7 +606,7 @@ impl Tui {
             self.stream_opening_pending = false;
             self.pending_stream_opening.clear();
         } else {
-            self.pending_scrollback.extend(lines);
+            self.append_styled_lines(lines);
         }
         self.ordered_content_open = false;
     }
@@ -628,16 +620,16 @@ impl Tui {
 
         if !filter_out.text.is_empty() {
             if self.stream_opening_pending {
-                self.pending_scrollback
-                    .extend(crate::scrollback::stream_opening_lines(
-                        self.stream_count,
-                        std::mem::take(&mut self.pending_stream_opening),
-                    ));
+                let opening = crate::scrollback::stream_opening_lines(
+                    self.stream_count,
+                    std::mem::take(&mut self.pending_stream_opening),
+                );
+                self.append_styled_lines(opening);
                 self.stream_opening_pending = false;
                 self.stream_count += 1;
             }
-            self.pending_scrollback
-                .extend(self.stream_render.push_chunk(&filter_out.text));
+            let lines = self.stream_render.push_chunk(&filter_out.text);
+            self.append_styled_lines(lines);
         }
     }
 
@@ -664,12 +656,12 @@ impl Tui {
                         self.finalize_active_stream();
                     }
                     self.finalize_ordered_content();
-                    self.pending_scrollback
-                        .extend(crate::scrollback::render_history_message(
-                            &mut self.stream_count,
-                            source,
-                            &text,
-                        ));
+                    let lines = crate::scrollback::render_history_message(
+                        &mut self.stream_count,
+                        source,
+                        &text,
+                    );
+                    self.append_styled_lines(lines);
                 }
             },
             UiOutput::Stream(msg) => {
@@ -682,12 +674,12 @@ impl Tui {
                 self.active_stream = Some(msg.stream);
             }
             UiOutput::Reasoning(text) => {
-                self.pending_scrollback
-                    .extend(crate::scrollback::render_history_message(
-                        &mut self.stream_count,
-                        talos_conversation::MessageSource::Reasoning,
-                        &text,
-                    ));
+                let lines = crate::scrollback::render_history_message(
+                    &mut self.stream_count,
+                    talos_conversation::MessageSource::Reasoning,
+                    &text,
+                );
+                self.append_styled_lines(lines);
             }
             UiOutput::ToolCallStarted { .. } => {
                 self.finalize_ordered_content();
@@ -711,8 +703,7 @@ impl Tui {
                     .push(TranscriptBlock::ToolResult(display));
             }
             UiOutput::TodoPanel(data) => {
-                self.pending_scrollback
-                    .extend(build_todo_panel_lines(&data));
+                self.append_styled_lines(build_todo_panel_lines(&data));
             }
             UiOutput::ThinkingPreview { text } => {
                 self.state.thinking_preview = text;
@@ -843,9 +834,9 @@ impl Tui {
             UiOutput::HydrateHistory(messages) => {
                 self.finalize_ordered_content();
                 self.finalize_active_stream();
-                self.flush_pending_scrollback().ok();
+                self.commit_pending_transcript().ok();
                 self.hydrate_history(&messages);
-                self.flush_pending_scrollback().ok();
+                self.commit_pending_transcript().ok();
             }
             UiOutput::AttachImageRequest { .. } => {
                 // Handled by the bridge — should not reach the TUI directly.
@@ -854,11 +845,12 @@ impl Tui {
         false
     }
 
-    fn flush_pending_scrollback(&mut self) -> io::Result<()> {
-        for line in std::mem::take(&mut self.pending_scrollback) {
-            self.pending_transcript
-                .push(TranscriptBlock::StyledLine(line));
-        }
+    fn append_styled_lines(&mut self, lines: impl IntoIterator<Item = ScrollbackLine>) {
+        self.pending_transcript
+            .extend(lines.into_iter().map(TranscriptBlock::StyledLine));
+    }
+
+    fn commit_pending_transcript(&mut self) -> io::Result<()> {
         for block in std::mem::take(&mut self.pending_transcript) {
             self.transcript.append(block);
         }
@@ -1016,9 +1008,8 @@ impl Tui {
         })?;
 
         {
-            let viewport = self.terminal.viewport_area();
-            let screen_w = self.terminal.screen_size().width;
-            let stack_top = viewport.bottom().saturating_sub(total_height);
+            let screen_w = screen_size.width;
+            let stack_top = app_layout.bottom.y;
             if self.state.slash_menu.is_credential_input() {
                 let panel_y_offset = match menu_placement {
                     crate::scrollback::BottomPanelPlacement::AboveInput => {
@@ -1329,16 +1320,14 @@ impl Tui {
             Event::Paste(text) => {
                 self.state.input_paste(text);
             }
-            Event::Resize(_, _) => {
-                self.terminal.notify_resize();
-            }
+            Event::Resize(_, _) => {}
             _ => {}
         }
         false
     }
 
     fn restore(&mut self) {
-        self.terminal.restore();
+        let _ = self.terminal.restore();
     }
 }
 

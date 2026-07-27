@@ -59,7 +59,7 @@ pub(crate) fn project_history(
     transcript: &TranscriptStore,
     width: u16,
     height: u16,
-    _scroll: &HistoryScrollState,
+    scroll: &HistoryScrollState,
 ) -> HistoryProjection {
     if width == 0 || height == 0 {
         return HistoryProjection::default();
@@ -78,9 +78,11 @@ pub(crate) fn project_history(
         }
     }
     let total_rows = all.len();
-    let start = match _scroll.mode {
+    let start = match scroll.mode {
         HistoryScrollMode::FollowTail => total_rows.saturating_sub(height as usize),
         HistoryScrollMode::Anchored { anchor, screen_row } => {
+            // A removed/changed row falls forward to the first surviving entry;
+            // if none survives, clamp at the end. This keeps the anchor logical.
             let index = all
                 .iter()
                 .position(|row| row.anchor == anchor)
@@ -209,6 +211,9 @@ fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option
         let mut progressed = false;
         for ch in &scalars {
             let width = UnicodeWidthChar::width(*ch).unwrap_or(0);
+            if width == 0 {
+                continue;
+            }
             if used.saturating_add(width) > available_cells {
                 continue;
             }
@@ -357,5 +362,78 @@ mod tests {
                         <= usize::from(width))
             );
         }
+    }
+
+    #[test]
+    fn fill_reprojects_reversibly_without_splitting_scalars() {
+        let line =
+            ScrollbackLine::styled_with_fill(Vec::new(), None, Some(HistorySegment::raw("你好")));
+        let initial = project_line(&line, 40);
+        for width in [1, 2, 3, 40] {
+            for row in project_line(&line, width) {
+                assert!(UnicodeWidthStr::width(row.text.as_str()) <= usize::from(width));
+                assert!(!row.text.contains('\u{fffd}'));
+            }
+        }
+        assert_eq!(project_line(&line, 40), initial);
+    }
+
+    #[test]
+    fn missing_anchor_degrades_to_nearest_valid_position() {
+        let mut transcript = TranscriptStore::default();
+        let _first = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "a", None,
+        )));
+        let second = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "b", None,
+        )));
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(
+            LogicalRowAnchor {
+                entry_id: second,
+                block_row: 99,
+            },
+            0,
+        );
+        let projection = project_history(&transcript, 80, 2, &scroll);
+        assert_eq!(projection.rows[0].anchor.entry_id, second);
+    }
+
+    #[test]
+    fn tool_call_reprojects_reversibly_across_40_1_160() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::ToolCall(
+            talos_conversation::ToolCallDisplay {
+                tool_name: "bash".into(),
+                arguments: serde_json::json!({"command": "echo 你好 -- a long argument"}),
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec!["command".into()],
+            },
+        ));
+        let stored = match &transcript.entries()[0].block {
+            TranscriptBlock::ToolCall(display) => (
+                display.tool_name.clone(),
+                display.arguments.clone(),
+                display.provenance.clone(),
+                display.summary_fields.clone(),
+            ),
+            _ => panic!("tool call stored logically"),
+        };
+        let scroll = HistoryScrollState::follow_tail();
+        let initial = project_history(&transcript, 160, 100, &scroll);
+        for width in [40, 1, 160] {
+            let _ = project_history(&transcript, width, 100, &scroll);
+        }
+        let after = match &transcript.entries()[0].block {
+            TranscriptBlock::ToolCall(display) => (
+                display.tool_name.clone(),
+                display.arguments.clone(),
+                display.provenance.clone(),
+                display.summary_fields.clone(),
+            ),
+            _ => panic!("tool call stored logically"),
+        };
+        assert_eq!(after, stored);
+        assert_eq!(project_history(&transcript, 160, 100, &scroll), initial);
     }
 }

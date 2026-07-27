@@ -133,15 +133,38 @@ impl<'a> ComponentStack<'a> {
     }
 }
 
-pub struct InlineTerminal {
+pub struct TerminalSession {
     backend: CrosstermBackend<Stdout>,
     buffers: [Buffer; 2],
     current: usize,
     frame_area: Rect,
     screen_size: Size,
     last_known_cursor_pos: Position,
-    restored: bool,
-    keyboard_enhancement_enabled: bool,
+    lifecycle: TerminalLifecycleState,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct TerminalLifecycleState {
+    raw_mode: bool,
+    alternate_screen: bool,
+    cursor_hidden: bool,
+    bracketed_paste: bool,
+    keyboard_enhancement: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TerminalAction {
+    EnableRawMode,
+    PushKeyboardEnhancement,
+    EnterAlternateScreen,
+    HideCursor,
+    EnableBracketedPaste,
+    ClearFrame,
+    DisableBracketedPaste,
+    ShowCursor,
+    LeaveAlternateScreen,
+    PopKeyboardEnhancement,
+    DisableRawMode,
 }
 
 fn keyboard_enhancement_flags() -> KeyboardEnhancementFlags {
@@ -154,31 +177,18 @@ fn keyboard_enhancement_supported(result: io::Result<bool>) -> bool {
     result.unwrap_or(false)
 }
 
-impl InlineTerminal {
+impl TerminalSession {
     pub fn new() -> io::Result<Self> {
         let stdout = io::stdout();
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
 
-        let keyboard_enhancement_enabled =
-            if keyboard_enhancement_supported(terminal::supports_keyboard_enhancement()) {
-                execute!(
-                    backend,
-                    PushKeyboardEnhancementFlags(keyboard_enhancement_flags())
-                )
-                .is_ok()
-            } else {
-                false
-            };
-        let _ = execute!(
-            backend,
-            EnterAlternateScreen,
-            Hide,
-            EnableBracketedPaste,
-            Clear(ClearType::All),
-            MoveTo(0, 0)
-        );
+        let keyboard_enabled =
+            keyboard_enhancement_supported(terminal::supports_keyboard_enhancement());
+        let lifecycle = initialize_lifecycle(keyboard_enabled, |action| {
+            execute_backend_action(&mut backend, action)
+        })?;
         let frame_area = Rect::new(0, 0, screen_size.width, screen_size.height);
 
         let buffers = [Buffer::empty(frame_area), Buffer::empty(frame_area)];
@@ -190,8 +200,7 @@ impl InlineTerminal {
             frame_area,
             screen_size,
             last_known_cursor_pos: Position::new(0, 0),
-            restored: false,
-            keyboard_enhancement_enabled,
+            lifecycle,
         })
     }
 
@@ -209,8 +218,7 @@ impl InlineTerminal {
             frame_area,
             screen_size: Size::new(80, 24),
             last_known_cursor_pos: Position::new(0, 0),
-            restored: false,
-            keyboard_enhancement_enabled: false,
+            lifecycle: TerminalLifecycleState::default(),
         }
     }
 
@@ -224,20 +232,6 @@ impl InlineTerminal {
     }
 
     #[allow(dead_code)]
-    pub const fn viewport_area(&self) -> Rect {
-        self.frame_area
-    }
-
-    pub fn notify_resize(&mut self) {
-        // Resize only invalidates the next full-frame projection. No terminal
-        // cleanup is needed because alternate screen is an output surface.
-    }
-
-    #[allow(dead_code)]
-    pub const fn screen_size(&self) -> Size {
-        self.screen_size
-    }
-
     pub fn size(&mut self) -> io::Result<Size> {
         let size = self.backend.size()?;
         self.screen_size = size;
@@ -320,30 +314,122 @@ impl InlineTerminal {
         Ok(())
     }
 
-    pub fn restore(&mut self) {
-        if self.restored {
-            return;
-        }
-        self.restored = true;
-        let _ = execute!(io::stdout(), crossterm::style::ResetColor,);
-        if self.keyboard_enhancement_enabled {
-            let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
-            self.keyboard_enhancement_enabled = false;
-        }
-        let _ = execute!(
-            io::stdout(),
-            DisableBracketedPaste,
-            EnableLineWrap,
-            SetCursorStyle::DefaultUserShape,
-            Show,
-            LeaveAlternateScreen
-        );
-        let _ = terminal::disable_raw_mode();
+    pub fn restore(&mut self) -> io::Result<()> {
+        restore_lifecycle(&mut self.lifecycle, execute_stdout_action)
     }
 
     #[allow(dead_code)]
     pub fn get_frame_area(&self) -> Rect {
         self.frame_area
+    }
+}
+
+fn initialize_lifecycle(
+    keyboard_enabled: bool,
+    mut run: impl FnMut(TerminalAction) -> io::Result<()>,
+) -> io::Result<TerminalLifecycleState> {
+    let mut lifecycle = TerminalLifecycleState::default();
+    run(TerminalAction::EnableRawMode)?;
+    lifecycle.raw_mode = true;
+    if keyboard_enabled {
+        if let Err(error) = run(TerminalAction::PushKeyboardEnhancement) {
+            rollback_lifecycle(&mut lifecycle, &mut run);
+            return Err(error);
+        }
+        lifecycle.keyboard_enhancement = true;
+    }
+    for action in [
+        TerminalAction::EnterAlternateScreen,
+        TerminalAction::HideCursor,
+        TerminalAction::EnableBracketedPaste,
+    ] {
+        if let Err(error) = run(action) {
+            rollback_lifecycle(&mut lifecycle, &mut run);
+            return Err(error);
+        }
+        match action {
+            TerminalAction::EnterAlternateScreen => lifecycle.alternate_screen = true,
+            TerminalAction::HideCursor => lifecycle.cursor_hidden = true,
+            TerminalAction::EnableBracketedPaste => lifecycle.bracketed_paste = true,
+            _ => unreachable!("only setup actions are listed above"),
+        }
+    }
+    if let Err(error) = run(TerminalAction::ClearFrame) {
+        rollback_lifecycle(&mut lifecycle, &mut run);
+        return Err(error);
+    }
+    Ok(lifecycle)
+}
+
+fn rollback_lifecycle(
+    lifecycle: &mut TerminalLifecycleState,
+    run: &mut impl FnMut(TerminalAction) -> io::Result<()>,
+) {
+    // Preserve the setup error: rollback is best-effort, but only actions that completed are run.
+    let _ = restore_lifecycle(lifecycle, run);
+}
+
+fn restore_lifecycle(
+    lifecycle: &mut TerminalLifecycleState,
+    mut run: impl FnMut(TerminalAction) -> io::Result<()>,
+) -> io::Result<()> {
+    if lifecycle.bracketed_paste {
+        run(TerminalAction::DisableBracketedPaste)?;
+        lifecycle.bracketed_paste = false;
+    }
+    if lifecycle.cursor_hidden {
+        run(TerminalAction::ShowCursor)?;
+        lifecycle.cursor_hidden = false;
+    }
+    if lifecycle.alternate_screen {
+        run(TerminalAction::LeaveAlternateScreen)?;
+        lifecycle.alternate_screen = false;
+    }
+    if lifecycle.keyboard_enhancement {
+        run(TerminalAction::PopKeyboardEnhancement)?;
+        lifecycle.keyboard_enhancement = false;
+    }
+    if lifecycle.raw_mode {
+        run(TerminalAction::DisableRawMode)?;
+        lifecycle.raw_mode = false;
+    }
+    Ok(())
+}
+
+fn execute_backend_action(
+    backend: &mut CrosstermBackend<Stdout>,
+    action: TerminalAction,
+) -> io::Result<()> {
+    match action {
+        TerminalAction::EnableRawMode => terminal::enable_raw_mode(),
+        TerminalAction::PushKeyboardEnhancement => {
+            execute!(
+                backend,
+                PushKeyboardEnhancementFlags(keyboard_enhancement_flags())
+            )
+        }
+        TerminalAction::EnterAlternateScreen => execute!(backend, EnterAlternateScreen),
+        TerminalAction::HideCursor => execute!(backend, Hide),
+        TerminalAction::EnableBracketedPaste => execute!(backend, EnableBracketedPaste),
+        TerminalAction::ClearFrame => execute!(backend, Clear(ClearType::All), MoveTo(0, 0)),
+        action => execute_stdout_action(action),
+    }
+}
+
+fn execute_stdout_action(action: TerminalAction) -> io::Result<()> {
+    let mut stdout = io::stdout();
+    match action {
+        TerminalAction::DisableBracketedPaste => execute!(stdout, DisableBracketedPaste),
+        TerminalAction::ShowCursor => execute!(stdout, SetCursorStyle::DefaultUserShape, Show),
+        TerminalAction::LeaveAlternateScreen => execute!(
+            stdout,
+            crossterm::style::ResetColor,
+            EnableLineWrap,
+            LeaveAlternateScreen
+        ),
+        TerminalAction::PopKeyboardEnhancement => execute!(stdout, PopKeyboardEnhancementFlags),
+        TerminalAction::DisableRawMode => terminal::disable_raw_mode(),
+        _ => Err(io::Error::other("invalid terminal restore action")),
     }
 }
 
@@ -356,15 +442,28 @@ pub(crate) fn clamp_cursor(position: Position, size: Size) -> Option<Position> {
     })
 }
 
-impl Drop for InlineTerminal {
+impl Drop for TerminalSession {
     fn drop(&mut self) {
-        self.restore();
+        let _ = self.restore();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn initialize_with_failure(
+        fail_at: TerminalAction,
+    ) -> (io::Result<TerminalLifecycleState>, Vec<TerminalAction>) {
+        let mut actions = Vec::new();
+        let result = initialize_lifecycle(false, |action| {
+            actions.push(action);
+            (action != fail_at)
+                .then_some(())
+                .ok_or_else(|| io::Error::other("injected terminal failure"))
+        });
+        (result, actions)
+    }
 
     #[test]
     fn keyboard_flags_disambiguate_modified_enter() {
@@ -398,5 +497,117 @@ mod tests {
         );
         assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(0, 1)), None);
         assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(1, 0)), None);
+    }
+
+    #[test]
+    fn alternate_screen_entry_failure_aborts_terminal_session() {
+        let (result, actions) = initialize_with_failure(TerminalAction::EnterAlternateScreen);
+        assert!(result.is_err());
+        assert_eq!(
+            actions,
+            vec![
+                TerminalAction::EnableRawMode,
+                TerminalAction::EnterAlternateScreen,
+                TerminalAction::DisableRawMode,
+            ]
+        );
+    }
+
+    #[test]
+    fn bracketed_paste_enable_failure_rolls_back_entered_states() {
+        let (result, actions) = initialize_with_failure(TerminalAction::EnableBracketedPaste);
+        assert!(result.is_err());
+        assert_eq!(
+            actions,
+            vec![
+                TerminalAction::EnableRawMode,
+                TerminalAction::EnterAlternateScreen,
+                TerminalAction::HideCursor,
+                TerminalAction::EnableBracketedPaste,
+                TerminalAction::ShowCursor,
+                TerminalAction::LeaveAlternateScreen,
+                TerminalAction::DisableRawMode,
+            ]
+        );
+    }
+
+    #[test]
+    fn cursor_hide_failure_rolls_back_alternate_screen() {
+        let (result, actions) = initialize_with_failure(TerminalAction::HideCursor);
+        assert!(result.is_err());
+        assert_eq!(
+            actions,
+            vec![
+                TerminalAction::EnableRawMode,
+                TerminalAction::EnterAlternateScreen,
+                TerminalAction::HideCursor,
+                TerminalAction::LeaveAlternateScreen,
+                TerminalAction::DisableRawMode,
+            ]
+        );
+    }
+
+    #[test]
+    fn restore_is_idempotent_after_partial_initialization() {
+        let mut lifecycle = TerminalLifecycleState {
+            raw_mode: true,
+            alternate_screen: true,
+            ..TerminalLifecycleState::default()
+        };
+        let mut actions = Vec::new();
+        restore_lifecycle(&mut lifecycle, |action| {
+            actions.push(action);
+            Ok(())
+        })
+        .expect("restore succeeds");
+        restore_lifecycle(&mut lifecycle, |action| {
+            actions.push(action);
+            Ok(())
+        })
+        .expect("second restore succeeds");
+        assert_eq!(
+            actions,
+            vec![
+                TerminalAction::LeaveAlternateScreen,
+                TerminalAction::DisableRawMode
+            ]
+        );
+    }
+
+    #[test]
+    fn leave_alternate_screen_runs_only_if_enter_succeeded() {
+        let mut lifecycle = TerminalLifecycleState {
+            raw_mode: true,
+            ..TerminalLifecycleState::default()
+        };
+        let mut actions = Vec::new();
+        restore_lifecycle(&mut lifecycle, |action| {
+            actions.push(action);
+            Ok(())
+        })
+        .expect("restore succeeds");
+        assert_eq!(actions, vec![TerminalAction::DisableRawMode]);
+    }
+
+    #[test]
+    fn drop_restore_only_targets_enabled_terminal_states() {
+        let mut lifecycle = TerminalLifecycleState {
+            bracketed_paste: true,
+            cursor_hidden: true,
+            ..TerminalLifecycleState::default()
+        };
+        let mut actions = Vec::new();
+        restore_lifecycle(&mut lifecycle, |action| {
+            actions.push(action);
+            Ok(())
+        })
+        .expect("restore succeeds");
+        assert_eq!(
+            actions,
+            vec![
+                TerminalAction::DisableBracketedPaste,
+                TerminalAction::ShowCursor
+            ]
+        );
     }
 }
