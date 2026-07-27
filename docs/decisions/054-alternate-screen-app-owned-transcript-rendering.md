@@ -1,9 +1,16 @@
 # ADR-054: Alternate-Screen Application-Owned Transcript Rendering
 
-- Status: Proposed
+- Status: Rejected (2026-07-27)
 - Date: 2026-07-27
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-035
+
+> Rejected after implementation trial. The design met fixed-pane isolation
+> goals but removed the required native-history experience: the primary-screen
+> logo, shell history, terminal selection/search, and live conversation
+> scrollback were unavailable during interaction. ADR-055 supersedes this
+> proposal with a single primary-screen renderer that retains the app-owned
+> logical transcript and appends a derived projection to native scrollback.
 
 ## Context
 

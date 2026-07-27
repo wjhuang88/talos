@@ -175,7 +175,15 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
-- Final modal cursor visibility correction automated evidence (2026-07-27,
+- Current native-history correction automated evidence (2026-07-27,
+  implementation commit `31e7a0d`): the geometry-free transcript remains the
+  logical authority, committed entries are projected exactly once through
+  ordinary primary-screen newlines, and only the bounded transient frame is
+  redrawn. Terminal startup neither enters nor clears Alternate Screen. Focused
+  TUI validation: 436 passed; locked workspace validation: 2463 passed across
+  62 test binaries/doc-test groups. This makes the implementation ready for the
+  real-terminal matrix; it does not change I156's Active state.
+- Superseded modal cursor visibility correction automated evidence (2026-07-27,
   implementation commit `ad67fc5`): credential and provider-wizard cursors use
   strict panel-local visibility. A field row that is absent from the final panel
   rectangle hides the cursor rather than being vertically clamped to a header,
@@ -183,8 +191,8 @@ If a stop condition occurs:
   has no text cursor. Test terminal state records cursor visibility/position,
   covering clipped ApiKey/BaseUrl/protocol/entry fields and real `draw_frame`
   terminal heights. Focused TUI validation: 437 passed; locked workspace
-  validation: 2464 passed. This makes the automated implementation ready for the
-  real-terminal matrix; it does not change I156's Active state.
+  validation: 2464 passed. These counts describe the rejected Alternate Screen
+  trial and are retained only as historical evidence.
 - Final coordinate and anchor correction automated evidence (2026-07-27,
   implementation commits `6c32d09` and `18648a6`): normal projected rows use
   half-open logical intervals, logical-line EOF is accepted only by the last
@@ -196,15 +204,17 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **437 passed, 0 failed, 0 ignored**.
+  **436 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2464 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  **2463 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
   The local-listener CLI tests were rerun outside the restricted sandbox after
   the sandbox correctly denied socket binding; the unrestricted run passed.
 - Current static validation: locked workspace check and Clippy with
   `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
   informational `talos-config` build-script warning reporting the compressed
   `models.toml` size.
+
+### Superseded Alternate-Screen Automated Evidence
 
 - Full-frame invariant correction automated evidence (2026-07-27, implementation
   commit `8b7a272`): transcript tool blocks are geometry-free; projection reflows them
@@ -235,24 +245,41 @@ If a stop condition occurs:
 
 ## Current Architecture And Implementation Commits
 
+- Native-history experience correction starting HEAD: `1de24fb`.
+- Primary-screen app-owned transcript implementation: `31e7a0d`.
+- Current runtime architecture: geometry-free `TranscriptStore` → width-aware
+  append-only projection → primary-screen terminal-native scrollback. The
+  bounded composer/status/panel frame is transient and is cleared on exit.
+  Runtime output uses ordinary newlines, not DECSTBM, reverse index, or terminal
+  insertion recovery.
+- ADR-054 is Rejected after its implemented Alternate Screen trial hid the
+  startup logo, pre-existing shell history, and native conversation
+  scrollback. ADR-055 Proposed records the single supported renderer.
+- Automated evidence: 436 focused TUI tests; native projection order,
+  exactly-once flush, primary-screen lifecycle, bounded frame, modal cursor,
+  geometry-free tool facts, and terminal recovery all pass.
+- Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
+  native-history/resize walkthrough. I156 remains Active.
+
+### Superseded Alternate-Screen Trial
+
 - Starting HEAD for the final coordinate correction: `a1885ac`.
 - Anchor-boundary implementation: `6c32d09`; interval-regression assertion:
   `1688e6f`.
 - Component-layout, final page-height, cursor-coordinate, and entry-point test
   implementation: `18648a6`.
 - Modal cursor visibility implementation: `ad67fc5`.
-- Current runtime architecture: geometry-free `TranscriptStore` →
-  width-independent logical lines → width-dependent full-frame projection in
-  alternate screen. The terminal is an output surface, not a history owner.
-- Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
-  real-terminal acceptance. I156 remains Active.
+- Trial architecture: geometry-free `TranscriptStore` → width-independent
+  logical lines → width-dependent full-frame projection in Alternate Screen.
+  This trial is not the current runtime architecture; it was rejected by the
+  maintainer after the native-history UX regression.
 
 ## Historical / Superseded Implementation Attempts
 
 The following DECSTBM, `insert_styled_history`, `resize_clear_action`, and
 pending-insertion recovery records are retained only as historical evidence.
-They are not part of the current runtime architecture and are superseded by
-ADR-054 app-owned full-frame rendering.
+They are not part of the current runtime architecture. ADR-054's later
+app-owned full-frame trial is also superseded; ADR-055 is current authority.
 
 ### Legacy Implementation Record
 
@@ -279,9 +306,38 @@ ADR-054 app-owned full-frame rendering.
 
 ## Variance And Residuals
 
+### Native-History Experience Correction — 2026-07-27
+
+**Classification:** maintainer-directed acceptance change. Native terminal
+history is a hard interaction requirement, and Talos exposes one renderer mode.
+
+Observed in the ADR-054 implementation:
+
+- the primary-screen logo disappeared immediately after startup;
+- shell history and terminal-native selection/search were unavailable while
+  Talos ran;
+- Talos history required application navigation and vanished from the visible
+  terminal surface on exit except for the compact summary.
+
+Correction:
+
+- retain the geometry-free app-owned transcript;
+- project only newly committed entries to primary-screen native scrollback,
+  exactly once, using ordinary newline output;
+- render only the current bounded input/status/panel frame;
+- reject ADR-054 and record ADR-055;
+- do not restore DECSTBM, reverse index, or width-specific transcript facts.
+
+Residual:
+
+- terminal-side resize can reflow transient frame cells before Talos receives
+  the event. This cannot be eliminated while preserving native scrollback.
+  The real-terminal matrix must document actual supported-terminal behavior.
+
 ### Architecture Correction — 2026-07-27
 
-**Classification:** in-scope correction. The published objective remains unchanged:
+**Classification:** superseded architecture correction. At this point the
+published objective was treated as unchanged:
 tool-call summaries must remain visible at narrow widths and fixed UI must never
 leak into scrollback. Real-terminal evidence disproved the original targeted
 DECSTBM approach, so this correction changes implementation ownership rather
@@ -304,8 +360,10 @@ Conclusion:
 - TUI-035 remains In Progress.
 
 - Screenshot evidence: maintainer-provided Alacritty resize capture, 2026-07-27.
-- Planned correction: ADR-054 Proposed; move history facts into an application-owned
-  transcript and render history plus fixed panes in one alternate-screen frame.
+- Historical correction plan: ADR-054; move history facts into an
+  application-owned transcript and render history plus fixed panes in one
+  Alternate Screen frame. The later native-history acceptance correction
+  rejected this plan and replaced it with ADR-055.
 
 - The real-terminal resize walkthrough (continuous wide→narrow drag, width 1/2/3 extreme, height-only shrink, widen) remains the mandatory human gate before I156 can move to Complete.
 - `resize_clear_action` is tested as a pure decision function; the full end-to-end "no history duplication during drag" is structurally guaranteed (bottom pane never calls `insert_history`) plus the resize-triggered full repaint, but final visual confirmation belongs to the human gate.

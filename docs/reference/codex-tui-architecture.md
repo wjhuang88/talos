@@ -12,10 +12,11 @@ Line numbers and function names reference the source at that snapshot.
 
 **Codex TUI is inline-by-default. Alt-screen is opt-in for sub-views only.**
 
-> Talos implementation note (ADR-054, 2026-07-27): this reference describes Codex's inline
-> architecture, not Talos's active interactive renderer. Talos uses alternate screen with an
-> application-owned transcript and one full-frame renderer because terminal-native primary
-> scrollback cannot isolate fixed panes during resize/reflow.
+> Talos implementation note (ADR-055, 2026-07-27): Talos retains Codex's
+> primary-screen/native-history interaction boundary but keeps an
+> application-owned geometry-free transcript. Committed entries are projected
+> exactly once with ordinary newlines; Talos does not restore Codex's
+> DECSTBM/reverse-index insertion path.
 
 This is the single most important fact and the source of all subsequent design choices:
 
