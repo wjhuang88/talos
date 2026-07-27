@@ -52,8 +52,23 @@ repeating known mistakes.
 | 40 | Terminal | 修饰键行为必须先启用终端键盘消歧协议，事件分支本身不能证明真实终端可达 | I142 |
 | 41 | TUI | 静态 scrollback 必须按物理行显式折行，不能依赖终端隐式换行维护滚动区域 | I142 |
 | 42 | TUI | 切换 Primary/Alternate Screen 所有权时，Logo 必须在目标 screen 建立后由同一 renderer 绘制 | I156/TUI-035 |
+| 43 | TUI | Alternate Screen 必须显式捕获滚轮；背景样式和语义空行必须由最终 projection 测试，而不能只检查逻辑字段 | I156/TUI-035 |
 
 ## Lessons
+
+## 2026-07-27 - Alternate-screen interaction needs terminal-boundary tests
+
+- Trigger: real-terminal screenshot and wheel testing after the I156 Logo-prefix correction.
+- Symptom: user-message background stopped at the text, a leading assistant newline produced a
+  prefix-only bullet row, and wheel input browsed composer history.
+- Root cause: model tests checked stored background and logical lines but not projected full-row
+  fill; Alternate Screen was entered without enabling mouse capture, so terminals could translate
+  wheel gestures into Up/Down key events.
+- Fix: project user padding/content with a bounded fill token, suppress non-user leading empty
+  stream rows, and make mouse capture an exhaustive/retryable TerminalSession state whose wheel
+  events move logical history.
+- Prevention: test final projected width, prefix-only output, real event entry points, and terminal
+  lifecycle transitions together for Alternate Screen interaction changes.
 
 ## 2026-07-27 - Screen ownership changes require target-screen startup evidence
 

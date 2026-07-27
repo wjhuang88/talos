@@ -99,6 +99,12 @@ transcript into primary scrollback during interactive execution.
   reserved before optional preview, queue, tips, and panels.
 - Terminal restoration attempts every enabled cleanup action, retains failed
   state for retry, and propagates failure before any primary-screen summary.
+- Mouse capture is a tracked terminal lifecycle state. Wheel events move the
+  application-owned logical history projection; successful/failed capture
+  transitions follow the same exhaustive rollback and retry rules.
+- User-message history rows preserve `INPUT_BG` across the full projected row,
+  including their padding rows. Projection suppresses synthetic leading
+  assistant prefix-only rows without mutating transcript content.
 - Rendered anchor ranges use half-open logical intervals. Only the last
   projected row accepts logical-line EOF; semantic empty and fill-only lines
   use an explicit zero-length logical range.

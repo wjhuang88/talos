@@ -35,6 +35,9 @@ pending terminal insertion recovery remain removed.
 - [x] one Alternate Screen app-owned full-frame renderer
 - [x] Logo rendered after Alternate Screen entry in the first application frame
 - [x] full and compact Logo modes covered without Transcript pollution
+- [x] submitted user blocks fill the history width with composer-aligned background styling
+- [x] assistant streams suppress leading prefix-only empty rows
+- [x] captured mouse-wheel events scroll logical history rather than composer input history
 - [x] fixed UI excluded from the transcript
 - [x] bounded fill projection and geometry-free ToolCall/ToolResult storage
 - [x] component-level `AppLayout`, panel-local cursor coordinates, and clipped modal input hiding
@@ -45,7 +48,7 @@ pending terminal insertion recovery remain removed.
 
 ## Current Alternate-Screen Logo Automated Evidence
 
-- Implementation commits `9c87d0f`, `635bc29`, and `dddf32f`.
+- Implementation commits `9c87d0f`, `635bc29`, `dddf32f`, and `dd10a62`.
 - `TranscriptStore` remains geometry-free and authoritative.
 - The first empty full frame contains the complete wide Logo at 80 columns and
   the compact Logo at narrow widths, with one display-only spacer row above the
@@ -55,8 +58,13 @@ pending terminal insertion recovery remain removed.
   history rectangle, Logo rows scroll out naturally.
 - Alternate Screen entry failure aborts initialization; restore remains
   exhaustive and retryable.
-- Focused TUI validation: 440 passed, 0 failed.
-- Locked workspace validation: 2471 passed, 0 failed across 62 test
+- Submitted user rows use bounded fill across the current history width;
+  assistant leading empty lines cannot create a prefix-only bullet row.
+- Mouse capture participates in transactional initialization/restoration, and
+  wheel entry-point tests prove three-row logical-history scrolling without
+  mutating composer history state.
+- Focused TUI validation: 446 passed, 0 failed.
+- Locked workspace validation: 2477 passed, 0 failed across 62 test
   binaries/doc-test groups.
 - Real-terminal acceptance remains pending.
 

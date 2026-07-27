@@ -213,9 +213,9 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **440 passed, 0 failed, 0 ignored**.
+  **446 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2471 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  **2477 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
 - Current static validation: locked workspace check and Clippy with
   `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
   informational `talos-config` build-script warning reporting the compressed
@@ -254,17 +254,19 @@ If a stop condition occurs:
 
 - Alternate Screen Logo correction starting HEAD: `c038852`.
 - Current implementation: `9c87d0f`, Logo spacing correction `635bc29`, and
-  virtual history-prefix correction `dddf32f`.
+  virtual history-prefix correction `dddf32f`; screenshot interaction
+  correction `dd10a62`.
 - Current runtime architecture: geometry-free `TranscriptStore` →
   width-independent logical lines → width-dependent full-frame projection in
   Alternate Screen. History, Logo, composer, status, and panels share the
   application-owned frame; only conversation facts enter the transcript.
 - ADR-054 is Accepted with the startup-splash amendment. ADR-019 is
   Superseded; ADR-055 is Rejected.
-- Automated evidence: 440 focused TUI tests; first-frame Logo, compact Logo,
+- Automated evidence: 446 focused TUI tests; first-frame Logo, compact Logo,
   transcript exclusion, logical scrolling, bounded layout, modal cursor,
-  geometry-free tool facts, and terminal recovery all pass. Locked workspace:
-  2471 passed.
+  full-width user history styling, prefix-only row suppression, mouse-wheel
+  history entry points, geometry-free tool facts, and terminal recovery all
+  pass. Locked workspace: 2477 passed.
 - Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
   Logo/resize/restore walkthrough. I156 remains Active.
 
@@ -310,6 +312,24 @@ app-owned full-frame renderer is current authority.
 - Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
 
 ## Variance And Residuals
+
+### Screenshot Interaction Correction — 2026-07-27
+
+**Classification:** maintainer-reported real-terminal defect.
+
+Screenshot evidence after the Logo-prefix correction exposed three regressions:
+
+- user-message `INPUT_BG` covered only content cells because logical user rows
+  carried background but no bounded fill segment;
+- an assistant stream beginning with `\n` produced a prefix-only `●` row;
+- without mouse capture, terminal wheel input degraded into Up/Down keys and
+  browsed composer input history.
+
+Commit `dd10a62` gives all user-block rows a projection-time fill token,
+suppresses non-user leading empty stream rows, transactionally enables mouse
+capture, and maps wheel movement to three-row logical-history navigation.
+Focused TUI: 446 passed; locked workspace: 2477 passed. Cross-terminal mouse
+and visual acceptance remains pending.
 
 ### Alternate-Screen Direction Reinstated With Logo Correction — 2026-07-27
 
