@@ -61,6 +61,30 @@ fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'st
     Line::from(spans).style(style)
 }
 
+fn frame_history_lines(
+    history: &HistoryProjection,
+    splash: Vec<Line<'static>>,
+    height: u16,
+    follow_tail: bool,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    if follow_tail {
+        let splash_start = if history.total_rows == 0 {
+            0
+        } else {
+            splash
+                .len()
+                .saturating_add(history.total_rows)
+                .saturating_sub(usize::from(height))
+        };
+        if splash_start < splash.len() {
+            lines.extend(splash.into_iter().skip(splash_start));
+        }
+    }
+    lines.extend(history.rows.iter().map(history_line));
+    lines
+}
+
 fn ratatui_color(color: crossterm::style::Color) -> ratatui::style::Color {
     use crossterm::style::Color as C;
     use ratatui::style::Color as R;
@@ -980,19 +1004,15 @@ impl Tui {
             &self.history_scroll,
         );
         self.last_history_projection = history.clone();
-        let splash = self
-            .transcript
-            .entries()
-            .is_empty()
-            .then(|| crate::splash::viewport_splash_lines(screen_size.width));
+        let splash = crate::splash::viewport_splash_lines(screen_size.width);
+        let follow_tail = matches!(
+            self.history_scroll.mode,
+            crate::history_projection::HistoryScrollMode::FollowTail
+        );
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
-                let history_text = if let Some(splash) = splash {
-                    splash
-                } else {
-                    history.rows.iter().map(history_line).collect::<Vec<_>>()
-                };
+                let history_text = frame_history_lines(&history, splash, area.height, follow_tail);
                 frame.render_widget(Paragraph::new(history_text), area);
             }
             if let Some(area) = app_layout.preview {

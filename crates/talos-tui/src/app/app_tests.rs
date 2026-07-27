@@ -1539,15 +1539,49 @@ fn alternate_screen_first_frame_renders_logo_without_transcript_pollution() {
 
     tui.handle_ui_output(talos_conversation::UiOutput::Content(
         talos_conversation::ContentOutput::Block {
-            source: MessageSource::Assistant,
-            text: "conversation replaces startup logo".into(),
+            source: MessageSource::User,
+            text: "conversation follows startup logo".into(),
         },
     ));
     tui.commit_pending_transcript().expect("commit transcript");
     tui.draw_frame().expect("conversation frame");
     let conversation_frame = tui.terminal.test_rendered_text();
-    assert!(conversation_frame.contains("conversation replaces startup logo"));
-    assert!(!conversation_frame.contains("The watchman never sleeps"));
+    let logo_offset = conversation_frame
+        .find("The watchman never sleeps")
+        .expect("startup logo should remain visible with the first message");
+    let message_offset = conversation_frame
+        .find("conversation follows startup logo")
+        .expect("first message should be visible below the startup logo");
+    assert!(logo_offset < message_offset);
+    assert!(tui.transcript.entries().iter().all(|entry| {
+        !matches!(
+            &entry.block,
+            crate::transcript::TranscriptBlock::StyledLine(line)
+                if line.text.contains("The watchman never sleeps")
+        )
+    }));
+}
+
+#[test]
+fn startup_logo_scrolls_out_after_history_fills_the_viewport() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+
+    for index in 0..30 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("history row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("full history frame");
+    let rendered = tui.terminal.test_rendered_text();
+
+    assert!(!rendered.contains("The watchman never sleeps"));
+    assert!(rendered.contains("history row 29"));
 }
 
 #[test]
