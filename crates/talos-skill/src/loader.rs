@@ -2,62 +2,82 @@ use crate::parser::{split_frontmatter, validate_frontmatter};
 use crate::{
     Result, Skill, SkillError, SkillFrontmatter, SkillIndex, SkillSource, estimate_tokens,
 };
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-/// Discovers and loads skills from configured search paths.
-///
-/// # Examples
-///
-/// ```no_run
-/// use talos_skill::SkillLoader;
-///
-/// let mut loader = SkillLoader::new();
-/// let skills = loader.discover().expect("failed to discover skills");
-/// let index = loader.get_index();
-/// ```
+const DEFAULT_MAX_SKILL_DISCOVERY_DEPTH: usize = 32;
+const DEFAULT_MAX_SKILL_DISCOVERY_ENTRIES: usize = 10_000;
+
+pub enum ExternalTargetPolicy {
+    DenyOutsideSearchRoot,
+    AllowAnyReadable,
+}
+
+pub struct SkillDiscoveryPolicy {
+    pub follow_directory_links: bool,
+    pub external_target_policy: ExternalTargetPolicy,
+    pub max_depth: usize,
+    pub max_entries: usize,
+}
+
+impl Default for SkillDiscoveryPolicy {
+    fn default() -> Self {
+        Self {
+            follow_directory_links: false,
+            external_target_policy: ExternalTargetPolicy::DenyOutsideSearchRoot,
+            max_depth: DEFAULT_MAX_SKILL_DISCOVERY_DEPTH,
+            max_entries: DEFAULT_MAX_SKILL_DISCOVERY_ENTRIES,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillDiscoveryWarningKind {
+    BrokenLink,
+    LinkLoop,
+    PermissionDenied,
+    ExternalTargetDenied,
+    CanonicalizeFailed,
+    DepthLimitReached,
+    EntryBudgetReached,
+    InvalidSkill,
+    Io,
+}
+
+#[derive(Debug, Clone)]
+pub struct SkillDiscoveryWarning {
+    pub kind: SkillDiscoveryWarningKind,
+    pub path: PathBuf,
+    pub message: String,
+}
+
 pub struct SkillLoader {
-    /// All discovered skills.
     pub skills: Vec<Skill>,
-    /// Directories to search for SKILL.md files.
     pub search_paths: Vec<PathBuf>,
-    /// Whether to include ~/.agents/skills/ as a discovery path.
     pub discover_shared: bool,
-    /// Workspace root for source classification.
     pub workspace_root: Option<PathBuf>,
+    pub discovery_policy: SkillDiscoveryPolicy,
+    pub discovery_warnings: Vec<SkillDiscoveryWarning>,
 }
 
 impl SkillLoader {
-    /// Creates a new `SkillLoader` with default search paths.
-    ///
-    /// Default paths (in priority order):
-    /// 1. `.talos/skills/` relative to the current directory (project-local)
-    /// 2. `~/.talos/skills/` (user-global)
-    /// 3. Parent directories up to git root, each with `.talos/skills/`
     pub fn new() -> Self {
         let cwd = std::env::current_dir().ok();
-
         Self {
             skills: Vec::new(),
             search_paths: default_search_paths(cwd.as_deref(), false),
             discover_shared: false,
             workspace_root: cwd.map(|p| p.to_path_buf()),
+            discovery_policy: SkillDiscoveryPolicy::default(),
+            discovery_warnings: Vec::new(),
         }
     }
 
-    /// Creates a new loader with search paths rooted at a specific workspace.
-    ///
-    /// Use this from runtime session startup instead of [`SkillLoader::new`]
-    /// when the process current directory may differ from the active session
-    /// workspace.
     pub fn for_workspace(workspace_root: impl AsRef<Path>) -> Self {
         Self::for_workspace_with_options(workspace_root.as_ref(), false)
     }
 
-    /// Creates a new loader with optional shared skills discovery.
-    ///
-    /// When `discover_shared` is true, `~/.agents/skills/` is appended as the
-    /// lowest-priority search path.
     pub fn for_workspace_with_options(
         workspace_root: impl AsRef<Path>,
         discover_shared: bool,
@@ -68,54 +88,185 @@ impl SkillLoader {
             search_paths: default_search_paths(Some(root), discover_shared),
             discover_shared,
             workspace_root: Some(root.to_path_buf()),
+            discovery_policy: SkillDiscoveryPolicy::default(),
+            discovery_warnings: Vec::new(),
         }
     }
 
-    /// Scans all search paths for SKILL.md files and parses them.
-    ///
-    /// Returns a vector of all successfully parsed skills. Files that fail to
-    /// parse are silently skipped (errors are logged but not propagated).
-    ///
-    /// Symbolic links and Windows junctions are followed to allow skill
-    /// directories to be shared across projects via symlinks. The walker
-    /// has built-in cycle detection to prevent infinite loops.
+    pub fn for_workspace_with_discovery_policy(
+        workspace_root: impl AsRef<Path>,
+        discover_shared: bool,
+        policy: SkillDiscoveryPolicy,
+    ) -> Self {
+        let root = workspace_root.as_ref();
+        Self {
+            skills: Vec::new(),
+            search_paths: default_search_paths(Some(root), discover_shared),
+            discover_shared,
+            workspace_root: Some(root.to_path_buf()),
+            discovery_policy: policy,
+            discovery_warnings: Vec::new(),
+        }
+    }
+
+    pub fn discovery_warnings(&self) -> &[SkillDiscoveryWarning] {
+        &self.discovery_warnings
+    }
+
     pub fn discover(&mut self) -> Result<&Vec<Skill>> {
         self.skills.clear();
+        self.discovery_warnings.clear();
 
-        for path in &self.search_paths {
-            if !path.is_dir() {
+        let mut seen_skill_names: HashSet<String> = HashSet::new();
+        let mut seen_canonical_dirs: HashSet<PathBuf> = HashSet::new();
+        let mut seen_canonical_files: HashSet<PathBuf> = HashSet::new();
+        let mut entry_count: usize = 0;
+
+        for search_root in &self.search_paths {
+            if !search_root.is_dir() {
                 continue;
             }
 
-            let source = self.classify_source(path);
+            let root_canonical = match search_root.canonicalize() {
+                Ok(c) => c,
+                Err(_) => search_root.clone(),
+            };
+            if !seen_canonical_dirs.insert(root_canonical.clone()) {
+                continue;
+            }
 
-            for entry in WalkDir::new(path)
-                .follow_links(true)
-                .max_depth(32)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
+            let source = self.classify_source(search_root);
+            let follow = self.discovery_policy.follow_directory_links;
+            let max_depth = self.discovery_policy.max_depth;
+            let max_entries = self.discovery_policy.max_entries;
+
+            let walker = WalkDir::new(search_root)
+                .follow_links(follow)
+                .max_depth(max_depth)
+                .into_iter();
+
+            for result in walker {
+                entry_count += 1;
+                if entry_count > max_entries {
+                    self.discovery_warnings.push(SkillDiscoveryWarning {
+                        kind: SkillDiscoveryWarningKind::EntryBudgetReached,
+                        path: search_root.clone(),
+                        message: format!(
+                            "entry budget {max_entries} reached; remaining entries skipped"
+                        ),
+                    });
+                    break;
+                }
+
+                let entry = match result {
+                    Ok(e) => e,
+                    Err(e) => {
+                        let kind = if e.loop_ancestor().is_some() {
+                            SkillDiscoveryWarningKind::LinkLoop
+                        } else if e.depth() > max_depth {
+                            SkillDiscoveryWarningKind::DepthLimitReached
+                        } else if e
+                            .path()
+                            .map(|p| {
+                                std::fs::symlink_metadata(p)
+                                    .map(|m| m.file_type().is_symlink() && !p.exists())
+                                    .unwrap_or(false)
+                            })
+                            .unwrap_or(false)
+                        {
+                            SkillDiscoveryWarningKind::BrokenLink
+                        } else {
+                            SkillDiscoveryWarningKind::Io
+                        };
+                        let path = e.path().map(|p| p.to_path_buf()).unwrap_or_default();
+                        self.discovery_warnings.push(SkillDiscoveryWarning {
+                            kind,
+                            path,
+                            message: e.to_string(),
+                        });
+                        continue;
+                    }
+                };
+
                 let entry_path = entry.path();
-                if entry_path.file_name() == Some(std::ffi::OsStr::new("SKILL.md")) {
-                    match Self::parse(entry_path) {
-                        Ok(mut skill) => {
+                if entry_path.file_name() != Some(std::ffi::OsStr::new("SKILL.md")) {
+                    continue;
+                }
+
+                if follow {
+                    if let Some(parent) = entry_path.parent() {
+                        match parent.canonicalize() {
+                            Ok(canon_dir) => {
+                                if !self.is_target_allowed(&canon_dir, &root_canonical) {
+                                    self.discovery_warnings.push(SkillDiscoveryWarning {
+                                        kind: SkillDiscoveryWarningKind::ExternalTargetDenied,
+                                        path: entry_path.to_path_buf(),
+                                        message: format!(
+                                            "target {canon_dir:?} is outside search root {root_canonical:?}"
+                                        ),
+                                    });
+                                    continue;
+                                }
+                                if !seen_canonical_dirs.insert(canon_dir) {
+                                    continue;
+                                }
+                            }
+                            Err(e) => {
+                                self.discovery_warnings.push(SkillDiscoveryWarning {
+                                    kind: SkillDiscoveryWarningKind::CanonicalizeFailed,
+                                    path: parent.to_path_buf(),
+                                    message: e.to_string(),
+                                });
+                                continue;
+                            }
+                        }
+                    }
+
+                    match entry_path.canonicalize() {
+                        Ok(canon_file) => {
+                            if !seen_canonical_files.insert(canon_file) {
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            self.discovery_warnings.push(SkillDiscoveryWarning {
+                                kind: SkillDiscoveryWarningKind::CanonicalizeFailed,
+                                path: entry_path.to_path_buf(),
+                                message: e.to_string(),
+                            });
+                            continue;
+                        }
+                    }
+                }
+
+                match Self::parse(entry_path) {
+                    Ok(mut skill) => {
+                        if seen_skill_names.insert(skill.name.clone()) {
                             skill.source = source;
                             self.skills.push(skill);
                         }
-                        Err(e) => {
-                            let _ = e;
-                        }
+                    }
+                    Err(e) => {
+                        self.discovery_warnings.push(SkillDiscoveryWarning {
+                            kind: SkillDiscoveryWarningKind::InvalidSkill,
+                            path: entry_path.to_path_buf(),
+                            message: e.to_string(),
+                        });
                     }
                 }
             }
         }
 
-        self.skills.dedup_by_key(|s| s.name.clone());
-
         Ok(&self.skills)
     }
 
-    /// Determines the [`SkillSource`] for a given search path.
+    fn is_target_allowed(&self, target: &Path, root: &Path) -> bool {
+        match self.discovery_policy.external_target_policy {
+            ExternalTargetPolicy::AllowAnyReadable => true,
+            ExternalTargetPolicy::DenyOutsideSearchRoot => target.starts_with(root),
+        }
+    }
+
     fn classify_source(&self, path: &Path) -> SkillSource {
         if let Some(ref home) = home_dir() {
             let agents_skills = home.join(".agents").join("skills");
@@ -138,16 +289,6 @@ impl SkillLoader {
         SkillSource::Parent
     }
 
-    /// Parses a single SKILL.md file into a [`Skill`].
-    ///
-    /// The file must start with `---`, followed by YAML frontmatter, then `---`,
-    /// then the Markdown body.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SkillError::FileNotFound`] if the path does not exist,
-    /// [`SkillError::YamlParseError`] if the frontmatter is invalid YAML,
-    /// or [`SkillError::InvalidFrontmatter`] if required fields are missing.
     pub fn parse(path: &Path) -> Result<Skill> {
         if !path.exists() {
             return Err(SkillError::FileNotFound(path.to_path_buf()));
@@ -169,10 +310,6 @@ impl SkillLoader {
         })
     }
 
-    /// Returns a lightweight index of all loaded skills.
-    ///
-    /// Use this for Level 0 progressive disclosure — injecting skill names
-    /// and descriptions into the system prompt without loading full bodies.
     pub fn get_index(&self) -> Vec<SkillIndex> {
         self.skills
             .iter()

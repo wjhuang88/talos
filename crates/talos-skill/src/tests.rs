@@ -154,6 +154,8 @@ fn discover_from_single_directory() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -199,6 +201,8 @@ Body B.
         search_paths: vec![skills1, skills2],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -248,6 +252,8 @@ Body V2.
         search_paths: vec![skills1, skills2],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -272,6 +278,8 @@ fn discover_skips_non_skill_files() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -295,6 +303,8 @@ fn discover_skips_unparseable_files() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -342,6 +352,8 @@ Body B.
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     loader.discover().expect("discovery should succeed");
@@ -366,6 +378,8 @@ fn skill_index_empty_when_no_skills() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let index = loader.get_index();
@@ -401,6 +415,8 @@ Git instructions.
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     loader.discover().expect("discovery should succeed");
@@ -436,6 +452,8 @@ Body.
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     loader.discover().expect("discovery should succeed");
@@ -468,6 +486,8 @@ Body.
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     loader.discover().expect("discovery should succeed");
@@ -631,6 +651,8 @@ fn skill_manager_level0_index_generation() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -651,6 +673,8 @@ fn skill_manager_index_cached() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -674,6 +698,8 @@ fn skill_manager_get_index_tokens() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -699,6 +725,8 @@ fn skill_manager_get_index_tokens_under_3000_for_20_skills() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -722,6 +750,8 @@ fn skill_manager_load_skill_level1() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -739,6 +769,8 @@ fn skill_manager_load_skill_not_found() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -754,6 +786,8 @@ fn skill_manager_load_skill_idempotent() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -772,6 +806,8 @@ fn skill_manager_unload_skill() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -797,6 +833,8 @@ fn skill_manager_get_active_skills() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -820,6 +858,8 @@ fn skill_manager_match_skill_exact() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let manager = SkillManager::new(loader);
@@ -847,6 +887,8 @@ fn skill_manager_match_skill_case_insensitive() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let manager = SkillManager::new(loader);
@@ -869,6 +911,8 @@ fn skill_manager_match_skill_no_match() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let manager = SkillManager::new(loader);
@@ -886,6 +930,8 @@ fn skill_manager_match_skill_first_wins() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let manager = SkillManager::new(loader);
@@ -921,6 +967,8 @@ See `template.txt` for the template.
         search_paths: vec![skill_dir.clone()],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
     loader.discover().expect("discover");
 
@@ -940,6 +988,8 @@ fn skill_manager_load_reference_skill_not_loaded() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let manager = SkillManager::new(loader);
@@ -955,6 +1005,8 @@ fn skill_manager_load_reference_file_not_found() {
         search_paths: Vec::new(),
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let mut manager = SkillManager::new(loader);
@@ -983,7 +1035,7 @@ fn skill_disclosure_enum_variants() {
 
 #[cfg(unix)]
 #[test]
-fn discover_follows_symlinked_skill_directory() {
+fn discover_ignores_symlinked_directory_by_default() {
     use std::os::unix::fs::symlink;
 
     let dir = tempfile::tempdir().expect("temp dir");
@@ -1002,6 +1054,47 @@ fn discover_follows_symlinked_skill_directory() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
+    };
+
+    let skills = loader.discover().expect("discovery should succeed");
+    assert_eq!(
+        skills.len(),
+        0,
+        "symlinked directory not followed by default"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn discover_follows_symlinked_directory_when_enabled() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    let real_skill_dir = dir.path().join("real-skill-dir");
+    let linked_skill_dir = skills_dir.join("linked-skill");
+
+    fs::create_dir_all(&skills_dir).expect("create skills dir");
+    fs::create_dir_all(&real_skill_dir).expect("create real skill dir");
+    fs::write(real_skill_dir.join("SKILL.md"), valid_skill_content()).expect("write SKILL.md");
+
+    symlink(&real_skill_dir, &linked_skill_dir).expect("create symlink");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -1021,17 +1114,25 @@ fn discover_follows_symlinked_skills_root() {
     fs::create_dir_all(real_root.join("my-skill")).expect("create skill dir");
     fs::write(
         real_root.join("my-skill").join("SKILL.md"),
-        "---\nname: symlinked-skill\ndescription: Found via symlink\ntiggers: []\ntriggers:\n  - sym\n---\n\nBody.\n",
+        "---\nname: symlinked-skill\ndescription: Found via symlink\ntriggers:\n  - sym\n---\n\nBody.\n",
     )
     .expect("write SKILL.md");
 
     symlink(&real_root, &linked_root).expect("create symlink to skills root");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
 
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![linked_root],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -1062,6 +1163,8 @@ fn discover_symlink_cycle_does_not_loop_forever() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader
@@ -1088,6 +1191,8 @@ fn discover_follows_nested_symlink_chain_to_skill() {
         search_paths: vec![skills_dir],
         discover_shared: false,
         workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -1193,6 +1298,8 @@ fn test_skill_source_tagged_correctly() {
         search_paths: vec![proj_skills_dir.clone(), shared_dir.clone()],
         discover_shared: true,
         workspace_root: Some(project_skills.path().to_path_buf()),
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
     };
     loader.discover().unwrap();
 
@@ -1241,4 +1348,281 @@ fn test_shared_skills_not_loaded_without_opt_in() {
             .any(|p| p.to_string_lossy().contains(".agents/skills")),
         "~/.agents/skills should not be in search paths when opt-in is off"
     );
+}
+
+// -----------------------------------------------------------------------
+// Policy, dedup, and observability tests
+// -----------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn same_physical_skill_via_two_aliases_is_loaded_once() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    let real_dir = dir.path().join("real-skill");
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&real_dir).expect("create real");
+    fs::write(real_dir.join("SKILL.md"), valid_skill_content()).expect("write");
+
+    symlink(&real_dir, skills_dir.join("alias-a")).expect("alias-a");
+    symlink(&real_dir, skills_dir.join("alias-b")).expect("alias-b");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    let count = loader
+        .skills
+        .iter()
+        .filter(|s| s.name == "test-skill")
+        .count();
+    assert_eq!(count, 1, "same physical skill via two aliases loaded once");
+}
+
+#[cfg(unix)]
+#[test]
+fn broken_symlink_produces_warning() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skills_dir = dir.path().join("skills");
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::write(skills_dir.join("SKILL.md"), valid_skill_content()).expect("write root skill");
+
+    let broken = skills_dir.join("broken-link");
+    symlink("/nonexistent/target", &broken).expect("create broken symlink");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::BrokenLink),
+        "broken link produces BrokenLink warning: {:?}",
+        loader.discovery_warnings
+    );
+}
+
+#[test]
+fn non_adjacent_duplicate_names_follow_first_wins() {
+    let dir1 = tempfile::tempdir().expect("temp");
+    let dir2 = tempfile::tempdir().expect("temp");
+    let dir3 = tempfile::tempdir().expect("temp");
+    let s1 = dir1.path();
+    let s2 = dir2.path();
+    let s3 = dir3.path();
+
+    fs::write(
+        s1.join("SKILL.md"),
+        "---\nname: dup\ndescription: Version 1\ntriggers:\n  - dup\n---\n\nBody 1.\n",
+    )
+    .expect("write");
+    fs::write(
+        s2.join("SKILL.md"),
+        "---\nname: other\ndescription: Unique\ntriggers:\n  - other\n---\n\nBody.\n",
+    )
+    .expect("write");
+    fs::write(
+        s3.join("SKILL.md"),
+        "---\nname: dup\ndescription: Version 2\ntriggers:\n  - dup\n---\n\nBody 2.\n",
+    )
+    .expect("write");
+
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![s1.to_path_buf(), s2.to_path_buf(), s3.to_path_buf()],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+
+    let dup_count = loader.skills.iter().filter(|s| s.name == "dup").count();
+    assert_eq!(dup_count, 1, "non-adjacent duplicate removed globally");
+    let dup = loader.skills.iter().find(|s| s.name == "dup").unwrap();
+    assert_eq!(dup.description, "Version 1", "first occurrence wins");
+}
+
+#[cfg(unix)]
+#[test]
+fn external_target_denied_by_default_when_following_links() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let outside = dir.path().join("outside");
+    fs::create_dir_all(&skills_dir).expect("create skills");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("SKILL.md"), valid_skill_content()).expect("write");
+    symlink(&outside, skills_dir.join("external-link")).expect("symlink");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::DenyOutsideSearchRoot,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(loader.skills.len(), 0, "external target denied");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::ExternalTargetDenied),
+        "ExternalTargetDenied warning present"
+    );
+}
+
+#[test]
+fn entry_budget_stops_scan_and_warns() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    fs::create_dir_all(&skills_dir).expect("create");
+    for i in 0..50 {
+        let sub = skills_dir.join(format!("skill-{i}"));
+        fs::create_dir_all(&sub).expect("create sub");
+        fs::write(sub.join("SKILL.md"), valid_skill_content()).expect("write");
+    }
+
+    let policy = SkillDiscoveryPolicy {
+        max_entries: 10,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert!(
+        loader
+            .discovery_warnings
+            .iter()
+            .any(|w| w.kind == SkillDiscoveryWarningKind::EntryBudgetReached),
+        "EntryBudgetReached warning present"
+    );
+    assert!(
+        loader.skills.len() < 50,
+        "not all skills found due to budget"
+    );
+}
+
+#[test]
+fn depth_limit_bounds_traversal() {
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let mut current = skills_dir.clone();
+    fs::create_dir_all(&current).expect("create");
+
+    for _ in 0..5 {
+        let next = current.join("nested");
+        fs::create_dir_all(&next).expect("create nested");
+        current = next;
+    }
+    fs::write(current.join("SKILL.md"), valid_skill_content()).expect("write");
+
+    let policy = SkillDiscoveryPolicy {
+        max_depth: 3,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    assert_eq!(loader.skills.len(), 0, "skill beyond max_depth not found");
+
+    let policy2 = SkillDiscoveryPolicy {
+        max_depth: 6,
+        ..Default::default()
+    };
+    loader.discovery_policy = policy2;
+    loader.discover().expect("discover deeper");
+    assert_eq!(loader.skills.len(), 1, "skill within max_depth found");
+}
+
+#[test]
+fn default_policy_does_not_follow_links() {
+    let p = SkillDiscoveryPolicy::default();
+    assert!(!p.follow_directory_links, "default does not follow links");
+    assert_eq!(p.max_depth, 32, "default max_depth is 32");
+    assert_eq!(p.max_entries, 10_000, "default max_entries is 10000");
+}
+
+#[cfg(unix)]
+#[test]
+fn symlink_cycle_reports_warning_and_does_not_duplicate() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().expect("temp");
+    let skills_dir = dir.path().join("skills");
+    let sub_a = skills_dir.join("a");
+    let sub_b = skills_dir.join("b");
+
+    fs::create_dir_all(&sub_a).expect("create a");
+    fs::create_dir_all(&sub_b).expect("create b");
+    symlink(&sub_b, sub_a.join("link-to-b")).expect("a->b");
+    symlink(&sub_a, sub_b.join("link-to-a")).expect("b->a");
+    fs::write(sub_a.join("SKILL.md"), valid_skill_content()).expect("write skill");
+
+    let policy = SkillDiscoveryPolicy {
+        follow_directory_links: true,
+        external_target_policy: ExternalTargetPolicy::AllowAnyReadable,
+        ..Default::default()
+    };
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: policy,
+        discovery_warnings: Vec::new(),
+    };
+    loader.discover().expect("discover");
+    let count = loader
+        .skills
+        .iter()
+        .filter(|s| s.name == "test-skill")
+        .count();
+    assert_eq!(count, 1, "skill found exactly once despite cycle");
 }

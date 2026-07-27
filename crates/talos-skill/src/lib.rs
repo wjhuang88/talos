@@ -11,9 +11,9 @@
 //! 2. `~/.talos/skills/` — user-global skills
 //! 3. Parent directories up to git root — inherited skills
 //!
-//! Symbolic links and Windows junctions are followed during discovery,
-//! allowing skill directories to be shared across projects. The walker
-//! has built-in cycle detection (max depth 32) to prevent infinite loops.
+//! Directory-link following is controlled by `SkillDiscoveryPolicy`.
+//! By default links are not followed; external targets are denied.
+//! Discovery is bounded by the configured maximum depth and entry budget.
 //!
 //! # SKILL.md Format
 //!
@@ -39,7 +39,10 @@ mod token;
 mod types;
 
 pub use error::{Result, SkillError};
-pub use loader::SkillLoader;
+pub use loader::{
+    ExternalTargetPolicy, SkillDiscoveryPolicy, SkillDiscoveryWarning, SkillDiscoveryWarningKind,
+    SkillLoader,
+};
 pub use manager::SkillManager;
 pub use token::estimate_tokens;
 pub use types::{Skill, SkillDisclosure, SkillFrontmatter, SkillIndex, SkillSource};
