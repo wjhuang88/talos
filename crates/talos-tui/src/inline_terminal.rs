@@ -89,47 +89,36 @@ impl HistorySegment {
     }
 }
 
+/// Legacy layout helper retained solely for isolated component tests. The
+/// interactive renderer uses `AppLayout` directly.
+#[cfg(test)]
 pub struct ComponentStack<'a> {
     components: Vec<&'a dyn ViewportComponent>,
 }
 
+#[cfg(test)]
 impl<'a> ComponentStack<'a> {
     pub fn new(components: Vec<&'a dyn ViewportComponent>) -> Self {
         Self { components }
     }
-
-    pub fn total_height(&self, available_width: u16) -> u16 {
+    pub fn total_height(&self, width: u16) -> u16 {
+        self.components.iter().map(|c| c.height_hint(width)).sum()
+    }
+    pub fn layout(&self, area: Rect, width: u16) -> Vec<(&'a dyn ViewportComponent, Rect)> {
+        let mut y = area.y;
         self.components
             .iter()
-            .map(|c| c.height_hint(available_width))
-            .sum()
-    }
-
-    pub fn layout(
-        &self,
-        area: Rect,
-        available_width: u16,
-    ) -> Vec<(&'a dyn ViewportComponent, Rect)> {
-        let mut result = Vec::new();
-        let mut y = area.y;
-
-        for component in &self.components {
-            let remaining = area.bottom().saturating_sub(y);
-            let h = component.height_hint(available_width).min(remaining);
-            if h == 0 {
-                continue;
-            }
-            let rect = Rect {
-                x: area.x,
-                y,
-                width: area.width,
-                height: h,
-            };
-            result.push((*component, rect));
-            y = y.saturating_add(h);
-        }
-
-        result
+            .filter_map(|component| {
+                let height = component
+                    .height_hint(width)
+                    .min(area.bottom().saturating_sub(y));
+                (height > 0).then(|| {
+                    let rect = Rect::new(area.x, y, area.width, height);
+                    y = y.saturating_add(height);
+                    (*component, rect)
+                })
+            })
+            .collect()
     }
 }
 

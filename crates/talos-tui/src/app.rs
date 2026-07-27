@@ -17,12 +17,10 @@ use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
 use tokio::{sync::mpsc, time::MissedTickBehavior};
 
-use crate::app_layout::compute_app_layout;
+use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
-use crate::inline_terminal::{
-    ComponentStack, HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent,
-};
+use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
 use crate::theme::{semantic, to_crossterm_color};
@@ -962,34 +960,17 @@ impl Tui {
             modal_natural,
         );
 
-        let stack = match menu_placement {
-            crate::scrollback::BottomPanelPlacement::AboveInput => ComponentStack::new(vec![
-                &preview,
-                &queue,
-                &tips,
-                &bottom_panel,
-                &input_pad_top,
-                &input,
-                &input_pad_bot,
-                &status_comp,
-            ]),
-            crate::scrollback::BottomPanelPlacement::BelowInput => ComponentStack::new(vec![
-                &preview,
-                &queue,
-                &tips,
-                &input_pad_top,
-                &input,
-                &bottom_panel,
-                &input_pad_bot,
-                &status_comp,
-            ]),
-        };
-
-        let total_height = stack
-            .total_height(screen_size.width)
-            .min(screen_size.height);
-        let app_layout = compute_app_layout(screen_size, total_height);
-        let history_height = app_layout.history.height;
+        let app_layout = compute_app_layout(
+            screen_size,
+            ComponentMetrics {
+                preview: preview.height_hint(width),
+                queue: queue.height_hint(width),
+                tips: tips.height_hint(width),
+                panel: bottom_panel.height_hint(width),
+                composer: actual_input_h,
+            },
+        );
+        let history_height = app_layout.history.map_or(0, |rect| rect.height);
         let history = project_history(
             &self.transcript,
             screen_size.width,
@@ -1000,16 +981,38 @@ impl Tui {
 
         self.terminal.draw(screen_size, |frame| {
             let history_text = history.rows.iter().map(history_line).collect::<Vec<_>>();
-            frame.render_widget(Paragraph::new(history_text), app_layout.history);
-            let layout = stack.layout(app_layout.bottom, screen_size.width);
-            for (component, area) in layout {
-                component.render(frame, area);
+            if let Some(area) = app_layout.history {
+                frame.render_widget(Paragraph::new(history_text), area);
+            }
+            if let Some(area) = app_layout.preview {
+                preview.render(frame, area);
+            }
+            if let Some(area) = app_layout.queue {
+                queue.render(frame, area);
+            }
+            if let Some(area) = app_layout.tips {
+                tips.render(frame, area);
+            }
+            if let Some(area) = app_layout.panel {
+                bottom_panel.render(frame, area);
+            }
+            if let Some(area) = app_layout.composer_top_pad {
+                input_pad_top.render(frame, area);
+            }
+            if let Some(area) = app_layout.composer {
+                input.render(frame, area);
+            }
+            if let Some(area) = app_layout.composer_bottom_pad {
+                input_pad_bot.render(frame, area);
+            }
+            if let Some(area) = app_layout.status {
+                status_comp.render(frame, area);
             }
         })?;
 
         {
             let screen_w = screen_size.width;
-            let stack_top = app_layout.bottom.y;
+            let stack_top = app_layout.panel.map_or(0, |rect| rect.y);
             if self.state.slash_menu.is_credential_input() {
                 let panel_y_offset = match menu_placement {
                     crate::scrollback::BottomPanelPlacement::AboveInput => {
@@ -1066,17 +1069,11 @@ impl Tui {
                     self.terminal.set_cursor(cursor_col, cursor_row)?;
                 }
             } else {
-                let mut input_y_offset: u16 = preview.height_hint(screen_w)
-                    + queue.height_hint(screen_w)
-                    + tips.height_hint(screen_w)
-                    + input_pad_top.height_hint(screen_w);
-                if matches!(
-                    menu_placement,
-                    crate::scrollback::BottomPanelPlacement::AboveInput
-                ) {
-                    input_y_offset += bottom_panel.height_hint(screen_w);
-                }
-                let input_top = stack_top + input_y_offset;
+                let Some(composer_rect) = app_layout.composer else {
+                    self.terminal.hide_cursor()?;
+                    return Ok(());
+                };
+                let input_top = composer_rect.y;
                 let byte_pos = self.state.cursor_byte_pos();
                 let content_w = crate::scrollback::composer_content_width(screen_w);
                 let (cursor_row_offset, cursor_col_offset) =
@@ -1088,12 +1085,15 @@ impl Tui {
                     &self.state.input_buffer[..byte_pos],
                     &self.state.input_buffer,
                     content_w,
-                    actual_input_h,
+                    composer_rect.height,
                 );
                 let input_row =
                     input_top.saturating_add(cursor_row_offset.saturating_sub(scroll_offset));
                 let cursor_col = crate::scrollback::COMPOSER_LEFT_PAD + cursor_col_offset;
-                self.terminal.set_cursor(cursor_col, input_row)?;
+                self.terminal.set_cursor(
+                    cursor_col.min(composer_rect.right().saturating_sub(1)),
+                    input_row.min(composer_rect.bottom().saturating_sub(1)),
+                )?;
             }
         }
 
