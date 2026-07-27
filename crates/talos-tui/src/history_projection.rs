@@ -47,6 +47,8 @@ impl HistoryScrollState {
 pub(crate) struct RenderedHistoryRow {
     pub(crate) start_anchor: LogicalContentAnchor,
     pub(crate) end_anchor: LogicalContentAnchor,
+    pub(crate) is_last_row_of_logical_line: bool,
+    pub(crate) is_empty_logical_line: bool,
     pub(crate) line: ScrollbackLine,
 }
 
@@ -99,25 +101,26 @@ pub(crate) fn project_history(
     let mut all = Vec::new();
     for entry in transcript.entries() {
         for (logical_line, line) in logical_lines(&entry.block).into_iter().enumerate() {
+            let chunks = project_line_chunks(&line, width);
+            let last = chunks.len().saturating_sub(1);
             all.extend(
-                project_line(&line, width)
+                chunks
                     .into_iter()
-                    .scan(0usize, |offset, line| {
-                        let start = *offset;
-                        *offset += line.text.chars().count();
-                        Some(RenderedHistoryRow {
-                            start_anchor: LogicalContentAnchor {
-                                entry_id: entry.id,
-                                logical_line,
-                                scalar_offset: start,
-                            },
-                            end_anchor: LogicalContentAnchor {
-                                entry_id: entry.id,
-                                logical_line,
-                                scalar_offset: *offset,
-                            },
-                            line,
-                        })
+                    .enumerate()
+                    .map(|(index, chunk)| RenderedHistoryRow {
+                        start_anchor: LogicalContentAnchor {
+                            entry_id: entry.id,
+                            logical_line,
+                            scalar_offset: chunk.logical_start,
+                        },
+                        end_anchor: LogicalContentAnchor {
+                            entry_id: entry.id,
+                            logical_line,
+                            scalar_offset: chunk.logical_end,
+                        },
+                        is_last_row_of_logical_line: index == last,
+                        is_empty_logical_line: line.text.is_empty(),
+                        line: chunk.line,
                     }),
             );
         }
@@ -130,12 +133,7 @@ pub(crate) fn project_history(
             // if none survives, clamp at the end. This keeps the anchor logical.
             let index = all
                 .iter()
-                .position(|row| {
-                    row.start_anchor.entry_id == anchor.entry_id
-                        && row.start_anchor.logical_line == anchor.logical_line
-                        && row.start_anchor.scalar_offset <= anchor.scalar_offset
-                        && anchor.scalar_offset <= row.end_anchor.scalar_offset
-                })
+                .position(|row| row_contains_anchor(row, anchor))
                 .unwrap_or_else(|| {
                     all.iter()
                         .position(|row| row.start_anchor.entry_id >= anchor.entry_id)
@@ -151,6 +149,22 @@ pub(crate) fn project_history(
         visible_start: start,
         all_rows: all,
     }
+}
+
+fn row_contains_anchor(row: &RenderedHistoryRow, anchor: LogicalContentAnchor) -> bool {
+    if row.start_anchor.entry_id != anchor.entry_id
+        || row.start_anchor.logical_line != anchor.logical_line
+    {
+        return false;
+    }
+    let start = row.start_anchor.scalar_offset;
+    let end = row.end_anchor.scalar_offset;
+    if start == end {
+        return row.is_empty_logical_line && anchor.scalar_offset == start;
+    }
+    start <= anchor.scalar_offset
+        && (anchor.scalar_offset < end
+            || (row.is_last_row_of_logical_line && anchor.scalar_offset == end))
 }
 
 /// Stable semantic lines. Tool display is formatted once at an effectively
@@ -173,11 +187,19 @@ fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
     }
 }
 
-fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
+struct ProjectedLineChunk {
+    line: ScrollbackLine,
+    logical_start: usize,
+    logical_end: usize,
+}
+
+fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineChunk> {
     let capacity = usize::from(width);
     let mut rows = Vec::new();
     let mut current = Vec::<HistorySegment>::new();
     let mut used = 0usize;
+    let mut logical_offset = 0usize;
+    let mut row_start = 0usize;
 
     for segment in &line.segments {
         for ch in segment.text.chars() {
@@ -186,21 +208,30 @@ fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
             // projection-only; the original scalar remains in TranscriptStore.
             if char_width > capacity {
                 if !current.is_empty() {
-                    rows.push(ScrollbackLine::styled(
-                        std::mem::take(&mut current),
-                        line.bg,
-                    ));
+                    rows.push(ProjectedLineChunk {
+                        line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
+                        logical_start: row_start,
+                        logical_end: logical_offset,
+                    });
                     used = 0;
                 }
-                rows.push(ScrollbackLine::plain("…", line.bg));
+                rows.push(ProjectedLineChunk {
+                    line: ScrollbackLine::plain("…", line.bg),
+                    logical_start: logical_offset,
+                    logical_end: logical_offset + 1,
+                });
+                logical_offset += 1;
+                row_start = logical_offset;
                 continue;
             }
             if used > 0 && used.saturating_add(char_width) > capacity {
-                rows.push(ScrollbackLine::styled(
-                    std::mem::take(&mut current),
-                    line.bg,
-                ));
+                rows.push(ProjectedLineChunk {
+                    line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
+                    logical_start: row_start,
+                    logical_end: logical_offset,
+                });
                 used = 0;
+                row_start = logical_offset;
             }
             if let Some(last) = current.last_mut()
                 && last.fg == segment.fg
@@ -215,24 +246,38 @@ fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
                 ));
             }
             used = used.saturating_add(char_width);
+            logical_offset += 1;
         }
     }
     if !current.is_empty() {
-        rows.push(ScrollbackLine::styled(current, line.bg));
+        rows.push(ProjectedLineChunk {
+            line: ScrollbackLine::styled(current, line.bg),
+            logical_start: row_start,
+            logical_end: logical_offset,
+        });
     }
     if rows.is_empty() && line.fill.is_none() {
-        return vec![line.clone()];
+        return vec![ProjectedLineChunk {
+            line: line.clone(),
+            logical_start: 0,
+            logical_end: logical_offset,
+        }];
     }
     if rows.is_empty() {
-        rows.push(ScrollbackLine::styled(Vec::new(), line.bg));
+        rows.push(ProjectedLineChunk {
+            line: ScrollbackLine::styled(Vec::new(), line.bg),
+            logical_start: 0,
+            logical_end: 0,
+        });
     }
     if let Some(fill) = &line.fill
         && let Some(last) = rows.last_mut()
     {
-        let used = UnicodeWidthStr::width(last.text.as_str());
+        let used = UnicodeWidthStr::width(last.line.text.as_str());
         if let Some(fill) = project_fill_segment(fill, capacity.saturating_sub(used)) {
-            last.segments.push(fill);
-            last.text = last
+            last.line.segments.push(fill);
+            last.line.text = last
+                .line
                 .segments
                 .iter()
                 .map(|segment| segment.text.as_str())
@@ -240,6 +285,14 @@ fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
         }
     }
     rows
+}
+
+#[cfg(test)]
+fn project_line(line: &ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
+    project_line_chunks(line, width)
+        .into_iter()
+        .map(|chunk| chunk.line)
+        .collect()
 }
 
 /// Repeats a fill token only up to the available display cells. The loop is by
@@ -400,6 +453,78 @@ mod tests {
     }
 
     #[test]
+    fn anchor_at_wrapped_row_start_resolves_to_that_row() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "0123456789abcdefghijABCDEFGHIJ",
+            None,
+        )));
+        let projection = project_history(&transcript, 10, 10, &HistoryScrollState::follow_tail());
+        let second_row_anchor = projection.rows[1].start_anchor;
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(second_row_anchor, 0);
+        let anchored = project_history(&transcript, 10, 10, &scroll);
+        assert_eq!(anchored.visible_start, 1);
+        assert_eq!(anchored.rows[0].start_anchor, second_row_anchor);
+    }
+
+    #[test]
+    fn anchor_at_logical_line_end_resolves_last_row() {
+        let mut transcript = TranscriptStore::default();
+        let id = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "0123456789abcdefghij",
+            None,
+        )));
+        let eof = LogicalContentAnchor {
+            entry_id: id,
+            logical_line: 0,
+            scalar_offset: 20,
+        };
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(eof, 0);
+        let projection = project_history(&transcript, 10, 10, &scroll);
+        assert_eq!(projection.visible_start, 1);
+        assert_eq!(projection.rows[0].end_anchor, eof);
+    }
+
+    #[test]
+    fn empty_line_anchor_resolves_deterministically() {
+        let mut transcript = TranscriptStore::default();
+        let first = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain("", None)));
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain("", None)));
+        let anchor = LogicalContentAnchor {
+            entry_id: first,
+            logical_line: 0,
+            scalar_offset: 0,
+        };
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        let projection = project_history(&transcript, 10, 2, &scroll);
+        assert_eq!(projection.rows[0].start_anchor, anchor);
+    }
+
+    #[test]
+    fn fill_only_line_anchor_is_independent_of_projected_fill_length() {
+        for width in [1, 3, 40] {
+            let mut transcript = TranscriptStore::default();
+            let id = transcript.append(TranscriptBlock::StyledLine(
+                ScrollbackLine::styled_with_fill(Vec::new(), None, Some(HistorySegment::raw("─"))),
+            ));
+            let projection =
+                project_history(&transcript, width, 2, &HistoryScrollState::follow_tail());
+            assert_eq!(
+                projection.rows[0].start_anchor,
+                LogicalContentAnchor {
+                    entry_id: id,
+                    logical_line: 0,
+                    scalar_offset: 0,
+                }
+            );
+            assert_eq!(projection.rows[0].end_anchor.scalar_offset, 0);
+        }
+    }
+
+    #[test]
     fn fill_only_line_projects_to_current_width() {
         let line = ScrollbackLine::styled_with_fill(
             Vec::new(),
@@ -506,5 +631,55 @@ mod tests {
         };
         assert_eq!(after, stored);
         assert_eq!(project_history(&transcript, 160, 100, &scroll), initial);
+    }
+
+    #[test]
+    fn anchor_inside_tool_call_arguments_survives_resize() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::ToolCall(
+            talos_conversation::ToolCallDisplay {
+                tool_name: "bash".into(),
+                arguments: serde_json::json!({
+                    "command": "printf 你好 && echo a-very-long-command-argument",
+                    "cwd": "/tmp/project",
+                    "timeout": 30
+                }),
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec!["command".into(), "cwd".into()],
+            },
+        ));
+        let initial = project_history(&transcript, 10, 100, &HistoryScrollState::follow_tail());
+        let anchor = initial.rows[2].start_anchor;
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        for width in [160, 40, 3, 2, 1, 80, 160] {
+            let projection = project_history(&transcript, width, 100, &scroll);
+            assert!(row_contains_anchor(&projection.rows[0], anchor));
+        }
+    }
+
+    #[test]
+    fn anchor_inside_multiline_tool_result_survives_resize() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::ToolResult(
+            talos_conversation::ToolResultDisplay {
+                tool_name: Some("bash".into()),
+                is_error: false,
+                content: "first\nsecond line with 你好 and long content\n\nfourth\nfifth".into(),
+            },
+        ));
+        let initial = project_history(&transcript, 8, 100, &HistoryScrollState::follow_tail());
+        let anchor = initial
+            .rows
+            .iter()
+            .find(|row| row.start_anchor.logical_line >= 1 && row.start_anchor.scalar_offset > 0)
+            .expect("wrapped result row")
+            .start_anchor;
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        for width in [160, 40, 3, 2, 1, 80, 160] {
+            let projection = project_history(&transcript, width, 100, &scroll);
+            assert!(row_contains_anchor(&projection.rows[0], anchor));
+        }
     }
 }
