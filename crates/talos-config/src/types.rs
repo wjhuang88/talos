@@ -193,11 +193,19 @@ impl Default for MemoryPromptConfig {
 }
 
 /// Configuration for skill discovery behavior.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct SkillConfig {
     /// When true, scan ~/.agents/skills/ as a lowest-priority discovery path.
     pub discover_shared: bool,
+}
+
+impl Default for SkillConfig {
+    fn default() -> Self {
+        Self {
+            discover_shared: true,
+        }
+    }
 }
 
 /// Configuration for the read-only loopback dashboard (ADR-031).

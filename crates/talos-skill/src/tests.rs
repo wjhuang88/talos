@@ -1201,10 +1201,10 @@ fn discover_follows_nested_symlink_chain_to_skill() {
 }
 
 #[test]
-fn test_shared_skills_disabled_by_default() {
+fn test_shared_skills_disabled_when_explicitly_off() {
     let dir = tempfile::tempdir().unwrap();
     let loader = SkillLoader::for_workspace_with_options(dir.path(), false);
-    // ~/.agents/skills should NOT be in search paths when disabled
+    // ~/.agents/skills should NOT be in search paths when explicitly disabled
     assert!(
         !loader
             .search_paths
@@ -1336,17 +1336,15 @@ fn test_skill_source_display() {
 }
 
 #[test]
-fn test_shared_skills_not_loaded_without_opt_in() {
+fn test_shared_skills_not_loaded_when_explicitly_disabled() {
     let project_skills = tempfile::tempdir().unwrap();
-
-    // With discover_shared = false (default), ~/.agents/skills should NOT be in search paths
     let loader = SkillLoader::for_workspace_with_options(project_skills.path(), false);
     assert!(
         !loader
             .search_paths
             .iter()
             .any(|p| p.to_string_lossy().contains(".agents/skills")),
-        "~/.agents/skills should not be in search paths when opt-in is off"
+        "~/.agents/skills should not be in search paths when explicitly disabled"
     );
 }
 

@@ -64,7 +64,7 @@ Currently shipped:
 Not shipped yet:
 
 - Stable 1.0 SDK guarantees for the embedded runtime facade.
-- `~/.agents/skills/` discovery from the dotagents shared directory.
+- `~/.agents/skills/` discovery from the dotagents shared directory (enabled by default).
 - Remote web control, browser automation, web approvals, and web write/action routes.
 - Plugin marketplace, remote install, automatic discovery, host calls, and write-capable plugins.
 - PDF/Office document extraction beyond the current web/fetch foundations.
@@ -558,7 +558,7 @@ Skill search paths, in priority order:
 - `.talos/skills/` in the active workspace
 - `~/.talos/skills/`
 - parent `.talos/skills/` directories up to the Git root
-- `~/.agents/skills/` (shared, opt-in via `[skills] discover_shared = true` in config)
+- `~/.agents/skills/` (shared, enabled by default; set `[skills] discover_shared = false` to disable)
 
 Use `/skills` in the TUI or inline mode to list runtime-discovered skills. Use
 `/skills activate <name>` to explicitly load one Skill body into provider

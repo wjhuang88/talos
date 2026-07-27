@@ -1288,9 +1288,9 @@ fn test_config_debug_masks_provider_api_keys() {
 }
 
 #[test]
-fn test_skill_config_default_off() {
+fn test_skill_config_default_on() {
     let config = Config::default();
-    assert!(!config.skills.discover_shared);
+    assert!(config.skills.discover_shared);
 }
 
 #[test]
