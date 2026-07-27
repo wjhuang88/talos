@@ -176,13 +176,14 @@ If a stop condition occurs:
 ## Verification Evidence
 
 - Current Alternate Screen startup correction automated evidence (2026-07-27,
-  implementation commits `9c87d0f` and `635bc29`): `TerminalSession` establishes Alternate
-  Screen before the first full-frame draw. The wide and compact Logo variants
-  render below one display-only spacer row inside the empty history rectangle,
-  never enter `TranscriptStore`, and yield to projected conversation history
-  after the first committed block. App-owned logical navigation, bounded
-  layout, modal cursor rules, and exhaustive retryable restore are active
-  again. Focused TUI validation: 439 passed, 0 failed.
+  implementation commits `9c87d0f`, `635bc29`, and `dddf32f`):
+  `TerminalSession` establishes Alternate Screen before the first full-frame
+  draw. The wide and compact Logo variants render below one display-only
+  spacer row as a virtual history prefix, never enter `TranscriptStore`, keep
+  the first user message immediately below them, and naturally scroll out as
+  projected history grows. App-owned logical navigation, bounded layout, modal
+  cursor rules, and exhaustive retryable restore are active again. Focused TUI
+  validation: 440 passed, 0 failed.
 - Superseded native-history correction automated evidence (2026-07-27,
   implementation commit `31e7a0d`): the geometry-free transcript remains the
   logical authority, committed entries are projected exactly once through
@@ -212,9 +213,9 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **439 passed, 0 failed, 0 ignored**.
+  **440 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2470 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  **2471 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
 - Current static validation: locked workspace check and Clippy with
   `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
   informational `talos-config` build-script warning reporting the compressed
@@ -252,17 +253,18 @@ If a stop condition occurs:
 ## Current Architecture And Implementation Commits
 
 - Alternate Screen Logo correction starting HEAD: `c038852`.
-- Current implementation: `9c87d0f`, with Logo spacing correction `635bc29`.
+- Current implementation: `9c87d0f`, Logo spacing correction `635bc29`, and
+  virtual history-prefix correction `dddf32f`.
 - Current runtime architecture: geometry-free `TranscriptStore` →
   width-independent logical lines → width-dependent full-frame projection in
   Alternate Screen. History, Logo, composer, status, and panels share the
   application-owned frame; only conversation facts enter the transcript.
 - ADR-054 is Accepted with the startup-splash amendment. ADR-019 is
   Superseded; ADR-055 is Rejected.
-- Automated evidence: 439 focused TUI tests; first-frame Logo, compact Logo,
+- Automated evidence: 440 focused TUI tests; first-frame Logo, compact Logo,
   transcript exclusion, logical scrolling, bounded layout, modal cursor,
   geometry-free tool facts, and terminal recovery all pass. Locked workspace:
-  2470 passed.
+  2471 passed.
 - Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
   Logo/resize/restore walkthrough. I156 remains Active.
 
@@ -321,11 +323,11 @@ defect, not a reason to retain the ADR-055 renderer:
 - `TerminalSession` enters and clears Alternate Screen transactionally.
 - The first full frame renders the wide or compact Logo in the history region.
 - Logo rows are display-only and never enter transcript/session/export facts.
-- The first committed conversation block replaces the startup Logo with the
-  normal history projection.
+- The first user message is appended below the Logo; growing history scrolls
+  the display-only Logo prefix out naturally.
 
-Implementation commit: `9c87d0f`. Real-terminal Logo, resize, and restore
-acceptance remains pending.
+Implementation commits: `9c87d0f`, `635bc29`, and `dddf32f`. Real-terminal
+Logo, resize, and restore acceptance remains pending.
 
 ### Native-History Experience Correction — 2026-07-27
 

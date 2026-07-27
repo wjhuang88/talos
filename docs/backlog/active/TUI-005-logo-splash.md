@@ -15,8 +15,10 @@
 The branded wordmark remains the shipped Logo content, but its former
 primary-screen placement is superseded. The single Alternate Screen renderer
 enters the target screen first, then draws the wide or compact Logo in the
-first full application frame. Logo rows are display-only and never enter
-TranscriptStore/session/export facts. Implementation: `9c87d0f`.
+first full application frame. Logo rows remain as a display-only virtual
+history prefix while initial messages append below them, then scroll out
+naturally; they never enter TranscriptStore/session/export facts.
+Implementation: `9c87d0f`, `635bc29`, and `dddf32f`.
 
 ## Historical Original Outcome
 

@@ -67,8 +67,9 @@ repeating known mistakes.
   frame.
 - Fix: After a short primary-screen trial, the maintainer selected one
   Alternate Screen mode. Talos now enters Alternate Screen first and draws a
-  single ratatui Logo model in the first full frame; it never enters
-  TranscriptStore and yields to conversation history.
+  single ratatui Logo model as a display-only history prefix; initial messages
+  append below it and growing history scrolls it out without adding Logo facts
+  to TranscriptStore.
 - Prevention: Any Primary/Alternate Screen ownership change must test the
   first visible frame, Logo placement, screen restoration, and which state owns
   startup content. Printing before a screen switch is not display evidence.

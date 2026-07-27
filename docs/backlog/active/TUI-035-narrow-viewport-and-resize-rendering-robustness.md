@@ -21,8 +21,9 @@ scroll anchors, and history plus fixed components are rendered together.
 
 The startup sequence enters and clears Alternate Screen before drawing the
 Logo in the first application frame. The Logo is display-only, never enters
-`TranscriptStore`, and yields to conversation history after the first
-committed entry. ADR-019 is Superseded and ADR-055 is Rejected.
+`TranscriptStore`, and acts as a virtual history prefix: the first user message
+is drawn below it, then growing history naturally scrolls it out of the
+viewport. ADR-019 is Superseded and ADR-055 is Rejected.
 
 Resize recomputes the full frame from one size snapshot and never mutates
 transcript facts. Runtime DECSTBM, reverse index, native-history insertion, and
@@ -44,17 +45,18 @@ pending terminal insertion recovery remain removed.
 
 ## Current Alternate-Screen Logo Automated Evidence
 
-- Implementation commits `9c87d0f` and `635bc29`.
+- Implementation commits `9c87d0f`, `635bc29`, and `dddf32f`.
 - `TranscriptStore` remains geometry-free and authoritative.
 - The first empty full frame contains the complete wide Logo at 80 columns and
   the compact Logo at narrow widths, with one display-only spacer row above the
   wordmark.
-- The Logo is not a transcript fact and disappears when the first committed
-  conversation block becomes the history projection.
+- The Logo is not a transcript fact. The first user message is appended below
+  it; after the combined virtual prefix and projected history exceed the
+  history rectangle, Logo rows scroll out naturally.
 - Alternate Screen entry failure aborts initialization; restore remains
   exhaustive and retryable.
-- Focused TUI validation: 439 passed, 0 failed.
-- Locked workspace validation: 2470 passed, 0 failed across 62 test
+- Focused TUI validation: 440 passed, 0 failed.
+- Locked workspace validation: 2471 passed, 0 failed across 62 test
   binaries/doc-test groups.
 - Real-terminal acceptance remains pending.
 

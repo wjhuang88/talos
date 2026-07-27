@@ -38,9 +38,10 @@ it never mutates transcript facts.
 
 The startup logo is display-only application state. `TerminalSession` enters
 and clears Alternate Screen before the first draw; the full-frame renderer then
-draws the logo in the history rectangle while the logical transcript is empty.
-The logo never enters `TranscriptStore`, is never printed to Primary Screen,
-and yields to projected conversation history after the first committed entry.
+draws the logo as a virtual prefix of the history rectangle. The first user
+message is appended below that prefix, and increasing projected history
+naturally scrolls Logo rows out of the rectangle. The Logo never enters
+`TranscriptStore` and is never printed to Primary Screen.
 
 ## Rejected Alternatives
 
@@ -86,8 +87,9 @@ transcript into primary scrollback during interactive execution.
   transitions that completed when initialization fails.
 - `viewport_splash_lines` is the single Logo representation. It is rendered
   after Alternate Screen entry, reserves one display-only spacer row above the
-  wordmark, uses a compact wordmark on narrow terminals, and is excluded from
-  transcript/session/export facts.
+  wordmark, uses a compact wordmark on narrow terminals, and participates only
+  as a virtual frame-history prefix excluded from transcript/session/export
+  facts.
 - The old primary-screen insertion recovery helpers and their test-only writer
   seam have been removed. Real-terminal acceptance remains an I156/TUI-035
   completion gate rather than an unresolved architecture decision.
