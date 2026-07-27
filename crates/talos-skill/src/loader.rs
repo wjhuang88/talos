@@ -169,8 +169,14 @@ impl SkillLoader {
             let mut depth_warning_emitted = false;
             let mut dir_warnings: Vec<SkillDiscoveryWarning> = Vec::new();
 
-            let walker = WalkDir::new(search_root)
+            let walk_root = if root_is_symlink {
+                root_canonical.clone()
+            } else {
+                search_root.clone()
+            };
+            let walker = WalkDir::new(&walk_root)
                 .follow_links(follow)
+                .follow_root_links(false)
                 .max_depth(observation_depth)
                 .sort_by_file_name()
                 .into_iter()
