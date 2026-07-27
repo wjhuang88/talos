@@ -90,6 +90,16 @@ staircase fill bars. History remains renderer-accounted (not
 terminal-autowrap-dependent) across resize, matching the TUI-034 intent for the
 lines it missed.
 
+## Architecture Correction (2026-07-27)
+
+Manual Alacritty acceptance failed: repeated resize leaked fixed hint, composer,
+and status rows into primary terminal scrollback. This is evidence that the
+primary-screen DECSTBM approach cannot meet this Story's existing fixed-pane
+isolation acceptance. Under I156 change control, implementation is corrected to
+ADR-054's alternate-screen, application-owned transcript and full-frame
+renderer. The Story remains In Progress; no completion claim is authorized until
+the real-terminal matrix passes.
+
 ## Scope
 
 ### Fix 1 — width-aware tool-call summary line

@@ -204,6 +204,34 @@ If a stop condition occurs:
 
 ## Variance And Residuals
 
+### Architecture Correction — 2026-07-27
+
+**Classification:** in-scope correction. The published objective remains unchanged:
+tool-call summaries must remain visible at narrow widths and fixed UI must never
+leak into scrollback. Real-terminal evidence disproved the original targeted
+DECSTBM approach, so this correction changes implementation ownership rather
+than the deliverable or acceptance target. ADR-054 records the proposed
+alternate-screen, app-owned transcript renderer.
+
+#### Manual Alacritty Walkthrough — Failed
+
+Observed:
+
+- repeated copies of the fixed `Enter to send...` hint row;
+- stale composer rows persisted above the newly drawn composer;
+- stale model/status rows entered terminal scrollback;
+- duplicates accumulated after repeated width and height resize.
+
+Conclusion:
+
+- the current primary-screen DECSTBM inline renderer does not satisfy TUI-035;
+- I156 remains Active;
+- TUI-035 remains In Progress.
+
+- Screenshot evidence: maintainer-provided Alacritty resize capture, 2026-07-27.
+- Planned correction: ADR-054 Proposed; move history facts into an application-owned
+  transcript and render history plus fixed panes in one alternate-screen frame.
+
 - The real-terminal resize walkthrough (continuous wide→narrow drag, width 1/2/3 extreme, height-only shrink, widen) remains the mandatory human gate before I156 can move to Complete.
 - `resize_clear_action` is tested as a pure decision function; the full end-to-end "no history duplication during drag" is structurally guaranteed (bottom pane never calls `insert_history`) plus the resize-triggered full repaint, but final visual confirmation belongs to the human gate.
 
