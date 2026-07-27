@@ -175,14 +175,22 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
-- Current native-history correction automated evidence (2026-07-27,
+- Current Alternate Screen startup correction automated evidence (2026-07-27,
+  implementation commit `9c87d0f`): `TerminalSession` establishes Alternate
+  Screen before the first full-frame draw. The wide and compact Logo variants
+  render inside the empty history rectangle, never enter `TranscriptStore`,
+  and yield to projected conversation history after the first committed
+  block. App-owned logical navigation, bounded layout, modal cursor rules, and
+  exhaustive retryable restore are active again. Focused TUI validation:
+  438 passed, 0 failed.
+- Superseded native-history correction automated evidence (2026-07-27,
   implementation commit `31e7a0d`): the geometry-free transcript remains the
   logical authority, committed entries are projected exactly once through
   ordinary primary-screen newlines, and only the bounded transient frame is
   redrawn. Terminal startup neither enters nor clears Alternate Screen. Focused
   TUI validation: 436 passed; locked workspace validation: 2463 passed across
-  62 test binaries/doc-test groups. This makes the implementation ready for the
-  real-terminal matrix; it does not change I156's Active state.
+  62 test binaries/doc-test groups. These counts describe the rejected
+  primary-screen ADR-055 trial.
 - Superseded modal cursor visibility correction automated evidence (2026-07-27,
   implementation commit `ad67fc5`): credential and provider-wizard cursors use
   strict panel-local visibility. A field row that is absent from the final panel
@@ -204,17 +212,15 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **436 passed, 0 failed, 0 ignored**.
+  **438 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2463 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
-  The local-listener CLI tests were rerun outside the restricted sandbox after
-  the sandbox correctly denied socket binding; the unrestricted run passed.
+  **2469 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
 - Current static validation: locked workspace check and Clippy with
   `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
   informational `talos-config` build-script warning reporting the compressed
   `models.toml` size.
 
-### Superseded Alternate-Screen Automated Evidence
+### Full-Frame Foundation Evidence
 
 - Full-frame invariant correction automated evidence (2026-07-27, implementation
   commit `8b7a272`): transcript tool blocks are geometry-free; projection reflows them
@@ -245,23 +251,22 @@ If a stop condition occurs:
 
 ## Current Architecture And Implementation Commits
 
-- Native-history experience correction starting HEAD: `1de24fb`.
-- Primary-screen app-owned transcript implementation: `31e7a0d`.
-- Current runtime architecture: geometry-free `TranscriptStore` → width-aware
-  append-only projection → primary-screen terminal-native scrollback. The
-  bounded composer/status/panel frame is transient and is cleared on exit.
-  Runtime output uses ordinary newlines, not DECSTBM, reverse index, or terminal
-  insertion recovery.
-- ADR-054 is Rejected after its implemented Alternate Screen trial hid the
-  startup logo, pre-existing shell history, and native conversation
-  scrollback. ADR-055 Proposed records the single supported renderer.
-- Automated evidence: 436 focused TUI tests; native projection order,
-  exactly-once flush, primary-screen lifecycle, bounded frame, modal cursor,
-  geometry-free tool facts, and terminal recovery all pass.
+- Alternate Screen Logo correction starting HEAD: `c038852`.
+- Current implementation: `9c87d0f`.
+- Current runtime architecture: geometry-free `TranscriptStore` →
+  width-independent logical lines → width-dependent full-frame projection in
+  Alternate Screen. History, Logo, composer, status, and panels share the
+  application-owned frame; only conversation facts enter the transcript.
+- ADR-054 is Accepted with the startup-splash amendment. ADR-019 is
+  Superseded; ADR-055 is Rejected.
+- Automated evidence: 438 focused TUI tests; first-frame Logo, compact Logo,
+  transcript exclusion, logical scrolling, bounded layout, modal cursor,
+  geometry-free tool facts, and terminal recovery all pass. Locked workspace:
+  2469 passed.
 - Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
-  native-history/resize walkthrough. I156 remains Active.
+  Logo/resize/restore walkthrough. I156 remains Active.
 
-### Superseded Alternate-Screen Trial
+### Full-Frame Foundation Commits
 
 - Starting HEAD for the final coordinate correction: `a1885ac`.
 - Anchor-boundary implementation: `6c32d09`; interval-regression assertion:
@@ -269,17 +274,15 @@ If a stop condition occurs:
 - Component-layout, final page-height, cursor-coordinate, and entry-point test
   implementation: `18648a6`.
 - Modal cursor visibility implementation: `ad67fc5`.
-- Trial architecture: geometry-free `TranscriptStore` → width-independent
-  logical lines → width-dependent full-frame projection in Alternate Screen.
-  This trial is not the current runtime architecture; it was rejected by the
-  maintainer after the native-history UX regression.
+- These commits remain part of the current geometry-free full-frame
+  architecture. Commit `9c87d0f` corrects their startup Logo sequencing.
 
 ## Historical / Superseded Implementation Attempts
 
 The following DECSTBM, `insert_styled_history`, `resize_clear_action`, and
 pending-insertion recovery records are retained only as historical evidence.
-They are not part of the current runtime architecture. ADR-054's later
-app-owned full-frame trial is also superseded; ADR-055 is current authority.
+They are not part of the current runtime architecture. The amended ADR-054
+app-owned full-frame renderer is current authority.
 
 ### Legacy Implementation Record
 
@@ -306,10 +309,28 @@ app-owned full-frame trial is also superseded; ADR-055 is current authority.
 
 ## Variance And Residuals
 
+### Alternate-Screen Direction Reinstated With Logo Correction — 2026-07-27
+
+**Classification:** maintainer-directed product decision.
+
+The maintainer removed native history as a hard requirement and selected one
+Alternate Screen mode. The ADR-054 trial's missing Logo was a startup-order
+defect, not a reason to retain the ADR-055 renderer:
+
+- Primary Screen no longer prints a splash before TUI initialization.
+- `TerminalSession` enters and clears Alternate Screen transactionally.
+- The first full frame renders the wide or compact Logo in the history region.
+- Logo rows are display-only and never enter transcript/session/export facts.
+- The first committed conversation block replaces the startup Logo with the
+  normal history projection.
+
+Implementation commit: `9c87d0f`. Real-terminal Logo, resize, and restore
+acceptance remains pending.
+
 ### Native-History Experience Correction — 2026-07-27
 
-**Classification:** maintainer-directed acceptance change. Native terminal
-history is a hard interaction requirement, and Talos exposes one renderer mode.
+**Classification:** superseded maintainer-directed experiment. Native terminal
+history was temporarily treated as a hard interaction requirement.
 
 Observed in the ADR-054 implementation:
 
@@ -332,7 +353,7 @@ Residual:
 
 - terminal-side resize can reflow transient frame cells before Talos receives
   the event. This cannot be eliminated while preserving native scrollback.
-  The real-terminal matrix must document actual supported-terminal behavior.
+  The later Alternate Screen decision removes this runtime tradeoff.
 
 ### Architecture Correction — 2026-07-27
 
@@ -363,7 +384,8 @@ Conclusion:
 - Historical correction plan: ADR-054; move history facts into an
   application-owned transcript and render history plus fixed panes in one
   Alternate Screen frame. The later native-history acceptance correction
-  rejected this plan and replaced it with ADR-055.
+  temporarily replaced it with ADR-055; the final maintainer decision
+  reinstated amended ADR-054 with correct first-frame Logo rendering.
 
 - The real-terminal resize walkthrough (continuous wide→narrow drag, width 1/2/3 extreme, height-only shrink, widen) remains the mandatory human gate before I156 can move to Complete.
 - `resize_clear_action` is tested as a pure decision function; the full end-to-end "no history duplication during drag" is structurally guaranteed (bottom pane never calls `insert_history`) plus the resize-triggered full repaint, but final visual confirmation belongs to the human gate.

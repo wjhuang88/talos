@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted (2026-07-03)
+Superseded (2026-07-27 by amended ADR-054)
+
+> Historical primary-screen history boundary. TUI-035 established the concrete
+> reversal trigger: deterministic resize with fixed-pane isolation and
+> application-owned reflow. The amended ADR-054 full-frame renderer is current.
 
 ## Context
 

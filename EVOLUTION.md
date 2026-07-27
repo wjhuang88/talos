@@ -51,27 +51,30 @@ repeating known mistakes.
 | 39 | Governance / Testing | 状态文档和同源 mock 不能证明产品闭环；失败必须由真实边界触发，运行时可见性必须来自真实状态 | I135-I139 corrective review |
 | 40 | Terminal | 修饰键行为必须先启用终端键盘消歧协议，事件分支本身不能证明真实终端可达 | I142 |
 | 41 | TUI | 静态 scrollback 必须按物理行显式折行，不能依赖终端隐式换行维护滚动区域 | I142 |
-| 42 | TUI | Alternate Screen 的隔离收益不能替代产品要求的 native scrollback 体验 | I156/TUI-035 |
+| 42 | TUI | 切换 Primary/Alternate Screen 所有权时，Logo 必须在目标 screen 建立后由同一 renderer 绘制 | I156/TUI-035 |
 
 ## Lessons
 
-## 2026-07-27 - Renderer ownership must preserve the required terminal interaction surface
+## 2026-07-27 - Screen ownership changes require target-screen startup evidence
 
 - Trigger: I156 replaced the primary-screen renderer with an Alternate Screen full-frame renderer
   to prevent fixed-pane resize leakage.
 - Symptom: The isolation defect disappeared, but the startup logo, pre-existing shell history,
   terminal-native conversation scrollback, selection, and search disappeared during interaction.
-- Root cause: Automated acceptance proved renderer-internal ownership invariants but did not treat
-  the terminal's native history surface as a product requirement. The architecture optimized the
-  fixed-pane invariant across an ownership boundary the user did not permit changing.
-- Fix: Keep the geometry-free app-owned transcript, project newly committed entries exactly once
-  to primary-screen native scrollback with ordinary newlines, and redraw only the bounded transient
-  input frame. Reject ADR-054 and record the one-mode design in ADR-055.
-- Prevention: Before changing primary/alternate-screen ownership, validate logo persistence,
-  pre-existing shell history, terminal selection/search, and conversation scrollback as explicit
-  runtime UX gates; do not infer equivalence from buffer or lifecycle tests.
-- Promoted to rule/check: ADR-055, TUI-035 current architecture checklist, and I156 real-terminal
-  acceptance matrix.
+- Root cause: The splash was printed before `EnterAlternateScreen`, so the
+  correct Logo bytes existed only on the screen that the application
+  immediately hid. Renderer ownership tests did not cover the first visible
+  frame.
+- Fix: After a short primary-screen trial, the maintainer selected one
+  Alternate Screen mode. Talos now enters Alternate Screen first and draws a
+  single ratatui Logo model in the first full frame; it never enters
+  TranscriptStore and yields to conversation history.
+- Prevention: Any Primary/Alternate Screen ownership change must test the
+  first visible frame, Logo placement, screen restoration, and which state owns
+  startup content. Printing before a screen switch is not display evidence.
+- Promoted to rule/check: amended ADR-054,
+  `alternate_screen_first_frame_renders_logo_without_transcript_pollution`,
+  TUI-035 current checklist, and I156 real-terminal matrix.
 
 ## 2026-07-19 - Modified-key handlers require terminal-protocol activation
 

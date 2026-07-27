@@ -14,53 +14,46 @@
 
 ## Current Architecture Authority
 
-ADR-019 and ADR-055 define the current implementation. Talos uses one
-primary-screen interactive renderer: `TranscriptStore` owns geometry-free
-conversation facts, newly committed entries are projected exactly once into
-terminal-native scrollback with ordinary newlines, and only the transient
-composer/status/panel frame is redrawn. The logo and pre-existing shell history
-remain visible through native terminal history.
+The amended ADR-054 is the sole current implementation authority. Talos uses
+one Alternate Screen full-frame renderer: `TranscriptStore` owns geometry-free
+conversation facts, `HistoryProjection` owns current-width rows and logical
+scroll anchors, and history plus fixed components are rendered together.
 
-ADR-054 is Rejected. Alternate Screen is not a runtime mode. Runtime DECSTBM,
-reverse index, `insert_history`, `insert_styled_history`, and pending terminal
-insertion recovery remain removed.
+The startup sequence enters and clears Alternate Screen before drawing the
+Logo in the first application frame. The Logo is display-only, never enters
+`TranscriptStore`, and yields to conversation history after the first
+committed entry. ADR-019 is Superseded and ADR-055 is Rejected.
 
-Resize changes only the transient frame and future native projection width; it
-never mutates transcript facts. Fixed UI remains excluded from
-`TranscriptStore`, but terminal-side reflow can move already-rendered transient
-cells before Talos receives the resize event. The real-terminal matrix must
-therefore verify supported-terminal behavior and record residual visual
-artifacts without claiming an impossible protocol-independent isolation
-guarantee.
+Resize recomputes the full frame from one size snapshot and never mutates
+transcript facts. Runtime DECSTBM, reverse index, native-history insertion, and
+pending terminal insertion recovery remain removed.
 
 ## Current Technical / Governance Checklist
 
 - [x] geometry-free `TranscriptBlock` with current-frame ToolCall/ToolResult projection
-- [x] single primary-screen renderer with exactly-once native-history projection
-- [x] startup logo, shell history, selection, search, and copy remain terminal-native
+- [x] one Alternate Screen app-owned full-frame renderer
+- [x] Logo rendered after Alternate Screen entry in the first application frame
+- [x] full and compact Logo modes covered without Transcript pollution
 - [x] fixed UI excluded from the transcript
 - [x] bounded fill projection and geometry-free ToolCall/ToolResult storage
 - [x] component-level `AppLayout`, panel-local cursor coordinates, and clipped modal input hiding
-- [x] exhaustive, retryable terminal restore and transient-frame cleanup
-- [x] no Alternate Screen, DECSTBM, reverse index, or legacy insertion identifiers
+- [x] exhaustive, retryable Alternate Screen lifecycle restore
+- [x] no DECSTBM, reverse index, native-history projection, or legacy insertion identifiers
 - [ ] real-terminal acceptance matrix
-- [ ] ADR-055 acceptance
 - [ ] Completion Commit
 
-## Current Native-History Automated Evidence
+## Current Alternate-Screen Logo Automated Evidence
 
-- Implementation commit `31e7a0d`.
+- Implementation commit `9c87d0f`.
 - `TranscriptStore` remains geometry-free and authoritative.
-- Newly committed entries are projected to native history exactly once; a
-  repeated frame draw does not append duplicates.
-- The inline frame advances below committed output and clamps at the physical
-  screen bottom without persisted terminal geometry.
-- Terminal initialization enables raw input, cursor control, and bracketed
-  paste without entering or clearing Alternate Screen.
-- Source scans contain no Alternate Screen, DECSTBM, reverse-index, or legacy
-  insertion runtime identifiers.
-- Focused TUI validation: 436 passed, 0 failed.
-- Locked workspace validation: 2463 passed, 0 failed across 62 test
+- The first empty full frame contains the complete wide Logo at 80 columns and
+  the compact Logo at narrow widths.
+- The Logo is not a transcript fact and disappears when the first committed
+  conversation block becomes the history projection.
+- Alternate Screen entry failure aborts initialization; restore remains
+  exhaustive and retryable.
+- Focused TUI validation: 438 passed, 0 failed.
+- Locked workspace validation: 2469 passed, 0 failed across 62 test
   binaries/doc-test groups.
 - Real-terminal acceptance remains pending.
 
@@ -69,8 +62,8 @@ guarantee.
 The following plan describes the superseded primary-screen DECSTBM
 implementation attempt. It is retained only as historical evidence and is not
 current implementation authority. Its Fix 1/Fix 2/Fix 3, exclusions, source
-references, and tests do not describe the ADR-055 newline-based runtime.
-ADR-054's later Alternate Screen experiment is also superseded and rejected.
+references, and tests do not describe the amended ADR-054 full-frame runtime.
+ADR-055's later primary-screen experiment is also superseded and rejected.
 
 ### Original Problem
 

@@ -1,9 +1,13 @@
 # ADR-055: Primary-Screen App-Owned Transcript With Native History Projection
 
-- Status: Proposed
+- Status: Rejected (2026-07-27)
 - Date: 2026-07-27
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-019, ADR-054
+
+> Rejected after a short implementation trial. The maintainer chose one
+> Alternate Screen mode and accepted the amended ADR-054 startup design.
+> Commit `9c87d0f` removes this primary-screen runtime path.
 
 ## Context
 

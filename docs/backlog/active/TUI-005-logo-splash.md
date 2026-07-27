@@ -10,7 +10,15 @@
 | Blocks | None (TUI-001 completion was delivered via I014) |
 | Owner | `crates/talos-tui/src/` |
 
-## Outcome
+## Current Runtime Placement — 2026-07-27
+
+The branded wordmark remains the shipped Logo content, but its former
+primary-screen placement is superseded. The single Alternate Screen renderer
+enters the target screen first, then draws the wide or compact Logo in the
+first full application frame. Logo rows are display-only and never enter
+TranscriptStore/session/export facts. Implementation: `9c87d0f`.
+
+## Historical Original Outcome
 
 User sees a branded, product-quality splash on startup: a scrollback-only `TALOS`
 block wordmark in Nord Frost colors, a short tagline, capability badges, version text,

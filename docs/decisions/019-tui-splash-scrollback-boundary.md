@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted (2026-06-13)
+Superseded (2026-07-27 by ADR-054 amendment)
+
+> Historical decision for the former primary-screen renderer. The single
+> Alternate Screen renderer now draws the same splash content in its first
+> application frame after `EnterAlternateScreen`; it does not print a
+> primary-screen copy. See ADR-054.
 
 This ADR draws the outer boundary for the TUI startup splash: it decides where the splash
 renders and what it will **not** grow into. It is a follow-on to the inline-by-default

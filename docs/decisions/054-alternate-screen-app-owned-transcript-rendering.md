@@ -1,16 +1,16 @@
 # ADR-054: Alternate-Screen Application-Owned Transcript Rendering
 
-- Status: Rejected (2026-07-27)
+- Status: Accepted (2026-07-27; reinstated with startup-splash amendment)
 - Date: 2026-07-27
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-035
 
-> Rejected after implementation trial. The design met fixed-pane isolation
-> goals but removed the required native-history experience: the primary-screen
-> logo, shell history, terminal selection/search, and live conversation
-> scrollback were unavailable during interaction. ADR-055 supersedes this
-> proposal with a single primary-screen renderer that retains the app-owned
-> logical transcript and appends a derived projection to native scrollback.
+> Decision history: the initial implementation was temporarily rejected when
+> its startup sequence printed the logo on Primary Screen and then hid it by
+> entering Alternate Screen. A primary-screen ADR-055 trial restored native
+> history, but the maintainer subsequently selected one Alternate Screen mode.
+> This accepted amendment fixes the actual startup defect: enter Alternate
+> Screen first, then render the logo in the first full application frame.
 
 ## Context
 
@@ -35,6 +35,12 @@ history insertion, reverse index, or primary-screen reflow behavior.
 One terminal-size snapshot is read for each frame and is used for layout,
 history projection, drawing, and cursor placement. Resize invalidates a frame;
 it never mutates transcript facts.
+
+The startup logo is display-only application state. `TerminalSession` enters
+and clears Alternate Screen before the first draw; the full-frame renderer then
+draws the logo in the history rectangle while the logical transcript is empty.
+The logo never enters `TranscriptStore`, is never printed to Primary Screen,
+and yields to projected conversation history after the first committed entry.
 
 ## Rejected Alternatives
 
@@ -78,9 +84,12 @@ transcript into primary scrollback during interactive execution.
 - Fill tokens are projected scalar-by-scalar and never exceed the viewport.
 - `TerminalSession` records each terminal mode transition and rolls back only
   transitions that completed when initialization fails.
+- `viewport_splash_lines` is the single Logo representation. It is rendered
+  after Alternate Screen entry, uses a compact wordmark on narrow terminals,
+  and is excluded from transcript/session/export facts.
 - The old primary-screen insertion recovery helpers and their test-only writer
-  seam have been removed. This ADR remains Proposed pending real-terminal
-  acceptance.
+  seam have been removed. Real-terminal acceptance remains an I156/TUI-035
+  completion gate rather than an unresolved architecture decision.
 - Logical history anchors identify `(entry_id, logical_line, scalar_offset)`;
   rendered rows carry a stable range rather than a width-specific row number.
 - Final component rectangles are assigned by `AppLayout`, with composer/status
