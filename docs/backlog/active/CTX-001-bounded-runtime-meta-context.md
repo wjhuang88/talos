@@ -5,7 +5,7 @@
 | Story ID | CTX-001 |
 | Type | Product / context-management story |
 | Priority | P1 |
-| Status | Refinement — deferred behind I156 / TUI-035 real-terminal acceptance |
+| Status | Refinement — pending design and iteration selection |
 | Source | Maintainer request 2026-07-27 |
 | Parent Epic | None |
 | Depends On | MEM-005, MEM-007, ARCH-006, model context-limit metadata |
@@ -144,5 +144,6 @@ keep remaining capacity explicitly unavailable.
 - The exact estimator, output/reasoning reserve, update-bucket granularity,
   and named budget are refinement decisions; no implementation is authorized
   until they are recorded.
-- Selection requires a new iteration after I156/TUI-035 reaches its documented
-  completion gate.
+- Selection requires an explicitly sequenced future iteration. CTX-001 is not
+  selected into the current program's next iteration merely because I156/TUI-035
+  has completed.

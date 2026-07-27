@@ -5,7 +5,7 @@
 | Story ID | TUI-036 |
 | Type | Product / input-reliability story |
 | Priority | P1 |
-| Status | Refinement — deferred behind I156 / TUI-035 real-terminal acceptance |
+| Status | Refinement — pending design and iteration selection |
 | Source | Maintainer report 2026-07-27: Ctrl+C can stop interrupting turns permanently until Talos is restarted |
 | Parent Epic | None |
 | Depends On | TUI-009, TUI-035; existing conversation cancellation boundary |
@@ -52,8 +52,8 @@ leave the session permanently unable to interrupt subsequent turns.
   behavior.
 - ADR-054 keeps interactive rendering application-owned; shortcut changes must
   not reintroduce terminal-native history or resize behavior.
-- The current I156 program permits no new implementation scope until its
-  real-terminal acceptance matrix passes.
+- I156/TUI-035 completion removed its former scope gate. This story remains
+  unselected until a future iteration explicitly sequences it.
 
 ## Uncertainty And Validation Path
 
@@ -113,5 +113,5 @@ than broadening this story silently.
 ## Residuals
 
 - The report's original trigger remains to be discovered during refinement.
-- Selection requires a new iteration after I156/TUI-035 reaches its documented
-  completion gate.
+- Selection requires an explicitly sequenced future iteration; it is not
+  selected automatically by I156/TUI-035 completion.

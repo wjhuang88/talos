@@ -5,7 +5,7 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P2 |
-| Status | Refinement — deferred behind I156 / TUI-035 real-terminal acceptance |
+| Status | Refinement — pending design and iteration selection |
 | Source | Maintainer request 2026-07-27 |
 | Parent Epic | None |
 | Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054 |
@@ -122,5 +122,5 @@ the click target rather than exposing the token.
 
 - OSC 8 support and the safe authenticated-Dashboard navigation behavior must
   be resolved before this story becomes Ready.
-- Selection requires a new iteration after I156/TUI-035 reaches its documented
-  completion gate.
+- Selection requires an explicitly sequenced future iteration; it is not
+  selected automatically by I156/TUI-035 completion.

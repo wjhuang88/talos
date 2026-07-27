@@ -324,6 +324,9 @@ stability rather than TUI-035 resize rendering. It is therefore deferred as
 `CTX-001` and does not alter I156's published scope, validation, or human
 terminal gate.
 
+I156/TUI-035 subsequently completed on 2026-07-27. `CTX-001` remains
+unselected and requires its own explicitly sequenced future iteration.
+
 ### Logo-Prefix Wheel Coordinate Correction — 2026-07-27
 
 **Classification:** maintainer-reported real-terminal interaction defect.
