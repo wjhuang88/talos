@@ -40,6 +40,7 @@ pub enum SkillDiscoveryWarningKind {
     LinkLoop,
     PermissionDenied,
     ExternalTargetDenied,
+    RootLinkDenied,
     CanonicalizeFailed,
     DepthLimitReached,
     EntryBudgetReached,
@@ -129,6 +130,32 @@ impl SkillLoader {
                 continue;
             }
 
+            let follow = self.discovery_policy.follow_directory_links;
+            let external_policy = self.discovery_policy.external_target_policy.clone();
+            let max_depth = self.discovery_policy.max_depth;
+            let max_entries = self.discovery_policy.max_entries;
+
+            let root_is_symlink = std::fs::symlink_metadata(search_root)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+
+            if root_is_symlink {
+                let allowed = follow && external_policy == ExternalTargetPolicy::AllowAnyReadable;
+                if !allowed {
+                    self.discovery_warnings.push(SkillDiscoveryWarning {
+                        kind: SkillDiscoveryWarningKind::RootLinkDenied,
+                        path: search_root.clone(),
+                        message: if !follow {
+                            "search root itself is a symbolic link and link following is disabled"
+                                .to_string()
+                        } else {
+                            "search root itself is a symbolic link; DenyOutsideSearchRoot cannot prove the canonical target is inside the logical root".to_string()
+                        },
+                    });
+                    continue;
+                }
+            }
+
             let root_canonical = match search_root.canonicalize() {
                 Ok(c) => c,
                 Err(_) => search_root.clone(),
@@ -138,15 +165,49 @@ impl SkillLoader {
             }
 
             let source = self.classify_source(search_root);
-            let follow = self.discovery_policy.follow_directory_links;
-            let max_depth = self.discovery_policy.max_depth;
-            let max_entries = self.discovery_policy.max_entries;
+            let observation_depth = max_depth.saturating_add(1);
+            let mut depth_warning_emitted = false;
+            let mut dir_warnings: Vec<SkillDiscoveryWarning> = Vec::new();
 
             let walker = WalkDir::new(search_root)
                 .follow_links(follow)
-                .max_depth(max_depth)
+                .max_depth(observation_depth)
                 .sort_by_file_name()
-                .into_iter();
+                .into_iter()
+                .filter_entry(|entry| {
+                    if entry.depth() == 0 {
+                        return true;
+                    }
+                    if !entry.file_type().is_dir() {
+                        return true;
+                    }
+                    let path = entry.path();
+                    let canon = match path.canonicalize() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            dir_warnings.push(SkillDiscoveryWarning {
+                                kind: SkillDiscoveryWarningKind::CanonicalizeFailed,
+                                path: path.to_path_buf(),
+                                message: e.to_string(),
+                            });
+                            return false;
+                        }
+                    };
+                    if !is_target_allowed(&canon, &root_canonical, &external_policy) {
+                        dir_warnings.push(SkillDiscoveryWarning {
+                            kind: SkillDiscoveryWarningKind::ExternalTargetDenied,
+                            path: path.to_path_buf(),
+                            message: format!(
+                                "target {canon:?} is outside search root {root_canonical:?}"
+                            ),
+                        });
+                        return false;
+                    }
+                    if !seen_canonical_dirs.insert(canon) {
+                        return false;
+                    }
+                    true
+                });
 
             for result in walker {
                 entry_count += 1;
@@ -158,33 +219,14 @@ impl SkillLoader {
                             "entry budget {max_entries} reached; all remaining roots skipped"
                         ),
                     });
+                    self.discovery_warnings.append(&mut dir_warnings);
                     return Ok(&self.skills);
                 }
 
                 let entry = match result {
                     Ok(e) => e,
                     Err(e) => {
-                        let kind = if e.loop_ancestor().is_some() {
-                            SkillDiscoveryWarningKind::LinkLoop
-                        } else if e
-                            .io_error()
-                            .map(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
-                            .unwrap_or(false)
-                        {
-                            SkillDiscoveryWarningKind::PermissionDenied
-                        } else if e
-                            .path()
-                            .map(|p| {
-                                std::fs::symlink_metadata(p)
-                                    .map(|m| m.file_type().is_symlink() && !p.exists())
-                                    .unwrap_or(false)
-                            })
-                            .unwrap_or(false)
-                        {
-                            SkillDiscoveryWarningKind::BrokenLink
-                        } else {
-                            SkillDiscoveryWarningKind::Io
-                        };
+                        let kind = classify_walk_error(&e);
                         let path = e.path().map(|p| p.to_path_buf()).unwrap_or_default();
                         self.discovery_warnings.push(SkillDiscoveryWarning {
                             kind,
@@ -195,46 +237,38 @@ impl SkillLoader {
                     }
                 };
 
+                if entry.depth() > max_depth {
+                    if !depth_warning_emitted {
+                        self.discovery_warnings.push(SkillDiscoveryWarning {
+                            kind: SkillDiscoveryWarningKind::DepthLimitReached,
+                            path: entry.path().to_path_buf(),
+                            message: format!(
+                                "max_depth {max_depth} reached; deeper entries truncated"
+                            ),
+                        });
+                        depth_warning_emitted = true;
+                    }
+                    continue;
+                }
+
                 let entry_path = entry.path();
                 if entry_path.file_name() != Some(std::ffi::OsStr::new("SKILL.md")) {
                     continue;
                 }
 
-                if follow {
-                    if let Some(parent) = entry_path.parent() {
-                        match parent.canonicalize() {
-                            Ok(canon_dir) => {
-                                if !self.is_target_allowed(&canon_dir, &root_canonical) {
-                                    self.discovery_warnings.push(SkillDiscoveryWarning {
-                                        kind: SkillDiscoveryWarningKind::ExternalTargetDenied,
-                                        path: entry_path.to_path_buf(),
-                                        message: format!(
-                                            "target {canon_dir:?} is outside search root {root_canonical:?}"
-                                        ),
-                                    });
-                                    continue;
-                                }
-                                if !seen_canonical_dirs.insert(canon_dir) {
-                                    continue;
-                                }
-                            }
-                            Err(e) => {
-                                self.discovery_warnings.push(SkillDiscoveryWarning {
-                                    kind: SkillDiscoveryWarningKind::CanonicalizeFailed,
-                                    path: parent.to_path_buf(),
-                                    message: e.to_string(),
-                                });
-                                continue;
-                            }
-                        }
-                    }
+                if !follow && entry.file_type().is_symlink() {
+                    self.discovery_warnings.push(SkillDiscoveryWarning {
+                        kind: SkillDiscoveryWarningKind::RootLinkDenied,
+                        path: entry_path.to_path_buf(),
+                        message: "SKILL.md is a symbolic link and link following is disabled"
+                            .to_string(),
+                    });
+                    continue;
+                }
 
-                    match entry_path.canonicalize() {
-                        Ok(canon_file) => {
-                            if !seen_canonical_files.insert(canon_file) {
-                                continue;
-                            }
-                        }
+                if follow {
+                    let canon_file = match entry_path.canonicalize() {
+                        Ok(c) => c,
                         Err(e) => {
                             self.discovery_warnings.push(SkillDiscoveryWarning {
                                 kind: SkillDiscoveryWarningKind::CanonicalizeFailed,
@@ -243,6 +277,19 @@ impl SkillLoader {
                             });
                             continue;
                         }
+                    };
+                    if !is_target_allowed(&canon_file, &root_canonical, &external_policy) {
+                        self.discovery_warnings.push(SkillDiscoveryWarning {
+                            kind: SkillDiscoveryWarningKind::ExternalTargetDenied,
+                            path: entry_path.to_path_buf(),
+                            message: format!(
+                                "file target {canon_file:?} is outside search root {root_canonical:?}"
+                            ),
+                        });
+                        continue;
+                    }
+                    if !seen_canonical_files.insert(canon_file) {
+                        continue;
                     }
                 }
 
@@ -262,16 +309,11 @@ impl SkillLoader {
                     }
                 }
             }
+
+            self.discovery_warnings.append(&mut dir_warnings);
         }
 
         Ok(&self.skills)
-    }
-
-    fn is_target_allowed(&self, target: &Path, root: &Path) -> bool {
-        match self.discovery_policy.external_target_policy {
-            ExternalTargetPolicy::AllowAnyReadable => true,
-            ExternalTargetPolicy::DenyOutsideSearchRoot => target.starts_with(root),
-        }
     }
 
     fn classify_source(&self, path: &Path) -> SkillSource {
@@ -331,6 +373,37 @@ impl SkillLoader {
                 }
             })
             .collect()
+    }
+}
+
+fn is_target_allowed(target: &Path, root: &Path, policy: &ExternalTargetPolicy) -> bool {
+    match policy {
+        ExternalTargetPolicy::AllowAnyReadable => true,
+        ExternalTargetPolicy::DenyOutsideSearchRoot => target.starts_with(root),
+    }
+}
+
+fn classify_walk_error(error: &walkdir::Error) -> SkillDiscoveryWarningKind {
+    if error.loop_ancestor().is_some() {
+        SkillDiscoveryWarningKind::LinkLoop
+    } else if error
+        .io_error()
+        .map(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
+        .unwrap_or(false)
+    {
+        SkillDiscoveryWarningKind::PermissionDenied
+    } else if error
+        .path()
+        .map(|p| {
+            std::fs::symlink_metadata(p)
+                .map(|m| m.file_type().is_symlink() && !p.exists())
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    {
+        SkillDiscoveryWarningKind::BrokenLink
+    } else {
+        SkillDiscoveryWarningKind::Io
     }
 }
 
