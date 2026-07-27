@@ -174,6 +174,15 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
+- Architecture-correction automated evidence (2026-07-27): `a3074ad` replaces the interactive
+  primary-screen history path with an alternate-screen full-frame renderer, logical
+  `TranscriptStore`, width-dependent `HistoryProjection`, application-owned history scroll
+  state, and a single size snapshot per draw. The legacy terminal insertion/DECSTBM/reverse-index
+  APIs are absent from the runtime TUI source path. `cargo fmt --all -- --check`,
+  `cargo clippy --locked -p talos-tui -- -D warnings`, `cargo test --workspace --locked`,
+  `cargo check --workspace --locked`, and `git diff --check` passed. This is automated evidence
+  only; real-terminal acceptance remains mandatory.
+
 - Focused tests: passed — `cargo test --locked -p talos-tui` → 404 passed, 0 failed (added tool-call width matrix 40/80/120/160, CJK wrap, continuation alignment, styling preservation; wrap edge 0/1/2/3/4; `resize_clear_action` decision matrix incl. zero-height safety).
 - Full locked validation: passed — `cargo fmt --all -- --check` clean; `cargo check --workspace --locked` clean; `cargo clippy --workspace --locked -- -D warnings` clean; `cargo test --workspace --locked` → 2431 passed, 0 failed.
 - Runtime evidence: automated gates green; real Alacritty walkthrough PENDING (human gate, not yet performed).

@@ -100,6 +100,10 @@ ADR-054's alternate-screen, application-owned transcript and full-frame
 renderer. The Story remains In Progress; no completion claim is authorized until
 the real-terminal matrix passes.
 
+Automated implementation evidence: `a3074ad` provides the app-owned transcript, history
+projection, full-frame renderer, alternate-screen lifecycle, and app-owned scroll state. It does
+not close this Story: visual acceptance on real terminals is still required.
+
 ## Scope
 
 ### Fix 1 — width-aware tool-call summary line
