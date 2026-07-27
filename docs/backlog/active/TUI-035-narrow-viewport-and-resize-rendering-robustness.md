@@ -44,16 +44,17 @@ pending terminal insertion recovery remain removed.
 
 ## Current Alternate-Screen Logo Automated Evidence
 
-- Implementation commit `9c87d0f`.
+- Implementation commits `9c87d0f` and `635bc29`.
 - `TranscriptStore` remains geometry-free and authoritative.
 - The first empty full frame contains the complete wide Logo at 80 columns and
-  the compact Logo at narrow widths.
+  the compact Logo at narrow widths, with one display-only spacer row above the
+  wordmark.
 - The Logo is not a transcript fact and disappears when the first committed
   conversation block becomes the history projection.
 - Alternate Screen entry failure aborts initialization; restore remains
   exhaustive and retryable.
-- Focused TUI validation: 438 passed, 0 failed.
-- Locked workspace validation: 2469 passed, 0 failed across 62 test
+- Focused TUI validation: 439 passed, 0 failed.
+- Locked workspace validation: 2470 passed, 0 failed across 62 test
   binaries/doc-test groups.
 - Real-terminal acceptance remains pending.
 

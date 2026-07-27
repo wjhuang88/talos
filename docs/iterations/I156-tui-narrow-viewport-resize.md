@@ -176,13 +176,13 @@ If a stop condition occurs:
 ## Verification Evidence
 
 - Current Alternate Screen startup correction automated evidence (2026-07-27,
-  implementation commit `9c87d0f`): `TerminalSession` establishes Alternate
+  implementation commits `9c87d0f` and `635bc29`): `TerminalSession` establishes Alternate
   Screen before the first full-frame draw. The wide and compact Logo variants
-  render inside the empty history rectangle, never enter `TranscriptStore`,
-  and yield to projected conversation history after the first committed
-  block. App-owned logical navigation, bounded layout, modal cursor rules, and
-  exhaustive retryable restore are active again. Focused TUI validation:
-  438 passed, 0 failed.
+  render below one display-only spacer row inside the empty history rectangle,
+  never enter `TranscriptStore`, and yield to projected conversation history
+  after the first committed block. App-owned logical navigation, bounded
+  layout, modal cursor rules, and exhaustive retryable restore are active
+  again. Focused TUI validation: 439 passed, 0 failed.
 - Superseded native-history correction automated evidence (2026-07-27,
   implementation commit `31e7a0d`): the geometry-free transcript remains the
   logical authority, committed entries are projected exactly once through
@@ -212,9 +212,9 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **438 passed, 0 failed, 0 ignored**.
+  **439 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2469 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  **2470 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
 - Current static validation: locked workspace check and Clippy with
   `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
   informational `talos-config` build-script warning reporting the compressed
@@ -252,17 +252,17 @@ If a stop condition occurs:
 ## Current Architecture And Implementation Commits
 
 - Alternate Screen Logo correction starting HEAD: `c038852`.
-- Current implementation: `9c87d0f`.
+- Current implementation: `9c87d0f`, with Logo spacing correction `635bc29`.
 - Current runtime architecture: geometry-free `TranscriptStore` →
   width-independent logical lines → width-dependent full-frame projection in
   Alternate Screen. History, Logo, composer, status, and panels share the
   application-owned frame; only conversation facts enter the transcript.
 - ADR-054 is Accepted with the startup-splash amendment. ADR-019 is
   Superseded; ADR-055 is Rejected.
-- Automated evidence: 438 focused TUI tests; first-frame Logo, compact Logo,
+- Automated evidence: 439 focused TUI tests; first-frame Logo, compact Logo,
   transcript exclusion, logical scrolling, bounded layout, modal cursor,
   geometry-free tool facts, and terminal recovery all pass. Locked workspace:
-  2469 passed.
+  2470 passed.
 - Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
   Logo/resize/restore walkthrough. I156 remains Active.
 

@@ -85,8 +85,9 @@ transcript into primary scrollback during interactive execution.
 - `TerminalSession` records each terminal mode transition and rolls back only
   transitions that completed when initialization fails.
 - `viewport_splash_lines` is the single Logo representation. It is rendered
-  after Alternate Screen entry, uses a compact wordmark on narrow terminals,
-  and is excluded from transcript/session/export facts.
+  after Alternate Screen entry, reserves one display-only spacer row above the
+  wordmark, uses a compact wordmark on narrow terminals, and is excluded from
+  transcript/session/export facts.
 - The old primary-screen insertion recovery helpers and their test-only writer
   seam have been removed. Real-terminal acceptance remains an I156/TUI-035
   completion gate rather than an unresolved architecture decision.
