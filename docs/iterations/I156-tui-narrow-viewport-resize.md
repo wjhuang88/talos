@@ -255,18 +255,18 @@ If a stop condition occurs:
 - Alternate Screen Logo correction starting HEAD: `c038852`.
 - Current implementation: `9c87d0f`, Logo spacing correction `635bc29`, and
   virtual history-prefix correction `dddf32f`; screenshot interaction
-  correction `dd10a62`.
+  correction `dd10a62`; Logo-prefix wheel correction `d4d95ad`.
 - Current runtime architecture: geometry-free `TranscriptStore` →
   width-independent logical lines → width-dependent full-frame projection in
   Alternate Screen. History, Logo, composer, status, and panels share the
   application-owned frame; only conversation facts enter the transcript.
 - ADR-054 is Accepted with the startup-splash amendment. ADR-019 is
   Superseded; ADR-055 is Rejected.
-- Automated evidence: 446 focused TUI tests; first-frame Logo, compact Logo,
+- Automated evidence: 449 focused TUI tests; first-frame Logo, compact Logo,
   transcript exclusion, logical scrolling, bounded layout, modal cursor,
   full-width user history styling, prefix-only row suppression, mouse-wheel
-  history entry points, geometry-free tool facts, and terminal recovery all
-  pass. Locked workspace: 2477 passed.
+  navigation across the Logo/Transcript boundary, geometry-free tool facts,
+  and terminal recovery all pass. Locked workspace: 2480 passed.
 - Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
   Logo/resize/restore walkthrough. I156 remains Active.
 
@@ -312,6 +312,24 @@ app-owned full-frame renderer is current authority.
 - Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
 
 ## Variance And Residuals
+
+### Logo-Prefix Wheel Coordinate Correction — 2026-07-27
+
+**Classification:** maintainer-reported real-terminal interaction defect.
+
+The Logo was a display-only virtual prefix while mouse-wheel navigation
+addressed only `HistoryProjection` transcript rows. The first wheel event could
+therefore drop the remaining Logo rows wholesale, and no transcript anchor
+could navigate back to the Logo after it left the frame.
+
+Commit `d4d95ad` introduces one continuous frame-history start coordinate over
+the Logo prefix and projected transcript. Wheel movement advances that
+coordinate by three rows; positions inside the Transcript resolve to existing
+width-independent logical anchors, while positions inside the Logo retain a
+display-only prefix offset. The Logo remains excluded from
+TranscriptStore/session/export. Focused TUI: 449 passed; locked workspace:
+2480 passed across 62 test binaries/doc-test groups. Real-terminal mouse
+acceptance remains pending.
 
 ### Screenshot Interaction Correction — 2026-07-27
 

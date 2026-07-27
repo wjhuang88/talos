@@ -53,8 +53,23 @@ repeating known mistakes.
 | 41 | TUI | 静态 scrollback 必须按物理行显式折行，不能依赖终端隐式换行维护滚动区域 | I142 |
 | 42 | TUI | 切换 Primary/Alternate Screen 所有权时，Logo 必须在目标 screen 建立后由同一 renderer 绘制 | I156/TUI-035 |
 | 43 | TUI | Alternate Screen 必须显式捕获滚轮；背景样式和语义空行必须由最终 projection 测试，而不能只检查逻辑字段 | I156/TUI-035 |
+| 44 | TUI | display-only 历史前缀必须与逻辑 Transcript 共享连续导航坐标，否则滚轮边界会跳变且无法返回前缀 | I156/TUI-035 |
 
 ## Lessons
+
+## 2026-07-27 - Display-only history prefixes need a shared navigation coordinate
+
+- Trigger: maintainer wheel-tested the Alternate Screen Logo after mouse capture was enabled.
+- Symptom: wheel behavior jumped while Logo rows were visible; after the Logo left the frame,
+  transcript scrolling worked but could never reach the Logo again.
+- Root cause: rendering composed a virtual Logo prefix with Transcript rows, but navigation
+  addressed only logical Transcript anchors. The two visible row domains had no shared coordinate.
+- Fix: keep one frame-history start coordinate across Logo and Transcript rows; resolve only the
+  Transcript portion to logical anchors, leaving Logo rows display-only.
+- Prevention: any display-only row prefix composed into a scrollable history viewport must have
+  bidirectional boundary tests for partial visibility, exit, and re-entry.
+- Promoted to rule/check: ADR-054 implementation note,
+  `mouse_scroll_moves_continuously_across_logo_transcript_boundary`, and TUI-035 current evidence.
 
 ## 2026-07-27 - Alternate-screen interaction needs terminal-boundary tests
 

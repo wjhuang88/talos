@@ -90,6 +90,10 @@ transcript into primary scrollback during interactive execution.
   wordmark, uses a compact wordmark on narrow terminals, and participates only
   as a virtual frame-history prefix excluded from transcript/session/export
   facts.
+- Mouse-wheel navigation addresses the Logo prefix and projected Transcript as
+  one continuous frame-history surface. Prefix positions remain display-only;
+  positions inside the Transcript resolve to logical content anchors, so the
+  Logo can scroll out and back into view without becoming a transcript fact.
 - The old primary-screen insertion recovery helpers and their test-only writer
   seam have been removed. Real-terminal acceptance remains an I156/TUI-035
   completion gate rather than an unresolved architecture decision.
