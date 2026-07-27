@@ -65,6 +65,10 @@ impl HistoryProjection {
         self.all_rows.first().map(|row| row.start_anchor)
     }
 
+    pub(crate) fn anchor_at(&self, index: usize) -> Option<LogicalContentAnchor> {
+        self.all_rows.get(index).map(|row| row.start_anchor)
+    }
+
     pub(crate) fn page_up(&self, height: u16) -> Option<LogicalContentAnchor> {
         let page = usize::from(height.saturating_sub(1).max(1));
         self.all_rows
@@ -83,24 +87,6 @@ impl HistoryProjection {
     pub(crate) fn page_down_reaches_tail(&self, height: u16) -> bool {
         let page = usize::from(height.saturating_sub(1).max(1));
         self.visible_start.saturating_add(page)
-            >= self.total_rows.saturating_sub(usize::from(height))
-    }
-
-    pub(crate) fn scroll_up(&self, rows: usize) -> Option<LogicalContentAnchor> {
-        self.all_rows
-            .get(self.visible_start.saturating_sub(rows))
-            .map(|row| row.start_anchor)
-    }
-
-    pub(crate) fn scroll_down(&self, rows: usize, height: u16) -> Option<LogicalContentAnchor> {
-        let max_start = self.total_rows.saturating_sub(usize::from(height));
-        self.all_rows
-            .get(self.visible_start.saturating_add(rows).min(max_start))
-            .map(|row| row.start_anchor)
-    }
-
-    pub(crate) fn scroll_down_reaches_tail(&self, rows: usize, height: u16) -> bool {
-        self.visible_start.saturating_add(rows)
             >= self.total_rows.saturating_sub(usize::from(height))
     }
 }

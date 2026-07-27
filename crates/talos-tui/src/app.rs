@@ -64,22 +64,11 @@ fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'st
 fn frame_history_lines(
     history: &HistoryProjection,
     splash: Vec<Line<'static>>,
-    height: u16,
-    follow_tail: bool,
+    frame_start: usize,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    if follow_tail {
-        let splash_start = if history.total_rows == 0 {
-            0
-        } else {
-            splash
-                .len()
-                .saturating_add(history.total_rows)
-                .saturating_sub(usize::from(height))
-        };
-        if splash_start < splash.len() {
-            lines.extend(splash.into_iter().skip(splash_start));
-        }
+    if frame_start < splash.len() {
+        lines.extend(splash.into_iter().skip(frame_start));
     }
     lines.extend(history.rows.iter().map(history_line));
     lines
@@ -128,6 +117,9 @@ pub struct Tui {
     history_scroll: HistoryScrollState,
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
+    history_prefix_start: Option<usize>,
+    last_frame_history_start: usize,
+    last_splash_row_count: usize,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -159,6 +151,9 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            history_prefix_start: None,
+            last_frame_history_start: 0,
+            last_splash_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -191,6 +186,9 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            history_prefix_start: None,
+            last_frame_history_start: 0,
+            last_splash_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -1006,14 +1004,30 @@ impl Tui {
         );
         self.last_history_projection = history.clone();
         let splash = crate::splash::viewport_splash_lines(screen_size.width);
+        let splash_rows = splash.len();
+        if let Some(prefix_start) = self.history_prefix_start.as_mut() {
+            *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
+        }
         let follow_tail = matches!(
             self.history_scroll.mode,
             crate::history_projection::HistoryScrollMode::FollowTail
         );
+        let natural_start = if history.total_rows == 0 {
+            0
+        } else if follow_tail {
+            splash_rows
+                .saturating_add(history.total_rows)
+                .saturating_sub(usize::from(history_height))
+        } else {
+            splash_rows.saturating_add(history.visible_start)
+        };
+        let frame_history_start = self.history_prefix_start.unwrap_or(natural_start);
+        self.last_frame_history_start = frame_history_start;
+        self.last_splash_row_count = splash_rows;
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
-                let history_text = frame_history_lines(&history, splash, area.height, follow_tail);
+                let history_text = frame_history_lines(&history, splash, frame_history_start);
                 frame.render_widget(Paragraph::new(history_text), area);
             }
             if let Some(area) = app_layout.preview {
@@ -1094,6 +1108,46 @@ impl Tui {
         Ok(())
     }
 
+    fn anchor_frame_history_start(&mut self, frame_start: usize) {
+        if frame_start < self.last_splash_row_count {
+            self.history_prefix_start = Some(frame_start);
+            if let Some(anchor) = self.last_history_projection.first_anchor() {
+                self.history_scroll.anchor(anchor, 0);
+            } else {
+                self.history_scroll.jump_to_end();
+            }
+            return;
+        }
+
+        self.history_prefix_start = None;
+        let transcript_index = frame_start.saturating_sub(self.last_splash_row_count);
+        if let Some(anchor) = self.last_history_projection.anchor_at(transcript_index) {
+            self.history_scroll.anchor(anchor, 0);
+        }
+    }
+
+    fn scroll_frame_history_up(&mut self, rows: usize) {
+        self.anchor_frame_history_start(self.last_frame_history_start.saturating_sub(rows));
+    }
+
+    fn scroll_frame_history_down(&mut self, rows: usize, height: u16) {
+        let total_rows = self
+            .last_splash_row_count
+            .saturating_add(self.last_history_projection.total_rows);
+        let max_start = total_rows.saturating_sub(usize::from(height));
+        let target = self
+            .last_frame_history_start
+            .saturating_add(rows)
+            .min(max_start);
+
+        if target >= max_start {
+            self.history_prefix_start = None;
+            self.history_scroll.jump_to_end();
+        } else {
+            self.anchor_frame_history_start(target);
+        }
+    }
+
     fn handle_input_event(&mut self, event: &Event) -> bool {
         match event {
             Event::Key(key) => {
@@ -1102,6 +1156,7 @@ impl Tui {
                 }
                 match key.code {
                     KeyCode::PageUp => {
+                        self.history_prefix_start = None;
                         let height = self.last_history_viewport_height;
                         if height == 0 {
                             return false;
@@ -1112,6 +1167,7 @@ impl Tui {
                         return false;
                     }
                     KeyCode::PageDown => {
+                        self.history_prefix_start = None;
                         let height = self.last_history_viewport_height;
                         if height == 0 {
                             return false;
@@ -1125,12 +1181,14 @@ impl Tui {
                         return false;
                     }
                     KeyCode::Home if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.history_prefix_start = None;
                         if let Some(anchor) = self.last_history_projection.first_anchor() {
                             self.history_scroll.anchor(anchor, 0);
                         }
                         return false;
                     }
                     KeyCode::End if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.history_prefix_start = None;
                         self.history_scroll.jump_to_end();
                         return false;
                     }
@@ -1334,25 +1392,10 @@ impl Tui {
                 }
                 match mouse.kind {
                     MouseEventKind::ScrollUp => {
-                        if let Some(anchor) = self
-                            .last_history_projection
-                            .scroll_up(MOUSE_HISTORY_SCROLL_ROWS)
-                        {
-                            self.history_scroll.anchor(anchor, 0);
-                        }
+                        self.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
                     }
                     MouseEventKind::ScrollDown => {
-                        if self
-                            .last_history_projection
-                            .scroll_down_reaches_tail(MOUSE_HISTORY_SCROLL_ROWS, height)
-                        {
-                            self.history_scroll.jump_to_end();
-                        } else if let Some(anchor) = self
-                            .last_history_projection
-                            .scroll_down(MOUSE_HISTORY_SCROLL_ROWS, height)
-                        {
-                            self.history_scroll.anchor(anchor, 0);
-                        }
+                        self.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, height);
                     }
                     _ => {}
                 }

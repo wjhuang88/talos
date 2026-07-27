@@ -5,7 +5,10 @@ use talos_conversation::{
 use talos_core::message::Message;
 use tokio::sync::mpsc;
 
-use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
+use crate::app::{
+    MOUSE_HISTORY_SCROLL_ROWS, SPINNER_FRAMES, ScrollbackLine, StreamRenderState,
+    build_todo_panel_lines,
+};
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
 use crate::scrollback;
@@ -1468,6 +1471,7 @@ fn entry_point_mouse_wheel_scrolls_history_without_browsing_composer_history() {
     tui.state.input_history = vec!["previous input".to_string()];
     tui.state.input_append_str("live draft");
     assert_eq!(tui.last_history_projection.visible_start, 20);
+    tui.last_frame_history_start = 20;
 
     tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
 
@@ -1477,6 +1481,7 @@ fn entry_point_mouse_wheel_scrolls_history_without_browsing_composer_history() {
     assert_eq!(scrolled.visible_start, 17);
 
     tui.last_history_projection = scrolled;
+    tui.last_frame_history_start = 17;
     tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollDown));
     assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
     assert_eq!(tui.state.input_buffer, "live draft");
@@ -1652,6 +1657,112 @@ fn startup_logo_scrolls_out_after_history_fills_the_viewport() {
 
     assert!(!rendered.contains("The watchman never sleeps"));
     assert!(rendered.contains("history row 29"));
+}
+
+#[test]
+fn mouse_scroll_preserves_visible_logo_prefix_until_its_rows_scroll_out() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "first message".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("initial frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("The watchman never sleeps")
+    );
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("scrolled frame");
+
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("The watchman never sleeps"),
+        "scrolling while the Logo prefix is visible must not drop it wholesale"
+    );
+}
+
+#[test]
+fn mouse_scroll_can_reach_logo_after_it_has_scrolled_out() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    for index in 0..30 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("history row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("tail frame");
+    assert!(
+        !tui.terminal
+            .test_rendered_text()
+            .contains("The watchman never sleeps")
+    );
+
+    for _ in 0..30 {
+        tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+        tui.draw_frame().expect("history scroll frame");
+    }
+
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("The watchman never sleeps"),
+        "the display-only Logo prefix must remain reachable from transcript history: \
+         frame_start={}, prefix_start={:?}, splash_rows={}, history_height={}",
+        tui.last_frame_history_start,
+        tui.history_prefix_start,
+        tui.last_splash_row_count,
+        tui.last_history_viewport_height
+    );
+}
+
+#[test]
+fn mouse_scroll_moves_continuously_across_logo_transcript_boundary() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    for index in 0..20 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("history row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("tail frame");
+
+    for _ in 0..30 {
+        tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+        tui.draw_frame().expect("history scroll frame");
+        if tui.history_prefix_start.is_some() {
+            break;
+        }
+    }
+    let prefix_start = tui
+        .history_prefix_start
+        .expect("wheel-up should enter the Logo prefix");
+    let expected = prefix_start.saturating_add(MOUSE_HISTORY_SCROLL_ROWS);
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollDown));
+    tui.draw_frame().expect("boundary scroll frame");
+
+    assert_eq!(
+        tui.last_frame_history_start, expected,
+        "wheel-down must advance continuously instead of jumping to transcript tail"
+    );
 }
 
 #[test]
