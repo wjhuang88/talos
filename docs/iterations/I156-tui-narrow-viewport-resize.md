@@ -161,7 +161,8 @@ If a stop condition occurs:
   - TUI-034: Complete — maintainer Alacritty walkthrough 2026-07-24; Completion Commit `616ff11` (P4 `dd6e090`)
   - TUI-025: Complete (2026-07-04)
   - ADR-035: Accepted (2026-07-03)
-- Source baseline (all present, no architectural rewrite):
+- Historical activation source baseline (superseded; these symbols are not
+  present in the current runtime architecture):
   - `crates/talos-tui/src/tool_display.rs`: `build_tool_call_scrollback_line` (L454), `build_tool_result_scrollback_lines` (L233)
   - `crates/talos-tui/src/app.rs`: tool-call site (L621), tool-result site (L632), `wrap_scrollback_line` flush (L792), `Event::Resize(_, _) => {}` no-op (L1253)
   - `crates/talos-tui/src/app_stream.rs`: `wrap_scrollback_line` (L76)
@@ -173,6 +174,27 @@ If a stop condition occurs:
 - Decision: `GO`
 
 ## Verification Evidence
+
+- Final coordinate and anchor correction automated evidence (2026-07-27,
+  implementation commits `6c32d09` and `18648a6`): normal projected rows use
+  half-open logical intervals, logical-line EOF is accepted only by the last
+  row, and empty/fill-only lines have deterministic zero-length anchors.
+  Logical offsets are recorded while consuming original scalars, so width-one
+  CJK markers and projected fill cannot move anchors. Page navigation uses the
+  final history rectangle height. `AppLayout` now allocates component heights
+  by priority and then assigns coordinates in explicit AboveInput/BelowInput
+  visual order. Credential/provider cursors are panel-local and converted only
+  through the final panel rectangle.
+- Current focused validation: `cargo test --locked -p talos-tui --lib` →
+  **430 passed, 0 failed, 0 ignored**.
+- Current workspace validation: `cargo test --workspace --locked` →
+  **2457 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  The local-listener CLI tests were rerun outside the restricted sandbox after
+  the sandbox correctly denied socket binding; the unrestricted run passed.
+- Current static validation: locked workspace check and Clippy with
+  `-D warnings` passed with zero Rust/Clippy diagnostics. Cargo emitted one
+  informational `talos-config` build-script warning reporting the compressed
+  `models.toml` size.
 
 - Full-frame invariant correction automated evidence (2026-07-27, implementation
   commit `8b7a272`): transcript tool blocks are geometry-free; projection reflows them
@@ -194,12 +216,34 @@ If a stop condition occurs:
   `cargo check --workspace --locked`, and `git diff --check` passed. This is automated evidence
   only; real-terminal acceptance remains mandatory.
 
-- Focused tests: passed — `cargo test --locked -p talos-tui` → 404 passed, 0 failed (added tool-call width matrix 40/80/120/160, CJK wrap, continuation alignment, styling preservation; wrap edge 0/1/2/3/4; `resize_clear_action` decision matrix incl. zero-height safety).
-- Full locked validation: passed — `cargo fmt --all -- --check` clean; `cargo check --workspace --locked` clean; `cargo clippy --workspace --locked -- -D warnings` clean; `cargo test --workspace --locked` → 2431 passed, 0 failed.
+- Historical focused evidence (superseded as the latest count):
+  `cargo test --locked -p talos-tui` → 404 passed, 0 failed.
+- Historical workspace evidence (superseded as the latest count):
+  `cargo test --workspace --locked` → 2431 passed, 0 failed.
 - Runtime evidence: automated gates green; real Alacritty walkthrough PENDING (human gate, not yet performed).
 - Governance validation: passed — `scripts/validate_project_governance.sh .` 0 warnings; `git diff --check` clean.
 
-## Implementation Record
+## Current Architecture And Implementation Commits
+
+- Starting HEAD for the final coordinate correction: `a1885ac`.
+- Anchor-boundary implementation: `6c32d09`; interval-regression assertion:
+  `1688e6f`.
+- Component-layout, final page-height, cursor-coordinate, and entry-point test
+  implementation: `18648a6`.
+- Current runtime architecture: geometry-free `TranscriptStore` →
+  width-independent logical lines → width-dependent full-frame projection in
+  alternate screen. The terminal is an output surface, not a history owner.
+- Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
+  real-terminal acceptance. I156 remains Active.
+
+## Historical / Superseded Implementation Attempts
+
+The following DECSTBM, `insert_styled_history`, `resize_clear_action`, and
+pending-insertion recovery records are retained only as historical evidence.
+They are not part of the current runtime architecture and are superseded by
+ADR-054 app-owned full-frame rendering.
+
+### Legacy Implementation Record
 
 - Implementation baseline: `2f9de9f` (ancestor `065d801` activation baseline).
 - Implementation Commit: `2f9de9f` — `fix(tui): harden narrow viewport and resize rendering (#TUI-035)`.

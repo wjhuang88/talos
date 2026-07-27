@@ -80,3 +80,11 @@ transcript into primary scrollback during interactive execution.
   reserved before optional preview, queue, tips, and panels.
 - Terminal restoration attempts every enabled cleanup action, retains failed
   state for retry, and propagates failure before any primary-screen summary.
+- Rendered anchor ranges use half-open logical intervals. Only the last
+  projected row accepts logical-line EOF; semantic empty and fill-only lines
+  use an explicit zero-length logical range.
+- Logical offsets come from original transcript scalars, never from
+  projection-only markers, fill characters, or rendered text length.
+- `AppLayout` separates resource allocation priority from visual placement,
+  owns above-input/below-input panel placement, and assigns every input cursor
+  from its final component rectangle.

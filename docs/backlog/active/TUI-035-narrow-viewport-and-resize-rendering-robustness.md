@@ -286,6 +286,29 @@ Technical / governance:
 
 TUI-035 remains **In Progress** until the real-terminal matrix is complete.
 
+## Final Anchor And Coordinate Automated Evidence — 2026-07-27
+
+- Wrapped-row anchors use half-open logical intervals; logical-line EOF,
+  semantic empty lines, and fill-only lines have explicit matching rules.
+- Logical offsets are derived from original scalar consumption, including
+  width-one CJK projection-only markers.
+- Tool-call argument and multiline tool-result anchors remain on the same
+  logical content through the resize matrix.
+- PageUp/PageDown consume the final history rectangle height, and real key
+  entry-point tests cover PageUp, PageDown, Ctrl+Home, Ctrl+End, tail, and
+  empty-history behavior.
+- Component height priority is separate from AboveInput/BelowInput visual
+  ordering. Composer padding, modal panels, and status have exact relational
+  layout tests at extreme terminal heights.
+- Credential/provider cursor positions are panel-local and converted through
+  the final panel rectangle; missing or zero-sized panels hide the cursor.
+- Full-frame rendering at `0x0`, `1x1`, `1x2`, `2x1`, `2x2`, `3x3`, `5x2`,
+  and `20x3` is safe. Fixed preview, tip, queue, composer, and modal state does
+  not enter the transcript.
+- Implementation/test commits: `6c32d09`, `18648a6`, `1688e6f`. Focused TUI validation:
+  430 passed. Locked workspace validation: 2457 passed. Real-terminal
+  acceptance remains pending.
+
 - Unit tests for tool-call wrap at 40/80/120/160 and extreme widths 1/2/3.
 - CJK tool-call wrap boundary test.
 - Resize/shrink test: assert bottom hint bar text is not present in committed
