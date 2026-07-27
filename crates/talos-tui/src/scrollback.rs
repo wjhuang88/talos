@@ -42,6 +42,12 @@ pub(crate) struct LocalCursorPosition {
     pub(crate) row: u16,
 }
 
+// BottomPanelComponent renders modal title, instruction, and primary field in
+// this fixed order. Keep cursor targets on these semantic rows rather than
+// deriving them from surrounding layout components.
+const PANEL_PRIMARY_INPUT_ROW: u16 = 2;
+const PANEL_SECONDARY_INPUT_ROW: u16 = 3;
+
 pub(crate) fn credential_cursor_position(
     menu: &crate::state::BottomPanelState,
 ) -> Option<LocalCursorPosition> {
@@ -49,8 +55,10 @@ pub(crate) fn credential_cursor_position(
         return None;
     }
     let (row, buffer) = match menu.credential_field {
-        crate::state::CredentialField::ApiKey => (2, &menu.credential_buffer),
-        crate::state::CredentialField::BaseUrl => (3, &menu.base_url_buffer),
+        crate::state::CredentialField::ApiKey => (PANEL_PRIMARY_INPUT_ROW, &menu.credential_buffer),
+        crate::state::CredentialField::BaseUrl => {
+            (PANEL_SECONDARY_INPUT_ROW, &menu.base_url_buffer)
+        }
     };
     Some(LocalCursorPosition {
         col: credential_cursor_col(buffer),
@@ -60,9 +68,9 @@ pub(crate) fn credential_cursor_position(
 
 /// Returns the cursor position within a custom-provider wizard panel.
 ///
-/// Entry steps place the cursor after the editable value; protocol places it
-/// on the selected option; confirmation has no editable field and anchors it
-/// at the panel header rather than leaving it in the composer.
+/// Entry steps place the cursor after the editable value and protocol places it
+/// on the selected option. Confirmation has no editable field, so it exposes
+/// no terminal text cursor.
 pub(crate) fn provider_wizard_cursor_position(
     menu: &crate::state::BottomPanelState,
 ) -> Option<(u16, u16)> {
@@ -79,18 +87,22 @@ pub(crate) fn provider_wizard_cursor_position(
     };
 
     let (row, col) = match step {
-        crate::state::WizardStep::Name => (2, credential_cursor_col(name)),
+        crate::state::WizardStep::Name => (PANEL_PRIMARY_INPUT_ROW, credential_cursor_col(name)),
         crate::state::WizardStep::Protocol => {
             let row = if protocol == "anthropic-messages" {
-                3
+                PANEL_SECONDARY_INPUT_ROW
             } else {
-                2
+                PANEL_PRIMARY_INPUT_ROW
             };
             (row, 1)
         }
-        crate::state::WizardStep::BaseUrl => (2, credential_cursor_col(base_url)),
-        crate::state::WizardStep::ApiKey => (2, credential_cursor_col(api_key)),
-        crate::state::WizardStep::Confirm => (0, 0),
+        crate::state::WizardStep::BaseUrl => {
+            (PANEL_PRIMARY_INPUT_ROW, credential_cursor_col(base_url))
+        }
+        crate::state::WizardStep::ApiKey => {
+            (PANEL_PRIMARY_INPUT_ROW, credential_cursor_col(api_key))
+        }
+        crate::state::WizardStep::Confirm => return None,
     };
     Some((row, col))
 }
@@ -1685,5 +1697,71 @@ mod r10_tests {
             !content.contains("/Users/") && !content.contains("/tmp/"),
             "no raw path: {content}"
         );
+    }
+}
+
+#[cfg(test)]
+mod modal_cursor_tests {
+    use super::*;
+    use ratatui::{buffer::Buffer, layout::Rect};
+
+    fn rendered_row(buffer: &Buffer, width: u16, row: u16) -> String {
+        buffer
+            .content()
+            .iter()
+            .skip(usize::from(row) * usize::from(width))
+            .take(usize::from(width))
+            .flat_map(|cell| cell.symbol().chars())
+            .collect()
+    }
+
+    #[test]
+    fn credential_base_url_cursor_targets_the_rendered_secondary_field_row() {
+        let mut menu = crate::panel_state::BottomPanelState::open_credential_input(
+            "provider", None, true, None,
+        );
+        menu.credential_field = crate::state::CredentialField::BaseUrl;
+        let component = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let area = Rect::new(0, 0, 40, 4);
+        let mut buffer = Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buffer);
+        component.render(&mut frame, area);
+
+        assert_eq!(
+            credential_cursor_position(&menu).map(|target| target.row),
+            Some(3)
+        );
+        assert!(rendered_row(&buffer, 40, 3).contains("required"));
+    }
+
+    #[test]
+    fn provider_protocol_cursor_targets_the_rendered_selected_option_row() {
+        let mut menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        let Some(crate::state::PanelKind::ProviderWizard { step, protocol, .. }) =
+            menu.kind.as_mut()
+        else {
+            panic!("provider wizard panel expected");
+        };
+        *step = crate::state::WizardStep::Protocol;
+        *protocol = "anthropic-messages".to_string();
+        let component = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let area = Rect::new(0, 0, 40, 4);
+        let mut buffer = Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buffer);
+        component.render(&mut frame, area);
+
+        assert_eq!(
+            provider_wizard_local_cursor_position(&menu).map(|target| target.row),
+            Some(3)
+        );
+        assert!(rendered_row(&buffer, 40, 3).contains("anthropic-messages"));
     }
 }

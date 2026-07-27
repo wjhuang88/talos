@@ -1034,7 +1034,7 @@ impl Tui {
                     return Ok(());
                 };
                 self.terminal
-                    .set_cursor_in_rect(panel, local.col, local.row)?;
+                    .set_cursor_if_visible_in_rect(panel, local.col, local.row)?;
             } else if self.state.slash_menu.is_provider_wizard() {
                 let (Some(panel), Some(local)) = (
                     app_layout.panel,
@@ -1046,7 +1046,7 @@ impl Tui {
                     return Ok(());
                 };
                 self.terminal
-                    .set_cursor_in_rect(panel, local.col, local.row)?;
+                    .set_cursor_if_visible_in_rect(panel, local.col, local.row)?;
             } else {
                 let Some(composer_rect) = app_layout.composer else {
                     self.terminal.hide_cursor()?;

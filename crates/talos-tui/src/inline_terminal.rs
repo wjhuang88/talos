@@ -132,6 +132,10 @@ pub struct TerminalSession {
     lifecycle: TerminalLifecycleState,
     #[cfg(test)]
     test_mode: bool,
+    #[cfg(test)]
+    cursor_visible: bool,
+    #[cfg(test)]
+    test_cursor_position: Option<Position>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -194,6 +198,10 @@ impl TerminalSession {
             lifecycle,
             #[cfg(test)]
             test_mode: false,
+            #[cfg(test)]
+            cursor_visible: false,
+            #[cfg(test)]
+            test_cursor_position: None,
         })
     }
 
@@ -213,12 +221,24 @@ impl TerminalSession {
             last_known_cursor_pos: Position::new(0, 0),
             lifecycle: TerminalLifecycleState::default(),
             test_mode: true,
+            cursor_visible: false,
+            test_cursor_position: None,
         }
     }
 
     #[cfg(test)]
     pub(crate) fn set_test_size(&mut self, size: Size) {
         self.screen_size = size;
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn test_cursor_visible(&self) -> bool {
+        self.cursor_visible
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn test_cursor_position(&self) -> Option<Position> {
+        self.test_cursor_position
     }
 
     #[allow(dead_code)]
@@ -318,6 +338,8 @@ impl TerminalSession {
         self.last_known_cursor_pos = position;
         #[cfg(test)]
         if self.test_mode {
+            self.cursor_visible = true;
+            self.test_cursor_position = Some(position);
             return Ok(());
         }
         let writer = self.backend_mut();
@@ -330,6 +352,8 @@ impl TerminalSession {
     pub fn hide_cursor(&mut self) -> io::Result<()> {
         #[cfg(test)]
         if self.test_mode {
+            self.cursor_visible = false;
+            self.test_cursor_position = None;
             return Ok(());
         }
         let writer = self.backend_mut();
@@ -351,6 +375,25 @@ impl TerminalSession {
         self.set_cursor(position.x, position.y)
     }
 
+    /// Sets a modal cursor only when its semantic row exists in the rendered
+    /// component rectangle. Unlike the composer helper, this never clamps a
+    /// vertical coordinate onto a different panel row.
+    pub fn set_cursor_if_visible_in_rect(
+        &mut self,
+        rect: Rect,
+        local_col: u16,
+        local_row: u16,
+    ) -> io::Result<()> {
+        if rect.width == 0 || rect.height == 0 || local_row >= rect.height {
+            return self.hide_cursor();
+        }
+        self.set_cursor(
+            rect.x
+                .saturating_add(local_col.min(rect.width.saturating_sub(1))),
+            rect.y.saturating_add(local_row),
+        )
+    }
+
     pub fn restore(&mut self) -> io::Result<()> {
         restore_lifecycle(&mut self.lifecycle, execute_stdout_action)
     }
@@ -363,11 +406,11 @@ impl TerminalSession {
 
 fn cursor_position_in_rect(rect: Rect, local_col: u16, local_row: u16) -> Option<Position> {
     (rect.width > 0 && rect.height > 0).then(|| {
+        let max_col = rect.width.saturating_sub(1);
+        let max_row = rect.height.saturating_sub(1);
         Position::new(
-            rect.x
-                .saturating_add(local_col.min(rect.width.saturating_sub(1))),
-            rect.y
-                .saturating_add(local_row.min(rect.height.saturating_sub(1))),
+            rect.x.saturating_add(local_col.min(max_col)),
+            rect.y.saturating_add(local_row.min(max_row)),
         )
     })
 }
@@ -592,6 +635,25 @@ mod tests {
             Some(Position::new(7, 8))
         );
         assert_eq!(cursor_position_in_rect(Rect::new(0, 0, 0, 2), 0, 0), None);
+    }
+
+    #[test]
+    fn modal_cursor_hides_instead_of_clamping_a_clipped_row() {
+        let mut session = TerminalSession::test_instance();
+        session.set_test_size(Size::new(20, 10));
+        let panel = Rect::new(4, 5, 3, 2);
+
+        session
+            .set_cursor_if_visible_in_rect(panel, 99, 2)
+            .expect("hiding a clipped modal cursor succeeds");
+        assert!(!session.test_cursor_visible());
+        assert_eq!(session.test_cursor_position(), None);
+
+        session
+            .set_cursor_if_visible_in_rect(panel, 99, 1)
+            .expect("visible modal cursor succeeds");
+        assert!(session.test_cursor_visible());
+        assert_eq!(session.test_cursor_position(), Some(Position::new(6, 6)));
     }
 
     #[test]

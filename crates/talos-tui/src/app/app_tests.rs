@@ -9,7 +9,7 @@ use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_p
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
 use crate::scrollback;
-use crate::state::{ApprovalState, TuiState};
+use crate::state::{ApprovalState, CredentialField, PanelKind, TuiState, WizardStep};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
@@ -1541,4 +1541,101 @@ fn modal_cursor_is_safe_when_final_panel_is_missing_or_short() {
                 .unwrap_or_else(|error| panic!("20x{height}: {error}"));
         }
     }
+}
+
+fn render_modal_for_cursor(
+    panel: crate::panel_state::BottomPanelState,
+    width: u16,
+    height: u16,
+) -> crate::app::Tui {
+    let mut state = TuiState::new();
+    state.slash_menu = panel;
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(width, height));
+    tui.draw_frame().expect("modal frame renders");
+    tui
+}
+
+#[test]
+fn credential_api_key_cursor_hidden_when_field_row_is_not_rendered() {
+    let panel =
+        crate::panel_state::BottomPanelState::open_credential_input("provider", None, false, None);
+    for height in [1, 2, 3, 4] {
+        let tui = render_modal_for_cursor(panel.clone(), 40, height);
+        assert!(
+            !tui.terminal.test_cursor_visible(),
+            "credential ApiKey cursor must hide at terminal height {height}"
+        );
+    }
+
+    let tui = render_modal_for_cursor(panel, 40, 10);
+    assert!(tui.terminal.test_cursor_visible());
+}
+
+#[test]
+fn credential_base_url_cursor_hidden_when_field_row_is_not_rendered() {
+    let mut panel =
+        crate::panel_state::BottomPanelState::open_credential_input("provider", None, true, None);
+    panel.credential_field = CredentialField::BaseUrl;
+    for height in [1, 2, 3, 4] {
+        let tui = render_modal_for_cursor(panel.clone(), 40, height);
+        assert!(
+            !tui.terminal.test_cursor_visible(),
+            "credential BaseUrl cursor must hide at terminal height {height}"
+        );
+    }
+
+    let tui = render_modal_for_cursor(panel, 40, 10);
+    assert_eq!(
+        tui.terminal.test_cursor_position().map(|pos| pos.y),
+        Some(7),
+        "BaseUrl local row 3 must be offset only by the final panel rectangle"
+    );
+}
+
+#[test]
+fn provider_protocol_cursor_hidden_when_selected_row_is_clipped() {
+    let mut panel = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let Some(PanelKind::ProviderWizard { step, protocol, .. }) = panel.kind.as_mut() else {
+        panic!("provider wizard panel expected");
+    };
+    *step = WizardStep::Protocol;
+    *protocol = "anthropic-messages".into();
+
+    for height in [1, 2, 3, 4] {
+        let tui = render_modal_for_cursor(panel.clone(), 40, height);
+        assert!(
+            !tui.terminal.test_cursor_visible(),
+            "second protocol option must hide at terminal height {height}"
+        );
+    }
+
+    let tui = render_modal_for_cursor(panel, 40, 10);
+    assert_eq!(
+        tui.terminal.test_cursor_position().map(|pos| pos.y),
+        Some(7),
+        "the second protocol option must remain at local row 3"
+    );
+}
+
+#[test]
+fn provider_entry_cursor_hides_when_field_is_clipped_and_confirm_has_no_cursor() {
+    for step in [WizardStep::Name, WizardStep::BaseUrl, WizardStep::ApiKey] {
+        let mut panel = crate::panel_state::BottomPanelState::open_provider_wizard();
+        let Some(PanelKind::ProviderWizard { step: current, .. }) = panel.kind.as_mut() else {
+            panic!("provider wizard panel expected");
+        };
+        *current = step;
+        let tui = render_modal_for_cursor(panel, 40, 3);
+        assert!(!tui.terminal.test_cursor_visible());
+    }
+
+    let mut panel = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let Some(PanelKind::ProviderWizard { step, .. }) = panel.kind.as_mut() else {
+        panic!("provider wizard panel expected");
+    };
+    *step = WizardStep::Confirm;
+    let tui = render_modal_for_cursor(panel, 40, 20);
+    assert!(!tui.terminal.test_cursor_visible());
 }
