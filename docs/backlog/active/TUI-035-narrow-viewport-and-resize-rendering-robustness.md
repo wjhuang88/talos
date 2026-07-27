@@ -6,13 +6,54 @@
 | Type | Product / Rendering Story |
 | Priority | P1 |
 | Status | In Progress (2026-07-26; I156 Active) |
-| Source | Maintainer bug reports 2026-07-24: (A) tool-call summary line renders blank at very small width; (B) shrinking a wide window duplicates the bottom hint bar into scrollback with staircase fill bars |
+| Source | Maintainer bug reports 2026-07-24: narrow tool-call visibility and fixed-pane resize isolation |
 | Parent Epic | None (follow-up to TUI-034 adaptive-width work) |
 | Depends on | TUI-034 (adaptive history width; shipped the tool-RESULT wrap but missed tool-CALL lines and resize); TUI-025 (tool argument one-line fit); ADR-035 |
 | Blocks | None |
 | Selected Iteration | I156 (Active) |
 
-## Problem
+## Current Architecture Authority
+
+ADR-054 is the sole current implementation authority for this Story. Talos runs
+the interactive TUI in alternate screen, owns transcript/history/scroll facts,
+and renders history plus fixed components in one application-owned full frame.
+The terminal grid and primary-screen native scrollback are output surfaces, not
+runtime history stores. Runtime DECSTBM, reverse index, `insert_history`, and
+`insert_styled_history` have been removed.
+
+Resize only recomputes the current projection, bounded layout, and full-frame
+draw from one terminal-size snapshot. Fixed hint, composer, status, preview,
+queue, and panel UI never enters `TranscriptStore`. TUI-035 remains In Progress:
+the outstanding completion evidence is the real-terminal matrix, not another
+primary-screen cleanup mechanism.
+
+Model-level and full-frame tests automatically prove fixed UI exclusion from
+the transcript/history renderer. They do not emulate every terminal's reflow
+implementation; artifact-free resize, duplicate-free fixed panes, and cursor
+behavior in real terminal emulators remain the manual gate.
+
+## Current Technical / Governance Checklist
+
+- [x] geometry-free `TranscriptBlock` with current-frame ToolCall/ToolResult projection
+- [x] alternate-screen app-owned full-frame renderer and app-owned history scroll
+- [x] fixed UI excluded from the transcript
+- [x] bounded fill projection, half-open logical anchors, and original-scalar offsets
+- [x] ToolCall/ToolResult anchor reflow coverage and PageUp/PageDown/Home/End entry points
+- [x] component-level `AppLayout`, panel-local cursor coordinates, and clipped modal input hiding
+- [x] exhaustive, retryable terminal restore and no legacy insertion identifiers
+- [ ] real-terminal acceptance matrix
+- [ ] ADR-054 acceptance
+- [ ] Completion Commit
+
+## Historical / Superseded Original Fix Plan
+
+The following plan describes the superseded primary-screen DECSTBM
+implementation attempt. It is retained only as historical evidence and is not
+current implementation authority after ADR-054. Its Fix 1/Fix 2/Fix 3,
+exclusions, source references, and tests do not describe current runtime
+behavior.
+
+### Original Problem
 
 Two distinct symptoms share one root architecture: the inline terminal renders
 scrollback by printing each history line individually through a DECSTBM
@@ -20,7 +61,7 @@ scroll-region + reverse-index mechanism (`inline_terminal.rs::insert_styled_hist
 keyed on `screen_size`, with no full-screen buffer diff. This is not robust when
 the viewport WIDTH changes or is very small.
 
-### Symptom A — tool-call summary line blank at narrow width
+#### Symptom A — tool-call summary line blank at narrow width
 
 When a tool is invoked, its one-line summary (`→ bash, command: ...`) is built by
 `build_tool_display.rs::build_tool_call_scrollback_line` (tool_display.rs:454).
@@ -45,7 +86,7 @@ defect for a 3-cell prefix (` → `):
   acceptance ("width overflow creates renderer-accounted continuation rows") was
   only satisfied for tool RESULT, not tool CALL.
 
-### Symptom B — resize (shrink) duplicates hint bar with staircase fill bars
+#### Symptom B — resize (shrink) duplicates hint bar with staircase fill bars
 
 Shrinking a wide window leaks the bottom hint/status pane into scrollback, one
 copy per intermediate width, each with a dark background bar that grows/shrinks
@@ -75,14 +116,14 @@ row by row (staircase). Verified cause chain:
    `fill.is_some()`, so fill-bearing hint/status lines are never re-wrapped to the
    new width — they are emitted at whatever stale width they were built with.
 
-### Shared root
+#### Shared root
 
 `insert_styled_history`'s per-line DECSTBM scroll model depends on `screen_size`,
 does no whole-screen diff, ignores `Event::Resize`, does not clear on width
 shrink, and computes fill from a possibly-stale width. Width-stable + wide cases
 work (early-return hits, no overflow); width-changing / very-narrow cases fail.
 
-## Goal / Value
+### Original Goal / Value
 
 Tool-call summaries stay visible and correctly wrapped at any width, and
 shrinking the window never leaks the bottom pane into scrollback or paints
@@ -90,7 +131,7 @@ staircase fill bars. History remains renderer-accounted (not
 terminal-autowrap-dependent) across resize, matching the TUI-034 intent for the
 lines it missed.
 
-## Architecture Correction (2026-07-27)
+### Architecture Correction (2026-07-27)
 
 Manual Alacritty acceptance failed: repeated resize leaked fixed hint, composer,
 and status rows into primary terminal scrollback. This is evidence that the
@@ -104,9 +145,9 @@ Automated implementation evidence: `a3074ad` provides the app-owned transcript, 
 projection, full-frame renderer, alternate-screen lifecycle, and app-owned scroll state. It does
 not close this Story: visual acceptance on real terminals is still required.
 
-## Scope
+### Original Scope
 
-### Fix 1 — width-aware tool-call summary line
+#### Fix 1 — width-aware tool-call summary line
 
 - Give `build_tool_call_scrollback_line` a `viewport_width` parameter and produce
   renderer-accounted continuation rows using the same display-width-aware wrap
@@ -115,7 +156,7 @@ not close this Story: visual acceptance on real terminals is still required.
 - Pass `self.terminal.screen_size().width` at the call site (app.rs:621),
   mirroring the tool-RESULT call (app.rs:632).
 
-### Fix 2 — continuation-prefix edge in `wrap_scrollback_line`
+#### Fix 2 — continuation-prefix edge in `wrap_scrollback_line`
 
 - Correct the app_stream.rs:90 guard so a 3-cell prefix does not silently drop
   continuation indent when `width <= 3`, and so extremely narrow widths degrade
@@ -125,7 +166,7 @@ not close this Story: visual acceptance on real terminals is still required.
   the tool-RESULT `budget = viewport - prefix_len` handling) so a 1–3 column
   viewport produces a bounded, legible result rather than dozens of empty rows.
 
-### Fix 3 — resize is handled; bottom pane never leaks; fill uses live width
+#### Fix 3 — resize is handled; bottom pane never leaks; fill uses live width
 
 - `Event::Resize` (app.rs:1253) must trigger a controlled full redraw of the
   viewport for the new size: reset the DECSTBM scroll region and clear the
@@ -139,13 +180,16 @@ not close this Story: visual acceptance on real terminals is still required.
   fill length derived from a prior width. Consider not committing fill-bearing
   bottom-pane lines to scrollback at all (they are viewport-fixed, not history).
 
-### Correctness invariant (both symptoms)
+#### Correctness invariant (both symptoms)
 
 The bottom hint/status/composer pane is viewport-fixed UI redrawn every frame. It
 MUST NEVER appear in scrollback history. Any path that moves a viewport-fixed pane
 row into `insert_history`/`insert_styled_history` is a defect.
 
-## Explicit Exclusions
+### Historical Explicit Exclusions
+
+Historical exclusion — superseded after real-terminal failure proved that the
+original architecture could not satisfy unchanged fixed-pane isolation.
 
 - No rewrite of the scrollback storage model or a switch away from the
   DECSTBM/inline-terminal approach; this is a targeted robustness fix.
@@ -158,7 +202,7 @@ row into `insert_history`/`insert_styled_history` is a defect.
 - `/export`, `/copy`, and resume/transcript paths are unaffected (they do not go
   through these viewport render functions).
 
-## Design / Security Constraints
+### Historical Design / Security Constraints
 
 - Reuse `wrap_to_display_width` and the tool-RESULT prefix/budget conventions;
   do not add a second wrapping algorithm.
@@ -171,7 +215,7 @@ row into `insert_history`/`insert_styled_history` is a defect.
 - Redraw-on-resize must not double-emit committed scrollback history (only the
   viewport is redrawn; already-scrolled history stays put).
 
-## Acceptance
+### Historical Acceptance
 
 Behavior:
 
@@ -196,7 +240,7 @@ Behavior:
 - Given a widen (grow) operation, when it occurs, then history and bottom pane
   render correctly with no truncation or leftover artifacts.
 
-Technical / governance:
+Historical technical / governance:
 
 - [x] `cargo test --workspace --locked` includes: tool-call wrap at 40/80/120/160;
       tool-call render at width 1/2/3 renderer-accounted (each output row display
@@ -218,7 +262,7 @@ Technical / governance:
       recorded as the Ready→Complete human gate, consistent with TUI-034's
       real-terminal acceptance requirement.
 
-## Resolved Decisions (2026-07-24)
+### Historical Resolved Decisions (2026-07-24)
 
 1. **One story, two symptoms** — Symptom A (tool-call blank) and Symptom B
    (resize hint duplication + staircase fill) share the inline-terminal
@@ -233,7 +277,7 @@ Technical / governance:
 5. **Priority P1** — user-visible corruption on a common interaction (resize) and
    lost tool-call visibility; raised above the P2 default for polish items.
 
-## Root-Cause Reference (verified lines)
+### Historical Root-Cause Reference (verified lines)
 
 - `crates/talos-tui/src/tool_display.rs:454` — `build_tool_call_scrollback_line`
   (no `viewport_width`; fixed 180-char budget).
@@ -255,7 +299,7 @@ Technical / governance:
 - `crates/talos-tui/src/app.rs:798-808` — fill computed from
   `self.terminal.screen_size().width` at flush time.
 
-## Required Reads
+### Historical Required Reads
 
 - `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 - `docs/iterations/I156-tui-narrow-viewport-resize.md`
@@ -271,7 +315,7 @@ Technical / governance:
 - `crates/talos-tui/src/scrollback_markdown.rs`
 - `crates/talos-tui/src/app.rs`
 
-## Minimum Validation
+### Historical Minimum Validation
 
 ## Automated Full-Frame Invariant Evidence — 2026-07-27
 
@@ -302,12 +346,19 @@ TUI-035 remains **In Progress** until the real-terminal matrix is complete.
   layout tests at extreme terminal heights.
 - Credential/provider cursor positions are panel-local and converted through
   the final panel rectangle; missing or zero-sized panels hide the cursor.
+- Modal cursor rows are strict: a clipped credential field, provider entry
+  field, or second protocol option hides rather than vertically clamping onto a
+  non-input row. Provider-wizard Confirm has no text cursor. Test-terminal
+  cursor visibility and position are asserted through the formal draw path.
 - Full-frame rendering at `0x0`, `1x1`, `1x2`, `2x1`, `2x2`, `3x3`, `5x2`,
   and `20x3` is safe. Fixed preview, tip, queue, composer, and modal state does
   not enter the transcript.
-- Implementation/test commits: `6c32d09`, `18648a6`, `1688e6f`. Focused TUI validation:
-  430 passed. Locked workspace validation: 2457 passed. Real-terminal
+- Implementation/test commits: `6c32d09`, `18648a6`, `1688e6f`, `ad67fc5`.
+  Focused TUI validation: 437 passed. Locked workspace validation: 2464 passed.
+  Real-terminal
   acceptance remains pending.
+
+### Historical Test Evidence
 
 - Unit tests for tool-call wrap at 40/80/120/160 and extreme widths 1/2/3.
 - CJK tool-call wrap boundary test.

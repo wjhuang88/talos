@@ -88,3 +88,7 @@ transcript into primary scrollback during interactive execution.
 - `AppLayout` separates resource allocation priority from visual placement,
   owns above-input/below-input panel placement, and assigns every input cursor
   from its final component rectangle.
+- A modal text cursor is visible only when its active semantic field or
+  selection row exists in the final panel rectangle. Vertical coordinates are
+  never clamped onto another semantic row; the panel renderer and cursor target
+  use the same title/instruction/input-row convention.

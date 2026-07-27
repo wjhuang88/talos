@@ -175,6 +175,16 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
+- Final modal cursor visibility correction automated evidence (2026-07-27,
+  implementation commit `ad67fc5`): credential and provider-wizard cursors use
+  strict panel-local visibility. A field row that is absent from the final panel
+  rectangle hides the cursor rather than being vertically clamped to a header,
+  instruction, preview, or another option. Provider-wizard Confirm intentionally
+  has no text cursor. Test terminal state records cursor visibility/position,
+  covering clipped ApiKey/BaseUrl/protocol/entry fields and real `draw_frame`
+  terminal heights. Focused TUI validation: 437 passed; locked workspace
+  validation: 2464 passed. This makes the automated implementation ready for the
+  real-terminal matrix; it does not change I156's Active state.
 - Final coordinate and anchor correction automated evidence (2026-07-27,
   implementation commits `6c32d09` and `18648a6`): normal projected rows use
   half-open logical intervals, logical-line EOF is accepted only by the last
@@ -186,9 +196,9 @@ If a stop condition occurs:
   visual order. Credential/provider cursors are panel-local and converted only
   through the final panel rectangle.
 - Current focused validation: `cargo test --locked -p talos-tui --lib` →
-  **430 passed, 0 failed, 0 ignored**.
+  **437 passed, 0 failed, 0 ignored**.
 - Current workspace validation: `cargo test --workspace --locked` →
-  **2457 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
+  **2464 passed, 0 failed, 0 ignored** across 62 test binaries/doc-test groups.
   The local-listener CLI tests were rerun outside the restricted sandbox after
   the sandbox correctly denied socket binding; the unrestricted run passed.
 - Current static validation: locked workspace check and Clippy with
@@ -230,6 +240,7 @@ If a stop condition occurs:
   `1688e6f`.
 - Component-layout, final page-height, cursor-coordinate, and entry-point test
   implementation: `18648a6`.
+- Modal cursor visibility implementation: `ad67fc5`.
 - Current runtime architecture: geometry-free `TranscriptStore` →
   width-independent logical lines → width-dependent full-frame projection in
   alternate screen. The terminal is an output surface, not a history owner.
