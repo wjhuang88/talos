@@ -5,7 +5,7 @@
 | Story ID | TUI-035 |
 | Type | Product / Rendering Story |
 | Priority | P1 |
-| Status | In Progress (2026-07-26; I156 Active) |
+| Status | Complete — maintainer Alacritty walkthrough passed 2026-07-27 (all 4 cases). Completion Commit: `6909675`. |
 | Source | Maintainer bug reports 2026-07-24: narrow tool-call visibility and fixed-pane resize isolation |
 | Parent Epic | None (follow-up to TUI-034 adaptive-width work) |
 | Depends on | TUI-034 (adaptive history width; shipped the tool-RESULT wrap but missed tool-CALL lines and resize); TUI-025 (tool argument one-line fit); ADR-035 |
@@ -284,9 +284,11 @@ Historical technical / governance:
 - [x] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
       `scripts/validate_project_governance.sh .`, and `git diff --check` clean.
 - [x] Owner status here and the Board mirror synchronized.
-- [ ] Manual Alacritty walkthrough (wide→narrow drag, and a width-1..3 extreme)
+- [x] Manual Alacritty walkthrough (wide→narrow drag, and a width-1..3 extreme)
       recorded as the Ready→Complete human gate, consistent with TUI-034's
-      real-terminal acceptance requirement.
+      real-terminal acceptance requirement. Maintainer performed all four cases
+      (A: tool-call width matrix, B: extreme narrow, C: continuous wide→narrow drag,
+      D: height-only shrink) in real Alacritty on 2026-07-27. All passed.
 
 ### Historical Resolved Decisions (2026-07-24)
 

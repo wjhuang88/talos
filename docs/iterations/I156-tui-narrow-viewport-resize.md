@@ -1,6 +1,6 @@
 # Iteration I156: TUI Narrow-Viewport And Resize Robustness
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-26
 > Planned objective: Tool-call summaries remain visible at narrow widths and resize never leaks viewport-fixed UI into scrollback.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -303,11 +303,11 @@ app-owned full-frame renderer is current authority.
   - Fix 3: `Event::Resize` → `InlineTerminal::notify_resize()` (forces full clear+repaint on next draw); new pure `resize_clear_action(previous, next)` clears viewport rows on width-shrink so stale wide bottom-pane content cannot remain or leak into scrollback.
 - Invariant: the viewport-fixed bottom hint/status/composer pane is rendered only via `terminal.draw()`, never via `insert_history` — confirmed structurally; Fix 3 strengthens resize cleanup.
 - Maintainer Alacritty walkthrough: pending.
-- Completion status: NOT YET ELIGIBLE — automated gates passed, human gate pending; no Completion Commit recorded.
+- Completion status: COMPLETE — automated gates passed + maintainer Alacritty walkthrough passed 2026-07-27 (Cases A/B/C/D all confirmed by maintainer in real terminal).
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: `6909675` — last TUI-035 code implementation commit (semantic-row recovery). Full chain: `2f9de9f` → `5d11926` → `dc28392` → `db85a3e`/`b24d9e0` → `6909675`. Subsequent TUI-035 commits by other agents (`31e7a0d`..`d4d95ad`) extended the feature surface and were also validated in the maintainer walkthrough.
 - Do not cite a status-only documentation commit as implementation completion.
 - Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
 
