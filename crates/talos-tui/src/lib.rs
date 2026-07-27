@@ -6,6 +6,7 @@ pub mod evolution;
 mod export;
 pub mod formatting;
 mod highlight;
+mod history_projection;
 mod inline_terminal;
 mod panel_state;
 mod scrollback;
@@ -19,6 +20,7 @@ mod state;
 mod stream_markdown;
 mod theme;
 mod tool_display;
+mod transcript;
 mod widgets;
 
 pub use app::Tui;

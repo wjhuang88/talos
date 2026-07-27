@@ -25,11 +25,12 @@ pub(crate) use crate::scrollback_input::{
     input_line_count_with_width,
 };
 #[cfg(test)]
+pub(crate) use crate::scrollback_markdown::append_fill_segment;
+#[cfg(test)]
 pub(crate) use crate::scrollback_markdown::history_segments_width;
 pub(crate) use crate::scrollback_markdown::{
-    append_fill_segment, build_code_block, horizontal_rule_segment, is_horizontal_rule,
-    render_code_block, render_markdown_segments, render_mermaid_block, render_table_block,
-    render_table_history_line,
+    build_code_block, horizontal_rule_segment, is_horizontal_rule, render_code_block,
+    render_markdown_segments, render_mermaid_block, render_table_block, render_table_history_line,
 };
 pub(crate) use crate::scrollback_status::build_status_text;
 #[cfg(test)]

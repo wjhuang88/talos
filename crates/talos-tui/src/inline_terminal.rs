@@ -7,10 +7,10 @@ use crossterm::{
         PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute, queue,
-    style::{
-        Attribute, Color as CColor, Print, SetAttribute, SetBackgroundColor, SetForegroundColor,
+    style::Color as CColor,
+    terminal::{
+        self, Clear, ClearType, EnableLineWrap, EnterAlternateScreen, LeaveAlternateScreen,
     },
-    terminal::{self, Clear, ClearType, EnableLineWrap},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -20,11 +20,13 @@ use ratatui::{
 };
 
 pub struct InlineFrame<'a> {
+    #[allow(dead_code)]
     area: Rect,
     buffer: &'a mut Buffer,
 }
 
 impl<'a> InlineFrame<'a> {
+    #[allow(dead_code)]
     pub const fn area(&self) -> Rect {
         self.area
     }
@@ -52,39 +54,6 @@ impl<'a> InlineFrame<'a> {
 pub trait ViewportComponent {
     fn height_hint(&self, available_width: u16) -> u16;
     fn render(&self, frame: &mut InlineFrame, area: Rect);
-}
-
-/// A resized or repositioned inline viewport must be cleared before diff rendering.
-///
-/// Changing the viewport resets both backing buffers to the new area. Without a full clear, the
-/// diff has no record of text that was physically present in newly claimed terminal rows, so stale
-/// content can remain behind a growing transient component (such as the steering queue preview).
-fn viewport_change_requires_clear(previous: Rect, next: Rect) -> bool {
-    previous != next
-}
-
-// TUI-035 Fix 3: pure decision describing what terminal cleanup a viewport-area change
-// requires. Height-shrink must clear below the new viewport (existing behavior); width-
-// shrink must clear the previously-drawn viewport rows so stale wide content (e.g. the
-// bottom hint/status pane rendered at the old width) cannot remain on the grid or get
-// pushed into scrollback by a later DECSTBM scroll. Pure so it can be unit-tested.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ResizeClearAction {
-    None,
-    ClearFromCursorDown,
-    ClearViewportRows,
-    ClearFromCursorDownAndRows,
-}
-
-fn resize_clear_action(previous: Rect, next: Rect) -> ResizeClearAction {
-    let height_shrunk = next.height < previous.height && previous.height > 0;
-    let width_shrunk = next.width < previous.width && previous.width > 0;
-    match (height_shrunk, width_shrunk) {
-        (false, false) => ResizeClearAction::None,
-        (true, false) => ResizeClearAction::ClearFromCursorDown,
-        (false, true) => ResizeClearAction::ClearViewportRows,
-        (true, true) => ResizeClearAction::ClearFromCursorDownAndRows,
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -167,10 +136,10 @@ pub struct InlineTerminal {
     backend: CrosstermBackend<Stdout>,
     buffers: [Buffer; 2],
     current: usize,
-    viewport_area: Rect,
+    frame_area: Rect,
     screen_size: Size,
     last_known_cursor_pos: Position,
-    needs_clear: bool,
+    restored: bool,
     keyboard_enhancement_enabled: bool,
 }
 
@@ -190,7 +159,6 @@ impl InlineTerminal {
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
-        let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
         let keyboard_enhancement_enabled =
             if keyboard_enhancement_supported(terminal::supports_keyboard_enhancement()) {
@@ -202,19 +170,26 @@ impl InlineTerminal {
             } else {
                 false
             };
-        let _ = execute!(backend, Hide, EnableBracketedPaste);
-        let viewport_area = Rect::new(0, cursor_pos.y, screen_size.width, 0);
+        let _ = execute!(
+            backend,
+            EnterAlternateScreen,
+            Hide,
+            EnableBracketedPaste,
+            Clear(ClearType::All),
+            MoveTo(0, 0)
+        );
+        let frame_area = Rect::new(0, 0, screen_size.width, screen_size.height);
 
-        let buffers = [Buffer::empty(viewport_area), Buffer::empty(viewport_area)];
+        let buffers = [Buffer::empty(frame_area), Buffer::empty(frame_area)];
 
         Ok(Self {
             backend,
             buffers,
             current: 0,
-            viewport_area,
+            frame_area,
             screen_size,
-            last_known_cursor_pos: cursor_pos,
-            needs_clear: false,
+            last_known_cursor_pos: Position::new(0, 0),
+            restored: false,
             keyboard_enhancement_enabled,
         })
     }
@@ -224,16 +199,16 @@ impl InlineTerminal {
     pub(crate) fn test_instance() -> Self {
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
-        let viewport_area = Rect::new(0, 0, 80, 24);
-        let buffers = [Buffer::empty(viewport_area), Buffer::empty(viewport_area)];
+        let frame_area = Rect::new(0, 0, 80, 24);
+        let buffers = [Buffer::empty(frame_area), Buffer::empty(frame_area)];
         Self {
             backend,
             buffers,
             current: 0,
-            viewport_area,
+            frame_area,
             screen_size: Size::new(80, 24),
             last_known_cursor_pos: Position::new(0, 0),
-            needs_clear: false,
+            restored: false,
             keyboard_enhancement_enabled: false,
         }
     }
@@ -249,50 +224,12 @@ impl InlineTerminal {
 
     #[allow(dead_code)]
     pub const fn viewport_area(&self) -> Rect {
-        self.viewport_area
-    }
-
-    pub fn set_viewport_area(&mut self, area: Rect) {
-        if area == self.viewport_area {
-            return;
-        }
-
-        let action = resize_clear_action(self.viewport_area, area);
-        if action != ResizeClearAction::None {
-            let prev_top = self.viewport_area.y;
-            let prev_bottom = self.viewport_area.bottom();
-            let writer = self.backend_mut();
-            match action {
-                ResizeClearAction::None => {}
-                ResizeClearAction::ClearFromCursorDown => {
-                    let _ = queue!(writer, MoveTo(0, area.bottom()));
-                    let _ = queue!(writer, Clear(ClearType::FromCursorDown));
-                }
-                ResizeClearAction::ClearViewportRows => {
-                    for y in prev_top..prev_bottom {
-                        let _ = queue!(writer, MoveTo(0, y));
-                        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
-                    }
-                }
-                ResizeClearAction::ClearFromCursorDownAndRows => {
-                    for y in prev_top..prev_bottom {
-                        let _ = queue!(writer, MoveTo(0, y));
-                        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
-                    }
-                    let _ = queue!(writer, MoveTo(0, area.bottom()));
-                    let _ = queue!(writer, Clear(ClearType::FromCursorDown));
-                }
-            }
-            let _ = std::io::Write::flush(writer);
-        }
-
-        self.viewport_area = area;
-        self.buffers[1 - self.current] = Buffer::empty(area);
-        self.buffers[self.current] = Buffer::empty(area);
+        self.frame_area
     }
 
     pub fn notify_resize(&mut self) {
-        self.needs_clear = true;
+        // Resize only invalidates the next full-frame projection. No terminal
+        // cleanup is needed because alternate screen is an output surface.
     }
 
     #[allow(dead_code)]
@@ -300,30 +237,20 @@ impl InlineTerminal {
         self.screen_size
     }
 
-    pub fn draw(&mut self, height: u16, draw_fn: impl FnOnce(&mut InlineFrame)) -> io::Result<()> {
-        let screen_size = self.backend.size()?;
-        self.screen_size = screen_size;
+    pub fn size(&mut self) -> io::Result<Size> {
+        let size = self.backend.size()?;
+        self.screen_size = size;
+        Ok(size)
+    }
 
-        let mut area = self.viewport_area;
-        area.height = height.min(screen_size.height);
-        area.width = screen_size.width;
-
-        if area.bottom() > screen_size.height {
-            area.y = screen_size.height.saturating_sub(area.height);
-        }
-
-        let area_changed = viewport_change_requires_clear(self.viewport_area, area);
-        if area_changed {
-            self.set_viewport_area(area);
-            self.needs_clear = true;
-        }
-
-        let force_clear = self.needs_clear;
-        if force_clear {
-            self.needs_clear = false;
-        }
-
-        self.draw_inner(draw_fn, force_clear, height)
+    pub fn draw(&mut self, size: Size, draw_fn: impl FnOnce(&mut InlineFrame)) -> io::Result<()> {
+        self.screen_size = size;
+        let area = Rect::new(0, 0, size.width, size.height);
+        let changed = self.frame_area != area;
+        self.frame_area = area;
+        self.buffers[0].resize(area);
+        self.buffers[1].resize(area);
+        self.draw_inner(draw_fn, changed, size.height)
     }
 
     fn draw_inner(
@@ -332,11 +259,10 @@ impl InlineTerminal {
         force_clear: bool,
         render_height: u16,
     ) -> io::Result<()> {
-        let area = self.viewport_area;
+        let area = self.frame_area;
         let prev_idx = 1 - self.current;
 
         let render_area = Rect {
-            y: area.bottom().saturating_sub(render_height),
             height: render_height.min(area.height),
             ..area
         };
@@ -381,100 +307,6 @@ impl InlineTerminal {
         Ok(())
     }
 
-    pub fn insert_history(&mut self, line: &str, bg: Option<CColor>) -> io::Result<()> {
-        self.insert_styled_history(&[HistorySegment::raw(line)], bg)
-    }
-
-    pub(crate) fn insert_styled_history(
-        &mut self,
-        segments: &[HistorySegment],
-        bg: Option<CColor>,
-    ) -> io::Result<()> {
-        let screen_height = self.screen_size.height;
-        let line_width = self.screen_size.width;
-        let mut area = self.viewport_area;
-        let writer = self.backend_mut();
-
-        let styled_print = |w: &mut CrosstermBackend<Stdout>,
-                            segments: &[HistorySegment],
-                            bg: Option<CColor>|
-         -> io::Result<()> {
-            if let Some(color) = bg {
-                queue!(w, SetBackgroundColor(color))?;
-                print_segments(w, segments)?;
-                let text_width = segments_width(segments);
-                if text_width < line_width as usize {
-                    queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
-                }
-                queue!(w, SetForegroundColor(CColor::Reset))?;
-                queue!(w, SetBackgroundColor(CColor::Reset))?;
-            } else {
-                print_segments(w, segments)?;
-            }
-            Ok(())
-        };
-
-        if area.bottom() < screen_height {
-            let top_1based = area.top() + 1;
-            queue!(
-                writer,
-                crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height))
-            )?;
-            queue!(writer, MoveTo(0, area.top()))?;
-            queue!(writer, crossterm::style::Print("\x1bM"))?;
-            queue!(writer, crossterm::style::Print("\x1b[r"))?;
-            area.y += 1;
-            queue!(writer, MoveTo(0, area.top() - 1))?;
-            queue!(writer, Clear(ClearType::UntilNewLine))?;
-            styled_print(writer, segments, bg)?;
-        } else if area.top() > 1 {
-            queue!(
-                writer,
-                crossterm::style::Print(format!("\x1b[1;{}r", area.top()))
-            )?;
-            queue!(writer, MoveTo(0, area.top() - 1))?;
-            queue!(writer, crossterm::style::Print("\r\n"))?;
-            queue!(writer, Clear(ClearType::UntilNewLine))?;
-            styled_print(writer, segments, bg)?;
-            queue!(writer, crossterm::style::Print("\x1b[r"))?;
-        }
-
-        std::io::Write::flush(writer)?;
-
-        let area_changed = area != self.viewport_area;
-        if area_changed {
-            self.set_viewport_area(area);
-        }
-        self.needs_clear = true;
-
-        Ok(())
-    }
-
-    /// Pushes scrollback content above the viewport up by `count` rows.
-    ///
-    /// Used when the viewport must grow upward into the scrollback (e.g. the
-    /// slash menu opens and the bottom pane overflows the screen). Unlike
-    /// `insert_history`, this always scrolls the region above the viewport up
-    /// (BRANCH 2), regardless of whether the viewport is at the screen bottom.
-    /// The oldest `count` scrollback rows are consumed; `count` blank rows are
-    /// freed at the viewport top for the grown viewport to render into.
-    pub fn push_scrollback_up(&mut self, count: u16) {
-        let top = self.viewport_area.top();
-        if count == 0 || top <= 1 {
-            return;
-        }
-        let writer = self.backend_mut();
-        let _ = queue!(writer, crossterm::style::Print(format!("\x1b[1;{top}r")));
-        let _ = queue!(writer, MoveTo(0, top - 1));
-        for _ in 0..count {
-            let _ = queue!(writer, crossterm::style::Print("\r\n"));
-        }
-        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
-        let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
-        let _ = std::io::Write::flush(writer);
-        self.needs_clear = true;
-    }
-
     pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
         self.last_known_cursor_pos = Position::new(col, row);
         let writer = self.backend_mut();
@@ -485,11 +317,11 @@ impl InlineTerminal {
     }
 
     pub fn restore(&mut self) {
-        let _ = execute!(
-            io::stdout(),
-            MoveTo(0, self.viewport_area.top()),
-            Clear(ClearType::FromCursorDown),
-        );
+        if self.restored {
+            return;
+        }
+        self.restored = true;
+        let _ = execute!(io::stdout(), crossterm::style::ResetColor,);
         if self.keyboard_enhancement_enabled {
             let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
             self.keyboard_enhancement_enabled = false;
@@ -499,61 +331,16 @@ impl InlineTerminal {
             DisableBracketedPaste,
             EnableLineWrap,
             SetCursorStyle::DefaultUserShape,
-            Show
+            Show,
+            LeaveAlternateScreen
         );
         let _ = terminal::disable_raw_mode();
     }
 
     #[allow(dead_code)]
     pub fn get_frame_area(&self) -> Rect {
-        self.viewport_area
+        self.frame_area
     }
-}
-
-fn print_segments(
-    writer: &mut CrosstermBackend<Stdout>,
-    segments: &[HistorySegment],
-) -> io::Result<()> {
-    for segment in segments {
-        if let Some(fg) = segment.fg {
-            queue!(writer, SetForegroundColor(fg))?;
-        }
-        set_attrs(writer, segment.attrs)?;
-        queue!(writer, Print(&segment.text))?;
-        clear_attrs(writer)?;
-        queue!(writer, SetForegroundColor(CColor::Reset))?;
-    }
-    Ok(())
-}
-
-fn set_attrs(writer: &mut CrosstermBackend<Stdout>, attrs: HistoryAttrs) -> io::Result<()> {
-    if attrs.bold {
-        queue!(writer, SetAttribute(Attribute::Bold))?;
-    }
-    if attrs.italic {
-        queue!(writer, SetAttribute(Attribute::Italic))?;
-    }
-    if attrs.underlined {
-        queue!(writer, SetAttribute(Attribute::Underlined))?;
-    }
-    if attrs.dim {
-        queue!(writer, SetAttribute(Attribute::Dim))?;
-    }
-    Ok(())
-}
-
-fn clear_attrs(writer: &mut CrosstermBackend<Stdout>) -> io::Result<()> {
-    queue!(writer, SetAttribute(Attribute::NormalIntensity))?;
-    queue!(writer, SetAttribute(Attribute::NoItalic))?;
-    queue!(writer, SetAttribute(Attribute::NoUnderline))?;
-    Ok(())
-}
-
-fn segments_width(segments: &[HistorySegment]) -> usize {
-    segments
-        .iter()
-        .map(|segment| unicode_width::UnicodeWidthStr::width(segment.text.as_str()))
-        .sum()
 }
 
 impl Drop for InlineTerminal {
@@ -588,79 +375,5 @@ mod tests {
         assert!(!keyboard_enhancement_supported(Err(io::Error::other(
             "probe failed"
         ))));
-    }
-
-    #[test]
-    fn viewport_growth_requires_full_clear_to_prevent_stale_rows() {
-        let previous = Rect::new(0, 18, 80, 6);
-        let expanded = Rect::new(0, 13, 80, 11);
-
-        assert!(viewport_change_requires_clear(previous, expanded));
-        assert!(!viewport_change_requires_clear(expanded, expanded));
-    }
-
-    #[test]
-    fn resize_clear_action_width_shrink_clears_viewport_rows() {
-        let previous = Rect::new(0, 0, 80, 24);
-        let narrower = Rect::new(0, 0, 40, 24);
-        assert_eq!(
-            resize_clear_action(previous, narrower),
-            ResizeClearAction::ClearViewportRows
-        );
-    }
-
-    #[test]
-    fn resize_clear_action_height_shrink_clears_below() {
-        let previous = Rect::new(0, 0, 80, 24);
-        let shorter = Rect::new(0, 0, 80, 12);
-        assert_eq!(
-            resize_clear_action(previous, shorter),
-            ResizeClearAction::ClearFromCursorDown
-        );
-    }
-
-    #[test]
-    fn resize_clear_action_both_shrink_clears_rows_and_below() {
-        let previous = Rect::new(0, 0, 80, 24);
-        let smaller = Rect::new(0, 0, 40, 12);
-        assert_eq!(
-            resize_clear_action(previous, smaller),
-            ResizeClearAction::ClearFromCursorDownAndRows
-        );
-    }
-
-    #[test]
-    fn resize_clear_action_width_or_height_grow_is_none() {
-        let previous = Rect::new(0, 0, 40, 12);
-        assert_eq!(
-            resize_clear_action(previous, Rect::new(0, 0, 80, 12)),
-            ResizeClearAction::None
-        );
-        assert_eq!(
-            resize_clear_action(previous, Rect::new(0, 0, 40, 24)),
-            ResizeClearAction::None
-        );
-    }
-
-    #[test]
-    fn resize_clear_action_unchanged_is_none() {
-        let area = Rect::new(0, 0, 80, 24);
-        assert_eq!(resize_clear_action(area, area), ResizeClearAction::None);
-    }
-
-    #[test]
-    fn resize_clear_action_zero_previous_height_is_safe() {
-        let zero_height = Rect::new(0, 0, 80, 0);
-        // Height-shrink guard requires previous.height > 0, so this is None.
-        assert_eq!(
-            resize_clear_action(zero_height, Rect::new(0, 0, 80, 0)),
-            ResizeClearAction::None
-        );
-        // A width-shrink is still classified as a row clear; with zero previous height the
-        // row loop is empty, so it is a harmless no-op (no panic, no underflow).
-        assert_eq!(
-            resize_clear_action(zero_height, Rect::new(0, 0, 40, 0)),
-            ResizeClearAction::ClearViewportRows
-        );
     }
 }

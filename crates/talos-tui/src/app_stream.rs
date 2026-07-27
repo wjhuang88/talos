@@ -3,6 +3,7 @@ use std::io;
 
 use crossterm::style::Color as CColor;
 use talos_conversation::MessageSource;
+#[cfg(test)]
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::highlight::HighlightEngine;
@@ -59,6 +60,7 @@ impl ScrollbackLine {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn has_plain_segments_only(&self) -> bool {
         if self.fill.is_some() {
             return false;
@@ -76,16 +78,19 @@ impl ScrollbackLine {
 /// a logical line occupied several rows. This helper makes every occupied row
 /// explicit, preserves segment styling/backgrounds, and aligns continuations
 /// beneath the standard three-column history prefix.
+#[cfg(test)]
 pub(crate) struct PreparedLogicalLine {
     pub original: ScrollbackLine,
     pub physical_rows: Vec<ScrollbackLine>,
 }
 
+#[cfg(test)]
 pub(crate) struct HistoryPreparation {
     pub ready_prefix: Vec<PreparedLogicalLine>,
     pub deferred_suffix: Vec<ScrollbackLine>,
 }
 
+#[cfg(test)]
 fn line_has_unrenderable_scalar(line: &ScrollbackLine, viewport_width: u16) -> bool {
     if viewport_width == 0 {
         return true;
@@ -98,10 +103,12 @@ fn line_has_unrenderable_scalar(line: &ScrollbackLine, viewport_width: u16) -> b
     })
 }
 
+#[cfg(test)]
 fn line_overflows_viewport(line: &ScrollbackLine, viewport_width: u16) -> bool {
     UnicodeWidthStr::width(line.text.as_str()) > viewport_width as usize
 }
 
+#[cfg(test)]
 pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
     if UnicodeWidthStr::width(line.text.as_str()) <= width as usize {
         return vec![line];
@@ -157,6 +164,7 @@ pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<Scro
     rows
 }
 
+#[cfg(test)]
 pub(crate) fn prepare_history_rows(
     lines: Vec<ScrollbackLine>,
     viewport_width: u16,
@@ -191,6 +199,7 @@ pub(crate) fn prepare_history_rows(
     }
 }
 
+#[cfg(test)]
 fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &HistorySegment) {
     if let Some(last) = segments.last_mut()
         && last.fg == source.fg
@@ -1296,7 +1305,7 @@ mod tests {
 
         let prep2 = prepare_history_rows(restored, 2);
         let mut w2 = MockWriter::new();
-        let (restored2, r2) = flush_prepared_with_writer(prep2, &mut w2);
+        let (_restored2, r2) = flush_prepared_with_writer(prep2, &mut w2);
         assert!(r2.is_ok());
 
         let committed = w1.inserted.iter().map(|s| s.chars().count()).sum::<usize>();

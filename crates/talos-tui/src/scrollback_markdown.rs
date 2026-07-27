@@ -333,6 +333,7 @@ pub(crate) fn history_segments_width(segments: &[HistorySegment]) -> usize {
         .sum()
 }
 
+#[cfg(test)]
 pub(crate) fn append_fill_segment(
     segments: &mut Vec<HistorySegment>,
     fill: HistorySegment,
