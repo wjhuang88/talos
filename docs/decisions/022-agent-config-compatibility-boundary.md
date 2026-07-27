@@ -140,3 +140,23 @@ To avoid configuration conflicts between tools, Talos uses its own namespace:
 - `docs/decisions/013-provider-config-schema-boundary.md`
 - `docs/backlog/active/AGENT-001-standard-agent-protocol-support.md`
 - `docs/iterations/I035-agent-protocol-compatibility-foundation.md`
+
+## Maintainer Clarification: Shared Skill Discovery Default (2026-07-27)
+
+This clarification is appended to the Accepted decision; it does not rewrite the Decision core.
+
+- The shared compatibility root `~/.agents/skills/` is now enabled by default in Talos
+  application configuration (`[skills] discover_shared = true`).
+- Explicit `discover_shared = false` remains supported and disables the shared root.
+- This does not change linked-directory policy: `discover_shared` controls only whether
+  `~/.agents/skills/` is added as a search root. `SkillDiscoveryPolicy.follow_directory_links`
+  controls whether filesystem links are followed. The two are separate and must not be
+  conflated; `discover_shared = true` does not implicitly enable link following.
+- The shared root remains the lowest-priority discovery source. Workspace and Talos-native
+  Skills retain precedence.
+- Library embedders using low-level `SkillLoader` constructors (`new`, `for_workspace`) do
+  not automatically inherit HOME-based shared scanning unless the caller passes the
+  application configuration. Application default and library constructor default are
+  distinct layers.
+- Implementation commit: `04999f1` (config default), `bfb8c22` (config/runtime evidence),
+  `b7e3704` (traversal boundaries), `a0079dd` (tests).

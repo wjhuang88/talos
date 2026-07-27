@@ -5,7 +5,7 @@
 | Story ID | SKILL-003 |
 | Type | Product / Security Story |
 | Priority | P2 |
-| Status | Refinement → I163 Active (2026-07-27) |
+| Status | In Progress (I163 Active, 2026-07-27) |
 | Selected Iteration | I163 (Active) |
 | Source | Commit `1f5e451` introduced unconditional `follow_links(true)` to `SkillLoader::discover` under incorrect `#TUI-035` tag; this Story owns all subsequent corrections |
 | Parent Epic | None |
@@ -45,10 +45,12 @@ Allow Skill directory sharing via filesystem links with an explicit, safe-by-def
 
 ## Explicit Exclusions
 
-- CLI configuration wiring (deferred to a follow-up wiring Story)
-- Runtime/agent behavior changes
-- New native dependencies or `unsafe`
-- Public `Skill` struct field changes (canonical path tracked in warnings, not in Skill)
+Configuration wiring was originally excluded, but the maintainer explicitly authorized the
+application-level `discover_shared` default and runtime wiring during I163. This bounded
+exception does not authorize additional Skill configuration expansion.
+
+Runtime/agent behavior changes, new native dependencies or `unsafe`, and public `Skill`
+struct field changes remain excluded.
 
 ## Design Constraints
 
@@ -59,28 +61,83 @@ Allow Skill directory sharing via filesystem links with an explicit, safe-by-def
 
 ## Acceptance
 
-- [ ] Default `follow_directory_links = false`; backward compatible with pre-`1f5e451` behavior.
-- [ ] `follow_directory_links = true` follows directory symlinks.
-- [ ] External targets denied by default; warning recorded.
-- [ ] Same canonical directory scanned at most once (alias dedup).
-- [ ] Same canonical SKILL.md parsed at most once.
-- [ ] Non-adjacent duplicate skill names resolved by first-wins priority.
-- [ ] Search-root priority preserved (Project shadows Shared even through aliases).
-- [ ] `max_depth` bounds traversal depth; skill at exactly `max_depth` is found, beyond is not.
-- [ ] `max_entries` bounds total entries; budget exhaustion produces warning.
-- [ ] Broken links produce `BrokenLink` warning.
-- [ ] Symlink cycles produce `LinkLoop` warning and do not duplicate skills.
-- [ ] Permission errors produce `PermissionDenied` warning.
-- [ ] Invalid SKILL.md files produce `InvalidSkill` warning.
-- [ ] `discovery_warnings()` returns structured evidence.
-- [ ] No `filter_map(|e| e.ok())` in the discovery path.
-- [ ] No `dedup_by_key` for skill-name precedence.
-- [ ] No `follow_links(true)` hardcoded outside policy control.
-- [ ] No `tiggers` typo in test data.
-- [ ] No misleading test names.
-- [ ] Windows junction claims removed or backed by Windows tests.
-- [ ] "at any depth" documentation corrected.
-- [ ] No reference to `#TUI-035` in new commits.
+### Shared discovery default (maintainer-authorized)
+
+- [x] `Config::default().skills.discover_shared == true`.
+- [x] Missing `[skills]` section → true (deserialization test).
+- [x] Empty `[skills]` section → true (deserialization test).
+- [x] Explicit `discover_shared = false` → false (preserved).
+- [x] Explicit `discover_shared = true` → true (preserved).
+- [x] Runtime wiring: default Config → `discover_runtime_skills` → `~/.agents/skills/`
+  in search paths (temp HOME, no real-HOME pollution).
+- [x] Explicit `false` excludes shared root at runtime.
+- [x] Shared root is lowest priority (workspace shadows shared end-to-end).
+- [x] README synchronized (shared discovery in "Currently shipped", not "Not shipped yet").
+- [x] ADR-022 clarification appended; I163/SKILL-003/Program/Board/Backlog synchronized.
+
+### Link safety
+
+- [x] `discover_shared` does not implicitly enable `follow_directory_links`.
+- [x] Linked project root rejected by default (`RootLinkDenied`).
+- [x] Linked shared root rejected by default (`RootLinkDenied`).
+- [x] Root link governed by `SkillDiscoveryPolicy` (pre-walker `symlink_metadata`).
+- [x] `AllowAnyReadable` permits linked root when `follow=true`.
+- [x] External directory rejected before descent (`WalkDir::filter_entry`).
+- [x] Alias subtree descended once (canonical directory dedup at descent time, budget
+  proof).
+- [x] Root-level `SKILL.md` parsed when `follow=true` (no canonical-dir dedup skip).
+- [x] File symlink policy: `follow=false` denies symlinked `SKILL.md`; `follow=true`
+  checks canonical file target against `ExternalTargetPolicy`.
+- [x] Canonical file dedup: same physical file via two links parsed once.
+- [x] Cycle: skill found once, `LinkLoop` warning present, no budget exhaustion.
+- [x] `LinkLoop` warning asserted in real cycle test.
+
+### Resource bounds
+
+- [x] `max_depth` definition: search root = depth 0, root/SKILL.md = depth 1.
+- [x] Skill at exact `max_depth` discovered.
+- [x] Skill beyond `max_depth` not discovered.
+- [x] `DepthLimitReached` warning reachable (observation_depth = max_depth + 1).
+- [x] Single `DepthLimitReached` warning per root.
+- [x] `max_entries` is global across all search roots.
+- [x] Unique-name budget test (50 distinct names, budget exhausted once).
+- [x] Later roots skipped after budget exhaustion.
+- [x] Deterministic ordering (`sort_by_file_name`).
+
+### Tests
+
+- [x] Real two-link chain (actual filesystem symlinks).
+- [x] Real cycle (`follow=true`, `LinkLoop` asserted).
+- [x] Root link deny/allow (default rejects, `AllowAnyReadable` permits).
+- [x] External pre-descent rejection (no `InvalidSkill`, no budget exhaustion).
+- [x] Alias subtree single descent (budget proof).
+- [x] Direct file link (external denied, internal enabled-only, two-links-once).
+- [x] Config deserialization matrix (missing/empty/explicit-true/explicit-false).
+- [x] Runtime wiring (Config → `discover_runtime_skills` → SkillLoader).
+- [x] Priority end-to-end (workspace shadows shared).
+- [x] Misleading tests removed/renamed (`nested_symlink_chain` → `regular_nested_skill`;
+  non-following cycle replaced with real `follow=true` cycle).
+
+### Governance
+
+- [x] Maintainer default decision recorded (I163 + ADR-022 clarification).
+- [x] `04999f1` scope variance resolved (owner docs synchronized).
+- [x] SKILL-003 In Progress.
+- [x] I163 Active.
+- [x] I163 corrective interruption (between I156 and I157).
+- [x] I157 Planned (resumes after I163 disposition).
+- [x] I156 Complete.
+- [x] Only one Active implementation iteration (I163).
+- [x] No release/version changes.
+
+### Residuals
+
+- [x] Windows state honest (Unix: automated; Windows symlink/junction: unverified).
+- [x] Level-2 reference-path security residual recorded (separate follow-up Story).
+- [x] Public struct-literal compatibility documented accurately (constructor-compatible,
+  struct-literal source-incompatible, pre-1.0).
+- [x] CI/local evidence distinction accurate (local validation only; no GitHub Actions
+  evidence for this iteration).
 
 ## Required Reads
 

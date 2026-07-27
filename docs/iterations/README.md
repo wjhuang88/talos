@@ -183,7 +183,8 @@ docs/iterations/
 | I153 | End-to-End Hardening And Release Candidate | **Complete** (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Full locked validation is green; release candidate checklist documented. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. No tag is authorized by this status change. See `I153-end-to-end-hardening-release-candidate.md`. |
 | I154 | Agent-Mediated Image Read Tool | **Complete** (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | MODEL-009-E adds a separate `read_image` tool for Supported models only. ADR-051 fixes the one-shot provider-continuation contract. P3 complete: `ToolExecutionOutput`/`execute_with_output` trait API, shared image validation, `ReadImageTool` implementation, turn-loop continuation overlay, capability-gated registration, Anthropic coalescing, atomic batch limit, execution-boundary capability gate, path sanitization. 40 new tests pass across 4 crates. Maintainer real-terminal walkthrough passed: Supported model called `read_image`, safe summary in history, one-shot continuation to provider. See `I154-agent-mediated-image-read-tool.md`. |
 | I156 | TUI Narrow-Viewport And Resize Robustness | Complete — maintainer Alacritty walkthrough 2026-07-27 | TUI-035. All automated gates passed; maintainer performed real-terminal Cases A/B/C/D (tool-call width, extreme narrow, continuous drag, height shrink). Completion Commit: `6909675`. See `I156-tui-narrow-viewport-resize.md`. |
-| I157 | Provider Removal And Credential Clear | Planned — next activation candidate (I156 Complete) | MODEL-010. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I156 Complete (passed 2026-07-27); MODEL-010 Ready. See `I157-provider-removal-credential-clear.md`. |
+| I163 | Policy-Controlled Linked Skill Discovery | Active — corrective interruption (2026-07-27) | SKILL-003. Maintainer-authorized shared discovery default (`discover_shared = true`). Root symlink policy, pre-descent external rejection, canonical dir dedup, root-level SKILL.md fix, file link policy, depth warning, real two-link/cycle/budget tests. 2508 workspace tests pass. I157 deferred until I163 disposition. See `I163-policy-controlled-linked-skill-discovery.md`. |
+| I157 | Provider Removal And Credential Clear | Planned — resumes after I163 disposition | MODEL-010. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I163 disposition (Complete or Paused); MODEL-010 Ready. See `I157-provider-removal-credential-clear.md`. |
 | I158 | Tool Registration Composition Consolidation | Blocked | ARCH-034-R01. One explicit tool registration composition model with preserved print/TUI/MCP behavior. Blocked until ADR-053 is Accepted and ARCH-034-R01 is Ready. See `I158-tool-registration-composition.md`. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
@@ -290,7 +291,8 @@ Complete/Superseded dispositions without erasing their published objectives.
 | Iteration | Current State | Disposition Before Next Activation |
 |---|---|---|
 | I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
-| I157 | Planned — next activation candidate (I156 Complete) | MODEL-010. CLI-only `config unset`; activation gate: I156 Complete (2026-07-27). |
+| I163 | Active — corrective interruption (2026-07-27) | SKILL-003. Maintainer-authorized shared discovery default; traversal boundaries and real tests landed. I157 deferred until I163 disposition. |
+| I157 | Planned — resumes after I163 disposition | MODEL-010. CLI-only `config unset`; activation gate: I163 disposition (Complete or Paused). |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
@@ -306,8 +308,9 @@ The current execution sequence is the
 [v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
 listed above.
 
-I156 is Active as the sole implementation iteration, and TUI-035 is In Progress. This historical
-table is not a current selection, planning, status, or activation owner.
+I163 is Active as the sole implementation iteration (corrective interruption), and SKILL-003 is
+In Progress. I156 is Complete. This historical table is not a current selection, planning, status,
+or activation owner.
 
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|
