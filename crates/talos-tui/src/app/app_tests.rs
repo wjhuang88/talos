@@ -7,11 +7,13 @@ use tokio::sync::mpsc;
 
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
+use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
 use crate::scrollback;
 use crate::state::{ApprovalState, TuiState};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
+use crate::transcript::TranscriptBlock;
 use talos_conversation::{TipKind, TurnPhase};
 
 fn state_line(text: &str) -> ScrollbackLine {
@@ -77,6 +79,19 @@ fn credential_display_never_reveals_secret_suffix() {
 #[test]
 fn credential_cursor_tracks_masked_buffer() {
     assert_eq!(scrollback::credential_cursor_col("abcd"), 7);
+}
+
+#[test]
+fn credential_and_provider_cursor_positions_are_panel_local() {
+    let credential =
+        crate::panel_state::BottomPanelState::open_credential_input("provider", None, false, None);
+    let local = scrollback::credential_cursor_position(&credential).unwrap();
+    assert_eq!(local.row, 2);
+
+    let provider = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let local = scrollback::provider_wizard_local_cursor_position(&provider).unwrap();
+    assert_eq!(local.row, 2);
+    assert_eq!(local.col, 3);
 }
 
 #[test]
@@ -1367,4 +1382,163 @@ fn entry_point_full_roundtrip_multiline_draft() {
 
     assert_eq!(tui.state.input_buffer, "line one\nline two");
     assert!(tui.state.history_cursor.is_none());
+}
+
+fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crate::app::Tui {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for index in 0..30 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("row-{index:02}"),
+                None,
+            )));
+    }
+    tui.last_history_projection = project_history(
+        &tui.transcript,
+        80,
+        visible_height,
+        &HistoryScrollState::follow_tail(),
+    );
+    tui.last_history_viewport_height = viewport_height;
+    tui
+}
+
+#[test]
+fn entry_point_page_up_uses_history_rect_height() {
+    let mut tui = tui_with_projected_history(4, 10);
+    assert_eq!(tui.last_history_projection.visible_start, 26);
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    let after = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(after.visible_start, 17);
+}
+
+#[test]
+fn entry_point_page_down_uses_history_rect_height_and_end_returns_follow_tail() {
+    let mut tui = tui_with_projected_history(4, 10);
+    let first = tui.last_history_projection.first_anchor().unwrap();
+    tui.history_scroll.anchor(first, 0);
+    tui.last_history_projection = project_history(&tui.transcript, 80, 4, &tui.history_scroll);
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    let after = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(after.visible_start, 9);
+
+    tui.last_history_projection = after;
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::End,
+        KeyModifiers::CONTROL,
+    ));
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+}
+
+#[test]
+fn entry_point_page_down_at_tail_remains_follow_tail() {
+    let mut tui = tui_with_projected_history(4, 10);
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+}
+
+#[test]
+fn entry_point_ctrl_home_moves_to_start_and_empty_navigation_is_safe() {
+    let mut tui = tui_with_projected_history(4, 10);
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Home,
+        KeyModifiers::CONTROL,
+    ));
+    let at_start = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(at_start.visible_start, 0);
+
+    let mut empty = crate::app::Tui::for_test(TuiState::new(), None);
+    for code in [KeyCode::PageUp, KeyCode::PageDown] {
+        empty.handle_input_event(&key_press(code));
+    }
+    empty.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Home,
+        KeyModifiers::CONTROL,
+    ));
+    empty.handle_input_event(&key_press_with_modifiers(
+        KeyCode::End,
+        KeyModifiers::CONTROL,
+    ));
+    assert_eq!(empty.history_scroll, HistoryScrollState::follow_tail());
+}
+
+#[test]
+fn fixed_components_are_never_appended_to_transcript() {
+    let mut state = TuiState::new();
+    state.input_append_str("draft composer text");
+    state.thinking_preview = Some("fixed thinking preview".into());
+    state.tip = Some(crate::state::Tip {
+        kind: TipKind::Info,
+        text: "fixed tip".into(),
+        ttl: std::time::Duration::from_secs(30),
+        created_at: std::time::Instant::now(),
+    });
+    state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(40, 10));
+    tui.draw_frame().expect("fixed frame renders");
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert!(tui.transcript.entries().is_empty());
+
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "submitted user text".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit transcript");
+    let stored = tui
+        .transcript
+        .entries()
+        .iter()
+        .filter_map(|entry| match &entry.block {
+            TranscriptBlock::StyledLine(line) => Some(line.text.as_str()),
+            _ => None,
+        })
+        .collect::<String>();
+    assert!(stored.contains("submitted user text"));
+    for fixed in ["draft composer text", "fixed thinking preview", "fixed tip"] {
+        assert!(!stored.contains(fixed));
+    }
+}
+
+#[test]
+fn full_frame_renderer_handles_extreme_terminal_sizes() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for (width, height) in [
+        (0, 0),
+        (1, 1),
+        (1, 2),
+        (2, 1),
+        (2, 2),
+        (3, 3),
+        (5, 2),
+        (20, 3),
+    ] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(width, height));
+        tui.draw_frame()
+            .unwrap_or_else(|error| panic!("{width}x{height}: {error}"));
+    }
+}
+
+#[test]
+fn modal_cursor_is_safe_when_final_panel_is_missing_or_short() {
+    for panel in [
+        crate::panel_state::BottomPanelState::open_credential_input("provider", None, false, None),
+        crate::panel_state::BottomPanelState::open_provider_wizard(),
+    ] {
+        for height in [2, 3, 5] {
+            let mut state = TuiState::new();
+            state.slash_menu = panel.clone();
+            let mut tui = crate::app::Tui::for_test(state, None);
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(20, height));
+            tui.draw_frame()
+                .unwrap_or_else(|error| panic!("20x{height}: {error}"));
+        }
+    }
 }

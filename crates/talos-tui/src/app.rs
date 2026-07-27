@@ -102,6 +102,7 @@ pub struct Tui {
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
     last_history_projection: HistoryProjection,
+    last_history_viewport_height: u16,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -143,6 +144,7 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
+            last_history_viewport_height: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -174,6 +176,7 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
+            last_history_viewport_height: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -966,11 +969,21 @@ impl Tui {
                 preview: preview.height_hint(width),
                 queue: queue.height_hint(width),
                 tips: tips.height_hint(width),
-                panel: bottom_panel.height_hint(width),
+                panel_required: if state.slash_menu.is_credential_input()
+                    || state.slash_menu.is_provider_wizard()
+                    || !matches!(state.approval_state, ApprovalState::Hidden)
+                {
+                    bottom_panel.height_hint(width).min(4)
+                } else {
+                    0
+                },
+                panel_preferred: bottom_panel.height_hint(width),
                 composer: actual_input_h,
             },
+            menu_placement,
         );
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
+        self.last_history_viewport_height = history_height;
         let history = project_history(
             &self.transcript,
             screen_size.width,
@@ -1012,68 +1025,33 @@ impl Tui {
 
         {
             let screen_w = screen_size.width;
-            let stack_top = app_layout.panel.map_or(0, |rect| rect.y);
             if self.state.slash_menu.is_credential_input() {
-                let panel_y_offset = match menu_placement {
-                    crate::scrollback::BottomPanelPlacement::AboveInput => {
-                        preview.height_hint(screen_w)
-                            + queue.height_hint(screen_w)
-                            + tips.height_hint(screen_w)
-                    }
-                    crate::scrollback::BottomPanelPlacement::BelowInput => {
-                        preview.height_hint(screen_w)
-                            + queue.height_hint(screen_w)
-                            + tips.height_hint(screen_w)
-                            + input_pad_top.height_hint(screen_w)
-                            + input.height_hint(screen_w)
-                    }
+                let (Some(panel), Some(local)) = (
+                    app_layout.panel,
+                    crate::scrollback::credential_cursor_position(&self.state.slash_menu),
+                ) else {
+                    self.terminal.hide_cursor()?;
+                    return Ok(());
                 };
-                let field_row_offset = match self.state.slash_menu.credential_field {
-                    crate::state::CredentialField::ApiKey => 2,
-                    crate::state::CredentialField::BaseUrl => 3,
-                };
-                let input_row = stack_top
-                    .saturating_add(panel_y_offset)
-                    .saturating_add(field_row_offset);
-                let active_buffer = match self.state.slash_menu.credential_field {
-                    crate::state::CredentialField::ApiKey => {
-                        &self.state.slash_menu.credential_buffer
-                    }
-                    crate::state::CredentialField::BaseUrl => {
-                        &self.state.slash_menu.base_url_buffer
-                    }
-                };
-                let cursor_col = crate::scrollback::credential_cursor_col(active_buffer);
-                self.terminal.set_cursor(cursor_col, input_row)?;
+                self.terminal
+                    .set_cursor_in_rect(panel, local.col, local.row)?;
             } else if self.state.slash_menu.is_provider_wizard() {
-                let panel_y_offset = match menu_placement {
-                    crate::scrollback::BottomPanelPlacement::AboveInput => {
-                        preview.height_hint(screen_w)
-                            + queue.height_hint(screen_w)
-                            + tips.height_hint(screen_w)
-                    }
-                    crate::scrollback::BottomPanelPlacement::BelowInput => {
-                        preview.height_hint(screen_w)
-                            + queue.height_hint(screen_w)
-                            + tips.height_hint(screen_w)
-                            + input_pad_top.height_hint(screen_w)
-                            + input.height_hint(screen_w)
-                    }
+                let (Some(panel), Some(local)) = (
+                    app_layout.panel,
+                    crate::scrollback::provider_wizard_local_cursor_position(
+                        &self.state.slash_menu,
+                    ),
+                ) else {
+                    self.terminal.hide_cursor()?;
+                    return Ok(());
                 };
-                if let Some((row_offset, cursor_col)) =
-                    crate::scrollback::provider_wizard_cursor_position(&self.state.slash_menu)
-                {
-                    let cursor_row = stack_top
-                        .saturating_add(panel_y_offset)
-                        .saturating_add(row_offset);
-                    self.terminal.set_cursor(cursor_col, cursor_row)?;
-                }
+                self.terminal
+                    .set_cursor_in_rect(panel, local.col, local.row)?;
             } else {
                 let Some(composer_rect) = app_layout.composer else {
                     self.terminal.hide_cursor()?;
                     return Ok(());
                 };
-                let input_top = composer_rect.y;
                 let byte_pos = self.state.cursor_byte_pos();
                 let content_w = crate::scrollback::composer_content_width(screen_w);
                 let (cursor_row_offset, cursor_col_offset) =
@@ -1087,13 +1065,10 @@ impl Tui {
                     content_w,
                     composer_rect.height,
                 );
-                let input_row =
-                    input_top.saturating_add(cursor_row_offset.saturating_sub(scroll_offset));
+                let local_row = cursor_row_offset.saturating_sub(scroll_offset);
                 let cursor_col = crate::scrollback::COMPOSER_LEFT_PAD + cursor_col_offset;
-                self.terminal.set_cursor(
-                    cursor_col.min(composer_rect.right().saturating_sub(1)),
-                    input_row.min(composer_rect.bottom().saturating_sub(1)),
-                )?;
+                self.terminal
+                    .set_cursor_in_rect(composer_rect, cursor_col, local_row)?;
             }
         }
 
@@ -1108,14 +1083,20 @@ impl Tui {
                 }
                 match key.code {
                     KeyCode::PageUp => {
-                        let height = self.last_history_projection.rows.len() as u16;
+                        let height = self.last_history_viewport_height;
+                        if height == 0 {
+                            return false;
+                        }
                         if let Some(anchor) = self.last_history_projection.page_up(height) {
                             self.history_scroll.anchor(anchor, 0);
                         }
                         return false;
                     }
                     KeyCode::PageDown => {
-                        let height = self.last_history_projection.rows.len() as u16;
+                        let height = self.last_history_viewport_height;
+                        if height == 0 {
+                            return false;
+                        }
                         if self.last_history_projection.page_down_reaches_tail(height) {
                             self.history_scroll.jump_to_end();
                         } else if let Some(anchor) = self.last_history_projection.page_down(height)

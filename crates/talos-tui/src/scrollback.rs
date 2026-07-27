@@ -36,7 +36,29 @@ pub(crate) use crate::scrollback_status::build_status_text;
 #[cfg(test)]
 pub(crate) use crate::scrollback_status::truncate_str;
 
-/// Returns the cursor row and column within a custom-provider wizard panel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct LocalCursorPosition {
+    pub(crate) col: u16,
+    pub(crate) row: u16,
+}
+
+pub(crate) fn credential_cursor_position(
+    menu: &crate::state::BottomPanelState,
+) -> Option<LocalCursorPosition> {
+    if !menu.is_credential_input() {
+        return None;
+    }
+    let (row, buffer) = match menu.credential_field {
+        crate::state::CredentialField::ApiKey => (2, &menu.credential_buffer),
+        crate::state::CredentialField::BaseUrl => (3, &menu.base_url_buffer),
+    };
+    Some(LocalCursorPosition {
+        col: credential_cursor_col(buffer),
+        row,
+    })
+}
+
+/// Returns the cursor position within a custom-provider wizard panel.
 ///
 /// Entry steps place the cursor after the editable value; protocol places it
 /// on the selected option; confirmation has no editable field and anchors it
@@ -56,7 +78,7 @@ pub(crate) fn provider_wizard_cursor_position(
         return None;
     };
 
-    Some(match step {
+    let (row, col) = match step {
         crate::state::WizardStep::Name => (2, credential_cursor_col(name)),
         crate::state::WizardStep::Protocol => {
             let row = if protocol == "anthropic-messages" {
@@ -69,7 +91,14 @@ pub(crate) fn provider_wizard_cursor_position(
         crate::state::WizardStep::BaseUrl => (2, credential_cursor_col(base_url)),
         crate::state::WizardStep::ApiKey => (2, credential_cursor_col(api_key)),
         crate::state::WizardStep::Confirm => (0, 0),
-    })
+    };
+    Some((row, col))
+}
+
+pub(crate) fn provider_wizard_local_cursor_position(
+    menu: &crate::state::BottomPanelState,
+) -> Option<LocalCursorPosition> {
+    provider_wizard_cursor_position(menu).map(|(row, col)| LocalCursorPosition { col, row })
 }
 
 pub(crate) struct PreviewComponent<'a> {

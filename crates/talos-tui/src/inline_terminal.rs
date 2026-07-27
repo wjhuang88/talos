@@ -130,6 +130,8 @@ pub struct TerminalSession {
     screen_size: Size,
     last_known_cursor_pos: Position,
     lifecycle: TerminalLifecycleState,
+    #[cfg(test)]
+    test_mode: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -190,6 +192,8 @@ impl TerminalSession {
             screen_size,
             last_known_cursor_pos: Position::new(0, 0),
             lifecycle,
+            #[cfg(test)]
+            test_mode: false,
         })
     }
 
@@ -208,7 +212,13 @@ impl TerminalSession {
             screen_size: Size::new(80, 24),
             last_known_cursor_pos: Position::new(0, 0),
             lifecycle: TerminalLifecycleState::default(),
+            test_mode: true,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_test_size(&mut self, size: Size) {
+        self.screen_size = size;
     }
 
     #[allow(dead_code)]
@@ -222,6 +232,10 @@ impl TerminalSession {
 
     #[allow(dead_code)]
     pub fn size(&mut self) -> io::Result<Size> {
+        #[cfg(test)]
+        if self.test_mode {
+            return Ok(self.screen_size);
+        }
         let size = self.backend.size()?;
         self.screen_size = size;
         Ok(size)
@@ -263,6 +277,12 @@ impl TerminalSession {
             draw_fn(&mut frame);
         }
 
+        #[cfg(test)]
+        if self.test_mode {
+            self.current = prev_idx;
+            return Ok(());
+        }
+
         if force_clear {
             let writer = self.backend_mut();
             for y in area.y..area.bottom() {
@@ -296,6 +316,10 @@ impl TerminalSession {
             return Ok(());
         };
         self.last_known_cursor_pos = position;
+        #[cfg(test)]
+        if self.test_mode {
+            return Ok(());
+        }
         let writer = self.backend_mut();
         queue!(writer, MoveTo(position.x, position.y))?;
         queue!(writer, Show)?;
@@ -303,11 +327,28 @@ impl TerminalSession {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn hide_cursor(&mut self) -> io::Result<()> {
+        #[cfg(test)]
+        if self.test_mode {
+            return Ok(());
+        }
         let writer = self.backend_mut();
         queue!(writer, Hide)?;
         io::Write::flush(writer)
+    }
+
+    pub fn set_cursor_in_rect(
+        &mut self,
+        rect: Rect,
+        local_col: u16,
+        local_row: u16,
+    ) -> io::Result<()> {
+        if rect.width == 0 || rect.height == 0 {
+            return self.hide_cursor();
+        }
+        let position = cursor_position_in_rect(rect, local_col, local_row)
+            .expect("non-empty rectangle has a cursor position");
+        self.set_cursor(position.x, position.y)
     }
 
     pub fn restore(&mut self) -> io::Result<()> {
@@ -318,6 +359,17 @@ impl TerminalSession {
     pub fn get_frame_area(&self) -> Rect {
         self.frame_area
     }
+}
+
+fn cursor_position_in_rect(rect: Rect, local_col: u16, local_row: u16) -> Option<Position> {
+    (rect.width > 0 && rect.height > 0).then(|| {
+        Position::new(
+            rect.x
+                .saturating_add(local_col.min(rect.width.saturating_sub(1))),
+            rect.y
+                .saturating_add(local_row.min(rect.height.saturating_sub(1))),
+        )
+    })
 }
 
 fn initialize_lifecycle(
@@ -530,6 +582,16 @@ mod tests {
         );
         assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(0, 1)), None);
         assert_eq!(clamp_cursor(Position::new(0, 0), Size::new(1, 0)), None);
+    }
+
+    #[test]
+    fn cursor_in_rect_clamps_to_final_component_bounds() {
+        let rect = Rect::new(5, 7, 3, 2);
+        assert_eq!(
+            cursor_position_in_rect(rect, 99, 99),
+            Some(Position::new(7, 8))
+        );
+        assert_eq!(cursor_position_in_rect(Rect::new(0, 0, 0, 2), 0, 0), None);
     }
 
     #[test]
