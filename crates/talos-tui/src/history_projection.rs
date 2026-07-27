@@ -85,6 +85,24 @@ impl HistoryProjection {
         self.visible_start.saturating_add(page)
             >= self.total_rows.saturating_sub(usize::from(height))
     }
+
+    pub(crate) fn scroll_up(&self, rows: usize) -> Option<LogicalContentAnchor> {
+        self.all_rows
+            .get(self.visible_start.saturating_sub(rows))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn scroll_down(&self, rows: usize, height: u16) -> Option<LogicalContentAnchor> {
+        let max_start = self.total_rows.saturating_sub(usize::from(height));
+        self.all_rows
+            .get(self.visible_start.saturating_add(rows).min(max_start))
+            .map(|row| row.start_anchor)
+    }
+
+    pub(crate) fn scroll_down_reaches_tail(&self, rows: usize, height: u16) -> bool {
+        self.visible_start.saturating_add(rows)
+            >= self.total_rows.saturating_sub(usize::from(height))
+    }
 }
 
 /// Projects logical transcript lines without changing their stored content.

@@ -2,7 +2,7 @@ use std::io;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
-use crossterm::event::{self, Event, EventStream, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, EventStream, KeyCode, KeyEventKind, MouseEventKind};
 use futures::{Stream, StreamExt};
 use ratatui::{
     style::{Modifier, Style},
@@ -113,6 +113,7 @@ fn ratatui_color(color: crossterm::style::Color) -> ratatui::style::Color {
 
 const PROCESSING_FRAME_INTERVAL: Duration = Duration::from_millis(150);
 const IME_ENTER_WINDOW: Duration = Duration::from_millis(50);
+const MOUSE_HISTORY_SCROLL_ROWS: usize = 3;
 
 pub struct Tui {
     state: TuiState,
@@ -1325,6 +1326,36 @@ impl Tui {
             }
             Event::Paste(text) => {
                 self.state.input_paste(text);
+            }
+            Event::Mouse(mouse) => {
+                let height = self.last_history_viewport_height;
+                if height == 0 {
+                    return false;
+                }
+                match mouse.kind {
+                    MouseEventKind::ScrollUp => {
+                        if let Some(anchor) = self
+                            .last_history_projection
+                            .scroll_up(MOUSE_HISTORY_SCROLL_ROWS)
+                        {
+                            self.history_scroll.anchor(anchor, 0);
+                        }
+                    }
+                    MouseEventKind::ScrollDown => {
+                        if self
+                            .last_history_projection
+                            .scroll_down_reaches_tail(MOUSE_HISTORY_SCROLL_ROWS, height)
+                        {
+                            self.history_scroll.jump_to_end();
+                        } else if let Some(anchor) = self
+                            .last_history_projection
+                            .scroll_down(MOUSE_HISTORY_SCROLL_ROWS, height)
+                        {
+                            self.history_scroll.anchor(anchor, 0);
+                        }
+                    }
+                    _ => {}
+                }
             }
             Event::Resize(_, _) => {}
             _ => {}

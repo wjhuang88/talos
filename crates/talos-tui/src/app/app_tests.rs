@@ -243,18 +243,30 @@ fn stream_render_state_wraps_user_blocks_with_background_rows() {
     let mut state = StreamRenderState::default();
     let bg = scrollback::stream_bg_for(Some(&MessageSource::User));
 
-    assert_eq!(
-        state.start(MessageSource::User),
-        vec![ScrollbackLine::plain(String::new(), bg)]
-    );
-    assert_eq!(
-        state.finish(),
-        vec![ScrollbackLine::plain(String::new(), bg)]
-    );
+    let opening = state.start(MessageSource::User);
+    assert_eq!(opening.len(), 1);
+    assert_eq!(opening[0].bg, bg);
+    assert!(opening[0].fill.is_some());
+
+    let closing = state.finish();
+    assert_eq!(closing.len(), 1);
+    assert_eq!(closing[0].bg, bg);
+    assert!(closing[0].fill.is_some());
 
     state.reset();
     assert!(state.source().is_none());
     assert_eq!(state.preview(), "");
+}
+
+#[test]
+fn assistant_stream_drops_leading_empty_prefix_row() {
+    let mut state = StreamRenderState::default();
+    assert!(state.start(MessageSource::Assistant).is_empty());
+
+    let lines = state.push_chunk("\nactual response\n");
+
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].text, " ● actual response");
 }
 
 #[test]
@@ -560,20 +572,47 @@ fn stream_render_state_styles_block_markdown_rows() {
 fn stream_render_state_keeps_user_markdown_literal() {
     let mut state = StreamRenderState::default();
     let bg = scrollback::stream_bg_for(Some(&MessageSource::User));
-    assert_eq!(
-        state.start(MessageSource::User),
-        vec![ScrollbackLine::plain(String::new(), bg)]
-    );
+    let opening = state.start(MessageSource::User);
+    assert_eq!(opening.len(), 1);
+    assert_eq!(opening[0].bg, bg);
+    assert!(opening[0].fill.is_some());
 
     let lines = state.push_chunk("# literal **user** `input`\n");
 
     assert_eq!(lines.len(), 1);
     assert_eq!(lines[0].text, " > # literal **user** `input`");
+    assert!(lines[0].fill.is_some());
     assert!(
         lines[0]
             .segments
             .iter()
             .all(|segment| !segment.attrs.italic)
+    );
+}
+
+#[test]
+fn user_history_block_fills_the_current_history_width() {
+    let mut stream_count = 0;
+    let lines = scrollback::render_history_message(
+        &mut stream_count,
+        MessageSource::User,
+        "submitted text",
+    );
+    let mut transcript = crate::transcript::TranscriptStore::default();
+    for line in lines {
+        transcript.append(TranscriptBlock::StyledLine(line));
+    }
+
+    let projection = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
+    let bg = scrollback::stream_bg_for(Some(&MessageSource::User));
+
+    assert_eq!(projection.rows.len(), 3);
+    assert!(projection.rows.iter().all(|row| row.line.bg == bg));
+    assert!(
+        projection
+            .rows
+            .iter()
+            .all(|row| { unicode_width::UnicodeWidthStr::width(row.line.text.as_str()) == 20 })
     );
 }
 
@@ -1197,7 +1236,9 @@ fn submit_input_message_keeps_preview_for_empty_or_unsent_input() {
 
 // ── TUI-030 entry-point tests: actual handle_input_event key dispatch ─────
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+};
 
 fn key_press(code: KeyCode) -> Event {
     key_press_with_modifiers(code, KeyModifiers::NONE)
@@ -1210,6 +1251,15 @@ fn key_press_with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Event {
         KeyEventKind::Press,
         crossterm::event::KeyEventState::NONE,
     ))
+}
+
+fn mouse_scroll(kind: MouseEventKind) -> Event {
+    Event::Mouse(MouseEvent {
+        kind,
+        column: 0,
+        row: 0,
+        modifiers: KeyModifiers::NONE,
+    })
 }
 
 #[test]
@@ -1410,6 +1460,26 @@ fn entry_point_page_up_uses_history_rect_height() {
     tui.handle_input_event(&key_press(KeyCode::PageUp));
     let after = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
     assert_eq!(after.visible_start, 17);
+}
+
+#[test]
+fn entry_point_mouse_wheel_scrolls_history_without_browsing_composer_history() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.state.input_history = vec!["previous input".to_string()];
+    tui.state.input_append_str("live draft");
+    assert_eq!(tui.last_history_projection.visible_start, 20);
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+
+    assert_eq!(tui.state.input_buffer, "live draft");
+    assert!(tui.state.history_cursor.is_none());
+    let scrolled = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    assert_eq!(scrolled.visible_start, 17);
+
+    tui.last_history_projection = scrolled;
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollDown));
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+    assert_eq!(tui.state.input_buffer, "live draft");
 }
 
 #[test]

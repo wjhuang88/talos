@@ -90,7 +90,7 @@ impl StreamRenderState {
         self.hold_status = None;
 
         if bg.is_some() {
-            vec![ScrollbackLine::plain(String::new(), bg)]
+            vec![self.styled_line(Vec::new())]
         } else {
             Vec::new()
         }
@@ -133,6 +133,9 @@ impl StreamRenderState {
 
         let held_lines = std::mem::take(&mut self.held_lines);
         for (_, line) in held_lines {
+            if self.should_skip_leading_empty_line(&line) {
+                continue;
+            }
             lines.push(self.render_next_line(&line));
         }
 
@@ -145,7 +148,7 @@ impl StreamRenderState {
         }
 
         if self.bg().is_some() {
-            lines.push(ScrollbackLine::plain(String::new(), self.bg()));
+            lines.push(self.styled_line(Vec::new()));
         }
 
         self.reset();
@@ -173,7 +176,7 @@ impl StreamRenderState {
             return ScrollbackLine::styled_with_fill(segments, self.bg(), Some(fill));
         }
         segments.extend(crate::scrollback::render_markdown_segments(line, block));
-        ScrollbackLine::styled(segments, self.bg())
+        self.styled_line(segments)
     }
 
     fn render_segments_line(
@@ -191,7 +194,7 @@ impl StreamRenderState {
             },
         )];
         segments.extend(content_segments);
-        ScrollbackLine::styled(segments, self.bg())
+        self.styled_line(segments)
     }
 
     fn render_plain_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
@@ -207,7 +210,7 @@ impl StreamRenderState {
             ),
             HistorySegment::raw(line),
         ];
-        ScrollbackLine::styled(segments, self.bg())
+        self.styled_line(segments)
     }
 
     fn render_block_line(
@@ -340,6 +343,9 @@ impl StreamRenderState {
     }
 
     fn push_complete_line(&mut self, line: String) -> Vec<ScrollbackLine> {
+        if self.should_skip_leading_empty_line(&line) {
+            return Vec::new();
+        }
         if !self.markdown_enabled() {
             return vec![self.render_next_line(&line)];
         }
@@ -414,6 +420,18 @@ impl StreamRenderState {
 
     fn bg(&self) -> Option<CColor> {
         crate::scrollback::stream_bg_for(self.source())
+    }
+
+    fn styled_line(&self, segments: Vec<HistorySegment>) -> ScrollbackLine {
+        let bg = self.bg();
+        let fill = bg.map(|_| HistorySegment::raw(" "));
+        ScrollbackLine::styled_with_fill(segments, bg, fill)
+    }
+
+    fn should_skip_leading_empty_line(&self, line: &str) -> bool {
+        line.is_empty()
+            && self.line_count == 0
+            && !matches!(self.source(), Some(MessageSource::User))
     }
 
     pub(crate) fn reset(&mut self) {
