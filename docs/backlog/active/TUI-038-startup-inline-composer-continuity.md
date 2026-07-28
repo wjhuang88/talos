@@ -5,7 +5,7 @@
 | Story ID | TUI-038 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | In Progress — I164 Active (2026-07-28) |
+| Status | In Progress — I164 Active; automated implementation complete (2026-07-28); awaiting rebuilt-binary human acceptance |
 | Source | Maintainer request 2026-07-28 |
 | Parent Epic | None |
 | Depends On | I163 Complete; TUI-035 Complete; ADR-054 Accepted |

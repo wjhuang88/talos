@@ -33,7 +33,7 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
-| I164 | Startup Inline Composer Continuity | Active — sole implementation authority (2026-07-28) | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. |
+| I164 | Startup Inline Composer Continuity | Active — automated implementation complete; awaiting rebuilt-binary human acceptance (2026-07-28) | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. 462 TUI + 2524 workspace tests pass. |
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |
@@ -293,7 +293,7 @@ Complete/Superseded dispositions without erasing their published objectives.
 |---|---|---|
 | I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`..`d4d95ad`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
 | I163 | Complete (2026-07-28) | SKILL-003. Discovery policy, safe shared-root default, traversal bounds, TOCTOU correction, and isolated tests complete. |
-| I164 | Active (2026-07-28) | TUI-038. Sole implementation authority for startup inline composer continuity. |
+| I164 | Active (2026-07-28) — automated implementation complete; awaiting rebuilt-binary human acceptance | TUI-038. Sole implementation authority for startup inline composer continuity. 462 TUI + 2524 workspace tests pass. |
 | I157 | Planned — resumes after I164 disposition | MODEL-010. CLI-only `config unset`; activation gate: I164 disposition (Complete or Paused). |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |

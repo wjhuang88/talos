@@ -89,14 +89,28 @@ then exit and confirm terminal restore.
 
 - Planning/governance validation: activation inventory complete; repository
   governance validation is replayed in the activation commit.
-- Focused tests: pending implementation.
-- Full locked validation: pending implementation completion.
-- Rebuilt-binary runtime evidence: pending activation.
+- Focused tests: 12 startup tests + full-frame Buffer assertions for 9 terminal
+  sizes (80x24, 160x40, 40x10, 20x5, 5x3, 3x2, 2x2, 1x1, 0x0) all pass.
+  `cargo test --locked -p talos-tui startup` = 11 passed, 0 failed.
+  `cargo test --locked -p talos-tui layout` = 14 passed, 0 failed.
+  `cargo test --locked -p talos-tui full_frame` = 2 passed, 0 failed.
+  `cargo test --locked -p talos-tui` = 462 passed, 0 failed.
+- Full locked validation: `cargo fmt --all -- --check` clean;
+  `cargo check --workspace --locked` exit 0;
+  `cargo clippy --workspace --locked -- -D warnings` exit 0;
+  `cargo test --workspace --locked` = 2524 passed, 0 failed;
+  `scripts/validate_project_governance.sh .` = 0 warnings;
+  `git diff --check` clean;
+  `cargo build --locked -p talos-cli` exit 0.
+- Rebuilt-binary runtime evidence: pending activation — rebuilt binary at
+  `target/debug/talos`; maintainer rebuilt-binary Alternate-Screen walkthrough
+  required before TUI-038 can move beyond In Progress.
 
 ## Completion Evidence
 
 - Prerequisite I163 Completion Commit: `12ef1e3`.
-- Completion Commit: pending implementation.
+- Completion Commit: pending — automated implementation complete; rebuilt-binary
+  human acceptance is the remaining gate before I164 can move to Complete.
 - A status-only documentation commit cannot satisfy completion evidence.
 
 ## Variance And Residuals
