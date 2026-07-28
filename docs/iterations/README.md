@@ -33,7 +33,8 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
-| I164 | Startup Inline Composer Continuity | Active — automated implementation complete; awaiting rebuilt-binary human acceptance (2026-07-28) | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. 462 TUI + 2524 workspace tests pass. |
+| I164 | Startup Inline Composer Continuity | Paused — superseded target (2026-07-28) | Published post-first-submit bottom-layout target retained as historical evidence; no Completion Commit. |
+| I165 | Growing Conversation Composer Continuity | Active (2026-07-28) | ⏳ Composer follows the short Logo/history flow and becomes bottom-fixed only once the frame overflows. |
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |
@@ -293,8 +294,9 @@ Complete/Superseded dispositions without erasing their published objectives.
 |---|---|---|
 | I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`..`d4d95ad`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
 | I163 | Complete (2026-07-28) | SKILL-003. Discovery policy, safe shared-root default, traversal bounds, TOCTOU correction, and isolated tests complete. |
-| I164 | Active (2026-07-28) — automated implementation complete; awaiting rebuilt-binary human acceptance | TUI-038. Sole implementation authority for startup inline composer continuity. 462 TUI + 2524 workspace tests pass. |
-| I157 | Planned — resumes after I164 disposition | MODEL-010. CLI-only `config unset`; activation gate: I164 disposition (Complete or Paused). |
+| I164 | Paused (2026-07-28) — superseded target | TUI-038. Published post-first-submit bottom-layout behavior retained as historical evidence; no Completion Commit. |
+| I165 | Active (2026-07-28) | TUI-039. Sole implementation authority for growing conversation composer continuity. |
+| I157 | Planned — resumes after I165 disposition | MODEL-010. CLI-only `config unset`; activation gate: I165 disposition. |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
@@ -310,7 +312,7 @@ The current execution sequence is the
 [v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
 listed above.
 
-I164 is Active as the sole implementation iteration and TUI-038 is In Progress.
+I165 is Active as the sole implementation iteration and TUI-039 is In Progress.
 I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
 current selection, planning, status, or activation owner.
 

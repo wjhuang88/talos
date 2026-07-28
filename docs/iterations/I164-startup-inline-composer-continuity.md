@@ -1,11 +1,11 @@
 # Iteration I164: Startup Inline Composer Continuity
 
-> Document status: Active
+> Document status: Paused — superseded layout target moved to I165 (2026-07-28)
 > Published plan date: 2026-07-28
 > Planned objective: Restore a compact new-session composer position approximately two rows below the Alternate-Screen Logo, then transition cleanly to the existing full-frame conversation layout after the first submitted user message.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: A rebuilt `talos` TUI shows an editable startup composer near the Logo, preserves it through first-draft redraws, and transitions to normal history/composer layout after first submission without transcript or resize regressions.
-> Activation rule: satisfied 2026-07-28; I163 is Complete and the activation record below makes I164 the sole implementation authority.
+> Activation rule: historical. I164 was activated on 2026-07-28 and later paused when manual verification changed its post-first-submit target; I165 is now the sole implementation authority.
 
 ## Published Baseline
 
@@ -128,6 +128,12 @@ then exit and confirm terminal restore.
 
 - The maintainer priority shift changes execution order only. I157's published
   baseline remains intact and its owner document records the deferral.
+- Rebuilt-binary manual verification found that I164's accepted first-submit
+  transition is not the intended product experience: the composer moves to the
+  terminal bottom while the conversation is still short. The published I164
+  baseline remains historical evidence; I165/TUI-039 owns the changed
+  growing-history layout target. I164 has no Completion Commit and is paused,
+  not complete.
 
 ## Retrospective
 

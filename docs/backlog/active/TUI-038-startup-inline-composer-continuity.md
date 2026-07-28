@@ -5,12 +5,12 @@
 | Story ID | TUI-038 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | In Progress — I164 Active; automated implementation complete (2026-07-28); awaiting rebuilt-binary human acceptance |
+| Status | Paused — I164 baseline is superseded by TUI-039 after rebuilt-binary manual verification (2026-07-28) |
 | Source | Maintainer request 2026-07-28 |
 | Parent Epic | None |
 | Depends On | I163 Complete; TUI-035 Complete; ADR-054 Accepted |
 | Blocks | None |
-| Selected Iteration | I164 (Active; sole implementation authority) |
+| Selected Iteration | I164 (Paused; historical implementation authority) |
 
 ## Identity / Goal / Value
 
@@ -143,6 +143,9 @@ history rather than jumping across unused screen space.
 - This story deliberately defines startup as "before the first submitted user
   message." Any request to keep the composer beside the Logo during later turns
   is a separate layout product decision.
-- I163 is Complete and I164 is Active. I157 remains a published Planned
-  baseline and is explicitly deferred until I164 disposition by the
+- I163 is Complete and I164 is paused. I157 remains a published Planned
+  baseline and is explicitly deferred until I165 disposition by the
   maintainer's 2026-07-28 priority shift.
+- Manual verification rejected the specified post-first-submit transition to a
+  bottom composer. This document preserves that published baseline and its
+  implementation evidence; TUI-039/I165 owns the replacement behavior.
