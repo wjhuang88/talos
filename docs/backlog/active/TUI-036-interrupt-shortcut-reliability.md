@@ -135,5 +135,7 @@ approval/modal priority, failure/timeout recovery, and idle exit.
 ## Residuals
 
 - The known stale Ctrl+C exit-state trigger is corrected by `f77a6f0`.
-- The planned Ctrl+C-to-Esc active-turn shortcut migration remains unimplemented
-  and is now the active I166 deliverable.
+- The Ctrl+C-to-Esc active-turn shortcut migration is implemented in `d85514e`.
+  Automated entry-point tests (15 total) and full locked workspace validation
+  pass. Rebuilt-binary terminal acceptance remains required before this story
+  can move beyond In Progress.

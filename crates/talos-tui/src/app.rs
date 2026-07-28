@@ -1294,7 +1294,7 @@ impl Tui {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.state.tip = Some(Tip {
                             kind: TipKind::ExitHint,
-                            text: "Input cleared. Press Ctrl+C again to exit.".to_string(),
+                            text: "Input cleared. Press Ctrl+C twice to exit.".to_string(),
                             ttl: Duration::from_secs(2),
                             created_at: Instant::now(),
                         });

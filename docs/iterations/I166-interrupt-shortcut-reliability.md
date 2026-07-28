@@ -195,19 +195,19 @@ Blocked or Active as appropriate; do not broaden scope.
 
 ## Verification Evidence
 
-- Focused tests: 12 entry-point tests through `Tui::handle_input_event` +
+- Focused tests: 15 entry-point tests through `Tui::handle_input_event` +
   renamed legacy consecutive-cancel test. All pass.
   `cargo test --locked -p talos-tui --lib entry_point_esc` = 7 passed.
-  `cargo test --locked -p talos-tui --lib entry_point_ctrl_c` = 3 passed.
+  `cargo test --locked -p talos-tui --lib entry_point_ctrl_c` = 6 passed.
   `cargo test --locked -p talos-tui --lib modified_ctrl_c` = 1 passed.
   `cargo test --locked -p talos-tui --lib repeated_esc` = 1 passed.
   `cargo test --locked -p talos-tui --lib test_ctrl_c` = 3 passed.
   `cargo test --locked -p talos-tui --lib esc_cancels_each` = 1 passed.
-  `cargo test --locked -p talos-tui --lib` = 480 passed, 0 failed.
+  `cargo test --locked -p talos-tui --lib` = 483 passed, 0 failed.
 - Full locked validation: `cargo fmt --all -- --check` clean;
   `cargo check --workspace --locked` exit 0;
   `cargo clippy --workspace --locked -- -D warnings` exit 0;
-  `cargo test --workspace --locked` = 2542 passed, 0 failed;
+  `cargo test --workspace --locked` = 2545 passed, 0 failed;
   `scripts/validate_project_governance.sh .` = 0 warnings;
   `git diff --check` clean;
   `cargo build --locked -p talos-cli` exit 0.

@@ -2698,3 +2698,101 @@ fn repeated_esc_does_not_corrupt_cancellation_state() {
     );
     assert_one_cancel(&mut rx);
 }
+
+#[test]
+fn entry_point_ctrl_c_draft_clear_tip_says_twice_and_requires_double_press() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.input_append_str("some draft");
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&ctrl_c_event());
+    assert!(!should_exit, "Ctrl+C with draft must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(tui.state.input_buffer.is_empty(), "draft must be cleared");
+    assert!(
+        matches!(tui.state.ctrl_c_state, CtrlCState::Idle),
+        "ctrl_c_state must be Idle after clearing draft"
+    );
+    let tip_text = tui
+        .state
+        .tip
+        .as_ref()
+        .expect("tip must be shown after clearing draft")
+        .text
+        .as_str();
+    assert!(
+        tip_text.contains("twice"),
+        "tip must say 'twice', got: {tip_text}"
+    );
+
+    // one more Ctrl+C does NOT exit — it only arms the first press
+    let second = tui.handle_input_event(&ctrl_c_event());
+    assert!(!second, "second Ctrl+C must arm, not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        matches!(tui.state.ctrl_c_state, CtrlCState::Waiting(_)),
+        "second Ctrl+C must arm the exit gesture"
+    );
+
+    // third Ctrl+C exits
+    let third = tui.handle_input_event(&ctrl_c_event());
+    assert!(third, "third Ctrl+C must exit");
+    assert!(tui.state.should_exit);
+}
+
+#[test]
+fn entry_point_ctrl_c_slash_menu_closes_without_cancel_or_exit() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.open_slash_menu(talos_conversation::command_registry());
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&ctrl_c_event());
+    assert!(!should_exit, "Ctrl+C in slash menu must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        !tui.state.slash_menu.is_open,
+        "Ctrl+C must close the slash menu"
+    );
+    assert!(
+        tui.state.input_buffer.is_empty(),
+        "Ctrl+C must clear the input buffer"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Ctrl+C must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_ctrl_c_approval_denies_without_cancel_or_exit() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let (resp_tx, mut resp_rx) = tokio::sync::oneshot::channel();
+    tui.state.pending_approval_response = Some(resp_tx);
+    tui.show_approval("test_tool", "args");
+
+    let should_exit = tui.handle_input_event(&ctrl_c_event());
+    assert!(!should_exit, "Ctrl+C in approval must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        matches!(tui.state.approval_state, ApprovalState::Hidden),
+        "Ctrl+C must resolve and hide approval"
+    );
+    let choice = resp_rx
+        .try_recv()
+        .expect("approval response channel must receive a choice");
+    assert!(
+        matches!(choice, ApprovalChoice::Deny),
+        "Ctrl+C in approval must Deny"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Ctrl+C in approval must not change processing state"
+    );
+}
