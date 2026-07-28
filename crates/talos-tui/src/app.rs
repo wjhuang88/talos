@@ -63,13 +63,26 @@ fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'st
 
 fn frame_history_lines(
     history: &HistoryProjection,
-    splash: Vec<Line<'static>>,
+    splash: &[Line<'static>],
     frame_start: usize,
+    startup_spacer_rows: usize,
 ) -> Vec<Line<'static>> {
+    let splash_len = splash.len();
+    let prefix_len = splash_len + startup_spacer_rows;
     let mut lines = Vec::new();
-    if frame_start < splash.len() {
-        lines.extend(splash.into_iter().skip(frame_start));
+
+    if frame_start < splash_len {
+        lines.extend(splash.iter().skip(frame_start).cloned());
+        for _ in 0..startup_spacer_rows {
+            lines.push(Line::default());
+        }
+    } else if frame_start < prefix_len {
+        let remaining_spacers = prefix_len - frame_start;
+        for _ in 0..remaining_spacers {
+            lines.push(Line::default());
+        }
     }
+
     lines.extend(history.rows.iter().map(history_line));
     lines
 }
@@ -875,6 +888,12 @@ impl Tui {
             next_processing_frame(self.state.status.is_processing, self.processing_frame);
     }
 
+    fn is_startup_mode(&self) -> bool {
+        self.transcript.entries().is_empty()
+            && !self.state.slash_menu.is_open
+            && matches!(self.state.approval_state, ApprovalState::Hidden)
+    }
+
     fn draw_frame(&mut self) -> io::Result<()> {
         let state = &self.state;
         let status = &state.status;
@@ -926,7 +945,27 @@ impl Tui {
 
         let screen_size = self.terminal.size()?;
         let width = screen_size.width;
+        let is_startup = self.is_startup_mode();
+        let splash = crate::splash::viewport_splash_lines(width);
+        let splash_rows = splash.len();
+        let startup_spacer_rows: usize = if is_startup { 2 } else { 0 };
+        let history_cap = if is_startup {
+            Some((splash_rows + startup_spacer_rows) as u16)
+        } else {
+            None
+        };
         let status_comp = crate::scrollback::StatusComponent { status, width };
+
+        let preview_h = if is_startup {
+            0
+        } else {
+            preview.height_hint(width)
+        };
+        let tips_h = if is_startup {
+            0
+        } else {
+            tips.height_hint(width)
+        };
 
         let input_natural = crate::scrollback::InputComponent {
             state,
@@ -934,8 +973,8 @@ impl Tui {
         }
         .height_hint(width);
         let modal_natural = bottom_panel.height_hint(width);
-        let fixed_heights = preview.height_hint(width)
-            + tips.height_hint(width)
+        let fixed_heights = preview_h
+            + tips_h
             + input_pad_top.height_hint(width)
             + input_pad_bot.height_hint(width)
             + status_comp.height_hint(width);
@@ -978,9 +1017,9 @@ impl Tui {
         let app_layout = compute_app_layout(
             screen_size,
             ComponentMetrics {
-                preview: preview.height_hint(width),
+                preview: preview_h,
                 queue: queue.height_hint(width),
-                tips: tips.height_hint(width),
+                tips: tips_h,
                 panel_required: if state.slash_menu.is_credential_input()
                     || state.slash_menu.is_provider_wizard()
                     || !matches!(state.approval_state, ApprovalState::Hidden)
@@ -991,6 +1030,7 @@ impl Tui {
                 },
                 panel_preferred: bottom_panel.height_hint(width),
                 composer: actual_input_h,
+                history_cap,
             },
             menu_placement,
         );
@@ -1003,8 +1043,6 @@ impl Tui {
             &self.history_scroll,
         );
         self.last_history_projection = history.clone();
-        let splash = crate::splash::viewport_splash_lines(screen_size.width);
-        let splash_rows = splash.len();
         if let Some(prefix_start) = self.history_prefix_start.as_mut() {
             *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
         }
@@ -1027,7 +1065,12 @@ impl Tui {
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
-                let history_text = frame_history_lines(&history, splash, frame_history_start);
+                let history_text = frame_history_lines(
+                    &history,
+                    &splash,
+                    frame_history_start,
+                    startup_spacer_rows,
+                );
                 frame.render_widget(Paragraph::new(history_text), area);
             }
             if let Some(area) = app_layout.preview {

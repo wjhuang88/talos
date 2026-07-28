@@ -12,6 +12,11 @@ pub(crate) struct ComponentMetrics {
     pub(crate) panel_required: u16,
     pub(crate) panel_preferred: u16,
     pub(crate) composer: u16,
+    /// When set, history height is capped at this value instead of consuming
+    /// all remaining space. Used by the startup inline-composer layout so the
+    /// composer sits just below the Logo virtual prefix rather than at the
+    /// terminal bottom.
+    pub(crate) history_cap: Option<u16>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -68,7 +73,10 @@ fn allocate_heights(total: u16, metrics: ComponentMetrics) -> AllocatedComponent
     let queue = take(metrics.queue);
     let panel_optional = take(metrics.panel_preferred.saturating_sub(panel_required));
     let composer_extra = take(metrics.composer.saturating_sub(composer));
-    let history = remaining;
+    let history = match metrics.history_cap {
+        Some(cap) => remaining.min(cap),
+        None => remaining,
+    };
 
     AllocatedComponentHeights {
         history,
@@ -143,6 +151,7 @@ mod tests {
             panel_required: 2,
             panel_preferred: 4,
             composer: 3,
+            history_cap: None,
         }
     }
 

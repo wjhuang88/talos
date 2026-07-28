@@ -1879,3 +1879,338 @@ fn provider_entry_cursor_hides_when_field_is_clipped_and_confirm_has_no_cursor()
     let tui = render_modal_for_cursor(panel, 40, 20);
     assert!(!tui.terminal.test_cursor_visible());
 }
+
+// ---------------------------------------------------------------------------
+// I164 / TUI-038: Startup Inline Composer Continuity
+// ---------------------------------------------------------------------------
+
+fn startup_tui_at(width: u16, height: u16) -> crate::app::Tui {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(width, height));
+    tui
+}
+
+#[test]
+fn startup_layout_places_composer_two_rows_below_logo() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.draw_frame().expect("startup frame renders");
+
+    let cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("cursor visible in startup composer");
+    let splash_rows = crate::splash::viewport_splash_lines(80).len();
+    // In startup mode, preview and tips are suppressed (0 rows), so:
+    // composer_y = splash_rows + 2 spacers + 1 composer_top_pad
+    let expected_y = (splash_rows + 2 + 1) as u16;
+    assert_eq!(
+        cursor.y, expected_y,
+        "composer cursor should be {} (splash {} + 2 spacers + 1 top_pad), got {}",
+        expected_y, splash_rows, cursor.y
+    );
+    assert!(cursor.y < 24, "cursor must be within terminal bounds");
+}
+
+#[test]
+fn startup_draft_does_not_mutate_transcript() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.state.input_append_str("draft text");
+    tui.draw_frame().expect("startup draft frame");
+    assert!(tui.transcript.entries().is_empty());
+
+    tui.state.input_clear();
+    tui.draw_frame().expect("startup cleared draft frame");
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn startup_draft_redraw_preserves_logo_and_cursor() {
+    let mut tui = startup_tui_at(80, 24);
+
+    tui.state.input_append_str("first edit");
+    tui.draw_frame().expect("first startup draft frame");
+    let first_cursor = tui.terminal.test_cursor_position().expect("cursor 1");
+    let first_render = tui.terminal.test_rendered_text();
+    assert!(
+        first_render.contains("████████"),
+        "logo visible on first draw"
+    );
+
+    tui.state.input_append_str(" and more");
+    tui.draw_frame().expect("second startup draft frame");
+    let second_cursor = tui.terminal.test_cursor_position().expect("cursor 2");
+    let second_render = tui.terminal.test_rendered_text();
+    assert!(
+        second_render.contains("████████"),
+        "logo still visible on redraw"
+    );
+    assert_eq!(
+        first_cursor.y, second_cursor.y,
+        "composer row must stay stable across draft redraws"
+    );
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn first_submit_transitions_to_normal_layout_once() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.input_append_str("hello world");
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+
+    tui.draw_frame().expect("startup frame");
+    let startup_cursor = tui.terminal.test_cursor_position().expect("startup cursor");
+    assert!(
+        startup_cursor.y < 20,
+        "startup composer should be near top, got y={}",
+        startup_cursor.y
+    );
+
+    tui.handle_input_event(&key_press(KeyCode::Enter));
+    let _ = rx.try_recv().expect("message dispatched");
+
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "hello world".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit");
+    tui.draw_frame().expect("conversation frame");
+    let conv_cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("conversation cursor");
+    assert_ne!(
+        conv_cursor.y, startup_cursor.y,
+        "layout must transition after first submit"
+    );
+
+    tui.draw_frame().expect("second conversation frame");
+    let conv_cursor_2 = tui.terminal.test_cursor_position().expect("second cursor");
+    assert_eq!(
+        conv_cursor.y, conv_cursor_2.y,
+        "no second transition — layout must be stable"
+    );
+}
+
+#[test]
+fn first_user_message_appears_below_logo_prefix() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "first user message".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit");
+    tui.draw_frame().expect("conversation frame");
+
+    let rendered = tui.terminal.test_rendered_text();
+    let logo_offset = rendered
+        .find("The watchman never sleeps")
+        .expect("logo should remain visible");
+    let msg_offset = rendered
+        .find("first user message")
+        .expect("user message should be visible");
+    assert!(
+        logo_offset < msg_offset,
+        "user message must appear below the logo prefix"
+    );
+    assert!(tui.transcript.entries().iter().all(|entry| {
+        !matches!(
+            &entry.block,
+            crate::transcript::TranscriptBlock::StyledLine(line)
+                if line.text.contains("The watchman never sleeps")
+        )
+    }));
+}
+
+#[test]
+fn startup_spacers_are_projection_only() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.draw_frame().expect("startup frame 1");
+    assert!(tui.transcript.entries().is_empty());
+    tui.draw_frame().expect("startup frame 2");
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn startup_resize_preserves_layout_invariants() {
+    for (width, height) in [(80, 24), (120, 30), (40, 10)] {
+        let mut tui = startup_tui_at(width, height);
+        tui.draw_frame()
+            .unwrap_or_else(|e| panic!("{width}x{height}: {e}"));
+        assert!(tui.transcript.entries().is_empty());
+        if let Some(cursor) = tui.terminal.test_cursor_position() {
+            assert!(
+                cursor.x < width && cursor.y < height,
+                "cursor ({}, {}) out of bounds for {width}x{height}",
+                cursor.x,
+                cursor.y
+            );
+        }
+    }
+}
+
+#[test]
+fn startup_short_terminal_uses_bounded_fallback() {
+    for (width, height) in [(5, 3), (3, 2), (2, 2), (1, 1), (0, 0)] {
+        let mut tui = startup_tui_at(width, height);
+        tui.draw_frame()
+            .unwrap_or_else(|e| panic!("{width}x{height}: {e}"));
+        if let Some(cursor) = tui.terminal.test_cursor_position() {
+            assert!(
+                cursor.x < width && cursor.y < height,
+                "cursor ({}, {}) out of bounds for {width}x{height}",
+                cursor.x,
+                cursor.y
+            );
+        }
+        assert!(tui.transcript.entries().is_empty());
+    }
+}
+
+#[test]
+fn startup_multiline_and_cjk_cursor_is_bounded() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.state.input_append_str("你好\nworld");
+    tui.draw_frame().expect("multiline CJK startup frame");
+
+    let cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("cursor visible for multiline CJK");
+    assert!(
+        cursor.x < 80 && cursor.y < 24,
+        "cursor ({}, {}) must be within 80x24",
+        cursor.x,
+        cursor.y
+    );
+    let splash_rows = crate::splash::viewport_splash_lines(80).len();
+    assert!(
+        cursor.y >= (splash_rows + 2) as u16,
+        "cursor should be at or below the spacer rows, got y={}",
+        cursor.y
+    );
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn startup_mouse_wheel_does_not_enter_composer_history() {
+    let mut state = TuiState::new();
+    state.input_history = vec!["previous input".to_string()];
+    state.input_append_str("live draft");
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("startup frame");
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("after scroll up");
+
+    assert_eq!(
+        tui.state.input_buffer, "live draft",
+        "mouse wheel must not browse composer input history"
+    );
+    assert!(
+        tui.state.history_cursor.is_none(),
+        "history cursor must not move from mouse wheel"
+    );
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn post_submit_preview_and_history_are_continuous() {
+    let mut tui = startup_tui_at(80, 24);
+
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "question".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit user");
+
+    tui.state.status.is_processing = true;
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::Assistant,
+            text: "answer text".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit assistant");
+    tui.draw_frame().expect("conversation frame");
+
+    let rendered = tui.terminal.test_rendered_text();
+    let user_offset = rendered.find("question").expect("user message visible");
+    let answer_offset = rendered
+        .find("answer text")
+        .expect("assistant response visible");
+    assert!(
+        user_offset < answer_offset,
+        "assistant response must be continuous after user message"
+    );
+}
+
+#[test]
+fn startup_terminal_restore_does_not_regress() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.draw_frame().expect("startup frame before restore");
+    tui.restore().expect("terminal restore should succeed");
+}
+
+#[test]
+fn startup_full_frame_buffer_assertions_all_sizes() {
+    for (width, height) in [
+        (80, 24),
+        (160, 40),
+        (40, 10),
+        (20, 5),
+        (5, 3),
+        (3, 2),
+        (2, 2),
+        (1, 1),
+        (0, 0),
+    ] {
+        let mut tui = startup_tui_at(width, height);
+        tui.draw_frame()
+            .unwrap_or_else(|e| panic!("{width}x{height}: {e}"));
+        assert!(
+            tui.transcript.entries().is_empty(),
+            "transcript must be empty at {width}x{height}"
+        );
+        if let Some(cursor) = tui.terminal.test_cursor_position() {
+            assert!(
+                cursor.x < width && cursor.y < height,
+                "cursor ({}, {}) out of bounds at {width}x{height}",
+                cursor.x,
+                cursor.y
+            );
+        }
+    }
+
+    // At normal sizes, the Logo should be visible
+    let mut tui = startup_tui_at(80, 24);
+    tui.draw_frame().expect("80x24 frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("████████"), "wide logo at 80 cols");
+    assert!(
+        rendered.contains("The watchman never sleeps"),
+        "subtitle at 80 cols"
+    );
+
+    let mut tui = startup_tui_at(160, 40);
+    tui.draw_frame().expect("160x40 frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("████████"), "wide logo at 160 cols");
+
+    // At narrow sizes, compact logo
+    let mut tui = startup_tui_at(40, 10);
+    tui.draw_frame().expect("40x10 frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("_____"), "compact logo at 40 cols");
+}
