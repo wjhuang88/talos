@@ -57,8 +57,15 @@ leave the session permanently unable to interrupt subsequent turns.
 
 ## Uncertainty And Validation Path
 
-The triggering condition for the stuck Ctrl+C report is not yet known. Before
-marking this story Ready, document the cancellation state machine and exercise
+The reported consecutive-turn trigger is now known: active-turn Ctrl+C reused
+the idle double-press exit state, and an automatically started queued turn
+inherited the armed first press. Post-completion TUI-009 correction `f77a6f0`
+separates those state machines and adds deterministic entry-point coverage.
+This correction preserves the current Ctrl+C cancellation behavior; it does
+not select or complete this Story's planned Esc migration.
+
+Before marking this story Ready, document the remaining cancellation state
+matrix and exercise
 at least: normal streaming, tool execution, approval visibility, modal input,
 cancel during shutdown, timeout/failure, repeated Esc, and a new turn after
 each terminal state. If the root cause lies outside the existing TUI/
@@ -112,6 +119,8 @@ than broadening this story silently.
 
 ## Residuals
 
-- The report's original trigger remains to be discovered during refinement.
+- The known stale Ctrl+C exit-state trigger is corrected by `f77a6f0`.
+- The planned Ctrl+C-to-Esc active-turn shortcut migration remains unimplemented
+  and requires explicit iteration selection.
 - Selection requires an explicitly sequenced future iteration; it is not
   selected automatically by I156/TUI-035 completion.

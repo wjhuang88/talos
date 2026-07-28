@@ -88,6 +88,21 @@ Maintainer-guided rebuilt-binary acceptance completed on 2026-07-20 and was judg
 passing. This closes the Shift+Enter, portable fallback, composer/history wrapping,
 CJK, cursor/editing, height/scroll, and bare-Enter submission checks.
 
+## Post-Completion Alternate-Screen Regression Correction (2026-07-28)
+
+The Alternate-Screen renderer migration exposed that terminal keyboard-mode stacks
+are screen-local. Talos had pushed keyboard enhancement before entering the
+alternate screen, so Alacritty still reported Shift+Enter like bare Enter in the
+screen where the TUI consumed events. Commit `4a2d31a` now enters the alternate
+screen before pushing `REPORT_EVENT_TYPES` and the existing modified-key flags,
+and pops those flags before leaving that screen. Capability-query errors use a
+best-effort enablement path while an explicit unsupported response retains
+Ctrl+J as the portable fallback.
+
+Focused lifecycle/entry-point tests, 468 `talos-tui` tests, locked workspace
+checks/tests, and maintainer Alacritty verification passed. TUI-032 remains
+Complete; this is post-completion regression evidence, not a new scope.
+
 ## Required Reads
 
 - `crates/talos-tui/src/app.rs` — composer rendering, input handling

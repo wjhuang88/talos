@@ -54,6 +54,7 @@ repeating known mistakes.
 | 42 | TUI | 切换 Primary/Alternate Screen 所有权时，Logo 必须在目标 screen 建立后由同一 renderer 绘制 | I156/TUI-035 |
 | 43 | TUI | Alternate Screen 必须显式捕获滚轮；背景样式和语义空行必须由最终 projection 测试，而不能只检查逻辑字段 | I156/TUI-035 |
 | 44 | TUI | display-only 历史前缀必须与逻辑 Transcript 共享连续导航坐标，否则滚轮边界会跳变且无法返回前缀 | I156/TUI-035 |
+| 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |
 
 ## Lessons
 
@@ -798,3 +799,19 @@ repeating known mistakes.
 - Prevention: Test both shrinking and growing transient viewport components; a buffer-only widget
   test cannot prove terminal repaint correctness after a viewport-area change.
 - Promoted to rule/check: `inline_terminal::tests::viewport_growth_requires_full_clear_to_prevent_stale_rows`.
+
+## 2026-07-28 - Terminal input modes and application gestures need explicit ownership
+
+- Trigger: Shift+Enter regressed after the Alternate-Screen migration, then a second Ctrl+C exited
+  while queued content had already started another active turn.
+- Symptom: Alacritty reported Shift+Enter like bare Enter; consecutive turn cancellations were
+  interpreted as the idle double-press exit gesture.
+- Root cause: Kitty keyboard-mode stacks are screen-local, but Talos pushed the mode on the primary
+  screen and consumed events on the alternate screen. Separately, active-turn cancellation reused
+  the state machine for the idle process-exit gesture.
+- Fix: Push/pop keyboard enhancement inside the alternate-screen lifetime, and make processing
+  Ctrl+C reset rather than arm the idle exit state.
+- Prevention: Lifecycle tests assert screen/mode ordering; an entry-point regression cancels two
+  consecutive processing turns without exiting.
+- Promoted to rule/check: `inline_terminal::tests::best_effort_keyboard_enablement_is_paired_with_restore`
+  and `app::app_tests::ctrl_c_cancels_each_consecutive_processing_turn_without_exiting`.

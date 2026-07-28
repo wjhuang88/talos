@@ -89,3 +89,16 @@ not be guessed.
 - `crates/talos-tui/src/app.rs`
 - `crates/talos-tui/src/state.rs`
 - `crates/talos-conversation/src/types.rs`
+
+## Post-Completion Consecutive-Turn Cancellation Correction (2026-07-28)
+
+The active-turn Ctrl+C path previously reused the idle double-Ctrl+C exit state.
+When cancellation drained queued steering content into an immediate next turn,
+the first cancellation left `CtrlCState::Waiting` armed; Ctrl+C on the new turn
+was then misclassified as the second idle exit press and terminated Talos.
+
+Commit `f77a6f0` separates the two actions. While processing, every Ctrl+C sends
+one `UserInput::Cancel`, resets the idle exit gesture to `Idle`, and never exits.
+Only an idle empty composer participates in the double-press exit gesture. The
+entry-point regression covers two consecutive processing turns, and the locked
+workspace test suite passes. TUI-009 remains Complete.
