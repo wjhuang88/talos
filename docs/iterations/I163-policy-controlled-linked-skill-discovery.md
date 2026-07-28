@@ -58,6 +58,7 @@ Fix the 15 blocking defects from commit `1f5e451`/`ea3cc74`:
 | 2026-07-27 | Traversal boundaries | Commit `b7e3704`: root symlink policy (symlink_metadata pre-walker, RootLinkDenied), pre-descent external rejection (WalkDir::filter_entry), canonical directory dedup at descent time, root-level SKILL.md fix, direct file symlink policy, DepthLimitReached warning (observation_depth = max_depth + 1), classify_walk_error/is_target_allowed extracted as free functions, RootLinkDenied warning kind added. |
 | 2026-07-27 | Test authenticity | Commit `a0079dd`: real two-link chain, real cycle (follow=true, LinkLoop asserted), root link deny/allow, external pre-descent rejection, alias subtree single-descent proof, root-level SKILL.md, direct file link policy, depth boundary (exact/beyond/single-warning), unique-name budget, global budget across roots, misleading tests removed/rename, tiggers typo fixed. 78 skill tests pass. |
 | 2026-07-27 | Oracle review + TOCTOU fix | Oracle review confirmed 8/10 questions correct. One MEDIUM-severity defense-in-depth gap: WalkDir `follow_root_links` defaults to `true`, creating a TOCTOU window where a swapped root symlink bypasses the explicit root-link check. Commit `e11481d`: added `.follow_root_links(false)` and pass `root_canonical` as walk root when root is an explicitly-allowed symlink. Two LOW-severity cosmetic issues (RootLinkDenied reused for file symlinks; inaccessible roots silently skipped) accepted as-is. 2508 workspace tests pass. |
+| 2026-07-28 | Final test-isolation correction | Commit `12ef1e3`: removed `unsafe std::env::set_var/remove_var` and module-local Mutex from runtime Skill discovery tests. Added home-injection seam: `SkillLoader::for_workspace_with_home_and_options` (pub, accepts explicit `Option<PathBuf>` home; never reads HOME env var); `discover_runtime_skills_with_home` (pub(crate) in talos-cli, accepts explicit home). Production `discover_runtime_skills` delegates to it via `dirs::home_dir()`. 3 tests rewritten + 3 new boundary tests (home=None, explicit-home-only, production delegation). All tests parallel-safe; no unsafe; no env mutation. 2511 workspace tests pass; 294 CLI tests pass with `--test-threads=8`. |
 
 ### Maintainer-Authorized Shared Default
 
@@ -135,6 +136,11 @@ validates that reference paths stay inside the active skill directory using
   `discover_shared`, `workspace_root`, `discovery_policy`, `discovery_warnings`).
   Existing constructor-based usage (`new`, `for_workspace`, `for_workspace_with_options`,
   `for_workspace_with_discovery_policy`) remains compatible.
+- A new `pub` constructor `for_workspace_with_home_and_options` was added to enable
+  test-isolated home injection. This is a minimal pre-1.0 API expansion required because
+  `pub(crate)` in `talos-skill` is not visible to `talos-cli` (a different crate). The
+  search-root generation logic remains in one authoritative implementation inside
+  `SkillLoader`; the CLI does not duplicate path construction.
 - External struct-literal construction (e.g., `SkillLoader { skills: vec![], ... }`) is
   source-incompatible if a new field is added, because the struct is not `#[non_exhaustive]`.
   The crate is pre-1.0 (v0.5.0) and does not claim stable 1.0 struct-literal compatibility.
@@ -142,3 +148,34 @@ validates that reference paths stay inside the active skill directory using
   change; exhaustive matches on this enum will need a new arm. Pre-1.0 semver allows this.
 - A future API-hardening Story may make `SkillLoader` fields private or mark the type
   `#[non_exhaustive]`. This iteration does not perform that refactor.
+
+### Final Test-Isolation Correction
+
+Oracle/maintainer review found that the runtime Skill discovery tests in
+`crates/talos-cli/src/skill_runtime.rs` used `unsafe std::env::set_var/remove_var` with a
+module-local `Mutex` guard to simulate a temporary HOME directory. This had three problems:
+
+1. **Violated I163 constraints**: the iteration explicitly forbids introducing `unsafe`.
+2. **Not parallel-safe**: the `Mutex` only serialized tests within the same module; other
+   parallel tests across the workspace could still read the mutated HOME.
+3. **Panic pollution risk**: if a test panicked before restoring the original HOME, the
+   process environment was left modified for subsequent tests.
+
+**Correction (commit `12ef1e3`)**:
+
+- Added `SkillLoader::for_workspace_with_home_and_options` (pub) which accepts an explicit
+  `Option<PathBuf>` home and never reads the `HOME` environment variable.
+- Refactored `default_search_paths` to accept `Option<&Path>` home instead of calling
+  `home_dir()` internally. `for_workspace_with_options` delegates to it with `home_dir()`.
+- Added `discover_runtime_skills_with_home` (pub(crate) in talos-cli) which constructs
+  `SkillLoader` with the injected home. Production `discover_runtime_skills` resolves the
+  system home via `dirs::home_dir()` and delegates to it.
+- Removed all `unsafe` blocks, `OnceLock<Mutex<()>>`, `home_guard()`, and
+  `std::env::set_var/remove_var` from the test module.
+- Rewrote 3 tests + added 3 new boundary tests: `application_without_home_does_not_add_shared_root`
+  (home=None), `explicit_home_is_used_instead_of_process_environment` (injected home A only,
+  home B not read), `discover_runtime_skills_delegates_to_with_home` (production entry works).
+
+All corrected tests inject home paths explicitly, own independent temp dirs, and are safe to
+run in parallel without a mutex. Test failure or panic cannot leave HOME modified because no
+test ever touches the process environment.

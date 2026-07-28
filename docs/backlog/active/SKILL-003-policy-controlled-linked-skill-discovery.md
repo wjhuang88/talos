@@ -139,6 +139,20 @@ struct field changes remain excluded.
 - [x] CI/local evidence distinction accurate (local validation only; no GitHub Actions
   evidence for this iteration).
 
+### Final Test-Isolation Correction
+
+- [x] Runtime wiring tests use explicit home injection
+  (`discover_runtime_skills_with_home`).
+- [x] No process-global HOME mutation (no `std::env::set_var/remove_var`).
+- [x] No `unsafe` introduced in the corrected test path.
+- [x] Tests can run in parallel (no Mutex, no serial execution needed;
+  `--test-threads=8` green).
+- [x] Panic cannot leave HOME polluted (tests never touch the process environment).
+
+This is a completion-review correction found before I163/SKILL-003 was submitted for
+maintainer Completion Review. It does not change the product semantics, discovery
+policy, or previously accepted invariants.
+
 ## Required Reads
 
 - `crates/talos-skill/src/loader.rs`
