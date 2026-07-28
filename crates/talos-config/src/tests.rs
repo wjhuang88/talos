@@ -1736,3 +1736,257 @@ fn test_image_input_override_on_existing_catalog_model() {
     assert_eq!(cap, ImageInputCapability::Unsupported);
     assert!(!cap.allows_attachment());
 }
+
+// ---------------------------------------------------------------------------
+// MODEL-010 / I157: Config::unset_dotted provider removal and credential clear
+// ---------------------------------------------------------------------------
+
+fn make_config_with_two_custom_providers() -> Config {
+    let mut config = Config::default();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: Some("https://a.example.com/v1".to_string()),
+            api_key: Some("key-a".to_string()),
+            api_key_env: Some("CUSTOM_A_KEY".to_string()),
+            models: HashMap::from([(
+                "model-a".to_string(),
+                ModelConfig {
+                    context_limit: Some(128_000),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "custom-b".to_string(),
+        ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: Some("https://b.example.com/v1".to_string()),
+            api_key: Some("key-b".to_string()),
+            models: HashMap::from([(
+                "model-b".to_string(),
+                ModelConfig {
+                    output_limit: Some(4096),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    config
+}
+
+#[test]
+fn unset_custom_provider_removes_only_target_entry() {
+    let mut config = make_config_with_two_custom_providers();
+    let outcome = config.unset_dotted("providers.custom-a").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-a".to_string()
+        }
+    );
+    assert!(!config.providers.contains_key("custom-a"));
+    assert!(config.providers.contains_key("custom-b"));
+    let b = config.providers.get("custom-b").unwrap();
+    assert_eq!(b.base_url.as_deref(), Some("https://b.example.com/v1"));
+}
+
+#[test]
+fn unset_builtin_provider_removes_only_user_configuration() {
+    let mut config = Config::default();
+    config.providers.insert(
+        "anthropic".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-ant-test".to_string()),
+            models: HashMap::from([(
+                "claude-test".to_string(),
+                ModelConfig {
+                    context_limit: Some(200_000),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "custom-x".to_string(),
+        ProviderConfig {
+            api_key: Some("key-x".to_string()),
+            ..Default::default()
+        },
+    );
+
+    let outcome = config.unset_dotted("providers.anthropic").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::BuiltinProviderDisconnected {
+            name: "anthropic".to_string()
+        }
+    );
+    assert!(!config.providers.contains_key("anthropic"));
+    assert!(config.providers.contains_key("custom-x"));
+    assert!(builtin_provider_config("anthropic").is_some());
+}
+
+#[test]
+fn unset_provider_api_key_preserves_other_fields() {
+    let mut config = make_config_with_two_custom_providers();
+    let outcome = config.unset_dotted("providers.custom-a.api_key").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::ApiKeyCleared {
+            name: "custom-a".to_string()
+        }
+    );
+    let a = config.providers.get("custom-a").unwrap();
+    assert!(a.api_key.is_none());
+    assert_eq!(a.protocol, ProviderProtocol::OpenAIChat);
+    assert_eq!(a.base_url.as_deref(), Some("https://a.example.com/v1"));
+    assert_eq!(a.api_key_env.as_deref(), Some("CUSTOM_A_KEY"));
+}
+
+#[test]
+fn unset_provider_api_key_preserves_model_overrides() {
+    let mut config = make_config_with_two_custom_providers();
+    config.unset_dotted("providers.custom-a.api_key").unwrap();
+    let a = config.providers.get("custom-a").unwrap();
+    assert!(a.models.contains_key("model-a"));
+    assert_eq!(
+        a.models.get("model-a").unwrap().context_limit,
+        Some(128_000)
+    );
+}
+
+#[test]
+fn unset_provider_api_key_is_omitted_from_toml() {
+    let mut config = make_config_with_two_custom_providers();
+    config.unset_dotted("providers.custom-a.api_key").unwrap();
+    let toml_str = toml::to_string_pretty(&config).unwrap();
+    let reloaded: Config = toml::from_str(&toml_str).unwrap();
+    assert!(
+        reloaded
+            .providers
+            .get("custom-a")
+            .unwrap()
+            .api_key
+            .is_none()
+    );
+    assert!(
+        !toml_str.contains("key-a"),
+        "cleared credential value must not appear in serialized TOML"
+    );
+    let a = reloaded.providers.get("custom-a").unwrap();
+    assert_eq!(a.base_url.as_deref(), Some("https://a.example.com/v1"));
+    assert_eq!(a.api_key_env.as_deref(), Some("CUSTOM_A_KEY"));
+}
+
+#[test]
+fn unset_provider_does_not_modify_unrelated_providers() {
+    let mut config = make_config_with_two_custom_providers();
+    let b_snapshot = config.providers.get("custom-b").cloned();
+    config.unset_dotted("providers.custom-a").unwrap();
+    assert_eq!(
+        config.providers.get("custom-b"),
+        b_snapshot.as_ref(),
+        "unrelated provider must be byte-identical"
+    );
+}
+
+#[test]
+fn unset_unknown_provider_does_not_mutate_config() {
+    let mut config = make_config_with_two_custom_providers();
+    let snapshot = toml::to_string_pretty(&config).unwrap();
+    let err = config.unset_dotted("providers.nonexistent").unwrap_err();
+    assert!(err.to_string().contains("not found"));
+    let after = toml::to_string_pretty(&config).unwrap();
+    assert_eq!(
+        snapshot, after,
+        "config must be unchanged on not-found error"
+    );
+}
+
+#[test]
+fn unset_invalid_dotted_key_does_not_mutate_config() {
+    let mut config = make_config_with_two_custom_providers();
+    let snapshot = toml::to_string_pretty(&config).unwrap();
+
+    let err = config.unset_dotted("model").unwrap_err();
+    assert!(err.to_string().contains("unsupported unset key"));
+    assert_eq!(snapshot, toml::to_string_pretty(&config).unwrap());
+
+    let err = config
+        .unset_dotted("providers.custom-a.base_url")
+        .unwrap_err();
+    assert!(err.to_string().contains("unsupported unset key"));
+    assert_eq!(snapshot, toml::to_string_pretty(&config).unwrap());
+}
+
+#[test]
+fn unset_write_failure_preserves_original_file() {
+    use std::fs;
+    let unique = format!(
+        "talos-unset-test-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let dir = std::env::temp_dir().join(&unique);
+    fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("config.toml");
+
+    let mut config = make_config_with_two_custom_providers();
+    let toml_str = toml::to_string_pretty(&config).unwrap();
+    fs::write(&config_path, &toml_str).unwrap();
+    let original_bytes = fs::read(&config_path).unwrap();
+
+    let err = config.unset_dotted("providers.nonexistent").unwrap_err();
+    assert!(err.to_string().contains("not found"));
+
+    let after_bytes = fs::read(&config_path).unwrap();
+    assert_eq!(
+        original_bytes, after_bytes,
+        "file on disk must be byte-identical when unset returns an error"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn unset_success_uses_atomic_save_path() {
+    use std::fs;
+    let unique = format!(
+        "talos-unset-success-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let dir = std::env::temp_dir().join(&unique);
+    fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("config.toml");
+
+    let mut config = make_config_with_two_custom_providers();
+    let toml_str = toml::to_string_pretty(&config).unwrap();
+    fs::write(&config_path, &toml_str).unwrap();
+
+    config.unset_dotted("providers.custom-a").unwrap();
+    let new_toml = toml::to_string_pretty(&config).unwrap();
+    fs::write(&config_path, &new_toml).unwrap();
+
+    let reloaded: Config = toml::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+    assert!(!reloaded.providers.contains_key("custom-a"));
+    assert!(reloaded.providers.contains_key("custom-b"));
+    assert!(
+        !new_toml.contains("key-a"),
+        "cleared credential must not appear in serialized output"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}

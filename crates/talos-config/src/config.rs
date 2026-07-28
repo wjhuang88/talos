@@ -1,7 +1,7 @@
 use crate::{
-    Config, ConfigError, Credentials, ModelConfig, ProviderConfig, ProviderProtocol,
-    builtin_provider_config, home_dir, model, normalize_provider_endpoint, opencode,
-    substitute_env_vars,
+    Config, ConfigError, ConfigUnsetOutcome, Credentials, ModelConfig, ProviderConfig,
+    ProviderProtocol, builtin_provider_config, home_dir, model, normalize_provider_endpoint,
+    opencode, substitute_env_vars,
 };
 use std::env;
 use std::fs;
@@ -534,6 +534,68 @@ impl Config {
             }
         });
         entry.api_key = Some(api_key.to_string());
+    }
+
+    /// Removes a provider entry or clears a single credential via a dotted key
+    /// (MODEL-010).
+    ///
+    /// Supported keys:
+    /// - `providers.<name>` — removes the entire user-saved entry (including
+    ///   model overrides). For custom providers the entry is gone entirely;
+    ///   for builtin-backed providers the user configuration is cleared but
+    ///   the builtin catalog entry remains available.
+    /// - `providers.<name>.api_key` — sets `api_key` to `None` (omitted from
+    ///   serialized TOML) while preserving all other fields and model
+    ///   overrides.
+    ///
+    /// Returns a [`ConfigUnsetOutcome`] describing which semantic occurred so
+    /// the caller can print an accurate message. Never carries credential
+    /// values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::InvalidConfig`] for unsupported dotted keys or
+    /// when the target provider entry is not present in the user configuration.
+    pub fn unset_dotted(&mut self, key: &str) -> Result<ConfigUnsetOutcome, ConfigError> {
+        let parts: Vec<&str> = key.split('.').collect();
+        match parts.as_slice() {
+            ["providers", name] => {
+                if self.providers.remove(*name).is_some() {
+                    if builtin_provider_config(name).is_some() {
+                        Ok(ConfigUnsetOutcome::BuiltinProviderDisconnected {
+                            name: (*name).to_string(),
+                        })
+                    } else {
+                        Ok(ConfigUnsetOutcome::CustomProviderRemoved {
+                            name: (*name).to_string(),
+                        })
+                    }
+                } else {
+                    Err(ConfigError::InvalidConfig(format!(
+                        "provider '{name}' not found in user configuration"
+                    )))
+                }
+            }
+            ["providers", name, "api_key"] => {
+                let provider = self.providers.get_mut(*name).ok_or_else(|| {
+                    ConfigError::InvalidConfig(format!(
+                        "provider '{name}' not found in user configuration"
+                    ))
+                })?;
+                if provider.api_key.is_none() {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "providers.{name}.api_key is already unset"
+                    )));
+                }
+                provider.api_key = None;
+                Ok(ConfigUnsetOutcome::ApiKeyCleared {
+                    name: (*name).to_string(),
+                })
+            }
+            _ => Err(ConfigError::InvalidConfig(format!(
+                "unsupported unset key: '{key}' — only 'providers.<name>' and 'providers.<name>.api_key' are supported"
+            ))),
+        }
     }
 
     /// Extracts all in-memory API keys into a [`Credentials`] store.

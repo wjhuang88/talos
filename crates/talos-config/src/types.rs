@@ -3,6 +3,24 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Outcome of a `config unset providers.<name>...` mutation (MODEL-010).
+///
+/// Distinguishes the three supported unset semantics so the CLI can print
+/// accurate user-facing messages. Never carries credential values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigUnsetOutcome {
+    /// A custom (non-builtin) provider entry was fully removed.
+    /// It will no longer appear under Connected or Available.
+    CustomProviderRemoved { name: String },
+    /// A builtin-backed provider's user configuration was removed.
+    /// The provider still appears under Available via the builtin catalog;
+    /// only the user-saved credential/overrides were cleared.
+    BuiltinProviderDisconnected { name: String },
+    /// A single `api_key` field was cleared to `None` (omitted from TOML).
+    /// All other provider fields and model overrides are preserved.
+    ApiKeyCleared { name: String },
+}
+
 /// Reasoning effort levels for OpenAI o-series models.
 pub use talos_core::model::ReasoningEffort;
 
