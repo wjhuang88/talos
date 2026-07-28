@@ -108,6 +108,7 @@ workspace test suite passes. TUI-009 remains Complete.
 The maintainer subsequently selected TUI-036/I166 to remove active-turn
 cancellation from Ctrl+C and assign it to Esc. TUI-009 remains the historical
 owner for idle composer clearing and the idle empty-composer exit summary
-behavior. Its completed active-turn Ctrl+C acceptance is superseded only by
-I166; `f77a6f0` remains the rollback-safe baseline until I166 passes rebuilt
-binary acceptance.
+behavior. Its completed active-turn Ctrl+C acceptance is superseded by the
+maintainer-accepted I166 shortcut model. `f77a6f0` remains historical
+rollback evidence; I166 completion commits `d1a8759e`, `d85514ef`, and
+`264ba8c0` are the current implementation authority.

@@ -1,6 +1,6 @@
 # Iteration I166: Interrupt Shortcut Reliability
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-28
 > Planned objective: Give Talos one deterministic shortcut model in which Ctrl+C owns local clear/close and idle exit, while Esc owns active-turn interruption after higher-priority UI consumes its local cancel action.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -192,6 +192,8 @@ Blocked or Active as appropriate; do not broaden scope.
 |---|---|---|
 | 2026-07-28 | Activation | Maintainer explicitly prioritized the shortcut refactor. Fresh inventory found no Active or Review iteration; I164 remains Paused, I157 remains Planned and is deferred until I166 disposition, I158-I162 remain Blocked, and TUI-036 dependencies are Complete. TUI-036 moved from Refinement to Ready and was selected into I166, then I166/TUI-036 became the sole Active implementation authority. Baseline `5c1acb78`; direct `main`, no parallel worktree. |
 | 2026-07-28 | Implementation | `d1a8759` adds 12 entry-point tests locking the target Esc/Ctrl+C dispatch semantics. `d85514e` refactors `handle_input_event` so Ctrl+C is checked before all modal blocks (preventing literal 'c' insertion), active-turn cancellation moves from Ctrl+C to Esc, approval gets Esc→Deny, and the hint/README text is updated. 480 TUI tests and 2542 workspace tests pass. |
+| 2026-07-28 | Acceptance correction | `264ba8c` corrects the post-clear Ctrl+C guidance, proves the full idle double-press state transition, adds slash-menu and approval Ctrl+C entry-point coverage, and reconciles the TUI-036 owner evidence. 483 TUI tests and 2545 workspace tests pass. |
+| 2026-07-28 | Maintainer acceptance | The maintainer rebuilt and exercised binary commit `264ba8c` in Alacritty. Streaming and consecutive queued turns remained Esc-interruptible; active draft and empty-composer Ctrl+C behavior, slash/approval/credential/provider priority, Shift+Enter/Ctrl+J regression, idle double-Ctrl+C exit, and Alternate-Screen restoration all passed. |
 
 ## Verification Evidence
 
@@ -211,17 +213,17 @@ Blocked or Active as appropriate; do not broaden scope.
   `scripts/validate_project_governance.sh .` = 0 warnings;
   `git diff --check` clean;
   `cargo build --locked -p talos-cli` exit 0.
-- Rebuilt-binary runtime evidence: pending — binary at
-  `target/debug/talos`; maintainer rebuilt-binary terminal matrix
-  required before TUI-036 can move beyond In Progress.
+- Rebuilt-binary runtime evidence: passed in Alacritty using
+  `target/debug/talos` built from `264ba8c`. All guided shortcut, queued-turn,
+  modal-priority, multiline-input, idle-exit, and terminal-restore cases passed.
 - Governance activation validation: `scripts/validate_project_governance.sh .` passed with
   0 warnings; `git diff --check` passed.
 
 ## Completion Evidence
 
-- Completion Commit: pending.
-- I166 and TUI-036 must remain Active/Review until implementation, full locked
-  validation, and rebuilt-binary runtime evidence are recorded.
+- Completion Commit: `d1a8759e`, `d85514ef`, `264ba8c0`.
+- I166 and TUI-036 completed after locked validation and maintainer
+  rebuilt-binary Alacritty acceptance.
 
 ## Variance And Residuals
 
@@ -231,6 +233,10 @@ Blocked or Active as appropriate; do not broaden scope.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending.
-- Lessons: pending.
+- Outcome: Ctrl+C now owns local clear/close and idle exit, while Esc reliably
+  interrupts normal active turns without contaminating later queued turns.
+- Documentation: README keyboard guidance, TUI-036, iteration index, Board, and
+  v0.6 program state are synchronized.
+- Lessons: shortcut dispatch must resolve modifier-aware and modal-local actions
+  before generic character input, and exit gestures must not share state with
+  turn cancellation.

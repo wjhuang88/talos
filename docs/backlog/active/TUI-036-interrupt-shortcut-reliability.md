@@ -5,12 +5,12 @@
 | Story ID | TUI-036 |
 | Type | Product / input-reliability story |
 | Priority | P1 |
-| Status | In Progress — selected into I166 (2026-07-28) |
+| Status | Complete — I166 maintainer Alacritty acceptance passed (2026-07-28) |
 | Source | Maintainer report 2026-07-27: Ctrl+C can stop interrupting turns permanently until Talos is restarted |
 | Parent Epic | None |
 | Depends On | TUI-009, TUI-035; existing conversation cancellation boundary |
 | Blocks | None |
-| Selected Iteration | I166 (Active) |
+| Selected Iteration | I166 (Complete) |
 
 ## Identity / Goal / Value
 
@@ -137,5 +137,18 @@ approval/modal priority, failure/timeout recovery, and idle exit.
 - The known stale Ctrl+C exit-state trigger is corrected by `f77a6f0`.
 - The Ctrl+C-to-Esc active-turn shortcut migration is implemented in `d85514e`.
   Automated entry-point tests (15 total) and full locked workspace validation
-  pass. Rebuilt-binary terminal acceptance remains required before this story
-  can move beyond In Progress.
+  pass. Correction commit `264ba8c` adds the final Ctrl+C guidance and
+  slash/approval coverage. The maintainer rebuilt `target/debug/talos` from
+  `264ba8c` and reported every guided Alacritty case passing, including
+  consecutive queued-turn interruption and terminal restoration.
+
+## Completion Evidence
+
+- Completion Commit: `d1a8759e`, `d85514ef`, `264ba8c0`.
+- Automated evidence: 483 TUI tests and 2545 locked workspace tests passed;
+  fmt, check, Clippy with denied warnings, governance, diff check, and CLI build
+  passed.
+- Human evidence: maintainer Alacritty walkthrough passed streaming and
+  consecutive-turn Esc cancellation, Ctrl+C local/idle behavior, modal and
+  approval priority, multiline-input regression, idle exit, and terminal
+  restoration.
