@@ -2,6 +2,7 @@ use crossterm::style::Color as CColor;
 use talos_conversation::{
     MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay, UserInput,
 };
+use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use tokio::sync::mpsc;
 
@@ -1298,27 +1299,27 @@ fn entry_point_ctrl_j_inserts_newline_without_sending() {
 }
 
 #[test]
-fn ctrl_c_cancels_each_consecutive_processing_turn_without_exiting() {
+fn esc_cancels_each_consecutive_processing_turn_without_exiting() {
     let mut state = TuiState::new();
     state.status.is_processing = true;
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut tui = crate::app::Tui::for_test(state, Some(tx));
-    let ctrl_c = key_press_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    let esc = key_press(KeyCode::Esc);
 
     assert!(
-        !tui.handle_input_event(&ctrl_c),
+        !tui.handle_input_event(&esc),
         "cancelling the first active turn must not exit"
     );
     assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
 
     // The queued steering message starts a new turn immediately after the
-    // cancellation acknowledgement. Its Ctrl+C must be treated as a fresh
-    // turn cancellation, not as the second press of the idle exit gesture.
+    // cancellation acknowledgement. Its Esc must be treated as a fresh
+    // turn cancellation.
     tui.state.status.is_processing = false;
     tui.state.status.is_processing = true;
 
     assert!(
-        !tui.handle_input_event(&ctrl_c),
+        !tui.handle_input_event(&esc),
         "cancelling the queued turn must not exit"
     );
     assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
@@ -2377,4 +2378,323 @@ fn startup_full_frame_buffer_assertions_all_sizes() {
     tui.draw_frame().expect("40x10 frame");
     let rendered = tui.terminal.test_rendered_text();
     assert!(rendered.contains("_____"), "compact logo at 40 cols");
+}
+
+// ---------------------------------------------------------------------------
+// I166 / TUI-036: Interrupt Shortcut Reliability entry-point tests
+// ---------------------------------------------------------------------------
+
+fn ctrl_c_event() -> Event {
+    key_press_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL)
+}
+
+fn esc_event() -> Event {
+    key_press(KeyCode::Esc)
+}
+
+fn assert_no_cancel(rx: &mut mpsc::UnboundedReceiver<UserInput>) {
+    match rx.try_recv() {
+        Ok(msg) => panic!("expected no UserInput, got {msg:?}"),
+        Err(_) => {}
+    }
+}
+
+fn assert_one_cancel(rx: &mut mpsc::UnboundedReceiver<UserInput>) {
+    match rx.try_recv() {
+        Ok(UserInput::Cancel) => {}
+        Ok(other) => panic!("expected Cancel, got {other:?}"),
+        Err(_) => panic!("expected exactly one Cancel, channel empty"),
+    }
+    assert_no_cancel(rx);
+}
+
+#[test]
+fn entry_point_esc_cancels_active_turn_once() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc must not exit");
+    assert_one_cancel(&mut rx);
+    assert!(
+        tui.state.tip.is_some(),
+        "Esc during active turn must show cancellation feedback"
+    );
+}
+
+#[test]
+fn entry_point_esc_can_cancel_a_later_turn_after_cancelled_failed_and_timed_out_states() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    // successful turn → new active turn → Esc
+    tui.state.status.is_processing = true;
+    tui.handle_input_event(&esc_event());
+    assert_one_cancel(&mut rx);
+    tui.state.status.is_processing = false;
+    tui.state.status.phase = None;
+
+    // cancelled turn → queued message starts next turn → Esc again
+    tui.state.status.is_processing = true;
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc on later turn must not exit");
+    assert_one_cancel(&mut rx);
+
+    // failed turn → new active turn → Esc
+    tui.state.status.is_processing = false;
+    tui.state.status.phase = Some(TurnPhase::Failed);
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = None;
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc after failed turn must not exit");
+    assert_one_cancel(&mut rx);
+
+    // timed-out turn → new active turn → Esc
+    tui.state.status.is_processing = false;
+    tui.state.status.phase = Some(TurnPhase::TimedOut);
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = None;
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc after timed-out turn must not exit");
+    assert_one_cancel(&mut rx);
+}
+
+#[test]
+fn entry_point_esc_idle_preserves_composer() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.input_append_str("draft text");
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc idle must not exit");
+    assert_no_cancel(&mut rx);
+    assert_eq!(
+        tui.state.input_buffer, "draft text",
+        "Esc idle must preserve composer content"
+    );
+}
+
+#[test]
+fn entry_point_esc_slash_menu_closes_without_turn_cancel() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.open_slash_menu(talos_conversation::command_registry());
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc in slash menu must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        !tui.state.slash_menu.is_open,
+        "Esc must close the slash menu"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Esc in slash menu must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_esc_credential_closes_without_turn_cancel() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.slash_menu = crate::panel_state::BottomPanelState::open_credential_input(
+        "test-provider",
+        None,
+        false,
+        None,
+    );
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc in credential must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        !tui.state.slash_menu.is_credential_input(),
+        "Esc must close credential input"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Esc in credential must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_esc_provider_wizard_closes_without_turn_cancel() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc in wizard must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        !tui.state.slash_menu.is_provider_wizard(),
+        "Esc must close provider wizard"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Esc in wizard must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_esc_approval_denies_without_turn_cancel() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let (resp_tx, mut resp_rx) = tokio::sync::oneshot::channel();
+    tui.state.pending_approval_response = Some(resp_tx);
+    tui.show_approval("test_tool", "args");
+
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(!should_exit, "Esc in approval must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        matches!(tui.state.approval_state, ApprovalState::Hidden),
+        "Esc must resolve and hide approval"
+    );
+    let choice = resp_rx
+        .try_recv()
+        .expect("approval response channel must receive a choice");
+    assert!(
+        matches!(choice, ApprovalChoice::Deny),
+        "Esc in approval must Deny"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Esc in approval must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_ctrl_c_active_draft_clears_without_cancel_or_exit() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.input_append_str("active draft");
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&ctrl_c_event());
+    assert!(!should_exit, "Ctrl+C with draft must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        tui.state.input_buffer.is_empty(),
+        "Ctrl+C must clear the composer"
+    );
+    assert!(
+        tui.state.status.is_processing,
+        "Ctrl+C must not change processing state"
+    );
+}
+
+#[test]
+fn entry_point_ctrl_c_active_empty_does_not_cancel_or_exit() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let should_exit = tui.handle_input_event(&ctrl_c_event());
+    assert!(!should_exit, "Ctrl+C active empty must not exit");
+    assert_no_cancel(&mut rx);
+    assert!(
+        !tui.state.should_exit,
+        "Ctrl+C active empty must not set should_exit"
+    );
+    assert!(
+        tui.state.tip.is_some(),
+        "Ctrl+C active empty must show Esc guidance tip"
+    );
+    assert!(
+        tui.state
+            .tip
+            .as_ref()
+            .is_some_and(|t| t.text.contains("Esc")),
+        "Tip must mention Esc for interrupting the turn"
+    );
+}
+
+#[test]
+fn entry_point_ctrl_c_idle_empty_retains_double_press_exit() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    let first = tui.handle_input_event(&ctrl_c_event());
+    assert!(!first, "first Ctrl+C must not exit immediately");
+    assert_no_cancel(&mut rx);
+    assert!(
+        matches!(tui.state.ctrl_c_state, CtrlCState::Waiting(_)),
+        "first Ctrl+C must arm the exit gesture"
+    );
+
+    let second = tui.handle_input_event(&ctrl_c_event());
+    assert!(second, "second Ctrl+C must exit");
+    assert!(tui.state.should_exit, "should_exit must be true");
+}
+
+#[test]
+fn modified_ctrl_c_is_never_inserted_into_modal_input() {
+    for modal in [
+        crate::panel_state::BottomPanelState::open_credential_input("provider", None, false, None),
+        crate::panel_state::BottomPanelState::open_provider_wizard(),
+    ] {
+        let mut state = TuiState::new();
+        state.slash_menu = modal;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+        let should_exit = tui.handle_input_event(&ctrl_c_event());
+        assert!(!should_exit, "Ctrl+C in modal must not exit");
+        assert_no_cancel(&mut rx);
+        assert!(
+            !tui.state.slash_menu.is_credential_input()
+                && !tui.state.slash_menu.is_provider_wizard(),
+            "Ctrl+C must close the modal"
+        );
+    }
+}
+
+#[test]
+fn repeated_esc_does_not_corrupt_cancellation_state() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    for _ in 0..3 {
+        let should_exit = tui.handle_input_event(&esc_event());
+        assert!(!should_exit, "repeated Esc must not exit");
+    }
+
+    // drain all 3 Cancel messages
+    for _ in 0..3 {
+        match rx.try_recv() {
+            Ok(UserInput::Cancel) => {}
+            Ok(other) => panic!("expected Cancel, got {other:?}"),
+            Err(_) => panic!("expected Cancel, channel empty"),
+        }
+    }
+    assert_no_cancel(&mut rx);
+
+    // after the turn ends and a new one starts, Esc must still work
+    tui.state.status.is_processing = false;
+    tui.state.status.is_processing = true;
+    let should_exit = tui.handle_input_event(&esc_event());
+    assert!(
+        !should_exit,
+        "Esc after repeated presses must still not exit"
+    );
+    assert_one_cancel(&mut rx);
 }
