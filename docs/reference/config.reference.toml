@@ -76,6 +76,18 @@ model = "claude-sonnet-4-20250514"
 #   3. Built-in env var: ANTHROPIC_API_KEY or OPENAI_API_KEY
 #   4. For built-in "openai" provider only: OPENAI_COMPAT_API_KEY
 #
+# Removing a provider or clearing a credential:
+#   talos config unset providers.<name> --confirm
+#       Removes the entire [providers.<name>] entry. For custom providers this
+#       deletes it completely. For builtin-backed providers (anthropic, openai,
+#       etc.) it clears user-saved credentials/overrides; the provider remains
+#       available via the builtin catalog.
+#   talos config unset providers.<name>.api_key --confirm
+#       Clears only the inline api_key (sets it to None / omitted from TOML).
+#       All other provider fields and model overrides are preserved.
+#   Without --confirm the command refuses to modify config (file stays
+#   byte-identical). Environment variables you set yourself are never touched.
+#
 # Per-model limits go in [providers.<name>.models.<model>]:
 #   context_limit  Max input context tokens
 #   output_limit   Max output tokens

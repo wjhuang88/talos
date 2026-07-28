@@ -156,7 +156,18 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 talos config list
 talos config get model
 talos config set model claude-sonnet-4-20250514
+
+# 删除 provider 配置或清除凭据（需要 --confirm）：
+talos config unset providers.my-gateway --confirm             # 删除整个自定义 provider
+talos config unset providers.anthropic --confirm              # 清除内置 provider 的用户凭据
+talos config unset providers.my-gateway.api_key --confirm     # 仅清除 API key
 ```
+
+`config unset` 用于删除 `[providers.<name>]` 配置项或清除单个 `api_key` 字段。缺少
+`--confirm` 时命令拒绝修改配置，文件保持字节级不变。删除自定义 provider 会完全移除；
+删除内置 provider（如 `anthropic`）的用户配置会清除凭据和覆盖配置，但 provider 仍可通过
+内置目录使用。删除当前活跃 provider 不会崩溃——下次启动或 `/model` 会重新打开模型选择器。
+用户自行设置的环境变量不会被删除。
 
 ## 开发
 

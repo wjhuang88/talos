@@ -1591,6 +1591,263 @@ api_key_env = "ANTHROPIC_API_KEY"
             "200000"
         );
     }
+
+    // -----------------------------------------------------------------
+    // MODEL-010 / I157: config unset CLI tests
+    // -----------------------------------------------------------------
+
+    use crate::{Cli, run_config_unset};
+    use clap::Parser;
+    use talos_config::ConfigUnsetOutcome;
+
+    #[test]
+    fn config_unset_cli_parses_provider_entry() {
+        let cli = Cli::try_parse_from(["talos", "config", "unset", "providers.my-gw", "--confirm"]);
+        assert!(cli.is_ok(), "parsing providers.<name> --confirm failed");
+    }
+
+    #[test]
+    fn config_unset_cli_parses_provider_api_key() {
+        let cli = Cli::try_parse_from([
+            "talos",
+            "config",
+            "unset",
+            "providers.my-gw.api_key",
+            "--confirm",
+        ]);
+        assert!(
+            cli.is_ok(),
+            "parsing providers.<name>.api_key --confirm failed"
+        );
+    }
+
+    #[test]
+    fn config_unset_cli_requires_confirm() {
+        let err = run_config_unset("providers.test", false).unwrap_err();
+        assert!(
+            err.to_string().contains("--confirm"),
+            "error must mention --confirm: {err}"
+        );
+    }
+
+    #[test]
+    fn config_unset_without_confirm_is_byte_identical() {
+        let unique = format!(
+            "talos-cli-unset-confirm-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let dir = std::env::temp_dir().join(&unique);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("config.toml");
+
+        let config = talos_config::Config {
+            provider: "custom-a".to_string(),
+            model: "model-a".to_string(),
+            providers: std::collections::HashMap::from([(
+                "custom-a".to_string(),
+                talos_config::ProviderConfig {
+                    protocol: talos_config::ProviderProtocol::OpenAIChat,
+                    base_url: Some("https://a.example.com/v1".to_string()),
+                    api_key: Some("secret-key-a".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(&config_path, &toml_str).unwrap();
+        let original = std::fs::read(&config_path).unwrap();
+
+        let err = run_config_unset("providers.custom-a", false).unwrap_err();
+        assert!(err.to_string().contains("--confirm"));
+
+        let after = std::fs::read(&config_path).unwrap();
+        assert_eq!(
+            original, after,
+            "file must be byte-identical without --confirm"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn config_unset_executes_real_mutation_path() {
+        let mut config = talos_config::Config::default();
+        config.providers.insert(
+            "custom-gw".to_string(),
+            talos_config::ProviderConfig {
+                protocol: talos_config::ProviderProtocol::OpenAIChat,
+                base_url: Some("https://gw.example.com/v1".to_string()),
+                api_key: Some("gw-key".to_string()),
+                ..Default::default()
+            },
+        );
+        config.providers.insert(
+            "other-gw".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("other-key".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let outcome = config.unset_dotted("providers.custom-gw").unwrap();
+        assert_eq!(
+            outcome,
+            ConfigUnsetOutcome::CustomProviderRemoved {
+                name: "custom-gw".to_string()
+            }
+        );
+        assert!(!config.providers.contains_key("custom-gw"));
+        assert!(config.providers.contains_key("other-gw"));
+    }
+
+    #[test]
+    fn config_unset_custom_provider_output_is_accurate() {
+        let outcome = ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "my-gateway".to_string(),
+        };
+        let msg = match &outcome {
+            ConfigUnsetOutcome::CustomProviderRemoved { name } => {
+                format!("Provider '{name}' configuration removed.")
+            }
+            _ => unreachable!(),
+        };
+        assert!(msg.contains("my-gateway"));
+        assert!(msg.contains("removed"));
+    }
+
+    #[test]
+    fn config_unset_builtin_provider_output_is_accurate() {
+        let outcome = ConfigUnsetOutcome::BuiltinProviderDisconnected {
+            name: "anthropic".to_string(),
+        };
+        let msg = match &outcome {
+            ConfigUnsetOutcome::BuiltinProviderDisconnected { name } => {
+                format!(
+                    "Provider '{name}' disconnected: user configuration and credentials cleared. \
+                     The builtin provider remains available under /connect."
+                )
+            }
+            _ => unreachable!(),
+        };
+        assert!(msg.contains("disconnected"));
+        assert!(msg.contains("anthropic"));
+        assert!(msg.contains("builtin"));
+    }
+
+    #[test]
+    fn config_unset_api_key_output_does_not_expose_secret() {
+        let mut config = talos_config::Config::default();
+        config.providers.insert(
+            "my-gw".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-super-secret-value".to_string()),
+                base_url: Some("https://gw.example.com/v1".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.my-gw.api_key").unwrap();
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(
+            !toml_str.contains("sk-super-secret-value"),
+            "cleared credential must not appear in serialized output"
+        );
+
+        let outcome_msg = "Credential cleared for provider 'my-gw'.";
+        assert!(!outcome_msg.contains("sk-super-secret-value"));
+    }
+
+    #[test]
+    fn config_unset_active_provider_is_picker_recoverable() {
+        let mut config = talos_config::Config {
+            provider: "my-active".to_string(),
+            model: "some-model".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "my-active".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("active-key".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.my-active").unwrap();
+        assert!(!config.providers.contains_key("my-active"));
+
+        let provider_config = config.active_provider_config();
+        assert_eq!(provider_config.api_key, None);
+
+        let api_result = config.api_key();
+        assert!(
+            api_result.is_err(),
+            "api_key() must return Err after active provider removal"
+        );
+
+        assert!(
+            config.model == "some-model",
+            "model must still be set for picker recovery"
+        );
+    }
+
+    #[test]
+    fn config_list_after_unset_does_not_expose_secret() {
+        let mut config = talos_config::Config::default();
+        config.providers.insert(
+            "gw-a".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-list-secret".to_string()),
+                base_url: Some("https://a.example.com".to_string()),
+                ..Default::default()
+            },
+        );
+        config.providers.insert(
+            "gw-b".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-list-other".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.gw-a").unwrap();
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let masked = mask_secrets(&toml_str, &config);
+        assert!(
+            !masked.contains("sk-list-secret"),
+            "cleared credential must not appear in config list output"
+        );
+    }
+
+    #[test]
+    fn config_get_after_unset_does_not_expose_secret() {
+        let mut config = talos_config::Config::default();
+        config.providers.insert(
+            "gw-c".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-get-secret".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.gw-c.api_key").unwrap();
+
+        let result = config_get_dotted(&config, "providers.gw-c.api_key");
+        assert!(
+            result.is_ok(),
+            "config_get_dotted should still return the (now-empty) value"
+        );
+        assert_eq!(result.unwrap(), "");
+        assert!(
+            is_secret_key("providers.gw-c.api_key"),
+            "is_secret_key must still identify api_key keys after clear"
+        );
+    }
 }
 
 #[cfg(test)]

@@ -170,7 +170,20 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 talos config list                                # print all settings (secrets masked)
 talos config get model                           # get a single value
 talos config set model claude-sonnet-4-20250514  # set and persist
+
+# Remove a provider entry or clear a credential (--confirm required):
+talos config unset providers.my-gateway --confirm             # remove entire custom provider
+talos config unset providers.anthropic --confirm              # clear builtin provider credentials
+talos config unset providers.my-gateway.api_key --confirm     # clear only the API key
 ```
+
+`config unset` removes a `[providers.<name>]` entry or clears a single `api_key`
+field. Without `--confirm`, the command refuses to modify config and the file is
+left byte-identical. Removing a custom provider deletes it entirely; removing a
+builtin-backed provider (e.g. `anthropic`) clears the user-saved credential and
+overrides but the provider remains available via the builtin catalog. Removing
+the active provider does not crash — the next session start or `/model` re-opens
+the model picker. Environment variables you set yourself are never touched.
 
 ## Development
 

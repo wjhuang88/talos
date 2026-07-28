@@ -149,6 +149,20 @@ pub(crate) enum ConfigCommand {
         /// New value.
         value: String,
     },
+    /// Remove a provider entry or clear a credential.
+    ///
+    /// Supported keys:
+    ///   providers.<name>             — remove entire user-saved provider entry
+    ///   providers.<name>.api_key     — clear only the inline api_key
+    Unset {
+        /// Dotted key path (e.g., "providers.my-gateway" or
+        /// "providers.my-gateway.api_key").
+        key: String,
+        /// Required confirmation flag — without it the command refuses to
+        /// modify config.
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 #[derive(Parser, Clone)]
@@ -418,6 +432,7 @@ async fn main() -> Result<()> {
             ConfigCommand::List => run_config_list(),
             ConfigCommand::Get { key } => run_config_get(key),
             ConfigCommand::Set { key, value } => run_config_set(&format!("{key}={value}")),
+            ConfigCommand::Unset { key, confirm } => run_config_unset(key, *confirm),
         };
     }
 
@@ -584,6 +599,35 @@ fn run_config_set(kv: &str) -> Result<()> {
             value.trim().to_string()
         }
     );
+    Ok(())
+}
+
+fn run_config_unset(key: &str, confirm: bool) -> Result<()> {
+    if !confirm {
+        anyhow::bail!(
+            "refusing to unset '{key}' without --confirm.\n\
+             Re-run with: talos config unset {key} --confirm"
+        );
+    }
+
+    let mut config = Config::load().context("failed to load configuration")?;
+    let outcome = config.unset_dotted(key)?;
+    config.save().context("failed to save configuration")?;
+
+    match outcome {
+        talos_config::ConfigUnsetOutcome::CustomProviderRemoved { name } => {
+            println!("Provider '{name}' configuration removed.");
+        }
+        talos_config::ConfigUnsetOutcome::BuiltinProviderDisconnected { name } => {
+            println!(
+                "Provider '{name}' disconnected: user configuration and credentials cleared. \
+                 The builtin provider remains available under /connect."
+            );
+        }
+        talos_config::ConfigUnsetOutcome::ApiKeyCleared { name } => {
+            println!("Credential cleared for provider '{name}'.");
+        }
+    }
     Ok(())
 }
 
