@@ -1901,15 +1901,34 @@ fn startup_layout_places_composer_one_row_below_logo() {
         .test_cursor_position()
         .expect("cursor visible in startup composer");
     let splash_rows = crate::splash::viewport_splash_lines(80).len();
-    // In startup mode, preview and tips are suppressed (0 rows), so:
-    // composer_y = splash_rows + 1 display-only spacer + 1 composer_top_pad
-    let expected_y = (splash_rows + 1 + 1) as u16;
+    // Startup suppresses preview but keeps the one-row tips surface visible:
+    // composer_y = splash_rows + 1 spacer + 1 tip + 1 composer_top_pad
+    let expected_y = (splash_rows + 1 + 1 + 1) as u16;
     assert_eq!(
         cursor.y, expected_y,
-        "composer cursor should be {} (splash {} + 1 spacer + 1 top_pad), got {}",
+        "composer cursor should be {} (splash {} + 1 spacer + 1 tip + 1 top_pad), got {}",
         expected_y, splash_rows, cursor.y
     );
     assert!(cursor.y < 24, "cursor must be within terminal bounds");
+}
+
+#[test]
+fn startup_tips_surface_shows_dashboard_address() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.state.tip = Some(crate::state::Tip {
+        text: "Dashboard ready: http://127.0.0.1:61205/ (loopback-only)".into(),
+        kind: TipKind::Info,
+        ttl: std::time::Duration::from_secs(8),
+        created_at: std::time::Instant::now(),
+    });
+
+    tui.draw_frame().expect("startup frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("Dashboard ready: http://127.0.0.1:61205/"),
+        "startup tips must retain the dashboard's copyable address"
+    );
 }
 
 #[test]
@@ -2264,7 +2283,7 @@ fn startup_spacer_row_has_no_composer_background() {
     let expected_bg = crate::theme::semantic::INPUT_BG;
 
     let spacer_y_1 = (splash_rows) as u16;
-    let top_pad_y = (splash_rows + 1) as u16;
+    let top_pad_y = (splash_rows + 2) as u16;
 
     let spacer_bg_1 = tui.terminal.test_cell_bg(0, spacer_y_1);
     let top_pad_bg = tui.terminal.test_cell_bg(0, top_pad_y);

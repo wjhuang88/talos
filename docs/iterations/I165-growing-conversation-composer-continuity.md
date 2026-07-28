@@ -45,6 +45,7 @@ workspace validation ladders and perform rebuilt-binary terminal acceptance.
 | 2026-07-28 | Implementation | `8e6ffe9` caps FollowTail history to the Logo plus current-width projected content rows. Composer/status therefore follow a short conversation, while normal allocation returns to bounded bottom placement at overflow or during anchored history navigation. |
 | 2026-07-28 | Automated validation | `cargo test --locked -p talos-tui --lib` = 464 passed; `cargo fmt --all -- --check`, `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`, `cargo test --workspace --locked`, `scripts/validate_project_governance.sh .`, `git diff --check`, and `cargo build --locked -p talos-cli` all exit 0. The build script emitted only its informational `models.toml compressed` warning. |
 | 2026-07-28 | Approved scope refinement | Maintainer reduced the initial display-only Logo-to-composer gap from two rows to one row. This preserves the renderer/transcript model and is covered by the startup layout assertion. |
+| 2026-07-28 | Startup tips correction | Maintainer confirmed that the normal tips surface must remain visible in a fresh session. Startup now keeps its one-row tips surface, so the existing loopback Dashboard address tip is visible and copyable before first submit. `cargo test --locked -p talos-tui --lib` = 465 passed. |
 
 ## Completion Evidence
 

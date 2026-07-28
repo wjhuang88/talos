@@ -991,11 +991,10 @@ impl Tui {
         } else {
             preview.height_hint(width)
         };
-        let tips_h = if is_startup {
-            0
-        } else {
-            tips.height_hint(width)
-        };
+        // Tips remain visible during startup so transient service notices (for
+        // example the loopback Dashboard address) have a stable, copyable
+        // location before the first message is submitted.
+        let tips_h = tips.height_hint(width);
 
         let input_natural = crate::scrollback::InputComponent {
             state,
