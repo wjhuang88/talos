@@ -88,15 +88,32 @@ impl RuntimeSkills {
     }
 }
 
-/// Discovers skills for a concrete workspace.
+/// Discovers skills for a concrete workspace using the system home directory.
 ///
-/// Invalid skill files are skipped by `SkillLoader`; duplicate names keep the
-/// first match according to search-path priority.
+/// Production entry point. Resolves the system home directory via `dirs::home_dir()`
+/// and delegates to [`discover_runtime_skills_with_home`].
 pub(crate) fn discover_runtime_skills(
     workspace_root: &Path,
     discover_shared: bool,
 ) -> Result<RuntimeSkills> {
-    let mut loader = SkillLoader::for_workspace_with_options(workspace_root, discover_shared);
+    let home = dirs::home_dir();
+    discover_runtime_skills_with_home(workspace_root, discover_shared, home.as_deref())
+}
+
+/// Discovers skills with an explicit home directory for test injection.
+///
+/// Does not read the `HOME` environment variable. When `home` is `None`, neither
+/// user-global nor shared roots are added.
+pub(crate) fn discover_runtime_skills_with_home(
+    workspace_root: &Path,
+    discover_shared: bool,
+    home: Option<&Path>,
+) -> Result<RuntimeSkills> {
+    let mut loader = SkillLoader::for_workspace_with_home_and_options(
+        workspace_root,
+        home.map(|p| p.to_path_buf()),
+        discover_shared,
+    );
     let search_paths = loader.search_paths.clone();
     loader.discover()?;
 
@@ -180,16 +197,10 @@ mod tests {
     use super::*;
     use std::fs;
     use std::sync::Arc;
-    use std::sync::{Mutex, OnceLock};
     use talos_agent::Agent;
     use talos_config::Config;
     use talos_core::tool::ToolRegistry;
     use talos_provider::mock::MockProvider;
-
-    fn home_guard() -> &'static Mutex<()> {
-        static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
-        GUARD.get_or_init(|| Mutex::new(()))
-    }
 
     fn write_skill(path: &Path, name: &str, description: &str) {
         fs::create_dir_all(path).unwrap();
@@ -369,47 +380,37 @@ mod tests {
 
     #[test]
     fn application_default_adds_shared_skill_root() {
-        let _guard = home_guard().lock().unwrap();
         let temp_home = tempfile::tempdir().unwrap();
         let shared_skills = temp_home.path().join(".agents/skills");
         fs::create_dir_all(&shared_skills).unwrap();
-        let orig_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", temp_home.path()) };
 
         let workspace = tempfile::tempdir().unwrap();
         let config = Config::default();
         assert!(config.skills.discover_shared);
 
-        let runtime =
-            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+        let runtime = discover_runtime_skills_with_home(
+            workspace.path(),
+            config.skills.discover_shared,
+            Some(temp_home.path()),
+        )
+        .unwrap();
         assert!(
-            runtime
-                .search_paths()
-                .iter()
-                .any(|p| p.ends_with(".agents/skills")),
+            runtime.search_paths().iter().any(|p| p == &shared_skills),
             "shared skill root must be in search paths when application default is used"
         );
 
         let last = runtime.search_paths().last().unwrap();
-        assert!(
-            last.ends_with(".agents/skills"),
+        assert_eq!(
+            last, &shared_skills,
             "shared root must be lowest priority (last)"
         );
-
-        match orig_home {
-            Some(h) => unsafe { std::env::set_var("HOME", h) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
     }
 
     #[test]
     fn application_explicit_false_excludes_shared_skill_root() {
-        let _guard = home_guard().lock().unwrap();
         let temp_home = tempfile::tempdir().unwrap();
         let shared_skills = temp_home.path().join(".agents/skills");
         fs::create_dir_all(&shared_skills).unwrap();
-        let orig_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", temp_home.path()) };
 
         let workspace = tempfile::tempdir().unwrap();
         let config = Config {
@@ -420,38 +421,35 @@ mod tests {
         };
         assert!(!config.skills.discover_shared);
 
-        let runtime =
-            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+        let runtime = discover_runtime_skills_with_home(
+            workspace.path(),
+            config.skills.discover_shared,
+            Some(temp_home.path()),
+        )
+        .unwrap();
         assert!(
-            !runtime
-                .search_paths()
-                .iter()
-                .any(|p| p.ends_with(".agents/skills")),
+            !runtime.search_paths().iter().any(|p| p == &shared_skills),
             "shared skill root must NOT be in search paths when explicitly disabled"
         );
-
-        match orig_home {
-            Some(h) => unsafe { std::env::set_var("HOME", h) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
     }
 
     #[test]
     fn shared_skill_is_lowest_priority_end_to_end() {
-        let _guard = home_guard().lock().unwrap();
         let temp_home = tempfile::tempdir().unwrap();
         let shared_dir = temp_home.path().join(".agents/skills/dup-skill");
         write_skill(&shared_dir, "dup-skill", "Shared version");
-        let orig_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", temp_home.path()) };
 
         let workspace = tempfile::tempdir().unwrap();
         let proj_dir = workspace.path().join(".talos/skills/dup-skill");
         write_skill(&proj_dir, "dup-skill", "Project version");
 
         let config = Config::default();
-        let runtime =
-            discover_runtime_skills(workspace.path(), config.skills.discover_shared).unwrap();
+        let runtime = discover_runtime_skills_with_home(
+            workspace.path(),
+            config.skills.discover_shared,
+            Some(temp_home.path()),
+        )
+        .unwrap();
 
         let dup: Vec<_> = runtime
             .index
@@ -464,10 +462,59 @@ mod tests {
             "workspace skill must shadow shared skill"
         );
         assert_eq!(dup[0].source.to_string(), "project");
+    }
 
-        match orig_home {
-            Some(h) => unsafe { std::env::set_var("HOME", h) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
+    #[test]
+    fn application_without_home_does_not_add_shared_root() {
+        let workspace = tempfile::tempdir().unwrap();
+        let proj_dir = workspace.path().join(".talos/skills/proj-skill");
+        write_skill(&proj_dir, "proj-skill", "Project only");
+
+        let runtime = discover_runtime_skills_with_home(workspace.path(), true, None).unwrap();
+        assert!(
+            !runtime
+                .search_paths()
+                .iter()
+                .any(|p| p.ends_with(".agents/skills")),
+            "no shared root when home is None"
+        );
+        assert!(
+            runtime.index.iter().any(|s| s.name == "proj-skill"),
+            "workspace skill still discovered without home"
+        );
+    }
+
+    #[test]
+    fn explicit_home_is_used_instead_of_process_environment() {
+        let home_a = tempfile::tempdir().unwrap();
+        let shared_a = home_a.path().join(".agents/skills/skill-a");
+        write_skill(&shared_a, "skill-a", "From home A");
+
+        let home_b = tempfile::tempdir().unwrap();
+        let shared_b = home_b.path().join(".agents/skills/skill-b");
+        write_skill(&shared_b, "skill-b", "From home B");
+
+        let workspace = tempfile::tempdir().unwrap();
+        let runtime =
+            discover_runtime_skills_with_home(workspace.path(), true, Some(home_a.path())).unwrap();
+
+        assert!(
+            runtime.index.iter().any(|s| s.name == "skill-a"),
+            "skill from injected home A must be discovered"
+        );
+        assert!(
+            !runtime.index.iter().any(|s| s.name == "skill-b"),
+            "skill from home B must NOT be discovered"
+        );
+    }
+
+    #[test]
+    fn discover_runtime_skills_delegates_to_with_home() {
+        let workspace = tempfile::tempdir().unwrap();
+        let proj_dir = workspace.path().join(".talos/skills/proj-skill");
+        write_skill(&proj_dir, "proj-skill", "Project skill");
+
+        let runtime = discover_runtime_skills(workspace.path(), false).unwrap();
+        assert!(runtime.index.iter().any(|s| s.name == "proj-skill"));
     }
 }

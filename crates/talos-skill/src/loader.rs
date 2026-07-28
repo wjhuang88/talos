@@ -67,9 +67,10 @@ pub struct SkillLoader {
 impl SkillLoader {
     pub fn new() -> Self {
         let cwd = std::env::current_dir().ok();
+        let home = home_dir();
         Self {
             skills: Vec::new(),
-            search_paths: default_search_paths(cwd.as_deref(), false),
+            search_paths: default_search_paths(cwd.as_deref(), home.as_deref(), false),
             discover_shared: false,
             workspace_root: cwd.map(|p| p.to_path_buf()),
             discovery_policy: SkillDiscoveryPolicy::default(),
@@ -85,10 +86,24 @@ impl SkillLoader {
         workspace_root: impl AsRef<Path>,
         discover_shared: bool,
     ) -> Self {
+        Self::for_workspace_with_home_and_options(workspace_root, home_dir(), discover_shared)
+    }
+
+    /// Constructs a loader with an explicit home directory for test injection.
+    ///
+    /// When `home` is `None`, neither user-global nor shared roots are added.
+    /// When `home` is `Some(h)`, user-global (`h/.talos/skills`) and — if
+    /// `discover_shared` is true — shared (`h/.agents/skills`) roots are added.
+    /// This constructor never reads the `HOME` environment variable.
+    pub fn for_workspace_with_home_and_options(
+        workspace_root: impl AsRef<Path>,
+        home: Option<PathBuf>,
+        discover_shared: bool,
+    ) -> Self {
         let root = workspace_root.as_ref();
         Self {
             skills: Vec::new(),
-            search_paths: default_search_paths(Some(root), discover_shared),
+            search_paths: default_search_paths(Some(root), home.as_deref(), discover_shared),
             discover_shared,
             workspace_root: Some(root.to_path_buf()),
             discovery_policy: SkillDiscoveryPolicy::default(),
@@ -102,9 +117,10 @@ impl SkillLoader {
         policy: SkillDiscoveryPolicy,
     ) -> Self {
         let root = workspace_root.as_ref();
+        let home = home_dir();
         Self {
             skills: Vec::new(),
-            search_paths: default_search_paths(Some(root), discover_shared),
+            search_paths: default_search_paths(Some(root), home.as_deref(), discover_shared),
             discover_shared,
             workspace_root: Some(root.to_path_buf()),
             discovery_policy: policy,
@@ -430,15 +446,19 @@ pub(crate) fn home_dir() -> Option<PathBuf> {
     }
 }
 
-fn default_search_paths(workspace_root: Option<&Path>, discover_shared: bool) -> Vec<PathBuf> {
+fn default_search_paths(
+    workspace_root: Option<&Path>,
+    home: Option<&Path>,
+    discover_shared: bool,
+) -> Vec<PathBuf> {
     let mut search_paths = Vec::new();
 
     if let Some(root) = workspace_root {
         push_if_dir(&mut search_paths, root.join(".talos/skills"));
     }
 
-    if let Some(home) = home_dir() {
-        push_if_dir(&mut search_paths, home.join(".talos/skills"));
+    if let Some(h) = home {
+        push_if_dir(&mut search_paths, h.join(".talos/skills"));
     }
 
     if let Some(root) = workspace_root {
@@ -453,8 +473,8 @@ fn default_search_paths(workspace_root: Option<&Path>, discover_shared: bool) ->
         }
     }
 
-    if discover_shared && let Some(home) = home_dir() {
-        push_if_dir(&mut search_paths, home.join(".agents/skills"));
+    if discover_shared && let Some(h) = home {
+        push_if_dir(&mut search_paths, h.join(".agents/skills"));
     }
 
     search_paths
