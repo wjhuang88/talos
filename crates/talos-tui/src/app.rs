@@ -953,8 +953,34 @@ impl Tui {
         let splash = crate::splash::viewport_splash_lines(width);
         let splash_rows = splash.len();
         let startup_spacer_rows: usize = if is_startup { 2 } else { 0 };
+        let follows_tail = matches!(
+            self.history_scroll.mode,
+            crate::history_projection::HistoryScrollMode::FollowTail
+        );
+        // A short FollowTail conversation is a single vertical flow: Logo,
+        // transcript, then the input frame.  `history_cap` makes AppLayout
+        // allocate only that natural history height.  Once it cannot fit, the
+        // normal allocation clamps it to the remaining frame and the composer
+        // naturally becomes bottom-fixed.  Anchored history deliberately uses
+        // the regular viewport so scrolling never moves the input frame.
         let history_cap = if is_startup {
             Some((splash_rows + startup_spacer_rows) as u16)
+        } else if follows_tail
+            && !self.state.slash_menu.is_open
+            && matches!(self.state.approval_state, ApprovalState::Hidden)
+        {
+            let natural_rows = project_history(
+                &self.transcript,
+                screen_size.width,
+                screen_size.height,
+                &self.history_scroll,
+            )
+            .total_rows;
+            Some(
+                splash_rows
+                    .saturating_add(natural_rows)
+                    .min(u16::MAX as usize) as u16,
+            )
         } else {
             None
         };
@@ -1050,10 +1076,7 @@ impl Tui {
         if let Some(prefix_start) = self.history_prefix_start.as_mut() {
             *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
         }
-        let follow_tail = matches!(
-            self.history_scroll.mode,
-            crate::history_projection::HistoryScrollMode::FollowTail
-        );
+        let follow_tail = follows_tail;
         let natural_start = if history.total_rows == 0 {
             0
         } else if follow_tail {

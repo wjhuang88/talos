@@ -1953,7 +1953,7 @@ fn startup_draft_redraw_preserves_logo_and_cursor() {
 }
 
 #[test]
-fn first_submit_transitions_to_normal_layout_once() {
+fn first_submit_keeps_short_conversation_adjacent_to_logo() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut state = TuiState::new();
     state.input_append_str("hello world");
@@ -1972,18 +1972,18 @@ fn first_submit_transitions_to_normal_layout_once() {
     tui.handle_input_event(&key_press(KeyCode::Enter));
     let _ = rx.try_recv().expect("message dispatched");
 
-    // P1 timing fix: after Enter, the layout must transition immediately —
-    // not wait for the async UiOutput echo. This verifies no extra startup
-    // frame with an empty composer is produced between submit and echo.
+    // Submission leaves startup mode immediately, but a short conversation
+    // must still keep the composer adjacent to the Logo/history flow.
     tui.draw_frame()
         .expect("post-submit frame (before UiOutput echo)");
     let post_submit_cursor = tui
         .terminal
         .test_cursor_position()
         .expect("post-submit cursor");
-    assert_ne!(
-        post_submit_cursor.y, startup_cursor.y,
-        "layout must transition on submit, not wait for UiOutput echo"
+    assert!(
+        post_submit_cursor.y < 20,
+        "empty post-submit composer must not jump to bottom, got {}",
+        post_submit_cursor.y
     );
 
     tui.handle_ui_output(talos_conversation::UiOutput::Content(
@@ -1998,16 +1998,89 @@ fn first_submit_transitions_to_normal_layout_once() {
         .terminal
         .test_cursor_position()
         .expect("conversation cursor");
-    assert_eq!(
-        conv_cursor.y, post_submit_cursor.y,
-        "cursor must not move again after UiOutput — transition is exactly once"
+    assert!(
+        conv_cursor.y < 20,
+        "short conversation composer must remain near logo, got {}",
+        conv_cursor.y
     );
 
     tui.draw_frame().expect("second conversation frame");
     let conv_cursor_2 = tui.terminal.test_cursor_position().expect("second cursor");
-    assert_eq!(
-        conv_cursor.y, conv_cursor_2.y,
-        "no second transition — layout must be stable"
+    assert_eq!(conv_cursor.y, conv_cursor_2.y, "stable without new content");
+    assert!(
+        conv_cursor.y < 20,
+        "first history row must not force bottom layout"
+    );
+}
+
+#[test]
+fn growing_follow_tail_history_moves_composer_until_frame_overflows() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::User,
+            text: "first".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit first");
+    tui.draw_frame().expect("first conversation frame");
+    let first_cursor = tui.terminal.test_cursor_position().expect("first cursor");
+
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::Assistant,
+            text: "second".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit second");
+    tui.draw_frame().expect("second conversation frame");
+    let second_cursor = tui.terminal.test_cursor_position().expect("second cursor");
+    assert!(
+        second_cursor.y > first_cursor.y,
+        "composer should follow growing history while it fits"
+    );
+
+    for index in 0..40 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("overflow row {index}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript()
+        .expect("commit overflow rows");
+    tui.draw_frame().expect("overflow conversation frame");
+    let overflow_cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("overflow cursor");
+    assert!(
+        overflow_cursor.y >= second_cursor.y,
+        "overflow must never move composer above existing flowing content"
+    );
+    assert!(
+        overflow_cursor.y < 24,
+        "bottom fallback cursor remains bounded"
+    );
+    assert!(
+        tui.last_history_projection.total_rows > usize::from(tui.last_history_viewport_height),
+        "overflow uses a bounded history viewport"
+    );
+
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    tui.draw_frame().expect("anchored history frame");
+    assert!(
+        matches!(tui.history_scroll.mode, HistoryScrollMode::Anchored { .. }),
+        "paging history leaves FollowTail"
+    );
+    let anchored_cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("anchored cursor");
+    assert!(
+        anchored_cursor.y >= overflow_cursor.y,
+        "anchored history keeps the composer in its bounded bottom layout"
     );
 }
 
