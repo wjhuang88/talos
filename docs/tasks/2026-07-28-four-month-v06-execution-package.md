@@ -5,7 +5,7 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: I157 / MODEL-010 only
+> Current implementation authority: None (I157 Complete; I158 Blocked)
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -68,8 +68,8 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | In Progress |
-| P1 | Execute I157 / MODEL-010 | `talos config unset providers.<name>[.api_key] --confirm`, atomic mutation, active-provider recovery, EN/zh-CN/reference docs | P0 | I157 owner acceptance, focused tests, real isolated-config evidence, full locked validation | Record blocker in I157; do not widen into TUI deletion | Active |
+| P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
+| P1 | Execute I157 / MODEL-010 | `talos config unset providers.<name>[.api_key] --confirm`, atomic mutation, active-provider recovery, EN/zh-CN/reference docs | P0 | I157 owner acceptance, focused tests, real isolated-config evidence, full locked validation | Record blocker in I157; do not widen into TUI deletion | Complete — Completion Commit: `84e7a6a3`, `46c919ee` |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -228,18 +228,22 @@ skip to a later mainline package.
 
 ## Current Checkpoint
 
-- Completed task items: baseline inventory; four-month package design; I157 activation preparation.
-- Current state and artifacts: clean `main` at baseline `2bb2b618`; I166 Complete; no competing
-  Active/Review implementation iteration; MODEL-010 selected into Active I157; ADR-053 Proposed;
-  I158-I162 Blocked.
-- Commands/checks and actual results: governance validation passed with 0 warnings. Scale assessment
-  recommends high-risk / release-managed / on-demand worktree; the maintainer's direct-`main`
-  preference remains the explicit I157 exception and must be reconsidered before I158.
-- External-action authorization: the maintainer authorized a validated `main` push at each phase
-  boundary on 2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain
-  unauthorized.
+- Completed task items: P0 (baseline inventory + package publication), P1 (I157/MODEL-010
+  three-phase implementation: config mutation core `84e7a6a3`, CLI wiring + docs `46c919ee`,
+  governance sync docs commit).
+- Current state and artifacts: clean `main` at HEAD after Phase 3 docs push; I157/MODEL-010
+  Complete; no Active or Review implementation iteration; I164 Paused; I158-I162 Blocked;
+  ADR-053 Proposed.
+- Commands/checks and actual results: `cargo test --workspace --locked` 2566 passed, 0 failed;
+  `cargo clippy --workspace --locked -- -D warnings` clean; `cargo fmt --all -- --check` clean;
+  `scripts/validate_project_governance.sh .` 0 warnings. Runtime fixture verified all acceptance
+  criteria including missing-confirm byte-identical, custom/builtin/api_key semantics, active-
+  provider picker recovery, and credential scan.
+- External-action authorization: validated `main` push at each phase boundary completed on
+  2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
 - Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
-  authorization are external gates.
-- Next task item: P1 / I157 / MODEL-010.
-- Recovery or resume instruction: read this package, the v0.6 program, I157, and MODEL-010; verify
-  the current Git state and execute only P1 until its owner gate is reached.
+  authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
+- Next task item: P2 (await maintainer selection — I158 Blocked on ADR-053; no other Planned
+  implementation iteration is Ready).
+- Recovery or resume instruction: read this package, the v0.6 program, and the iterations README;
+  verify the current Git state; confirm I158 still Blocked before any architecture work.

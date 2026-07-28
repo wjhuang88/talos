@@ -5,12 +5,13 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress (I157 activated 2026-07-28) |
+| Status | Complete (I157 — Phase 1 `84e7a6a3`, Phase 2 `46c919ee`; 2026-07-28) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
-| Selected Iteration | I157 (Active; baseline `2bb2b618`) |
+| Selected Iteration | I157 (Complete; Phase 1 `84e7a6a3`, Phase 2 `46c919ee`) |
+> Completion Commit: `84e7a6a3` — config mutation core (ConfigUnsetOutcome + unset_dotted + 10 unit tests); `46c919ee` — CLI wiring + docs (ConfigCommand::Unset + run_config_unset + 11 CLI tests + README/zh-CN/config.reference.toml).
 
 ## Problem
 
@@ -152,13 +153,30 @@ Behavior:
 
 Technical / governance:
 
-- [ ] `cargo test --workspace --locked` proves entry removal, single-field clear,
+- [x] `cargo test --workspace --locked` proves entry removal, single-field clear,
       `--confirm` gating, no-partial-write, and active-provider-removal recovery.
-- [ ] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
+- [x] `cargo fmt --all`, `cargo clippy --workspace --locked -- -D warnings`,
       `scripts/validate_project_governance.sh .`, and `git diff --check` are clean.
-- [ ] Owner status here and the Board mirror are synchronized.
-- [ ] README EN/zh-CN and `docs/reference/config.reference.toml` document
+- [x] Owner status here and the Board mirror are synchronized.
+- [x] README EN/zh-CN and `docs/reference/config.reference.toml` document
       `config unset`, or a documentation residual is registered.
+
+## Completion Evidence
+
+- Phase 1 (config mutation core): `84e7a6a3` — `ConfigUnsetOutcome` enum +
+  `Config::unset_dotted` method + 10 talos-config unit tests.
+- Phase 2 (CLI wiring + docs): `46c919ee` — `ConfigCommand::Unset` variant +
+  `run_config_unset` + `--confirm` gating + 11 talos-cli tests + README/zh-CN/
+  config.reference.toml documentation.
+- Workspace: `cargo test --workspace --locked` 2566 passed, 0 failed.
+- Clippy: `cargo clippy --workspace --locked -- -D warnings` clean.
+- Governance: `scripts/validate_project_governance.sh .` 0 warnings.
+- Runtime fixture: isolated HOME; missing-`--confirm` byte-identical; custom
+  removal; builtin-backed disconnection semantics; api_key clear (no empty
+  string in TOML); active-provider removal → picker recovery, no panic;
+  credential scan clean in `config list`/`config get`.
+- Security scan: no credential in stdout/stderr; no `unsafe`; no new
+  dependencies; no bulk/wildcard; single mutation path via `config.unset_dotted`.
 
 ## Resolved Decisions (2026-07-24)
 

@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -147,16 +147,27 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
-- Focused tests: pending
-- Full locked validation: pending
-- Runtime evidence: pending
-- Governance validation: pending
+- Focused tests: 10 talos-config + 11 talos-cli = 21 new tests, all pass.
+- Full locked validation: `cargo test --workspace --locked` 2566 passed, 0 failed;
+  `cargo clippy --workspace --locked -- -D warnings` clean;
+  `cargo fmt --all -- --check` clean;
+  `scripts/validate_project_governance.sh .` 0 warnings.
+- Runtime evidence: isolated HOME fixture verified missing-`--confirm` byte-identical,
+  custom-provider removal, builtin-backed disconnection semantics, api_key clear
+  (no empty string), active-provider removal → picker recovery (no panic), and
+  credential scan clean in `config list`/`config get` output.
+- Governance validation: I157 sole Active; MODEL-010 Complete; I158-I162 Blocked;
+  ADR-053 Proposed; no release/version change.
 
 ## Completion Evidence
 
-- Completion Commit: pending
-- Do not cite a status-only documentation commit as implementation completion.
-- Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
+- Completion Commit: `84e7a6a3` (Phase 1 config mutation) + `46c919ee` (Phase 2 CLI + docs)
+- Phase 1: `feat(config): add atomic provider removal mutation (#MODEL-010 #I157)` —
+  `ConfigUnsetOutcome` enum, `Config::unset_dotted` method, 10 unit tests.
+- Phase 2: `feat(cli): add confirmed provider config removal (#MODEL-010 #I157)` —
+  `ConfigCommand::Unset`, `run_config_unset` with `--confirm` gate, 11 CLI tests,
+  README EN/zh-CN + config.reference.toml documentation.
+- Phase 3: `docs(iteration): record I157 provider removal evidence` — owner docs sync.
 
 ## Variance And Residuals
 
