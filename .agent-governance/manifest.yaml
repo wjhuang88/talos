@@ -63,7 +63,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Execute only I164/TUI-038 from an isolated worktree; keep I157 deferred until I164 disposition"
+    - "Execute only I164/TUI-038 directly on main under the 2026-07-28 maintainer no-parallel-work exception; restore worktree isolation if parallel work begins"
     - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
     - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"

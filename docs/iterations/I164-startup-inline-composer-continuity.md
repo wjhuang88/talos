@@ -83,6 +83,7 @@ then exit and confirm terminal restore.
 | --- | --- | --- |
 | 2026-07-28 | Planning / priority shift | Maintainer requested immediate implementation scheduling. I164/TUI-038 is selected as the next candidate after I163 disposition; I157 remains Planned but deferred. No production code changed and I164 is not Active. |
 | 2026-07-28 | Activation | I163/SKILL-003 is Complete. TUI-035 is Complete and ADR-054 is Accepted. Fresh inventory confirms I157 remains Planned, I158-I162 remain Blocked, ADR-053 remains Proposed, and no conflicting Active iteration exists. Baseline `c600110`. I164/TUI-038 is the sole implementation authority. |
+| 2026-07-28 | Maintainer execution-mode decision | No implementation work is running in parallel. The maintainer explicitly authorized I164 execution directly on `main`; the unused `feature/i164-startup-inline-composer` worktree and branch were removed before any implementation change. If parallel work begins, re-run the inventory and restore the required isolation before continuing. |
 
 ## Verification Evidence
 
