@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -143,7 +143,7 @@ If a stop condition occurs:
 
 | Date | Type | Record |
 |---|---|---|
-| YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-07-28 | Activation | Full inventory at `2bb2b6185f2f9ca35af269efa63c618076f4a32e`: I166/TUI-036 Complete; no other implementation iteration Active or in Review; I164 remains Paused; I158-I162 remain Blocked; ADR-053 remains Proposed. MODEL-010 is Ready and every I157 dependency is satisfied. I157 is the sole Active implementation authority on direct `main` execution. The four-month execution owner is `docs/tasks/2026-07-28-four-month-v06-execution-package.md`. |
 
 ## Verification Evidence
 
@@ -168,12 +168,17 @@ If a stop condition occurs:
   selected I166/TUI-036 before I157. I157/MODEL-010 remains Planned/Ready with
   its published baseline unchanged and resumes after I166 reaches a terminal
   disposition.
+- 2026-07-28 activation: I166 reached Complete with maintainer acceptance.
+  The required inventory found no competing Active or Review implementation
+  iteration, so the published I157/MODEL-010 baseline is now Active/In Progress.
+  No scope or acceptance target changed.
 
 ## REL-002 Execution Record
 
-- Primary executor/runtime: pending
+- Primary executor/runtime: frontline implementation agent to be dispatched from the four-month package
 - External assistance: pending
-- Planning/editing/testing/docs/commit/push ownership: pending
+- Planning/activation/docs ownership: Codex (`gpt-5`); implementation/testing/commit ownership:
+  pending dispatch; push ownership remains maintainer-only
 - Qualification verdict: pending; do not assume qualification.
 
 ## Retrospective

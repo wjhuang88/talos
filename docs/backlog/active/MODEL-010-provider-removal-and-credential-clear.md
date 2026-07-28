@@ -5,12 +5,12 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | Ready (2026-07-24; 4 open questions resolved below) |
+| Status | In Progress (I157 activated 2026-07-28) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
-| Selected Iteration | I157 (Planned; activation gate: I156 Complete; not yet In Progress) |
+| Selected Iteration | I157 (Active; baseline `2bb2b618`) |
 
 ## Problem
 
