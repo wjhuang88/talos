@@ -6,7 +6,7 @@
     <title>路线图 — Talos</title>
     <meta
       name="description"
-      content="Talos 项目状态：v0.5.0 已发布内容、已规划内容，以及仍处于研究阶段的内容。"
+      content="Talos 项目状态：v0.6.0 已发布内容、已规划内容，以及仍处于研究阶段的内容。"
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
@@ -42,7 +42,7 @@
         <p>
           Talos 的已发布、计划中与研究中边界。标记为
           <span class="talos-pill talos-pill--shipped">已发布</span>
-          的属于 v0.5.0；标记为
+          的属于 v0.6.0；标记为
           <span class="talos-pill talos-pill--planned">计划中</span>
           的已纳入范围；标记为
           <span class="talos-pill talos-pill--research">研究中</span>
@@ -65,7 +65,7 @@
       </section>
 
       <section>
-        <h2>已在 v0.5.0 发布</h2>
+        <h2>已在 v0.6.0 发布</h2>
         <p>
           以下内容属于当前已发布 release。详见
           <a href="capabilities.html">能力页面</a>和
@@ -100,7 +100,8 @@
             <span class="talos-pill talos-pill--shipped">已发布</span>
             来自 <code>.talos/skills/</code>、
             <code>~/.talos/skills/</code> 和继承父级
-            <code>.talos/skills/</code> 的运行时 Skills。
+            <code>.talos/skills/</code> 的运行时 Skills，以及默认启用的共享
+            <code>~/.agents/skills/</code> 目录发现。符号链接遍历仍默认禁用。
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
@@ -118,6 +119,11 @@
               rel="noopener"
               >ADR-024</a
             >）。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            通过 <code>--plugin DIRECTORY</code> 显式选择的本地只读 WASM 包；
+            不提供 host calls，也不自动发现。
           </li>
         </ul>
       </section>
@@ -190,16 +196,6 @@
         <ul>
           <li>
             <span class="talos-pill talos-pill--research">研究中</span>
-            <code>~/.agents/skills/</code> dotagents 共享目录发现。
-            跟踪项：
-            <a
-              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/AGENT-002-dotagents-protocol-support.md"
-              rel="noopener"
-              >AGENT-002</a
-            >。
-          </li>
-          <li>
-            <span class="talos-pill talos-pill--research">研究中</span>
             只读 dashboard MVP 之外的 Web 控制面扩展。
             独立跟踪项：
             <a
@@ -212,7 +208,7 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--research">研究中</span>
-            WASM plugin runtime 与插件市场。相关架构决策
+            远程插件分发、自动发现、host calls、可写插件与插件市场。相关架构决策
             <a
               href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/027-plugin-runtime-boundary.md"
               rel="noopener"
@@ -250,7 +246,7 @@
       </section>
 
       <section>
-        <h2>v0.5.0 非目标</h2>
+        <h2>v0.6.0 非目标</h2>
         <p>
           以下为明确非目标，提前列出以避免用户通过试错获得这些结论。
         </p>
@@ -261,7 +257,7 @@
           </li>
           <li>
             Talos <strong>不是</strong> marketplace runtime。
-            WASM plugin runtime 和插件市场仅处于研究阶段。
+            远程插件分发、自动发现、可写插件和插件市场仅处于研究阶段。
           </li>
           <li>
             Talos <strong>不是</strong>远程 Web 控制平面或浏览器自动化产品。

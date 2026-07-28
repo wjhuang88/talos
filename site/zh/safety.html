@@ -40,13 +40,13 @@
       <header class="talos-lead">
         <h1>安全</h1>
         <p>
-          Talos 在 v0.5.0 中承诺的权限策略、密钥脱敏边界与 sandbox
+          Talos 在 v0.6.0 中承诺的权限策略、密钥脱敏边界与 sandbox
           边界。
         </p>
       </header>
 
       <section>
-        <h2>v0.5.0 已发布内容</h2>
+        <h2>v0.6.0 已发布内容</h2>
         <p>
           Talos 是面向会审查其执行动作的开发者的本地编码 Agent。
           安全模型建立在三个显式边界上：
@@ -169,7 +169,7 @@
       <section>
         <h2>Sandbox 策略</h2>
         <p>
-          Talos 是本地进程，不是远程服务。在 v0.5.0 中，启动时唯一的 Web 表面是
+          Talos 是本地进程，不是远程服务。在 v0.6.0 中，启动时唯一的 Web 表面是
           只读、token-gated 的 loopback dashboard；批准、写操作、日志和会话控制不会迁移到远程 Web 平面。
           运行时设计目标是让默认核心保持本地且可审计。
           加固细节（<code>talos-sandbox/hardening.rs</code> 中的四处生产
@@ -192,7 +192,7 @@
           >。
         </p>
         <p>
-          在 v0.5.0 中，Talos 也<strong>不是</strong>远程多用户服务、
+          在 v0.6.0 中，Talos 也<strong>不是</strong>远程多用户服务、
           marketplace runtime、浏览器自动化产品、Web 批准表面或自主后台守护进程。
           已发布 / 计划中 / 研究中的边界划分见
           <a href="roadmap.html">路线图</a>。
@@ -207,7 +207,8 @@
             仍是 pre-1.0；在 <code>v1.0.0</code> 之前，SDK 表面仍可能变化。
           </li>
           <li>
-            <code>~/.agents/skills/</code> dotagents 共享目录是研究项，尚未发布。
+            共享 <code>~/.agents/skills/</code> 目录发现已发布并默认启用。
+            符号链接遍历仍默认禁用，必须由显式 discovery policy 开启。
           </li>
           <li>
             只读 dashboard 之外的 Web 控制面扩展（<a
@@ -218,8 +219,8 @@
             Web 写操作/动作路由尚未发布，也不是安全边界。
           </li>
           <li>
-            WASM plugin runtime 是研究项，尚未发布。网站会在
-            <a href="roadmap.html">路线图</a> 页面反映该状态。
+            本地只读 WASM 包仅在操作者通过 <code>--plugin</code> 显式选择目录时启用。
+            它们没有 host calls 或写能力；远程分发与自动发现尚未发布。
           </li>
         </ul>
         <div class="talos-callout talos-callout--info">

@@ -11,10 +11,10 @@ Talos 是一个 Rust 原生的本地编码 Agent，面向希望在自己机器�
 运行时的开发者。它提供终端 UI、模型提供商适配、会话历史、内置编码工具、显式权限控制、
 运行时 Skills、MCP/RPC 集成和项目治理支持，同时保持默认本地、边界清晰、可审计。
 
-Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.5.0`。它已经可以用于
+Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.6.0`。它已经可以用于
 本地编码工作流，但仍然处于 1.0 之前：API、命令界面和存储格式仍可能随着产品化加固继续演进。
 本 README 只描述已经发布或当前已实现的用户可见能力；只读 loopback dashboard 之外的 Web
-控制面扩展、dotagents shared Skills、更广泛的插件载体和高级文档解析等研究方向请查看[项目状态](#项目状态)。
+控制面扩展、超出已发布 shared Skills 目录的 dotagents 兼容、更广泛的插件载体和高级文档解析等研究方向请查看[项目状态](#项目状态)。
 
 ## 主要能力
 
@@ -32,7 +32,7 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 
 ## 当前 Release 边界
 
-`v0.5.0` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
+`v0.6.0` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
 插件市场、浏览器自动化控制面或自主后台守护进程。
 
 当前已发布/已实现：
@@ -506,7 +506,7 @@ GitHub Release 工作流由 tag 触发：
 创建 tag 前，请运行与 CI 和 Release workflow 相同的预检：
 
 ```bash
-./scripts/release_preflight.sh v0.5.0
+./scripts/release_preflight.sh v0.6.0
 ```
 
 仓库通过 `rust-toolchain.toml` 固定 Rust/Clippy 工具链；不要使用其他工具链直接发布。
@@ -515,13 +515,13 @@ Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
 
 post-v0.2.0 加固素材集中在
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md)。已发布的
-`v0.5.0` release 公告和下载以 GitHub Releases 为准。
+`v0.6.0` release 公告和下载以 GitHub Releases 为准。
 
 ## 项目状态
 
 Talos 正从核心运行时实现阶段进入产品化加固和差异化体验阶段。接下来的研究重点是：
 
-- `AGENT-002-B`：兼容 dotagents `~/.agents/skills/`。
+- `AGENT-002-B`：扩展已发布 shared Skills 目录之外的 dotagents 兼容。
 - `TOOL-004`：先确定搜索引擎方向，再做工具集整体重构。
 - `TOOL-007`：工具集综合审计，并纳入 WEBFETCH Phase 2+ 规划。
 - `WEB-001`：在只读 loopback dashboard MVP 之外继续扩展本地 Web 控制面。

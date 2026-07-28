@@ -38,7 +38,7 @@
 
     <main id="main" class="talos-main">
       <section class="talos-hero">
-        <p class="talos-hero__eyebrow">v0.5.0 — pre-1.0 发布线</p>
+        <p class="talos-hero__eyebrow">v0.6.0 — pre-1.0 发布线</p>
         <h1>一个安全优先的本地编码 Agent，使用 Rust 编写。</h1>
         <p class="talos-hero__tagline">
           Talos 是一个 Rust 原生本地编码 Agent，面向希望在自己机器上审查、扩展和运行
@@ -101,8 +101,8 @@
           <article class="talos-card">
             <h3>可扩展能力面</h3>
             <p>
-              MCP stdio 工具、hooks、JSON-RPC 和项目治理状态
-              已实现；plugin/WASM 和浏览器控制面仍处于研究阶段。
+              MCP stdio 工具、hooks、JSON-RPC、项目治理状态，以及显式选择的
+              本地只读 WASM 包已实现；远程插件分发和浏览器控制面仍处于研究阶段。
             </p>
           </article>
         </div>
@@ -111,20 +111,23 @@
       <section>
         <h2>当前发布边界</h2>
         <p>
-          <span class="talos-pill talos-pill--shipped">已在 v0.5.0 发布</span>
+          <span class="talos-pill talos-pill--shipped">已在 v0.6.0 发布</span>
           TUI、inline 与 print 执行模式；无参数的 provider/模型选择器、兼容 provider
           注册与模型发现；面向确认支持视觉输入模型的显式本地图片附件；本地 provider 配置与密钥脱敏；
           带权限门控的内置编码工具；会话存储、搜索、清理、维护、记忆固化
           与探索库导入；来自 <code>.talos/skills/</code>、
           <code>~/.talos/skills/</code> 和继承父级 <code>.talos/skills/</code>
-          的运行时 Skills；MCP stdio 工具与 JSON-RPC 基础设施；以及初始
+          的运行时 Skills，以及默认启用的共享
+          <code>~/.agents/skills/</code> 目录发现；MCP stdio 工具与 JSON-RPC 基础设施；
+          通过 <code>--plugin DIRECTORY</code> 显式选择的本地只读 WASM 包；以及初始
           <code>talos-runtime</code> 可嵌入 facade。
         </p>
         <p>
           <span class="talos-pill talos-pill--research">尚未发布</span>
           可嵌入运行时 facade 的稳定 1.0 SDK 保证、
-          <code>~/.agents/skills/</code> dotagents 共享目录发现、
-          远程 Web 控制、浏览器自动化、Web 批准和 Web 写操作/动作路由、WASM plugin runtime 与插件市场、
+          超出共享 Skills 目录发现之外的 dotagents 兼容、
+          远程 Web 控制、浏览器自动化、Web 批准和 Web 写操作/动作路由、远程插件分发、
+          自动插件发现、可写插件与插件市场、
           超出当前 web/fetch 基础能力的 PDF/Office 文档解析、以及远程或
           P2P 会话控制。完整的已发布 / 计划中 / 研究中划分请见
           <a href="roadmap.html">路线图</a>。

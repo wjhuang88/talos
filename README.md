@@ -13,10 +13,10 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.5.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.6.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
-dashboard, dotagents shared Skills, broader plugin carriers, and advanced document ingestion are tracked separately under
+dashboard, broader dotagents compatibility, plugin carriers, and advanced document ingestion are tracked separately under
 [Project Status](#project-status).
 
 ## Highlights
@@ -36,7 +36,7 @@ dashboard, dotagents shared Skills, broader plugin carriers, and advanced docume
 
 ## Current Release Boundary
 
-`v0.5.0` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.6.0` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 automation surface, or autonomous background daemon.
 
@@ -735,7 +735,7 @@ Release tags drive the GitHub release workflow:
 Before creating a tag, run the same preflight used by CI and the release workflow:
 
 ```bash
-./scripts/release_preflight.sh v0.5.0
+./scripts/release_preflight.sh v0.6.0
 ```
 
 The repository pins the Rust/Clippy toolchain in `rust-toolchain.toml`; do not tag a release from
@@ -745,14 +745,14 @@ The release workflow builds Linux, macOS, and Windows artifacts from a macOS run
 
 The post-v0.2.0 hardening notes that fed the pre-0.3 release line are collected in
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). GitHub Releases
-is the source of truth for the published `v0.5.0` release announcement and downloads.
+is the source of truth for the published `v0.6.0` release announcement and downloads.
 
 ## Project Status
 
 Talos is moving from core runtime implementation toward product hardening and differentiated
 developer experience. The next research priorities are:
 
-- `AGENT-002-B`: dotagents `~/.agents/skills/` compatibility.
+- `AGENT-002-B`: broader dotagents compatibility beyond the shipped shared Skills directory.
 - `TOOL-004`: search engine direction before broader tool-set redesign.
 - `TOOL-007`: holistic tool-set audit, including WEBFETCH Phase 2+ planning.
 - `WEB-001`: local loopback web surface expansion beyond the read-only dashboard MVP.

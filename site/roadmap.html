@@ -6,7 +6,7 @@
     <title>Roadmap — Talos</title>
     <meta
       name="description"
-      content="Talos project status: what is shipped in v0.5.0, what is planned, and what remains research."
+      content="Talos project status: what is shipped in v0.6.0, what is planned, and what remains research."
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
@@ -42,7 +42,7 @@
         <p>
           The shipped, planned, and research split for Talos. Items marked
           <span class="talos-pill talos-pill--shipped">Shipped</span>
-          are part of v0.5.0; items marked
+          are part of v0.6.0; items marked
           <span class="talos-pill talos-pill--planned">Planned</span>
           are scoped; items marked
           <span class="talos-pill talos-pill--research">Research</span>
@@ -67,7 +67,7 @@
       </section>
 
       <section>
-        <h2>Shipped in v0.5.0</h2>
+        <h2>Shipped in v0.6.0</h2>
         <p>
           The following are part of the current published release. They are
           documented in detail on the
@@ -103,7 +103,9 @@
             <span class="talos-pill talos-pill--shipped">Shipped</span>
             Runtime Skills from <code>.talos/skills/</code>,
             <code>~/.talos/skills/</code>, and inherited parent
-            <code>.talos/skills/</code>.
+            <code>.talos/skills/</code>, plus shared
+            <code>~/.agents/skills/</code> discovery enabled by default.
+            Symbolic-link traversal remains disabled by default.
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
@@ -122,6 +124,12 @@
               rel="noopener"
               >ADR-024</a
             >).
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Explicit local read-only WASM packages selected with
+            <code>--plugin DIRECTORY</code>, without host calls or automatic
+            discovery.
           </li>
         </ul>
       </section>
@@ -197,16 +205,6 @@
         <ul>
           <li>
             <span class="talos-pill talos-pill--research">Research</span>
-            <code>~/.agents/skills/</code> dotagents shared-directory
-            discovery. Tracked under
-            <a
-              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/AGENT-002-dotagents-protocol-support.md"
-              rel="noopener"
-              >AGENT-002</a
-            >.
-          </li>
-          <li>
-            <span class="talos-pill talos-pill--research">Research</span>
             Web control expansion beyond the read-only dashboard MVP.
             Tracked separately under
             <a
@@ -219,7 +217,8 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--research">Research</span>
-            WASM plugin runtime and plugin marketplace. Architecture
+            Remote plugin distribution, automatic discovery, host calls,
+            write-capable plugins, and a plugin marketplace. Architecture
             decisions are
             <a
               href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/027-plugin-runtime-boundary.md"
@@ -259,7 +258,7 @@
       </section>
 
       <section>
-        <h2>Non-goals for v0.5.0</h2>
+        <h2>Non-goals for v0.6.0</h2>
         <p>
           These are explicit non-goals. They are listed so users do not
           have to discover them by experiment.
@@ -272,7 +271,8 @@
           </li>
           <li>
             Talos is <strong>not</strong> a marketplace runtime. The
-            WASM plugin runtime and plugin marketplace are research only.
+            Remote plugin distribution, automatic discovery, write-capable
+            plugins, and a plugin marketplace are research only.
           </li>
           <li>
             Talos is <strong>not</strong> a remote web control plane or
