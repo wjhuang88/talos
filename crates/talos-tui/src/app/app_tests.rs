@@ -12,7 +12,7 @@ use crate::app::{
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
 use crate::scrollback;
-use crate::state::{ApprovalState, CredentialField, PanelKind, TuiState, WizardStep};
+use crate::state::{ApprovalState, CredentialField, CtrlCState, PanelKind, TuiState, WizardStep};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
@@ -1295,6 +1295,35 @@ fn entry_point_ctrl_j_inserts_newline_without_sending() {
 
     assert_eq!(tui.state.input_buffer, "line one\n");
     assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn ctrl_c_cancels_each_consecutive_processing_turn_without_exiting() {
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+    let ctrl_c = key_press_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL);
+
+    assert!(
+        !tui.handle_input_event(&ctrl_c),
+        "cancelling the first active turn must not exit"
+    );
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
+
+    // The queued steering message starts a new turn immediately after the
+    // cancellation acknowledgement. Its Ctrl+C must be treated as a fresh
+    // turn cancellation, not as the second press of the idle exit gesture.
+    tui.state.status.is_processing = false;
+    tui.state.status.is_processing = true;
+
+    assert!(
+        !tui.handle_input_event(&ctrl_c),
+        "cancelling the queued turn must not exit"
+    );
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
+    assert!(matches!(tui.state.ctrl_c_state, CtrlCState::Idle));
+    assert!(!tui.state.should_exit);
 }
 
 /// Entry-point test: Up/Down through the actual `handle_input_event` method.

@@ -1331,7 +1331,24 @@ impl Tui {
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         let was_processing = self.state.status.is_processing;
-                        if !was_processing && !self.state.input_buffer.is_empty() {
+                        if was_processing {
+                            // Active-turn cancellation and the idle double-Ctrl+C exit gesture
+                            // are separate state machines. A queued message can start another turn
+                            // immediately after cancellation, so never leave that turn armed as
+                            // the first press of the idle exit gesture.
+                            self.state.ctrl_c_state = CtrlCState::Idle;
+                            self.state.tip = Some(Tip {
+                                kind: TipKind::ExitHint,
+                                text: "Turn cancellation requested.".to_string(),
+                                ttl: Duration::from_secs(2),
+                                created_at: Instant::now(),
+                            });
+                            if let Some(ref tx) = self.user_input_tx {
+                                let _ = tx.send(UserInput::Cancel);
+                            }
+                            return false;
+                        }
+                        if !self.state.input_buffer.is_empty() {
                             self.state.input_clear();
                             self.state.slash_menu.close();
                             self.state.ctrl_c_state = CtrlCState::Idle;
@@ -1343,11 +1360,7 @@ impl Tui {
                             });
                             return false;
                         }
-                        let should_exit = self.state.handle_ctrl_c();
-                        if was_processing && let Some(ref tx) = self.user_input_tx {
-                            let _ = tx.send(UserInput::Cancel);
-                        }
-                        return should_exit;
+                        return self.state.handle_ctrl_c();
                     }
                     KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
