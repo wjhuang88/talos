@@ -149,7 +149,11 @@ do not record only “green”.
 - Recheck a clean worktree and `origin/main` relationship at every dispatch.
 - If parallel work starts, stop and establish a dedicated worktree/branch before further edits.
 - Make one conventional commit per logical change and inspect `git diff --cached` first.
-- Do not push unless the maintainer separately authorizes the push.
+- The maintainer authorized one push at every completed phase boundary on 2026-07-28.
+- After the phase completion gate and staged-diff review pass, commit, push `main`, and verify that
+  `origin/main` resolves to the pushed phase commit. Never force-push.
+- If a phase is Blocked, push only its intentional evidence/checkpoint commit after validation;
+  do not push an uncommitted or known-broken implementation state.
 - Append a checkpoint to this file and the active iteration at every phase boundary.
 
 Checkpoint template:
@@ -169,11 +173,12 @@ Authorized by this package:
 
 - read and edit in-repository files within the Active iteration scope;
 - run local focused/workspace validation;
-- create intentional local commits after staged-diff review.
+- create intentional local commits after staged-diff review;
+- push the validated phase commit to `origin/main` once per completed or formally blocked phase.
 
 Not authorized:
 
-- push, force-push, tag, publish, release, deploy, or version changes;
+- force-push, tag, publish, release, deploy, or version changes;
 - paid APIs, cloud resources, remote mutations, or new credentials;
 - destructive cleanup, history rewriting, migration of user data, or changing permissions;
 - new dependencies unless the active owner explicitly permits them and the dependency review passes.
@@ -230,6 +235,9 @@ skip to a later mainline package.
 - Commands/checks and actual results: governance validation passed with 0 warnings. Scale assessment
   recommends high-risk / release-managed / on-demand worktree; the maintainer's direct-`main`
   preference remains the explicit I157 exception and must be reconsidered before I158.
+- External-action authorization: the maintainer authorized a validated `main` push at each phase
+  boundary on 2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain
+  unauthorized.
 - Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
   authorization are external gates.
 - Next task item: P1 / I157 / MODEL-010.
