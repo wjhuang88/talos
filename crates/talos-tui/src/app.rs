@@ -473,6 +473,9 @@ impl Tui {
                 };
                 self.resolve_approval(choice);
             }
+            KeyCode::Esc => {
+                self.resolve_approval(ApprovalChoice::Deny);
+            }
             KeyCode::Char(c) => {
                 if let Some(choice) = self.handle_approval_key(c) {
                     self.resolve_approval(choice);
@@ -1263,6 +1266,52 @@ impl Tui {
                     }
                     _ => {}
                 }
+                if key.code == KeyCode::Char('c')
+                    && key.modifiers.contains(event::KeyModifiers::CONTROL)
+                {
+                    if !matches!(self.state.approval_state, ApprovalState::Hidden) {
+                        self.resolve_approval(ApprovalChoice::Deny);
+                        return false;
+                    }
+                    if self.state.slash_menu.is_credential_input() {
+                        self.state.credential_cancel();
+                        self.state.input_clear();
+                        return false;
+                    }
+                    if self.state.slash_menu.is_provider_wizard() {
+                        self.state.wizard_cancel();
+                        self.state.input_clear();
+                        return false;
+                    }
+                    if self.state.slash_menu.is_open {
+                        self.state.slash_menu.close();
+                        self.state.input_clear();
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        return false;
+                    }
+                    if !self.state.input_buffer.is_empty() {
+                        self.state.input_clear();
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::ExitHint,
+                            text: "Input cleared. Press Ctrl+C again to exit.".to_string(),
+                            ttl: Duration::from_secs(2),
+                            created_at: Instant::now(),
+                        });
+                        return false;
+                    }
+                    if self.state.status.is_processing {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::ExitHint,
+                            text: "Press Esc to interrupt the current turn.".to_string(),
+                            ttl: Duration::from_secs(2),
+                            created_at: Instant::now(),
+                        });
+                        return false;
+                    }
+                    return self.state.handle_ctrl_c();
+                }
                 if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                     self.handle_pending_approval_input(key.code);
                     return false;
@@ -1329,39 +1378,6 @@ impl Tui {
                     return false;
                 }
                 match key.code {
-                    KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        let was_processing = self.state.status.is_processing;
-                        if was_processing {
-                            // Active-turn cancellation and the idle double-Ctrl+C exit gesture
-                            // are separate state machines. A queued message can start another turn
-                            // immediately after cancellation, so never leave that turn armed as
-                            // the first press of the idle exit gesture.
-                            self.state.ctrl_c_state = CtrlCState::Idle;
-                            self.state.tip = Some(Tip {
-                                kind: TipKind::ExitHint,
-                                text: "Turn cancellation requested.".to_string(),
-                                ttl: Duration::from_secs(2),
-                                created_at: Instant::now(),
-                            });
-                            if let Some(ref tx) = self.user_input_tx {
-                                let _ = tx.send(UserInput::Cancel);
-                            }
-                            return false;
-                        }
-                        if !self.state.input_buffer.is_empty() {
-                            self.state.input_clear();
-                            self.state.slash_menu.close();
-                            self.state.ctrl_c_state = CtrlCState::Idle;
-                            self.state.tip = Some(Tip {
-                                kind: TipKind::ExitHint,
-                                text: "Input cleared. Press Ctrl+C twice to exit.".to_string(),
-                                ttl: Duration::from_secs(2),
-                                created_at: Instant::now(),
-                            });
-                            return false;
-                        }
-                        return self.state.handle_ctrl_c();
-                    }
                     KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.state.slash_menu.close();
@@ -1463,6 +1479,17 @@ impl Tui {
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        if self.state.status.is_processing {
+                            if let Some(ref tx) = self.user_input_tx {
+                                let _ = tx.send(UserInput::Cancel);
+                            }
+                            self.state.tip = Some(Tip {
+                                kind: TipKind::ExitHint,
+                                text: "Turn cancellation requested.".to_string(),
+                                ttl: Duration::from_secs(2),
+                                created_at: Instant::now(),
+                            });
+                        }
                     }
                     _ => {}
                 }

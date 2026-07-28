@@ -639,11 +639,7 @@ impl TuiState {
         let now = Instant::now();
         match &self.ctrl_c_state {
             CtrlCState::Idle => {
-                let text = if self.status.is_processing {
-                    "Turn cancelled. Press Ctrl+C again to exit.".to_string()
-                } else {
-                    "Press Ctrl+C again within 2 seconds to exit.".to_string()
-                };
+                let text = "Press Ctrl+C again within 2 seconds to exit.".to_string();
                 self.tip = Some(Tip {
                     kind: TipKind::ExitHint,
                     text,
