@@ -167,12 +167,19 @@ enum TerminalAction {
 
 fn keyboard_enhancement_flags() -> KeyboardEnhancementFlags {
     KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+        | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
         | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
         | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
 }
 
-fn keyboard_enhancement_supported(result: io::Result<bool>) -> bool {
-    result.unwrap_or(false)
+/// A negative capability response is authoritative, but a failed query is not.
+///
+/// The Kitty protocol query can time out when a multiplexer consumes its
+/// response even though it still forwards keyboard-mode enablement to the
+/// terminal. In that case a best-effort push is safe and lets modified Enter
+/// continue to work in terminals such as Alacritty behind a multiplexer.
+fn keyboard_enhancement_requested(result: io::Result<bool>) -> bool {
+    !matches!(result, Ok(false))
 }
 
 impl TerminalSession {
@@ -181,11 +188,10 @@ impl TerminalSession {
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
-        let keyboard_enabled =
-            keyboard_enhancement_supported(terminal::supports_keyboard_enhancement());
-        let lifecycle = initialize_lifecycle(keyboard_enabled, |action| {
-            execute_backend_action(&mut backend, action)
-        })?;
+        let lifecycle = initialize_lifecycle(
+            || keyboard_enhancement_requested(terminal::supports_keyboard_enhancement()),
+            |action| execute_backend_action(&mut backend, action),
+        )?;
         let frame_area = Rect::new(0, 0, screen_size.width, screen_size.height);
 
         let buffers = [Buffer::empty(frame_area), Buffer::empty(frame_area)];
@@ -440,20 +446,29 @@ fn cursor_position_in_rect(rect: Rect, local_col: u16, local_row: u16) -> Option
 }
 
 fn initialize_lifecycle(
-    keyboard_enabled: bool,
+    mut keyboard_enhancement_requested: impl FnMut() -> bool,
     mut run: impl FnMut(TerminalAction) -> io::Result<()>,
 ) -> io::Result<TerminalLifecycleState> {
     let mut lifecycle = TerminalLifecycleState::default();
     run(TerminalAction::EnableRawMode)?;
     lifecycle.raw_mode = true;
-    if keyboard_enabled {
+    // Capability detection must run in the same raw-mode state used by the
+    // event reader. This preserves the ordering that passed the original
+    // Alacritty acceptance while keeping setup rollback transactional.
+    let enable_keyboard_enhancement = keyboard_enhancement_requested();
+    if let Err(error) = run(TerminalAction::EnterAlternateScreen) {
+        return Err(setup_error(error, &mut lifecycle, &mut run));
+    }
+    lifecycle.alternate_screen = true;
+    // Keyboard mode stacks are independent for the main and alternate
+    // screens. Push only after entering the screen whose events we consume.
+    if enable_keyboard_enhancement {
         if let Err(error) = run(TerminalAction::PushKeyboardEnhancement) {
             return Err(setup_error(error, &mut lifecycle, &mut run));
         }
         lifecycle.keyboard_enhancement = true;
     }
     for action in [
-        TerminalAction::EnterAlternateScreen,
         TerminalAction::HideCursor,
         TerminalAction::EnableBracketedPaste,
         TerminalAction::EnableMouseCapture,
@@ -462,7 +477,6 @@ fn initialize_lifecycle(
             return Err(setup_error(error, &mut lifecycle, &mut run));
         }
         match action {
-            TerminalAction::EnterAlternateScreen => lifecycle.alternate_screen = true,
             TerminalAction::HideCursor => lifecycle.cursor_hidden = true,
             TerminalAction::EnableBracketedPaste => lifecycle.bracketed_paste = true,
             TerminalAction::EnableMouseCapture => lifecycle.mouse_capture = true,
@@ -520,14 +534,14 @@ fn restore_lifecycle(
         &mut first_error,
     );
     attempt_restore(
-        &mut lifecycle.alternate_screen,
-        TerminalAction::LeaveAlternateScreen,
+        &mut lifecycle.keyboard_enhancement,
+        TerminalAction::PopKeyboardEnhancement,
         &mut run,
         &mut first_error,
     );
     attempt_restore(
-        &mut lifecycle.keyboard_enhancement,
-        TerminalAction::PopKeyboardEnhancement,
+        &mut lifecycle.alternate_screen,
+        TerminalAction::LeaveAlternateScreen,
         &mut run,
         &mut first_error,
     );
@@ -613,17 +627,21 @@ impl Drop for TerminalSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     fn initialize_with_failure(
         fail_at: TerminalAction,
     ) -> (io::Result<TerminalLifecycleState>, Vec<TerminalAction>) {
         let mut actions = Vec::new();
-        let result = initialize_lifecycle(false, |action| {
-            actions.push(action);
-            (action != fail_at)
-                .then_some(())
-                .ok_or_else(|| io::Error::other("injected terminal failure"))
-        });
+        let result = initialize_lifecycle(
+            || false,
+            |action| {
+                actions.push(action);
+                (action != fail_at)
+                    .then_some(())
+                    .ok_or_else(|| io::Error::other("injected terminal failure"))
+            },
+        );
         (result, actions)
     }
 
@@ -632,6 +650,9 @@ mod tests {
         assert!(
             keyboard_enhancement_flags()
                 .contains(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        );
+        assert!(
+            keyboard_enhancement_flags().contains(KeyboardEnhancementFlags::REPORT_EVENT_TYPES)
         );
         assert!(
             keyboard_enhancement_flags()
@@ -643,12 +664,72 @@ mod tests {
     }
 
     #[test]
-    fn keyboard_support_probe_degrades_on_false_or_error() {
-        assert!(keyboard_enhancement_supported(Ok(true)));
-        assert!(!keyboard_enhancement_supported(Ok(false)));
-        assert!(!keyboard_enhancement_supported(Err(io::Error::other(
+    fn keyboard_probe_requests_best_effort_enablement_after_an_error() {
+        assert!(keyboard_enhancement_requested(Ok(true)));
+        assert!(!keyboard_enhancement_requested(Ok(false)));
+        assert!(keyboard_enhancement_requested(Err(io::Error::other(
             "probe failed"
         ))));
+    }
+
+    #[test]
+    fn keyboard_probe_runs_after_raw_mode_is_enabled() {
+        let raw_mode_enabled = Cell::new(false);
+        let mut actions = Vec::new();
+        initialize_lifecycle(
+            || {
+                assert!(raw_mode_enabled.get());
+                false
+            },
+            |action| {
+                actions.push(action);
+                if action == TerminalAction::EnableRawMode {
+                    raw_mode_enabled.set(true);
+                }
+                Ok(())
+            },
+        )
+        .expect("terminal initialization succeeds");
+
+        assert_eq!(actions[0], TerminalAction::EnableRawMode);
+    }
+
+    #[test]
+    fn best_effort_keyboard_enablement_is_paired_with_restore() {
+        let mut actions = Vec::new();
+        let mut lifecycle = initialize_lifecycle(
+            || true,
+            |action| {
+                actions.push(action);
+                Ok(())
+            },
+        )
+        .expect("best-effort keyboard initialization succeeds");
+
+        assert!(lifecycle.keyboard_enhancement);
+        assert_eq!(
+            actions[0..3],
+            [
+                TerminalAction::EnableRawMode,
+                TerminalAction::EnterAlternateScreen,
+                TerminalAction::PushKeyboardEnhancement
+            ]
+        );
+
+        restore_lifecycle(&mut lifecycle, |action| {
+            actions.push(action);
+            Ok(())
+        })
+        .expect("keyboard restore succeeds");
+        let pop_index = actions
+            .iter()
+            .position(|action| *action == TerminalAction::PopKeyboardEnhancement)
+            .expect("keyboard mode is popped");
+        let leave_index = actions
+            .iter()
+            .position(|action| *action == TerminalAction::LeaveAlternateScreen)
+            .expect("alternate screen is left");
+        assert!(pop_index < leave_index);
     }
 
     #[test]
@@ -707,10 +788,13 @@ mod tests {
     #[test]
     fn successful_initialization_enables_mouse_capture() {
         let mut actions = Vec::new();
-        let lifecycle = initialize_lifecycle(false, |action| {
-            actions.push(action);
-            Ok(())
-        })
+        let lifecycle = initialize_lifecycle(
+            || false,
+            |action| {
+                actions.push(action);
+                Ok(())
+            },
+        )
         .expect("terminal initialization succeeds");
 
         assert!(lifecycle.mouse_capture);
