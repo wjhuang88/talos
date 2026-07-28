@@ -33,6 +33,7 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
+| I164 | Startup Inline Composer Continuity | Planned — selected next after I163 disposition | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. |
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |

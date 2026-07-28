@@ -160,7 +160,9 @@ If a stop condition occurs:
 
 ## Variance And Residuals
 
-- None recorded at planning time.
+- 2026-07-28 priority shift: maintainer selected planned I164/TUI-038 as the
+  next candidate after I163 disposition. I157 remains Planned, its published
+  scope and baseline are unchanged, and it is deferred rather than superseded.
 
 ## REL-002 Execution Record
 
