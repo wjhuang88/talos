@@ -56,6 +56,35 @@
         <div class="talos-codeblock">
           <pre><code>iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)</code></pre>
         </div>
+        <h3>安装或回退到指定 release</h3>
+        <p>
+          使用
+          <a href="https://github.com/wjhuang88/talos/releases" rel="noopener"
+            >GitHub Releases</a
+          >
+          中显示的完整 Git tag。macOS 或 Linux：
+        </p>
+        <div class="talos-codeblock">
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
+  | TALOS_VERSION=v0.6.0 sh
+~/.talos/bin/talos --version</code></pre>
+        </div>
+        <p>Windows x86_64 PowerShell：</p>
+        <div class="talos-codeblock">
+          <pre><code>$env:TALOS_VERSION = 'v0.6.0'
+iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
+&amp; "$env:USERPROFILE\.talos\bin\talos.exe" --version
+Remove-Item Env:TALOS_VERSION</code></pre>
+        </div>
+        <p>
+          请将 <code>v0.6.0</code> 替换为需要的 release tag。安装器会覆盖目标
+          安装目录中的二进制文件，但不会回退配置或会话数据。Talos 仍处于
+          pre-1.0；运行旧版本前建议备份 <code>~/.talos</code>，也可以设置
+          <code>TALOS_INSTALL_DIR</code>，在隔离目录中试用旧版本。需要恢复到
+          最新 release 时，清除 <code>TALOS_VERSION</code> 后重新执行默认安装
+          命令。指定 tag 或对应平台压缩包不存在时，安装会明确失败，不会静默
+          改装其他版本。
+        </p>
         <p>
           安装器位于仓库的 <code>install/</code> 下，因为它们是面向用户的
           release 入口。开发和治理脚本位于 <code>scripts/</code>；

@@ -5,7 +5,7 @@
 # - Canonical GitHub release URLs
 # - Platform archive naming (matches README table)
 # - Offline/error handling behavior (graceful failure, not silent crash)
-# - Site install.html references the same install commands
+# - Site install.html references the same latest and version-pinned install commands
 #
 # Usage:
 #   scripts/validate_installers.sh
@@ -118,8 +118,32 @@ else
 fi
 echo ""
 
-# 6. No credential or secret references in install scripts
-echo "6. Credential safety"
+# 6. Version-pinned installation and rollback documentation
+echo "6. Version selection documentation"
+if grep -Eq 'TALOS_VERSION=v[0-9]+\.[0-9]+\.[0-9]+ sh' "$readme" \
+  && grep -Eq 'TALOS_VERSION=v[0-9]+\.[0-9]+\.[0-9]+ sh' "$install_html"; then
+  log_ok "shell version selection is documented"
+else
+  log_error "shell version selection is missing from README or site/install.html"
+fi
+
+if grep -Eq "\\\$env:TALOS_VERSION = 'v[0-9]+\\.[0-9]+\\.[0-9]+'" "$readme" \
+  && grep -Eq "\\\$env:TALOS_VERSION = 'v[0-9]+\\.[0-9]+\\.[0-9]+'" "$install_html"; then
+  log_ok "PowerShell version selection is documented"
+else
+  log_error "PowerShell version selection is missing from README or site/install.html"
+fi
+
+if grep -q 'does not roll back configuration or session data' "$readme" \
+  && grep -q 'restore the newest release' "$install_html"; then
+  log_ok "rollback boundary and latest restoration are documented"
+else
+  log_error "rollback boundary or latest restoration guidance is missing"
+fi
+echo ""
+
+# 7. No credential or secret references in install scripts
+echo "7. Credential safety"
 if grep -qiE 'api_key|secret|password|token' "$install_dir/install.sh" 2>/dev/null; then
   log_error "install.sh contains credential-like string"
 else

@@ -265,9 +265,14 @@ jobs:
             echo '```bash'
             echo "# macOS / Linux"
             echo "curl -fsSL ${RAW_URL_BASE}/install/install.sh | sh"
+            echo "# Install or roll back to this release"
+            echo "curl -fsSL ${RAW_URL_BASE}/install/install.sh | TALOS_VERSION=${TAG} sh"
+            echo '```'
             echo
+            echo '```powershell'
             echo '# Windows (PowerShell)'
             echo "irm ${RAW_URL_BASE}/install/install.ps1 | iex"
+            echo "\$env:TALOS_VERSION = '${TAG}'; irm ${RAW_URL_BASE}/install/install.ps1 | iex; Remove-Item Env:TALOS_VERSION"
             echo '```'
             echo
             echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."

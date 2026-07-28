@@ -3,6 +3,8 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
+#     | TALOS_VERSION=v0.6.0 sh
 #
 # Environment overrides:
 #   TALOS_REPO         GitHub <owner>/<repo>     (default: wjhuang88/talos)

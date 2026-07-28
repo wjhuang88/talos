@@ -76,6 +76,28 @@ Windows x86_64 在 PowerShell 中安装最新 release：
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 ```
 
+使用完整 Git tag 安装或回退到指定 release：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
+  | TALOS_VERSION=v0.6.0 sh
+~/.talos/bin/talos --version
+```
+
+```powershell
+$env:TALOS_VERSION = 'v0.6.0'
+iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
+& "$env:USERPROFILE\.talos\bin\talos.exe" --version
+Remove-Item Env:TALOS_VERSION
+```
+
+请将 `v0.6.0` 替换为
+[GitHub Releases](https://github.com/wjhuang88/talos/releases) 中存在的 tag。安装器会覆盖目标
+安装目录中的 Talos 二进制文件，但不会回退配置或会话数据。Talos 仍处于 pre-1.0；运行旧版本前
+建议备份 `~/.talos`，也可以同时设置 `TALOS_INSTALL_DIR`，在隔离目录中试用旧版本。需要恢复到
+最新 release 时，清除 `TALOS_VERSION` 后重新执行默认安装命令。指定 tag 或对应平台压缩包不存在
+时，安装会明确失败，不会静默改装其他版本。
+
 安装脚本放在 `install/`，因为它们是面向用户的 release 入口。开发和治理脚本放在
 `scripts/`；pre-1.0 安装器目录清理后，不再保留旧的 `scripts/install.*` 路径。
 

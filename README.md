@@ -85,6 +85,29 @@ Install the latest Windows x86_64 release from PowerShell:
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 ```
 
+Install or roll back to a specific release by using its complete Git tag:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
+  | TALOS_VERSION=v0.6.0 sh
+~/.talos/bin/talos --version
+```
+
+```powershell
+$env:TALOS_VERSION = 'v0.6.0'
+iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
+& "$env:USERPROFILE\.talos\bin\talos.exe" --version
+Remove-Item Env:TALOS_VERSION
+```
+
+Replace `v0.6.0` with a tag listed on
+[GitHub Releases](https://github.com/wjhuang88/talos/releases). The installer overwrites the Talos
+binary in the selected install directory; it does not roll back configuration or session data.
+Because Talos is pre-1.0, back up `~/.talos` before running an older binary, or test it in an
+isolated directory by also setting `TALOS_INSTALL_DIR`. To return to the newest release, clear
+`TALOS_VERSION` and run the normal latest-install command again. A missing tag or missing platform
+archive fails the installation instead of silently falling back to another version.
+
 Installers live under `install/` because they are user-facing release entrypoints. Development and
 governance scripts live under `scripts/`; the old `scripts/install.*` paths are intentionally not
 kept after the pre-1.0 installer layout cleanup.
