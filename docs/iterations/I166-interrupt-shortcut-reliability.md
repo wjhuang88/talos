@@ -191,12 +191,29 @@ Blocked or Active as appropriate; do not broaden scope.
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-28 | Activation | Maintainer explicitly prioritized the shortcut refactor. Fresh inventory found no Active or Review iteration; I164 remains Paused, I157 remains Planned and is deferred until I166 disposition, I158-I162 remain Blocked, and TUI-036 dependencies are Complete. TUI-036 moved from Refinement to Ready and was selected into I166, then I166/TUI-036 became the sole Active implementation authority. Baseline `5c1acb78`; direct `main`, no parallel worktree. |
+| 2026-07-28 | Implementation | `d1a8759` adds 12 entry-point tests locking the target Esc/Ctrl+C dispatch semantics. `d85514e` refactors `handle_input_event` so Ctrl+C is checked before all modal blocks (preventing literal 'c' insertion), active-turn cancellation moves from Ctrl+C to Esc, approval gets Esc→Deny, and the hint/README text is updated. 480 TUI tests and 2542 workspace tests pass. |
 
 ## Verification Evidence
 
-- Focused tests: pending implementation.
-- Full locked validation: pending implementation.
-- Rebuilt-binary terminal matrix: pending implementation.
+- Focused tests: 12 entry-point tests through `Tui::handle_input_event` +
+  renamed legacy consecutive-cancel test. All pass.
+  `cargo test --locked -p talos-tui --lib entry_point_esc` = 7 passed.
+  `cargo test --locked -p talos-tui --lib entry_point_ctrl_c` = 3 passed.
+  `cargo test --locked -p talos-tui --lib modified_ctrl_c` = 1 passed.
+  `cargo test --locked -p talos-tui --lib repeated_esc` = 1 passed.
+  `cargo test --locked -p talos-tui --lib test_ctrl_c` = 3 passed.
+  `cargo test --locked -p talos-tui --lib esc_cancels_each` = 1 passed.
+  `cargo test --locked -p talos-tui --lib` = 480 passed, 0 failed.
+- Full locked validation: `cargo fmt --all -- --check` clean;
+  `cargo check --workspace --locked` exit 0;
+  `cargo clippy --workspace --locked -- -D warnings` exit 0;
+  `cargo test --workspace --locked` = 2542 passed, 0 failed;
+  `scripts/validate_project_governance.sh .` = 0 warnings;
+  `git diff --check` clean;
+  `cargo build --locked -p talos-cli` exit 0.
+- Rebuilt-binary runtime evidence: pending — binary at
+  `target/debug/talos`; maintainer rebuilt-binary terminal matrix
+  required before TUI-036 can move beyond In Progress.
 - Governance activation validation: `scripts/validate_project_governance.sh .` passed with
   0 warnings; `git diff --check` passed.
 
