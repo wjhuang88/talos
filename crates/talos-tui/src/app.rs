@@ -952,7 +952,7 @@ impl Tui {
         let is_startup = self.is_startup_mode();
         let splash = crate::splash::viewport_splash_lines(width);
         let splash_rows = splash.len();
-        let startup_spacer_rows: usize = if is_startup { 2 } else { 0 };
+        let startup_spacer_rows: usize = if is_startup { 1 } else { 0 };
         let follows_tail = matches!(
             self.history_scroll.mode,
             crate::history_projection::HistoryScrollMode::FollowTail

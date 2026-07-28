@@ -1892,7 +1892,7 @@ fn startup_tui_at(width: u16, height: u16) -> crate::app::Tui {
 }
 
 #[test]
-fn startup_layout_places_composer_two_rows_below_logo() {
+fn startup_layout_places_composer_one_row_below_logo() {
     let mut tui = startup_tui_at(80, 24);
     tui.draw_frame().expect("startup frame renders");
 
@@ -1902,11 +1902,11 @@ fn startup_layout_places_composer_two_rows_below_logo() {
         .expect("cursor visible in startup composer");
     let splash_rows = crate::splash::viewport_splash_lines(80).len();
     // In startup mode, preview and tips are suppressed (0 rows), so:
-    // composer_y = splash_rows + 2 spacers + 1 composer_top_pad
-    let expected_y = (splash_rows + 2 + 1) as u16;
+    // composer_y = splash_rows + 1 display-only spacer + 1 composer_top_pad
+    let expected_y = (splash_rows + 1 + 1) as u16;
     assert_eq!(
         cursor.y, expected_y,
-        "composer cursor should be {} (splash {} + 2 spacers + 1 top_pad), got {}",
+        "composer cursor should be {} (splash {} + 1 spacer + 1 top_pad), got {}",
         expected_y, splash_rows, cursor.y
     );
     assert!(cursor.y < 24, "cursor must be within terminal bounds");
@@ -2256,7 +2256,7 @@ fn startup_terminal_restore_does_not_regress() {
 }
 
 #[test]
-fn startup_spacer_rows_have_no_composer_background() {
+fn startup_spacer_row_has_no_composer_background() {
     let mut tui = startup_tui_at(80, 24);
     tui.draw_frame().expect("startup frame");
     let splash_rows = crate::splash::viewport_splash_lines(80).len();
@@ -2264,20 +2264,14 @@ fn startup_spacer_rows_have_no_composer_background() {
     let expected_bg = crate::theme::semantic::INPUT_BG;
 
     let spacer_y_1 = (splash_rows) as u16;
-    let spacer_y_2 = (splash_rows + 1) as u16;
-    let top_pad_y = (splash_rows + 2) as u16;
+    let top_pad_y = (splash_rows + 1) as u16;
 
     let spacer_bg_1 = tui.terminal.test_cell_bg(0, spacer_y_1);
-    let spacer_bg_2 = tui.terminal.test_cell_bg(0, spacer_y_2);
     let top_pad_bg = tui.terminal.test_cell_bg(0, top_pad_y);
 
     assert_ne!(
         spacer_bg_1, expected_bg,
         "spacer row 1 must not carry composer INPUT_BG"
-    );
-    assert_ne!(
-        spacer_bg_2, expected_bg,
-        "spacer row 2 must not carry composer INPUT_BG"
     );
     assert_eq!(
         top_pad_bg, expected_bg,

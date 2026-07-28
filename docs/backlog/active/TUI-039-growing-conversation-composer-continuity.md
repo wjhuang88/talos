@@ -19,7 +19,7 @@ to its bounded height and the composer become bottom-fixed.
 
 ## Scope
 
-- Retain the display-only Logo prefix and two startup spacer rows.
+- Retain the display-only Logo prefix and one startup spacer row.
 - In FollowTail with no active modal, cap history to its current projected
   content height so composer/status immediately follow the visible flow.
 - When the combined flow no longer fits, use the existing bounded full-frame
