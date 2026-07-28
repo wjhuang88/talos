@@ -89,16 +89,27 @@ then exit and confirm terminal restore.
 
 - Planning/governance validation: activation inventory complete; repository
   governance validation is replayed in the activation commit.
-- Focused tests: 12 startup tests + full-frame Buffer assertions for 9 terminal
+- Focused tests: 13 startup tests + full-frame Buffer assertions for 9 terminal
   sizes (80x24, 160x40, 40x10, 20x5, 5x3, 3x2, 2x2, 1x1, 0x0) all pass.
-  `cargo test --locked -p talos-tui startup` = 11 passed, 0 failed.
+  `cargo test --locked -p talos-tui startup` = 12 passed, 0 failed.
   `cargo test --locked -p talos-tui layout` = 14 passed, 0 failed.
   `cargo test --locked -p talos-tui full_frame` = 2 passed, 0 failed.
-  `cargo test --locked -p talos-tui` = 462 passed, 0 failed.
+  `cargo test --locked -p talos-tui` = 463 passed, 0 failed.
+- P1 timing fix: `first_message_dispatched` flag ensures the layout transitions
+  on submit (Enter + tx.send success), not on async UiOutput echo — verified by
+  `first_submit_transitions_to_normal_layout_once` which draws a frame between
+  Enter and UiOutput and asserts the cursor has already moved.
+- P2 restore test: `startup_terminal_restore_does_not_regress` now documents
+  its coverage limitation (test_instance default lifecycle = restore no-op) and
+  points to `inline_terminal.rs` lifecycle tests + Case H for full coverage.
+- P3 buffer assertion: `startup_spacer_rows_have_no_composer_background` checks
+  via `test_cell_bg` that spacer rows lack INPUT_BG while composer top_pad
+  carries it — confirming the 2 spacers are projection-only and the top_pad is
+  part of the composer frame, not an additional spacer.
 - Full locked validation: `cargo fmt --all -- --check` clean;
   `cargo check --workspace --locked` exit 0;
   `cargo clippy --workspace --locked -- -D warnings` exit 0;
-  `cargo test --workspace --locked` = 2524 passed, 0 failed;
+  `cargo test --workspace --locked` = 2525 passed, 0 failed;
   `scripts/validate_project_governance.sh .` = 0 warnings;
   `git diff --check` clean;
   `cargo build --locked -p talos-cli` exit 0.

@@ -259,6 +259,12 @@ impl TerminalSession {
             .join("\n")
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_cell_bg(&self, x: u16, y: u16) -> ratatui::style::Color {
+        let buffer = &self.buffers[1 - self.current];
+        buffer[(x, y)].bg
+    }
+
     #[allow(dead_code)]
     pub const fn backend(&self) -> &CrosstermBackend<Stdout> {
         &self.backend

@@ -144,6 +144,7 @@ pub struct Tui {
     stream_count: usize,
     session_id: Option<String>,
     last_char_time: Option<Instant>,
+    first_message_dispatched: bool,
 }
 
 impl Tui {
@@ -178,6 +179,7 @@ impl Tui {
             stream_count: 0,
             session_id: None,
             last_char_time: None,
+            first_message_dispatched: false,
         })
     }
 
@@ -213,6 +215,7 @@ impl Tui {
             stream_count: 0,
             session_id: None,
             last_char_time: None,
+            first_message_dispatched: false,
         }
     }
 
@@ -890,6 +893,7 @@ impl Tui {
 
     fn is_startup_mode(&self) -> bool {
         self.transcript.entries().is_empty()
+            && !self.first_message_dispatched
             && !self.state.slash_menu.is_open
             && matches!(self.state.approval_state, ApprovalState::Hidden)
     }
@@ -1412,11 +1416,14 @@ impl Tui {
                         if key.modifiers.contains(event::KeyModifiers::SHIFT) {
                             self.state.input_append_char('\n');
                         } else {
-                            submit_input_message(
+                            let sent = submit_input_message(
                                 &mut self.state,
                                 &mut self.stream_render,
                                 self.user_input_tx.as_ref(),
                             );
+                            if sent {
+                                self.first_message_dispatched = true;
+                            }
                         }
                     }
                     KeyCode::Esc => {

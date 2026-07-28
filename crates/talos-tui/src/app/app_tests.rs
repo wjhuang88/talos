@@ -1972,6 +1972,20 @@ fn first_submit_transitions_to_normal_layout_once() {
     tui.handle_input_event(&key_press(KeyCode::Enter));
     let _ = rx.try_recv().expect("message dispatched");
 
+    // P1 timing fix: after Enter, the layout must transition immediately —
+    // not wait for the async UiOutput echo. This verifies no extra startup
+    // frame with an empty composer is produced between submit and echo.
+    tui.draw_frame()
+        .expect("post-submit frame (before UiOutput echo)");
+    let post_submit_cursor = tui
+        .terminal
+        .test_cursor_position()
+        .expect("post-submit cursor");
+    assert_ne!(
+        post_submit_cursor.y, startup_cursor.y,
+        "layout must transition on submit, not wait for UiOutput echo"
+    );
+
     tui.handle_ui_output(talos_conversation::UiOutput::Content(
         talos_conversation::ContentOutput::Block {
             source: MessageSource::User,
@@ -1984,9 +1998,9 @@ fn first_submit_transitions_to_normal_layout_once() {
         .terminal
         .test_cursor_position()
         .expect("conversation cursor");
-    assert_ne!(
-        conv_cursor.y, startup_cursor.y,
-        "layout must transition after first submit"
+    assert_eq!(
+        conv_cursor.y, post_submit_cursor.y,
+        "cursor must not move again after UiOutput — transition is exactly once"
     );
 
     tui.draw_frame().expect("second conversation frame");
@@ -2161,6 +2175,41 @@ fn startup_terminal_restore_does_not_regress() {
     let mut tui = startup_tui_at(80, 24);
     tui.draw_frame().expect("startup frame before restore");
     tui.restore().expect("terminal restore should succeed");
+    // Full lifecycle restore (LeaveAlternateScreen, DisableRawMode, ShowCursor,
+    // DisableMouseCapture, etc.) is covered by inline_terminal.rs lifecycle tests
+    // and the real-terminal Case H acceptance gate. test_instance() starts with
+    // a default lifecycle (all-false), so this verifies restore() is a safe no-op
+    // in the startup state rather than exercising full terminal-mode transitions.
+}
+
+#[test]
+fn startup_spacer_rows_have_no_composer_background() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.draw_frame().expect("startup frame");
+    let splash_rows = crate::splash::viewport_splash_lines(80).len();
+
+    let expected_bg = crate::theme::semantic::INPUT_BG;
+
+    let spacer_y_1 = (splash_rows) as u16;
+    let spacer_y_2 = (splash_rows + 1) as u16;
+    let top_pad_y = (splash_rows + 2) as u16;
+
+    let spacer_bg_1 = tui.terminal.test_cell_bg(0, spacer_y_1);
+    let spacer_bg_2 = tui.terminal.test_cell_bg(0, spacer_y_2);
+    let top_pad_bg = tui.terminal.test_cell_bg(0, top_pad_y);
+
+    assert_ne!(
+        spacer_bg_1, expected_bg,
+        "spacer row 1 must not carry composer INPUT_BG"
+    );
+    assert_ne!(
+        spacer_bg_2, expected_bg,
+        "spacer row 2 must not carry composer INPUT_BG"
+    );
+    assert_eq!(
+        top_pad_bg, expected_bg,
+        "composer top_pad must carry INPUT_BG — it is part of the composer frame, not a spacer"
+    );
 }
 
 #[test]
