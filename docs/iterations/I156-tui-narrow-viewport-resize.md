@@ -247,7 +247,9 @@ If a stop condition occurs:
   `cargo test --locked -p talos-tui` → 404 passed, 0 failed.
 - Historical workspace evidence (superseded as the latest count):
   `cargo test --workspace --locked` → 2431 passed, 0 failed.
-- Runtime evidence: automated gates green; real Alacritty walkthrough PENDING (human gate, not yet performed).
+- Historical checkpoint: automated gates were green while the Alacritty
+  walkthrough was still pending. The walkthrough subsequently passed on
+  2026-07-27.
 - Governance validation: passed — `scripts/validate_project_governance.sh .` 0 warnings; `git diff --check` clean.
 
 ## Current Architecture And Implementation Commits
@@ -267,8 +269,9 @@ If a stop condition occurs:
   full-width user history styling, prefix-only row suppression, mouse-wheel
   navigation across the Logo/Transcript boundary, geometry-free tool facts,
   and terminal recovery all pass. Locked workspace: 2480 passed.
-- Remaining gate: Alacritty, Kitty/WezTerm, macOS Terminal/iTerm2, and tmux
-  Logo/resize/restore walkthrough. I156 remains Active.
+- Required completion gate: maintainer Alacritty Cases A/B/C/D passed
+  2026-07-27. Kitty/WezTerm, macOS Terminal/iTerm2, and tmux remain
+  non-blocking compatibility residuals.
 
 ### Full-Frame Foundation Commits
 
@@ -302,12 +305,17 @@ app-owned full-frame renderer is current authority.
   - Fix 2: `wrap_scrollback_line` returns the line as-is below `MIN_WRAP_WIDTH=4` (covers width 0/1/2/3) instead of shredding; content preserved, no panic, no runaway rows.
   - Fix 3: `Event::Resize` → `InlineTerminal::notify_resize()` (forces full clear+repaint on next draw); new pure `resize_clear_action(previous, next)` clears viewport rows on width-shrink so stale wide bottom-pane content cannot remain or leak into scrollback.
 - Invariant: the viewport-fixed bottom hint/status/composer pane is rendered only via `terminal.draw()`, never via `insert_history` — confirmed structurally; Fix 3 strengthens resize cleanup.
-- Maintainer Alacritty walkthrough: pending.
+- Maintainer Alacritty walkthrough: passed 2026-07-27 (Cases A/B/C/D).
 - Completion status: COMPLETE — automated gates passed + maintainer Alacritty walkthrough passed 2026-07-27 (Cases A/B/C/D all confirmed by maintainer in real terminal).
 
 ## Completion Evidence
 
-- Completion Commit: `6909675` — last TUI-035 code implementation commit (semantic-row recovery). Full chain: `2f9de9f` → `5d11926` → `dc28392` → `db85a3e`/`b24d9e0` → `6909675`. Subsequent TUI-035 commits by other agents (`31e7a0d`..`d4d95ad`) extended the feature surface and were also validated in the maintainer walkthrough.
+- Completion Commits: `6909675`, `9c87d0f`, `635bc29`, `dddf32f`,
+  `dd10a62`, `d4d95ad`. `6909675` closes the historical semantic-row
+  recovery stage; the later commits are the accepted Alternate-Screen Logo,
+  history-prefix, interaction, and wheel-coordinate implementation that
+  replaced the old terminal-insertion architecture. All are existing
+  implementation commits and were covered by the maintainer walkthrough.
 - Do not cite a status-only documentation commit as implementation completion.
 - Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
 
@@ -428,11 +436,12 @@ Observed:
 - stale model/status rows entered terminal scrollback;
 - duplicates accumulated after repeated width and height resize.
 
-Conclusion:
+Conclusion at that historical checkpoint:
 
-- the current primary-screen DECSTBM inline renderer does not satisfy TUI-035;
-- I156 remains Active;
-- TUI-035 remains In Progress.
+- the then-current primary-screen DECSTBM inline renderer did not satisfy
+  TUI-035;
+- I156 and TUI-035 therefore remained non-complete until the architecture
+  correction and later Alacritty acceptance.
 
 - Screenshot evidence: maintainer-provided Alacritty resize capture, 2026-07-27.
 - Historical correction plan: ADR-054; move history facts into an
@@ -441,7 +450,8 @@ Conclusion:
   temporarily replaced it with ADR-055; the final maintainer decision
   reinstated amended ADR-054 with correct first-frame Logo rendering.
 
-- The real-terminal resize walkthrough (continuous wide→narrow drag, width 1/2/3 extreme, height-only shrink, widen) remains the mandatory human gate before I156 can move to Complete.
+- The mandatory Alacritty resize walkthrough (continuous wide→narrow drag,
+  width 1/2/3 extreme, height-only shrink, widen) passed on 2026-07-27.
 - `resize_clear_action` is tested as a pure decision function; the full end-to-end "no history duplication during drag" is structurally guaranteed (bottom pane never calls `insert_history`) plus the resize-triggered full repaint, but final visual confirmation belongs to the human gate.
 
 ## REL-002 Execution Record

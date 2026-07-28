@@ -151,7 +151,7 @@ All agents follow this sequence for compile, merge, and release work:
 | "How do I set up local dev?" | `docs/sop/LOCAL-DEV.md` |
 | "What's the testing strategy?" | `docs/sop/TESTING.md` |
 | "How do I commit my work?" | `docs/sop/GIT-WORKFLOW.md` |
-| "How do I compile or publish a release?" | `docs/sop/RELEASE-WORKFLOW.md` |
+| "How do I compile or publish a release?" | `docs/sop/RELEASE.md` → `docs/sop/RELEASE-WORKFLOW.md` |
 | "Run an unattended / overnight / long-running task" | `docs/sop/LONG-RUNNING-TASK.md` |
 | "Where is the architecture documented?" | `docs/reference/ARCHITECTURE.md` |
 | "What are the reference projects?" | `docs/reference/REFERENCE-PROJECTS.md` |

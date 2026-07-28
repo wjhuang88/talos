@@ -5,12 +5,12 @@
 | Story ID | TUI-035 |
 | Type | Product / Rendering Story |
 | Priority | P1 |
-| Status | Complete — maintainer Alacritty walkthrough passed 2026-07-27 (all 4 cases). Completion Commit: `6909675`. |
+| Status | Complete — maintainer Alacritty walkthrough passed 2026-07-27 (all 4 cases). Completion commits include `6909675` and the final Alternate-Screen correction chain through `d4d95ad`. |
 | Source | Maintainer bug reports 2026-07-24: narrow tool-call visibility and fixed-pane resize isolation |
 | Parent Epic | None (follow-up to TUI-034 adaptive-width work) |
 | Depends on | TUI-034 (adaptive history width; shipped the tool-RESULT wrap but missed tool-CALL lines and resize); TUI-025 (tool argument one-line fit); ADR-035 |
 | Blocks | None |
-| Selected Iteration | I156 (Active) |
+| Selected Iteration | I156 (Complete) |
 
 ## Current Architecture Authority
 
@@ -43,8 +43,8 @@ pending terminal insertion recovery remain removed.
 - [x] component-level `AppLayout`, panel-local cursor coordinates, and clipped modal input hiding
 - [x] exhaustive, retryable Alternate Screen lifecycle restore
 - [x] no DECSTBM, reverse index, native-history projection, or legacy insertion identifiers
-- [ ] real-terminal acceptance matrix
-- [ ] Completion Commit
+- [x] required Alacritty real-terminal acceptance (Cases A/B/C/D)
+- [x] Completion Commit records existing implementation evidence
 
 ## Current Alternate-Screen Logo Automated Evidence
 
@@ -69,7 +69,20 @@ pending terminal insertion recovery remain removed.
 - Focused TUI validation: 449 passed, 0 failed.
 - Locked workspace validation: 2480 passed, 0 failed across 62 test
   binaries/doc-test groups.
-- Real-terminal acceptance remains pending.
+- Required Alacritty acceptance passed 2026-07-27. Additional
+  Kitty/WezTerm/macOS Terminal/tmux coverage is a non-blocking compatibility
+  residual, not an unrecorded I156 completion gate.
+
+## Completion Evidence
+
+- Completion Commits: `6909675`, `9c87d0f`, `635bc29`, `dddf32f`,
+  `dd10a62`, `d4d95ad`.
+- The first commit is historical recovery evidence; the later existing
+  implementation commits establish the accepted Alternate-Screen runtime that
+  replaced it.
+- Maintainer Alacritty Cases A/B/C/D passed 2026-07-27. This owner and I156 are
+  Complete; the governance synchronization commit is not used as its own
+  completion evidence.
 
 ## Historical / Superseded Original Fix Plan
 
@@ -164,8 +177,8 @@ and status rows into primary terminal scrollback. This is evidence that the
 primary-screen DECSTBM approach cannot meet this Story's existing fixed-pane
 isolation acceptance. Under I156 change control, implementation is corrected to
 ADR-054's alternate-screen, application-owned transcript and full-frame
-renderer. The Story remains In Progress; no completion claim is authorized until
-the real-terminal matrix passes.
+renderer. This historical failure was later corrected and the required
+Alacritty acceptance passed; the Story is Complete.
 
 Automated implementation evidence: `a3074ad` provides the app-owned transcript, history
 projection, full-frame renderer, alternate-screen lifecycle, and app-owned scroll state. It does
@@ -356,7 +369,8 @@ Historical technical / governance:
 - Bounded layout/cursor and transactional alternate-screen lifecycle tests pass.
 - The test-only DECSTBM insertion recovery architecture was removed.
 
-TUI-035 remains **In Progress** until the real-terminal matrix is complete.
+Historical note: at this checkpoint TUI-035 remained In Progress. It later
+completed after the required maintainer Alacritty walkthrough.
 
 ## Final Anchor And Coordinate Automated Evidence — 2026-07-27
 
@@ -383,8 +397,8 @@ TUI-035 remains **In Progress** until the real-terminal matrix is complete.
   not enter the transcript.
 - Implementation/test commits: `6c32d09`, `18648a6`, `1688e6f`, `ad67fc5`.
   Focused TUI validation: 437 passed. Locked workspace validation: 2464 passed.
-  Real-terminal
-  acceptance remains pending.
+  The required Alacritty acceptance subsequently passed. Broader terminal
+  coverage remains a compatibility residual.
 
 ### Historical Test Evidence
 

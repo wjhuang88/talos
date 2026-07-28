@@ -5,12 +5,12 @@
 | Story ID | TUI-038 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | Ready — selected into planned I164 after I163 disposition |
+| Status | In Progress — I164 Active (2026-07-28) |
 | Source | Maintainer request 2026-07-28 |
 | Parent Epic | None |
-| Depends On | I163 disposition; TUI-035 Complete; ADR-054 Accepted |
+| Depends On | I163 Complete; TUI-035 Complete; ADR-054 Accepted |
 | Blocks | None |
-| Selected Iteration | I164 (Planned; not implementation authority until activated) |
+| Selected Iteration | I164 (Active; sole implementation authority) |
 
 ## Identity / Goal / Value
 
@@ -143,6 +143,6 @@ history rather than jumping across unused screen space.
 - This story deliberately defines startup as "before the first submitted user
   message." Any request to keep the composer beside the Logo during later turns
   is a separate layout product decision.
-- I164 cannot activate until I163 is Complete or Paused. I157 remains a
-  published Planned baseline and is explicitly deferred by the maintainer's
-  2026-07-28 priority shift.
+- I163 is Complete and I164 is Active. I157 remains a published Planned
+  baseline and is explicitly deferred until I164 disposition by the
+  maintainer's 2026-07-28 priority shift.

@@ -5,8 +5,8 @@
 | Story ID | SKILL-003 |
 | Type | Product / Security Story |
 | Priority | P2 |
-| Status | In Progress (I163 Active, 2026-07-27) |
-| Selected Iteration | I163 (Active) |
+| Status | Complete (I163, 2026-07-28) |
+| Selected Iteration | I163 (Complete) |
 | Source | Commit `1f5e451` introduced unconditional `follow_links(true)` to `SkillLoader::discover` under incorrect `#TUI-035` tag; this Story owns all subsequent corrections |
 | Parent Epic | None |
 | Depends on | ADR-022 (agent config compatibility boundary) |
@@ -122,12 +122,12 @@ struct field changes remain excluded.
 
 - [x] Maintainer default decision recorded (I163 + ADR-022 clarification).
 - [x] `04999f1` scope variance resolved (owner docs synchronized).
-- [x] SKILL-003 In Progress.
-- [x] I163 Active.
-- [x] I163 corrective interruption (between I156 and I157).
-- [x] I157 Planned (resumes after I163 disposition).
+- [x] SKILL-003 Complete with existing implementation evidence.
+- [x] I163 Complete.
+- [x] I163 corrective interruption completed between I156 and I164.
+- [x] I164/TUI-038 may activate; I157 remains Planned after I164 disposition.
 - [x] I156 Complete.
-- [x] Only one Active implementation iteration (I163).
+- [x] Only one Active implementation iteration after closure (I164).
 - [x] No release/version changes.
 
 ### Residuals
@@ -152,6 +152,15 @@ struct field changes remain excluded.
 This is a completion-review correction found before I163/SKILL-003 was submitted for
 maintainer Completion Review. It does not change the product semantics, discovery
 policy, or previously accepted invariants.
+
+## Completion Evidence
+
+- Completion Commit: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`,
+  `e11481d`, `12ef1e3`.
+- Focused closure replay: 78 `talos-skill` unit tests plus 1 doc-test, and 14
+  `talos-cli` `skill_runtime` tests passed on 2026-07-28.
+- I163 is Complete. Windows directory-link evidence and the Level-2 reference
+  containment audit remain explicit residual work, not hidden acceptance gaps.
 
 ## Required Reads
 

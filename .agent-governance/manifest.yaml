@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-20"
-status_note: "I142/TUI-032 is Complete and shipped in v0.4.0. WEB-006/I143 is the next planned public-documentation candidate; ARCH-034/I144 is a deferred audit-only baseline behind I143. I018/I139 stale inventory is reconciled. REL-002 remains NO-GO."
+last_audited_at: "2026-07-28"
+status_note: "High-risk/release-managed profile confirmed. I156/TUI-035 and I163/SKILL-003 are Complete; I164/TUI-038 is the sole Active implementation iteration; I157 is Planned; I158-I162 are Blocked; ADR-053 is Proposed. SESSION-008 owns GitHub Issue #45 in Refinement. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -40,7 +40,7 @@ capabilities:
   iteration_workflow: "conformant"
   change_control: "conformant"
   decision_records: "conformant"
-  release_workflow: "not_applicable"
+  release_workflow: "conformant"
   risk_specific_gates: "conformant"
 
 risk_gates:
@@ -63,7 +63,8 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Preserve the accepted I135-I138 and I140 corrective evidence and explicit residual boundaries"
-    - "Commit and push the accepted correction only on maintainer request, then replay I139 from clean main"
+    - "Execute only I164/TUI-038 from an isolated worktree; keep I157 deferred until I164 disposition"
+    - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
+    - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

@@ -33,7 +33,7 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
-| I164 | Startup Inline Composer Continuity | Planned — selected next after I163 disposition | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. |
+| I164 | Startup Inline Composer Continuity | Active — sole implementation authority (2026-07-28) | ⏳ Fresh-session composer two rows below Logo before first submit; normal full-frame transition afterwards. |
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |
@@ -183,9 +183,9 @@ docs/iterations/
 | I152 | MODEL-009-D Provider Adapter And TUI/CLI | **Complete** (maintainer walkthrough 2026-07-24; `17e3fef`, `65eb108`) | OpenAI `image_url` + Anthropic base64 wire mapping. R3: capability gate. R5/P1-B: TOCTOU + digest verification. R7: `/attachments` + `/detach` + status count. R8: `--attach` CLI flag. R10: scrollback safe summary. P1-A: shared `image_authorization` routes `/attach` and `--attach` through SEC-001 permission pipeline; canonical-path regression passes. TUI: interactive approval. Print: headless fail-closed. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. See `I152-provider-adapter-tui-cli.md`. |
 | I153 | End-to-End Hardening And Release Candidate | **Complete** (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Full locked validation is green; release candidate checklist documented. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. No tag is authorized by this status change. See `I153-end-to-end-hardening-release-candidate.md`. |
 | I154 | Agent-Mediated Image Read Tool | **Complete** (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | MODEL-009-E adds a separate `read_image` tool for Supported models only. ADR-051 fixes the one-shot provider-continuation contract. P3 complete: `ToolExecutionOutput`/`execute_with_output` trait API, shared image validation, `ReadImageTool` implementation, turn-loop continuation overlay, capability-gated registration, Anthropic coalescing, atomic batch limit, execution-boundary capability gate, path sanitization. 40 new tests pass across 4 crates. Maintainer real-terminal walkthrough passed: Supported model called `read_image`, safe summary in history, one-shot continuation to provider. See `I154-agent-mediated-image-read-tool.md`. |
-| I156 | TUI Narrow-Viewport And Resize Robustness | Complete — maintainer Alacritty walkthrough 2026-07-27 | TUI-035. All automated gates passed; maintainer performed real-terminal Cases A/B/C/D (tool-call width, extreme narrow, continuous drag, height shrink). Completion Commit: `6909675`. See `I156-tui-narrow-viewport-resize.md`. |
-| I163 | Policy-Controlled Linked Skill Discovery | Active — corrective interruption (2026-07-27) | SKILL-003. Maintainer-authorized shared discovery default (`discover_shared = true`). Root symlink policy, pre-descent external rejection, canonical dir dedup, root-level SKILL.md fix, file link policy, depth warning, real two-link/cycle/budget tests. 2508 workspace tests pass. I157 deferred until I163 disposition. See `I163-policy-controlled-linked-skill-discovery.md`. |
-| I157 | Provider Removal And Credential Clear | Planned — resumes after I163 disposition | MODEL-010. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I163 disposition (Complete or Paused); MODEL-010 Ready. See `I157-provider-removal-credential-clear.md`. |
+| I156 | TUI Narrow-Viewport And Resize Robustness | Complete — maintainer Alacritty walkthrough 2026-07-27 | TUI-035. All automated gates passed; maintainer performed real-terminal Cases A/B/C/D. Completion commits include `6909675` and the accepted Alternate-Screen correction chain through `d4d95ad`. See `I156-tui-narrow-viewport-resize.md`. |
+| I163 | Policy-Controlled Linked Skill Discovery | Complete (2026-07-28) | SKILL-003. Existing completion commits: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`, `e11481d`, `12ef1e3`. Windows link behavior and Level-2 reference containment remain explicit residuals. See `I163-policy-controlled-linked-skill-discovery.md`. |
+| I157 | Provider Removal And Credential Clear | Planned — resumes after I164 disposition | MODEL-010. `talos config unset ... --confirm` removes a provider entry or clears one credential without hand-editing TOML. Activation gate: I164 disposition (Complete or Paused); MODEL-010 Ready. See `I157-provider-removal-credential-clear.md`. |
 | I158 | Tool Registration Composition Consolidation | Blocked | ARCH-034-R01. One explicit tool registration composition model with preserved print/TUI/MCP behavior. Blocked until ADR-053 is Accepted and ARCH-034-R01 is Ready. See `I158-tool-registration-composition.md`. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
@@ -291,9 +291,10 @@ Complete/Superseded dispositions without erasing their published objectives.
 
 | Iteration | Current State | Disposition Before Next Activation |
 |---|---|---|
-| I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
-| I163 | Active — corrective interruption (2026-07-27) | SKILL-003. Maintainer-authorized shared discovery default; traversal boundaries and real tests landed. I157 deferred until I163 disposition. |
-| I157 | Planned — resumes after I163 disposition | MODEL-010. CLI-only `config unset`; activation gate: I163 disposition (Complete or Paused). |
+| I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`..`d4d95ad`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
+| I163 | Complete (2026-07-28) | SKILL-003. Discovery policy, safe shared-root default, traversal bounds, TOCTOU correction, and isolated tests complete. |
+| I164 | Active (2026-07-28) | TUI-038. Sole implementation authority for startup inline composer continuity. |
+| I157 | Planned — resumes after I164 disposition | MODEL-010. CLI-only `config unset`; activation gate: I164 disposition (Complete or Paused). |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
@@ -309,9 +310,9 @@ The current execution sequence is the
 [v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
 listed above.
 
-I163 is Active as the sole implementation iteration (corrective interruption), and SKILL-003 is
-In Progress. I156 is Complete. This historical table is not a current selection, planning, status,
-or activation owner.
+I164 is Active as the sole implementation iteration and TUI-038 is In Progress.
+I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
+current selection, planning, status, or activation owner.
 
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|

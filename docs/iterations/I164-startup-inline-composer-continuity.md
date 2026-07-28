@@ -1,15 +1,15 @@
 # Iteration I164: Startup Inline Composer Continuity
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-28
 > Planned objective: Restore a compact new-session composer position approximately two rows below the Alternate-Screen Logo, then transition cleanly to the existing full-frame conversation layout after the first submitted user message.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: A rebuilt `talos` TUI shows an editable startup composer near the Logo, preserves it through first-draft redraws, and transitions to normal history/composer layout after first submission without transcript or resize regressions.
-> Activation rule: I163 must be Complete or explicitly Paused; I164 remains Planned and is not implementation authority until its activation record is appended.
+> Activation rule: satisfied 2026-07-28; I163 is Complete and the activation record below makes I164 the sole implementation authority.
 
 ## Published Baseline
 
-### Iteration Inventory And Disposition
+### Iteration Inventory And Disposition At Selection
 
 | Iteration | State on 2026-07-28 | Disposition |
 | --- | --- | --- |
@@ -82,16 +82,19 @@ then exit and confirm terminal restore.
 | Date | Type | Record |
 | --- | --- | --- |
 | 2026-07-28 | Planning / priority shift | Maintainer requested immediate implementation scheduling. I164/TUI-038 is selected as the next candidate after I163 disposition; I157 remains Planned but deferred. No production code changed and I164 is not Active. |
+| 2026-07-28 | Activation | I163/SKILL-003 is Complete. TUI-035 is Complete and ADR-054 is Accepted. Fresh inventory confirms I157 remains Planned, I158-I162 remain Blocked, ADR-053 remains Proposed, and no conflicting Active iteration exists. Baseline `c600110`. I164/TUI-038 is the sole implementation authority. |
 
 ## Verification Evidence
 
-- Planning/governance validation: pending activation.
-- Focused tests: pending activation.
-- Full locked validation: pending activation.
+- Planning/governance validation: activation inventory complete; repository
+  governance validation is replayed in the activation commit.
+- Focused tests: pending implementation.
+- Full locked validation: pending implementation completion.
 - Rebuilt-binary runtime evidence: pending activation.
 
 ## Completion Evidence
 
+- Prerequisite I163 Completion Commit: `12ef1e3`.
 - Completion Commit: pending implementation.
 - A status-only documentation commit cannot satisfy completion evidence.
 

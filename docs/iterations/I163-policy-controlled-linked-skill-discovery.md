@@ -1,6 +1,6 @@
 # Iteration I163: Policy-Controlled Linked Skill Discovery
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-27
 > Planned objective: Correct SKILL-003 linked skill discovery — safe-by-default policy, pre-descent external target rejection, canonical dedup, global budget, deterministic ordering, observable warnings.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -59,6 +59,7 @@ Fix the 15 blocking defects from commit `1f5e451`/`ea3cc74`:
 | 2026-07-27 | Test authenticity | Commit `a0079dd`: real two-link chain, real cycle (follow=true, LinkLoop asserted), root link deny/allow, external pre-descent rejection, alias subtree single-descent proof, root-level SKILL.md, direct file link policy, depth boundary (exact/beyond/single-warning), unique-name budget, global budget across roots, misleading tests removed/rename, tiggers typo fixed. 78 skill tests pass. |
 | 2026-07-27 | Oracle review + TOCTOU fix | Oracle review confirmed 8/10 questions correct. One MEDIUM-severity defense-in-depth gap: WalkDir `follow_root_links` defaults to `true`, creating a TOCTOU window where a swapped root symlink bypasses the explicit root-link check. Commit `e11481d`: added `.follow_root_links(false)` and pass `root_canonical` as walk root when root is an explicitly-allowed symlink. Two LOW-severity cosmetic issues (RootLinkDenied reused for file symlinks; inaccessible roots silently skipped) accepted as-is. 2508 workspace tests pass. |
 | 2026-07-28 | Final test-isolation correction | Commit `12ef1e3`: removed `unsafe std::env::set_var/remove_var` and module-local Mutex from runtime Skill discovery tests. Added home-injection seam: `SkillLoader::for_workspace_with_home_and_options` (pub, accepts explicit `Option<PathBuf>` home; never reads HOME env var); `discover_runtime_skills_with_home` (pub(crate) in talos-cli, accepts explicit home). Production `discover_runtime_skills` delegates to it via `dirs::home_dir()`. 3 tests rewritten + 3 new boundary tests (home=None, explicit-home-only, production delegation). All tests parallel-safe; no unsafe; no env mutation. 2511 workspace tests pass; 294 CLI tests pass with `--test-threads=8`. |
+| 2026-07-28 | Completion | All published SKILL-003 acceptance items are implemented by the existing implementation chain and focused verification was replayed before closure. I163 is Complete; I164/TUI-038 may activate as the sole implementation iteration. |
 
 ### Maintainer-Authorized Shared Default
 
@@ -179,3 +180,34 @@ module-local `Mutex` guard to simulate a temporary HOME directory. This had thre
 All corrected tests inject home paths explicitly, own independent temp dirs, and are safe to
 run in parallel without a mutex. Test failure or panic cannot leave HOME modified because no
 test ever touches the process environment.
+
+## Verification Evidence
+
+- `cargo test --locked -p talos-skill`: 78 unit tests and 1 doc-test passed.
+- `cargo test --locked -p talos-cli skill_runtime`: 14 focused tests passed.
+- Source scans found no unconditional `follow_links(true)`, silent
+  `filter_map(|e| e.ok())`, or `dedup_by_key` skill-precedence path.
+- The full locked workspace evidence recorded with implementation commit
+  `12ef1e3` is 2511 passing tests with no failures.
+- Windows directory symlink and junction behavior remains explicitly
+  unverified; it is a documented residual rather than an unclaimed completion
+  condition.
+
+## Completion Evidence
+
+- Completion Commit: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`,
+  `e11481d`, `12ef1e3`.
+- These are existing implementation/test commits. The governance closure
+  commit is not used as its own completion evidence.
+- SKILL-003 is Complete. The Level-2 reference containment residual remains a
+  separate security follow-up and does not reopen this bounded discovery
+  deliverable.
+
+## Retrospective
+
+- Policy and filesystem trust boundaries must be established before enabling
+  link traversal; post-descent filtering is too late.
+- Tests that mutate process-global environment are not isolated by a
+  module-local mutex. Explicit dependency injection is the durable boundary.
+- The implementation-first documentation variance is closed here; future
+  iteration activation must precede implementation.
