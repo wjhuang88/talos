@@ -5,11 +5,12 @@
 | Story ID | TUI-036 |
 | Type | Product / input-reliability story |
 | Priority | P1 |
-| Status | Refinement — pending design and iteration selection |
+| Status | In Progress — selected into I166 (2026-07-28) |
 | Source | Maintainer report 2026-07-27: Ctrl+C can stop interrupting turns permanently until Talos is restarted |
 | Parent Epic | None |
 | Depends On | TUI-009, TUI-035; existing conversation cancellation boundary |
 | Blocks | None |
+| Selected Iteration | I166 (Active) |
 
 ## Identity / Goal / Value
 
@@ -43,7 +44,7 @@ leave the session permanently unable to interrupt subsequent turns.
 - No promise that every terminal reports modified keys; the implementation must
   preserve a documented portable path.
 - No work on I156/TUI-035 architecture beyond the minimum integration needed
-  when this story is selected by a later iteration.
+  by I166.
 
 ## Decision Links And Constraints
 
@@ -52,8 +53,8 @@ leave the session permanently unable to interrupt subsequent turns.
   behavior.
 - ADR-054 keeps interactive rendering application-owned; shortcut changes must
   not reintroduce terminal-native history or resize behavior.
-- I156/TUI-035 completion removed its former scope gate. This story remains
-  unselected until a future iteration explicitly sequences it.
+- I156/TUI-035 completion removed its former scope gate. Maintainer priority
+  selected this Story into I166 on 2026-07-28.
 
 ## Uncertainty And Validation Path
 
@@ -61,23 +62,23 @@ The reported consecutive-turn trigger is now known: active-turn Ctrl+C reused
 the idle double-press exit state, and an automatically started queued turn
 inherited the armed first press. Post-completion TUI-009 correction `f77a6f0`
 separates those state machines and adds deterministic entry-point coverage.
-This correction preserves the current Ctrl+C cancellation behavior; it does
-not select or complete this Story's planned Esc migration.
+That correction is the rollback baseline; it preserved Ctrl+C cancellation
+before I166 explicitly selected the Esc migration.
 
-Before marking this story Ready, document the remaining cancellation state
-matrix and exercise
-at least: normal streaming, tool execution, approval visibility, modal input,
-cancel during shutdown, timeout/failure, repeated Esc, and a new turn after
-each terminal state. If the root cause lies outside the existing TUI/
-conversation boundary, record the exact owner and required decision rather
-than broadening this story silently.
+I166 fixes the remaining matrix as follows: Ctrl+C is local clear/close plus
+idle empty-composer exit; it never interrupts or exits an active turn. Esc is
+consumed first by approval, credential/provider, and slash UI; only a normal
+active turn emits `UserInput::Cancel`. Each key press emits at most one action,
+and no persistent cancellation latch may be introduced. Runtime acceptance
+must cover streaming, tool execution, queued-next-turn cancellation,
+approval/modal priority, failure/timeout recovery, and idle exit.
 
 ## State / Status Owners
 
 - TUI key dispatch and visible feedback: `crates/talos-tui`.
 - Active-turn cancellation state and acknowledgement: current
   `talos-conversation` owner.
-- Story state: this document; iteration selection is a future owner.
+- Story state: this document; I166 owns implementation evidence.
 
 ## User-Facing Documentation
 
@@ -117,10 +118,22 @@ than broadening this story silently.
 - Entry-point, state-machine, and real-terminal tests cover the above matrix;
   `cargo test --workspace --locked` passes.
 
+## Resolved Shortcut Decisions (2026-07-28)
+
+- Active turn + Esc + no modal: send one existing `UserInput::Cancel` for the
+  key press; do not exit.
+- Approval + Esc: local `Deny`; credential/provider/slash + Esc: local close;
+  none may also interrupt the underlying turn.
+- Active turn + Ctrl+C: clear a non-empty composer locally; with an empty
+  composer show Esc guidance. Never cancel or exit.
+- Idle empty composer + Ctrl+C: retain the explicit double-press exit gesture.
+- Modified Ctrl+C must be handled before generic `KeyCode::Char(c)` modal input
+  so it can never append a literal `c` to a credential or provider field.
+- Cancellation remains on the existing typed bridge. No new public protocol,
+  persistent cancel latch, or global event bus is authorized.
+
 ## Residuals
 
 - The known stale Ctrl+C exit-state trigger is corrected by `f77a6f0`.
 - The planned Ctrl+C-to-Esc active-turn shortcut migration remains unimplemented
-  and requires explicit iteration selection.
-- Selection requires an explicitly sequenced future iteration; it is not
-  selected automatically by I156/TUI-035 completion.
+  and is now the active I166 deliverable.

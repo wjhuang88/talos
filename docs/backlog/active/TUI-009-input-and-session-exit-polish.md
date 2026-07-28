@@ -102,3 +102,12 @@ one `UserInput::Cancel`, resets the idle exit gesture to `Idle`, and never exits
 Only an idle empty composer participates in the double-press exit gesture. The
 entry-point regression covers two consecutive processing turns, and the locked
 workspace test suite passes. TUI-009 remains Complete.
+
+## I166 Shortcut Change Control (2026-07-28)
+
+The maintainer subsequently selected TUI-036/I166 to remove active-turn
+cancellation from Ctrl+C and assign it to Esc. TUI-009 remains the historical
+owner for idle composer clearing and the idle empty-composer exit summary
+behavior. Its completed active-turn Ctrl+C acceptance is superseded only by
+I166; `f77a6f0` remains the rollback-safe baseline until I166 passes rebuilt
+binary acceptance.

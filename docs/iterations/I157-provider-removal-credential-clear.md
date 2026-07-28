@@ -164,6 +164,10 @@ If a stop condition occurs:
   after I163 completed. I157 remains Planned, its published scope and baseline
   are unchanged, and it is deferred until I164 disposition rather than
   superseded.
+- 2026-07-28 shortcut priority shift: after I165 completed, the maintainer
+  selected I166/TUI-036 before I157. I157/MODEL-010 remains Planned/Ready with
+  its published baseline unchanged and resumes after I166 reaches a terminal
+  disposition.
 
 ## REL-002 Execution Record
 

@@ -8,7 +8,7 @@
 | Status | Refinement — ADR decision required before Ready |
 | Source | Maintainer feedback after session `9945f9b4-9c93-41d3-9a9b-a7b33814f130` stream-idle timeout (2026-07-28) |
 | Depends On | ADR-006; RUNTIME-002 and PROVIDER-002 resolved timeout foundations; SESSION-006 durable error-path boundary |
-| Iteration | Unselected; I165/TUI-039 remains the sole Active implementation authority |
+| Iteration | Unselected; I166/TUI-036 is the sole Active implementation authority |
 
 ## Problem
 
