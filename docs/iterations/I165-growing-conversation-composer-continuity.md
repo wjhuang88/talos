@@ -1,6 +1,6 @@
 # Iteration I165: Growing Conversation Composer Continuity
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-28
 > Planned objective: Keep the Alternate-Screen composer directly below the Logo/history flow until projected content exhausts the usable frame, then use the bounded bottom-composer history viewport.
 > Baseline rule: this iteration replaces only the paused I164 post-first-submit acceptance target; all ADR-054 renderer ownership invariants remain unchanged.
@@ -46,9 +46,14 @@ workspace validation ladders and perform rebuilt-binary terminal acceptance.
 | 2026-07-28 | Automated validation | `cargo test --locked -p talos-tui --lib` = 464 passed; `cargo fmt --all -- --check`, `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`, `cargo test --workspace --locked`, `scripts/validate_project_governance.sh .`, `git diff --check`, and `cargo build --locked -p talos-cli` all exit 0. The build script emitted only its informational `models.toml compressed` warning. |
 | 2026-07-28 | Approved scope refinement | Maintainer reduced the initial display-only Logo-to-composer gap from two rows to one row. This preserves the renderer/transcript model and is covered by the startup layout assertion. |
 | 2026-07-28 | Startup tips correction | Maintainer confirmed that the normal tips surface must remain visible in a fresh session. Startup now keeps its one-row tips surface, so the existing loopback Dashboard address tip is visible and copyable before first submit. `cargo test --locked -p talos-tui --lib` = 465 passed. |
+| 2026-07-28 | Human rebuilt-binary acceptance | Maintainer performed the full 9-case rebuilt-binary terminal walkthrough (A: startup layout 1 spacer, B: CJK/multiline draft editing via Ctrl+J portable newline fallback, C: first submit keeps composer adjacent to Logo, D: growing conversation composer follows flow, E: overflow falls back to bottom-fixed, F: resize bounded, G: narrow/short bounded fallback, H: mouse wheel + input history separation, I: terminal restore). All 9 cases PASS. |
 
 ## Completion Evidence
 
-- Implementation Commit: `8e6ffe9`.
-- Completion Commit: pending.
-- Human rebuilt-binary acceptance: pending.
+- Implementation Commits: `8e6ffe9b`, `dc52b21a`, `9726797e`.
+- Completion Commit: `8e6ffe9b`, `dc52b21a`, `9726797e`.
+- Human rebuilt-binary acceptance: PASS (2026-07-28). All 9 terminal cases
+  passed in the maintainer's real terminal session. Shift+Enter newline uses
+  the documented `Ctrl+J` portable fallback in terminals without the kitty
+  keyboard protocol; this is a terminal capability distinction, not a code
+  regression.

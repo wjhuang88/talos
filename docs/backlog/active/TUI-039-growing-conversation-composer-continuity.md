@@ -5,7 +5,7 @@
 | Story ID | TUI-039 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | In Progress — I165 Active |
+| Status | Complete — I165 Complete; human rebuilt-binary acceptance passed 2026-07-28 (all 9 cases) |
 | Source | Maintainer correction after I164 rebuilt-binary verification (2026-07-28) |
 | Depends On | TUI-035 Complete; ADR-054 Accepted; I164 paused |
 | Selected Iteration | I165 (Active; sole implementation authority) |
@@ -63,6 +63,13 @@ implementation authority.
 - `8e6ffe9` adds FollowTail natural-history allocation and tests first-submit
   continuity, progressive growth, overflow fallback, and anchored-history
   bottom placement.
-- `cargo test --locked -p talos-tui --lib` = 464 passed; locked workspace
+- `dc52b21` reduces the startup Logo-to-composer gap to one row.
+- `9726797e` retains the startup tips surface so the loopback Dashboard address
+  tip remains visible before first submit.
+- `cargo test --locked -p talos-tui --lib` = 466 passed; locked workspace
   tests, format, check, Clippy, governance validation, diff check, and CLI
-  build all pass. Rebuilt-binary terminal acceptance remains required.
+  build all pass.
+- Completion Commit: `8e6ffe9b`, `dc52b21a`, `9726797e`.
+- Human rebuilt-binary acceptance: PASS (2026-07-28). All 9 terminal cases
+  (A–I) passed. Shift+Enter uses the documented `Ctrl+J` portable fallback
+  in terminals without the kitty keyboard protocol.
