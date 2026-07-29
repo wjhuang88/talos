@@ -23,9 +23,10 @@ fn write_credentials(home: &std::path::Path, toml_content: &str) {
     fs::write(home.join(".talos/credentials.toml"), toml_content).unwrap();
 }
 
-fn run_unset(home: &std::path::Path, args: &[&str]) -> (bool, String, String) {
+fn run_cmd(home: &std::path::Path, args: &[&str]) -> (bool, String, String) {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_talos"));
     cmd.env("HOME", home);
+    cmd.env("TALOS_INSTALL_DIR", home.join(".talos/bin"));
     for arg in args {
         cmd.arg(arg);
     }
@@ -37,192 +38,217 @@ fn run_unset(home: &std::path::Path, args: &[&str]) -> (bool, String, String) {
     )
 }
 
-fn file_hash(path: &std::path::Path) -> String {
-    if !path.exists() {
-        return "NONEXISTENT".to_string();
+fn read_bytes(path: &std::path::Path) -> Vec<u8> {
+    fs::read(path).unwrap_or_default()
+}
+
+fn assert_no_secret(stdout: &str, stderr: &str, markers: &[&str]) {
+    for m in markers {
+        assert!(!stdout.contains(m), "secret marker '{m}' found in stdout");
+        assert!(!stderr.contains(m), "secret marker '{m}' found in stderr");
     }
-    let bytes = fs::read(path).unwrap();
-    format!("{}bytes", bytes.len())
+}
+
+fn assert_no_temp_residual(home: &std::path::Path) {
+    let entries: Vec<String> = fs::read_dir(home.join(".talos"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        !entries.iter().any(|n| n.contains(".tmp")),
+        "no temp files must remain: {entries:?}"
+    );
 }
 
 fn cleanup(home: &std::path::Path) {
     let _ = fs::remove_dir_all(home);
 }
 
+const SECRET_A: &str = "sk-MARKER-A";
+const SECRET_B: &str = "sk-MARKER-B";
+const SECRET_ANT: &str = "sk-MARKER-ANT";
+
 #[test]
-fn missing_confirm_exits_nonzero_and_leaves_files_unchanged() {
+fn missing_confirm_both_files_byte_identical() {
     let home = unique_home("no-confirm");
-    let config_toml = r#"
+    write_config(
+        &home,
+        &format!(
+            r#"
 provider = "custom-a"
 model = "model-a"
 
 [providers.custom-a]
-api_key = "sk-test-marker-a"
-"#;
-    write_config(&home, config_toml);
-
-    let config_before = file_hash(&home.join(".talos/config.toml"));
-
-    let (success, stdout, stderr) = run_unset(&home, &["config", "unset", "providers.custom-a"]);
-    assert!(!success, "must exit non-zero without --confirm");
-    assert!(
-        stderr.contains("--confirm"),
-        "stderr must mention --confirm: {stderr}"
+api_key = "{SECRET_A}"
+"#
+        ),
     );
+    write_credentials(&home, &format!("custom-a = \"{SECRET_A}\"\n"));
 
-    let config_after = file_hash(&home.join(".talos/config.toml"));
+    let config_before = read_bytes(&home.join(".talos/config.toml"));
+    let creds_before = read_bytes(&home.join(".talos/credentials.toml"));
+
+    let (success, stdout, stderr) = run_cmd(&home, &["config", "unset", "providers.custom-a"]);
+    assert!(!success);
+    assert!(stderr.contains("--confirm"));
+
+    assert_eq!(config_before, read_bytes(&home.join(".talos/config.toml")),);
     assert_eq!(
-        config_before, config_after,
-        "config.toml must be byte-identical without --confirm"
+        creds_before,
+        read_bytes(&home.join(".talos/credentials.toml")),
     );
-    assert!(
-        !stdout.contains("sk-test-marker-a"),
-        "credential must not appear in stdout"
-    );
+    assert_no_secret(&stdout, &stderr, &[SECRET_A]);
     cleanup(&home);
 }
 
 #[test]
-fn custom_provider_removed_from_config_and_credentials() {
-    let home = unique_home("custom-remove");
+fn custom_provider_removed_from_both_files() {
+    let home = unique_home("custom-rm");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
 provider = "custom-a"
 model = "model-a"
 
 [providers.custom-a]
-api_key = "sk-inline-a"
-base_url = "https://a.example.com/v1"
+api_key = "{SECRET_A}"
 
 [providers.custom-b]
-api_key = "sk-inline-b"
-"#,
+api_key = "{SECRET_B}"
+"#
+        ),
     );
     write_credentials(
         &home,
-        "custom-a = \"sk-creds-a\"\ncustom-b = \"sk-creds-b\"\n",
+        &format!("custom-a = \"{SECRET_A}\"\ncustom-b = \"{SECRET_B}\"\n"),
     );
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.custom-a", "--confirm"],
     );
-    assert!(success, "must succeed with --confirm");
+    assert!(success);
     assert!(stdout.contains("removed"));
+    assert_no_secret(&stdout, &stderr, &[SECRET_A]);
 
     let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
     let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
     assert!(!reloaded.providers.contains_key("custom-a"));
     assert!(reloaded.providers.contains_key("custom-b"));
 
-    let creds_path = home.join(".talos/credentials.toml");
-    let creds_raw = fs::read_to_string(&creds_path).unwrap();
+    let creds_raw = fs::read_to_string(home.join(".talos/credentials.toml")).unwrap();
     assert!(!creds_raw.contains("custom-a"));
     assert!(creds_raw.contains("custom-b"));
+    assert_no_temp_residual(&home);
     cleanup(&home);
 }
 
 #[test]
 fn builtin_provider_disconnected() {
-    let home = unique_home("builtin-disconnect");
+    let home = unique_home("builtin-disc");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
 provider = "anthropic"
 model = "claude-test"
 
 [providers.anthropic]
-api_key = "sk-ant-inline"
-"#,
+api_key = "{SECRET_ANT}"
+"#
+        ),
     );
-    write_credentials(&home, "anthropic = \"sk-ant-creds\"\n");
+    write_credentials(&home, &format!("anthropic = \"{SECRET_ANT}\"\n"));
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.anthropic", "--confirm"],
     );
     assert!(success);
-    assert!(
-        stdout.contains("disconnected"),
-        "output must use disconnected semantics: {stdout}"
-    );
-    assert!(
-        !stdout.contains("destroyed"),
-        "must not claim builtin was destroyed"
-    );
+    assert!(stdout.contains("disconnected"));
+    assert!(!stdout.contains("destroyed"));
+    assert_no_secret(&stdout, &stderr, &[SECRET_ANT]);
 
     let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
     let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
     assert!(!reloaded.providers.contains_key("anthropic"));
+    assert_no_temp_residual(&home);
     cleanup(&home);
 }
 
 #[test]
 fn api_key_cleared_preserves_other_fields() {
-    let home = unique_home("apikey-clear");
+    let home = unique_home("apikey");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
 provider = "my-gw"
 model = "test-model"
 
 [providers.my-gw]
 protocol = "openai-chat"
 base_url = "https://gw.example.com/v1"
-api_key = "sk-gw-secret"
+api_key = "{SECRET_A}"
 api_key_env = "GW_API_KEY"
-"#,
+"#
+        ),
     );
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.my-gw.api_key", "--confirm"],
     );
     assert!(success);
     assert!(stdout.contains("cleared"));
+    assert_no_secret(&stdout, &stderr, &[SECRET_A]);
 
     let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
     assert!(config_raw.contains("base_url"));
     assert!(config_raw.contains("api_key_env"));
-    assert!(
-        !config_raw.contains("sk-gw-secret"),
-        "cleared credential must not appear in config"
-    );
-    assert!(
-        !config_raw.contains("api_key = \"\""),
-        "must not write empty api_key"
-    );
+    assert!(!config_raw.contains(SECRET_A));
+    assert!(!config_raw.contains("api_key = \"\""));
+    assert_no_temp_residual(&home);
     cleanup(&home);
 }
 
 #[test]
-fn unknown_provider_exits_nonzero() {
+fn unknown_provider_both_files_unchanged() {
     let home = unique_home("unknown");
     write_config(&home, "provider = \"x\"\nmodel = \"y\"\n");
+    write_credentials(&home, "x = \"key-x\"\n");
 
-    let config_before = file_hash(&home.join(".talos/config.toml"));
+    let config_before = read_bytes(&home.join(".talos/config.toml"));
+    let creds_before = read_bytes(&home.join(".talos/credentials.toml"));
 
-    let (success, _stdout, stderr) = run_unset(
+    let (success, _stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.nonexistent", "--confirm"],
     );
     assert!(!success);
     assert!(stderr.contains("not found"));
 
-    let config_after = file_hash(&home.join(".talos/config.toml"));
-    assert_eq!(config_before, config_after);
+    assert_eq!(config_before, read_bytes(&home.join(".talos/config.toml")));
+    assert_eq!(
+        creds_before,
+        read_bytes(&home.join(".talos/credentials.toml"))
+    );
     cleanup(&home);
 }
 
 #[test]
-fn invalid_dotted_key_exits_nonzero() {
-    let home = unique_home("invalid-key");
+fn invalid_dotted_key_both_files_unchanged() {
+    let home = unique_home("invalid");
     write_config(&home, "provider = \"x\"\nmodel = \"y\"\n");
 
-    let (success, _stdout, stderr) = run_unset(&home, &["config", "unset", "model", "--confirm"]);
+    let config_before = read_bytes(&home.join(".talos/config.toml"));
+
+    let (success, _stdout, stderr) = run_cmd(&home, &["config", "unset", "model", "--confirm"]);
     assert!(!success);
     assert!(stderr.contains("unsupported"));
+
+    assert_eq!(config_before, read_bytes(&home.join(".talos/config.toml")));
     cleanup(&home);
 }
 
@@ -230,19 +256,23 @@ fn invalid_dotted_key_exits_nonzero() {
 fn credentials_only_custom_provider_removed() {
     let home = unique_home("creds-only-custom");
     write_config(&home, "provider = \"x\"\nmodel = \"y\"\n");
-    write_credentials(&home, "old-custom = \"sk-old\"\n");
+    write_credentials(&home, &format!("old-custom = \"{SECRET_A}\"\n"));
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.old-custom", "--confirm"],
     );
     assert!(success);
     assert!(stdout.contains("removed"));
+    assert_no_secret(&stdout, &stderr, &[SECRET_A]);
 
     let creds_path = home.join(".talos/credentials.toml");
     if creds_path.exists() {
-        let creds_raw = fs::read_to_string(&creds_path).unwrap();
-        assert!(!creds_raw.contains("old-custom"));
+        assert!(
+            !fs::read_to_string(&creds_path)
+                .unwrap()
+                .contains("old-custom")
+        );
     }
     cleanup(&home);
 }
@@ -251,115 +281,216 @@ fn credentials_only_custom_provider_removed() {
 fn credentials_only_builtin_provider_removed() {
     let home = unique_home("creds-only-builtin");
     write_config(&home, "provider = \"x\"\nmodel = \"y\"\n");
-    write_credentials(&home, "anthropic = \"sk-legacy\"\n");
+    write_credentials(&home, &format!("anthropic = \"{SECRET_ANT}\"\n"));
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.anthropic", "--confirm"],
     );
     assert!(success);
-    assert!(
-        stdout.contains("disconnected"),
-        "credentials-only builtin must report disconnected"
-    );
+    assert!(stdout.contains("disconnected"));
+    assert_no_secret(&stdout, &stderr, &[SECRET_ANT]);
 
     let creds_path = home.join(".talos/credentials.toml");
     if creds_path.exists() {
-        let creds_raw = fs::read_to_string(&creds_path).unwrap();
-        assert!(!creds_raw.contains("anthropic"));
+        assert!(
+            !fs::read_to_string(&creds_path)
+                .unwrap()
+                .contains("anthropic")
+        );
     }
     cleanup(&home);
 }
 
 #[test]
-fn active_custom_provider_unset_is_picker_recoverable() {
-    let home = unique_home("active-custom");
+fn active_custom_provider_unset_reaches_no_init_rejection() {
+    let home = unique_home("active-custom-noinit");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
 provider = "active-gw"
 model = "active-model"
 
 [providers.active-gw]
-api_key = "sk-active"
-"#,
+api_key = "{SECRET_A}"
+"#
+        ),
     );
 
-    let (success, stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.active-gw", "--confirm"],
     );
     assert!(success);
+    assert_no_secret(&stdout, &stderr, &[SECRET_A]);
+    assert_no_temp_residual(&home);
 
     let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
     let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
     assert!(!reloaded.providers.contains_key("active-gw"));
     assert!(reloaded.api_key().is_err());
-    let pc = reloaded.active_provider_config();
-    assert!(pc.api_key.is_none());
 
+    let (init_success, _init_stdout, init_stderr) = run_cmd(&home, &["--no-init", "-p", "test"]);
     assert!(
-        !stdout.contains("sk-active"),
-        "credential must not appear in stdout"
+        !init_success,
+        "talos --no-init must reject when active provider credential is gone"
     );
+    assert!(
+        init_stderr.to_lowercase().contains("api key")
+            || init_stderr.to_lowercase().contains("no model")
+            || init_stderr.contains("--no-init"),
+        "stderr must mention api key or model setup: {init_stderr}"
+    );
+    assert_no_secret(&_init_stdout, &init_stderr, &[SECRET_A]);
+
     cleanup(&home);
 }
 
 #[test]
-fn active_builtin_provider_unset_is_picker_recoverable() {
-    let home = unique_home("active-builtin");
+fn active_builtin_provider_unset_reaches_no_init_rejection() {
+    let home = unique_home("active-builtin-noinit");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
 provider = "anthropic"
 model = "claude-test"
 
 [providers.anthropic]
-api_key = "sk-ant-active"
-"#,
+api_key = "{SECRET_ANT}"
+"#
+        ),
     );
 
-    let (success, _stdout, _stderr) = run_unset(
+    let (success, stdout, stderr) = run_cmd(
         &home,
         &["config", "unset", "providers.anthropic", "--confirm"],
     );
     assert!(success);
+    assert_no_secret(&stdout, &stderr, &[SECRET_ANT]);
 
     let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
     let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
     assert!(!reloaded.providers.contains_key("anthropic"));
+    assert!(reloaded.api_key().is_err());
+
+    let (init_success, _init_stdout, init_stderr) = run_cmd(&home, &["--no-init", "-p", "test"]);
+    assert!(!init_success);
     assert!(
-        reloaded.api_key().is_err(),
-        "active builtin removal must leave api_key() in error state for picker recovery"
+        init_stderr.to_lowercase().contains("api key")
+            || init_stderr.to_lowercase().contains("no model")
+            || init_stderr.contains("--no-init"),
     );
+
     cleanup(&home);
 }
 
 #[test]
-fn no_temp_residual_after_success() {
-    let home = unique_home("no-residual");
+fn config_list_after_unset_no_secret() {
+    let home = unique_home("list-after");
     write_config(
         &home,
-        r#"
+        &format!(
+            r#"
+provider = "my-gw"
+model = "test-model"
+
+[providers.my-gw]
+api_key = "{SECRET_A}"
+
+[providers.keeper]
+api_key = "{SECRET_B}"
+"#
+        ),
+    );
+
+    run_cmd(&home, &["config", "unset", "providers.my-gw", "--confirm"]);
+
+    let (list_ok, list_out, list_err) = run_cmd(&home, &["config", "list"]);
+    assert!(list_ok);
+    assert_no_secret(&list_out, &list_err, &[SECRET_A]);
+
+    let (get_ok, get_out, get_err) = run_cmd(&home, &["config", "get", "providers.my-gw.api_key"]);
+    assert!(!get_ok || !get_out.contains(SECRET_A));
+    assert_no_secret(&get_out, &get_err, &[SECRET_A]);
+
+    let (keep_ok, keep_out, _keep_err) =
+        run_cmd(&home, &["config", "get", "providers.keeper.api_key"]);
+    assert!(keep_ok);
+    assert_eq!(keep_out.trim(), "***");
+
+    cleanup(&home);
+}
+
+#[test]
+fn config_get_after_api_key_clear_no_secret() {
+    let home = unique_home("get-after-clear");
+    write_config(
+        &home,
+        &format!(
+            r#"
 provider = "gw"
 model = "m"
 
 [providers.gw]
-api_key = "sk-gw"
-"#,
+api_key = "{SECRET_A}"
+base_url = "https://gw.example.com"
+"#
+        ),
     );
 
-    run_unset(&home, &["config", "unset", "providers.gw", "--confirm"]);
+    run_cmd(
+        &home,
+        &["config", "unset", "providers.gw.api_key", "--confirm"],
+    );
 
-    let entries: Vec<String> = fs::read_dir(home.join(".talos"))
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-        .collect();
+    let (get_ok, get_out, get_err) = run_cmd(&home, &["config", "get", "providers.gw.api_key"]);
+    assert!(get_ok);
+    assert!(!get_out.contains(SECRET_A));
+    assert_no_secret(&get_out, &get_err, &[SECRET_A]);
+
+    let (list_ok, list_out, list_err) = run_cmd(&home, &["config", "list"]);
+    assert!(list_ok);
+    assert_no_secret(&list_out, &list_err, &[SECRET_A]);
+
+    cleanup(&home);
+}
+
+#[test]
+fn unrelated_credential_not_copied_to_config() {
+    let home = unique_home("unrelated-creds");
+    write_config(
+        &home,
+        &format!(
+            r#"
+provider = "target"
+model = "m"
+
+[providers.target]
+api_key = "{SECRET_A}"
+
+[providers.keeper]
+api_key = "{SECRET_B}"
+"#
+        ),
+    );
+    write_credentials(
+        &home,
+        &format!("target = \"{SECRET_A}\"\nkeeper = \"{SECRET_B}\"\norphan = \"{SECRET_ANT}\"\n"),
+    );
+
+    run_cmd(&home, &["config", "unset", "providers.target", "--confirm"]);
+
+    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
+    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    assert!(!reloaded.providers.contains_key("target"));
+    assert!(reloaded.providers.contains_key("keeper"));
     assert!(
-        !entries
-            .iter()
-            .any(|n| n.contains(".atomic-tmp") || n.ends_with(".tmp")),
-        "no temp files must remain: {entries:?}"
+        !reloaded.providers.contains_key("orphan"),
+        "orphan credential must not create a config entry"
     );
+
+    assert_no_temp_residual(&home);
     cleanup(&home);
 }
