@@ -1,6 +1,6 @@
 # Iteration I168: Provider Terminal Outcome Integrity
 
-> Document status: Active
+> Document status: Paused — maintainer-requested hold (2026-07-29)
 > Published plan date: 2026-07-29
 > Planned objective: Stop treating unknown or missing provider terminal signals as normal success, preserve a bounded terminal-cause diagnostic, and show truncation/failure accurately.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -157,6 +157,7 @@ Real paid/provider credentials are not required and must not be introduced.
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-29 | Activation | Inventory at `19d0f2e4` found no Active or Review implementation iteration; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and existing reserve work remains deferred. Maintainer classified silent provider false-success and lost stop-cause evidence as serious. RUNTIME-003 was refined to Ready, selected into I168, then moved to In Progress. I168 is the sole Active implementation authority. |
+| 2026-07-29 | Maintainer pause | The maintainer requested that I168 stop before implementation while they handle the underlying repair context. No implementation work is authorized while paused, no replacement iteration is activated, and resumption requires an explicit maintainer instruction followed by owner/Board/program synchronization. The published objective, scope, acceptance criteria, and P0 priority remain unchanged. |
 
 ## Verification Evidence
 
@@ -170,6 +171,8 @@ Real paid/provider credentials are not required and must not be introduced.
 
 ## Variance And Residuals
 
+- I168 is paused by maintainer direction. This is a scheduling hold, not completion, cancellation,
+  scope reduction, or evidence that the defect is resolved.
 - OBS-002 remains a separate broader observability Story. I168 does not add a general
   request/tool/header progress event contract.
 - The supplied TLOG proves evidence loss and false-success acceptance but cannot recover its
