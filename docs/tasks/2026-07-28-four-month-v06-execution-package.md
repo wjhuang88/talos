@@ -5,7 +5,7 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: I157 (Transaction Finalization Correction)
+> Current implementation authority: none; I157 transaction finalization Complete
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome

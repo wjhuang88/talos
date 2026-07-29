@@ -5,13 +5,14 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress — Prepare, Commit And Cleanup Recovery Correction (I157 reopened round 6) |
+| Status | Complete (I157 transaction finalization — `6b5c3cd0`; 2026-07-29) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
 | Selected Iteration | I157 (Complete; Phase 1 `84e7a6a3`, Phase 2 `46c919ee`) |
-> Completion Commit: `fd35524b` — recover_pending returns Result; strict serde manifest; parse_strict replaces parse_or_default; rollback verification; rollback failure retains journal; sync_dir returns Result; after-state verification before Committed; atomic manifest writes.
+
+> Completion Commit: `6b5c3cd0` — strict manifest (deny_unknown_fields, version validation, Phase enum), after images, Committed recovery verifies after state, RolledBack phase, cleanup manifest-last, credentials remove parent sync, load_effective() production helper.
 
 ## Problem
 
