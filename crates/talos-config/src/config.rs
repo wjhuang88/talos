@@ -1,7 +1,7 @@
 use crate::{
-    Config, ConfigError, ConfigUnsetOutcome, Credentials, ModelConfig, ProviderConfig,
+    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig, ProviderConfig,
     ProviderProtocol, builtin_provider_config, home_dir, model, normalize_provider_endpoint,
-    opencode, substitute_env_vars,
+    opencode,
 };
 use std::env;
 use std::fs;
@@ -33,23 +33,7 @@ impl Config {
     /// call [`Config::validate`] explicitly after applying the edit, before
     /// saving.
     pub fn load() -> Result<Self, ConfigError> {
-        crate::store::ConfigStore::recover_pending()?;
-
-        let path = Self::default_path();
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-
-        let raw = fs::read_to_string(&path)?;
-        let substituted = substitute_env_vars(&raw);
-        let mut config: Config =
-            toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
-
-        if let Ok(creds) = Credentials::load() {
-            config.merge_credentials(&creds);
-        }
-
-        Ok(config)
+        ConfigStore::default_store().load_effective()
     }
 
     /// Returns the API key for the current provider.
@@ -605,7 +589,7 @@ impl Config {
     ///
     /// For each provider that has a stored credential but no inline key,
     /// the credential is injected into `api_key`.
-    fn merge_credentials(&mut self, creds: &Credentials) {
+    pub(crate) fn merge_credentials(&mut self, creds: &Credentials) {
         for (name, key) in &creds.keys {
             if let Some(provider) = self.providers.get_mut(name) {
                 if provider.api_key.is_none() {

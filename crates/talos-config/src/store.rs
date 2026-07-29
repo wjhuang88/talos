@@ -6,6 +6,20 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TXN_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+const MANIFEST_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+enum Phase {
+    Prepared,
+    Applying,
+    Committed,
+    RollbackRequired,
+    RolledBack,
+}
 
 pub struct ConfigStore {
     config_path: PathBuf,
@@ -70,11 +84,26 @@ impl ConfigStore {
         };
 
         let dir = self.txn_dir();
+        let txn_id = gen_txn_id();
 
-        prepare(fs, &dir, &txn)?;
+        prepare(fs, &dir, &txn, &txn_id)?;
 
-        if let Err(apply_err) = apply(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
-            match rollback(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
+        if let Err(apply_err) = apply(
+            fs,
+            &dir,
+            &self.config_path,
+            &self.credentials_path,
+            &txn,
+            &txn_id,
+        ) {
+            match rollback(
+                fs,
+                &dir,
+                &self.config_path,
+                &self.credentials_path,
+                &txn,
+                &txn_id,
+            ) {
                 Ok(()) => {
                     cleanup(fs, &dir)?;
                     return Err(apply_err);
@@ -95,6 +124,37 @@ impl ConfigStore {
         Self::default_store().recover(&StdFs)
     }
 
+    pub fn load_effective(&self) -> Result<Config, ConfigError> {
+        self.recover(&StdFs)?;
+
+        if !self.config_path.exists() {
+            let mut config = Config::default();
+            if self.credentials_path.exists() {
+                let raw = std::fs::read_to_string(&self.credentials_path)
+                    .map_err(ConfigError::IoError)?;
+                if let Ok(creds) = toml::from_str::<Credentials>(&raw) {
+                    config.merge_credentials(&creds);
+                }
+            }
+            return Ok(config);
+        }
+
+        let raw = std::fs::read_to_string(&self.config_path).map_err(ConfigError::IoError)?;
+        let substituted = crate::substitute_env_vars(&raw);
+        let mut config: Config =
+            toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+
+        if self.credentials_path.exists() {
+            let raw_creds =
+                std::fs::read_to_string(&self.credentials_path).map_err(ConfigError::IoError)?;
+            if let Ok(creds) = toml::from_str::<Credentials>(&raw_creds) {
+                config.merge_credentials(&creds);
+            }
+        }
+
+        Ok(config)
+    }
+
     pub(crate) fn recover(&self, fs: &dyn Fs) -> Result<(), ConfigError> {
         let dir = self.txn_dir();
         if !fs.exists(&dir) {
@@ -113,18 +173,43 @@ impl ConfigStore {
         let raw = fs.read(&manifest_path)?;
         let manifest = parse_manifest(&raw)?;
 
-        match manifest.phase.as_str() {
-            "Committed" => {
+        match manifest.phase {
+            Phase::Committed => {
+                let cfg_after = if manifest.config_exists_after {
+                    Some(fs.read(&dir.join("config.after"))?)
+                } else {
+                    None
+                };
+                let cred_after = if manifest.credentials_exist_after {
+                    Some(fs.read(&dir.join("credentials.after"))?)
+                } else {
+                    None
+                };
+
+                let cfg_actual = fs.read_opt(&self.config_path)?;
+                let cred_actual = fs.read_opt(&self.credentials_path)?;
+
+                if cfg_actual.as_deref() != cfg_after.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "Committed recovery: config does not match after image".into(),
+                    ));
+                }
+                if cred_actual.as_deref() != cred_after.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "Committed recovery: credentials does not match after image".into(),
+                    ));
+                }
+
                 cleanup(fs, &dir)?;
                 Ok(())
             }
-            "Prepared" | "Applying" | "RollbackRequired" => {
-                let cfg_before = if manifest.cfg_existed {
+            Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {
+                let cfg_before = if manifest.config_existed_before {
                     Some(fs.read(&dir.join("config.before"))?)
                 } else {
                     None
                 };
-                let cred_before = if manifest.cred_existed {
+                let cred_before = if manifest.credentials_existed_before {
                     Some(fs.read(&dir.join("credentials.before"))?)
                 } else {
                     None
@@ -146,12 +231,54 @@ impl ConfigStore {
                     ));
                 }
 
+                let _ = write_manifest(
+                    fs,
+                    &dir,
+                    Phase::RolledBack,
+                    &manifest.transaction_id,
+                    &Txn {
+                        cfg_existed: manifest.config_existed_before,
+                        cfg_after_exists: manifest.config_exists_after,
+                        cred_existed: manifest.credentials_existed_before,
+                        cred_after_exists: manifest.credentials_exist_after,
+                        cfg_before: cfg_before.unwrap_or_default(),
+                        cfg_after: Vec::new(),
+                        cred_before: cred_before.unwrap_or_default(),
+                        cred_after: Vec::new(),
+                    },
+                );
+
                 cleanup(fs, &dir)?;
                 Ok(())
             }
-            other => Err(ConfigError::InvalidConfig(format!(
-                "manifest has unknown phase '{other}' — manual recovery required"
-            ))),
+            Phase::RolledBack => {
+                let cfg_before = if manifest.config_existed_before {
+                    Some(fs.read(&dir.join("config.before"))?)
+                } else {
+                    None
+                };
+                let cred_before = if manifest.credentials_existed_before {
+                    Some(fs.read(&dir.join("credentials.before"))?)
+                } else {
+                    None
+                };
+
+                let cfg_actual = fs.read_opt(&self.config_path)?;
+                let cred_actual = fs.read_opt(&self.credentials_path)?;
+                if cfg_actual.as_deref() != cfg_before.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "RolledBack recovery: config does not match before image".into(),
+                    ));
+                }
+                if cred_actual.as_deref() != cred_before.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "RolledBack recovery: credentials does not match before image".into(),
+                    ));
+                }
+
+                cleanup(fs, &dir)?;
+                Ok(())
+            }
         }
     }
 
@@ -226,23 +353,45 @@ struct Txn {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Manifest {
     version: u32,
-    phase: String,
-    cfg_existed: bool,
-    cfg_after_exists: bool,
-    cred_existed: bool,
-    cred_after_exists: bool,
+    phase: Phase,
+    transaction_id: String,
+    config_existed_before: bool,
+    config_exists_after: bool,
+    credentials_existed_before: bool,
+    credentials_exist_after: bool,
 }
 
-fn write_manifest(fs: &dyn Fs, dir: &Path, phase: &str, t: &Txn) -> Result<(), ConfigError> {
+fn gen_txn_id() -> String {
+    let n = TXN_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "{}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+        n
+    )
+}
+
+fn write_manifest(
+    fs: &dyn Fs,
+    dir: &Path,
+    phase: Phase,
+    txn_id: &str,
+    t: &Txn,
+) -> Result<(), ConfigError> {
     let m = Manifest {
-        version: 1,
-        phase: phase.to_string(),
-        cfg_existed: t.cfg_existed,
-        cfg_after_exists: t.cfg_after_exists,
-        cred_existed: t.cred_existed,
-        cred_after_exists: t.cred_after_exists,
+        version: MANIFEST_VERSION,
+        phase,
+        transaction_id: txn_id.to_string(),
+        config_existed_before: t.cfg_existed,
+        config_exists_after: t.cfg_after_exists,
+        credentials_existed_before: t.cred_existed,
+        credentials_exist_after: t.cred_after_exists,
     };
     let toml_str = toml::to_string(&m).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
     fs.atomic_write(&dir.join("manifest"), toml_str.as_bytes())
@@ -251,11 +400,18 @@ fn write_manifest(fs: &dyn Fs, dir: &Path, phase: &str, t: &Txn) -> Result<(), C
 fn parse_manifest(raw: &[u8]) -> Result<Manifest, ConfigError> {
     let s = std::str::from_utf8(raw)
         .map_err(|e| ConfigError::ParseError(format!("manifest is not valid UTF-8: {e}")))?;
-    toml::from_str::<Manifest>(s)
-        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid TOML: {e}")))
+    let m: Manifest = toml::from_str(s)
+        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid TOML: {e}")))?;
+    if m.version != MANIFEST_VERSION {
+        return Err(ConfigError::InvalidConfig(format!(
+            "unsupported manifest version {} — expected {}",
+            m.version, MANIFEST_VERSION
+        )));
+    }
+    Ok(m)
 }
 
-fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn) -> Result<(), ConfigError> {
+fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn, txn_id: &str) -> Result<(), ConfigError> {
     fs.mkdir(dir)?;
     if t.cfg_existed {
         fs.write_secure(&dir.join("config.before"), &t.cfg_before)?;
@@ -263,19 +419,35 @@ fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn) -> Result<(), ConfigError> {
     if t.cred_existed {
         fs.write_secure(&dir.join("credentials.before"), &t.cred_before)?;
     }
-    write_manifest(fs, dir, "Prepared", t)?;
+    if t.cfg_after_exists {
+        fs.write_secure(&dir.join("config.after"), &t.cfg_after)?;
+    }
+    if t.cred_after_exists {
+        fs.write_secure(&dir.join("credentials.after"), &t.cred_after)?;
+    }
+    write_manifest(fs, dir, Phase::Prepared, txn_id, t)?;
     fs.sync_dir(dir)?;
     Ok(())
 }
 
-fn apply(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
-    write_manifest(fs, dir, "Applying", t)?;
+fn apply(
+    fs: &dyn Fs,
+    dir: &Path,
+    cfg: &Path,
+    cred: &Path,
+    t: &Txn,
+    txn_id: &str,
+) -> Result<(), ConfigError> {
+    write_manifest(fs, dir, Phase::Applying, txn_id, t)?;
     fs.atomic_write(cfg, &t.cfg_after)?;
 
     if t.cred_after_exists {
         fs.atomic_write(cred, &t.cred_after)?;
     } else if fs.exists(cred) {
         fs.remove_file(cred)?;
+        if let Some(parent) = cred.parent() {
+            fs.sync_dir(parent)?;
+        }
     }
 
     let cfg_actual = fs.read_opt(cfg)?;
@@ -297,12 +469,21 @@ fn apply(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<()
         )));
     }
 
-    write_manifest(fs, dir, "Committed", t)?;
+    write_manifest(fs, dir, Phase::Committed, txn_id, t)?;
     Ok(())
 }
 
-fn rollback(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
-    let _ = write_manifest(fs, dir, "RollbackRequired", t);
+fn rollback(
+    fs: &dyn Fs,
+    dir: &Path,
+    cfg: &Path,
+    cred: &Path,
+    t: &Txn,
+    txn_id: &str,
+) -> Result<(), ConfigError> {
+    if let Err(e) = write_manifest(fs, dir, Phase::RollbackRequired, txn_id, t) {
+        tracing::warn!("failed to write RollbackRequired manifest: {e}");
+    }
 
     restore(
         fs,
@@ -348,6 +529,10 @@ fn rollback(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result
         ));
     }
 
+    if let Err(e) = write_manifest(fs, dir, Phase::RolledBack, txn_id, t) {
+        tracing::warn!("failed to write RolledBack manifest: {e}");
+    }
+
     Ok(())
 }
 
@@ -367,8 +552,15 @@ fn cleanup(fs: &dyn Fs, dir: &Path) -> Result<(), ConfigError> {
     if !fs.exists(dir) {
         return Ok(());
     }
+    let manifest_path = dir.join("manifest");
     for entry in fs.list_dir(dir)? {
-        fs.remove_file(&entry)?;
+        if entry != manifest_path {
+            fs.remove_file(&entry)?;
+        }
+    }
+    fs.sync_dir(dir)?;
+    if fs.exists(&manifest_path) {
+        fs.remove_file(&manifest_path)?;
     }
     fs.remove_dir(dir)?;
     Ok(())

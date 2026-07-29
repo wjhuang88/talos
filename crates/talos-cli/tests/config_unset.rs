@@ -516,7 +516,7 @@ api_key = "{SECRET_A}"
     fs::create_dir_all(&txn_dir).unwrap();
     fs::write(
         txn_dir.join("manifest"),
-        "version = 1\nphase = \"Prepared\"\ncfg_existed = true\ncfg_after_exists = true\ncred_existed = false\ncred_after_exists = false\n",
+        "version = 1\nphase = \"Prepared\"\ntransaction_id = \"test-1\"\nconfig_existed_before = true\nconfig_exists_after = true\ncredentials_existed_before = false\ncredentials_exist_after = false\n",
     )
     .unwrap();
     fs::write(txn_dir.join("config.before"), &config_before).unwrap();
@@ -547,9 +547,10 @@ api_key = "key-x"
 
     let txn_dir = home.join(".talos/.provider-unset-transaction");
     fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.after"), new_config.as_bytes()).unwrap();
     fs::write(
         txn_dir.join("manifest"),
-        "version = 1\nphase = \"Committed\"\ncfg_existed = true\ncfg_after_exists = true\ncred_existed = false\ncred_after_exists = false\n",
+        "version = 1\nphase = \"Committed\"\ntransaction_id = \"test-2\"\nconfig_existed_before = true\nconfig_exists_after = true\ncredentials_existed_before = false\ncredentials_exist_after = false\n",
     )
     .unwrap();
 
