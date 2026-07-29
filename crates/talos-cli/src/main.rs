@@ -610,9 +610,10 @@ fn run_config_unset(key: &str, confirm: bool) -> Result<()> {
         );
     }
 
-    let mut config = Config::load().context("failed to load configuration")?;
-    let outcome = config.unset_dotted(key)?;
-    config.save().context("failed to save configuration")?;
+    let store = talos_config::ConfigStore::default_store();
+    let outcome = store
+        .unset_provider(key)
+        .context("failed to unset provider configuration")?;
 
     match outcome {
         talos_config::ConfigUnsetOutcome::CustomProviderRemoved { name } => {

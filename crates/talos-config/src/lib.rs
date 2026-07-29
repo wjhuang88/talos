@@ -13,6 +13,7 @@ mod credentials;
 mod endpoint;
 mod env;
 mod error;
+mod store;
 #[cfg(test)]
 #[allow(warnings)]
 mod tests;
@@ -24,6 +25,7 @@ pub use endpoint::{
     validate_provider_name, validate_provider_protocol,
 };
 pub use error::ConfigError;
+pub use store::ConfigStore;
 pub use types::{
     Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration, LogConfig,
     LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig, MemoryPromptConfig,

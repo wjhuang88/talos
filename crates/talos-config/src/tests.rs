@@ -1925,11 +1925,17 @@ fn unset_invalid_dotted_key_does_not_mutate_config() {
     assert_eq!(snapshot, toml::to_string_pretty(&config).unwrap());
 }
 
-#[test]
-fn unset_write_failure_preserves_original_file() {
-    use std::fs;
+// ---------------------------------------------------------------------------
+// MODEL-010 / I157 correction: ConfigStore persisted unset with atomic writes
+// and credentials.toml resurrection prevention
+// ---------------------------------------------------------------------------
+
+use crate::ConfigStore;
+use std::path::{Path, PathBuf};
+
+fn unique_test_dir(label: &str) -> PathBuf {
     let unique = format!(
-        "talos-unset-test-{}-{}",
+        "talos-store-test-{label}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1938,54 +1944,437 @@ fn unset_write_failure_preserves_original_file() {
     );
     let dir = std::env::temp_dir().join(&unique);
     fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("config.toml");
+    dir
+}
 
-    let mut config = make_config_with_two_custom_providers();
-    let toml_str = toml::to_string_pretty(&config).unwrap();
-    fs::write(&config_path, &toml_str).unwrap();
-    let original_bytes = fs::read(&config_path).unwrap();
+fn write_test_config(dir: &Path, config: &Config) {
+    let toml_str = toml::to_string_pretty(config).unwrap();
+    fs::write(dir.join("config.toml"), &toml_str).unwrap();
+}
 
-    let err = config.unset_dotted("providers.nonexistent").unwrap_err();
-    assert!(err.to_string().contains("not found"));
+fn write_test_credentials(dir: &Path, creds: &Credentials) {
+    let toml_str = toml::to_string_pretty(creds).unwrap();
+    fs::write(dir.join("credentials.toml"), &toml_str).unwrap();
+}
 
-    let after_bytes = fs::read(&config_path).unwrap();
+fn make_store(dir: &Path) -> ConfigStore {
+    ConfigStore::with_paths(dir.join("config.toml"), dir.join("credentials.toml"))
+}
+
+fn reload_via_config_load(dir: &Path) -> Config {
+    let raw = fs::read_to_string(dir.join("config.toml")).unwrap();
+    let mut config: Config = toml::from_str(&raw).unwrap();
+    let creds_path = dir.join("credentials.toml");
+    if creds_path.exists() {
+        let raw_creds = fs::read_to_string(&creds_path).unwrap();
+        if let Ok(creds) = toml::from_str::<Credentials>(&raw_creds) {
+            for (name, key) in &creds.keys {
+                if let Some(provider) = config.providers.get_mut(name) {
+                    if provider.api_key.is_none() {
+                        provider.api_key = Some(key.clone());
+                    }
+                } else {
+                    let mut provider = crate::builtin_provider_config(name).unwrap_or_else(|| {
+                        crate::ProviderConfig {
+                            protocol: crate::ProviderProtocol::OpenAIChat,
+                            ..Default::default()
+                        }
+                    });
+                    provider.api_key = Some(key.clone());
+                    config.providers.insert(name.clone(), provider);
+                }
+            }
+        }
+    }
+    config
+}
+
+#[test]
+fn store_unset_custom_provider_removes_from_both_files() {
+    let dir = unique_test_dir("custom-both");
+    let mut config = Config::default();
+    config.provider = "custom-a".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-inline-a".to_string()),
+            base_url: Some("https://a.example.com/v1".to_string()),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "custom-b".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-inline-b".to_string()),
+            ..Default::default()
+        },
+    );
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-a".to_string(), "sk-creds-a".to_string());
+    creds
+        .keys
+        .insert("custom-b".to_string(), "sk-creds-b".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.custom-a").unwrap();
     assert_eq!(
-        original_bytes, after_bytes,
-        "file on disk must be byte-identical when unset returns an error"
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-a".to_string()
+        }
+    );
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(!reloaded.providers.contains_key("custom-a"));
+    assert!(reloaded.providers.contains_key("custom-b"));
+
+    let creds_raw = fs::read_to_string(dir.join("credentials.toml")).unwrap();
+    assert!(
+        !creds_raw.contains("custom-a"),
+        "credential for removed provider must be gone from credentials.toml"
+    );
+    assert!(creds_raw.contains("custom-b"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_builtin_provider_clears_credentials() {
+    let dir = unique_test_dir("builtin-creds");
+    let mut config = Config::default();
+    config.providers.insert(
+        "anthropic".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-ant-inline".to_string()),
+            ..Default::default()
+        },
+    );
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("anthropic".to_string(), "sk-ant-creds".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.anthropic").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::BuiltinProviderDisconnected {
+            name: "anthropic".to_string()
+        }
+    );
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(!reloaded.providers.contains_key("anthropic"));
+    assert!(
+        reloaded.api_key().is_err(),
+        "builtin provider must not have resurrected credential"
     );
 
     let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn unset_success_uses_atomic_save_path() {
-    use std::fs;
-    let unique = format!(
-        "talos-unset-success-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+fn store_unset_api_key_clears_from_both_sources() {
+    let dir = unique_test_dir("apikey-both");
+    let mut config = Config::default();
+    config.providers.insert(
+        "my-gw".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-inline".to_string()),
+            base_url: Some("https://gw.example.com/v1".to_string()),
+            protocol: ProviderProtocol::OpenAIChat,
+            api_key_env: Some("GW_KEY".to_string()),
+            ..Default::default()
+        },
     );
-    let dir = std::env::temp_dir().join(&unique);
-    fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("config.toml");
+    write_test_config(&dir, &config);
 
-    let mut config = make_config_with_two_custom_providers();
-    let toml_str = toml::to_string_pretty(&config).unwrap();
-    fs::write(&config_path, &toml_str).unwrap();
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("my-gw".to_string(), "sk-creds".to_string());
+    write_test_credentials(&dir, &creds);
 
-    config.unset_dotted("providers.custom-a").unwrap();
-    let new_toml = toml::to_string_pretty(&config).unwrap();
-    fs::write(&config_path, &new_toml).unwrap();
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.my-gw.api_key").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::ApiKeyCleared {
+            name: "my-gw".to_string()
+        }
+    );
 
-    let reloaded: Config = toml::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
-    assert!(!reloaded.providers.contains_key("custom-a"));
-    assert!(reloaded.providers.contains_key("custom-b"));
+    let reloaded = reload_via_config_load(&dir);
+    let gw = reloaded.providers.get("my-gw").unwrap();
+    assert!(gw.api_key.is_none(), "api_key must be None after clear");
+    assert_eq!(
+        gw.base_url.as_deref(),
+        Some("https://gw.example.com/v1"),
+        "base_url must be preserved"
+    );
+    assert_eq!(gw.protocol, ProviderProtocol::OpenAIChat);
+    assert_eq!(gw.api_key_env.as_deref(), Some("GW_KEY"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_no_credential_resurrection_on_reload() {
+    let dir = unique_test_dir("no-resurrection");
+    let mut config = Config::default();
+    config.provider = "custom-x".to_string();
+    config.model = "model-x".to_string();
+    config.providers.insert(
+        "custom-x".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-secret-x".to_string()),
+            ..Default::default()
+        },
+    );
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-x".to_string(), "sk-secret-x-creds".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.custom-x").unwrap();
+
+    let reloaded = reload_via_config_load(&dir);
     assert!(
-        !new_toml.contains("key-a"),
-        "cleared credential must not appear in serialized output"
+        !reloaded.providers.contains_key("custom-x"),
+        "provider must NOT be resurrected from credentials.toml on reload"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_credentials_only_builtin() {
+    let dir = unique_test_dir("creds-only-builtin");
+    let config = Config::default();
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("anthropic".to_string(), "sk-legacy-ant".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.anthropic").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::BuiltinProviderDisconnected {
+            name: "anthropic".to_string()
+        }
+    );
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(
+        !reloaded.providers.contains_key("anthropic"),
+        "credentials-only provider must not be recreated on reload"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_credentials_only_custom() {
+    let dir = unique_test_dir("creds-only-custom");
+    let config = Config::default();
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("old-custom".to_string(), "sk-old".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.old-custom").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "old-custom".to_string()
+        }
+    );
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(
+        !reloaded.providers.contains_key("old-custom"),
+        "credentials-only custom provider must not be recreated on reload"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_not_found_leaves_both_files_unchanged() {
+    let dir = unique_test_dir("not-found");
+    let mut config = make_config_with_two_custom_providers();
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-a".to_string(), "sk-a".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let config_before = fs::read(dir.join("config.toml")).unwrap();
+    let creds_before = fs::read(dir.join("credentials.toml")).unwrap();
+
+    let store = make_store(&dir);
+    let err = store.unset_provider("providers.nonexistent").unwrap_err();
+    assert!(err.to_string().contains("not found"));
+
+    let config_after = fs::read(dir.join("config.toml")).unwrap();
+    let creds_after = fs::read(dir.join("credentials.toml")).unwrap();
+    assert_eq!(
+        config_before, config_after,
+        "config.toml must be byte-identical"
+    );
+    assert_eq!(
+        creds_before, creds_after,
+        "credentials.toml must be byte-identical"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_invalid_key_leaves_both_files_unchanged() {
+    let dir = unique_test_dir("invalid-key");
+    write_test_config(&dir, &make_config_with_two_custom_providers());
+
+    let config_before = fs::read(dir.join("config.toml")).unwrap();
+
+    let store = make_store(&dir);
+    let err = store.unset_provider("model").unwrap_err();
+    assert!(err.to_string().contains("unsupported unset key"));
+
+    let config_after = fs::read(dir.join("config.toml")).unwrap();
+    assert_eq!(config_before, config_after);
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_no_temp_residual() {
+    let dir = unique_test_dir("no-residual");
+    write_test_config(&dir, &make_config_with_two_custom_providers());
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.custom-a").unwrap();
+
+    let entries: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        !entries.iter().any(|n| n.contains(".atomic-tmp")),
+        "no temp files must remain: {entries:?}"
+    );
+    assert!(
+        !entries.iter().any(|n| n.ends_with(".tmp")),
+        "no .tmp files must remain: {entries:?}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_unrelated_credentials_preserved() {
+    let dir = unique_test_dir("unrelated-creds");
+    let mut config = Config::default();
+    config.providers.insert(
+        "target".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-target".to_string()),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "keeper".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-keeper".to_string()),
+            ..Default::default()
+        },
+    );
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("target".to_string(), "sk-target-creds".to_string());
+    creds
+        .keys
+        .insert("keeper".to_string(), "sk-keeper-creds".to_string());
+    creds
+        .keys
+        .insert("orphan".to_string(), "sk-orphan-creds".to_string());
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.target").unwrap();
+
+    let creds_raw = fs::read_to_string(dir.join("credentials.toml")).unwrap();
+    assert!(!creds_raw.contains("target"));
+    assert!(creds_raw.contains("keeper"));
+    assert!(creds_raw.contains("orphan"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn store_unset_credential_not_in_files_after_success() {
+    let dir = unique_test_dir("no-leak");
+    let mut config = Config::default();
+    config.providers.insert(
+        "secret-gw".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-super-secret-DO-NOT-LEAK".to_string()),
+            ..Default::default()
+        },
+    );
+    write_test_config(&dir, &config);
+
+    let mut creds = Credentials::default();
+    creds.keys.insert(
+        "secret-gw".to_string(),
+        "sk-super-secret-creds-DO-NOT-LEAK".to_string(),
+    );
+    write_test_credentials(&dir, &creds);
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.secret-gw").unwrap();
+
+    let config_raw = fs::read_to_string(dir.join("config.toml")).unwrap();
+    let creds_path = dir.join("credentials.toml");
+    let creds_raw = if creds_path.exists() {
+        fs::read_to_string(&creds_path).unwrap()
+    } else {
+        String::new()
+    };
+
+    assert!(
+        !config_raw.contains("DO-NOT-LEAK"),
+        "secret must not appear in config.toml after removal"
+    );
+    assert!(
+        !creds_raw.contains("DO-NOT-LEAK"),
+        "secret must not appear in credentials.toml after removal"
     );
 
     let _ = fs::remove_dir_all(&dir);
