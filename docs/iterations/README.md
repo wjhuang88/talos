@@ -189,7 +189,7 @@ docs/iterations/
 | I163 | Policy-Controlled Linked Skill Discovery | Complete (2026-07-28) | SKILL-003. Existing completion commits: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`, `e11481d`, `12ef1e3`. Windows link behavior and Level-2 reference containment remain explicit residuals. See `I163-policy-controlled-linked-skill-discovery.md`. |
 | I166 | Complete (2026-07-28) | TUI-036. Ctrl+C local clear/close and idle exit; Esc active-turn interruption after modal priority. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; 483 TUI + 2545 workspace tests and maintainer Alacritty acceptance passed. See `I166-interrupt-shortcut-reliability.md`. |
 | I157 | **Complete** (2026-07-28) | MODEL-010. `talos config unset providers.<name> --confirm` and `talos config unset providers.<name>.api_key --confirm` shipped. Completion commits `84e7a6a3` + `46c919ee`; 2566 workspace tests pass. |
-| I167 | **Active** (2026-07-29) | TUI-040. Bounded approval-option contrast correction: unselected actionable rows become readable while selected styling and approval behavior remain unchanged. See `I167-approval-option-contrast.md`. |
+| I167 | **Review** (2026-07-29) | TUI-040. `3356aac` makes unselected actionable rows readable while preserving selected styling and approval behavior; real-terminal visual check pending. See `I167-approval-option-contrast.md`. |
 | I158 | Tool Registration Composition Consolidation | Blocked | ARCH-034-R01. One explicit tool registration composition model with preserved print/TUI/MCP behavior. Blocked until ADR-053 is Accepted and ARCH-034-R01 is Ready. See `I158-tool-registration-composition.md`. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
@@ -301,7 +301,7 @@ Complete/Superseded dispositions without erasing their published objectives.
 | I165 | Complete (2026-07-28) | TUI-039. Composer follows short Logo/history flow; bottom-fixed on overflow. Implementation commits `8e6ffe9`, `dc52b21`, `97267a`. All 9 human acceptance cases PASS. |
 | I166 | Complete (2026-07-28) | TUI-036. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; automated and maintainer Alacritty acceptance passed. |
 | I157 | Complete (2026-07-28) | MODEL-010. `config unset providers.<name> [--confirm]` and `config unset providers.<name>.api_key [--confirm]` shipped. Completion commits `84e7a6a3` + `46c919ee`. |
-| I167 | Active (2026-07-29) | TUI-040. Selected while I158 remains ADR-053-blocked; scope is only unselected approval-option contrast. |
+| I167 | Review (2026-07-29) | TUI-040. `3356aac` is automated-validated; scope is only unselected approval-option contrast and awaits a real-terminal visual check. |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
@@ -318,8 +318,8 @@ The current execution sequence is the
 listed above.
 
 I165 is Complete. TUI-039 is Complete. I164/TUI-038 is Paused.
-I166/TUI-036 and I157/MODEL-010 are Complete. I167/TUI-040 is the sole
-Active/In Progress implementation authority. I164/TUI-038 remains Paused and
+I166/TUI-036 and I157/MODEL-010 are Complete. I167/TUI-040 is in Review for
+real-terminal visual acceptance. I164/TUI-038 remains Paused and
 I158-I162 remain Blocked.
 I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
 current selection, planning, status, or activation owner.

@@ -1,6 +1,6 @@
 # Iteration I167: Approval Option Contrast
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-29
 > Planned objective: Make unselected interactive approval choices clearly readable without changing approval behavior, layout, or terminal lifecycle.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -70,19 +70,22 @@ after Up/Down movement.
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-29 | Activation | Inventory at `1cf9f6ffea17b4afc808a0c23135efcef365016c`: I157/MODEL-010 Complete; I164 Paused; I158-I162 Blocked; ADR-053 Proposed; no Active or Review implementation iteration. TUI-040 is Ready, has no unresolved dependency, and I167 is the sole Active implementation authority on direct `main`. |
+| 2026-07-29 | Implementation | `3356aac52e755a29c4bfbdd43854c47e851569d9` changes only the unselected approval-option foreground from muted metadata to `semantic::TEXT_PRIMARY`. It preserves the selected accent/background treatment and approval behavior. |
 
 ## Verification Evidence
 
-- Focused tests: pending.
-- Full locked validation: pending.
-- Runtime evidence: pending.
-- Governance validation: pending.
+- Focused tests: `cargo test --locked -p talos-tui test_approval_render_unselected_options_use_readable_primary_foreground` passed (1 test); `cargo test --locked -p talos-tui --lib` passed (484 tests).
+- Full locked validation: `cargo fmt --all -- --check`, `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`, and `cargo test --workspace --locked` passed. The latter required the normal local test-server permission boundary; in the restricted sandbox the unrelated CLI server tests fail with `Operation not permitted`, then passed outside that sandbox.
+- Build: `cargo build --locked -p talos-cli` passed; rebuilt binary is `target/debug/talos` from `3356aac`.
+- Governance validation: `scripts/validate_project_governance.sh .` passed with 0 warnings; `scripts/assess_project_scale.sh .` reports the existing high-risk/release-managed/on-demand profile.
+- Runtime evidence: pending maintainer visual check in a real terminal. Trigger an approval prompt, confirm all choices are readable before navigation, then use Up/Down to confirm selected and unselected rows remain distinguishable.
 
 ## Completion Evidence
 
-- Completion Commit: pending.
+- Implementation Commit: `3356aac52e755a29c4bfbdd43854c47e851569d9`.
+- Completion Commit: pending real-terminal visual acceptance.
 - Do not cite a status-only documentation commit as implementation completion.
-- Keep Active, Review, Partial, or Blocked if implementation, validation, or runtime evidence is pending.
+- Keep Review until the runtime visual check passes; do not use this documentation commit as implementation completion.
 
 ## Variance And Residuals
 
@@ -92,6 +95,6 @@ after Up/Down movement.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending.
-- Lessons: pending.
+- Outcome: automated acceptance achieved; manual visual acceptance remains pending.
+- Documentation: owner, Board, program, package, and iteration index synchronized to Review.
+- Lessons: actionable menu choices must not reuse muted metadata styling merely because they are unselected.
