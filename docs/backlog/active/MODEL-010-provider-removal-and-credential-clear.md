@@ -5,13 +5,13 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress — Journal, Rollback And Recovery Correction (I157 reopened 2026-07-29 round 4) |
+| Status | Complete (I157 recoverable transaction — Phase 1 `363f0f32`, Phase 2 `11ca7ea7`; 2026-07-29) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
 | Selected Iteration | I157 (Complete; Phase 1 `84e7a6a3`, Phase 2 `46c919ee`) |
-> Completion Commit: `f0039b24` — ConfigStore config-first write order, orphan credential reconciliation in merge_credentials, TransactionFs failure injection, permission-preserving atomic_write with unique temp names, 9 failure matrix tests with byte-level assertions; `900f7976` — 13 real CLI integration tests with real byte comparisons, stderr scanning, config list/get verification, and end-to-end active-provider startup recovery via `talos --no-init`. Previous corrections `8055f7ad` + `bbe76021` retained as historical.
+> Completion Commit: `363f0f32` — atomic_file module (single-file durable replacement) + transaction journal (Prepared→Applying→Committed, before images, rollback, Config::load recovery) + merge_credentials original behavior restored; `11ca7ea7` — crash recovery CLI tests + committed-transaction recovery test + persisted-to-picker disk evidence chain.
 
 ## Problem
 
