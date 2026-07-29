@@ -1075,7 +1075,10 @@ impl BottomPanelComponent<'_> {
         let nord2 = semantic::NORD2;
         let input_bg = semantic::INPUT_BG;
         let selected_style = Style::default().fg(accent).bg(nord2);
-        let unselected_style = Style::default().fg(dim).bg(input_bg);
+        // Approval choices are actionable controls, not secondary metadata. Keep every
+        // unselected choice readable against the input background while selection remains
+        // distinguishable through the accent/background style above.
+        let unselected_style = Style::default().fg(semantic::TEXT_PRIMARY).bg(input_bg);
 
         let width = area.width;
         let height = area.height as usize;

@@ -1422,6 +1422,29 @@ mod tests {
     }
 
     #[test]
+    fn test_approval_render_unselected_options_use_readable_primary_foreground() {
+        for (width, selected, unselected_rows) in [(40, 0, [3, 4]), (80, 1, [2, 4])] {
+            let (buf, _) = render_approval_to_buffer("bash", "", width, selected);
+
+            // Option rows start at y=2 when there are no narrow-layout argument rows.
+            // Cell x=2 is the first non-padding character. These are actionable choices,
+            // not muted metadata that disappears against the input background.
+            for row in unselected_rows {
+                assert_eq!(
+                    buf[(2, row)].fg,
+                    crate::theme::semantic::TEXT_PRIMARY,
+                    "unselected approval option at width {width}, row {row} must use the readable primary foreground"
+                );
+                assert_ne!(
+                    buf[(2, row)].fg,
+                    crate::theme::semantic::DIM_TEXT,
+                    "unselected approval option at width {width}, row {row} must not use the dim metadata foreground"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_approval_render_40_cols_args_max_2_lines() {
         let long_args = "a".repeat(200);
         let (buf, h) = render_approval_to_buffer("bash", &long_args, 40, 0);
