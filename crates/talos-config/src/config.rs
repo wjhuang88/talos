@@ -602,19 +602,19 @@ impl Config {
     /// Merges credentials into this config's provider `api_key` fields.
     ///
     /// For each provider that has a stored credential but no inline key,
-    /// the credential is injected into `api_key`.
+    /// the credential is injected into `api_key`. Credentials for non-builtin
+    /// providers absent from `self.providers` are treated as orphans and
+    /// skipped — this prevents credential resurrection after a provider is
+    /// removed via `ConfigStore::unset_provider` but the process crashes
+    /// before the credential is removed from `credentials.toml`.
     fn merge_credentials(&mut self, creds: &Credentials) {
         for (name, key) in &creds.keys {
             if let Some(provider) = self.providers.get_mut(name) {
                 if provider.api_key.is_none() {
                     provider.api_key = Some(key.clone());
                 }
-            } else {
-                let mut provider =
-                    builtin_provider_config(name).unwrap_or_else(|| ProviderConfig {
-                        protocol: ProviderProtocol::OpenAIChat,
-                        ..Default::default()
-                    });
+            } else if let Some(builtin) = builtin_provider_config(name) {
+                let mut provider = builtin;
                 provider.api_key = Some(key.clone());
                 self.providers.insert(name.clone(), provider);
             }

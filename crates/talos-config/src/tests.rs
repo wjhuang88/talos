@@ -1973,13 +1973,8 @@ fn reload_via_config_load(dir: &Path) -> Config {
                     if provider.api_key.is_none() {
                         provider.api_key = Some(key.clone());
                     }
-                } else {
-                    let mut provider = crate::builtin_provider_config(name).unwrap_or_else(|| {
-                        crate::ProviderConfig {
-                            protocol: crate::ProviderProtocol::OpenAIChat,
-                            ..Default::default()
-                        }
-                    });
+                } else if let Some(builtin) = crate::builtin_provider_config(name) {
+                    let mut provider = builtin;
                     provider.api_key = Some(key.clone());
                     config.providers.insert(name.clone(), provider);
                 }
@@ -2375,6 +2370,419 @@ fn store_unset_credential_not_in_files_after_success() {
     assert!(
         !creds_raw.contains("DO-NOT-LEAK"),
         "secret must not appear in credentials.toml after removal"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------
+// I157 Transaction Atomicity Correction: failure injection + byte identity
+// ---------------------------------------------------------------------------
+
+use crate::store::TransactionFs;
+use std::cell::Cell;
+
+struct FaultyFs {
+    fail_at_write: Option<usize>,
+    write_count: Cell<usize>,
+}
+
+impl FaultyFs {
+    fn new(fail_at_write: Option<usize>) -> Self {
+        Self {
+            fail_at_write,
+            write_count: Cell::new(0),
+        }
+    }
+}
+
+impl TransactionFs for FaultyFs {
+    fn exists(&self, path: &Path) -> bool {
+        path.exists()
+    }
+
+    fn read_to_string(&self, path: &Path) -> Result<String, ConfigError> {
+        std::fs::read_to_string(path).map_err(ConfigError::IoError)
+    }
+
+    fn atomic_write(&self, path: &Path, content: &str) -> Result<(), ConfigError> {
+        let n = self.write_count.get();
+        self.write_count.set(n + 1);
+        if self.fail_at_write == Some(n) {
+            return Err(ConfigError::IoError(std::io::Error::other(
+                "injected write failure",
+            )));
+        }
+        crate::store::atomic_write_for_test(path, content)
+    }
+
+    fn remove_file(&self, path: &Path) -> Result<(), ConfigError> {
+        let n = self.write_count.get();
+        self.write_count.set(n + 1);
+        if self.fail_at_write == Some(n) {
+            return Err(ConfigError::IoError(std::io::Error::other(
+                "injected remove failure",
+            )));
+        }
+        std::fs::remove_file(path).map_err(ConfigError::IoError)
+    }
+}
+
+fn write_both_files(
+    dir: &Path,
+    config: &Config,
+    creds: Option<&Credentials>,
+) -> (Vec<u8>, Vec<u8>) {
+    let config_toml = toml::to_string_pretty(config).unwrap();
+    fs::write(dir.join("config.toml"), &config_toml).unwrap();
+    let config_bytes = config_toml.as_bytes().to_vec();
+
+    let creds_bytes = if let Some(c) = creds {
+        let creds_toml = toml::to_string_pretty(c).unwrap();
+        fs::write(dir.join("credentials.toml"), &creds_toml).unwrap();
+        creds_toml.as_bytes().to_vec()
+    } else {
+        Vec::new()
+    };
+
+    (config_bytes, creds_bytes)
+}
+
+fn read_both_files(dir: &Path) -> (Vec<u8>, Vec<u8>) {
+    let config_bytes = fs::read(dir.join("config.toml")).unwrap_or_default();
+    let creds_bytes = fs::read(dir.join("credentials.toml")).unwrap_or_default();
+    (config_bytes, creds_bytes)
+}
+
+#[test]
+fn config_write_failure_leaves_both_files_byte_identical() {
+    let dir = unique_test_dir("config-fail");
+    let mut config = Config::default();
+    config.provider = "custom-a".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-inline-a".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-a".to_string(), "sk-creds-a".to_string());
+    let (config_before, creds_before) = write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(0)); // Fail at first write (config)
+    let result = store.unset_provider_inner("providers.custom-a", &fs);
+    assert!(result.is_err(), "must return error on config write failure");
+
+    let (config_after, creds_after) = read_both_files(&dir);
+    assert_eq!(
+        config_before, config_after,
+        "config.toml must be byte-identical after config write failure"
+    );
+    assert_eq!(
+        creds_before, creds_after,
+        "credentials.toml must be byte-identical after config write failure"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn credentials_write_failure_leaves_config_updated_and_orphan_reconciled_on_reload() {
+    let dir = unique_test_dir("creds-fail");
+    let mut config = Config::default();
+    config.provider = "custom-a".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-inline-a".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-a".to_string(), "sk-creds-a".to_string());
+    let (_, creds_before) = write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(1)); // Fail at second write (credentials)
+    let result = store.unset_provider_inner("providers.custom-a", &fs);
+    assert!(
+        result.is_err(),
+        "must return error on credentials write failure"
+    );
+
+    let config_raw = std::fs::read_to_string(dir.join("config.toml")).unwrap();
+    let parsed: Config = toml::from_str(&config_raw).unwrap();
+    assert!(
+        !parsed.providers.contains_key("custom-a"),
+        "config must be updated (config-first order)"
+    );
+
+    let creds_after = fs::read(dir.join("credentials.toml")).unwrap_or_default();
+    assert_eq!(
+        creds_before, creds_after,
+        "credentials.toml must be unchanged when credentials write fails"
+    );
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(
+        !reloaded.providers.contains_key("custom-a"),
+        "orphan credential must NOT be resurrected on reload"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn credentials_removal_failure_leaves_config_updated_and_orphan_reconciled() {
+    let dir = unique_test_dir("creds-remove-fail");
+    let mut config = Config::default();
+    config.provider = "only-one".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "only-one".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-only".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("only-one".to_string(), "sk-only-creds".to_string());
+    let (_, creds_before) = write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(1)); // Fail at second mutation (credentials remove)
+    let result = store.unset_provider_inner("providers.only-one", &fs);
+    assert!(result.is_err());
+
+    let config_raw = std::fs::read_to_string(dir.join("config.toml")).unwrap();
+    let parsed: Config = toml::from_str(&config_raw).unwrap();
+    assert!(!parsed.providers.contains_key("only-one"));
+
+    let creds_after = std::fs::read(dir.join("credentials.toml")).unwrap_or_default();
+    assert_eq!(creds_before, creds_after);
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(!reloaded.providers.contains_key("only-one"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn transaction_success_no_temp_residual() {
+    let dir = unique_test_dir("no-tmp-residual");
+    let mut config = Config::default();
+    config.providers.insert(
+        "target".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-target".to_string()),
+            ..Default::default()
+        },
+    );
+    write_both_files(&dir, &config, None);
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.target").unwrap();
+
+    let entries: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        !entries.iter().any(|n| n.contains(".tmp")),
+        "no temp files must remain: {entries:?}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn orphan_credential_for_non_builtin_not_injected_on_load() {
+    let dir = unique_test_dir("orphan-skip");
+    let mut config = Config::default();
+    config.provider = "real-provider".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "real-provider".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-real".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("orphan-custom".to_string(), "sk-orphan".to_string());
+    creds
+        .keys
+        .insert("real-provider".to_string(), "sk-real-creds".to_string());
+    write_both_files(&dir, &config, Some(&creds));
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(
+        !reloaded.providers.contains_key("orphan-custom"),
+        "orphan credential for non-builtin provider must not be injected"
+    );
+    assert!(reloaded.providers.contains_key("real-provider"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn builtin_credential_without_config_entry_still_injected() {
+    let dir = unique_test_dir("builtin-inject");
+    let mut config = Config::default();
+    config.provider = "anthropic".to_string();
+    config.model = "claude-test".to_string();
+    write_both_files(&dir, &config, None);
+
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("anthropic".to_string(), "sk-ant-legacy".to_string());
+    write_both_files(&dir, &config, Some(&creds));
+
+    let reloaded = reload_via_config_load(&dir);
+    assert!(
+        reloaded.providers.contains_key("anthropic"),
+        "builtin provider credential must still be injected"
+    );
+    assert_eq!(
+        reloaded
+            .providers
+            .get("anthropic")
+            .unwrap()
+            .api_key
+            .as_deref(),
+        Some("sk-ant-legacy")
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn success_writes_config_first_then_credentials() {
+    let dir = unique_test_dir("order-check");
+    let mut config = Config::default();
+    config.providers.insert(
+        "gw-a".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-a".to_string()),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "gw-b".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-b".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("gw-a".to_string(), "sk-a-creds".to_string());
+    creds
+        .keys
+        .insert("gw-b".to_string(), "sk-b-creds".to_string());
+    write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.gw-a").unwrap();
+
+    let (config_after, creds_after) = read_both_files(&dir);
+    let parsed_config: Config = toml::from_str(&String::from_utf8_lossy(&config_after)).unwrap();
+    assert!(!parsed_config.providers.contains_key("gw-a"));
+    assert!(parsed_config.providers.contains_key("gw-b"));
+
+    let parsed_creds: Credentials =
+        toml::from_str(&String::from_utf8_lossy(&creds_after)).unwrap_or_default();
+    assert!(!parsed_creds.keys.contains_key("gw-a"));
+    assert!(parsed_creds.keys.contains_key("gw-b"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn unrelated_config_sections_preserved_after_unset() {
+    let dir = unique_test_dir("unrelated-sections");
+    let mut config = Config::default();
+    config.provider = "keep-me".to_string();
+    config.model = "model-x".to_string();
+    config.providers.insert(
+        "keep-me".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-keep".to_string()),
+            base_url: Some("https://keep.example.com".to_string()),
+            protocol: ProviderProtocol::OpenAIChat,
+            api_key_env: Some("KEEP_KEY".to_string()),
+            models: HashMap::from([(
+                "model-x".to_string(),
+                ModelConfig {
+                    context_limit: Some(200_000),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "remove-me".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-remove".to_string()),
+            ..Default::default()
+        },
+    );
+    write_both_files(&dir, &config, None);
+
+    let store = make_store(&dir);
+    store.unset_provider("providers.remove-me").unwrap();
+
+    let config_after = std::fs::read_to_string(dir.join("config.toml")).unwrap();
+    let parsed: Config = toml::from_str(&config_after).unwrap();
+    let keep = parsed.providers.get("keep-me").unwrap();
+    assert_eq!(keep.base_url.as_deref(), Some("https://keep.example.com"));
+    assert_eq!(keep.api_key_env.as_deref(), Some("KEEP_KEY"));
+    assert!(keep.models.contains_key("model-x"));
+    assert_eq!(
+        keep.models.get("model-x").unwrap().context_limit,
+        Some(200_000)
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn credential_not_in_error_or_debug() {
+    let dir = unique_test_dir("no-secret-err");
+    let mut config = Config::default();
+    config.providers.insert(
+        "secret-gw".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-MARKER-DO-NOT-LEAK".to_string()),
+            ..Default::default()
+        },
+    );
+    write_both_files(&dir, &config, None);
+
+    let store = make_store(&dir);
+    let err = store.unset_provider("providers.nonexistent").unwrap_err();
+    assert!(
+        !err.to_string().contains("MARKER-DO-NOT-LEAK"),
+        "error must not contain credential marker"
+    );
+    assert!(
+        !format!("{err:?}").contains("MARKER-DO-NOT-LEAK"),
+        "Debug must not contain credential marker"
     );
 
     let _ = fs::remove_dir_all(&dir);
