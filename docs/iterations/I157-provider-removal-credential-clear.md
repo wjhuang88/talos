@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Active — Acceptance Correction
+> Document status: Complete
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -161,13 +161,16 @@ If a stop condition occurs:
 
 ## Completion Evidence
 
-- Completion Commit: `84e7a6a3` (Phase 1 config mutation) + `46c919ee` (Phase 2 CLI + docs)
-- Phase 1: `feat(config): add atomic provider removal mutation (#MODEL-010 #I157)` —
-  `ConfigUnsetOutcome` enum, `Config::unset_dotted` method, 10 unit tests.
-- Phase 2: `feat(cli): add confirmed provider config removal (#MODEL-010 #I157)` —
-  `ConfigCommand::Unset`, `run_config_unset` with `--confirm` gate, 11 CLI tests,
-  README EN/zh-CN + config.reference.toml documentation.
-- Phase 3: `docs(iteration): record I157 provider removal evidence` — owner docs sync.
+- Completion Commit: `8055f7ad` (Phase 1 correction: ConfigStore persisted-unset) + `bbe76021` (Phase 2 correction: CLI integration + recovery seam)
+- Previous premature completion: `84e7a6a3` + `46c919ee` (retained as historical implementation; superseded by correction).
+- Phase 1 correction: `ConfigStore` with atomic temp-file-then-rename writes to
+  both config.toml and credentials.toml; raw file reads without merge_credentials;
+  credentials.toml resurrection prevention; 11 real persistence tests that reload
+  via simulated Config::load.
+- Phase 2 correction: 11 real CLI integration tests via `std::process::Command`
+  with isolated HOME and `env!("CARGO_BIN_EXE_talos")`; startup model recovery
+  seam (`resolve_startup_model_action`) extracted from mode_runners.rs as the
+  single production decision source; 4 recovery unit tests.
 
 ## Variance And Residuals
 
@@ -209,6 +212,12 @@ If a stop condition occurs:
     and durably update both raw config.toml and raw credentials.toml using atomic
     temp-file-then-rename, without `merge_credentials`. The CLI calls one
     authoritative persisted-unset path via `ConfigStore::unset_provider`.
+  - Correction commits: `8055f7ad` (Phase 1: ConfigStore + atomic persistence
+    + credentials.toml resurrection fix + 11 persistence tests) and `bbe76021`
+    (Phase 2: 11 real CLI integration tests via `std::process::Command` with
+    isolated HOME + startup model recovery seam extraction + 4 recovery tests).
+  - Full workspace validation: 2591 tests, 0 failed; clippy clean; fmt clean;
+    governance 0 warnings; no new dependencies; no unsafe; no Cargo.lock change.
 
 ## REL-002 Execution Record
 

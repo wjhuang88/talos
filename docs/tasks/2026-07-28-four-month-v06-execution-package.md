@@ -5,7 +5,7 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: I157 (Acceptance Correction — P1 Correction Active)
+> Current implementation authority: none; I157/MODEL-010 correction Complete
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -69,7 +69,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
-| P1 | Execute I157 / MODEL-010 | `talos config unset providers.<name>[.api_key] --confirm`, atomic mutation, active-provider recovery, EN/zh-CN/reference docs | P0 | I157 owner acceptance, focused tests, real isolated-config evidence, full locked validation | Record blocker in I157; do not widen into TUI deletion | Correction Active — previous completion `84e7a6a3`+`46c919ee` premature; persistence/credential-resurrection/test-evidence correction in progress |
+| P1 | Execute I157 / MODEL-010 | `talos config unset providers.<name>[.api_key] --confirm`, atomic mutation, active-provider recovery, EN/zh-CN/reference docs | P0 | I157 owner acceptance, focused tests, real isolated-config evidence, full locked validation | Record blocker in I157; do not widen into TUI deletion | Complete — Completion Commit: `8055f7ad`, `bbe76021` |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |

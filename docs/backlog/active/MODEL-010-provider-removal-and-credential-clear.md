@@ -5,13 +5,13 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress — Persistence And Runtime Evidence Correction (I157 reopened 2026-07-29) |
+| Status | Complete (I157 correction — Phase 1 `8055f7ad`, Phase 2 `bbe76021`; 2026-07-29) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | None |
 | Selected Iteration | I157 (Complete; Phase 1 `84e7a6a3`, Phase 2 `46c919ee`) |
-> Completion Commit: `84e7a6a3` — config mutation core (ConfigUnsetOutcome + unset_dotted + 10 unit tests); `46c919ee` — CLI wiring + docs (ConfigCommand::Unset + run_config_unset + 11 CLI tests + README/zh-CN/config.reference.toml).
+> Completion Commit: `8055f7ad` — ConfigStore persisted-unset with atomic file replacement and credentials.toml resurrection prevention; `bbe76021` — real CLI integration tests and startup recovery seam. Previous `84e7a6a3` + `46c919ee` retained as historical premature implementation.
 
 ## Problem
 
