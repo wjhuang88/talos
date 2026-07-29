@@ -2384,7 +2384,7 @@ fn store_unset_credential_not_in_files_after_success() {
 // I157 Recoverable Transaction: failure injection + byte identity
 // ---------------------------------------------------------------------------
 
-use crate::store::Fs;
+use crate::store::{Fs, StdFs};
 use std::cell::Cell;
 
 struct FaultyFs {
@@ -2804,5 +2804,401 @@ fn credential_not_in_error_or_debug() {
         "Debug must not contain credential marker"
     );
 
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------
+// I157 Transaction Publication: staging→active, finalize, interruption tests
+// ---------------------------------------------------------------------------
+
+fn make_full_config() -> (Config, Credentials) {
+    let mut config = Config::default();
+    config.provider = "custom-a".to_string();
+    config.model = "model-a".to_string();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-MARKER-A".to_string()),
+            base_url: Some("https://a.example.com".to_string()),
+            ..Default::default()
+        },
+    );
+    config.providers.insert(
+        "custom-b".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-MARKER-B".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("custom-a".to_string(), "sk-CREDS-A".to_string());
+    creds
+        .keys
+        .insert("custom-b".to_string(), "sk-CREDS-B".to_string());
+    (config, creds)
+}
+
+fn setup_full_fixture(dir: &Path) -> (Vec<u8>, Vec<u8>) {
+    let (config, creds) = make_full_config();
+    write_both_files(dir, &config, Some(&creds))
+}
+
+fn active_dir(dir: &Path) -> PathBuf {
+    dir.join(".provider-unset-transaction")
+}
+
+fn assert_no_active(dir: &Path) {
+    assert!(
+        !active_dir(dir).exists(),
+        "active transaction dir must not exist"
+    );
+}
+
+fn assert_both_unchanged(dir: &Path, cfg_before: &[u8], cred_before: &[u8]) {
+    let cfg_after = fs::read(dir.join("config.toml")).unwrap_or_default();
+    let cred_after = fs::read(dir.join("credentials.toml")).unwrap_or_default();
+    assert_eq!(
+        cfg_before,
+        cfg_after.as_slice(),
+        "config bytes must be unchanged"
+    );
+    assert_eq!(
+        cred_before,
+        cred_after.as_slice(),
+        "credentials bytes must be unchanged"
+    );
+}
+
+#[test]
+fn prepare_mkdir_failure_does_not_publish_active() {
+    let dir = unique_test_dir("prep-mkdir");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(0));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_no_active(&dir);
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn prepare_config_before_failure_does_not_publish_active() {
+    let dir = unique_test_dir("prep-cfg-before");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(1));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_no_active(&dir);
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn prepare_manifest_failure_does_not_publish_active() {
+    let dir = unique_test_dir("prep-manifest");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(5));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_no_active(&dir);
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn publish_rename_failure_does_not_modify_targets() {
+    let dir = unique_test_dir("publish-fail");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(6));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_no_active(&dir);
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn config_replace_failure_rolls_back() {
+    let dir = unique_test_dir("cfg-repl-fail");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(8));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn credentials_replace_failure_rolls_back() {
+    let dir = unique_test_dir("cred-repl-fail");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(9));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn committed_manifest_failure_rolls_back() {
+    let dir = unique_test_dir("commit-manifest-fail");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(10));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn finalize_rename_failure_leaves_active_for_recovery() {
+    let dir = unique_test_dir("finalize-rename-fail");
+    let (cfg_b, _cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(11));
+    let result = store.run("providers.custom-a", &fs);
+    assert!(result.is_err(), "finalize rename failure must return error");
+    assert!(
+        active_dir(&dir).exists(),
+        "active journal must remain for recovery"
+    );
+    let cfg_after = fs::read(dir.join("config.toml")).unwrap();
+    assert_ne!(
+        cfg_after, cfg_b,
+        "config must reflect committed after state"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- Interruption matrix ---
+
+fn write_toml_manifest(
+    dir: &Path,
+    phase: &str,
+    txn_id: &str,
+    cfg_before: bool,
+    cfg_after: bool,
+    cred_before: bool,
+    cred_after: bool,
+) {
+    let m = format!(
+        "version = 1\nphase = \"{}\"\ntransaction_id = \"{}\"\n\
+         config_existed_before = {}\nconfig_exists_after = {}\n\
+         credentials_existed_before = {}\ncredentials_exist_after = {}\n",
+        phase, txn_id, cfg_before, cfg_after, cred_before, cred_after
+    );
+    fs::write(dir.join("manifest"), m).unwrap();
+}
+
+#[test]
+fn interruption_prepared_recovers_before_state() {
+    let dir = unique_test_dir("int-prepared");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "Prepared", "int-1", true, true, true, true);
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists(), "journal cleaned after recovery");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_applying_after_config_recovers_before() {
+    let dir = unique_test_dir("int-applying-cfg");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "Applying", "int-2", true, true, true, true);
+    fs::write(dir.join("config.toml"), b"new config after").unwrap();
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_committed_preserves_after_state() {
+    let dir = unique_test_dir("int-committed");
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
+    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    write_toml_manifest(&txn_dir, "Committed", "int-3", true, true, true, false);
+    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    let cfg_actual = fs::read(dir.join("config.toml")).unwrap();
+    assert_eq!(cfg_actual.as_slice(), cfg_after);
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_rolled_back_verifies_before() {
+    let dir = unique_test_dir("int-rolledback");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "RolledBack", "int-4", true, true, true, true);
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_committed_credentials_absent_recovers() {
+    let dir = unique_test_dir("int-committed-absent");
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    let cfg_after = b"provider = \"x\"\nmodel = \"y\"\n";
+    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    write_toml_manifest(&txn_dir, "Committed", "int-5", true, true, true, false);
+    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert!(!txn_dir.exists());
+    assert_eq!(
+        fs::read(dir.join("config.toml")).unwrap().as_slice(),
+        cfg_after
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- Builtin second-file failure ---
+
+#[test]
+fn builtin_second_file_failure_rolls_back() {
+    let dir = unique_test_dir("builtin-2nd-fail");
+    let mut config = Config::default();
+    config.provider = "anthropic".to_string();
+    config.model = "claude-test".to_string();
+    config.providers.insert(
+        "anthropic".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-MARKER-ANT".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("anthropic".to_string(), "sk-CREDS-ANT".to_string());
+    let (cfg_b, cred_b) = write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(9));
+    let err = store.run("providers.anthropic", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- API-key second-file failure ---
+
+#[test]
+fn api_key_second_file_failure_rolls_back() {
+    let dir = unique_test_dir("apikey-2nd-fail");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(9));
+    let err = store.run("providers.custom-a.api_key", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- Rollback success cleans journal ---
+
+#[test]
+fn rollback_success_cleans_journal() {
+    let dir = unique_test_dir("rb-success-clean");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(8));
+    let err = store.run("providers.custom-a", &fs);
+    assert!(err.is_err());
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(
+        !active_dir(&dir).exists(),
+        "journal must be cleaned after successful rollback"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- Recovery idempotency ---
+
+#[test]
+fn repeated_recovery_is_idempotent() {
+    let dir = unique_test_dir("recovery-idem");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "Prepared", "idem-1", true, true, true, true);
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists());
+
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// --- Secret scan in errors ---
+
+#[test]
+fn transaction_error_does_not_leak_secret() {
+    let dir = unique_test_dir("err-no-leak");
+    let mut config = Config::default();
+    config.provider = "secret-gw".to_string();
+    config.model = "m".to_string();
+    config.providers.insert(
+        "secret-gw".to_string(),
+        ProviderConfig {
+            api_key: Some("sk-MARKER-SECRET".to_string()),
+            ..Default::default()
+        },
+    );
+    let mut creds = Credentials::default();
+    creds
+        .keys
+        .insert("secret-gw".to_string(), "sk-CREDS-SECRET".to_string());
+    write_both_files(&dir, &config, Some(&creds));
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(Some(8));
+    let err = store.run("providers.secret-gw", &fs).unwrap_err();
+    assert!(!err.to_string().contains("MARKER-SECRET"));
+    assert!(!err.to_string().contains("CREDS-SECRET"));
+    assert!(!format!("{err:?}").contains("MARKER-SECRET"));
     let _ = fs::remove_dir_all(&dir);
 }

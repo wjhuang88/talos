@@ -105,7 +105,7 @@ impl ConfigStore {
                 &txn_id,
             ) {
                 Ok(()) => {
-                    let _ = finalize(fs, &active_dir, &txn_id);
+                    finalize(fs, &active_dir, &txn_id)?;
                     return Err(apply_err);
                 }
                 Err(_) => {
@@ -116,7 +116,7 @@ impl ConfigStore {
             }
         }
 
-        let _ = finalize(fs, &active_dir, &txn_id);
+        finalize(fs, &active_dir, &txn_id)?;
         Ok(outcome)
     }
 
@@ -591,9 +591,7 @@ fn rollback(
         ));
     }
 
-    if let Err(e) = write_manifest(fs, dir, Phase::RolledBack, txn_id, t) {
-        tracing::warn!("failed to write RolledBack manifest: {e}");
-    }
+    write_manifest(fs, dir, Phase::RolledBack, txn_id, t)?;
 
     Ok(())
 }
@@ -678,7 +676,7 @@ pub(crate) trait Fs {
     fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, ConfigError>;
 }
 
-struct StdFs;
+pub(crate) struct StdFs;
 
 impl Fs for StdFs {
     fn exists(&self, p: &Path) -> bool {
