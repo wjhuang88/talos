@@ -2584,4 +2584,87 @@ mod steering_snapshot_tests {
             "empty provider must yield None hint"
         );
     }
+
+    // -----------------------------------------------------------------
+    // I157 Recoverable Transaction: persisted-to-picker disk evidence
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn persisted_unset_to_disk_then_startup_picker_decision() {
+        use crate::mode_runners::{
+            StartupModelAction, StartupModelRecoveryReason, resolve_startup_model_action,
+        };
+        use talos_config::ConfigStore;
+
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        let creds_path = dir.path().join("credentials.toml");
+
+        let mut config = talos_config::Config {
+            provider: "active-gw".to_string(),
+            model: "active-model".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "active-gw".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-active-marker".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let config_toml = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(&config_path, &config_toml).unwrap();
+
+        let mut creds = talos_config::Credentials::default();
+        creds
+            .keys
+            .insert("active-gw".to_string(), "sk-active-creds".to_string());
+        let creds_toml = toml::to_string_pretty(&creds).unwrap();
+        std::fs::write(&creds_path, &creds_toml).unwrap();
+
+        let store = ConfigStore::with_paths(config_path.clone(), creds_path.clone());
+        let outcome = store.unset_provider("providers.active-gw").unwrap();
+        assert_eq!(
+            outcome,
+            talos_config::ConfigUnsetOutcome::CustomProviderRemoved {
+                name: "active-gw".to_string()
+            }
+        );
+
+        let config_raw = std::fs::read_to_string(&config_path).unwrap();
+        let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+        assert!(!reloaded.providers.contains_key("active-gw"));
+        assert!(reloaded.api_key().is_err());
+
+        let action = resolve_startup_model_action(&reloaded, false, false);
+        assert_eq!(
+            action,
+            StartupModelAction::OpenModelPicker {
+                reason: StartupModelRecoveryReason::MissingApiKey
+            }
+        );
+
+        let _pc = reloaded.active_provider_config();
+        assert!(reloaded.api_key().is_err());
+        assert!(
+            config_raw.contains("active-gw"),
+            "active provider name may persist but credential must be gone"
+        );
+        assert!(
+            !config_raw.contains("sk-active-marker"),
+            "inline credential must not appear in config.toml"
+        );
+
+        let creds_raw = std::fs::read_to_string(&creds_path).unwrap_or_default();
+        assert!(
+            !creds_raw.contains("active-gw"),
+            "credential must be removed from credentials.toml"
+        );
+
+        assert!(
+            !dir.path().join(".provider-unset-transaction").exists(),
+            "journal must be cleaned up after successful transaction"
+        );
+    }
 }

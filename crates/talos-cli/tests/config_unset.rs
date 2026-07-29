@@ -494,3 +494,70 @@ api_key = "{SECRET_B}"
     assert_no_temp_residual(&home);
     cleanup(&home);
 }
+
+#[test]
+fn crash_recovery_restores_before_state_on_config_load() {
+    let home = unique_home("crash-recovery");
+    write_config(
+        &home,
+        &format!(
+            r#"provider = "my-gw"
+model = "test-model"
+
+[providers.my-gw]
+api_key = "{SECRET_A}"
+"#
+        ),
+    );
+
+    let config_before = read_bytes(&home.join(".talos/config.toml"));
+    let talos_dir = home.join(".talos");
+    let txn_dir = talos_dir.join(".provider-unset-transaction");
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(
+        txn_dir.join("manifest"),
+        "phase=Prepared\ncfg_existed=true\ncfg_after_exists=true\ncred_existed=false\ncred_after_exists=false\n",
+    )
+    .unwrap();
+    fs::write(txn_dir.join("config.before"), &config_before).unwrap();
+
+    let (list_ok, list_stdout, list_err) = run_cmd(&home, &["config", "list"]);
+    assert!(list_ok, "config list must succeed after recovery");
+
+    assert_eq!(config_before, read_bytes(&home.join(".talos/config.toml")),);
+    assert!(!txn_dir.exists(), "journal must be cleaned up");
+    assert_no_secret(&list_stdout, &list_err, &[SECRET_A]);
+    cleanup(&home);
+}
+
+#[test]
+fn committed_transaction_preserves_after_state_on_config_load() {
+    let home = unique_home("committed-recovery");
+    write_config(
+        &home,
+        r#"provider = "x"
+model = "y"
+
+[providers.x]
+api_key = "key-x"
+"#,
+    );
+    let new_config = "provider = \"x\"\nmodel = \"y\"\n";
+    fs::write(&home.join(".talos/config.toml"), new_config).unwrap();
+
+    let txn_dir = home.join(".talos/.provider-unset-transaction");
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(
+        txn_dir.join("manifest"),
+        "phase=Committed\ncfg_existed=true\ncfg_after_exists=true\ncred_existed=false\ncred_after_exists=false\n",
+    )
+    .unwrap();
+
+    let (list_ok, _stdout, _err) = run_cmd(&home, &["config", "list"]);
+    assert!(list_ok);
+
+    let after = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
+    assert_eq!(after, new_config);
+    assert!(!txn_dir.exists());
+    cleanup(&home);
+}
