@@ -83,14 +83,14 @@ impl ConfigStore {
             cred_after,
         };
 
-        let dir = self.txn_dir();
+        let active_dir = self.txn_dir();
         let txn_id = gen_txn_id();
 
-        prepare(fs, &dir, &txn, &txn_id)?;
+        prepare(fs, &active_dir, &txn, &txn_id)?;
 
         if let Err(apply_err) = apply(
             fs,
-            &dir,
+            &active_dir,
             &self.config_path,
             &self.credentials_path,
             &txn,
@@ -98,14 +98,14 @@ impl ConfigStore {
         ) {
             match rollback(
                 fs,
-                &dir,
+                &active_dir,
                 &self.config_path,
                 &self.credentials_path,
                 &txn,
                 &txn_id,
             ) {
                 Ok(()) => {
-                    cleanup(fs, &dir)?;
+                    let _ = finalize(fs, &active_dir, &txn_id);
                     return Err(apply_err);
                 }
                 Err(_) => {
@@ -116,7 +116,7 @@ impl ConfigStore {
             }
         }
 
-        cleanup(fs, &dir)?;
+        let _ = finalize(fs, &active_dir, &txn_id);
         Ok(outcome)
     }
 
@@ -156,7 +156,11 @@ impl ConfigStore {
     }
 
     pub(crate) fn recover(&self, fs: &dyn Fs) -> Result<(), ConfigError> {
+        let parent = self.txn_dir_parent();
         let dir = self.txn_dir();
+
+        self.cleanup_residues(fs, &parent);
+
         if !fs.exists(&dir) {
             return Ok(());
         }
@@ -200,7 +204,7 @@ impl ConfigStore {
                     ));
                 }
 
-                cleanup(fs, &dir)?;
+                let _ = finalize(fs, &dir, &manifest.transaction_id);
                 Ok(())
             }
             Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {
@@ -231,7 +235,7 @@ impl ConfigStore {
                     ));
                 }
 
-                let _ = write_manifest(
+                write_manifest(
                     fs,
                     &dir,
                     Phase::RolledBack,
@@ -246,9 +250,9 @@ impl ConfigStore {
                         cred_before: cred_before.unwrap_or_default(),
                         cred_after: Vec::new(),
                     },
-                );
+                )?;
 
-                cleanup(fs, &dir)?;
+                let _ = finalize(fs, &dir, &manifest.transaction_id);
                 Ok(())
             }
             Phase::RolledBack => {
@@ -276,17 +280,36 @@ impl ConfigStore {
                     ));
                 }
 
-                cleanup(fs, &dir)?;
+                let _ = finalize(fs, &dir, &manifest.transaction_id);
                 Ok(())
             }
         }
     }
 
-    fn txn_dir(&self) -> PathBuf {
+    fn txn_dir_parent(&self) -> PathBuf {
         self.config_path
             .parent()
-            .unwrap_or(Path::new("."))
-            .join(".provider-unset-transaction")
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+
+    fn txn_dir(&self) -> PathBuf {
+        self.txn_dir_parent().join(".provider-unset-transaction")
+    }
+
+    fn cleanup_residues(&self, fs: &dyn Fs, parent: &Path) {
+        let prefix = ".provider-unset-transaction.";
+        if let Ok(entries) = fs.list_dir(parent) {
+            for entry in entries {
+                if let Some(name) = entry.file_name().and_then(|n| n.to_str())
+                    && name.starts_with(prefix)
+                    && (name.starts_with(".provider-unset-transaction.prepare.")
+                        || name.starts_with(".provider-unset-transaction.finalize."))
+                {
+                    let _ = fs.remove_dir(&entry);
+                }
+            }
+        }
     }
 }
 
@@ -411,22 +434,61 @@ fn parse_manifest(raw: &[u8]) -> Result<Manifest, ConfigError> {
     Ok(m)
 }
 
-fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn, txn_id: &str) -> Result<(), ConfigError> {
-    fs.mkdir(dir)?;
-    if t.cfg_existed {
-        fs.write_secure(&dir.join("config.before"), &t.cfg_before)?;
+fn prepare(fs: &dyn Fs, active_dir: &Path, t: &Txn, txn_id: &str) -> Result<(), ConfigError> {
+    let parent = active_dir.parent().unwrap_or(Path::new("."));
+    let staging_dir = parent.join(format!(".provider-unset-transaction.prepare.{txn_id}"));
+
+    let staging_cleanup = |fs: &dyn Fs| {
+        if fs.exists(&staging_dir) {
+            let _ = fs.remove_dir(&staging_dir);
+        }
+    };
+
+    fs.mkdir(&staging_dir)?;
+    if t.cfg_existed
+        && let Err(e) = fs.write_secure(&staging_dir.join("config.before"), &t.cfg_before)
+    {
+        staging_cleanup(fs);
+        return Err(e);
     }
-    if t.cred_existed {
-        fs.write_secure(&dir.join("credentials.before"), &t.cred_before)?;
+    if t.cred_existed
+        && let Err(e) = fs.write_secure(&staging_dir.join("credentials.before"), &t.cred_before)
+    {
+        staging_cleanup(fs);
+        return Err(e);
     }
-    if t.cfg_after_exists {
-        fs.write_secure(&dir.join("config.after"), &t.cfg_after)?;
+    if t.cfg_after_exists
+        && let Err(e) = fs.write_secure(&staging_dir.join("config.after"), &t.cfg_after)
+    {
+        staging_cleanup(fs);
+        return Err(e);
     }
-    if t.cred_after_exists {
-        fs.write_secure(&dir.join("credentials.after"), &t.cred_after)?;
+    if t.cred_after_exists
+        && let Err(e) = fs.write_secure(&staging_dir.join("credentials.after"), &t.cred_after)
+    {
+        staging_cleanup(fs);
+        return Err(e);
     }
-    write_manifest(fs, dir, Phase::Prepared, txn_id, t)?;
-    fs.sync_dir(dir)?;
+    if let Err(e) = write_manifest(fs, &staging_dir, Phase::Prepared, txn_id, t) {
+        staging_cleanup(fs);
+        return Err(e);
+    }
+    if let Err(e) = fs.sync_dir(&staging_dir) {
+        staging_cleanup(fs);
+        return Err(e);
+    }
+
+    if fs.exists(active_dir) {
+        staging_cleanup(fs);
+        return Err(ConfigError::InvalidConfig(
+            "active transaction directory already exists — \
+             recover pending transaction first"
+                .into(),
+        ));
+    }
+
+    fs.rename_dir(&staging_dir, active_dir)?;
+    fs.sync_dir(parent)?;
     Ok(())
 }
 
@@ -542,27 +604,31 @@ fn restore(fs: &dyn Fs, path: &Path, before: Option<&[u8]>) -> Result<(), Config
         None => {
             if fs.exists(path) {
                 fs.remove_file(path)?;
+                if let Some(parent) = path.parent() {
+                    fs.sync_dir(parent)?;
+                }
             }
         }
     }
     Ok(())
 }
 
-fn cleanup(fs: &dyn Fs, dir: &Path) -> Result<(), ConfigError> {
-    if !fs.exists(dir) {
+fn finalize(fs: &dyn Fs, active_dir: &Path, txn_id: &str) -> Result<(), ConfigError> {
+    if !fs.exists(active_dir) {
         return Ok(());
     }
-    let manifest_path = dir.join("manifest");
-    for entry in fs.list_dir(dir)? {
-        if entry != manifest_path {
-            fs.remove_file(&entry)?;
-        }
+
+    let parent = active_dir.parent().unwrap_or(Path::new("."));
+    let finalize_dir = parent.join(format!(".provider-unset-transaction.finalize.{txn_id}"));
+
+    if fs.exists(&finalize_dir) {
+        let _ = fs.remove_dir(&finalize_dir);
     }
-    fs.sync_dir(dir)?;
-    if fs.exists(&manifest_path) {
-        fs.remove_file(&manifest_path)?;
-    }
-    fs.remove_dir(dir)?;
+
+    fs.rename_dir(active_dir, &finalize_dir)?;
+    fs.sync_dir(parent)?;
+
+    let _ = fs.remove_dir(&finalize_dir);
     Ok(())
 }
 
@@ -607,6 +673,7 @@ pub(crate) trait Fs {
     fn mkdir(&self, path: &Path) -> Result<(), ConfigError>;
     fn remove_file(&self, path: &Path) -> Result<(), ConfigError>;
     fn remove_dir(&self, path: &Path) -> Result<(), ConfigError>;
+    fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError>;
     fn sync_dir(&self, dir: &Path) -> Result<(), ConfigError>;
     fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, ConfigError>;
 }
@@ -634,6 +701,9 @@ impl Fs for StdFs {
     }
     fn remove_dir(&self, p: &Path) -> Result<(), ConfigError> {
         std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
+    }
+    fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError> {
+        std::fs::rename(from, to).map_err(ConfigError::IoError)
     }
     fn sync_dir(&self, d: &Path) -> Result<(), ConfigError> {
         atomic_file::sync_dir(d)

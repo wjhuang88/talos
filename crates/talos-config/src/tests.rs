@@ -2439,6 +2439,10 @@ impl Fs for FaultyFs {
         self.check()?;
         std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
     }
+    fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError> {
+        self.check()?;
+        std::fs::rename(from, to).map_err(ConfigError::IoError)
+    }
     fn sync_dir(&self, _d: &Path) -> Result<(), ConfigError> {
         Ok(())
     }

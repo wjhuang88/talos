@@ -13,9 +13,11 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Atomically replaces `path` with `content`.
 ///
-/// Creates a uniquely-named temp file in the same directory, writes + syncs,
-/// copies permissions from the original (if it exists), then renames.
+/// Creates a uniquely-named temp file in the same directory using
+/// `create_new` (collision-resistant: pid + nanos + counter), writes +
+/// syncs, copies permissions from the original (if it exists), then renames.
 /// On any I/O error the temp file is removed and the original is untouched.
+/// Pre-existing temp files from other processes are never deleted.
 pub(crate) fn durable_replace(path: &Path, content: &[u8]) -> Result<(), ConfigError> {
     let dir = path
         .parent()
@@ -23,17 +25,54 @@ pub(crate) fn durable_replace(path: &Path, content: &[u8]) -> Result<(), ConfigE
 
     std::fs::create_dir_all(dir)?;
 
-    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-    let tmp = dir.join(format!(
-        ".{}.tmp.{n}",
-        path.file_name()
-            .map(|f| f.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "file".into())
-    ));
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
 
-    let _ = std::fs::remove_file(&tmp);
+    let mut created_tmp = None;
+    for attempt in 0..16 {
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let tmp = dir.join(format!(
+            ".{}.tmp.{pid}.{nanos}.{n}",
+            path.file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "file".into())
+        ));
 
-    write_file_synced(&tmp, content)?;
+        match open_create_new(&tmp) {
+            Ok(file) => {
+                created_tmp = Some((tmp, file));
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && attempt < 15 => {
+                continue;
+            }
+            Err(e) => return Err(ConfigError::IoError(e)),
+        }
+    }
+
+    let (tmp, mut file) = created_tmp.ok_or_else(|| {
+        ConfigError::IoError(std::io::Error::other(
+            "could not create unique temp file after retries",
+        ))
+    })?;
+
+    file.write_all(content).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        ConfigError::IoError(e)
+    })?;
+    file.flush().map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        ConfigError::IoError(e)
+    })?;
+    file.sync_all().map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        ConfigError::IoError(e)
+    })?;
+    drop(file);
+
     copy_permissions(&tmp, path)?;
 
     if let Err(e) = std::fs::rename(&tmp, path) {
@@ -73,6 +112,24 @@ pub(crate) fn sync_dir(dir: &Path) -> Result<(), ConfigError> {
     sync_dir_impl(dir).map_err(ConfigError::IoError)
 }
 
+/// Removes `path` and syncs its parent directory (durable removal).
+#[allow(dead_code)]
+pub(crate) fn durable_remove(path: &Path) -> Result<(), ConfigError> {
+    if path.exists() {
+        std::fs::remove_file(path).map_err(ConfigError::IoError)?;
+    }
+    if let Some(parent) = path.parent() {
+        sync_dir(parent)?;
+    }
+    Ok(())
+}
+
+/// Atomically renames a directory. The destination must not exist.
+#[allow(dead_code)]
+pub(crate) fn rename_dir(from: &Path, to: &Path) -> Result<(), ConfigError> {
+    std::fs::rename(from, to).map_err(ConfigError::IoError)
+}
+
 // ---- platform-specific internals ----
 
 #[cfg(unix)]
@@ -89,6 +146,24 @@ fn open_secure(path: &Path) -> Result<std::fs::File, std::io::Error> {
 #[cfg(not(unix))]
 fn open_secure(path: &Path) -> Result<std::fs::File, std::io::Error> {
     std::fs::File::create(path)
+}
+
+#[cfg(unix)]
+fn open_create_new(path: &Path) -> Result<std::fs::File, std::io::Error> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+}
+
+#[cfg(not(unix))]
+fn open_create_new(path: &Path) -> Result<std::fs::File, std::io::Error> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
 }
 
 #[cfg(unix)]
