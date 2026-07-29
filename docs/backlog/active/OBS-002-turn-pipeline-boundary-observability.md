@@ -8,7 +8,7 @@
 | Status | Refinement — ADR decision required before Ready |
 | Source | Maintainer feedback after session `9945f9b4-9c93-41d3-9a9b-a7b33814f130` stream-idle timeout (2026-07-28) |
 | Depends On | ADR-006; RUNTIME-002 and PROVIDER-002 resolved timeout foundations; SESSION-006 durable error-path boundary |
-| Iteration | Unselected; no implementation iteration is Active, and I157 is the next candidate |
+| Iteration | Unselected; RUNTIME-003/I168 owns the narrower P0 terminal-outcome correction |
 
 ## Problem
 
@@ -23,6 +23,22 @@ response headers arrived, or the stream subsequently became idle.
 
 This story makes those existing runtime boundaries explicit and correlated. It
 does not change tool, provider, retry, permission, or session semantics.
+
+## 2026-07-29 Scope Split
+
+Maintainer-provided TLOG evidence exposed a narrower correctness defect that cannot wait for this
+Story's broader public progress-contract ADR:
+
+- unknown finish/stop reasons are normalized to `EndTurn`;
+- terminal-frame-less EOF is normalized to `EndTurn`;
+- text-only `MaxTokens` is indistinguishable from ordinary success;
+- interactive TLOG does not retain the terminal cause.
+
+That bounded repair is owned by
+`RUNTIME-003` / `I168`. It uses existing provider/session event semantics, forbids a breaking public
+event contract, and is now the sole Active P0 implementation. OBS-002 remains Refinement for the
+larger live timeline covering tool completion, result acceptance, dispatch, headers, first packet,
+retry, and terminal correlation. Completing RUNTIME-003 does not complete OBS-002.
 
 ## Goal
 
@@ -115,6 +131,7 @@ The ADR must decide:
 - `docs/backlog/active/RUNTIME-002-turn-health-and-stuck-processing.md`
 - `docs/backlog/active/PROVIDER-002-response-reliability-timeout-retry.md`
 - `docs/backlog/active/SESSION-006-session-error-path-persistence.md`
+- `docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md`
 - `crates/talos-core/src/provider.rs`
 - `crates/talos-agent/src/lib.rs`
 - `crates/talos-provider/src/anthropic_stream.rs`

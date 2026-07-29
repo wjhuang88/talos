@@ -70,6 +70,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
 | P1 | Execute I157 / MODEL-010 | `talos config unset providers.<name>[.api_key] --confirm`, atomic mutation, active-provider recovery, EN/zh-CN/reference docs | P0 | I157 owner acceptance, focused tests, real isolated-config evidence, full locked validation | Record blocker in I157; do not widen into TUI deletion | Complete — Completion Commit: `f0039b24`, `900f7976` |
+| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | P1 Complete; no competing Active/Review iteration; maintainer priority | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | In Progress |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -229,10 +230,9 @@ skip to a later mainline package.
 ## Current Checkpoint
 
 - Completed task items: P0 (baseline inventory + package publication), P1 (I157/MODEL-010
-  three-phase implementation: config mutation core `84e7a6a3`, CLI wiring + docs `46c919ee`,
-  governance sync docs commit).
-- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 Complete (`3356aac` for I167);
-  I164 Paused; I158-I162 Blocked; ADR-053 Proposed.
+  transaction-corrected implementation).
+- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 Complete; I168/RUNTIME-003 is the
+  sole Active P0 correction; I164 Paused; I158-I162 Blocked; ADR-053 Proposed.
 - Commands/checks and actual results: `cargo test --workspace --locked` 2566 passed, 0 failed;
   `cargo clippy --workspace --locked -- -D warnings` clean; `cargo fmt --all -- --check` clean;
   `scripts/validate_project_governance.sh .` 0 warnings. Runtime fixture verified all acceptance
@@ -242,8 +242,7 @@ skip to a later mainline package.
   2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
 - Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
   authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
-- Next task item: return to G1 (ADR-053 review) unless the maintainer selects a different Ready
-  Story.
-- Recovery or resume instruction: read this package, I167/TUI-040, the v0.6 program, and the
-  iterations README; verify the current Git state; confirm I158's continued blocked status before
-  any architecture work.
+- Next task item: U1 / I168 RUNTIME-003; G1 remains deferred until I168 reaches a terminal state.
+- Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
+  the v0.6 program; verify the current Git state; write the required failing provider fixtures
+  before production changes; keep I158 blocked.

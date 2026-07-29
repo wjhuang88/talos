@@ -815,3 +815,23 @@ repeating known mistakes.
   consecutive processing turns without exiting.
 - Promoted to rule/check: `inline_terminal::tests::best_effort_keyboard_enablement_is_paired_with_restore`
   and `app::app_tests::ctrl_c_cancels_each_consecutive_processing_turn_without_exiting`.
+
+## 2026-07-29 - Protocol fallbacks must not manufacture normal completion
+
+- Trigger: A maintainer-provided TLOG contained several assistant fragments ending immediately
+  before an intended tool call; users had to send `继续` or another prompt to resume.
+- Symptom: The fragments were committed as successful assistant turns, but the retained session
+  had no stop reason, terminal event, timeout, cancellation, or transport-close evidence from
+  which to reconstruct why generation stopped.
+- Root cause: Both compatible-provider stream parsers mapped unknown finish reasons and
+  terminal-frame-less EOF to `StopReason::EndTurn`; the agent treated every text-only `TurnEnd`
+  (including `MaxTokens`) as success; interactive persistence retained messages but not bounded
+  terminal-cause diagnostics.
+- Fix: RUNTIME-003/I168 owns the P0 correction: explicit terminal signals remain success,
+  unknown/missing signals become observable errors, truncation remains distinct, and bounded
+  redacted terminal evidence is retained outside transcript/model/export.
+- Prevention: Every streaming adapter fixture matrix must distinguish explicit completion,
+  unsupported terminal reason, transport error, timeout, and EOF without a terminal frame.
+  Fallback code may degrade to a specific error, never to a stronger success claim.
+- Promoted to rule/check: RUNTIME-003 provider fixtures, terminal-diagnostic TLOG round-trip and
+  exclusion tests, and I168 rebuilt-binary acceptance.
