@@ -5,7 +5,7 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: I157 (Recovery Fail-Closed Correction)
+> Current implementation authority: none; I157 recovery fail-closed Complete
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -69,7 +69,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
-| P1 | Execute I157 / MODEL-010 | provider-unset | P0 | acceptance | gate | Correction Active — recovery fail-closed |
+| P1 | Execute I157 / MODEL-010 | provider-unset | P0 | acceptance | gate | Complete — Completion Commit: `fd35524b` |
 | U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Paused — maintainer-requested hold |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
