@@ -516,7 +516,7 @@ api_key = "{SECRET_A}"
     fs::create_dir_all(&txn_dir).unwrap();
     fs::write(
         txn_dir.join("manifest"),
-        "phase=Prepared\ncfg_existed=true\ncfg_after_exists=true\ncred_existed=false\ncred_after_exists=false\n",
+        "version = 1\nphase = \"Prepared\"\ncfg_existed = true\ncfg_after_exists = true\ncred_existed = false\ncred_after_exists = false\n",
     )
     .unwrap();
     fs::write(txn_dir.join("config.before"), &config_before).unwrap();
@@ -549,7 +549,7 @@ api_key = "key-x"
     fs::create_dir_all(&txn_dir).unwrap();
     fs::write(
         txn_dir.join("manifest"),
-        "phase=Committed\ncfg_existed=true\ncfg_after_exists=true\ncred_existed=false\ncred_after_exists=false\n",
+        "version = 1\nphase = \"Committed\"\ncfg_existed = true\ncfg_after_exists = true\ncred_existed = false\ncred_after_exists = false\n",
     )
     .unwrap();
 

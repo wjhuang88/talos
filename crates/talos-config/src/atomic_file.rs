@@ -41,7 +41,7 @@ pub(crate) fn durable_replace(path: &Path, content: &[u8]) -> Result<(), ConfigE
         return Err(ConfigError::IoError(e));
     }
 
-    sync_dir(dir);
+    sync_dir(dir)?;
     Ok(())
 }
 
@@ -69,8 +69,8 @@ pub(crate) fn create_dir_secure(path: &Path) -> Result<(), ConfigError> {
 }
 
 /// Opens the parent directory of `path` and fsyncs it.
-pub(crate) fn sync_dir(dir: &Path) {
-    let _ = sync_dir_impl(dir);
+pub(crate) fn sync_dir(dir: &Path) -> Result<(), ConfigError> {
+    sync_dir_impl(dir).map_err(ConfigError::IoError)
 }
 
 // ---- platform-specific internals ----

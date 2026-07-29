@@ -1,13 +1,10 @@
 //! Two-file transaction coordinator for provider removal (MODEL-010).
-//!
-//! Uses [`atomic_file`] for single-file replacement. Owns the journal,
-//! rollback, and `Config::load` recovery for the config.toml +
-//! credentials.toml pair.
 
 use crate::{
     Config, ConfigError, ConfigUnsetOutcome, Credentials, atomic_file, builtin_provider_config,
     home_dir,
 };
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub struct ConfigStore {
@@ -44,8 +41,8 @@ impl ConfigStore {
         let cfg_before = fs.read_opt(&self.config_path)?;
         let cred_before = fs.read_opt(&self.credentials_path)?;
 
-        let mut config: Config = parse_or_default(&cfg_before);
-        let mut creds: Credentials = parse_or_default(&cred_before);
+        let mut config: Config = parse_strict(&cfg_before)?;
+        let mut creds: Credentials = parse_strict(&cred_before)?;
 
         let outcome = mutate(&mut config, &mut creds, key)?;
 
@@ -76,18 +73,26 @@ impl ConfigStore {
 
         prepare(fs, &dir, &txn)?;
 
-        if let Err(e) = apply(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
-            let _ = rollback(fs, &dir, &self.config_path, &self.credentials_path, &txn);
-            let _ = cleanup(fs, &dir);
-            return Err(e);
+        if let Err(apply_err) = apply(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
+            match rollback(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
+                Ok(()) => {
+                    cleanup(fs, &dir)?;
+                    return Err(apply_err);
+                }
+                Err(_) => {
+                    return Err(ConfigError::InvalidConfig(
+                        "recovery required: rollback failed after apply error".into(),
+                    ));
+                }
+            }
         }
 
-        let _ = cleanup(fs, &dir);
+        cleanup(fs, &dir)?;
         Ok(outcome)
     }
 
-    pub fn recover_pending() {
-        let _ = Self::default_store().recover(&StdFs);
+    pub fn recover_pending() -> Result<(), ConfigError> {
+        Self::default_store().recover(&StdFs)
     }
 
     pub(crate) fn recover(&self, fs: &dyn Fs) -> Result<(), ConfigError> {
@@ -95,37 +100,59 @@ impl ConfigStore {
         if !fs.exists(&dir) {
             return Ok(());
         }
-        let manifest = dir.join("manifest");
-        if !fs.exists(&manifest) {
-            let _ = cleanup(fs, &dir);
-            return Ok(());
-        }
-        let raw = fs.read(&manifest)?;
-        let phase = field(&raw, "phase");
 
-        if phase == "Committed" {
-            let _ = cleanup(fs, &dir);
-            return Ok(());
+        let manifest_path = dir.join("manifest");
+        if !fs.exists(&manifest_path) {
+            return Err(ConfigError::InvalidConfig(
+                "pending transaction directory exists without manifest — \
+                 manual recovery required"
+                    .into(),
+            ));
         }
 
-        let cfg_existed = field(&raw, "cfg_existed") == "true";
-        let cred_existed = field(&raw, "cred_existed") == "true";
+        let raw = fs.read(&manifest_path)?;
+        let manifest = parse_manifest(&raw)?;
 
-        let cfg_before = if cfg_existed {
-            Some(fs.read(&dir.join("config.before"))?)
-        } else {
-            None
-        };
-        let cred_before = if cred_existed {
-            Some(fs.read(&dir.join("credentials.before"))?)
-        } else {
-            None
-        };
+        match manifest.phase.as_str() {
+            "Committed" => {
+                cleanup(fs, &dir)?;
+                Ok(())
+            }
+            "Prepared" | "Applying" | "RollbackRequired" => {
+                let cfg_before = if manifest.cfg_existed {
+                    Some(fs.read(&dir.join("config.before"))?)
+                } else {
+                    None
+                };
+                let cred_before = if manifest.cred_existed {
+                    Some(fs.read(&dir.join("credentials.before"))?)
+                } else {
+                    None
+                };
 
-        restore(fs, &self.config_path, cfg_before.as_deref())?;
-        restore(fs, &self.credentials_path, cred_before.as_deref())?;
-        let _ = cleanup(fs, &dir);
-        Ok(())
+                restore(fs, &self.config_path, cfg_before.as_deref())?;
+                restore(fs, &self.credentials_path, cred_before.as_deref())?;
+
+                let cfg_actual = fs.read_opt(&self.config_path)?;
+                let cred_actual = fs.read_opt(&self.credentials_path)?;
+                if cfg_actual.as_deref() != cfg_before.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "recovery verification failed for config".into(),
+                    ));
+                }
+                if cred_actual.as_deref() != cred_before.as_deref() {
+                    return Err(ConfigError::InvalidConfig(
+                        "recovery verification failed for credentials".into(),
+                    ));
+                }
+
+                cleanup(fs, &dir)?;
+                Ok(())
+            }
+            other => Err(ConfigError::InvalidConfig(format!(
+                "manifest has unknown phase '{other}' — manual recovery required"
+            ))),
+        }
     }
 
     fn txn_dir(&self) -> PathBuf {
@@ -198,13 +225,34 @@ struct Txn {
     cred_after: Vec<u8>,
 }
 
-fn manifest(phase: &str, t: &Txn) -> String {
-    format!(
-        "phase={phase}\n\
-         cfg_existed={}\ncfg_after_exists={}\n\
-         cred_existed={}\ncred_after_exists={}\n",
-        t.cfg_existed, t.cfg_after_exists, t.cred_existed, t.cred_after_exists
-    )
+#[derive(Serialize, Deserialize)]
+struct Manifest {
+    version: u32,
+    phase: String,
+    cfg_existed: bool,
+    cfg_after_exists: bool,
+    cred_existed: bool,
+    cred_after_exists: bool,
+}
+
+fn write_manifest(fs: &dyn Fs, dir: &Path, phase: &str, t: &Txn) -> Result<(), ConfigError> {
+    let m = Manifest {
+        version: 1,
+        phase: phase.to_string(),
+        cfg_existed: t.cfg_existed,
+        cfg_after_exists: t.cfg_after_exists,
+        cred_existed: t.cred_existed,
+        cred_after_exists: t.cred_after_exists,
+    };
+    let toml_str = toml::to_string(&m).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
+    fs.atomic_write(&dir.join("manifest"), toml_str.as_bytes())
+}
+
+fn parse_manifest(raw: &[u8]) -> Result<Manifest, ConfigError> {
+    let s = std::str::from_utf8(raw)
+        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid UTF-8: {e}")))?;
+    toml::from_str::<Manifest>(s)
+        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid TOML: {e}")))
 }
 
 fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn) -> Result<(), ConfigError> {
@@ -215,28 +263,47 @@ fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn) -> Result<(), ConfigError> {
     if t.cred_existed {
         fs.write_secure(&dir.join("credentials.before"), &t.cred_before)?;
     }
-    fs.write_secure(&dir.join("manifest"), manifest("Prepared", t).as_bytes())?;
+    write_manifest(fs, dir, "Prepared", t)?;
     fs.sync_dir(dir)?;
     Ok(())
 }
 
 fn apply(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
-    fs.atomic_write(&dir.join("manifest"), manifest("Applying", t).as_bytes())?;
+    write_manifest(fs, dir, "Applying", t)?;
     fs.atomic_write(cfg, &t.cfg_after)?;
+
     if t.cred_after_exists {
         fs.atomic_write(cred, &t.cred_after)?;
     } else if fs.exists(cred) {
         fs.remove_file(cred)?;
     }
-    fs.atomic_write(&dir.join("manifest"), manifest("Committed", t).as_bytes())?;
+
+    let cfg_actual = fs.read_opt(cfg)?;
+    if cfg_actual.as_deref() != Some(t.cfg_after.as_slice()) {
+        return Err(ConfigError::IoError(std::io::Error::other(
+            "config after-state verification failed",
+        )));
+    }
+
+    let cred_actual = fs.read_opt(cred)?;
+    let cred_expected: Option<&[u8]> = if t.cred_after_exists {
+        Some(&t.cred_after)
+    } else {
+        None
+    };
+    if cred_actual.as_deref() != cred_expected {
+        return Err(ConfigError::IoError(std::io::Error::other(
+            "credentials after-state verification failed",
+        )));
+    }
+
+    write_manifest(fs, dir, "Committed", t)?;
     Ok(())
 }
 
 fn rollback(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
-    let _ = fs.atomic_write(
-        &dir.join("manifest"),
-        manifest("RollbackRequired", t).as_bytes(),
-    );
+    let _ = write_manifest(fs, dir, "RollbackRequired", t);
+
     restore(
         fs,
         cfg,
@@ -255,6 +322,32 @@ fn rollback(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result
             None
         },
     )?;
+
+    let cfg_actual = fs.read_opt(cfg)?;
+    let cred_actual = fs.read_opt(cred)?;
+    if cfg_actual.as_deref()
+        != (if t.cfg_existed {
+            Some(&t.cfg_before[..])
+        } else {
+            None
+        })
+    {
+        return Err(ConfigError::InvalidConfig(
+            "rollback verification failed for config".into(),
+        ));
+    }
+    if cred_actual.as_deref()
+        != (if t.cred_existed {
+            Some(&t.cred_before[..])
+        } else {
+            None
+        })
+    {
+        return Err(ConfigError::InvalidConfig(
+            "rollback verification failed for credentials".into(),
+        ));
+    }
+
     Ok(())
 }
 
@@ -275,7 +368,7 @@ fn cleanup(fs: &dyn Fs, dir: &Path) -> Result<(), ConfigError> {
         return Ok(());
     }
     for entry in fs.list_dir(dir)? {
-        let _ = fs.remove_file(&entry);
+        fs.remove_file(&entry)?;
     }
     fs.remove_dir(dir)?;
     Ok(())
@@ -287,30 +380,24 @@ fn serialize<T: serde::Serialize>(val: &T) -> Result<Vec<u8>, ConfigError> {
         .map_err(|e| ConfigError::SerializeError(e.to_string()))
 }
 
-fn parse_or_default<T>(opt: &Option<Vec<u8>>) -> T
+fn parse_strict<T>(opt: &Option<Vec<u8>>) -> Result<T, ConfigError>
 where
     T: Default + serde::de::DeserializeOwned,
 {
-    opt.as_ref()
-        .and_then(|b| toml::from_str(&String::from_utf8_lossy(b)).ok())
-        .unwrap_or_default()
+    match opt {
+        None => Ok(T::default()),
+        Some(bytes) => {
+            let s = std::str::from_utf8(bytes)
+                .map_err(|e| ConfigError::ParseError(format!("invalid UTF-8: {e}")))?;
+            toml::from_str(s).map_err(|e| ConfigError::ParseError(e.to_string()))
+        }
+    }
 }
 
 fn reparse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<(), ConfigError> {
     toml::from_str::<T>(&String::from_utf8_lossy(bytes))
         .map_err(|e| ConfigError::ParseError(e.to_string()))?;
     Ok(())
-}
-
-fn field(raw: &[u8], key: &str) -> String {
-    for line in String::from_utf8_lossy(raw).lines() {
-        if let Some((k, v)) = line.split_once('=')
-            && k.trim() == key
-        {
-            return v.trim().to_string();
-        }
-    }
-    String::new()
 }
 
 pub(crate) trait Fs {
@@ -357,8 +444,7 @@ impl Fs for StdFs {
         std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
     }
     fn sync_dir(&self, d: &Path) -> Result<(), ConfigError> {
-        atomic_file::sync_dir(d);
-        Ok(())
+        atomic_file::sync_dir(d)
     }
     fn list_dir(&self, d: &Path) -> Result<Vec<PathBuf>, ConfigError> {
         std::fs::read_dir(d)

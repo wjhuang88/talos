@@ -33,7 +33,7 @@ impl Config {
     /// call [`Config::validate`] explicitly after applying the edit, before
     /// saving.
     pub fn load() -> Result<Self, ConfigError> {
-        crate::store::ConfigStore::recover_pending();
+        crate::store::ConfigStore::recover_pending()?;
 
         let path = Self::default_path();
         if !path.exists() {
