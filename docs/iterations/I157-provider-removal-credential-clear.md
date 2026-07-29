@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Complete
+> Document status: Active — Transaction Atomicity Correction
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -218,6 +218,32 @@ If a stop condition occurs:
     isolated HOME + startup model recovery seam extraction + 4 recovery tests).
   - Full workspace validation: 2591 tests, 0 failed; clippy clean; fmt clean;
     governance 0 warnings; no new dependencies; no unsafe; no Cargo.lock change.
+  - 2026-07-29 second premature completion (ad61fe49): the ConfigStore
+    credentials-first/config-second write order is NOT a two-file logical
+    transaction. If the second file write fails after the first succeeds,
+    a half-committed state persists. Transaction atomicity correction findings:
+    1. **Half-commit risk**: ConfigStore writes credentials.toml first, then
+       config.toml. A failure between the two leaves one source committed.
+    2. **Irreversible remove_file**: when credentials.toml becomes empty, it is
+       removed via `remove_file` before config.toml is written. A subsequent
+       config write failure cannot restore the old credentials file.
+    3. **No failure injection**: tests do not inject real persistence failures
+       (write/sync/rename/remove/parent-sync). No deterministic proof that
+       failure paths leave both files unchanged.
+    4. **Pseudo-hash**: CLI tests use `file_hash()` returning file length, not
+       real byte comparison.
+    5. **Missing stderr scan**: integration tests ignore `_stderr`; no complete
+       secret marker scan.
+    6. **No config list/get binary evidence**: `talos config list` and
+       `talos config get` not exercised through the real binary after unset.
+    7. **Fixed temp names**: `.atomic-tmp` suffix risks concurrent overwrite.
+    8. **Startup evidence split**: active-provider recovery is split between
+       "real CLI" and "pure-memory startup helper" without a single persisted
+       disk-to-startup-decision chain.
+  - Second correction baseline: `ad61fe49` (no Active/Review iterations).
+  - Required: bounded transaction journal with before/after images, recovery
+    on Config::load, failure injection backend, byte-level assertions, and
+    complete real-binary config list/get evidence.
 
 ## REL-002 Execution Record
 
