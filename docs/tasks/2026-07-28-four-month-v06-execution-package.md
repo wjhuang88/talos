@@ -5,7 +5,7 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: none; I167/TUI-040 is in Review and I158 remains blocked
+> Current implementation authority: none; I167/TUI-040 is Complete and I158 remains blocked
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -231,8 +231,8 @@ skip to a later mainline package.
 - Completed task items: P0 (baseline inventory + package publication), P1 (I157/MODEL-010
   three-phase implementation: config mutation core `84e7a6a3`, CLI wiring + docs `46c919ee`,
   governance sync docs commit).
-- Current state and artifacts: I157/MODEL-010 Complete; I167/TUI-040 is Review after automated
-  visual-correction evidence (`3356aac`); I164 Paused; I158-I162 Blocked; ADR-053 Proposed.
+- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 Complete (`3356aac` for I167);
+  I164 Paused; I158-I162 Blocked; ADR-053 Proposed.
 - Commands/checks and actual results: `cargo test --workspace --locked` 2566 passed, 0 failed;
   `cargo clippy --workspace --locked -- -D warnings` clean; `cargo fmt --all -- --check` clean;
   `scripts/validate_project_governance.sh .` 0 warnings. Runtime fixture verified all acceptance
@@ -242,8 +242,8 @@ skip to a later mainline package.
   2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
 - Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
   authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
-- Next task item: perform I167/TUI-040's one real-terminal approval-menu visual check, then return
-  to G1 (ADR-053 review) unless the maintainer selects a different Ready Story.
+- Next task item: return to G1 (ADR-053 review) unless the maintainer selects a different Ready
+  Story.
 - Recovery or resume instruction: read this package, I167/TUI-040, the v0.6 program, and the
-  iterations README; verify the current Git state; confirm I167's manual evidence and I158's
-  continued blocked status before any architecture work.
+  iterations README; verify the current Git state; confirm I158's continued blocked status before
+  any architecture work.

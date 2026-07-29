@@ -1,6 +1,6 @@
 # Iteration I167: Approval Option Contrast
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-07-29
 > Planned objective: Make unselected interactive approval choices clearly readable without changing approval behavior, layout, or terminal lifecycle.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -78,14 +78,17 @@ after Up/Down movement.
 - Full locked validation: `cargo fmt --all -- --check`, `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`, and `cargo test --workspace --locked` passed. The latter required the normal local test-server permission boundary; in the restricted sandbox the unrelated CLI server tests fail with `Operation not permitted`, then passed outside that sandbox.
 - Build: `cargo build --locked -p talos-cli` passed; rebuilt binary is `target/debug/talos` from `3356aac`.
 - Governance validation: `scripts/validate_project_governance.sh .` passed with 0 warnings; `scripts/assess_project_scale.sh .` reports the existing high-risk/release-managed/on-demand profile.
-- Runtime evidence: pending maintainer visual check in a real terminal. Trigger an approval prompt, confirm all choices are readable before navigation, then use Up/Down to confirm selected and unselected rows remain distinguishable.
+- Runtime evidence: maintainer visual check passed 2026-07-29 in a real terminal. An approval
+  prompt showed all choices before navigation, and Up/Down movement retained clear selected and
+  unselected states.
 
 ## Completion Evidence
 
 - Implementation Commit: `3356aac52e755a29c4bfbdd43854c47e851569d9`.
-- Completion Commit: pending real-terminal visual acceptance.
+- Completion Commit: `3356aac52e755a29c4bfbdd43854c47e851569d9`.
 - Do not cite a status-only documentation commit as implementation completion.
-- Keep Review until the runtime visual check passes; do not use this documentation commit as implementation completion.
+- Maintainer real-terminal review passed on 2026-07-29: all choices were visible before navigation,
+  and selected/unselected rows remained distinguishable after movement.
 
 ## Variance And Residuals
 
@@ -95,6 +98,6 @@ after Up/Down movement.
 
 ## Retrospective
 
-- Outcome: automated acceptance achieved; manual visual acceptance remains pending.
-- Documentation: owner, Board, program, package, and iteration index synchronized to Review.
+- Outcome: automated and maintainer visual acceptance achieved.
+- Documentation: owner, Board, program, package, and iteration index synchronized to Complete.
 - Lessons: actionable menu choices must not reuse muted metadata styling merely because they are unselected.

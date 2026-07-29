@@ -5,12 +5,12 @@
 | Story ID | TUI-040 |
 | Type | Product / TUI visual-reliability story |
 | Priority | P1 |
-| Status | Review — automated evidence complete; interactive-terminal visual check pending |
+| Status | Complete — maintainer real-terminal review passed 2026-07-29 |
 | Source | Maintainer report: unselected approval options are so faint that users do not discover the available choices. |
 | Parent Epic | None; bounded follow-up to completed TUI-008 approval UX |
 | Depends On | TUI-008 Complete; TUI-035/I156 Alternate-Screen renderer Complete |
 | Blocks | None |
-| Selected Iteration | I167 (Review; implementation `3356aac`) |
+| Selected Iteration | I167 (Complete; implementation `3356aac`) |
 
 ## Goal / Value
 
@@ -68,7 +68,12 @@ and I167 runtime walkthrough are the user-visible evidence.
 
 - A future global contrast/theme audit, if requested, requires a separate Story. This slice changes
   only approval option discoverability.
-- Manual terminal gate: open a real approval prompt in Alacritty (or an equivalent terminal), verify
-  that all three choices are visible before navigation, then move the selection with Up/Down and
-  verify the accent/background distinction remains clear. This check is visual evidence only; no
-  approval behavior or permission policy changed.
+- Manual terminal gate: passed 2026-07-29. The maintainer opened an approval prompt, confirmed all
+  choices were visible before navigation, and verified the accent/background distinction remained
+  clear after Up/Down movement.
+
+## Completion Evidence
+
+- Completion Commit: `3356aac52e755a29c4bfbdd43854c47e851569d9`.
+- Maintainer review: passed 2026-07-29; unselected approval choices are now discoverable and the
+  selected treatment remains clear.
