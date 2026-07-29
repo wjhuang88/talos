@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Complete
+> Document status: Active — Acceptance Correction
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -183,6 +183,32 @@ If a stop condition occurs:
   The required inventory found no competing Active or Review implementation
   iteration, so the published I157/MODEL-010 baseline is now Active/In Progress.
   No scope or acceptance target changed.
+- 2026-07-29 premature completion correction: the 2026-07-28 completion was
+  premature. Acceptance correction findings:
+  1. **Atomic save finding**: `Config::save()` uses `fs::write` (truncate-then-write),
+     not the atomic temp-file-then-rename pattern used elsewhere in the codebase
+     (`recent_models.rs`, `compact_text.rs`). A mid-write I/O failure can leave a
+     truncated file.
+  2. **Credential resurrection finding**: `Config::load()` reads `credentials.toml`
+     via `Credentials::load()` and calls `merge_credentials()`, which re-injects
+     old API keys for providers where `api_key` is `None` and even creates new
+     provider entries for credentials that no longer have a config entry. After
+     `config unset`, the next `Config::load()` resurrects the old credential.
+  3. **False-positive test finding**: `unset_success_uses_atomic_save_path` called
+     `fs::write` directly, not the production save path.
+     `unset_write_failure_preserves_original_file` did not inject a real write
+     failure. CLI output tests hand-constructed strings instead of capturing real
+     binary output. The active-provider test did not reach the startup/model-picker
+     decision seam.
+  4. **Missing real CLI evidence**: no integration test exercised the real `talos`
+     binary under an isolated HOME.
+  5. **Public API variance**: `ConfigUnsetOutcome` is additive; no breaking change.
+     The correction adds a narrow `ConfigStore` persisted-unset entrypoint.
+  - Correction baseline HEAD: `6cde6508` (I167 Complete; no Active/Review iterations).
+  - Selected design: Option A — keep credentials.toml backward-compatibility read
+    and durably update both raw config.toml and raw credentials.toml using atomic
+    temp-file-then-rename, without `merge_credentials`. The CLI calls one
+    authoritative persisted-unset path via `ConfigStore::unset_provider`.
 
 ## REL-002 Execution Record
 
