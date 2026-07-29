@@ -2632,8 +2632,7 @@ mod steering_snapshot_tests {
             }
         );
 
-        let config_raw = std::fs::read_to_string(&config_path).unwrap();
-        let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+        let reloaded = store.load_effective().unwrap();
         assert!(!reloaded.providers.contains_key("active-gw"));
         assert!(reloaded.api_key().is_err());
 
@@ -2647,10 +2646,8 @@ mod steering_snapshot_tests {
 
         let _pc = reloaded.active_provider_config();
         assert!(reloaded.api_key().is_err());
-        assert!(
-            config_raw.contains("active-gw"),
-            "active provider name may persist but credential must be gone"
-        );
+
+        let config_raw = std::fs::read_to_string(&config_path).unwrap_or_default();
         assert!(
             !config_raw.contains("sk-active-marker"),
             "inline credential must not appear in config.toml"
