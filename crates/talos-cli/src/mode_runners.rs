@@ -229,15 +229,21 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     )?;
     apply_session_model_to_config(&mut config, &session);
 
-    let needs_model_setup = config.model.is_empty() && !cli.mock;
-    let needs_api_key = !cli.mock && !needs_model_setup && config.api_key().is_err();
-
-    if (needs_model_setup || needs_api_key) && !cli.mock && cli.no_init {
-        bail!(
-            "no model configured and --no-init was given. Set 'model' in ~/.talos/config.toml, pass --model, or remove --no-init to run the setup wizard."
-        );
-    }
-
+    let startup_action = resolve_startup_model_action(&config, cli.mock, cli.no_init);
+    let (needs_model_setup, needs_api_key) = match &startup_action {
+        StartupModelAction::RejectNoInit => {
+            bail!(
+                "no model configured and --no-init was given. Set 'model' in ~/.talos/config.toml, pass --model, or remove --no-init to run the setup wizard."
+            );
+        }
+        StartupModelAction::OpenModelPicker {
+            reason: StartupModelRecoveryReason::EmptyModel,
+        } => (true, false),
+        StartupModelAction::OpenModelPicker {
+            reason: StartupModelRecoveryReason::MissingApiKey,
+        } => (false, true),
+        StartupModelAction::Ready => (false, false),
+    };
     let mock_for_startup = cli.mock || needs_model_setup || needs_api_key;
     let api_key = if mock_for_startup {
         config.api_key().unwrap_or_default()
@@ -777,3 +783,56 @@ pub(crate) async fn run_mcp_server() -> Result<()> {
 #[cfg(test)]
 #[path = "mode_runners_tests.rs"]
 mod tests;
+
+/// Why the startup model picker needs to open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum StartupModelRecoveryReason {
+    EmptyModel,
+    MissingApiKey,
+}
+
+/// Startup model decision extracted from the TUI runner as a pure,
+/// testable seam (MODEL-010 / I157 correction).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum StartupModelAction {
+    Ready,
+    OpenModelPicker { reason: StartupModelRecoveryReason },
+    RejectNoInit,
+}
+
+/// Determines the startup model action from the loaded config and CLI flags.
+///
+/// This is the single production source for the "should we open the model
+/// picker?" decision. After removing the active provider via
+/// `ConfigStore::unset_provider`, the next `Config::load()` will yield a
+/// config where `api_key()` returns `Err`, and this function returns
+/// `OpenModelPicker { reason: MissingApiKey }`.
+pub(crate) fn resolve_startup_model_action(
+    config: &talos_config::Config,
+    mock_mode: bool,
+    no_init: bool,
+) -> StartupModelAction {
+    let needs_model_setup = config.model.is_empty() && !mock_mode;
+    if needs_model_setup {
+        return if !mock_mode && no_init {
+            StartupModelAction::RejectNoInit
+        } else {
+            StartupModelAction::OpenModelPicker {
+                reason: StartupModelRecoveryReason::EmptyModel,
+            }
+        };
+    }
+
+    let needs_api_key = !mock_mode && config.api_key().is_err();
+    if needs_api_key {
+        return if !mock_mode && no_init {
+            StartupModelAction::RejectNoInit
+        } else {
+            StartupModelAction::OpenModelPicker {
+                reason: StartupModelRecoveryReason::MissingApiKey,
+            }
+        };
+    }
+
+    StartupModelAction::Ready
+}

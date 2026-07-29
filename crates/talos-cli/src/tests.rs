@@ -1848,6 +1848,115 @@ api_key_env = "ANTHROPIC_API_KEY"
             "is_secret_key must still identify api_key keys after clear"
         );
     }
+
+    // -----------------------------------------------------------------
+    // MODEL-010 / I157 correction: startup model recovery seam tests
+    // -----------------------------------------------------------------
+
+    use crate::mode_runners::{
+        StartupModelAction, StartupModelRecoveryReason, resolve_startup_model_action,
+    };
+
+    #[test]
+    fn active_custom_provider_unset_reaches_startup_picker() {
+        let mut config = talos_config::Config {
+            provider: "my-active".to_string(),
+            model: "some-model".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "my-active".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("active-key".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.my-active").unwrap();
+
+        let action = resolve_startup_model_action(&config, false, false);
+        assert_eq!(
+            action,
+            StartupModelAction::OpenModelPicker {
+                reason: StartupModelRecoveryReason::MissingApiKey
+            },
+            "active custom provider removal must reach startup picker"
+        );
+    }
+
+    #[test]
+    fn active_builtin_provider_unset_reaches_startup_picker() {
+        let mut config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "anthropic".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("sk-ant-active".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.anthropic").unwrap();
+
+        let action = resolve_startup_model_action(&config, false, false);
+        assert_eq!(
+            action,
+            StartupModelAction::OpenModelPicker {
+                reason: StartupModelRecoveryReason::MissingApiKey
+            },
+            "active builtin provider removal must reach startup picker"
+        );
+    }
+
+    #[test]
+    fn active_provider_unset_with_no_init_preserves_existing_error() {
+        let mut config = talos_config::Config {
+            provider: "my-active".to_string(),
+            model: "some-model".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "my-active".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("active-key".to_string()),
+                ..Default::default()
+            },
+        );
+
+        config.unset_dotted("providers.my-active").unwrap();
+
+        let action = resolve_startup_model_action(&config, false, true);
+        assert_eq!(
+            action,
+            StartupModelAction::RejectNoInit,
+            "--no-init with missing api_key must preserve existing rejection"
+        );
+    }
+
+    #[test]
+    fn active_provider_unset_does_not_panic_config_resolution() {
+        let mut config = talos_config::Config {
+            provider: "deleted-provider".to_string(),
+            model: "some-model".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "deleted-provider".to_string(),
+            talos_config::ProviderConfig {
+                api_key: Some("active-key".to_string()),
+                ..Default::default()
+            },
+        );
+        config.unset_dotted("providers.deleted-provider").unwrap();
+
+        let _provider_config = config.active_provider_config();
+        let _api_result = config.api_key();
+        let action = resolve_startup_model_action(&config, false, false);
+        assert!(matches!(action, StartupModelAction::OpenModelPicker { .. }));
+    }
 }
 
 #[cfg(test)]
