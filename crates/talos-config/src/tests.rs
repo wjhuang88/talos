@@ -1973,8 +1973,13 @@ fn reload_via_config_load(dir: &Path) -> Config {
                     if provider.api_key.is_none() {
                         provider.api_key = Some(key.clone());
                     }
-                } else if let Some(builtin) = crate::builtin_provider_config(name) {
-                    let mut provider = builtin;
+                } else {
+                    let mut provider = crate::builtin_provider_config(name).unwrap_or_else(|| {
+                        crate::ProviderConfig {
+                            protocol: crate::ProviderProtocol::OpenAIChat,
+                            ..Default::default()
+                        }
+                    });
                     provider.api_key = Some(key.clone());
                     config.providers.insert(name.clone(), provider);
                 }
@@ -2376,10 +2381,10 @@ fn store_unset_credential_not_in_files_after_success() {
 }
 
 // ---------------------------------------------------------------------------
-// I157 Transaction Atomicity Correction: failure injection + byte identity
+// I157 Recoverable Transaction: failure injection + byte identity
 // ---------------------------------------------------------------------------
 
-use crate::store::TransactionFs;
+use crate::store::Fs;
 use std::cell::Cell;
 
 struct FaultyFs {
@@ -2394,37 +2399,54 @@ impl FaultyFs {
             write_count: Cell::new(0),
         }
     }
+
+    fn check(&self) -> Result<(), ConfigError> {
+        let n = self.write_count.get();
+        self.write_count.set(n + 1);
+        if self.fail_at_write == Some(n) {
+            return Err(ConfigError::IoError(std::io::Error::other(
+                "injected failure",
+            )));
+        }
+        Ok(())
+    }
 }
 
-impl TransactionFs for FaultyFs {
-    fn exists(&self, path: &Path) -> bool {
-        path.exists()
+impl Fs for FaultyFs {
+    fn exists(&self, p: &Path) -> bool {
+        p.exists()
     }
-
-    fn read_to_string(&self, path: &Path) -> Result<String, ConfigError> {
-        std::fs::read_to_string(path).map_err(ConfigError::IoError)
+    fn read(&self, p: &Path) -> Result<Vec<u8>, ConfigError> {
+        std::fs::read(p).map_err(ConfigError::IoError)
     }
-
-    fn atomic_write(&self, path: &Path, content: &str) -> Result<(), ConfigError> {
-        let n = self.write_count.get();
-        self.write_count.set(n + 1);
-        if self.fail_at_write == Some(n) {
-            return Err(ConfigError::IoError(std::io::Error::other(
-                "injected write failure",
-            )));
-        }
-        crate::store::atomic_write_for_test(path, content)
+    fn atomic_write(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
+        self.check()?;
+        crate::atomic_file::durable_replace(p, c)
     }
-
-    fn remove_file(&self, path: &Path) -> Result<(), ConfigError> {
-        let n = self.write_count.get();
-        self.write_count.set(n + 1);
-        if self.fail_at_write == Some(n) {
-            return Err(ConfigError::IoError(std::io::Error::other(
-                "injected remove failure",
-            )));
-        }
-        std::fs::remove_file(path).map_err(ConfigError::IoError)
+    fn write_secure(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
+        self.check()?;
+        crate::atomic_file::write_file_synced(p, c)
+    }
+    fn mkdir(&self, p: &Path) -> Result<(), ConfigError> {
+        self.check()?;
+        crate::atomic_file::create_dir_secure(p)
+    }
+    fn remove_file(&self, p: &Path) -> Result<(), ConfigError> {
+        self.check()?;
+        std::fs::remove_file(p).map_err(ConfigError::IoError)
+    }
+    fn remove_dir(&self, p: &Path) -> Result<(), ConfigError> {
+        self.check()?;
+        std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
+    }
+    fn sync_dir(&self, _d: &Path) -> Result<(), ConfigError> {
+        Ok(())
+    }
+    fn list_dir(&self, d: &Path) -> Result<Vec<PathBuf>, ConfigError> {
+        std::fs::read_dir(d)
+            .map_err(ConfigError::IoError)?
+            .map(|e| e.map(|e| e.path()).map_err(ConfigError::IoError))
+            .collect()
     }
 }
 
@@ -2475,7 +2497,7 @@ fn config_write_failure_leaves_both_files_byte_identical() {
 
     let store = make_store(&dir);
     let fs = FaultyFs::new(Some(0)); // Fail at first write (config)
-    let result = store.unset_provider_inner("providers.custom-a", &fs);
+    let result = store.run("providers.custom-a", &fs);
     assert!(result.is_err(), "must return error on config write failure");
 
     let (config_after, creds_after) = read_both_files(&dir);
@@ -2492,8 +2514,8 @@ fn config_write_failure_leaves_both_files_byte_identical() {
 }
 
 #[test]
-fn credentials_write_failure_leaves_config_updated_and_orphan_reconciled_on_reload() {
-    let dir = unique_test_dir("creds-fail");
+fn credentials_write_failure_rolls_back_both_files() {
+    let dir = unique_test_dir("creds-fail-rollback");
     let mut config = Config::default();
     config.provider = "custom-a".to_string();
     config.model = "model-a".to_string();
@@ -2508,41 +2530,41 @@ fn credentials_write_failure_leaves_config_updated_and_orphan_reconciled_on_relo
     creds
         .keys
         .insert("custom-a".to_string(), "sk-creds-a".to_string());
-    let (_, creds_before) = write_both_files(&dir, &config, Some(&creds));
+    let (config_before, creds_before) = write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(1)); // Fail at second write (credentials)
-    let result = store.unset_provider_inner("providers.custom-a", &fs);
+    // Step 0: mkdir, 1: write config.before, 2: write cred.before,
+    // 3: write manifest(Prepared), 4: atomic manifest(Applying),
+    // 5: atomic config.toml, 6: atomic credentials.toml → fail here
+    let fs = FaultyFs::new(Some(6));
+    let result = store.run("providers.custom-a", &fs);
     assert!(
         result.is_err(),
         "must return error on credentials write failure"
     );
 
-    let config_raw = std::fs::read_to_string(dir.join("config.toml")).unwrap();
-    let parsed: Config = toml::from_str(&config_raw).unwrap();
-    assert!(
-        !parsed.providers.contains_key("custom-a"),
-        "config must be updated (config-first order)"
+    let (config_after, creds_after) = read_both_files(&dir);
+    assert_eq!(
+        config_before, config_after,
+        "config.toml must be byte-identical after rollback"
     );
-
-    let creds_after = fs::read(dir.join("credentials.toml")).unwrap_or_default();
     assert_eq!(
         creds_before, creds_after,
-        "credentials.toml must be unchanged when credentials write fails"
+        "credentials.toml must be byte-identical after rollback"
     );
 
     let reloaded = reload_via_config_load(&dir);
     assert!(
-        !reloaded.providers.contains_key("custom-a"),
-        "orphan credential must NOT be resurrected on reload"
+        reloaded.providers.contains_key("custom-a"),
+        "provider must be present after rollback — original state restored"
     );
 
     let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn credentials_removal_failure_leaves_config_updated_and_orphan_reconciled() {
-    let dir = unique_test_dir("creds-remove-fail");
+fn credentials_removal_failure_rolls_back_both_files() {
+    let dir = unique_test_dir("creds-remove-rollback");
     let mut config = Config::default();
     config.provider = "only-one".to_string();
     config.model = "model-a".to_string();
@@ -2557,24 +2579,18 @@ fn credentials_removal_failure_leaves_config_updated_and_orphan_reconciled() {
     creds
         .keys
         .insert("only-one".to_string(), "sk-only-creds".to_string());
-    let (_, creds_before) = write_both_files(&dir, &config, Some(&creds));
+    let (config_before, creds_before) = write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(1)); // Fail at second mutation (credentials remove)
-    let result = store.unset_provider_inner("providers.only-one", &fs);
+    let fs = FaultyFs::new(Some(6)); // fail at credentials remove
+    let result = store.run("providers.only-one", &fs);
     assert!(result.is_err());
 
-    let config_raw = std::fs::read_to_string(dir.join("config.toml")).unwrap();
-    let parsed: Config = toml::from_str(&config_raw).unwrap();
-    assert!(!parsed.providers.contains_key("only-one"));
-
-    let creds_after = std::fs::read(dir.join("credentials.toml")).unwrap_or_default();
+    let (config_after, creds_after) = read_both_files(&dir);
+    assert_eq!(config_before, config_after);
     assert_eq!(creds_before, creds_after);
 
-    let reloaded = reload_via_config_load(&dir);
-    assert!(!reloaded.providers.contains_key("only-one"));
-
-    let _ = std::fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -2606,8 +2622,8 @@ fn transaction_success_no_temp_residual() {
 }
 
 #[test]
-fn orphan_credential_for_non_builtin_not_injected_on_load() {
-    let dir = unique_test_dir("orphan-skip");
+fn credentials_only_custom_provider_still_merged_on_load() {
+    let dir = unique_test_dir("custom-merge");
     let mut config = Config::default();
     config.provider = "real-provider".to_string();
     config.model = "model-a".to_string();
@@ -2629,10 +2645,9 @@ fn orphan_credential_for_non_builtin_not_injected_on_load() {
 
     let reloaded = reload_via_config_load(&dir);
     assert!(
-        !reloaded.providers.contains_key("orphan-custom"),
-        "orphan credential for non-builtin provider must not be injected"
+        reloaded.providers.contains_key("orphan-custom"),
+        "pre-I157 merge_credentials must create entry for custom credentials-only provider"
     );
-    assert!(reloaded.providers.contains_key("real-provider"));
 
     let _ = fs::remove_dir_all(&dir);
 }

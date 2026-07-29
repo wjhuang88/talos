@@ -1,11 +1,14 @@
-use crate::{
-    Config, ConfigError, ConfigUnsetOutcome, Credentials, builtin_provider_config, home_dir,
-};
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+//! Two-file transaction coordinator for provider removal (MODEL-010).
+//!
+//! Uses [`atomic_file`] for single-file replacement. Owns the journal,
+//! rollback, and `Config::load` recovery for the config.toml +
+//! credentials.toml pair.
 
-static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+use crate::{
+    Config, ConfigError, ConfigUnsetOutcome, Credentials, atomic_file, builtin_provider_config,
+    home_dir,
+};
+use std::path::{Path, PathBuf};
 
 pub struct ConfigStore {
     config_path: PathBuf,
@@ -15,11 +18,11 @@ pub struct ConfigStore {
 impl ConfigStore {
     #[must_use]
     pub fn default_store() -> Self {
-        let mut config_dir = home_dir();
-        config_dir.push(".talos");
+        let mut dir = home_dir();
+        dir.push(".talos");
         Self {
-            config_path: config_dir.join("config.toml"),
-            credentials_path: config_dir.join("credentials.toml"),
+            config_path: dir.join("config.toml"),
+            credentials_path: dir.join("credentials.toml"),
         }
     }
 
@@ -32,259 +35,335 @@ impl ConfigStore {
     }
 
     pub fn unset_provider(&self, key: &str) -> Result<ConfigUnsetOutcome, ConfigError> {
-        self.unset_provider_inner(key, &StdFs)
+        self.run(key, &StdFs)
     }
 
-    pub(crate) fn unset_provider_inner(
-        &self,
-        key: &str,
-        fs: &dyn TransactionFs,
-    ) -> Result<ConfigUnsetOutcome, ConfigError> {
-        let mut config = self.load_raw_config(fs)?;
-        let mut credentials = self.load_raw_credentials(fs)?;
+    pub(crate) fn run(&self, key: &str, fs: &dyn Fs) -> Result<ConfigUnsetOutcome, ConfigError> {
+        self.recover(fs)?;
 
-        let parts: Vec<&str> = key.split('.').collect();
-        let (outcome, config_changed, creds_changed) = match parts.as_slice() {
-            ["providers", name] => {
-                let was_in_config = config.providers.remove(*name).is_some();
-                let was_in_credentials = credentials.keys.remove(*name).is_some();
+        let cfg_before = fs.read_opt(&self.config_path)?;
+        let cred_before = fs.read_opt(&self.credentials_path)?;
 
-                if !was_in_config && !was_in_credentials {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "provider '{name}' not found in user configuration or credentials"
-                    )));
-                }
+        let mut config: Config = parse_or_default(&cfg_before);
+        let mut creds: Credentials = parse_or_default(&cred_before);
 
-                let oc = if builtin_provider_config(name).is_some() {
-                    ConfigUnsetOutcome::BuiltinProviderDisconnected {
-                        name: (*name).to_string(),
-                    }
-                } else {
-                    ConfigUnsetOutcome::CustomProviderRemoved {
-                        name: (*name).to_string(),
-                    }
-                };
-                (oc, was_in_config, was_in_credentials)
-            }
-            ["providers", name, "api_key"] => {
-                let mut cfg_changed = false;
-                let mut crd_changed = false;
+        let outcome = mutate(&mut config, &mut creds, key)?;
 
-                if let Some(provider) = config.providers.get_mut(*name)
-                    && provider.api_key.is_some()
-                {
-                    provider.api_key = None;
-                    cfg_changed = true;
-                }
+        let cfg_after = serialize(&config)?;
+        reparse::<Config>(&cfg_after)?;
 
-                if credentials.keys.remove(*name).is_some() {
-                    crd_changed = true;
-                }
-
-                if !cfg_changed && !crd_changed {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "providers.{name}.api_key not found in user configuration or credentials"
-                    )));
-                }
-
-                (
-                    ConfigUnsetOutcome::ApiKeyCleared {
-                        name: (*name).to_string(),
-                    },
-                    cfg_changed,
-                    crd_changed,
-                )
-            }
-            _ => {
-                return Err(ConfigError::InvalidConfig(format!(
-                    "unsupported unset key: '{key}' — only 'providers.<name>' and \
-                     'providers.<name>.api_key' are supported"
-                )));
-            }
+        let cred_after_exists = !creds.keys.is_empty();
+        let cred_after = if cred_after_exists {
+            let s = serialize(&creds)?;
+            reparse::<Credentials>(&s)?;
+            s
+        } else {
+            Vec::new()
         };
 
-        if config_changed {
-            let config_toml = toml::to_string_pretty(&config)
-                .map_err(|e| ConfigError::SerializeError(e.to_string()))?;
-            let _: Config =
-                toml::from_str(&config_toml).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        let txn = Txn {
+            cfg_existed: cfg_before.is_some(),
+            cfg_after_exists: true,
+            cred_existed: cred_before.is_some(),
+            cred_after_exists,
+            cfg_before: cfg_before.unwrap_or_default(),
+            cfg_after,
+            cred_before: cred_before.unwrap_or_default(),
+            cred_after,
+        };
+
+        let dir = self.txn_dir();
+
+        prepare(fs, &dir, &txn)?;
+
+        if let Err(e) = apply(fs, &dir, &self.config_path, &self.credentials_path, &txn) {
+            let _ = rollback(fs, &dir, &self.config_path, &self.credentials_path, &txn);
+            let _ = cleanup(fs, &dir);
+            return Err(e);
         }
 
-        // Canonical write order for removal: config FIRST, then credentials.
-        // If we crash after config but before credentials, the provider is gone
-        // from config.toml while the old credential lingers in credentials.toml.
-        // On the next Config::load(), merge_credentials skips orphan credentials
-        // for non-builtin providers absent from config — preventing resurrection.
-        // The orphan is naturally cleaned up on the next unset operation.
-        if config_changed {
-            let config_toml = toml::to_string_pretty(&config)
-                .map_err(|e| ConfigError::SerializeError(e.to_string()))?;
-            fs.atomic_write(&self.config_path, &config_toml)?;
-        }
-
-        if creds_changed {
-            if credentials.keys.is_empty() {
-                if fs.exists(&self.credentials_path) {
-                    fs.remove_file(&self.credentials_path)?;
-                }
-            } else {
-                let creds_toml = toml::to_string_pretty(&credentials)
-                    .map_err(|e| ConfigError::SerializeError(e.to_string()))?;
-                let _: Credentials = toml::from_str(&creds_toml)
-                    .map_err(|e| ConfigError::ParseError(e.to_string()))?;
-                fs.atomic_write(&self.credentials_path, &creds_toml)?;
-            }
-        }
-
+        let _ = cleanup(fs, &dir);
         Ok(outcome)
     }
 
-    fn load_raw_config(&self, fs: &dyn TransactionFs) -> Result<Config, ConfigError> {
-        if !fs.exists(&self.config_path) {
-            return Ok(Config::default());
-        }
-        let raw = fs.read_to_string(&self.config_path)?;
-        toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))
+    pub fn recover_pending() {
+        let _ = Self::default_store().recover(&StdFs);
     }
 
-    fn load_raw_credentials(&self, fs: &dyn TransactionFs) -> Result<Credentials, ConfigError> {
-        if !fs.exists(&self.credentials_path) {
-            return Ok(Credentials::default());
+    pub(crate) fn recover(&self, fs: &dyn Fs) -> Result<(), ConfigError> {
+        let dir = self.txn_dir();
+        if !fs.exists(&dir) {
+            return Ok(());
         }
-        let raw = fs.read_to_string(&self.credentials_path)?;
-        toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))
+        let manifest = dir.join("manifest");
+        if !fs.exists(&manifest) {
+            let _ = cleanup(fs, &dir);
+            return Ok(());
+        }
+        let raw = fs.read(&manifest)?;
+        let phase = field(&raw, "phase");
+
+        if phase == "Committed" {
+            let _ = cleanup(fs, &dir);
+            return Ok(());
+        }
+
+        let cfg_existed = field(&raw, "cfg_existed") == "true";
+        let cred_existed = field(&raw, "cred_existed") == "true";
+
+        let cfg_before = if cfg_existed {
+            Some(fs.read(&dir.join("config.before"))?)
+        } else {
+            None
+        };
+        let cred_before = if cred_existed {
+            Some(fs.read(&dir.join("credentials.before"))?)
+        } else {
+            None
+        };
+
+        restore(fs, &self.config_path, cfg_before.as_deref())?;
+        restore(fs, &self.credentials_path, cred_before.as_deref())?;
+        let _ = cleanup(fs, &dir);
+        Ok(())
+    }
+
+    fn txn_dir(&self) -> PathBuf {
+        self.config_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(".provider-unset-transaction")
     }
 }
 
-pub(crate) trait TransactionFs {
+fn mutate(
+    config: &mut Config,
+    creds: &mut Credentials,
+    key: &str,
+) -> Result<ConfigUnsetOutcome, ConfigError> {
+    let parts: Vec<&str> = key.split('.').collect();
+    match parts.as_slice() {
+        ["providers", name] => {
+            let in_cfg = config.providers.remove(*name).is_some();
+            let in_cred = creds.keys.remove(*name).is_some();
+            if !in_cfg && !in_cred {
+                return Err(ConfigError::InvalidConfig(format!(
+                    "provider '{name}' not found"
+                )));
+            }
+            Ok(if builtin_provider_config(name).is_some() {
+                ConfigUnsetOutcome::BuiltinProviderDisconnected {
+                    name: (*name).to_string(),
+                }
+            } else {
+                ConfigUnsetOutcome::CustomProviderRemoved {
+                    name: (*name).to_string(),
+                }
+            })
+        }
+        ["providers", name, "api_key"] => {
+            let mut changed = false;
+            if let Some(p) = config.providers.get_mut(*name)
+                && p.api_key.is_some()
+            {
+                p.api_key = None;
+                changed = true;
+            }
+            if creds.keys.remove(*name).is_some() {
+                changed = true;
+            }
+            if !changed {
+                return Err(ConfigError::InvalidConfig(format!(
+                    "providers.{name}.api_key not found"
+                )));
+            }
+            Ok(ConfigUnsetOutcome::ApiKeyCleared {
+                name: (*name).to_string(),
+            })
+        }
+        _ => Err(ConfigError::InvalidConfig(format!(
+            "unsupported unset key: '{key}'"
+        ))),
+    }
+}
+
+struct Txn {
+    cfg_existed: bool,
+    cfg_after_exists: bool,
+    cred_existed: bool,
+    cred_after_exists: bool,
+    cfg_before: Vec<u8>,
+    cfg_after: Vec<u8>,
+    cred_before: Vec<u8>,
+    cred_after: Vec<u8>,
+}
+
+fn manifest(phase: &str, t: &Txn) -> String {
+    format!(
+        "phase={phase}\n\
+         cfg_existed={}\ncfg_after_exists={}\n\
+         cred_existed={}\ncred_after_exists={}\n",
+        t.cfg_existed, t.cfg_after_exists, t.cred_existed, t.cred_after_exists
+    )
+}
+
+fn prepare(fs: &dyn Fs, dir: &Path, t: &Txn) -> Result<(), ConfigError> {
+    fs.mkdir(dir)?;
+    if t.cfg_existed {
+        fs.write_secure(&dir.join("config.before"), &t.cfg_before)?;
+    }
+    if t.cred_existed {
+        fs.write_secure(&dir.join("credentials.before"), &t.cred_before)?;
+    }
+    fs.write_secure(&dir.join("manifest"), manifest("Prepared", t).as_bytes())?;
+    fs.sync_dir(dir)?;
+    Ok(())
+}
+
+fn apply(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
+    fs.atomic_write(&dir.join("manifest"), manifest("Applying", t).as_bytes())?;
+    fs.atomic_write(cfg, &t.cfg_after)?;
+    if t.cred_after_exists {
+        fs.atomic_write(cred, &t.cred_after)?;
+    } else if fs.exists(cred) {
+        fs.remove_file(cred)?;
+    }
+    fs.atomic_write(&dir.join("manifest"), manifest("Committed", t).as_bytes())?;
+    Ok(())
+}
+
+fn rollback(fs: &dyn Fs, dir: &Path, cfg: &Path, cred: &Path, t: &Txn) -> Result<(), ConfigError> {
+    let _ = fs.atomic_write(
+        &dir.join("manifest"),
+        manifest("RollbackRequired", t).as_bytes(),
+    );
+    restore(
+        fs,
+        cfg,
+        if t.cfg_existed {
+            Some(&t.cfg_before)
+        } else {
+            None
+        },
+    )?;
+    restore(
+        fs,
+        cred,
+        if t.cred_existed {
+            Some(&t.cred_before)
+        } else {
+            None
+        },
+    )?;
+    Ok(())
+}
+
+fn restore(fs: &dyn Fs, path: &Path, before: Option<&[u8]>) -> Result<(), ConfigError> {
+    match before {
+        Some(bytes) => fs.atomic_write(path, bytes)?,
+        None => {
+            if fs.exists(path) {
+                fs.remove_file(path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cleanup(fs: &dyn Fs, dir: &Path) -> Result<(), ConfigError> {
+    if !fs.exists(dir) {
+        return Ok(());
+    }
+    for entry in fs.list_dir(dir)? {
+        let _ = fs.remove_file(&entry);
+    }
+    fs.remove_dir(dir)?;
+    Ok(())
+}
+
+fn serialize<T: serde::Serialize>(val: &T) -> Result<Vec<u8>, ConfigError> {
+    toml::to_string_pretty(val)
+        .map(|s| s.into_bytes())
+        .map_err(|e| ConfigError::SerializeError(e.to_string()))
+}
+
+fn parse_or_default<T>(opt: &Option<Vec<u8>>) -> T
+where
+    T: Default + serde::de::DeserializeOwned,
+{
+    opt.as_ref()
+        .and_then(|b| toml::from_str(&String::from_utf8_lossy(b)).ok())
+        .unwrap_or_default()
+}
+
+fn reparse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<(), ConfigError> {
+    toml::from_str::<T>(&String::from_utf8_lossy(bytes))
+        .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+    Ok(())
+}
+
+fn field(raw: &[u8], key: &str) -> String {
+    for line in String::from_utf8_lossy(raw).lines() {
+        if let Some((k, v)) = line.split_once('=')
+            && k.trim() == key
+        {
+            return v.trim().to_string();
+        }
+    }
+    String::new()
+}
+
+pub(crate) trait Fs {
     fn exists(&self, path: &Path) -> bool;
-    fn read_to_string(&self, path: &Path) -> Result<String, ConfigError>;
-    fn atomic_write(&self, path: &Path, content: &str) -> Result<(), ConfigError>;
+    fn read(&self, path: &Path) -> Result<Vec<u8>, ConfigError>;
+    fn read_opt(&self, path: &Path) -> Result<Option<Vec<u8>>, ConfigError> {
+        if self.exists(path) {
+            Ok(Some(self.read(path)?))
+        } else {
+            Ok(None)
+        }
+    }
+    fn atomic_write(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError>;
+    fn write_secure(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError>;
+    fn mkdir(&self, path: &Path) -> Result<(), ConfigError>;
     fn remove_file(&self, path: &Path) -> Result<(), ConfigError>;
+    fn remove_dir(&self, path: &Path) -> Result<(), ConfigError>;
+    fn sync_dir(&self, dir: &Path) -> Result<(), ConfigError>;
+    fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, ConfigError>;
 }
 
 struct StdFs;
 
-impl TransactionFs for StdFs {
-    fn exists(&self, path: &Path) -> bool {
-        path.exists()
+impl Fs for StdFs {
+    fn exists(&self, p: &Path) -> bool {
+        p.exists()
     }
-
-    fn read_to_string(&self, path: &Path) -> Result<String, ConfigError> {
-        std::fs::read_to_string(path).map_err(ConfigError::IoError)
+    fn read(&self, p: &Path) -> Result<Vec<u8>, ConfigError> {
+        std::fs::read(p).map_err(ConfigError::IoError)
     }
-
-    fn atomic_write(&self, path: &Path, content: &str) -> Result<(), ConfigError> {
-        atomic_write_impl(path, content)
+    fn atomic_write(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
+        atomic_file::durable_replace(p, c)
     }
-
-    fn remove_file(&self, path: &Path) -> Result<(), ConfigError> {
-        std::fs::remove_file(path).map_err(ConfigError::IoError)
+    fn write_secure(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
+        atomic_file::write_file_synced(p, c)
     }
-}
-
-fn atomic_write_impl(path: &Path, content: &str) -> Result<(), ConfigError> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| ConfigError::InvalidConfig("path has no parent directory".to_string()))?;
-
-    std::fs::create_dir_all(dir)?;
-
-    let counter = TEMP_COUNTER.fetch_add(1, Ordering::SeqCst);
-    let temp_name = format!(
-        ".{}.tmp.{}.{}",
-        path.file_name()
-            .map(|f| f.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "config".to_string()),
-        std::process::id(),
-        counter
-    );
-    let temp_path = dir.join(&temp_name);
-
-    let _ = std::fs::remove_file(&temp_path);
-
-    create_secure_file(&temp_path, path)?;
-    {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(&temp_path)
-            .map_err(|e| {
-                let _ = std::fs::remove_file(&temp_path);
-                ConfigError::IoError(e)
-            })?;
-        file.write_all(content.as_bytes()).map_err(|e| {
-            let _ = std::fs::remove_file(&temp_path);
-            ConfigError::IoError(e)
-        })?;
-        file.flush().map_err(|e| {
-            let _ = std::fs::remove_file(&temp_path);
-            ConfigError::IoError(e)
-        })?;
-        file.sync_all().map_err(|e| {
-            let _ = std::fs::remove_file(&temp_path);
-            ConfigError::IoError(e)
-        })?;
+    fn mkdir(&self, p: &Path) -> Result<(), ConfigError> {
+        atomic_file::create_dir_secure(p)
     }
-
-    copy_permissions(&temp_path, path)?;
-
-    if let Err(e) = std::fs::rename(&temp_path, path) {
-        let _ = std::fs::remove_file(&temp_path);
-        return Err(ConfigError::IoError(e));
+    fn remove_file(&self, p: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_file(p).map_err(ConfigError::IoError)
     }
-
-    sync_parent_dir(dir);
-
-    Ok(())
-}
-
-#[cfg(unix)]
-fn create_secure_file(temp_path: &Path, ref_path: &Path) -> Result<(), ConfigError> {
-    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-    let mut opts = std::fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
-    if let Ok(meta) = std::fs::metadata(ref_path) {
-        opts.mode(meta.permissions().mode());
-    } else {
-        opts.mode(0o600);
+    fn remove_dir(&self, p: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
     }
-    opts.open(temp_path).map_err(ConfigError::IoError)?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn create_secure_file(temp_path: &Path, _ref_path: &Path) -> Result<(), ConfigError> {
-    std::fs::File::create(temp_path).map_err(ConfigError::IoError)?;
-    Ok(())
-}
-
-#[cfg(unix)]
-fn copy_permissions(temp_path: &Path, ref_path: &Path) -> Result<(), ConfigError> {
-    if let Ok(meta) = std::fs::metadata(ref_path) {
-        std::fs::set_permissions(temp_path, meta.permissions()).map_err(|e| {
-            let _ = std::fs::remove_file(temp_path);
-            ConfigError::IoError(e)
-        })?;
+    fn sync_dir(&self, d: &Path) -> Result<(), ConfigError> {
+        atomic_file::sync_dir(d);
+        Ok(())
     }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn copy_permissions(_temp_path: &Path, _ref_path: &Path) -> Result<(), ConfigError> {
-    Ok(())
-}
-
-#[cfg(unix)]
-fn sync_parent_dir(dir: &Path) {
-    if let Ok(dir_file) = std::fs::File::open(dir) {
-        let _ = dir_file.sync_all();
+    fn list_dir(&self, d: &Path) -> Result<Vec<PathBuf>, ConfigError> {
+        std::fs::read_dir(d)
+            .map_err(ConfigError::IoError)?
+            .map(|e| e.map(|e| e.path()).map_err(ConfigError::IoError))
+            .collect()
     }
-}
-
-#[cfg(not(unix))]
-fn sync_parent_dir(_dir: &Path) {}
-
-#[cfg(test)]
-pub(crate) fn atomic_write_for_test(path: &Path, content: &str) -> Result<(), ConfigError> {
-    atomic_write_impl(path, content)
 }

@@ -7,6 +7,7 @@ pub mod agents;
 pub mod model;
 pub mod opencode;
 
+mod atomic_file;
 mod builtin;
 mod config;
 mod credentials;

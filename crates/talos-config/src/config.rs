@@ -33,6 +33,8 @@ impl Config {
     /// call [`Config::validate`] explicitly after applying the edit, before
     /// saving.
     pub fn load() -> Result<Self, ConfigError> {
+        crate::store::ConfigStore::recover_pending();
+
         let path = Self::default_path();
         if !path.exists() {
             return Ok(Self::default());
@@ -602,19 +604,19 @@ impl Config {
     /// Merges credentials into this config's provider `api_key` fields.
     ///
     /// For each provider that has a stored credential but no inline key,
-    /// the credential is injected into `api_key`. Credentials for non-builtin
-    /// providers absent from `self.providers` are treated as orphans and
-    /// skipped — this prevents credential resurrection after a provider is
-    /// removed via `ConfigStore::unset_provider` but the process crashes
-    /// before the credential is removed from `credentials.toml`.
+    /// the credential is injected into `api_key`.
     fn merge_credentials(&mut self, creds: &Credentials) {
         for (name, key) in &creds.keys {
             if let Some(provider) = self.providers.get_mut(name) {
                 if provider.api_key.is_none() {
                     provider.api_key = Some(key.clone());
                 }
-            } else if let Some(builtin) = builtin_provider_config(name) {
-                let mut provider = builtin;
+            } else {
+                let mut provider =
+                    builtin_provider_config(name).unwrap_or_else(|| ProviderConfig {
+                        protocol: ProviderProtocol::OpenAIChat,
+                        ..Default::default()
+                    });
                 provider.api_key = Some(key.clone());
                 self.providers.insert(name.clone(), provider);
             }
