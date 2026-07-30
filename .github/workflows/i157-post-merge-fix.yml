@@ -1,0 +1,599 @@
+name: I157 post-merge correction
+
+on:
+  push:
+    branches:
+      - automation/i157-post-merge-fix
+
+permissions:
+  contents: write
+
+jobs:
+  apply-correction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i157-post-merge-durability-concurrency
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Apply correction
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          # Semantic checkpoints for stale-before CAS and conflict terminalization.
+          replace_once(
+              "crates/talos-config/src/store/fs.rs",
+              "    VerifyConfigAfter,\n    VerifyCredentialsAfter,\n    WriteCommittedManifest,\n",
+              "    VerifyConfigAfter,\n    VerifyCredentialsAfter,\n    VerifyConfigBeforeApply,\n    VerifyCredentialsBeforeApply,\n    WriteCommittedManifest,\n    WriteAbortedManifest,\n",
+          )
+
+          # Store-level before-image CAS after active journal publication.
+          replace_once(
+              "crates/talos-config/src/store.rs",
+              "use journal::{FinalizeOutcome, Txn, apply, finalize_active, gen_txn_id, prepare, rollback};",
+              "use journal::{\n    FinalizeOutcome, Phase, Txn, apply, finalize_active, gen_txn_id, prepare, rollback,\n    write_manifest,\n};",
+          )
+          replace_once(
+              "crates/talos-config/src/store.rs",
+              "        prepare(fs, &active_dir, &txn, &txn_id)?;\n\n        if let Err(apply_err) = apply(\n",
+              "        prepare(fs, &active_dir, &txn, &txn_id)?;\n\n        if !before_state_matches(\n            fs,\n            &self.config_path,\n            &self.credentials_path,\n            &txn,\n        )? {\n            fs.checkpoint(FsOperation::WriteAbortedManifest)?;\n            write_manifest(fs, &active_dir, Phase::Aborted, &txn_id, &txn)?;\n            match finalize_active(fs, &active_dir, &txn_id) {\n                Ok(FinalizeOutcome::Finalized) => {}\n                Ok(pending) => log_finalize_pending(\"concurrent-abort\", &pending),\n                Err(error) => tracing::warn!(\n                    error = %error,\n                    \"ambiguous provider configuration finalization after concurrent abort\"\n                ),\n            }\n            return Err(concurrent_mutation_error());\n        }\n\n        if let Err(apply_err) = apply(\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store.rs",
+              "pub(super) fn ambiguous_finalization_error() -> ConfigError {\n",
+              "pub(super) fn concurrent_mutation_error() -> ConfigError {\n    ConfigError::InvalidConfig(\n        \"provider configuration changed concurrently; retry the mutation\".into(),\n    )\n}\n\npub(super) fn before_state_matches(\n    fs: &dyn Fs,\n    config_path: &std::path::Path,\n    credentials_path: &std::path::Path,\n    txn: &Txn,\n) -> Result<bool, ConfigError> {\n    fs.checkpoint(FsOperation::VerifyConfigBeforeApply)?;\n    let actual_config = fs.read_opt(config_path)?;\n    fs.checkpoint(FsOperation::VerifyCredentialsBeforeApply)?;\n    let actual_credentials = fs.read_opt(credentials_path)?;\n\n    Ok(\n        actual_config.as_deref()\n            == if txn.cfg_existed {\n                Some(txn.cfg_before.as_slice())\n            } else {\n                None\n            }\n            && actual_credentials.as_deref()\n                == if txn.cred_existed {\n                    Some(txn.cred_before.as_slice())\n                } else {\n                    None\n                },\n    )\n}\n\npub(super) fn ambiguous_finalization_error() -> ConfigError {\n",
+          )
+
+          # Add an explicit Aborted terminal phase for a published journal that never mutated targets.
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "    RolledBack,\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(super) enum TerminalPhase {\n    Committed,\n    RolledBack,\n}",
+              "    RolledBack,\n    Aborted,\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(super) enum TerminalPhase {\n    Committed,\n    RolledBack,\n    Aborted,\n}",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "    let (config_image, credentials_image) = match phase {\n        TerminalPhase::Committed => (",
+              "    if phase == TerminalPhase::Aborted {\n        return Ok(());\n    }\n\n    let (config_image, credentials_image) = match phase {\n        TerminalPhase::Committed => (",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "        TerminalPhase::RolledBack => (\n            read_image(\n",
+              "        TerminalPhase::RolledBack => (\n            read_image(\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "        ),\n    };\n\n    verify_state(\n",
+              "        ),\n        TerminalPhase::Aborted => unreachable!(\"handled above\"),\n    };\n\n    verify_state(\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "            TerminalPhase::RolledBack => FsOperation::VerifyConfigBefore,\n        },\n",
+              "            TerminalPhase::RolledBack => FsOperation::VerifyConfigBefore,\n            TerminalPhase::Aborted => unreachable!(\"handled above\"),\n        },\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "            TerminalPhase::RolledBack => FsOperation::VerifyCredentialsBefore,\n        },\n",
+              "            TerminalPhase::RolledBack => FsOperation::VerifyCredentialsBefore,\n            TerminalPhase::Aborted => unreachable!(\"handled above\"),\n        },\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store/journal.rs",
+              "            TerminalPhase::RolledBack => \"RolledBack recovery\",\n        },\n",
+              "            TerminalPhase::RolledBack => \"RolledBack recovery\",\n            TerminalPhase::Aborted => unreachable!(\"handled above\"),\n        },\n",
+          )
+
+          # Recovery: resync cleanup marker, preserve foreign prepare directories, and abort stale Prepared journals.
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "use super::{\n    ConfigStore, FINALIZE_PREFIX, Fs, FsOperation, PREPARE_PREFIX, ambiguous_finalization_error,\n};",
+              "use super::{\n    ConfigStore, FINALIZE_PREFIX, Fs, FsOperation, PREPARE_PREFIX, ambiguous_finalization_error,\n    before_state_matches,\n};",
+          )
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "    RolledBack,\n}",
+              "    RolledBack,\n    Aborted,\n}",
+          )
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "            TerminalPhase::RolledBack => Self::RolledBack,\n",
+              "            TerminalPhase::RolledBack => Self::RolledBack,\n            TerminalPhase::Aborted => Self::Aborted,\n",
+          )
+
+          old_arm = '''            Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {
+                let cfg_before = read_image(
+                    fs,
+                    active_dir,
+                    "config.before",
+                    manifest.config_existed_before,
+                    FsOperation::ReadConfigBeforeImage,
+                )?;
+                let cred_before = read_image(
+                    fs,
+                    active_dir,
+                    "credentials.before",
+                    manifest.credentials_existed_before,
+                    FsOperation::ReadCredentialsBeforeImage,
+                )?;
+
+                fs.checkpoint(FsOperation::RestoreConfigBefore)?;
+                restore(
+                    fs,
+                    &self.config_path,
+                    cfg_before.as_deref(),
+                    FsOperation::RemoveConfigForBeforeAbsence,
+                    FsOperation::SyncConfigParentAfterRollback,
+                )?;
+                fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
+                restore(
+                    fs,
+                    &self.credentials_path,
+                    cred_before.as_deref(),
+                    FsOperation::RemoveCredentialsForBeforeAbsence,
+                    FsOperation::SyncCredentialsParentAfterRollback,
+                )?;
+
+                verify_state(
+                    fs,
+                    &self.config_path,
+                    &self.credentials_path,
+                    cfg_before.as_deref(),
+                    cred_before.as_deref(),
+                    FsOperation::VerifyConfigBefore,
+                    FsOperation::VerifyCredentialsBefore,
+                    "recovery",
+                )?;
+
+                fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
+                write_manifest(
+                    fs,
+                    active_dir,
+                    Phase::RolledBack,
+                    &manifest.transaction_id,
+                    &Txn {
+                        cfg_existed: manifest.config_existed_before,
+                        cfg_after_exists: manifest.config_exists_after,
+                        cred_existed: manifest.credentials_existed_before,
+                        cred_after_exists: manifest.credentials_exist_after,
+                        cfg_before: cfg_before.unwrap_or_default(),
+                        cfg_after: Vec::new(),
+                        cred_before: cred_before.unwrap_or_default(),
+                        cred_after: Vec::new(),
+                    },
+                )?;
+
+                Ok(map_finalize_outcome(
+                    finalize_active(fs, active_dir, &manifest.transaction_id)?,
+                    TerminalPhase::RolledBack,
+                ))
+            }
+'''
+          new_arm = '''            Phase::Prepared => {
+                let cfg_before = read_image(
+                    fs,
+                    active_dir,
+                    "config.before",
+                    manifest.config_existed_before,
+                    FsOperation::ReadConfigBeforeImage,
+                )?;
+                let cred_before = read_image(
+                    fs,
+                    active_dir,
+                    "credentials.before",
+                    manifest.credentials_existed_before,
+                    FsOperation::ReadCredentialsBeforeImage,
+                )?;
+                let txn = Txn {
+                    cfg_existed: manifest.config_existed_before,
+                    cfg_after_exists: manifest.config_exists_after,
+                    cred_existed: manifest.credentials_existed_before,
+                    cred_after_exists: manifest.credentials_exist_after,
+                    cfg_before: cfg_before.unwrap_or_default(),
+                    cfg_after: Vec::new(),
+                    cred_before: cred_before.unwrap_or_default(),
+                    cred_after: Vec::new(),
+                };
+
+                if !before_state_matches(
+                    fs,
+                    &self.config_path,
+                    &self.credentials_path,
+                    &txn,
+                )? {
+                    fs.checkpoint(FsOperation::WriteAbortedManifest)?;
+                    write_manifest(
+                        fs,
+                        active_dir,
+                        Phase::Aborted,
+                        &manifest.transaction_id,
+                        &txn,
+                    )?;
+                    return Ok(map_finalize_outcome(
+                        finalize_active(fs, active_dir, &manifest.transaction_id)?,
+                        TerminalPhase::Aborted,
+                    ));
+                }
+
+                recover_before_state(fs, self, active_dir, &manifest, txn)
+            }
+            Phase::Applying | Phase::RollbackRequired => {
+                let cfg_before = read_image(
+                    fs,
+                    active_dir,
+                    "config.before",
+                    manifest.config_existed_before,
+                    FsOperation::ReadConfigBeforeImage,
+                )?;
+                let cred_before = read_image(
+                    fs,
+                    active_dir,
+                    "credentials.before",
+                    manifest.credentials_existed_before,
+                    FsOperation::ReadCredentialsBeforeImage,
+                )?;
+                recover_before_state(
+                    fs,
+                    self,
+                    active_dir,
+                    &manifest,
+                    Txn {
+                        cfg_existed: manifest.config_existed_before,
+                        cfg_after_exists: manifest.config_exists_after,
+                        cred_existed: manifest.credentials_existed_before,
+                        cred_after_exists: manifest.credentials_exist_after,
+                        cfg_before: cfg_before.unwrap_or_default(),
+                        cfg_after: Vec::new(),
+                        cred_before: cred_before.unwrap_or_default(),
+                        cred_after: Vec::new(),
+                    },
+                )
+            }
+'''
+          replace_once("crates/talos-config/src/store/recovery.rs", old_arm, new_arm)
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "            Phase::RolledBack => {\n",
+              "            Phase::Aborted => Ok(map_finalize_outcome(\n                finalize_active(fs, active_dir, &manifest.transaction_id)?,\n                TerminalPhase::Aborted,\n            )),\n            Phase::RolledBack => {\n",
+          )
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "            if fs.exists(&cleanup_ready) {\n                fs.checkpoint(FsOperation::ReadCleanupReadyMarker)?;\n                let marker = fs.read(&cleanup_ready)?;\n                if marker != transaction_id.as_bytes() {\n                    return Err(ConfigError::InvalidConfig(\n                        \"finalization cleanup marker transaction identifier mismatch\".into(),\n                    ));\n                }\n                outcome = merge_recovery_outcomes(\n",
+              "            if fs.exists(&cleanup_ready) {\n                fs.checkpoint(FsOperation::ReadCleanupReadyMarker)?;\n                let marker = fs.read(&cleanup_ready)?;\n                if marker != transaction_id.as_bytes() {\n                    return Err(ConfigError::InvalidConfig(\n                        \"finalization cleanup marker transaction identifier mismatch\".into(),\n                    ));\n                }\n                if fs\n                    .checkpoint(FsOperation::SyncFinalizeDirectory)\n                    .and_then(|_| fs.sync_dir(&entry))\n                    .is_err()\n                {\n                    return Ok(RecoveryOutcome::ParentSyncPending {\n                        transaction_id: transaction_id.to_string(),\n                        phase: TerminalPhase::Committed,\n                        finalize_dir: entry,\n                    });\n                }\n                outcome = merge_recovery_outcomes(\n",
+          )
+          old_cleanup = '''            // Preparation residues are unpublished and never interpreted.
+            // Refuse to follow links; cleanup remains best-effort.
+            if !fs.is_real_dir(&entry)? {
+                continue;
+            }
+
+            if fs.checkpoint(FsOperation::CleanupPrepareResidues).is_ok() {
+                let _ = fs.remove_dir(&entry);
+            }
+'''
+          new_cleanup = '''            // Preparation directories are unpublished but may belong to a live
+            // concurrent process. Never delete an unowned preparation directory.
+            // A future lease/owner-token design may add bounded garbage collection.
+            let _ = fs.is_real_dir(&entry)?;
+'''
+          replace_once("crates/talos-config/src/store/recovery.rs", old_cleanup, new_cleanup)
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "fn cleanup_ready_residue(\n",
+              '''fn recover_before_state(
+    fs: &dyn Fs,
+    store: &ConfigStore,
+    active_dir: &Path,
+    manifest: &Manifest,
+    txn: Txn,
+) -> Result<RecoveryOutcome, ConfigError> {
+    fs.checkpoint(FsOperation::RestoreConfigBefore)?;
+    restore(
+        fs,
+        &store.config_path,
+        if txn.cfg_existed {
+            Some(txn.cfg_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::RemoveConfigForBeforeAbsence,
+        FsOperation::SyncConfigParentAfterRollback,
+    )?;
+    fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
+    restore(
+        fs,
+        &store.credentials_path,
+        if txn.cred_existed {
+            Some(txn.cred_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::RemoveCredentialsForBeforeAbsence,
+        FsOperation::SyncCredentialsParentAfterRollback,
+    )?;
+
+    verify_state(
+        fs,
+        &store.config_path,
+        &store.credentials_path,
+        if txn.cfg_existed {
+            Some(txn.cfg_before.as_slice())
+        } else {
+            None
+        },
+        if txn.cred_existed {
+            Some(txn.cred_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::VerifyConfigBefore,
+        FsOperation::VerifyCredentialsBefore,
+        "recovery",
+    )?;
+
+    fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
+    write_manifest(
+        fs,
+        active_dir,
+        Phase::RolledBack,
+        &manifest.transaction_id,
+        &txn,
+    )?;
+
+    Ok(map_finalize_outcome(
+        finalize_active(fs, active_dir, &manifest.transaction_id)?,
+        TerminalPhase::RolledBack,
+    ))
+}
+
+fn cleanup_ready_residue(
+''',
+          )
+          replace_once(
+              "crates/talos-config/src/store/recovery.rs",
+              "        Phase::RolledBack => Ok(TerminalPhase::RolledBack),\n",
+              "        Phase::RolledBack => Ok(TerminalPhase::RolledBack),\n        Phase::Aborted => Ok(TerminalPhase::Aborted),\n",
+          )
+
+          # Tests: concurrent stale snapshot, Prepared crash recovery, marker resync, and foreign prepare preservation.
+          p = Path("crates/talos-config/src/store_finalization_tests.rs")
+          text = p.read_text()
+          text = text.replace("use std::cell::RefCell;", "use std::cell::{Cell, RefCell};", 1)
+          insertion = r'''
+
+struct ConcurrentWriteFs {
+    config_path: PathBuf,
+    credentials_path: PathBuf,
+    config_bytes: Vec<u8>,
+    credential_bytes: Vec<u8>,
+    fired: Cell<bool>,
+}
+
+impl ConcurrentWriteFs {
+    fn new(
+        config_path: PathBuf,
+        credentials_path: PathBuf,
+        config_bytes: Vec<u8>,
+        credential_bytes: Vec<u8>,
+    ) -> Self {
+        Self {
+            config_path,
+            credentials_path,
+            config_bytes,
+            credential_bytes,
+            fired: Cell::new(false),
+        }
+    }
+}
+
+impl Fs for ConcurrentWriteFs {
+    fn checkpoint(&self, operation: FsOperation) -> Result<(), ConfigError> {
+        if operation == FsOperation::VerifyConfigBeforeApply && !self.fired.replace(true) {
+            crate::atomic_file::durable_replace(&self.config_path, &self.config_bytes)?;
+            crate::atomic_file::durable_replace(&self.credentials_path, &self.credential_bytes)?;
+        }
+        Ok(())
+    }
+
+    fn exists(&self, path: &Path) -> bool {
+        path.exists()
+    }
+
+    fn read(&self, path: &Path) -> Result<Vec<u8>, ConfigError> {
+        std::fs::read(path).map_err(ConfigError::IoError)
+    }
+
+    fn atomic_write(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError> {
+        crate::atomic_file::durable_replace(path, content)
+    }
+
+    fn write_secure(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError> {
+        crate::atomic_file::write_file_synced(path, content)
+    }
+
+    fn mkdir(&self, path: &Path) -> Result<(), ConfigError> {
+        crate::atomic_file::create_dir_secure(path)
+    }
+
+    fn remove_file(&self, path: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_file(path).map_err(ConfigError::IoError)
+    }
+
+    fn remove_dir(&self, path: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_dir_all(path).map_err(ConfigError::IoError)
+    }
+
+    fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError> {
+        std::fs::rename(from, to).map_err(ConfigError::IoError)
+    }
+
+    fn sync_dir(&self, dir: &Path) -> Result<(), ConfigError> {
+        crate::atomic_file::sync_dir(dir)
+    }
+
+    fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, ConfigError> {
+        std::fs::read_dir(dir)
+            .map_err(ConfigError::IoError)?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.path())
+                    .map_err(ConfigError::IoError)
+            })
+            .collect()
+    }
+}
+
+#[test]
+fn stale_before_snapshot_is_aborted_without_overwriting_concurrent_state() {
+    let dir = unique_dir("stale-before-cas");
+    setup_two_providers(&dir);
+    let store = make_store(&dir);
+
+    let mut concurrent_config: Config = toml::from_str(
+        &std::fs::read_to_string(dir.join("config.toml")).unwrap(),
+    )
+    .unwrap();
+    concurrent_config.providers.remove("custom-b");
+    let concurrent_config_bytes = toml::to_string_pretty(&concurrent_config).unwrap().into_bytes();
+
+    let mut concurrent_credentials: Credentials = toml::from_str(
+        &std::fs::read_to_string(dir.join("credentials.toml")).unwrap(),
+    )
+    .unwrap();
+    concurrent_credentials.keys.remove("custom-b");
+    let concurrent_credential_bytes =
+        toml::to_string_pretty(&concurrent_credentials).unwrap().into_bytes();
+
+    let fs = ConcurrentWriteFs::new(
+        dir.join("config.toml"),
+        dir.join("credentials.toml"),
+        concurrent_config_bytes.clone(),
+        concurrent_credential_bytes.clone(),
+    );
+    let error = store.run("providers.custom-a", &fs).unwrap_err();
+    assert!(error.to_string().contains("changed concurrently"));
+    assert_persisted_bytes(
+        &dir,
+        &concurrent_config_bytes,
+        &concurrent_credential_bytes,
+    );
+    assert!(!active_dir(&dir).exists());
+
+    let loaded = store.load_effective().unwrap();
+    assert!(loaded.providers.contains_key("custom-a"));
+    assert!(!loaded.providers.contains_key("custom-b"));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn stale_prepared_journal_recovery_aborts_without_rollback() {
+    let dir = unique_dir("stale-prepared-recovery");
+    let (config_before, credentials_before) = setup_two_providers(&dir);
+    let active = active_dir(&dir);
+    std::fs::create_dir_all(&active).unwrap();
+    std::fs::write(active.join("config.before"), &config_before).unwrap();
+    std::fs::write(active.join("credentials.before"), &credentials_before).unwrap();
+    write_manifest(&active, "Prepared", "stale-prepared", true, true, true, true);
+
+    let mut newer_config: Config = toml::from_str(
+        &String::from_utf8(config_before.clone()).unwrap(),
+    )
+    .unwrap();
+    newer_config.providers.remove("custom-b");
+    let newer_config = toml::to_string_pretty(&newer_config).unwrap().into_bytes();
+    let mut newer_credentials: Credentials = toml::from_str(
+        &String::from_utf8(credentials_before.clone()).unwrap(),
+    )
+    .unwrap();
+    newer_credentials.keys.remove("custom-b");
+    let newer_credentials = toml::to_string_pretty(&newer_credentials).unwrap().into_bytes();
+    std::fs::write(dir.join("config.toml"), &newer_config).unwrap();
+    std::fs::write(dir.join("credentials.toml"), &newer_credentials).unwrap();
+
+    make_store(&dir).recover(&StdFs).unwrap();
+    assert_persisted_bytes(&dir, &newer_config, &newer_credentials);
+    assert!(!active.exists());
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cleanup_ready_marker_is_resynced_before_mutation_becomes_safe() {
+    let dir = unique_dir("cleanup-marker-resync");
+    setup_two_providers(&dir);
+    let store = make_store(&dir);
+
+    let first_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
+    store
+        .run("providers.custom-a", &FaultFs::new(first_plan.clone()))
+        .unwrap();
+    first_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
+
+    let second_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
+    let error = store
+        .run("providers.custom-b", &FaultFs::new(second_plan.clone()))
+        .unwrap_err();
+    assert!(error.to_string().contains("finalization is pending"));
+    second_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
+    assert!(prepare_entries(&dir).is_empty());
+
+    let third_plan = FaultPlan::fail_once(FsOperation::CleanupFinalizeDirectory);
+    let outcome = store
+        .run("providers.custom-b", &FaultFs::new(third_plan.clone()))
+        .unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-b".to_string()
+        }
+    );
+    third_plan.assert_consumed_in_order(&[FsOperation::CleanupFinalizeDirectory]);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn foreign_prepare_directory_is_never_deleted_automatically() {
+    let dir = unique_dir("foreign-prepare");
+    setup_two_providers(&dir);
+    let prepare = dir.join(".provider-unset-transaction.prepare.foreign-process");
+    std::fs::create_dir_all(&prepare).unwrap();
+    std::fs::write(prepare.join("owner"), b"other-process").unwrap();
+
+    make_store(&dir).load_effective().unwrap();
+    assert_eq!(std::fs::read(prepare.join("owner")).unwrap(), b"other-process");
+    assert!(prepare.exists());
+    let _ = std::fs::remove_dir_all(dir);
+}
+'''
+          marker = "\n#[test]\nfn ordered_apply_rollback_and_recovery_failures_preserve_journal()"
+          if marker not in text:
+              raise SystemExit("test insertion marker missing")
+          text = text.replace(marker, insertion + marker, 1)
+          p.write_text(text)
+          PY
+      - name: Format
+        run: cargo fmt --all
+      - name: Focused validation
+        run: |
+          cargo test --locked -p talos-config
+          cargo test --locked -p talos-cli --test config_unset_finalization
+          cargo clippy --locked -p talos-config -- -D warnings
+      - name: Commit and push correction
+        shell: bash
+        run: |
+          git config user.name "i157-correction-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add crates/talos-config
+          git commit -m "fix(config): prevent stale provider-unset overwrite (#MODEL-010 #I157)"
+          git push origin HEAD:fix/i157-post-merge-durability-concurrency
