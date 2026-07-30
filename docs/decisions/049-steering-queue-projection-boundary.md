@@ -93,3 +93,8 @@ this projection into a queue-control API opportunistically.
   ownership, bounded projection, ordered event path, persistence boundary, and authoritative drain
   timing remain unchanged; the prior public single-item drain API is retained for source
   compatibility.
+- That initial I169 interpretation was rejected by PR #64/#68 architecture review. ADR-056 now
+  supersedes this record only for the previously deferred control/drain-cardinality semantics:
+  structured item ownership, bridge-accepted cutoff, transactional SQ transfer, actor arbitration,
+  terminal pause, persistence equivalence, and hard bounds. This ADR's engine-owned pre-accept UI
+  projection and single ordered `UiOutput` requirements remain Accepted.

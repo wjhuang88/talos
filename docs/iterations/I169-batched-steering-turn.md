@@ -105,6 +105,11 @@
 | 2026-07-30 | Validation | Focused tests, formatting, locked workspace check, Clippy, governance validation, scale assessment, diff check, CLI build, and rebuilt-binary mock smoke passed. Full workspace tests remain blocked by unrelated Windows baseline failures recorded below. |
 | 2026-07-30 | Remote refresh | `git fetch origin` succeeded; `origin/main` advanced from `395a0e02` to `b5fcaaf3`. Rebase and post-rebase focused validation are required before PR creation. |
 | 2026-07-30 | Rebase audit | Refreshed main records I168 as Active after maintainer resumption. That later remote state is preserved; I169 remains isolated to this Issue #50 draft PR and does not alter I168 scope or files. |
+| 2026-07-30 | Change control | PR #64/#68 review reclassified the initial batch drain as a core asynchronous data-flow change. The prior narrow implementation is invalidated, not completed. The product objective remains Issue #50, but acceptance expands to the review's G0-G13 safety gates. ADR-056 records the selected bridge-accepted/transactional/actor-arbitrated design before replacement implementation. |
+| 2026-07-30 | Review disposition | PR #64 is closed only as duplicate/superseded by Draft PR #68. Reviews `4819565218` and `4819746766`, comment `5132132605`, and migrated #68 comment `5132551226` remain binding. |
+| 2026-07-30 | Replacement implementation | Added ADR-056 structured submissions, actor-owned FIFO arbitration without implicit preemption, distinct per-item provider/persistence messages, source-aware scheduler input, bridge identity/sequence validation, transactional prepare/reserve/send/start-ack/commit, bounded queue/batch/context checks, and paused Cancel/Error behavior. |
+| 2026-07-30 | Deterministic validation | Core/agent/conversation and all 290 CLI binary tests pass, including distinct-message capture, attachment/kind separation, send acknowledgement, cancellation terminal handling, and a 1,000-step fixed-seed queue invariant stress test. |
+| 2026-07-30 | Windows baseline audit | Repaired Unix-only image fixture compilation, CRLF artifact comparison, and hard-coded `/tmp` permission fixtures. Full workspace tests now stop at 27 pre-existing `talos-tools` Windows failures caused by unavailable `sh` plus Unix path/permission output assumptions. Process-boundary behavior is outside TUI-041 and remains a Ready-for-Review blocker. |
 
 ## Closure Ledger
 
@@ -121,19 +126,19 @@
 
 ## Verification Evidence
 
-- PASS — `cargo test --locked -p talos-conversation drain_steering_queue`: 4 passed.
-- PASS — `cargo test --locked -p talos-cli conversation_loop_batches_all_queued_steering_into_one_submit`: 1 passed.
-- PASS — `cargo test --locked -p talos-cli conversation_loop_keeps_steering_queued_across_provider_tool_end`: 1 passed.
+- PASS — `cargo test -p talos-agent --locked`: 297 passed.
+- PASS — `cargo test -p talos-cli --bin talos --locked`: 290 passed.
+- PASS — `cargo test -p talos-memory --locked`: 68 passed.
+- PASS — `cargo test -p talos-permission --locked`: 112 passed.
 - PASS — `cargo fmt --all -- --check`.
 - PASS — `cargo check --workspace --locked`.
 - PASS — `cargo clippy --workspace --locked -- -D warnings`.
-- BLOCKED — `cargo test --workspace --locked` cannot compile the pre-existing
-  `talos-provider` test at `crates/talos-provider/src/image_io.rs:198` and `:200` on Windows because
-  it unconditionally references `std::os::unix::fs::symlink`.
-- BLOCKED — a diagnostic retry excluding `talos-provider` reached tests and exposed a second
-  pre-existing Windows line-ending mismatch in
-  `talos-memory::benchmark::tests::benchmark_is_byte_stable_and_matches_checked_in_artifact`.
-  These unrelated cross-platform defects are not folded into TUI-041.
+- RESOLVED — the prior Windows blockers in `talos-provider`, `talos-memory`, and
+  `talos-permission` were repaired with portable test fixtures and normalized artifact comparison.
+- BLOCKED — `cargo test --workspace --locked` reaches `talos-tools` but reports 27 Windows-only
+  baseline failures: BashTool tests cannot spawn host `sh`, and file/search assertions assume Unix
+  separators or permission strings. This write-capable tool/process boundary requires its own
+  security-reviewed scope and remains a Ready-for-Review blocker for G13.
 - PASS — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate_project_governance.ps1 .`: 0 warnings.
 - PASS — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assess_project_scale.ps1 .`:
   high-risk, release-managed, worktree required.
@@ -151,8 +156,30 @@
 - The candidate code arrived before governance intake; I169 records rather than conceals that
   variance.
 - I169 remains Active rather than Review because the repository-mandated full workspace test gate
-  is not green on Windows. The two baseline failures require separately scoped remediation or a
-  successful run on a supported environment; no completion claim is made here.
+  is not green on Windows. The remaining `talos-tools` process/path baseline requires separately
+  scoped, security-reviewed remediation or a successful run on a supported environment; real TUI
+  acceptance and CI are also pending, so no completion claim is made here.
+- The original baseline described one `A\n\nB\n\nC` string and excluded scheduler, session switch,
+  attachment, persistence, and context interactions. Maintainer review proved those exclusions do
+  not remove real runtime coupling. They are accepted as a material same-objective correction;
+  the immutable original baseline remains above, while ADR-056 and TUI-041 own the expanded gates.
+
+## PR #64/#68 G0-G13 Execution Gate
+
+- G0: ADR-056, TUI-041, TUI-026, ADR-049, PR description, and iteration evidence synchronized.
+- G1: bridge-accepted cutoff documented and deterministically tested with both channels ready.
+- G2: active session/turn/sequence and actor-owned submission correlation enforced.
+- G3: explicit Idle/Submitting/Running/Cancelling/PausedAfterFailure state transitions tested.
+- G4-G5: unique staged ownership and prepare/reserve/send/ack/commit rollback proven for SQ
+  closed/full/timeout/sender change.
+- G6-G8: recoverable items, input kind, multiline text, preview, slash, and per-item attachments.
+- G7: live UI, actor messages, successful durable replay, memory/hook/usage turn semantics aligned.
+- G9: scheduler and session mutation ordering/isolation deterministic with no implicit preemption.
+- G10: item/queue/batch/context hard limits and visible non-truncating overflow behavior.
+- G11: content-free structured lifecycle/stale/rollback diagnostics.
+- G12: barrier/oneshot/paused-time matrix plus fixed-seed stress invariant test.
+- G13: locked workspace format/check/Clippy/test, Windows fixtures, governance, CI, and rebuilt real
+  TUI transcript all green before Ready for Review.
 
 ## Retrospective
 
