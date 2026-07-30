@@ -1,6 +1,7 @@
 use super::journal::{
-    FinalizeOutcome, Manifest, Phase, TerminalPhase as JournalTerminalPhase, Txn, finalize_active,
-    parse_manifest, read_image, restore, validate_terminal_state, verify_state, write_manifest,
+    CLEANUP_READY_FILE, FinalizeOutcome, Manifest, Phase, TerminalPhase as JournalTerminalPhase,
+    Txn, finalize_active, parse_manifest, read_image, restore, validate_terminal_state,
+    verify_state, write_manifest,
 };
 use super::{
     ConfigStore, FINALIZE_PREFIX, Fs, FsOperation, PREPARE_PREFIX, ambiguous_finalization_error,
