@@ -82,7 +82,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             let _ = ui_tx.send(output);
                         }
                         if turn_completed
-                            && let Some(msg) = engine.drain_steering_queue()
+                            && let Some(msg) = engine.drain_steering_queue_batched()
                         {
                             let outputs = engine.start_user_message(&msg);
                             for output in outputs {

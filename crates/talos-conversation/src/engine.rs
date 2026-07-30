@@ -1119,11 +1119,18 @@ impl ConversationEngine {
         vec![content_block(MessageSource::System, text)]
     }
 
-    pub fn drain_steering_queue(&mut self) -> Option<String> {
+    /// Drains the entire steering queue into a single batched message (I50).
+    ///
+    /// When multiple user inputs accumulate in the steering queue during an
+    /// active turn, this method joins them with `\n\n` separators so they are
+    /// processed as one consolidated user turn instead of N sequential turns.
+    /// Returns `None` when the queue is empty.
+    pub fn drain_steering_queue_batched(&mut self) -> Option<String> {
         if self.steering_queue.is_empty() {
             None
         } else {
-            Some(self.steering_queue.remove(0))
+            let joined = std::mem::take(&mut self.steering_queue).join("\n\n");
+            Some(joined)
         }
     }
 

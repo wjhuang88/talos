@@ -847,7 +847,7 @@ fn mock_request_is_model_passthrough_slash_command() {
 }
 
 // ---------------------------------------------------------------------------
-// drain_steering_queue
+// drain_steering_queue_batched
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -869,7 +869,7 @@ fn enqueue_steering_records_queue_and_status() {
 
     let outputs = engine.enqueue_steering("queued".to_string());
 
-    assert_eq!(engine.drain_steering_queue(), Some("queued".to_string()));
+    assert_eq!(engine.drain_steering_queue_batched(), Some("queued".to_string()));
     assert!(outputs.iter().any(|output| matches!(
         output,
         UiOutput::Tip {
@@ -951,25 +951,39 @@ fn timeout_error_sets_timed_out_phase() {
 }
 
 #[test]
-fn drain_steering_queue_fifo_order() {
+fn drain_steering_queue_batched_joins_all_with_separator() {
     let mut engine = new_engine();
     engine.steering_queue.push("first".to_string());
     engine.steering_queue.push("second".to_string());
     engine.steering_queue.push("third".to_string());
 
-    assert_eq!(engine.drain_steering_queue(), Some("first".to_string()));
-    assert_eq!(engine.drain_steering_queue(), Some("second".to_string()));
-    assert_eq!(engine.drain_steering_queue(), Some("third".to_string()));
+    let msg = engine
+        .drain_steering_queue_batched()
+        .expect("batched drain should return joined message");
+    assert_eq!(msg, "first\n\nsecond\n\nthird");
+    assert!(
+        engine.steering_queue.is_empty(),
+        "queue must be empty after batched drain"
+    );
 }
 
 #[test]
-fn drain_steering_queue_none_when_empty() {
+fn drain_steering_queue_batched_single_message() {
     let mut engine = new_engine();
-    assert_eq!(engine.drain_steering_queue(), None);
+    engine.steering_queue.push("only".to_string());
 
-    engine.steering_queue.push("one".to_string());
-    assert_eq!(engine.drain_steering_queue(), Some("one".to_string()));
-    assert_eq!(engine.drain_steering_queue(), None);
+    let msg = engine
+        .drain_steering_queue_batched()
+        .expect("batched drain with one entry should return it");
+    assert_eq!(msg, "only");
+    assert!(engine.steering_queue.is_empty());
+}
+
+#[test]
+fn drain_steering_queue_batched_none_when_empty() {
+    let mut engine = new_engine();
+    assert_eq!(engine.drain_steering_queue_batched(), None);
+    assert!(engine.steering_queue.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -2678,13 +2692,12 @@ fn steering_queue_snapshot_reflects_drain() {
     engine.enqueue_steering("first".into());
     engine.enqueue_steering("second".into());
 
-    let drained = engine.drain_steering_queue();
-    assert_eq!(drained, Some("first".to_string()));
+    let drained = engine.drain_steering_queue_batched();
+    assert_eq!(drained, Some("first\n\nsecond".to_string()));
 
     let snap = engine.steering_queue_snapshot();
-    assert_eq!(snap.total_count, 1);
-    assert_eq!(snap.entries.len(), 1);
-    assert_eq!(snap.entries[0].text, "second");
+    assert_eq!(snap.total_count, 0);
+    assert!(snap.entries.is_empty());
 }
 
 #[test]
