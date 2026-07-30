@@ -5,7 +5,7 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress — Ordered Failure And Recovery Evidence (I157 reopened round 9) |
+| Status | Complete (I157 composite recovery — `89b2b3a7`; 2026-07-29) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
@@ -14,7 +14,8 @@
 
 
 
-> Completion Commit: `5c3edd6b` — finalization contract: Committed failure returns Ok; RolledBack failure returns original apply error; load_effective documented; active journal allows load but blocks new mutation until recovered.
+
+> Completion Commit: `89b2b3a7` — strict credentials parse, mutation readiness check before staging, load_effective rustdoc, 8 new tests (corrupt creds, residue non-blocking, Applying-after-credentials, RollbackRequired recovery). 2634 tests.
 
 ## Problem
 
