@@ -53,5 +53,9 @@ fn terminal_cli_projection_keeps_explicit_completion_quiet() {
         usage: Usage::default(),
     });
 
-    assert!(terminal.iter().all(|output| !matches!(output, UiOutput::Tip { .. })));
+    assert!(
+        terminal
+            .iter()
+            .all(|output| !matches!(output, UiOutput::Tip { .. }))
+    );
 }
