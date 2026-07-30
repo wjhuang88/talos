@@ -5,7 +5,7 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | Complete (I157 ordered composite failure — `7153bfaa` + `911887f4`; 2026-07-29) |
+| Status | In Progress — Finalization Durability (I157 reopened round 11) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
