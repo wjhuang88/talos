@@ -2195,3 +2195,104 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod i168_terminal_outcome_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    async fn parse_raw_body(body: Vec<u8>) -> Vec<AgentEvent> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 2048];
+            let _ = socket.read(&mut request).await;
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            socket.write_all(headers.as_bytes()).await.unwrap();
+            socket.write_all(&body).await.unwrap();
+            socket.flush().await.unwrap();
+        });
+
+        let response = reqwest::get(format!("http://{addr}/stream")).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(32);
+        parse_sse_stream(response, tx, Duration::from_secs(5), Duration::from_secs(5)).await;
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn openai_eof_after_partial_text_is_terminal_error() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(
+            events.iter().any(
+                |event| matches!(event, AgentEvent::TextDelta { delta } if delta == "partial")
+            )
+        );
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("explicit terminal"))));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn openai_unknown_finish_reason_is_not_end_turn() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"content_filter\"}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("content_filter"))));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_byte_stream_error_is_terminal_error() {
+        let mut body = b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n".to_vec();
+        body.push(0xff);
+        let events = parse_raw_body(body).await;
+        assert!(events.iter().any(
+            |event| matches!(event, AgentEvent::Error { message } if message.contains("decode"))
+        ));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn explicit_provider_completion_regression_is_unchanged() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"complete\"},\"finish_reason\":\"stop\"}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                ..
+            }
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::Error { .. }))
+        );
+    }
+}
