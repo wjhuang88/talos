@@ -1,0 +1,45 @@
+name: I168 Apply Print Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'agent/i168-terminal-closeout'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/i168-terminal-closeout
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Apply print-mode fix and focused verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .i168_print_fix.py
+          cargo fmt --all
+          cargo test --locked -p talos-cli terminal
+          cargo clippy --locked -p talos-cli -- -D warnings
+          git diff --check
+          rm -f \
+            .i168_print_fix.py \
+            .github/workflows/i168-apply-print-fix.yml \
+            .github/workflows/i168-print-red.yml \
+            .i168-print-red-trigger \
+            .i168-closeout-pr-trigger \
+            .i168-closeout-pr-ready \
+            .github/PULL_REQUEST_TEMPLATE/i168-closeout.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(cli): surface MaxTokens truncation in print mode (#RUNTIME-003 #I168) [model:gpt-5.6-thinking]'
+          git push origin HEAD:agent/i168-terminal-closeout
