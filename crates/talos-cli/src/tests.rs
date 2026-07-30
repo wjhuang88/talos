@@ -1986,25 +1986,34 @@ mod steering_snapshot_tests {
         engine.enqueue_steering("a".into());
         engine.enqueue_steering("b".into());
 
-        let drained1 = engine.drain_steering_queue();
-        let snap1 = engine.steering_queue_snapshot();
-        assert_eq!(drained1, Some("a".into()));
-        assert_eq!(snap1.total_count, 1);
-        assert_eq!(snap1.omitted_count, 0);
-        assert_eq!(snap1.entries.len(), 1);
-
-        let drained2 = engine.drain_steering_queue();
-        let snap2 = engine.steering_queue_snapshot();
-        assert_eq!(drained2, Some("b".into()));
-        assert_eq!(snap2.total_count, 0);
-        assert_eq!(snap2.omitted_count, 0);
-        assert!(snap2.entries.is_empty());
+        let drained = engine.drain_steering_queue_batched();
+        let snap = engine.steering_queue_snapshot();
+        assert_eq!(drained, Some("a\n\nb".into()));
+        assert_eq!(snap.total_count, 0);
+        assert_eq!(snap.omitted_count, 0);
+        assert!(snap.entries.is_empty());
 
         let empty = build_empty_snapshot();
         assert_eq!(empty.total_count, 0);
         assert!(empty.entries.is_empty());
     }
 
+    #[test]
+    fn engine_batched_drain_joins_multiple_messages() {
+        let mut engine = new_engine();
+        engine.enqueue_steering("a".into());
+        engine.enqueue_steering("b".into());
+        engine.enqueue_steering("c".into());
+
+        let msg = engine
+            .drain_steering_queue_batched()
+            .expect("batched drain should join all messages");
+        assert_eq!(msg, "a\n\nb\n\nc");
+
+        let snap = engine.steering_queue_snapshot();
+        assert_eq!(snap.total_count, 0, "queue must be empty after batched drain");
+        assert!(snap.entries.is_empty());
+    }
     #[test]
     fn non_empty_snapshot_preserved_on_error_path() {
         // On error/cancel paths, the engine does NOT clear the steering queue.
