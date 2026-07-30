@@ -60,3 +60,11 @@ pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 pub use tree::TreeTool;
 pub use web_search::{WebSearchError, WebSearchInput, WebSearchTool};
+
+/// Returns a stable workspace-relative display path using `/` on every host.
+pub(crate) fn workspace_relative_display(path: &std::path::Path, root: &std::path::Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}

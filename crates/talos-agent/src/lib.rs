@@ -959,7 +959,9 @@ impl Agent {
                             ),
                             ..ui_result.clone()
                         }
-                    } else if self.bash_compression_enabled && observed.call.name == "bash" {
+                    } else if self.bash_compression_enabled
+                        && matches!(observed.call.name.as_str(), "bash" | "powershell")
+                    {
                         let compressed =
                             BashOutputCompressor::new().compress(&projection.model_content);
                         MessageToolResult {

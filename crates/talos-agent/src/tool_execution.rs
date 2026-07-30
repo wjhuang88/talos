@@ -323,7 +323,9 @@ impl Agent {
                     ),
                     ..ui_result.clone()
                 }
-            } else if self.bash_compression_enabled && observed.call.name == "bash" {
+            } else if self.bash_compression_enabled
+                && matches!(observed.call.name.as_str(), "bash" | "powershell")
+            {
                 let compressed = BashOutputCompressor::new().compress(&projection.model_content);
                 MessageToolResult {
                     content: compressed.content,
@@ -707,7 +709,7 @@ fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> S
 fn collect_access_evidence_diagnostics(
     call: &ToolCall,
 ) -> Vec<(String, talos_permission::AccessEvidence)> {
-    if call.name == "bash" {
+    if matches!(call.name.as_str(), "bash" | "powershell") {
         return call
             .input
             .get("command")
@@ -810,6 +812,16 @@ mod access_evidence_tests {
         let evidence = collect_access_evidence_diagnostics(&call(
             "bash",
             json!({"command": "find . -delete"}),
+        ));
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].1.is_unknown());
+    }
+
+    #[test]
+    fn powershell_production_input_produces_one_diagnostic() {
+        let evidence = collect_access_evidence_diagnostics(&call(
+            "powershell",
+            json!({"command": "Remove-Item -Recurse ."}),
         ));
         assert_eq!(evidence.len(), 1);
         assert!(evidence[0].1.is_unknown());
