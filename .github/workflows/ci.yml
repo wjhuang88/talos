@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,98 +43,3 @@ jobs:
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
-
-  i168-review-correction:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/i168-terminal-closeout'
-    name: I168 Review Correction
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      CARGO_TERM_COLOR: never
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: agent/i168-terminal-closeout
-          fetch-depth: 0
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Prove review regressions before production correction
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m py_compile .i168_review_fix.py
-          python3 .i168_review_fix.py tests
-          cargo fmt --all
-
-          set +e
-          cargo test --locked -p talos-provider i168_terminal_outcome_tests \
-            > i168-review-red-provider.log 2>&1
-          provider_red=$?
-          cargo build --locked -p talos-cli > i168-review-red-build.log 2>&1
-          build_status=$?
-          if [[ "$build_status" -eq 0 ]]; then
-            scripts/verify_i168_provider_terminal.sh target/debug/talos \
-              > i168-review-red-fixture.log 2>&1
-            fixture_red=$?
-          else
-            fixture_red=125
-          fi
-          set -e
-
-          cat i168-review-red-provider.log
-          cat i168-review-red-build.log
-          [[ -f i168-review-red-fixture.log ]] && cat i168-review-red-fixture.log || true
-          printf '\nREVIEW_RED_PROVIDER_EXIT=%s\n' "$provider_red"
-          printf 'REVIEW_RED_FIXTURE_EXIT=%s\n' "$fixture_red"
-          if [[ "$provider_red" -eq 0 || "$fixture_red" -eq 0 ]]; then
-            echo 'Expected parser-policy and rebuilt-output assertions to fail before correction.' >&2
-            exit 1
-          fi
-
-      - name: Apply correction and run focused validation
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 .i168_review_fix.py production
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('crates/talos-cli/src/mode_print.rs')
-          text = path.read_text()
-          broken = "stdout_line_open = !delta.ends_with('\n');"
-          fixed = r"stdout_line_open = !delta.ends_with('\n');"
-          if broken not in text:
-              raise SystemExit('generated newline literal was not found')
-          path.write_text(text.replace(broken, fixed, 1))
-          PY
-          cargo fmt --all
-          cargo test --locked -p talos-provider i168_terminal_outcome_tests
-          cargo test --locked -p talos-provider terminal
-          cargo test --locked -p talos-session diagnostic
-          cargo test --locked -p talos-cli terminal
-          cargo test --locked -p talos-tui terminal
-          cargo clippy --locked -p talos-provider -p talos-session -p talos-cli -p talos-tui -- -D warnings
-          cargo build --locked -p talos-cli
-          scripts/verify_i168_provider_terminal.sh target/debug/talos
-          git diff --check
-
-      - name: Commit corrected implementation
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f \
-            .i168_review_fix.py \
-            .i168-review-trigger \
-            .github/workflows/i168-review-fix.yml
-          git checkout origin/main -- .github/workflows/ci.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'fix(provider): classify known terminal policies (#RUNTIME-003 #I168) [model:gpt-5.6-thinking]'
-          git push origin HEAD:agent/i168-terminal-closeout

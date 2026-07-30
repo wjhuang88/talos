@@ -167,6 +167,8 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let mut stdout = io::stdout().lock();
     let mut terminal_notice = None;
+    let mut saw_stdout = false;
+    let mut stdout_line_open = false;
     while let Some(event) = handle.eq_rx.recv().await {
         match event {
             SessionEvent::TurnEvent {
@@ -176,8 +178,12 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                     },
                 ..
             } => {
-                print!("{delta}");
+                write!(stdout, "{delta}").context("failed to write stdout")?;
                 stdout.flush().context("failed to flush stdout")?;
+                if !delta.is_empty() {
+                    saw_stdout = true;
+                    stdout_line_open = !delta.ends_with('\n');
+                }
             }
             SessionEvent::TurnEvent {
                 payload:
@@ -193,21 +199,32 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                 ..
             } => match status {
                 talos_core::session::TurnCompletionStatus::Success { .. } => {
+                    if stdout_line_open || !saw_stdout {
+                        writeln!(stdout).context("failed to finish stdout line")?;
+                    }
+                    stdout.flush().context("failed to flush stdout")?;
                     if let Some(notice) = terminal_notice.take() {
                         eprintln!("{notice}");
                     }
-                    println!();
                     return Ok(());
                 }
                 talos_core::session::TurnCompletionStatus::Cancelled => {
                     return Ok(());
                 }
                 talos_core::session::TurnCompletionStatus::Error { message } => {
+                    if stdout_line_open {
+                        writeln!(stdout).context("failed to finish stdout line")?;
+                        stdout.flush().context("failed to flush stdout")?;
+                    }
                     eprintln!("Error: {message}");
                     std::process::exit(1);
                 }
             },
             SessionEvent::Error { message } => {
+                if stdout_line_open {
+                    writeln!(stdout).context("failed to finish stdout line")?;
+                    stdout.flush().context("failed to flush stdout")?;
+                }
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }

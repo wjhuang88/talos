@@ -1,0 +1,4 @@
+protocol	mode	exit
+openai	normal	0
+openai	max-tokens	0
+/tmp/tmp.ZhPKHy16FV/combined-openai/combined mismatch: expected 'fixture partial\nWarning: response truncated because the provider reached the output token limit; partial response preserved.\n', got 'fixture partialWarning: response truncated because the provider reached the output token limit; partial response preserved.\n\n'

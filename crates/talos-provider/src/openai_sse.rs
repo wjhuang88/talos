@@ -299,6 +299,22 @@ pub(crate) async fn parse_sse_stream(
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,
                     "length" => StopReason::MaxTokens,
+                    "content_filter" => {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: "provider response filtered by content policy (finish_reason=content_filter)".into(),
+                            })
+                            .await;
+                        return;
+                    }
+                    "function_call" => {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: "provider requested deprecated legacy function_call (finish_reason=function_call); use tool_calls".into(),
+                            })
+                            .await;
+                        return;
+                    }
                     unknown => {
                         let _ = tx
                             .send(AgentEvent::Error {
@@ -2212,6 +2228,16 @@ mod i168_terminal_outcome_tests {
         events
     }
 
+    fn terminal_error(events: &[AgentEvent]) -> &str {
+        events
+            .iter()
+            .find_map(|event| match event {
+                AgentEvent::Error { message } => Some(message.as_str()),
+                _ => None,
+            })
+            .expect("terminal error")
+    }
+
     #[tokio::test]
     async fn openai_eof_after_partial_text_is_terminal_error() {
         let events = parse_raw_body(
@@ -2232,12 +2258,49 @@ mod i168_terminal_outcome_tests {
     }
 
     #[tokio::test]
-    async fn openai_unknown_finish_reason_is_not_end_turn() {
+    async fn openai_content_filter_uses_known_filtered_policy() {
         let events = parse_raw_body(
             b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"content_filter\"}]}\n\n".to_vec(),
         )
         .await;
-        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("content_filter"))));
+        let message = terminal_error(&events);
+        assert!(message.contains("filtered"));
+        assert!(message.contains("content_filter"));
+        assert!(!message.contains("unsupported provider finish_reason"));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn openai_legacy_function_call_uses_known_policy() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"function_call\"}]}\n\n".to_vec(),
+        )
+        .await;
+        let message = terminal_error(&events);
+        assert!(message.contains("legacy function_call"));
+        assert!(message.contains("tool_calls"));
+        assert!(!message.contains("unsupported provider finish_reason"));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn openai_unknown_finish_reason_is_not_end_turn() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"fixture_unknown_reason\"}]}\n\n".to_vec(),
+        )
+        .await;
+        let message = terminal_error(&events);
+        assert!(message.contains("unsupported provider finish_reason"));
+        assert!(message.contains("fixture_unknown_reason"));
+        assert!(!message.contains("content_filter"));
         assert!(
             !events
                 .iter()

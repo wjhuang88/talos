@@ -93,6 +93,22 @@ fn classify_error(message: &str) -> (ProviderTerminalSource, String) {
             "missing_explicit_terminal".into(),
         );
     }
+    for (prefix, reason) in [
+        (
+            "provider response filtered by content policy",
+            "content_filter",
+        ),
+        (
+            "provider requested deprecated legacy function_call",
+            "legacy_function_call",
+        ),
+        ("provider paused turn", "pause_turn"),
+        ("provider refused request", "refusal"),
+    ] {
+        if message.starts_with(prefix) {
+            return (ProviderTerminalSource::ProviderError, reason.into());
+        }
+    }
     for prefix in [
         "unsupported provider finish_reason:",
         "unsupported provider stop_reason:",

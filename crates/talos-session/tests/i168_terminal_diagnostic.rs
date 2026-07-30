@@ -42,7 +42,7 @@ fn interactive_tlog_terminal_diagnostic_round_trips_with_turn_correlation() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("round-trip", "").unwrap();
     let terminal = AgentEvent::Error {
-        message: "unsupported provider finish_reason: content_filter".into(),
+        message: "unsupported provider finish_reason: fixture_unknown_reason".into(),
     };
     let diagnostic = diagnostic("turn-correlated", 3, &terminal);
 
@@ -57,9 +57,63 @@ fn interactive_tlog_terminal_diagnostic_round_trips_with_turn_correlation() {
         diagnostics[0].source,
         ProviderTerminalSource::UnsupportedReason
     );
-    assert_eq!(diagnostics[0].reason.as_deref(), Some("content_filter"));
+    assert_eq!(
+        diagnostics[0].reason.as_deref(),
+        Some("fixture_unknown_reason")
+    );
     assert_eq!(diagnostics[0].provider.as_deref(), Some("fixture-provider"));
     assert_eq!(diagnostics[0].model.as_deref(), Some("fixture-model"));
+}
+
+#[test]
+fn known_provider_policies_remain_distinct_from_truly_unknown_reasons() {
+    let known_cases = [
+        (
+            "provider response filtered by content policy (finish_reason=content_filter)",
+            "content_filter",
+        ),
+        (
+            "provider requested deprecated legacy function_call (finish_reason=function_call); use tool_calls",
+            "legacy_function_call",
+        ),
+        (
+            "provider paused turn (stop_reason=pause_turn); automatic continuation is not supported",
+            "pause_turn",
+        ),
+        ("provider refused request (stop_reason=refusal)", "refusal"),
+    ];
+
+    for (index, (message, expected_reason)) in known_cases.into_iter().enumerate() {
+        let terminal = AgentEvent::Error {
+            message: message.into(),
+        };
+        let diagnostic = diagnostic("turn-known-policy", index as u32 + 1, &terminal);
+        assert_eq!(diagnostic.outcome, ProviderTerminalOutcome::Error);
+        assert_eq!(diagnostic.source, ProviderTerminalSource::ProviderError);
+        assert_eq!(diagnostic.reason.as_deref(), Some(expected_reason));
+    }
+
+    let unknown = diagnostic(
+        "turn-unknown-policy",
+        1,
+        &AgentEvent::Error {
+            message: "unsupported provider stop_reason: fixture_unknown_reason".into(),
+        },
+    );
+    assert_eq!(unknown.source, ProviderTerminalSource::UnsupportedReason);
+    assert_eq!(unknown.reason.as_deref(), Some("fixture_unknown_reason"));
+
+    let stop_sequence = diagnostic(
+        "turn-stop-sequence",
+        1,
+        &AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    );
+    assert_eq!(stop_sequence.outcome, ProviderTerminalOutcome::Completed);
+    assert_eq!(stop_sequence.source, ProviderTerminalSource::Explicit);
+    assert_eq!(stop_sequence.reason, None);
 }
 
 #[test]

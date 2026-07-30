@@ -70,11 +70,11 @@ def _anthropic_text(text: str) -> bytes:
     )
 
 
-def _anthropic_terminal(reason: str) -> bytes:
+def _anthropic_terminal(reason: str, stop_sequence: str | None = None) -> bytes:
     return _sse(
         "message_delta",
         {
-            "delta": {"stop_reason": reason, "stop_sequence": None},
+            "delta": {"stop_reason": reason, "stop_sequence": stop_sequence},
             "usage": {"output_tokens": 1},
         },
     )
@@ -123,7 +123,9 @@ def _response(protocol: str, model: str, ordinal: int) -> tuple[list[bytes], int
         table = {
             "normal": ([_openai_text("fixture normal", "stop")], 0),
             "max-tokens": ([_openai_text("fixture partial", "length")], 0),
-            "unknown": ([_openai_text("fixture partial", "content_filter")], 0),
+            "content-filter": ([_openai_text("fixture partial", "content_filter")], 0),
+            "legacy-function-call": ([_openai_text("fixture partial", "function_call")], 0),
+            "unknown": ([_openai_text("fixture partial", "fixture_unknown_reason")], 0),
             "eof": ([partial], 0),
             "decode-error": ([partial, b"\xff"], 0),
             "transport-error": ([partial], 64),
@@ -135,8 +137,14 @@ def _response(protocol: str, model: str, ordinal: int) -> tuple[list[bytes], int
     partial = _anthropic_text("fixture partial")
     table = {
         "normal": ([_anthropic_text("fixture normal"), _anthropic_terminal("end_turn")], 0),
+        "stop-sequence": (
+            [_anthropic_text("fixture stop sequence"), _anthropic_terminal("stop_sequence", "END")],
+            0,
+        ),
         "max-tokens": ([partial, _anthropic_terminal("max_tokens")], 0),
-        "unknown": ([partial, _anthropic_terminal("pause_turn")], 0),
+        "pause-turn": ([partial, _anthropic_terminal("pause_turn")], 0),
+        "refusal": ([partial, _anthropic_terminal("refusal")], 0),
+        "unknown": ([partial, _anthropic_terminal("fixture_unknown_reason")], 0),
         "eof": ([partial], 0),
         "decode-error": ([partial, b"\xff"], 0),
         "transport-error": ([partial], 64),
