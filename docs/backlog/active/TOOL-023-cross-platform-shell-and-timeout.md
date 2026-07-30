@@ -1,6 +1,6 @@
 # TOOL-023: Cross-Platform Shell Execution and Reliable Timeout (Epic)
 
-**Status**: Refinement (2026-07-24)
+**Status**: In Progress — A/C selected by I170; B remains Ready (2026-07-31)
 **Priority**: P1 (bug fix child) / P2 (platform + config children)
 **Source**: User request 2026-07-24 ("Windows 下 bash 工具替换为 Windows 命令行工具；命令行工具加可配置超时，默认 300s")
 **Type**: Epic

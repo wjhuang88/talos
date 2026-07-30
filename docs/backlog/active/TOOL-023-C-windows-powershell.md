@@ -1,6 +1,6 @@
 # TOOL-023-C: Windows-Native Shell (PowerShell) for the Bash Tool
 
-**Status**: Ready (2026-07-24)
+**Status**: In Progress — selected by I170 (2026-07-31)
 **Priority**: P2
 **Parent Epic**: TOOL-023
 **Type**: Product/State Story
@@ -48,6 +48,8 @@ commands and the tool works on Windows hosts.
 - ADR-012: shell command classification for the permission pipeline. Verify the
   classifier's assumptions (pipes/redirects/globs meaning) still hold under
   PowerShell, or record the difference as a residual/ADR note.
+- ADR-057: selects `powershell.exe`, the Windows `powershell` tool identity, child-local env
+  removal, exact permission fallback, and the no-translation/no-rlimit boundary.
 - Permission pipeline: the tool remains `ToolNature::Execute` / `ToolFamily::Shell`;
   a per-platform tool-name change must not weaken permission routing.
 

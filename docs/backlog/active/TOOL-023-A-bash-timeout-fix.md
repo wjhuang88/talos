@@ -1,6 +1,6 @@
 # TOOL-023-A: Fix Bash Timeout Defeated by Continuous Output
 
-**Status**: Ready (2026-07-24)
+**Status**: In Progress — selected by I170 (2026-07-31)
 **Priority**: P1
 **Parent Epic**: TOOL-023
 **Type**: Technical Story (bug fix)

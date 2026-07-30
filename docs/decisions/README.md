@@ -120,3 +120,5 @@ Which Assumptions need validation?]
 - [054: Alternate-Screen Application-Owned Transcript Rendering](054-alternate-screen-app-owned-transcript-rendering.md) — **Accepted** (2026-07-27; reinstated with startup-splash amendment). Talos has one Alternate Screen full-frame renderer; it enters Alternate Screen before drawing the Logo as display-only first-frame content, while TranscriptStore remains the sole conversation-history authority.
 
 - [055: Primary-Screen App-Owned Transcript With Native History Projection](055-primary-screen-app-owned-transcript-native-projection.md) — **Rejected** (2026-07-27). Short-lived one-mode primary-screen trial superseded by the maintainer-selected amended ADR-054 Alternate Screen renderer.
+
+- [057: Windows PowerShell Process Boundary](057-windows-powershell-process-boundary.md) — **Proposed** (2026-07-31). Selects `powershell`/`powershell.exe` on Windows, preserves Unix `bash`/`sh -c`, applies child-local dangerous-environment removal, retains exact Execute permission routing, and records the no-translation/no-Windows-rlimit boundary. Pending independent I170 security and maintainer review.
