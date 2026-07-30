@@ -7,7 +7,7 @@
 //!
 //! - All types are `pub(crate)` — no public semver-bound API surface.
 //! - The actor (SF101) owns a `HashMap` of active tasks and injects messages
-//!   via the existing `SessionOp::Submit` queue.
+//!   via source-aware `SessionOp::SubmitStructured` operations.
 //! - The `delay` tool (SF102) sends commands through [`SchedulerHandle`].
 //! - No persistence, no cron, no direct tool execution — session-scoped only.
 //!
@@ -25,7 +25,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use talos_core::session::SessionOp;
+use talos_core::session::{
+    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionSource,
+};
 use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -84,13 +86,13 @@ pub(crate) fn validate_interval_secs(interval_secs: u64) -> Result<(), String> {
 ///
 /// This label ensures both the user and the model can distinguish a scheduled
 /// follow-up from a user-typed message in the transcript. It is encoded in the
-/// message `String` sent via `SessionOp::Submit` — no public API change is
-/// required.
+/// structured submission text; the source is separately identified as
+/// [`SubmissionSource::Scheduler`].
 pub(crate) const SCHEDULED_FOLLOWUP_LABEL: &str = "[scheduled-followup]";
 
 /// Formats a user message with the scheduled-followup source label.
 ///
-/// The resulting string is sent via `SessionOp::Submit` and appears in the
+/// The resulting string is carried by a structured submission and appears in the
 /// transcript as a visibly labeled message.
 pub(crate) fn label_scheduled_message(message: &str) -> String {
     format!("{SCHEDULED_FOLLOWUP_LABEL} {message}")
@@ -99,6 +101,7 @@ pub(crate) fn label_scheduled_message(message: &str) -> String {
 // ── Task IDs ────────────────────────────────────────────────────────────
 
 static NEXT_TASK_SEQ: AtomicU64 = AtomicU64::new(1);
+static NEXT_FIRE_SEQ: AtomicU64 = AtomicU64::new(1);
 
 /// Generates a deterministic, monotonically increasing task ID.
 ///
@@ -106,6 +109,23 @@ static NEXT_TASK_SEQ: AtomicU64 = AtomicU64::new(1);
 /// and are never persisted or reused after a restart.
 pub(crate) fn next_task_id() -> String {
     format!("sched_{}", NEXT_TASK_SEQ.fetch_add(1, Ordering::Relaxed))
+}
+
+fn scheduled_submission(task_id: &str, message: String) -> SessionOp {
+    let sequence = NEXT_FIRE_SEQ.fetch_add(1, Ordering::Relaxed);
+    SessionOp::SubmitStructured {
+        submission: StructuredSubmission {
+            id: format!("{task_id}_fire_{sequence}"),
+            source: SubmissionSource::Scheduler,
+            items: vec![SubmissionItem {
+                id: format!("{task_id}_item_{sequence}"),
+                enqueue_sequence: sequence,
+                kind: SubmissionKind::UserTurn,
+                text: message,
+                attachments: Vec::new(),
+            }],
+        },
+    }
 }
 
 // ── Schedule kind ───────────────────────────────────────────────────────
@@ -430,9 +450,7 @@ impl SchedulerActor {
             tokio::time::sleep(delay).await;
 
             if sq_tx
-                .send(SessionOp::Submit {
-                    message: labeled_for_fire,
-                })
+                .send(scheduled_submission(&task_id_for_fire, labeled_for_fire))
                 .await
                 .is_err()
             {
@@ -491,9 +509,10 @@ impl SchedulerActor {
                 timer.tick().await;
 
                 if sq_tx
-                    .send(SessionOp::Submit {
-                        message: labeled_for_fire.clone(),
-                    })
+                    .send(scheduled_submission(
+                        &task_id_for_fire,
+                        labeled_for_fire.clone(),
+                    ))
                     .await
                     .is_err()
                 {
@@ -1135,14 +1154,16 @@ mod tests {
             .try_recv()
             .expect("message should have been injected after delay");
         match op {
-            SessionOp::Submit { message } => {
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                let message = &submission.items[0].text;
                 assert!(
                     message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
                     "injected message must carry the source label"
                 );
                 assert!(message.contains("check the build"));
             }
-            other => panic!("expected Submit, got {other:?}"),
+            other => panic!("expected scheduler structured submission, got {other:?}"),
         }
     }
 
@@ -1490,8 +1511,15 @@ mod tests {
         let op = sq_rx.try_recv();
         assert!(op.is_ok(), "first fire at ~t=5");
         match op.unwrap() {
-            SessionOp::Submit { message } => assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL)),
-            _ => panic!("expected Submit"),
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                assert!(
+                    submission.items[0]
+                        .text
+                        .starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                );
+            }
+            _ => panic!("expected scheduler structured submission"),
         }
 
         // Second fire at t=10
@@ -1915,7 +1943,9 @@ mod tests {
             .try_recv()
             .expect("one labeled message should be injected after the delay");
         match op {
-            SessionOp::Submit { message } => {
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                let message = &submission.items[0].text;
                 assert!(
                     message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
                     "injected message must carry the scheduled-followup source label"
@@ -1925,7 +1955,7 @@ mod tests {
                     "injected message must contain the original text"
                 );
             }
-            other => panic!("expected SessionOp::Submit, got {other:?}"),
+            other => panic!("expected scheduler structured submission, got {other:?}"),
         }
 
         // Step 4: Verify no second injection (one-shot fires exactly once).
@@ -1966,15 +1996,17 @@ mod tests {
 
         let op = sq_rx.try_recv().expect("message should be injected");
         match op {
-            SessionOp::Submit { message } => {
-                // The injected op is a plain String message.
-                // It carries no permission state, no tool call,
-                // and no pre-approval. The session actor will treat it
-                // identically to a user-typed message — any tool call
-                // in the resulting turn gets a fresh permission decision.
-                assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL));
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                // Source identity carries no permission grant. Any tool call
+                // in the resulting turn receives a fresh decision.
+                assert!(
+                    submission.items[0]
+                        .text
+                        .starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                );
             }
-            _ => panic!("expected SessionOp::Submit"),
+            _ => panic!("expected scheduler structured submission"),
         }
     }
 

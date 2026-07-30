@@ -70,6 +70,38 @@ mod tests {
             }
             Ok(())
         }
+
+        fn start_submission(&self, submission_id: String, turn_id: &str) {
+            self.tx
+                .send(SessionEvent::SubmissionStarted {
+                    session_id: "session_test".into(),
+                    submission_id,
+                    turn_id: turn_id.into(),
+                })
+                .unwrap();
+            self.tx
+                .send(SessionEvent::TurnEvent {
+                    session_id: "session_test".into(),
+                    turn_id: turn_id.into(),
+                    sequence: 0,
+                    payload: TurnEventPayload::Started,
+                })
+                .unwrap();
+        }
+
+        fn complete_cancelled(&self) {
+            use std::sync::atomic::Ordering;
+            self.tx
+                .send(SessionEvent::TurnEvent {
+                    session_id: "session_test".into(),
+                    turn_id: "turn_test".into(),
+                    sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+                    payload: TurnEventPayload::Completed {
+                        status: TurnCompletionStatus::Cancelled,
+                    },
+                })
+                .unwrap();
+        }
     }
 
     fn empty_runtime_skills()
@@ -220,6 +252,20 @@ mod tests {
             })
             .unwrap();
 
+        let submitted =
+            tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
+                .await
+                .unwrap()
+                .expect("structured follow-up");
+        let submission_id = match submitted {
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.items[0].text, "queued follow-up");
+                submission.id
+            }
+            other => panic!("expected structured submission, got {other:?}"),
+        };
+        agent_tx.start_submission(submission_id, "turn_followup");
+
         let mut saw_queued_user_stream = false;
         let mut saw_queue_drained_status = false;
         for _ in 0..20 {
@@ -245,11 +291,6 @@ mod tests {
 
         assert!(saw_queued_user_stream);
         assert!(saw_queue_drained_status);
-        assert!(matches!(
-            interrupt_rx.try_recv(),
-            Ok(talos_core::session::SessionOp::Submit { message }) if message == "queued follow-up"
-        ));
-
         drop(agent_tx);
         drop(user_tx);
         loop_handle.await.unwrap();
@@ -405,7 +446,9 @@ mod tests {
                 .await
                 .unwrap()
                 .and_then(|op| match op {
-                    talos_core::session::SessionOp::Submit { message } => Some(message),
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission.items[0].text.clone())
+                    }
                     _ => None,
                 })
                 .as_deref(),
@@ -496,16 +539,40 @@ mod tests {
             .await
             .expect("batched submit arrives")
             .and_then(|op| match op {
-                talos_core::session::SessionOp::Submit { message } => Some(message),
+                talos_core::session::SessionOp::SubmitStructured { submission } => Some((
+                    submission.id,
+                    submission
+                        .items
+                        .into_iter()
+                        .map(|item| item.text)
+                        .collect::<Vec<_>>(),
+                )),
                 _ => None,
-            });
-        assert_eq!(first_batch.as_deref(), Some("first\n\nsecond\n\nthird"));
+            })
+            .expect("structured batch");
+        assert_eq!(first_batch.1, vec!["first", "second", "third"]);
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(100), sq_rx.recv())
                 .await
                 .is_err(),
             "one completed turn must create exactly one follow-up submit"
         );
+
+        event_tx
+            .send(SessionEvent::SubmissionStarted {
+                session_id: "session_test".into(),
+                submission_id: first_batch.0,
+                turn_id: "turn_2".into(),
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_2".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .unwrap();
 
         tokio::time::timeout(std::time::Duration::from_secs(1), async {
             while let Some(output) = ui_rx.recv().await {
@@ -540,7 +607,7 @@ mod tests {
             .send(SessionEvent::TurnEvent {
                 session_id: "session_test".into(),
                 turn_id: "turn_2".into(),
-                sequence: 0,
+                sequence: 1,
                 payload: TurnEventPayload::Completed {
                     status: TurnCompletionStatus::Success {
                         final_text: String::new(),
@@ -554,7 +621,9 @@ mod tests {
             .await
             .expect("later batch submit arrives")
             .and_then(|op| match op {
-                talos_core::session::SessionOp::Submit { message } => Some(message),
+                talos_core::session::SessionOp::SubmitStructured { submission } => {
+                    Some(submission.items[0].text.clone())
+                }
                 _ => None,
             });
         assert_eq!(second_batch.as_deref(), Some("later"));
@@ -877,6 +946,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         user_tx.send(UserInput::Cancel).unwrap();
+        agent_tx.complete_cancelled();
 
         let mut saw_cancelled_status = false;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -2262,10 +2332,14 @@ mod steering_snapshot_tests {
             "must receive a SessionOp within timeout"
         );
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::SubmitMultimodal { text, attachments } => {
-                assert_eq!(text, "describe this image");
-                assert_eq!(attachments.len(), 1);
-                match &attachments[0] {
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(
+                    submission.source,
+                    talos_core::session::SubmissionSource::User
+                );
+                assert_eq!(submission.items[0].text, "describe this image");
+                assert_eq!(submission.items[0].attachments.len(), 1);
+                match &submission.items[0].attachments[0] {
                     ContentPart::Image { mime, .. } => {
                         assert_eq!(mime, "image/png");
                     }
@@ -2273,7 +2347,7 @@ mod steering_snapshot_tests {
                 }
             }
             other => panic!(
-                "expected SubmitMultimodal, got {:?}",
+                "expected SubmitStructured, got {:?}",
                 std::mem::discriminant(&other)
             ),
         }
@@ -2330,10 +2404,14 @@ mod steering_snapshot_tests {
 
         assert!(received_op.is_ok());
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::Submit { message } => {
-                assert_eq!(message, "plain text message");
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(
+                    submission.source,
+                    talos_core::session::SubmissionSource::User
+                );
+                assert_eq!(submission.items[0].text, "plain text message");
             }
-            other => panic!("expected Submit, got {:?}", other),
+            other => panic!("expected SubmitStructured, got {:?}", other),
         }
     }
 

@@ -9,7 +9,94 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::message::AgentEvent;
+use crate::message::ContentPart;
 use crate::message::Message;
+
+/// Maximum UTF-8 bytes accepted for one structured submission item (ADR-056).
+pub const MAX_SUBMISSION_ITEM_BYTES: usize = 64 * 1024;
+/// Maximum items retained in one interactive steering queue (ADR-056).
+pub const MAX_STEERING_QUEUE_ITEMS: usize = 128;
+/// Maximum UTF-8 text bytes retained in one interactive steering queue (ADR-056).
+pub const MAX_STEERING_QUEUE_BYTES: usize = 1024 * 1024;
+/// Maximum compatible items projected into one actor turn (ADR-056).
+pub const MAX_SUBMISSION_BATCH_ITEMS: usize = 32;
+/// Maximum UTF-8 text bytes projected into one actor turn (ADR-056).
+pub const MAX_SUBMISSION_BATCH_BYTES: usize = 256 * 1024;
+
+/// Origin of a structured session submission (ADR-056).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionSource {
+    /// Interactive user input accepted by a product bridge.
+    User,
+    /// A scheduled follow-up produced by the session scheduler.
+    Scheduler,
+    /// A legacy or external caller using the compatibility operations.
+    Compatibility,
+}
+
+/// Dispatch semantics fixed before an item enters a queue (ADR-056).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionKind {
+    /// A normal model-visible user turn.
+    UserTurn,
+    /// A request-preview diagnostic that must not call the provider.
+    PreviewRequest,
+}
+
+/// One recoverable item inside a structured session submission.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubmissionItem {
+    /// Opaque producer-assigned item identity.
+    pub id: String,
+    /// Monotonic order assigned by the producer within its source domain.
+    pub enqueue_sequence: u64,
+    /// Dispatch kind fixed before queue insertion.
+    pub kind: SubmissionKind,
+    /// Original text without delimiter rewriting.
+    pub text: String,
+    /// Image parts bound to this item before queue insertion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<ContentPart>,
+}
+
+impl SubmissionItem {
+    /// Returns the original UTF-8 text size used by queue and batch budgets.
+    #[must_use]
+    pub fn text_bytes(&self) -> usize {
+        self.text.len()
+    }
+}
+
+/// One actor-owned submission containing a bounded ordered item batch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StructuredSubmission {
+    /// Opaque producer-assigned batch identity used for acknowledgement.
+    pub id: String,
+    /// Producer/source used by actor arbitration and diagnostics.
+    pub source: SubmissionSource,
+    /// Ordered recoverable items. A batch never mixes dispatch kinds.
+    pub items: Vec<SubmissionItem>,
+}
+
+impl StructuredSubmission {
+    /// Returns the aggregate UTF-8 text size without inspecting user content.
+    #[must_use]
+    pub fn total_text_bytes(&self) -> usize {
+        self.items.iter().map(SubmissionItem::text_bytes).sum()
+    }
+
+    /// Returns the common dispatch kind when the batch is non-empty and homogeneous.
+    #[must_use]
+    pub fn common_kind(&self) -> Option<SubmissionKind> {
+        let first = self.items.first()?.kind;
+        self.items
+            .iter()
+            .all(|item| item.kind == first)
+            .then_some(first)
+    }
+}
 
 /// Commands sent to the session actor via the bounded SQ.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +112,11 @@ pub enum SessionOp {
     },
     /// Build a provider request preview for diagnostics without calling the provider.
     PreviewRequest { message: String },
+    /// Submit a source-aware, recoverable item batch (ADR-056 / TUI-041).
+    ///
+    /// Legacy Submit variants remain supported and are normalized by the
+    /// session actor as one-item compatibility submissions.
+    SubmitStructured { submission: StructuredSubmission },
     /// Replace the model-visible activated Skill context.
     ///
     /// The CLI/runtime layer is responsible for validating paths and budgets
@@ -47,6 +139,37 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// The actor accepted ownership of one structured submission from the SQ.
+    SubmissionQueued {
+        /// Session that accepted the submission.
+        session_id: String,
+        /// Opaque producer-assigned submission identity.
+        submission_id: String,
+        /// Source used by actor arbitration.
+        source: SubmissionSource,
+        /// Number of original recoverable items.
+        item_count: usize,
+        /// Aggregate text bytes; user content is never included.
+        total_text_bytes: usize,
+    },
+    /// The actor correlated an accepted structured submission to a new turn.
+    SubmissionStarted {
+        /// Session that owns the turn.
+        session_id: String,
+        /// Submission that started.
+        submission_id: String,
+        /// Canonical actor turn identity.
+        turn_id: String,
+    },
+    /// The actor rejected a structured submission before starting a turn.
+    SubmissionRejected {
+        /// Session that rejected the submission.
+        session_id: String,
+        /// Submission that was rejected.
+        submission_id: String,
+        /// Bounded, content-free rejection reason.
+        reason: SubmissionRejectionReason,
+    },
     /// A durable embedded session has atomically committed a completed turn.
     ///
     /// Emitted only after durable storage reports success. Existing unbound
@@ -94,6 +217,20 @@ pub enum SessionEvent {
     },
     /// A session-level error.
     Error { message: String },
+}
+
+/// Content-free reason a structured submission could not start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionRejectionReason {
+    /// The submission was empty or mixed incompatible dispatch kinds.
+    InvalidStructure,
+    /// An item or batch exceeded a hard byte/item budget.
+    LimitExceeded,
+    /// Compacted history plus input still exceeded the model context budget.
+    ContextBudgetExceeded,
+    /// The actor was shutting down before the submission could start.
+    SessionClosed,
 }
 
 /// Ordered payload carried by [`SessionEvent::TurnEvent`].
@@ -232,6 +369,19 @@ mod tests {
             SessionOp::PreviewRequest {
                 message: "diagnostic".into(),
             },
+            SessionOp::SubmitStructured {
+                submission: StructuredSubmission {
+                    id: "batch_1".into(),
+                    source: SubmissionSource::User,
+                    items: vec![SubmissionItem {
+                        id: "item_1".into(),
+                        enqueue_sequence: 1,
+                        kind: SubmissionKind::UserTurn,
+                        text: "structured".into(),
+                        attachments: Vec::new(),
+                    }],
+                },
+            },
             SessionOp::Interrupt,
             SessionOp::Shutdown,
         ];
@@ -248,6 +398,23 @@ mod tests {
     #[test]
     fn session_event_serde_roundtrip() {
         let events = vec![
+            SessionEvent::SubmissionQueued {
+                session_id: "session_1".into(),
+                submission_id: "batch_1".into(),
+                source: SubmissionSource::User,
+                item_count: 1,
+                total_text_bytes: 10,
+            },
+            SessionEvent::SubmissionStarted {
+                session_id: "session_1".into(),
+                submission_id: "batch_1".into(),
+                turn_id: "turn_1".into(),
+            },
+            SessionEvent::SubmissionRejected {
+                session_id: "session_1".into(),
+                submission_id: "batch_2".into(),
+                reason: SubmissionRejectionReason::LimitExceeded,
+            },
             SessionEvent::TurnEvent {
                 session_id: "session_1".into(),
                 turn_id: "turn_1".into(),

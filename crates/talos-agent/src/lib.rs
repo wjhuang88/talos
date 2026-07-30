@@ -270,6 +270,7 @@ impl Agent {
     /// assistant/tool messages. On error, this may contain a valid prefix
     /// of completed exchanges that should be persisted; incomplete streamed
     /// assistant fragments are never included.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn(
         &self,
         user_message: String,
@@ -283,6 +284,7 @@ impl Agent {
     /// Session turn with multimodal content (MODEL-009-D/I152).
     /// Constructs `Message::Multimodal` instead of `Message::User`
     /// when image attachments are present.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn_multimodal(
         &self,
         user_message: String,
@@ -301,6 +303,40 @@ impl Agent {
             },
         )
         .await
+    }
+
+    /// Runs one actor turn from an ordered structured submission.
+    ///
+    /// Each item remains a distinct persisted user message. Text projection is
+    /// used only for memory lookup; it is never the authoritative transcript.
+    pub(crate) async fn run_for_session_turn_items(
+        &self,
+        items: Vec<talos_core::session::SubmissionItem>,
+        history: Vec<Message>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let memory_query = items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let input_messages = items
+            .into_iter()
+            .map(|item| {
+                if item.attachments.is_empty() {
+                    Message::User { content: item.text }
+                } else {
+                    let mut parts = Vec::with_capacity(item.attachments.len() + 1);
+                    if !item.text.is_empty() {
+                        parts.push(talos_core::message::ContentPart::Text { text: item.text });
+                    }
+                    parts.extend(item.attachments);
+                    Message::Multimodal { parts }
+                }
+            })
+            .collect();
+        self.run_inner_with_messages(memory_query, input_messages, history, Some(event_tx))
+            .await
     }
 
     /// Builds a provider request preview without calling the provider.
@@ -406,6 +442,7 @@ impl Agent {
 
     /// Like `build_provider_messages` but pushes `Message::Multimodal`
     /// instead of `Message::User` when attachments are present.
+    #[allow(dead_code)]
     async fn build_provider_messages_with_attachments(
         &self,
         user_message: String,
@@ -446,22 +483,46 @@ impl Agent {
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         attachments: Option<Vec<talos_core::message::ContentPart>>,
     ) -> (AgentResult<String>, Vec<Message>) {
+        let input_messages = if let Some(atts) = attachments {
+            let mut parts = Vec::with_capacity(atts.len() + 1);
+            if !user_message.is_empty() {
+                parts.push(talos_core::message::ContentPart::Text {
+                    text: user_message.clone(),
+                });
+            }
+            parts.extend(atts);
+            vec![Message::Multimodal { parts }]
+        } else {
+            vec![Message::User {
+                content: user_message.clone(),
+            }]
+        };
+        self.run_inner_with_messages(user_message, input_messages, history, event_tx)
+            .await
+    }
+
+    async fn run_inner_with_messages(
+        &self,
+        memory_query: String,
+        input_messages: Vec<Message>,
+        history: Vec<Message>,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+    ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
-        let (mut messages, persist_start) = match if let Some(atts) = attachments {
-            self.build_provider_messages_with_attachments(user_message, history, &hook_ctx, atts)
-                .await
-        } else {
-            self.build_provider_messages(user_message, history, &hook_ctx)
-                .await
-        } {
+        let (mut messages, persist_start) = match self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await
+        {
             Ok(messages) => messages,
             Err(error) => {
                 self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
                 return (Err(error), Vec::new());
             }
         };
+        messages.pop();
+        messages.extend(input_messages);
 
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
