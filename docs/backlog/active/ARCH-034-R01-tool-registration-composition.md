@@ -5,13 +5,13 @@
 | Story ID | ARCH-034-R01 |
 | Type | Architecture / Technical Story |
 | Parent Epic | ARCH-034 |
-| Status | Refinement — ADR decision required before Ready |
+| Status | In Progress — I158 Active; ADR-053 Accepted 2026-07-31 |
 | Priority | P1 |
 | Source | ARCH-034-F01 audit finding; maintainer requirement, 2026-07-22 |
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
 | Blocks | Future built-in tool additions and ARCH-031-A feature-boundary work |
-| Selected Iteration | I158 (Blocked — gated on ADR-053 Accepted; not yet Ready) |
+| Selected Iteration | I158 (Active — ADR-053 accepted; baseline `e539537d`) |
 
 ## Problem
 
@@ -120,17 +120,10 @@ and reject any approach that relies on hidden global initialization.
 
 ## Readiness Gate
 
-This story becomes Ready only after [ADR-053](../../decisions/053-tool-registration-composition.md)
-is **Accepted**. ADR-053 is currently Proposed; until it is accepted by architecture/maintainer
-review, this story stays Refinement and [I158](../../iterations/I158-tool-registration-composition.md)
-stays Blocked. The Accepted ADR must record:
-
-1. the additive core API and downstream migration path;
-2. ownership of built-in factories/descriptors versus mode composition;
-3. exact duplicate-name/source diagnostic behavior;
-4. why plugin registration, permission wrapping, and model capability gating remain explicit;
-5. the absence of cycles and global/implicit registration; and
-6. a behavior-equivalence matrix for print, TUI, MCP, plugins, and runtime-owned tools.
+Satisfied on 2026-07-31. ADR-053 is Accepted and records the additive core API, migration path,
+factory/composition ownership, exact duplicate diagnostic, explicit plugin/permission/capability
+boundaries, acyclic module ownership, and the print/TUI/MCP behavior-equivalence matrix. I158 is the
+sole Active implementation iteration and this Story is now In Progress.
 
 ## Acceptance
 

@@ -1,6 +1,6 @@
 # Iteration I158: Tool Registration Composition Consolidation
 
-> Document status: Blocked
+> Document status: Active
 > Published plan date: 2026-07-26
 > Planned objective: Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -13,7 +13,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `ARCH-034-R01` | `ARCH-034` | `Refinement/Blocked` | `ADR-053` Accepted and ARCH-034-R01 updated to Ready | Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior. |
+| `ARCH-034-R01` | `ARCH-034` | `In Progress` | ADR-053 Accepted 2026-07-31; activation recorded against `e539537d` | Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior. |
 
 ### Start Here
 
@@ -138,7 +138,7 @@ If a stop condition occurs:
 
 | Date | Type | Record |
 |---|---|---|
-| YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-07-31 | Activation | Baseline `e539537d` (`main` after I168 merge). No other implementation iteration is Active or in Review. ADR-053 Accepted; ARCH-034-R01 moved to In Progress. Primary executor is GPT-5.6 Thinking through the connected GitHub repository workflow. Begin with the additive core contract and red tests; retain all old builders until equivalence evidence passes. |
 
 ## Verification Evidence
 
@@ -159,10 +159,10 @@ If a stop condition occurs:
 
 ## REL-002 Execution Record
 
-- Primary executor/runtime: pending
-- External assistance: pending
-- Planning/editing/testing/docs/commit/push ownership: pending
-- Qualification verdict: pending; do not assume qualification.
+- Primary executor/runtime: GPT-5.6 Thinking through connected GitHub repository tooling
+- External assistance: none
+- Planning/editing/testing/docs/commit/push ownership: primary executor; GitHub Actions supplies repository validation evidence
+- Qualification verdict: non-qualifying for REL-002 until Talos itself is the primary execution runtime
 
 ## Retrospective
 
