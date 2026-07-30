@@ -1,0 +1,99 @@
+name: I168 Closeout Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.head_ref == 'agent/i168-terminal-closeout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/i168-terminal-closeout
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Install source-scan tool
+        run: command -v rg >/dev/null || { sudo apt-get update && sudo apt-get install -y ripgrep; }
+      - name: Run complete I168 matrix
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p i168-evidence/logs
+          summary="$PWD/i168-evidence/summary.tsv"
+          printf 'name\texit\tpassed\tfailed\tignored\twarnings\n' > "$summary"
+          overall=0
+
+          metrics() {
+            python3 - "$1" <<'PY'
+          import re, sys
+          text = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+          rows = re.findall(r'test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;', text)
+          passed = sum(int(row[0]) for row in rows)
+          failed = sum(int(row[1]) for row in rows)
+          ignored = sum(int(row[2]) for row in rows)
+          warnings = len(re.findall(r'(?m)^warning(?:\[|:)', text))
+          print(f'{passed}\t{failed}\t{ignored}\t{warnings}')
+          PY
+          }
+
+          run_cmd() {
+            local name="$1"
+            local command="$2"
+            local log="i168-evidence/logs/${name}.log"
+            printf '\n===== %s =====\n%s\n' "$name" "$command" | tee "$log"
+            set +e
+            bash -lc "$command" >> "$log" 2>&1
+            local status=$?
+            set -e
+            local values
+            values="$(metrics "$log")"
+            printf '%s\t%s\t%s\n' "$name" "$status" "$values" | tee -a "$summary"
+            cat "$log"
+            [[ "$status" -eq 0 ]] || overall=1
+          }
+
+          set -e
+          printf 'commit=%s\nbranch=%s\n' "$(git rev-parse HEAD)" "$(git branch --show-current)" \
+            | tee i168-evidence/baseline.txt
+          git status --short | tee -a i168-evidence/baseline.txt
+          git log -12 --oneline | tee -a i168-evidence/baseline.txt
+
+          run_cmd provider_terminal 'cargo test --locked -p talos-provider terminal'
+          run_cmd provider_eof 'cargo test --locked -p talos-provider eof'
+          run_cmd agent_terminal 'cargo test --locked -p talos-agent terminal'
+          run_cmd session_diagnostic 'cargo test --locked -p talos-session diagnostic'
+          run_cmd conversation_terminal 'cargo test --locked -p talos-conversation terminal'
+          run_cmd cli_terminal 'cargo test --locked -p talos-cli terminal'
+          run_cmd tui_terminal 'cargo test --locked -p talos-tui terminal'
+          run_cmd fmt 'cargo fmt --all -- --check'
+          run_cmd workspace_check 'cargo check --workspace --locked'
+          run_cmd workspace_clippy 'cargo clippy --workspace --locked -- -D warnings'
+          run_cmd workspace_test 'cargo test --workspace --locked'
+          run_cmd governance 'scripts/validate_project_governance.sh .'
+          run_cmd diff_check 'git diff --check'
+          run_cmd cli_build 'cargo build --locked -p talos-cli'
+          run_cmd source_scan "rg -n 'unknown|finish_reason|stop_reason|StopReason::EndTurn' crates/talos-provider/src/openai_sse.rs crates/talos-provider/src/anthropic_stream.rs"
+          run_cmd rebuilt_binary_fixture 'scripts/verify_i168_provider_terminal.sh target/debug/talos'
+
+          printf '\nOVERALL_EXIT=%s\n' "$overall" | tee -a "$summary"
+          cat "$summary"
+          exit "$overall"
+      - name: Upload I168 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i168-closeout-validation
+          path: i168-evidence
+          if-no-files-found: error
