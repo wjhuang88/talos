@@ -224,7 +224,9 @@ impl ConfigStore {
         let mut outcome = RecoveryOutcome::Clean;
 
         for entry in fs.list_dir(parent)? {
-            let file_name = entry.file_name();
+            let Some(file_name) = entry.file_name() else {
+                continue;
+            };
             let Some(name) = file_name.to_str() else {
                 continue;
             };
@@ -322,7 +324,9 @@ impl ConfigStore {
         }
 
         for entry in fs.list_dir(parent)? {
-            let file_name = entry.file_name();
+            let Some(file_name) = entry.file_name() else {
+                continue;
+            };
             let Some(name) = file_name.to_str() else {
                 continue;
             };
