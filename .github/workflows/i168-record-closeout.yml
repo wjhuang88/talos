@@ -1,0 +1,302 @@
+name: I168 Record Closeout
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: github.head_ref == 'agent/i168-terminal-closeout'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/i168-terminal-closeout
+          fetch-depth: 0
+      - name: Synchronize I168 owner and derived documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 2eac5b0523f6d8006318456b631c72cdb5bf9bed HEAD
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          def append_once(path: str, marker: str, content: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if marker in text:
+                  return
+              file.write_text(text.rstrip() + "\n\n" + content.rstrip() + "\n")
+
+          # Owner: I168
+          i168 = "docs/iterations/I168-provider-terminal-outcome-integrity.md"
+          replace_once(
+              i168,
+              "> Document status: Active — maintainer resumed implementation (2026-07-30)",
+              "> Document status: Complete (2026-07-30)",
+          )
+          replace_once(
+              i168,
+              "| 2026-07-30 | Maintainer resumption | The maintainer explicitly requested I168 activation after the I157 stale-snapshot correction completed at `5aac6756`. Inventory confirms I157/MODEL-010 and I167 are Complete, I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and no competing Active/Review implementation iteration exists. I168/RUNTIME-003 is the sole Active implementation authority on direct `main`. |",
+              "| 2026-07-30 | Maintainer resumption | The maintainer explicitly requested I168 activation after the I157 stale-snapshot correction completed at `5aac6756`. Inventory confirms I157/MODEL-010 and I167 are Complete, I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and no competing Active/Review implementation iteration exists. I168/RUNTIME-003 became the sole Active implementation authority. |\n| 2026-07-30 | Branch variance | After implementation PR #63 merged at `b5fcaaf3`, the maintainer authorized branch/PR closeout. PR #67 used `agent/i168-terminal-closeout`; no direct `main` mutation, force-push, tag, publish, release, or deployment occurred. |\n| 2026-07-30 | Completion | Red-first print-mode proof failed with exit 101 before `dda2170f`; deterministic fixtures and the complete locked matrix passed at validation harness commit `62ae098d`. Completion Commit is the already-existing implementation/fixture commit `2eac5b05`. |",
+          )
+          replace_once(
+              i168,
+              "- Planning/governance validation: pending.\n- Implementation and runtime evidence: pending.",
+              "- Red-first print/headless proof: workflow run `30551626267` checked out `b5fcaaf3` and the new MaxTokens projection assertion failed before production code with exit 101 (`E0425`: missing `terminal_notice_for_stop_reason`).\n- Implementation chain: PR #63 merge `b5fcaaf3`; print/headless truncation projection `dda2170f`; deterministic two-protocol fixture packet `2eac5b05`.\n- Final validation: workflow run `30552762936`, job `90905349923`, validation harness commit `62ae098d`, `OVERALL_EXIT=0`. Standard PR CI run `30552762362` also passed.\n- Runtime fixture command: `scripts/verify_i168_provider_terminal.sh target/debug/talos`. Binary path: `target/debug/talos`. The harness commit differs from Completion Commit only by the temporary validation workflow; production and fixture content are owned by `2eac5b05`.\n- Warning accounting: commands that build `talos-config` emitted one informational build-script line (`models.toml compressed`); Rust check and Clippy produced no code warning and `clippy -D warnings` exited 0.\n\n| Validation command | Exit | Passed | Failed | Ignored | Warning lines |\n|---|---:|---:|---:|---:|---:|\n| `cargo test --locked -p talos-provider terminal` | 0 | 8 | 0 | 0 | 1 |\n| `cargo test --locked -p talos-provider eof` | 0 | 2 | 0 | 0 | 1 |\n| `cargo test --locked -p talos-agent terminal` | 0 | 2 | 0 | 0 | 0 |\n| `cargo test --locked -p talos-session diagnostic` | 0 | 4 | 0 | 0 | 0 |\n| `cargo test --locked -p talos-conversation terminal` | 0 | 2 | 0 | 0 | 0 |\n| `cargo test --locked -p talos-cli terminal` | 0 | 6 | 0 | 0 | 1 |\n| `cargo test --locked -p talos-tui terminal` | 0 | 28 | 0 | 0 | 0 |\n| `cargo fmt --all -- --check` | 0 | 0 | 0 | 0 | 0 |\n| `cargo check --workspace --locked` | 0 | 0 | 0 | 0 | 1 |\n| `cargo clippy --workspace --locked -- -D warnings` | 0 | 0 | 0 | 0 | 1 |\n| `cargo test --workspace --locked` | 0 | 2673 | 0 | 0 | 1 |\n| `scripts/validate_project_governance.sh .` | 0 | 0 | 0 | 0 | 0 |\n| `git diff --check` | 0 | 0 | 0 | 0 | 0 |\n| `cargo build --locked -p talos-cli` | 0 | 0 | 0 | 0 | 1 |\n| provider terminal source scan | 0 | 0 | 0 | 0 | 0 |\n| rebuilt-binary two-protocol fixture | 0 | 0 | 0 | 0 | 0 |\n\n- Fixture outcomes for both OpenAI-compatible and Anthropic-compatible protocols: normal completion exited 0 quietly; MaxTokens exited 0 with partial stdout and truncation stderr; unknown reason, terminal-frame-less EOF, invalid UTF-8, transport failure, and continuation EOF exited 1 with bounded cause. Both continuation requests contained the previously completed tool result.\n- Session tests prove TLOG round trip, compaction retention, turn/response correlation, bounded redaction, and exclusion from messages, provider history, transcript, copy, and export.",
+          )
+          replace_once(
+              i168,
+              "- Completion Commit: pending. I168/RUNTIME-003 must not become Complete without already-existing\n  implementation SHA evidence and rebuilt-binary acceptance.",
+              "- Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.\n- Rebuilt-binary acceptance: PASS for both compatible protocols in workflow run `30552762936`; normal, truncation, unknown, EOF, decode, transport, and tool-continuation outcomes matched the owner acceptance matrix.\n- Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.",
+          )
+          replace_once(
+              i168,
+              "## Retrospective\n\n- Pending.",
+              "## Retrospective\n\n- The provider adapters must never infer normal success from transport exhaustion; explicit protocol terminal evidence is the authority.\n- A shared conversation projection test did not prove the separate print-mode consumer. Behavior-facing terminal outcomes require fixture coverage through every product consumer, including headless output.\n- Completion documents must be part of the implementation sequence rather than deferred until after merge; PR #63 was code-complete but not governance-complete.\n- Deterministic local SSE fixtures provide stronger, credential-free evidence than provider-paid smoke tests and are now retained under `scripts/fixtures/`.",
+          )
+
+          # Owner: RUNTIME-003
+          story = "docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md"
+          replace_once(
+              story,
+              "| Status | In Progress — I168 resumed by maintainer (2026-07-30) |",
+              "| Status | Complete — I168 accepted (2026-07-30) |",
+          )
+          replace_once(story, "| Selected Iteration | I168 (Active) |", "| Selected Iteration | I168 (Complete) |")
+          story_path = Path(story)
+          story_text = story_path.read_text().replace("- [ ]", "- [x]")
+          story_path.write_text(story_text)
+          append_once(
+              story,
+              "## Completion Evidence",
+              """## Completion Evidence
+
+- Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`.
+- Provider/session/TUI foundation merged through PR #63 at `b5fcaaf3`; print/headless MaxTokens projection landed at `dda2170f`; deterministic fixture scripts landed at `2eac5b05`.
+- Red-before-green evidence: workflow run `30551626267`, exit 101 before print-mode production implementation.
+- Final evidence: workflow run `30552762936`, job `90905349923`, `OVERALL_EXIT=0`; 2673 workspace tests passed with zero failures; focused counts are recorded in I168.
+- Rebuilt `target/debug/talos` passed the OpenAI-compatible and Anthropic-compatible matrix for explicit completion, MaxTokens, unknown reason, EOF, invalid UTF-8, transport failure, and tool-success-then-continuation-failure.
+- Terminal diagnostics remain bounded operational evidence and are excluded from model context, transcript, copy, and export.
+- OBS-002 remains Refinement and is not completed by this Story.""",
+          )
+
+          # Iteration index
+          replace_once(
+              "docs/iterations/README.md",
+              "| I168 | Provider Terminal Outcome Integrity | Active — maintainer resumed (2026-07-30) | Pending — implement explicit provider terminal classification and bounded non-transcript diagnostic evidence. |",
+              "| I168 | Provider Terminal Outcome Integrity | Complete (2026-07-30) | ✅ Completion Commit `2eac5b05`; 2673 workspace tests and deterministic rebuilt-binary OpenAI/Anthropic terminal-outcome fixtures pass. |",
+          )
+
+          # OBS-002 remains separate and incomplete.
+          replace_once(
+              "docs/backlog/active/OBS-002-turn-pipeline-boundary-observability.md",
+              "`RUNTIME-003` / `I168`. It uses existing provider/session event semantics, forbids a breaking public\nevent contract, and is now the sole Active P0 implementation. OBS-002 remains Refinement for the\nlarger live timeline covering tool completion, result acceptance, dispatch, headers, first packet,\nretry, and terminal correlation. Completing RUNTIME-003 does not complete OBS-002.",
+              "`RUNTIME-003` / `I168`. It uses existing provider/session event semantics and forbids a breaking public\nevent contract. I168 completed that P0 correction on 2026-07-30 at Completion Commit `2eac5b05`.\nOBS-002 remains Refinement for the larger live timeline covering tool completion, result acceptance,\ndispatch, headers, first packet, retry, and terminal correlation. Completing RUNTIME-003 does not\ncomplete OBS-002.",
+          )
+
+          # Product Backlog
+          replace_once(
+              "docs/backlog/PRODUCT-BACKLOG.md",
+              "| 0 | v0.6 Runtime Productization Program | Current execution owner. I168/RUNTIME-003 Active after maintainer resumption; I157/MODEL-010 Complete at `5aac6756`; I158-I162 Blocked. |",
+              "| 0 | v0.6 Runtime Productization Program | Current execution owner. I168/RUNTIME-003 Complete at `2eac5b05`; I157/MODEL-010 Complete at `5aac6756`; ADR-053 maintainer review is the next gate and I158-I162 remain Blocked. |",
+          )
+
+          # Board mirror; keep four columns.
+          replace_once(
+              "docs/BOARD.md",
+              "| I168 Provider Terminal Outcome Integrity | Active — maintainer resumed 2026-07-30 | [I168](iterations/I168-provider-terminal-outcome-integrity.md) / [RUNTIME-003](backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md) | Sole Active implementation authority: reject false-success terminal fallbacks and retain bounded, non-transcript terminal-cause evidence. |",
+              "| I168 Provider Terminal Outcome Integrity | Complete (2026-07-30) | [I168](iterations/I168-provider-terminal-outcome-integrity.md) / [RUNTIME-003](backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md) | Completion Commit `2eac5b05`; explicit terminal classification, bounded non-transcript diagnostics, print/TUI truncation display, 2673 workspace tests, and rebuilt-binary dual-protocol fixtures pass. |",
+          )
+          replace_once(
+              "docs/BOARD.md",
+              "| v0.6 Runtime Productization Program | In Progress — I168 active; I158 blocked | [four-month package](tasks/2026-07-28-four-month-v06-execution-package.md) / [program](tasks/2026-07-26-v0.6-runtime-productization-program.md) / [ARCH-031](backlog/active/ARCH-031-crate-publication-boundary.md) / [ADR-053](decisions/053-tool-registration-composition.md) | I168/RUNTIME-003 is the sole Active implementation authority. I157 is Complete; I158-I162 remain blocked. |",
+              "| v0.6 Runtime Productization Program | In Progress — I168 complete; ADR-053 review next | [four-month package](tasks/2026-07-28-four-month-v06-execution-package.md) / [program](tasks/2026-07-26-v0.6-runtime-productization-program.md) / [ARCH-031](backlog/active/ARCH-031-crate-publication-boundary.md) / [ADR-053](decisions/053-tool-registration-composition.md) | No implementation iteration is Active. I157 and I168 are Complete; ADR-053 remains Proposed and I158-I162 remain blocked. |",
+          )
+
+          # Program owner
+          program = "docs/tasks/2026-07-26-v0.6-runtime-productization-program.md"
+          replace_once(program, "> Current active iteration: I168", "> Current active iteration: None — I168 Complete; ADR-053 maintainer review is the next gate")
+          replace_once(
+              program,
+              "> Implementation authority: I168 / RUNTIME-003 provider terminal-outcome integrity only; I157 is Complete and I158 remains blocked",
+              "> Implementation authority: none; ADR-053 remains Proposed and I158 remains blocked",
+          )
+          replace_once(
+              program,
+              "| 2B | I168 | RUNTIME-003 | Active — maintainer resumed implementation (2026-07-30) | Explicit maintainer resumption; ADR-039/042 and prior timeout/error-prefix work complete | Provider terminal outcome is never falsely normalized to success; truncation/failure is visible and retained as bounded non-transcript evidence |",
+              "| 2B | I168 | RUNTIME-003 | Complete — accepted 2026-07-30 (`2eac5b05`) | Explicit maintainer resumption; ADR-039/042 and prior timeout/error-prefix work complete | Provider terminal outcome is never falsely normalized to success; truncation/failure is visible in TUI/print and retained as bounded non-transcript evidence |",
+          )
+          replace_once(
+              program,
+              "I157 is Complete. Its final correction commit `5aac6756` coordinates provider removal, effective\nreads, full-snapshot saves, and semantic updates through one cross-process lock so stale Talos\nwriters cannot restore removed provider state. I168 is now the sole Active implementation\nauthority for RUNTIME-003. ADR-053 remains Proposed and I158 is blocked.",
+              "I157 is Complete. Its final correction commit `5aac6756` coordinates provider removal, effective\nreads, full-snapshot saves, and semantic updates through one cross-process lock so stale Talos\nwriters cannot restore removed provider state. I168/RUNTIME-003 is Complete at `2eac5b05`; no\nimplementation iteration is Active. ADR-053 remains Proposed and I158 is blocked.",
+          )
+          append_once(
+              program,
+              "## 13. I168 Completion Checkpoint",
+              """## 13. I168 Completion Checkpoint
+
+- I168/RUNTIME-003 completed at Completion Commit `2eac5b05` after PR #63 foundation and PR #67 closeout.
+- Final locked validation passed: 2673 workspace tests, zero failures, `clippy -D warnings`, governance, diff check, source scan, and rebuilt-binary two-protocol fixtures.
+- No implementation iteration is Active. The next program action is maintainer/architecture review of Proposed ADR-053; I158-I162 remain Blocked.
+- OBS-002 remains Refinement; no release, publish, tag, deployment, permission, sandbox, or workspace-version action was authorized.""",
+          )
+
+          # Execution package
+          package = "docs/tasks/2026-07-28-four-month-v06-execution-package.md"
+          replace_once(
+              package,
+              "> Branch mode: direct `main` for I168 under the maintainer's no-parallel-task direction;\n> reassess release-managed/on-demand worktree mode before I158\n> Current implementation authority: I168 / RUNTIME-003 provider terminal-outcome integrity only",
+              "> Branch mode: I168 implementation PR #63 merged to `main`; maintainer-authorized closeout used PR #67;\n> reassess release-managed/on-demand worktree mode before I158\n> Current implementation authority: none; ADR-053 review is next and I158 remains blocked",
+          )
+          replace_once(
+              package,
+              "| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Active — maintainer resumed 2026-07-30 |",
+              "| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `2eac5b05`; 2673 tests and dual-protocol fixture pass |",
+          )
+          replace_once(
+              package,
+              "- Work directly on `main` for I168 under the maintainer's existing no-parallel-task direction.",
+              "- I168 began under the direct-`main` direction; after PR #63 merged, the maintainer authorized branch/PR closeout through PR #67. No force-push or parallel implementation occurred.",
+          )
+          append_once(
+              package,
+              "## I168 Closeout Checkpoint — 2026-07-30",
+              """## I168 Closeout Checkpoint — 2026-07-30
+
+Completed task items:
+- U1 / I168 / RUNTIME-003 Complete at `2eac5b05`.
+
+Current state and artifacts:
+- provider/session/conversation/TUI foundation: PR #63 merge `b5fcaaf3`;
+- print/headless MaxTokens projection: `dda2170f`;
+- deterministic fixture packet: `2eac5b05`;
+- final detailed validation: workflow `30552762936`, artifact `i168-closeout-validation`.
+
+Commands/checks and actual results:
+- all required focused commands exit 0;
+- 2673 workspace tests passed, zero failed;
+- fmt, check, Clippy with `-D warnings`, governance, diff check, source scan, build, and rebuilt-binary fixture exit 0.
+
+Open risks or deviations:
+- the recurring `talos-config` model-compression build-script line is informational, not a Rust/Clippy warning;
+- OBS-002 remains Refinement and is not completed;
+- no implementation iteration is Active.
+
+Next task item:
+- G1 maintainer/architecture review of Proposed ADR-053; I158 remains Blocked.
+
+Recovery or resume instruction:
+- do not activate I158 until ADR-053 is explicitly Accepted and normal activation inventory is repeated.""",
+          )
+
+          # User/reference documentation.
+          reference_doc = Path("docs/reference/PROVIDER-TERMINAL-OUTCOMES.md")
+          reference_doc.write_text("""# Provider Terminal Outcomes
+
+Talos treats the provider protocol's explicit terminal signal as authoritative. It does not infer a
+successful response from prose shape or from the transport simply closing.
+
+## User-visible outcomes
+
+| Outcome | TUI | `--print` | Exit behavior |
+|---|---|---|---|
+| Explicit normal completion | Response completes quietly | Response completes quietly | Success |
+| Output token limit (`MaxTokens`) | Partial response remains visible with a truncation notice | Partial stdout remains visible and stderr reports that the response was truncated | Success, but explicitly truncated |
+| Unsupported finish/stop reason | Bounded provider failure | Partial stdout may remain visible; stderr names the bounded unsupported reason | Failure |
+| Stream closes without terminal frame | Bounded provider/stream failure | Partial stdout may remain visible; stderr explains the missing explicit terminal signal | Failure |
+| Invalid UTF-8 or transport read failure | Bounded provider/transport failure | stderr identifies decode or transport category | Failure |
+
+A truncation notice means the visible partial answer is retained intentionally; it must not be
+mistaken for a complete answer. Retry or continuation is a user decision—Talos does not silently
+continue, fail over, or infer intent.
+
+## Tool continuation failures
+
+When a tool call and result completed successfully but the following provider continuation fails,
+Talos preserves the completed tool exchange under SESSION-006. A half-streamed continuation
+fragment is not committed as a completed assistant fact, and the provider failure is reported
+separately rather than being described as a tool failure.
+
+## Diagnostic evidence
+
+Interactive sessions retain one bounded terminal diagnostic per provider-response boundary. The
+record contains normalized outcome, source, bounded reason/category, provider/model identity,
+`turn_id`, and response ordinal. It does not contain credentials, headers, raw request/response
+bodies, hidden reasoning, or raw tool output.
+
+Terminal diagnostics survive supported TLOG reopen and recent-entry compaction, but are excluded
+from conversation messages, provider history, transcript hydration, copy, and export.
+
+## Deterministic verification
+
+No paid provider credentials are needed:
+
+```bash
+cargo build --locked -p talos-cli
+scripts/verify_i168_provider_terminal.sh target/debug/talos
+```
+
+The fixture covers OpenAI-compatible and Anthropic-compatible normal completion, MaxTokens,
+unsupported reasons, terminal-frame-less EOF, invalid UTF-8, transport failure, and a successful
+tool result followed by continuation EOF.
+
+## Troubleshooting
+
+- A normal provider gateway must emit the compatible protocol's documented terminal signal.
+- A gateway that closes after content without `[DONE]`, `finish_reason`, or Anthropic
+  `message_delta.stop_reason` is treated as malformed rather than successful.
+- For post-incident inspection, use the retained session/TLOG evidence; do not copy raw provider
+  payloads or credentials into logs.
+""")
+          replace_once(
+              "docs/reference/README.md",
+              "| `RUNTIME-SDK-CONTRACT.md` | talos-runtime pre-1.0 embedding support boundary and caveats |",
+              "| `RUNTIME-SDK-CONTRACT.md` | talos-runtime pre-1.0 embedding support boundary and caveats |\n| `PROVIDER-TERMINAL-OUTCOMES.md` | Explicit completion, truncation, provider terminal errors, and retained diagnostic behavior |",
+          )
+          replace_once(
+              "README.md",
+              "Run a one-shot prompt in print mode:\n\n```bash\ntalos -p \"summarize this repository\"\n```",
+              "Run a one-shot prompt in print mode:\n\n```bash\ntalos -p \"summarize this repository\"\n```\n\nIf the provider reaches its output-token limit, Talos preserves the partial answer and prints an explicit truncation warning. Unsupported terminal reasons, transport failures, and streams that close without a protocol terminal signal fail instead of being reported as normal completion. See [`docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`](docs/reference/PROVIDER-TERMINAL-OUTCOMES.md).",
+          )
+
+          # Evolution lesson.
+          replace_once(
+              "EVOLUTION.md",
+              "| 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |",
+              "| 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |\n| 46 | Provider / Runtime | transport EOF 不是成功；每个消费者都必须投影明确 terminal outcome | I168/RUNTIME-003 |",
+          )
+          replace_once(
+              "EVOLUTION.md",
+              "## Lessons\n",
+              "## Lessons\n\n## 2026-07-30 - Provider transport exhaustion is not completion\n\n- Trigger: retained assistant text could be committed as successful after an unknown finish reason or a stream that closed without a terminal frame.\n- Symptom: TUI/session tests could pass while `talos --print` preserved partial MaxTokens output without telling the user it was truncated.\n- Root cause: provider adapters synthesized normal completion from transport exhaustion, and later projection work validated the shared conversation layer but not every product consumer.\n- Fix: require explicit compatible-protocol terminal signals, preserve bounded non-transcript diagnostics, and test TUI plus print mode through deterministic rebuilt-binary fixtures.\n- Prevention: every streaming adapter and every consumer must have a matrix for normal completion, truncation, unknown reason, EOF, decode/transport failure, and tool-continuation failure. A shared projection test is not end-to-end evidence.\n- Promoted to rule/check: I168/RUNTIME-003 Completion Commit `2eac5b05`, `scripts/verify_i168_provider_terminal.sh`, and `docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`.\n",
+          )
+          PY
+
+          scripts/validate_project_governance.sh .
+          git diff --check
+          grep -Fq '> Document status: Complete (2026-07-30)' docs/iterations/I168-provider-terminal-outcome-integrity.md
+          grep -Fq '| Status | Complete — I168 accepted (2026-07-30) |' docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md
+          grep -Fq '| Status | Refinement — ADR decision required before Ready |' docs/backlog/active/OBS-002-turn-pipeline-boundary-observability.md
+          grep -Fq 'Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`' docs/iterations/I168-provider-terminal-outcome-integrity.md
+          ! grep -Eq '^> Document status: (Active|.*Review)' docs/iterations/I168-provider-terminal-outcome-integrity.md
+          rm .github/workflows/i168-record-closeout.yml .github/workflows/i168-closeout-validation.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'docs(iteration): record I168 terminal outcome evidence (#RUNTIME-003 #I168) [model:gpt-5.6-thinking]'
+          git push origin HEAD:agent/i168-terminal-closeout
