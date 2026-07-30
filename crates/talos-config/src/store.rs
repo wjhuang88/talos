@@ -158,7 +158,9 @@ impl ConfigStore {
         }
 
         let raw = std::fs::read(&self.config_path).map_err(ConfigError::IoError)?;
-        let substituted = crate::substitute_env_vars(&String::from_utf8_lossy(&raw));
+        let config_str = std::str::from_utf8(&raw)
+            .map_err(|_| ConfigError::ParseError("config.toml is not valid UTF-8".into()))?;
+        let substituted = crate::substitute_env_vars(config_str);
         let mut config: Config = toml::from_str(&substituted)
             .map_err(|_| ConfigError::ParseError("config.toml is not valid TOML".into()))?;
 
@@ -176,6 +178,7 @@ impl ConfigStore {
         let parent = self.txn_dir_parent();
         let dir = self.txn_dir();
 
+        fs.checkpoint(FsOperation::CleanupPrepareResidues)?;
         self.cleanup_residues(fs, &parent);
 
         if !fs.exists(&dir) {
@@ -191,23 +194,28 @@ impl ConfigStore {
             ));
         }
 
+        fs.checkpoint(FsOperation::ReadActiveManifest)?;
         let raw = fs.read(&manifest_path)?;
         let manifest = parse_manifest(&raw)?;
 
         match manifest.phase {
             Phase::Committed => {
+                fs.checkpoint(FsOperation::ReadConfigAfterImage)?;
                 let cfg_after = if manifest.config_exists_after {
                     Some(fs.read(&dir.join("config.after"))?)
                 } else {
                     None
                 };
+                fs.checkpoint(FsOperation::ReadCredentialsAfterImage)?;
                 let cred_after = if manifest.credentials_exist_after {
                     Some(fs.read(&dir.join("credentials.after"))?)
                 } else {
                     None
                 };
 
+                fs.checkpoint(FsOperation::VerifyConfigAfter)?;
                 let cfg_actual = fs.read_opt(&self.config_path)?;
+                fs.checkpoint(FsOperation::VerifyCredentialsAfter)?;
                 let cred_actual = fs.read_opt(&self.credentials_path)?;
 
                 if cfg_actual.as_deref() != cfg_after.as_deref() {
@@ -225,21 +233,27 @@ impl ConfigStore {
                 Ok(())
             }
             Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {
+                fs.checkpoint(FsOperation::ReadConfigBeforeImage)?;
                 let cfg_before = if manifest.config_existed_before {
                     Some(fs.read(&dir.join("config.before"))?)
                 } else {
                     None
                 };
+                fs.checkpoint(FsOperation::ReadCredentialsBeforeImage)?;
                 let cred_before = if manifest.credentials_existed_before {
                     Some(fs.read(&dir.join("credentials.before"))?)
                 } else {
                     None
                 };
 
+                fs.checkpoint(FsOperation::RestoreConfigBefore)?;
                 restore(fs, &self.config_path, cfg_before.as_deref())?;
+                fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
                 restore(fs, &self.credentials_path, cred_before.as_deref())?;
 
+                fs.checkpoint(FsOperation::VerifyConfigBefore)?;
                 let cfg_actual = fs.read_opt(&self.config_path)?;
+                fs.checkpoint(FsOperation::VerifyCredentialsBefore)?;
                 let cred_actual = fs.read_opt(&self.credentials_path)?;
                 if cfg_actual.as_deref() != cfg_before.as_deref() {
                     return Err(ConfigError::InvalidConfig(
@@ -252,6 +266,7 @@ impl ConfigStore {
                     ));
                 }
 
+                fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
                 write_manifest(
                     fs,
                     &dir,
@@ -273,18 +288,22 @@ impl ConfigStore {
                 Ok(())
             }
             Phase::RolledBack => {
+                fs.checkpoint(FsOperation::ReadConfigBeforeImage)?;
                 let cfg_before = if manifest.config_existed_before {
                     Some(fs.read(&dir.join("config.before"))?)
                 } else {
                     None
                 };
+                fs.checkpoint(FsOperation::ReadCredentialsBeforeImage)?;
                 let cred_before = if manifest.credentials_existed_before {
                     Some(fs.read(&dir.join("credentials.before"))?)
                 } else {
                     None
                 };
 
+                fs.checkpoint(FsOperation::VerifyConfigBefore)?;
                 let cfg_actual = fs.read_opt(&self.config_path)?;
+                fs.checkpoint(FsOperation::VerifyCredentialsBefore)?;
                 let cred_actual = fs.read_opt(&self.credentials_path)?;
                 if cfg_actual.as_deref() != cfg_before.as_deref() {
                     return Err(ConfigError::InvalidConfig(
@@ -315,13 +334,11 @@ impl ConfigStore {
     }
 
     fn cleanup_residues(&self, fs: &dyn Fs, parent: &Path) {
-        let prefix = ".provider-unset-transaction.";
+        let prepare_prefix = ".provider-unset-transaction.prepare.";
         if let Ok(entries) = fs.list_dir(parent) {
             for entry in entries {
                 if let Some(name) = entry.file_name().and_then(|n| n.to_str())
-                    && name.starts_with(prefix)
-                    && (name.starts_with(".provider-unset-transaction.prepare.")
-                        || name.starts_with(".provider-unset-transaction.finalize."))
+                    && name.starts_with(prepare_prefix)
                 {
                     let _ = fs.remove_dir(&entry);
                 }

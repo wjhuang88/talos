@@ -3109,7 +3109,146 @@ fn interruption_prepared_recovers_before_state() {
     let store = make_store(&dir);
     store.recover(&StdFs).unwrap();
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
-    assert!(!txn_dir.exists(), "journal cleaned after recovery");
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------
+// Round 11: ordered composite failures + recovery checkpoint + finalize residue
+// ---------------------------------------------------------------------------
+
+#[test]
+fn apply_credentials_failure_then_rollback_config_failure_retains_journal() {
+    let dir = unique_test_dir("composite-1");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(FaultPlan::fail_sequence(&[
+        FsOperation::ReplaceCredentialsAfter,
+        FsOperation::RestoreConfigBefore,
+    ]));
+    let result = store.run("providers.custom-a", &fs);
+    assert!(result.is_err(), "must fail");
+    assert!(
+        active_dir(&dir).exists(),
+        "active journal must be retained after rollback failure"
+    );
+    let cfg_after = fs::read(dir.join("config.toml")).unwrap_or_default();
+    assert_ne!(
+        cfg_after, cfg_b,
+        "config should be in after-state (apply partially succeeded)"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn apply_failure_then_rollback_success_then_second_recovery_completes() {
+    let dir = unique_test_dir("composite-2");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceConfigAfter));
+    let result = store.run("providers.custom-a", &fs);
+    assert!(result.is_err(), "must fail");
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(
+        !active_dir(&dir).exists(),
+        "journal should be finalized after rollback"
+    );
+
+    let store2 = make_store(&dir);
+    store2.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn recovery_restore_config_succeeds_credentials_fails_retains_journal() {
+    let dir = unique_test_dir("composite-3");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::write(txn_dir.join("config.after"), b"new").unwrap();
+    write_toml_manifest(&txn_dir, "Applying", "comp-3", true, true, true, true);
+    fs::write(dir.join("config.toml"), b"new").unwrap();
+
+    let store = make_store(&dir);
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::RestoreCredentialsBefore));
+    let result = store.recover(&fs);
+    assert!(
+        result.is_err(),
+        "recovery must fail when credentials restore fails"
+    );
+    assert!(txn_dir.exists(), "active journal must be retained");
+    let cfg_after = fs::read(dir.join("config.toml")).unwrap_or_default();
+    assert_eq!(cfg_after, cfg_b, "config should be restored to before");
+
+    let store2 = make_store(&dir);
+    store2.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(
+        !txn_dir.exists(),
+        "journal must be cleaned after second recovery"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn finalize_residue_not_deleted_by_cleanup_residues() {
+    let dir = unique_test_dir("finalize-retain");
+    let _ = setup_full_fixture(&dir);
+    let finalize_dir = dir.join(".provider-unset-transaction.finalize.orphan-3");
+    fs::create_dir_all(&finalize_dir).unwrap();
+    fs::write(finalize_dir.join("manifest"), b"stale").unwrap();
+
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+
+    assert!(
+        finalize_dir.exists(),
+        "finalize residue must NOT be deleted by cleanup_residues"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn corrupt_credentials_marker_not_in_display_or_debug() {
+    let dir = unique_test_dir("cred-leak-2");
+    let mut config = Config::default();
+    config.provider = "x".to_string();
+    config.model = "y".to_string();
+    write_both_files(&dir, &config, None);
+    fs::write(
+        dir.join("credentials.toml"),
+        "leaked = \"sk-MARKER-LEAKED-CREDENTIAL\"\nbroken = [",
+    )
+    .unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    let display = err.to_string();
+    let debug = format!("{err:?}");
+    assert!(!display.contains("MARKER-LEAKED-CREDENTIAL"));
+    assert!(!debug.contains("MARKER-LEAKED-CREDENTIAL"));
+    assert!(!display.contains("sk-"));
+    assert!(!debug.contains("sk-"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn corrupt_config_marker_not_in_display_or_debug() {
+    let dir = unique_test_dir("cfg-leak");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("config.toml"),
+        "provider = \"x\"\nmodel = \"y\"\n[providers.x\napi_key = \"sk-MARKER-CONFIG-LEAK\"",
+    )
+    .unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    let display = err.to_string();
+    let debug = format!("{err:?}");
+    assert!(!display.contains("MARKER-CONFIG-LEAK"));
+    assert!(!debug.contains("MARKER-CONFIG-LEAK"));
     let _ = fs::remove_dir_all(&dir);
 }
 
