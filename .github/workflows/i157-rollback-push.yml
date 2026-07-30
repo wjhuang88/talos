@@ -1,0 +1,95 @@
+name: I157 rollback intent push runner
+
+on:
+  push:
+    branches:
+      - automation/i157-rollback-intent
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i157-post-merge-durability-concurrency
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Apply strict rollback-intent correction
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          journal = Path('crates/talos-config/src/store/journal.rs')
+          text = journal.read_text()
+          old = '''    if let Err(error) = fs
+              .checkpoint(FsOperation::WriteRollbackRequiredManifest)
+              .and_then(|_| write_manifest(fs, dir, Phase::RollbackRequired, txn_id, txn))
+          {
+              tracing::warn!("failed to write RollbackRequired manifest: {error}");
+          }
+          '''
+          new = '''    fs.checkpoint(FsOperation::WriteRollbackRequiredManifest)?;
+          write_manifest(fs, dir, Phase::RollbackRequired, txn_id, txn)?;
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f'rollback intent replacement count: {text.count(old)}')
+          journal.write_text(text.replace(old, new, 1))
+
+          tests = Path('crates/talos-config/src/store_finalization_tests.rs')
+          text = tests.read_text()
+          marker = '\n#[test]\nfn ordered_apply_rollback_and_recovery_failures_preserve_journal()'
+          addition = r'''
+
+#[test]
+fn rollback_required_manifest_failure_retains_applying_and_recovers() {
+    let dir = unique_dir("rollback-intent-failure");
+    let (config_before, credentials_before) = setup_two_providers(&dir);
+    let store = make_store(&dir);
+
+    let plan = FaultPlan::fail_sequence(&[
+        FsOperation::ReplaceCredentialsAfter,
+        FsOperation::WriteRollbackRequiredManifest,
+    ]);
+    let result = store.run("providers.custom-a", &FaultFs::new(plan.clone()));
+    let error = result.unwrap_err();
+    assert!(error.to_string().contains("recovery required"));
+    plan.assert_consumed_in_order(&[
+        FsOperation::ReplaceCredentialsAfter,
+        FsOperation::WriteRollbackRequiredManifest,
+    ]);
+    assert!(active_dir(&dir).exists());
+    let manifest = std::fs::read_to_string(active_dir(&dir).join("manifest")).unwrap();
+    assert!(manifest.contains("phase = \"Applying\""));
+
+    store.recover(&StdFs).unwrap();
+    assert_persisted_bytes(&dir, &config_before, &credentials_before);
+    assert!(!active_dir(&dir).exists());
+    let _ = std::fs::remove_dir_all(dir);
+}
+'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'test insertion marker count: {text.count(marker)}')
+          tests.write_text(text.replace(marker, addition + marker, 1))
+          PY
+      - name: Validate
+        run: |
+          cargo fmt --all
+          cargo test --locked -p talos-config
+          cargo test --locked -p talos-cli --test config_unset_finalization
+          cargo clippy --locked -p talos-config -- -D warnings
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "i157-correction-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add crates/talos-config
+          git commit -m "fix(config): require durable rollback intent (#MODEL-010 #I157)"
+          git push origin HEAD:fix/i157-post-merge-durability-concurrency
