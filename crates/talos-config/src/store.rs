@@ -11,7 +11,8 @@ use journal::{
     FinalizeOutcome, Phase, Txn, apply, finalize_active, gen_txn_id, prepare, rollback,
     write_manifest,
 };
-use std::path::PathBuf;
+use std::fs::{File, OpenOptions};
+use std::path::{Path, PathBuf};
 
 pub(crate) use fs::{Fs, FsOperation, StdFs};
 #[cfg(test)]
@@ -21,6 +22,11 @@ pub(crate) use recovery::RecoveryPurpose;
 pub(crate) const ACTIVE_DIR_NAME: &str = ".provider-unset-transaction";
 pub(crate) const PREPARE_PREFIX: &str = ".provider-unset-transaction.prepare.";
 pub(crate) const FINALIZE_PREFIX: &str = ".provider-unset-transaction.finalize.";
+const MUTATION_LOCK_NAME: &str = ".config-mutation.lock";
+
+struct MutationLock {
+    _file: File,
+}
 
 pub struct ConfigStore {
     pub(super) config_path: PathBuf,
@@ -51,6 +57,7 @@ impl ConfigStore {
     }
 
     pub(crate) fn run(&self, key: &str, fs: &dyn Fs) -> Result<ConfigUnsetOutcome, ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
         let recovery = self.recover_with_purpose(fs, RecoveryPurpose::Mutation)?;
         if !recovery.allows_mutation() {
             return Err(finalization_pending_error());
@@ -157,7 +164,79 @@ impl ConfigStore {
     }
 
     pub fn recover_pending() -> Result<(), ConfigError> {
-        Self::default_store().recover(&StdFs)
+        let store = Self::default_store();
+        let _lock = store.acquire_mutation_lock()?;
+        store.recover(&StdFs)
+    }
+
+    /// Applies one semantic configuration change to the latest persisted state.
+    ///
+    /// The mutation lock covers recovery, reading, mutation, validation of the
+    /// serialized representation, and durable replacement. Callers should keep
+    /// `update` short and must not perform user interaction or network I/O in
+    /// the closure.
+    ///
+    /// Unlike [`Config::save`], this API does not write a caller-owned snapshot
+    /// back wholesale. It reloads `config.toml` after acquiring the same lock
+    /// used by provider removal, preventing an older interactive snapshot from
+    /// restoring a provider or credential that another process removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if recovery is incomplete, the persisted configuration
+    /// cannot be parsed, the callback rejects the change, serialization fails,
+    /// or the durable replacement cannot be completed.
+    pub fn update_config(
+        &self,
+        update: impl FnOnce(&mut Config) -> Result<(), ConfigError>,
+    ) -> Result<Config, ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
+        let recovery = self.recover_with_purpose(&StdFs, RecoveryPurpose::Mutation)?;
+        if !recovery.allows_mutation() {
+            return Err(finalization_pending_error());
+        }
+
+        let persisted = StdFs.read_opt(&self.config_path)?;
+        let mut config: Config = parse_optional_persisted(&persisted, PersistedDocument::Config)?;
+        update(&mut config)?;
+
+        let serialized = serialize(&config)?;
+        reparse::<Config>(&serialized)?;
+        StdFs.atomic_write(&self.config_path, &serialized)?;
+
+        self.load_effective_unlocked()
+    }
+
+    pub(crate) fn replace_config_snapshot(&self, config: &Config) -> Result<(), ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
+        let recovery = self.recover_with_purpose(&StdFs, RecoveryPurpose::Mutation)?;
+        if !recovery.allows_mutation() {
+            return Err(finalization_pending_error());
+        }
+        let serialized = serialize(config)?;
+        reparse::<Config>(&serialized)?;
+        StdFs.atomic_write(&self.config_path, &serialized)
+    }
+
+    pub(crate) fn load_credentials_snapshot(&self) -> Result<Credentials, ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
+        let _ = self.recover_with_purpose(&StdFs, RecoveryPurpose::Load)?;
+        let persisted = StdFs.read_opt(&self.credentials_path)?;
+        parse_optional_persisted(&persisted, PersistedDocument::Credentials)
+    }
+
+    pub(crate) fn replace_credentials_snapshot(
+        &self,
+        credentials: &Credentials,
+    ) -> Result<(), ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
+        let recovery = self.recover_with_purpose(&StdFs, RecoveryPurpose::Mutation)?;
+        if !recovery.allows_mutation() {
+            return Err(finalization_pending_error());
+        }
+        let serialized = serialize(credentials)?;
+        reparse::<Credentials>(&serialized)?;
+        StdFs.atomic_write(&self.credentials_path, &serialized)
     }
 
     /// Loads the effective configuration from this store's explicit paths.
@@ -169,8 +248,12 @@ impl ConfigStore {
     /// This is an additive public API (pre-1.0, non-breaking).
     /// It is not a general-purpose transaction API.
     pub fn load_effective(&self) -> Result<Config, ConfigError> {
+        let _lock = self.acquire_mutation_lock()?;
         let _ = self.recover_with_purpose(&StdFs, RecoveryPurpose::Load)?;
+        self.load_effective_unlocked()
+    }
 
+    fn load_effective_unlocked(&self) -> Result<Config, ConfigError> {
         if !self.config_path.exists() {
             let mut config = Config::default();
             if self.credentials_path.exists() {
@@ -198,6 +281,14 @@ impl ConfigStore {
         Ok(config)
     }
 
+    fn acquire_mutation_lock(&self) -> Result<MutationLock, ConfigError> {
+        let parent = self.txn_dir_parent();
+        std::fs::create_dir_all(&parent).map_err(ConfigError::IoError)?;
+        let file = open_lock_file(&parent.join(MUTATION_LOCK_NAME))?;
+        file.lock().map_err(ConfigError::IoError)?;
+        Ok(MutationLock { _file: file })
+    }
+
     pub(super) fn txn_dir_parent(&self) -> PathBuf {
         self.config_path
             .parent()
@@ -213,6 +304,31 @@ impl ConfigStore {
         self.txn_dir_parent()
             .join(format!("{FINALIZE_PREFIX}{transaction_id}"))
     }
+}
+
+#[cfg(unix)]
+fn open_lock_file(path: &Path) -> Result<File, ConfigError> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .mode(0o600)
+        .open(path)
+        .map_err(ConfigError::IoError)
+}
+
+#[cfg(not(unix))]
+fn open_lock_file(path: &Path) -> Result<File, ConfigError> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .map_err(ConfigError::IoError)
 }
 
 pub(super) fn finalization_pending_error() -> ConfigError {

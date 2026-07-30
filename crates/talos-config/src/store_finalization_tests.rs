@@ -699,3 +699,127 @@ fn finalize_symlink_residue_is_not_followed_or_deleted() {
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(outside);
 }
+
+#[test]
+fn semantic_update_does_not_restore_provider_removed_from_stale_snapshot() {
+    let dir = unique_dir("semantic-update-stale-snapshot");
+    setup_two_providers(&dir);
+    let store = make_store(&dir);
+    let stale = store.load_effective().unwrap();
+    assert!(stale.providers.contains_key("custom-a"));
+
+    store.unset_provider("providers.custom-a").unwrap();
+    let updated = store
+        .update_config(|current| {
+            current.provider = "custom-b".to_string();
+            current.model = "model-b".to_string();
+            Ok(())
+        })
+        .unwrap();
+
+    assert!(!updated.providers.contains_key("custom-a"));
+    assert_eq!(updated.provider, "custom-b");
+    assert_eq!(updated.model, "model-b");
+    let persisted = store.load_effective().unwrap();
+    assert!(!persisted.providers.contains_key("custom-a"));
+    assert_eq!(persisted.provider, "custom-b");
+    assert_eq!(persisted.model, "model-b");
+    let credentials: Credentials =
+        toml::from_str(&std::fs::read_to_string(dir.join("credentials.toml")).unwrap()).unwrap();
+    assert!(!credentials.keys.contains_key("custom-a"));
+
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn semantic_update_and_provider_unset_share_one_mutation_lock() {
+    use std::sync::{Arc, mpsc};
+    use std::time::Duration;
+
+    let dir = unique_dir("semantic-update-lock");
+    setup_two_providers(&dir);
+    let store = Arc::new(make_store(&dir));
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let (unset_done_tx, unset_done_rx) = mpsc::channel();
+
+    let update_store = Arc::clone(&store);
+    let update = std::thread::spawn(move || {
+        update_store
+            .update_config(|current| {
+                entered_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+                current.provider = "custom-b".to_string();
+                current.model = "model-b".to_string();
+                Ok(())
+            })
+            .unwrap();
+    });
+    entered_rx.recv().unwrap();
+
+    let unset_store = Arc::clone(&store);
+    let unset = std::thread::spawn(move || {
+        let result = unset_store.unset_provider("providers.custom-a");
+        unset_done_tx.send(result).unwrap();
+    });
+
+    assert!(
+        unset_done_rx
+            .recv_timeout(Duration::from_millis(100))
+            .is_err(),
+        "provider unset must wait for the in-flight semantic update"
+    );
+    release_tx.send(()).unwrap();
+    update.join().unwrap();
+    unset_done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .unwrap();
+    unset.join().unwrap();
+
+    let persisted = store.load_effective().unwrap();
+    assert_eq!(persisted.provider, "custom-b");
+    assert_eq!(persisted.model, "model-b");
+    assert!(!persisted.providers.contains_key("custom-a"));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn semantic_update_preserves_placeholders_and_credentials_file_boundary() {
+    let dir = unique_dir("semantic-update-persisted-boundary");
+    let mut config = Config::default();
+    config.providers.insert(
+        "custom-a".to_string(),
+        ProviderConfig {
+            api_key: Some("${CUSTOM_A_API_KEY}".to_string()),
+            ..ProviderConfig::default()
+        },
+    );
+    let mut credentials = Credentials::default();
+    credentials
+        .keys
+        .insert("custom-b".to_string(), "credential-file-secret".to_string());
+    std::fs::write(
+        dir.join("config.toml"),
+        toml::to_string_pretty(&config).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("credentials.toml"),
+        toml::to_string_pretty(&credentials).unwrap(),
+    )
+    .unwrap();
+
+    make_store(&dir)
+        .update_config(|current| {
+            current.model = "updated-model".to_string();
+            Ok(())
+        })
+        .unwrap();
+
+    let persisted = std::fs::read_to_string(dir.join("config.toml")).unwrap();
+    assert!(persisted.contains("${CUSTOM_A_API_KEY}"));
+    assert!(!persisted.contains("credential-file-secret"));
+    assert!(!persisted.contains("custom-b"));
+    let _ = std::fs::remove_dir_all(dir);
+}

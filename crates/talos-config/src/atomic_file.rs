@@ -208,8 +208,3 @@ fn sync_dir_impl(_dir: &Path) -> Result<(), std::io::Error> {
 fn cleanup_err(e: std::io::Error) -> ConfigError {
     ConfigError::IoError(e)
 }
-
-#[cfg(test)]
-pub(crate) fn durable_replace_for_test(path: &Path, content: &[u8]) -> Result<(), ConfigError> {
-    durable_replace(path, content)
-}

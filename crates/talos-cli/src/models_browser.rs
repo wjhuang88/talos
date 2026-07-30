@@ -9,7 +9,7 @@ use crossterm::{
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use talos_config::{Config, ProviderProtocol};
+use talos_config::{Config, ConfigError, ConfigStore, ProviderProtocol};
 
 pub(crate) fn run_available_models_browser(initial_filter: Option<&str>) -> Result<()> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
@@ -154,8 +154,13 @@ fn select_row<W: Write>(
     row: &CatalogBrowserRow,
 ) -> Result<()> {
     if row.authenticated {
-        config.set_active_model(&row.qualified)?;
-        config.save().context("failed to save configuration")?;
+        *config = ConfigStore::default_store()
+            .update_config(|current| {
+                current
+                    .set_active_model(&row.qualified)
+                    .map_err(|error| ConfigError::InvalidConfig(error.to_string()))
+            })
+            .context("failed to save configuration")?;
         state.message = format!("Active model set to {}", row.qualified);
         return Ok(());
     }
@@ -206,8 +211,12 @@ fn prompt_provider_setup(config: &mut Config, row: &CatalogBrowserRow) -> Result
         }
     };
 
-    apply_provider_setup(config, row, &api_key, typed_base_url)?;
-    config.save().context("failed to save configuration")?;
+    *config = ConfigStore::default_store()
+        .update_config(|current| {
+            apply_provider_setup(current, row, &api_key, typed_base_url)
+                .map_err(|error| ConfigError::InvalidConfig(error.to_string()))
+        })
+        .context("failed to save configuration")?;
     Ok(())
 }
 

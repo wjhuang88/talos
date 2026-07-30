@@ -1,6 +1,7 @@
 //! Session and provider handler functions.
 
 use super::*;
+use talos_config::ConfigStore;
 
 /// Maximum discovered-model entries to persist into the provider's
 /// `models` map during a single registration. Caps config growth when
@@ -271,15 +272,6 @@ pub(crate) async fn handle_register_custom_provider(
     let discovery_base_url = endpoint.base_url.clone();
     let discovery_protocol = typed_protocol.clone();
 
-    let mut new_config = config.clone();
-    let provider_entry = new_config.providers.entry(name.to_string()).or_default();
-    provider_entry.protocol = typed_protocol;
-    provider_entry.base_url = Some(endpoint.base_url);
-    provider_entry.api_key = Some(api_key.to_string());
-    if provider_entry.api_key_env.is_none() {
-        provider_entry.api_key_env = Some(format!("{}_API_KEY", name.to_uppercase()));
-    }
-
     // Run discovery BEFORE persisting so we can atomically write provider
     // + discovered models in a single save. If discovery fails we still
     // save the provider entry alone (R9: provider registration must not
@@ -293,24 +285,47 @@ pub(crate) async fn handle_register_custom_provider(
     .await;
 
     let mut discovered_count = 0usize;
+    let mut discovered_models = Vec::new();
     match &discovery_outcome {
         Ok(models) if !models.is_empty() => {
-            for model_id in models.iter().take(MAX_DISCOVERED_MODELS_TO_PERSIST) {
-                provider_entry.models.entry(model_id.clone()).or_default();
-            }
             discovered_count = models.len();
+            discovered_models.extend(
+                models
+                    .iter()
+                    .take(MAX_DISCOVERED_MODELS_TO_PERSIST)
+                    .cloned(),
+            );
         }
         _ => {}
     }
 
-    if let Err(e) = new_config.save() {
-        send_stream(
-            ui_tx,
-            MessageSource::Error,
-            format!("[Error] Failed to save provider config: {e}\n"),
-        );
-        return None;
-    }
+    let provider_name = name.to_string();
+    let provider_protocol = typed_protocol;
+    let provider_base_url = endpoint.base_url;
+    let provider_api_key = api_key.to_string();
+    let new_config = match ConfigStore::default_store().update_config(|current| {
+        let provider_entry = current.providers.entry(provider_name.clone()).or_default();
+        provider_entry.protocol = provider_protocol;
+        provider_entry.base_url = Some(provider_base_url);
+        provider_entry.api_key = Some(provider_api_key);
+        if provider_entry.api_key_env.is_none() {
+            provider_entry.api_key_env = Some(format!("{}_API_KEY", provider_name.to_uppercase()));
+        }
+        for model_id in discovered_models {
+            provider_entry.models.entry(model_id).or_default();
+        }
+        Ok(())
+    }) {
+        Ok(config) => config,
+        Err(e) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to save provider config: {e}\n"),
+            );
+            return None;
+        }
+    };
 
     send_stream(
         ui_tx,
@@ -368,41 +383,43 @@ pub(crate) async fn handle_register_custom_provider(
 
 pub(crate) async fn handle_connect_with_credential(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
-    config: &Config,
+    _config: &Config,
     cred: talos_conversation::CredentialResponseData,
 ) -> Option<Config> {
-    let mut new_config = config.clone();
-    new_config.set_provider_credential(&cred.provider, &cred.api_key);
+    let provider = cred.provider.clone();
+    let api_key = cred.api_key.clone();
+    let base_url = cred.base_url.clone();
+    let new_config = match ConfigStore::default_store().update_config(|current| {
+        current.set_provider_credential(&provider, &api_key);
 
-    let provider_entry = new_config
-        .providers
-        .entry(cred.provider.clone())
-        .or_default();
-    if provider_entry.api_key_env.is_none() {
-        provider_entry.api_key_env = match cred.provider.as_str() {
-            "anthropic" => Some("ANTHROPIC_API_KEY".to_string()),
-            "openai" => Some("OPENAI_API_KEY".to_string()),
-            _ => Some(format!("{}_API_KEY", cred.provider.to_uppercase())),
-        };
-    }
-    // `cred.base_url` is already resolved by the TUI credential panel to
-    // either the user-typed value or the request's `default_base_url`.
-    // `None` here means neither was available, so the existing (or absent)
-    // `base_url` is left untouched — never overwritten with an empty value.
-    if let Some(base_url) = cred.base_url.as_ref() {
-        let endpoint = talos_config::normalize_provider_endpoint(base_url);
-        provider_entry.protocol = endpoint.protocol;
-        provider_entry.base_url = Some(endpoint.base_url);
-    }
-
-    if let Err(e) = new_config.save() {
-        send_stream(
-            ui_tx,
-            MessageSource::Error,
-            format!("[Error] Failed to save provider config: {e}\n"),
-        );
-        return None;
-    }
+        let provider_entry = current.providers.entry(provider.clone()).or_default();
+        if provider_entry.api_key_env.is_none() {
+            provider_entry.api_key_env = match provider.as_str() {
+                "anthropic" => Some("ANTHROPIC_API_KEY".to_string()),
+                "openai" => Some("OPENAI_API_KEY".to_string()),
+                _ => Some(format!("{}_API_KEY", provider.to_uppercase())),
+            };
+        }
+        // `base_url` is already resolved by the TUI credential panel to
+        // either the user-typed value or the request's `default_base_url`.
+        // `None` means the existing value must remain untouched.
+        if let Some(base_url) = base_url.as_ref() {
+            let endpoint = talos_config::normalize_provider_endpoint(base_url);
+            provider_entry.protocol = endpoint.protocol;
+            provider_entry.base_url = Some(endpoint.base_url);
+        }
+        Ok(())
+    }) {
+        Ok(config) => config,
+        Err(e) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to save provider config: {e}\n"),
+            );
+            return None;
+        }
+    };
 
     send_stream(
         ui_tx,
@@ -518,11 +535,7 @@ pub(crate) async fn handle_session_model(
         return None;
     }
 
-    if crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref())
-        && let Err(e) = model_config.save()
-    {
-        tracing::warn!("Failed to persist model variant: {e}");
-    }
+    crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref());
 
     let provider_name = model_config.provider.clone();
 
@@ -577,11 +590,18 @@ pub(crate) async fn handle_session_model(
     })
     .await
     {
-        if let Err(e) = model_config.save() {
-            let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        match ConfigStore::default_store().update_config(|current| {
+            current.set_active_model(&resolve_id)?;
+            crate::model_lifecycle::apply_variant_change(current, variant.as_deref());
+            Ok(())
+        }) {
+            Ok(committed) => Some(committed),
+            Err(e) => {
+                let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
+                send_stream(ui_tx, MessageSource::Error, text);
+                Some(model_config)
+            }
         }
-        Some(model_config)
     } else {
         None
     }
@@ -608,13 +628,19 @@ pub(crate) async fn handle_session_model_with_credential(
 ) -> Option<Config> {
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
-    let mut model_config = config.clone();
-    model_config.set_provider_credential(&cred.provider, &cred.api_key);
-    if let Err(e) = model_config.save() {
-        let text = format!("[Error] Failed to persist credentials: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return None;
-    }
+    let credential_provider = cred.provider.clone();
+    let credential_api_key = cred.api_key.clone();
+    let mut model_config = match ConfigStore::default_store().update_config(|current| {
+        current.set_provider_credential(&credential_provider, &credential_api_key);
+        Ok(())
+    }) {
+        Ok(config) => config,
+        Err(e) => {
+            let text = format!("[Error] Failed to persist credentials: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            return None;
+        }
+    };
 
     let model_id = match &cred.model_id {
         Some(id) => id.clone(),
@@ -646,11 +672,7 @@ pub(crate) async fn handle_session_model_with_credential(
         return None;
     }
 
-    if crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref())
-        && let Err(e) = model_config.save()
-    {
-        tracing::warn!("Failed to persist model variant: {e}");
-    }
+    crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref());
 
     let api_key = cred.api_key.clone();
     let provider_for_status = model_config.provider.clone();
@@ -680,11 +702,19 @@ pub(crate) async fn handle_session_model_with_credential(
     })
     .await
     {
-        if let Err(e) = model_config.save() {
-            let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        match ConfigStore::default_store().update_config(|current| {
+            current.set_provider_credential(&cred.provider, &cred.api_key);
+            current.set_active_model(&parsed_model_id)?;
+            crate::model_lifecycle::apply_variant_change(current, variant.as_deref());
+            Ok(())
+        }) {
+            Ok(committed) => Some(committed),
+            Err(e) => {
+                let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
+                send_stream(ui_tx, MessageSource::Error, text);
+                Some(model_config)
+            }
         }
-        Some(model_config)
     } else {
         None
     }

@@ -95,6 +95,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                 ..Default::default()
             },
         );
+        config.save().expect("persist runtime baseline");
 
         let cred = talos_conversation::CredentialResponseData {
             provider: "groq".to_string(),
@@ -149,6 +150,7 @@ async fn handle_connect_with_credential_updates_base_url_when_provided() {
                 ..Default::default()
             },
         );
+        config.save().expect("persist runtime baseline");
 
         let cred = talos_conversation::CredentialResponseData {
             provider: "groq".to_string(),
@@ -514,6 +516,7 @@ async fn handle_register_custom_provider_update_preserves_unrelated_providers() 
                 ..Default::default()
             },
         );
+        config.save().expect("persist runtime baseline");
         let result = handle_register_custom_provider(
             &tx,
             &config,
@@ -904,6 +907,7 @@ async fn p1_update_preserves_unrelated_models() {
             .unwrap()
             .models
             .insert("manual-model".to_string(), Default::default());
+        config.save().expect("persist manual model");
 
         // Second: re-register (update) the same provider with discovery.
         let result = handle_register_custom_provider(
@@ -1194,6 +1198,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .unwrap()
             .models
             .insert("target-model".to_string(), Default::default());
+        config.save().expect("persist runtime baseline");
 
         let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
         let hooks = Arc::new(HookRegistry::new());

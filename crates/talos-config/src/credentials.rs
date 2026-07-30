@@ -1,7 +1,6 @@
-use crate::{ConfigError, home_dir};
+use crate::{ConfigError, ConfigStore, home_dir};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 
 /// Credentials store — maps provider names to API keys.
@@ -36,25 +35,15 @@ impl Credentials {
     ///
     /// Returns an empty credentials store if the file does not exist.
     pub fn load() -> Result<Self, ConfigError> {
-        let path = Self::default_path();
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let raw = fs::read_to_string(&path)?;
-        let creds: Credentials =
-            toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))?;
-        Ok(creds)
+        ConfigStore::default_store().load_credentials_snapshot()
     }
 
-    /// Persists credentials to the default path.
+    /// Persists the complete credentials snapshot to the default path.
+    ///
+    /// Talos runtime flows use [`ConfigStore::update_config`] or the provider
+    /// removal transaction instead of holding this snapshot across user
+    /// interaction.
     pub fn save(&self) -> Result<(), ConfigError> {
-        let path = Self::default_path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let toml_str =
-            toml::to_string_pretty(self).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
-        fs::write(&path, toml_str)?;
-        Ok(())
+        ConfigStore::default_store().replace_credentials_snapshot(self)
     }
 }

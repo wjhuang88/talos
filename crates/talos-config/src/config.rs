@@ -4,7 +4,6 @@ use crate::{
     opencode,
 };
 use std::env;
-use std::fs;
 use std::path::PathBuf;
 
 impl Config {
@@ -298,15 +297,12 @@ impl Config {
     /// `api_key` values are serialized in the main config file. Run
     /// `talos config list` or `talos config get` to view config without
     /// leaking keys.
+    ///
+    /// This method replaces the complete caller-owned snapshot. Long-lived
+    /// interactive flows should use [`crate::ConfigStore::update_config`] so
+    /// their semantic change is applied to the latest persisted state.
     pub fn save(&self) -> Result<(), ConfigError> {
-        let path = Self::default_path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let toml_str =
-            toml::to_string_pretty(self).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
-        fs::write(&path, toml_str)?;
-        Ok(())
+        crate::ConfigStore::default_store().replace_config_snapshot(self)
     }
 
     /// Checks whether the named provider has a usable API key.

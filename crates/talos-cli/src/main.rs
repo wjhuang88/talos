@@ -56,7 +56,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
-use talos_config::{Config, ProviderProtocol};
+use talos_config::{Config, ConfigError, ConfigStore, ProviderProtocol};
 use talos_plugin::{HookRegistry, LoggingHandler};
 
 use crate::logging::init_logger;
@@ -483,9 +483,12 @@ async fn main() -> Result<()> {
     }
 
     if cli.init {
-        let mut config = Config::load().context("failed to load configuration")?;
-        config.model.clear();
-        config.save().context("failed to save configuration")?;
+        ConfigStore::default_store()
+            .update_config(|config| {
+                config.model.clear();
+                Ok(())
+            })
+            .context("failed to save configuration")?;
         // Falls through to the TUI path which will auto-open the model picker
     }
 
@@ -585,12 +588,13 @@ fn run_config_set(kv: &str) -> Result<()> {
     let (key, value) = kv
         .split_once('=')
         .ok_or_else(|| anyhow::anyhow!("invalid format: expected KEY=VALUE (got '{kv}')"))?;
-    let mut config = Config::load().context("failed to load configuration")?;
-    config_set_dotted(&mut config, key.trim(), value.trim())?;
-    config
-        .validate()
+    ConfigStore::default_store()
+        .update_config(|config| {
+            config_set_dotted(config, key.trim(), value.trim())
+                .map_err(|error| ConfigError::InvalidConfig(error.to_string()))?;
+            config.validate()
+        })
         .context("configuration validation failed — value not saved")?;
-    config.save().context("failed to save configuration")?;
     println!(
         "Set {key} = {}",
         if is_secret_key(key) {
@@ -729,9 +733,12 @@ fn model_matches_filter(model: &talos_config::model::ModelMetadata, filter: Opti
 }
 
 fn run_use_model(model_id: &str) -> Result<()> {
-    let mut config = Config::load().context("failed to load configuration")?;
-    config
-        .set_active_model(model_id)
+    let config = ConfigStore::default_store()
+        .update_config(|config| {
+            config
+                .set_active_model(model_id)
+                .map_err(|error| ConfigError::InvalidConfig(error.to_string()))
+        })
         .with_context(|| format!("unknown model '{model_id}'"))?;
 
     if !config.provider_authenticated(&config.provider) {
@@ -745,7 +752,6 @@ fn run_use_model(model_id: &str) -> Result<()> {
         );
     }
 
-    config.save().context("failed to save configuration")?;
     println!("Active model set to {model_id}.");
     Ok(())
 }

@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
-use talos_config::Config;
 use talos_config::model::{ModelMetadata, builtin_models};
+use talos_config::{Config, ConfigStore};
 
 /// Entry point for the init wizard subcommand.
 pub(crate) async fn run_init_wizard(non_interactive: bool) -> Result<()> {
@@ -148,7 +148,26 @@ async fn run_wizard_interactive<R: BufRead, W: Write>(
         return Ok(());
     }
 
-    config.save().context("failed to save configuration")?;
+    ConfigStore::default_store()
+        .update_config(|current| {
+            current.set_active_model(&qualified_model_id)?;
+            match &credential_type {
+                CredentialType::EnvVar(env_name) => {
+                    current
+                        .providers
+                        .entry(provider_name.clone())
+                        .or_insert_with(|| {
+                            builtin_provider_config(&provider_name).unwrap_or_default()
+                        })
+                        .api_key_env = Some(env_name.clone());
+                }
+                CredentialType::InlineKey(key) => {
+                    current.set_provider_credential(&provider_name, key);
+                }
+            }
+            Ok(())
+        })
+        .context("failed to save configuration")?;
     writeln!(writer, "Configuration saved to ~/.talos/config.toml")?;
 
     Ok(())
