@@ -245,6 +245,22 @@ impl ConfigStore {
                 ));
             }
 
+            let cleanup_ready = entry.join(CLEANUP_READY_FILE);
+            if fs.exists(&cleanup_ready) {
+                fs.checkpoint(FsOperation::ReadCleanupReadyMarker)?;
+                let marker = fs.read(&cleanup_ready)?;
+                if marker != transaction_id.as_bytes() {
+                    return Err(ConfigError::InvalidConfig(
+                        "finalization cleanup marker transaction identifier mismatch".into(),
+                    ));
+                }
+                outcome = merge_recovery_outcomes(
+                    outcome,
+                    cleanup_ready_residue(fs, parent, &entry, transaction_id, None),
+                );
+                continue;
+            }
+
             let manifest_path = entry.join("manifest");
             if !fs.exists(&manifest_path) {
                 return Err(ConfigError::InvalidConfig(
@@ -261,7 +277,6 @@ impl ConfigStore {
             }
 
             let terminal_phase = terminal_phase(&manifest)?;
-
             validate_terminal_state(
                 fs,
                 &entry,
@@ -275,6 +290,14 @@ impl ConfigStore {
                 .checkpoint(FsOperation::SyncFinalizeResidueParent)
                 .and_then(|_| fs.sync_dir(parent))
                 .is_err()
+                || fs
+                    .checkpoint(FsOperation::WriteCleanupReadyMarker)
+                    .and_then(|_| fs.write_secure(&cleanup_ready, transaction_id.as_bytes()))
+                    .is_err()
+                || fs
+                    .checkpoint(FsOperation::SyncFinalizeDirectory)
+                    .and_then(|_| fs.sync_dir(&entry))
+                    .is_err()
             {
                 return Ok(RecoveryOutcome::ParentSyncPending {
                     transaction_id: transaction_id.to_string(),
@@ -283,36 +306,10 @@ impl ConfigStore {
                 });
             }
 
-            let cleanup_result = fs
-                .checkpoint(FsOperation::CleanupFinalizeDirectory)
-                .and_then(|_| fs.remove_dir(&entry));
-
-            if cleanup_result.is_err() {
-                outcome = merge_recovery_outcomes(
-                    outcome,
-                    RecoveryOutcome::CleanupPending {
-                        transaction_id: transaction_id.to_string(),
-                        phase: terminal_phase,
-                        finalize_dir: entry,
-                    },
-                );
-                continue;
-            }
-
-            if fs
-                .checkpoint(FsOperation::SyncTransactionParentAfterCleanup)
-                .and_then(|_| fs.sync_dir(parent))
-                .is_err()
-            {
-                outcome = merge_recovery_outcomes(
-                    outcome,
-                    RecoveryOutcome::CleanupPending {
-                        transaction_id: transaction_id.to_string(),
-                        phase: terminal_phase,
-                        finalize_dir: entry,
-                    },
-                );
-            }
+            outcome = merge_recovery_outcomes(
+                outcome,
+                cleanup_ready_residue(fs, parent, &entry, transaction_id, Some(terminal_phase)),
+            );
         }
 
         Ok(outcome)
@@ -347,6 +344,41 @@ impl ConfigStore {
 
         Ok(())
     }
+}
+
+fn cleanup_ready_residue(
+    fs: &dyn Fs,
+    parent: &Path,
+    entry: &Path,
+    transaction_id: &str,
+    phase: Option<TerminalPhase>,
+) -> RecoveryOutcome {
+    let phase = phase.unwrap_or(TerminalPhase::Committed);
+    if fs
+        .checkpoint(FsOperation::CleanupFinalizeDirectory)
+        .and_then(|_| fs.remove_dir(entry))
+        .is_err()
+    {
+        return RecoveryOutcome::CleanupPending {
+            transaction_id: transaction_id.to_string(),
+            phase,
+            finalize_dir: entry.to_path_buf(),
+        };
+    }
+
+    if fs
+        .checkpoint(FsOperation::SyncTransactionParentAfterCleanup)
+        .and_then(|_| fs.sync_dir(parent))
+        .is_err()
+    {
+        return RecoveryOutcome::CleanupPending {
+            transaction_id: transaction_id.to_string(),
+            phase,
+            finalize_dir: entry.to_path_buf(),
+        };
+    }
+
+    RecoveryOutcome::Clean
 }
 
 fn terminal_phase(manifest: &Manifest) -> Result<TerminalPhase, ConfigError> {

@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static TXN_COUNTER: AtomicU64 = AtomicU64::new(0);
 const MANIFEST_VERSION: u32 = 1;
+pub(super) const CLEANUP_READY_FILE: &str = "cleanup.ready";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub(super) enum Phase {
@@ -434,6 +435,13 @@ pub(super) fn restore(
     Ok(())
 }
 
+fn write_cleanup_ready(fs: &dyn Fs, finalize_dir: &Path, txn_id: &str) -> Result<(), ConfigError> {
+    fs.checkpoint(FsOperation::WriteCleanupReadyMarker)?;
+    fs.write_secure(&finalize_dir.join(CLEANUP_READY_FILE), txn_id.as_bytes())?;
+    fs.checkpoint(FsOperation::SyncFinalizeDirectory)?;
+    fs.sync_dir(finalize_dir)
+}
+
 pub(super) fn finalize_active(
     fs: &dyn Fs,
     active_dir: &Path,
@@ -464,6 +472,7 @@ pub(super) fn finalize_active(
         .checkpoint(FsOperation::SyncTransactionParentAfterFinalize)
         .and_then(|_| fs.sync_dir(parent))
         .is_err()
+        || write_cleanup_ready(fs, &finalize_dir, txn_id).is_err()
     {
         return Ok(FinalizeOutcome::ParentSyncPending {
             transaction_id: txn_id.to_string(),
