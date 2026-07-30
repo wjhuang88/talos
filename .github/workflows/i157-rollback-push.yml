@@ -1,4 +1,5 @@
 name: I157 rollback intent push runner
+# trigger after workflow registration
 
 on:
   push:
