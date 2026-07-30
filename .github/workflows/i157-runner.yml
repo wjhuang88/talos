@@ -1,4 +1,5 @@
 name: I157 correction runner
+# synchronize trigger for rollback-intent correction
 
 on:
   pull_request:
