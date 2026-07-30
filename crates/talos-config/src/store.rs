@@ -52,6 +52,13 @@ impl ConfigStore {
     pub(crate) fn run(&self, key: &str, fs: &dyn Fs) -> Result<ConfigUnsetOutcome, ConfigError> {
         self.recover(fs)?;
 
+        let active = self.txn_dir();
+        if fs.exists(&active) {
+            return Err(ConfigError::InvalidConfig(
+                "provider configuration finalization is pending; retry after recovery".into(),
+            ));
+        }
+
         let cfg_before = fs.read_opt(&self.config_path)?;
         let cred_before = fs.read_opt(&self.credentials_path)?;
 
@@ -144,9 +151,9 @@ impl ConfigStore {
             if self.credentials_path.exists() {
                 let raw = std::fs::read_to_string(&self.credentials_path)
                     .map_err(ConfigError::IoError)?;
-                if let Ok(creds) = toml::from_str::<Credentials>(&raw) {
-                    config.merge_credentials(&creds);
-                }
+                let creds: Credentials =
+                    toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+                config.merge_credentials(&creds);
             }
             return Ok(config);
         }
@@ -159,9 +166,9 @@ impl ConfigStore {
         if self.credentials_path.exists() {
             let raw_creds =
                 std::fs::read_to_string(&self.credentials_path).map_err(ConfigError::IoError)?;
-            if let Ok(creds) = toml::from_str::<Credentials>(&raw_creds) {
-                config.merge_credentials(&creds);
-            }
+            let creds: Credentials =
+                toml::from_str(&raw_creds).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+            config.merge_credentials(&creds);
         }
 
         Ok(config)

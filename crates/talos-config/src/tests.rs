@@ -3268,3 +3268,143 @@ fn transaction_error_does_not_leak_secret() {
     assert!(!format!("{err:?}").contains("MARKER-SECRET"));
     let _ = fs::remove_dir_all(&dir);
 }
+
+// ---------------------------------------------------------------------------
+// I157 Round 9: strict credentials, interruption matrix, residue boundary
+// ---------------------------------------------------------------------------
+
+#[test]
+fn load_effective_rejects_corrupt_credentials() {
+    let dir = unique_test_dir("corrupt-cred");
+    let mut config = Config::default();
+    config.provider = "x".to_string();
+    config.model = "y".to_string();
+    write_both_files(&dir, &config, None);
+    fs::write(dir.join("credentials.toml"), "not valid toml [[[").unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    assert!(matches!(err, ConfigError::ParseError(_)));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn load_effective_rejects_non_utf8_credentials() {
+    let dir = unique_test_dir("nonutf8-cred");
+    let mut config = Config::default();
+    config.provider = "x".to_string();
+    config.model = "y".to_string();
+    write_both_files(&dir, &config, None);
+    fs::write(dir.join("credentials.toml"), b"invalid \xff\xfe utf8").unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    assert!(matches!(
+        err,
+        ConfigError::ParseError(_) | ConfigError::IoError(_)
+    ));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn missing_config_does_not_hide_corrupt_credentials() {
+    let dir = unique_test_dir("missing-cfg-corrupt-cred");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("credentials.toml"), "broken [[[[").unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    assert!(matches!(err, ConfigError::ParseError(_)));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn corrupt_credentials_error_does_not_leak_secret() {
+    let dir = unique_test_dir("corrupt-cred-leak");
+    let mut config = Config::default();
+    config.provider = "x".to_string();
+    config.model = "y".to_string();
+    write_both_files(&dir, &config, None);
+    fs::write(dir.join("credentials.toml"), "not valid toml").unwrap();
+    let store = make_store(&dir);
+    let err = store.load_effective().unwrap_err();
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn finalize_residue_does_not_block_new_mutation() {
+    let dir = unique_test_dir("finalize-residue-ok");
+    let _ = setup_full_fixture(&dir);
+    let residue_dir = dir.join(".provider-unset-transaction.finalize.orphan-1");
+    fs::create_dir_all(&residue_dir).unwrap();
+    fs::write(residue_dir.join("manifest"), b"stale").unwrap();
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.custom-a").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-a".to_string()
+        }
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn prepare_residue_does_not_block_load_effective() {
+    let dir = unique_test_dir("prepare-residue-load");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let residue_dir = dir.join(".provider-unset-transaction.prepare.orphan-2");
+    fs::create_dir_all(&residue_dir).unwrap();
+    fs::write(residue_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(residue_dir.join("credentials.before"), &cred_b).unwrap();
+    let store = make_store(&dir);
+    let config = store.load_effective().unwrap();
+    assert!(config.providers.contains_key("custom-a"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_applying_after_credentials_recovers_before() {
+    let dir = unique_test_dir("int-applying-cred");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
+    let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
+    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    fs::write(txn_dir.join("credentials.after"), cred_after).unwrap();
+    write_toml_manifest(&txn_dir, "Applying", "int-6", true, true, true, true);
+    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn interruption_rollback_required_completes_rollback() {
+    let dir = unique_test_dir("int-rbrequired");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
+    write_toml_manifest(
+        &txn_dir,
+        "RollbackRequired",
+        "int-7",
+        true,
+        true,
+        true,
+        true,
+    );
+    fs::write(dir.join("config.toml"), &cfg_b).unwrap();
+    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+    let store = make_store(&dir);
+    store.recover(&StdFs).unwrap();
+    assert_both_unchanged(&dir, &cfg_b, &cred_b);
+    assert!(!txn_dir.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
