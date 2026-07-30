@@ -999,12 +999,21 @@ impl talos_core::tool::AgentTool for EchoTool {
 /// Model that sends a tool call, then on second call sends an error.
 struct ToolCallThenErrorModel {
     call_count: Arc<std::sync::atomic::AtomicU8>,
+    trailing_fragment: bool,
 }
 
 impl ToolCallThenErrorModel {
     fn new() -> Self {
         Self {
             call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            trailing_fragment: false,
+        }
+    }
+
+    fn with_trailing_fragment() -> Self {
+        Self {
+            call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            trailing_fragment: true,
         }
     }
 }
@@ -1013,6 +1022,7 @@ impl LanguageModel for ToolCallThenErrorModel {
     async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(64);
         let count = self.call_count.clone();
+        let trailing_fragment = self.trailing_fragment;
         tokio::spawn(async move {
             let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if n == 0 {
@@ -1034,8 +1044,7 @@ impl LanguageModel for ToolCallThenErrorModel {
                         usage: talos_core::message::Usage::default(),
                     })
                     .await;
-            } else {
-                // Second call: expose a half-streamed continuation, then fail.
+            } else if trailing_fragment {
                 let _ = tx
                     .send(AgentEvent::TextDelta {
                         delta: "trailing half-streamed fragment".into(),
@@ -1044,6 +1053,12 @@ impl LanguageModel for ToolCallThenErrorModel {
                 let _ = tx
                     .send(AgentEvent::Error {
                         message: "provider stream closed without explicit terminal signal ([DONE] or finish_reason)".into(),
+                    })
+                    .await;
+            } else {
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider server error".into(),
                     })
                     .await;
             }
@@ -1065,7 +1080,10 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
     let mut registry = ToolRegistry::new();
     registry.register(std::sync::Arc::new(EchoTool));
     #[allow(deprecated)]
-    let agent = Agent::new(std::sync::Arc::new(ToolCallThenErrorModel::new()), registry);
+    let agent = Agent::new(
+        std::sync::Arc::new(ToolCallThenErrorModel::with_trailing_fragment()),
+        registry,
+    );
 
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
