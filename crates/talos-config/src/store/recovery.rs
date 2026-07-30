@@ -228,7 +228,8 @@ impl ConfigStore {
         let mut outcome = RecoveryOutcome::Clean;
 
         for entry in fs.list_dir(parent)? {
-            let Some(name) = entry.file_name().and_then(|value| value.to_str()) else {
+            let file_name = entry.file_name();
+            let Some(name) = file_name.to_str() else {
                 continue;
             };
             let Some(transaction_id) = name.strip_prefix(FINALIZE_PREFIX) else {
@@ -329,7 +330,8 @@ impl ConfigStore {
         }
 
         for entry in fs.list_dir(parent)? {
-            let Some(name) = entry.file_name().and_then(|value| value.to_str()) else {
+            let file_name = entry.file_name();
+            let Some(name) = file_name.to_str() else {
                 continue;
             };
             if !name.starts_with(PREPARE_PREFIX) {
