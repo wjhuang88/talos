@@ -42,6 +42,7 @@ jobs:
 - OpenAI `content_filter` is a known filtered error and deprecated `function_call` is a known legacy error with `tool_calls` migration guidance. Anthropic `stop_sequence` is normal completion; `pause_turn` and `refusal` are known bounded non-success outcomes. Only `fixture_unknown_reason` uses `UnsupportedReason`.
 - Red evidence recorded parser exit 101 and rebuilt fixture exit 1 before correction, including the rejected merged shape `fixture partialWarning...`.
 - Corrected implementation `c570991b` plus cleanup `86262d02` passed workflow `30558757429`; standard clean-HEAD Release preflight and Windows fixture passed in run `30558599777`.
+- Superseded initial Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`; PR review replaced it with clean Completion Commit `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
 ''')
 
           story = 'docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md'
@@ -81,7 +82,7 @@ jobs:
 - Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
   the v0.6 program; verify the current Git state; write the required failing provider fixtures
   before production changes; keep I158 blocked.''', '''- Completed task items: P0, P1, and U1. I157/MODEL-010 and I168/RUNTIME-003 are Complete.
-- Completion Commit for U1: `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95` for U1.
 - Current state and artifacts: I164 is Paused; I158-I162 are Blocked; ADR-053 is Proposed; no implementation iteration is Active.
 - Commands/checks and actual results: reviewed provider/session/CLI/TUI fixtures, 2681 workspace tests, formatting, check, Clippy, governance, diff checks, build, negative assertions, and merged-fd ordering passed.
 - External-action authorization: tag, publish, release, deploy, force-push, and version changes remain unauthorized.
