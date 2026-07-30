@@ -2960,21 +2960,87 @@ fn committed_manifest_failure_rolls_back() {
 }
 
 #[test]
-fn finalize_rename_failure_leaves_active_for_recovery() {
+fn committed_finalize_rename_failure_returns_success() {
     let dir = unique_test_dir("finalize-rename-fail");
     let (cfg_b, _cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
     let fs = FaultyFs::new(Some(11));
-    let result = store.run("providers.custom-a", &fs);
-    assert!(result.is_err(), "finalize rename failure must return error");
+    let outcome = store.run("providers.custom-a", &fs);
+    assert!(
+        outcome.is_ok(),
+        "Committed finalize failure must return Ok — business already succeeded"
+    );
     assert!(
         active_dir(&dir).exists(),
-        "active journal must remain for recovery"
+        "active journal may remain for recovery"
     );
     let cfg_after = fs::read(dir.join("config.toml")).unwrap();
     assert_ne!(
         cfg_after, cfg_b,
         "config must reflect committed after state"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn committed_active_journal_does_not_block_load_effective() {
+    let dir = unique_test_dir("committed-active-load");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
+    let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    fs::write(txn_dir.join("credentials.after"), cred_after).unwrap();
+    write_toml_manifest(&txn_dir, "Committed", "load-1", true, true, true, true);
+    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+
+    let store = make_store(&dir);
+    let config = store.load_effective().unwrap();
+    assert!(config.providers.contains_key("custom-b"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn rolled_back_active_journal_does_not_block_load() {
+    let dir = unique_test_dir("rolledback-active-load");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "RolledBack", "load-2", true, true, true, true);
+
+    let store = make_store(&dir);
+    let config = store.load_effective().unwrap();
+    assert!(config.providers.contains_key("custom-a"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn active_journal_committed_recovers_then_allows_new_unset() {
+    let dir = unique_test_dir("active-then-unset");
+    let (cfg_b, cred_b) = setup_full_fixture(&dir);
+    let txn_dir = active_dir(&dir);
+    fs::create_dir_all(&txn_dir).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::write(txn_dir.join("config.after"), &cfg_b).unwrap();
+    fs::write(txn_dir.join("credentials.after"), &cred_b).unwrap();
+    write_toml_manifest(&txn_dir, "Committed", "block-1", true, true, true, true);
+    fs::write(dir.join("config.toml"), &cfg_b).unwrap();
+    fs::write(dir.join("credentials.toml"), &cred_b).unwrap();
+
+    let store = make_store(&dir);
+    let outcome = store.unset_provider("providers.custom-b").unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-b".to_string()
+        }
     );
     let _ = fs::remove_dir_all(&dir);
 }

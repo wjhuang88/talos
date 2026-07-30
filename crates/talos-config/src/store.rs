@@ -105,7 +105,9 @@ impl ConfigStore {
                 &txn_id,
             ) {
                 Ok(()) => {
-                    finalize(fs, &active_dir, &txn_id)?;
+                    if let Err(e) = finalize(fs, &active_dir, &txn_id) {
+                        tracing::warn!("finalization pending after rollback: {e}");
+                    }
                     return Err(apply_err);
                 }
                 Err(_) => {
@@ -116,7 +118,9 @@ impl ConfigStore {
             }
         }
 
-        finalize(fs, &active_dir, &txn_id)?;
+        if let Err(e) = finalize(fs, &active_dir, &txn_id) {
+            tracing::warn!("finalization pending after committed: {e}");
+        }
         Ok(outcome)
     }
 
@@ -124,6 +128,14 @@ impl ConfigStore {
         Self::default_store().recover(&StdFs)
     }
 
+    /// Loads the effective configuration from this store's explicit paths.
+    ///
+    /// Recovers any pending provider-unset transaction before reading.
+    /// Applies environment variable substitution and credential merge
+    /// using the same semantics as [`Config::load`].
+    ///
+    /// This is an additive public API (pre-1.0, non-breaking).
+    /// It is not a general-purpose transaction API.
     pub fn load_effective(&self) -> Result<Config, ConfigError> {
         self.recover(&StdFs)?;
 
