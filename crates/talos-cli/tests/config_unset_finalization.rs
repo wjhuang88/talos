@@ -113,23 +113,12 @@ fn real_cli_fails_closed_on_ambiguous_active_and_finalize_evidence() {
     for journal in [&active, &finalize] {
         fs::write(journal.join("config.after"), &config).unwrap();
         fs::write(journal.join("credentials.after"), &credentials).unwrap();
-        write_manifest(
-            journal,
-            "Committed",
-            transaction_id,
-            true,
-            true,
-            true,
-            true,
-        );
+        write_manifest(journal, "Committed", transaction_id, true, true, true, true);
     }
 
     let (success, stdout, stderr) = run_cmd(&home, &["config", "list"]);
     assert!(!success);
-    assert!(
-        stderr.to_lowercase().contains("ambiguous")
-            || stdout.to_lowercase().contains("ambiguous")
-    );
+    assert!(stderr.to_lowercase().contains("ambiguous") || stdout.to_lowercase().contains("ambiguous"));
     assert_no_marker(&stdout, &stderr);
     assert!(active.exists());
     assert!(finalize.exists());
