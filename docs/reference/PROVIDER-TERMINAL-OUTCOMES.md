@@ -47,6 +47,12 @@ The fixture covers OpenAI-compatible and Anthropic-compatible normal completion,
 unsupported reasons, terminal-frame-less EOF, invalid UTF-8, transport failure, and a successful
 tool result followed by continuation EOF.
 
+The I168 completion packet used workflow run `30552762936` at validation harness commit `62ae098d`.
+All focused commands, source scan, governance validation, build, and the rebuilt-binary fixture
+exited 0; `cargo test --workspace --locked` recorded 2673 passed and zero failed. The governance
+closeout mutation then passed in workflow run `30554255195`. Completion Commit `2eac5b05` predates
+both evidence-recording steps and owns the final implementation plus deterministic fixture scripts.
+
 ## Troubleshooting
 
 - A normal provider gateway must emit the compatible protocol's documented terminal signal.
