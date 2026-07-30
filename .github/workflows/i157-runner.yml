@@ -63,6 +63,52 @@ jobs:
           Path('/tmp/apply_i157.py').write_text(script)
           PY
           python3 /tmp/apply_i157.py
+          python3 <<'PY'
+          from pathlib import Path
+
+          fs_path = Path('crates/talos-config/src/store/fs.rs')
+          fs_text = fs_path.read_text()
+          fs_text = fs_text.replace('    CleanupPrepareResidues,\n', '', 1)
+          fs_path.write_text(fs_text)
+
+          tests_path = Path('crates/talos-config/src/tests.rs')
+          tests = tests_path.read_text()
+          old = '''#[test]
+          fn test_load_nonexistent_file() {
+              let path = Config::default_path();
+              if path.exists() {
+                  return;
+              }
+              let config = Config::load().unwrap();
+              assert_eq!(config.provider, "anthropic");
+              assert!(config.model.is_empty());
+          }
+          '''
+          new = '''#[test]
+          fn test_load_nonexistent_file() {
+              let dir = std::env::temp_dir().join(format!(
+                  "talos-config-nonexistent-{}-{}",
+                  std::process::id(),
+                  std::time::SystemTime::now()
+                      .duration_since(std::time::UNIX_EPOCH)
+                      .unwrap()
+                      .as_nanos()
+              ));
+              std::fs::create_dir_all(&dir).unwrap();
+              let store = ConfigStore::with_paths(
+                  dir.join("config.toml"),
+                  dir.join("credentials.toml"),
+              );
+              let config = store.load_effective().unwrap();
+              assert_eq!(config.provider, "anthropic");
+              assert!(config.model.is_empty());
+              let _ = std::fs::remove_dir_all(dir);
+          }
+          '''
+          if tests.count(old) != 1:
+              raise SystemExit(f'test_load_nonexistent_file replacement count: {tests.count(old)}')
+          tests_path.write_text(tests.replace(old, new, 1))
+          PY
       - name: Format and focused validation
         run: |
           cargo fmt --all
