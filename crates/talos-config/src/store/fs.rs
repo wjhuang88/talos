@@ -6,6 +6,7 @@ pub(crate) enum FsOperation {
     CleanupPrepareResidues,
     ReadActiveManifest,
     ReadFinalizeManifest,
+    ReadCleanupReadyMarker,
     ReadConfigBeforeImage,
     ReadCredentialsBeforeImage,
     ReadConfigAfterImage,
@@ -40,9 +41,9 @@ pub(crate) enum FsOperation {
     PublishFinalizeDirectory,
     SyncTransactionParentAfterFinalize,
     SyncFinalizeResidueParent,
-    PublishCleanupDirectory,
-    SyncTransactionParentAfterCleanupPublish,
-    CleanupPublishedDirectory,
+    WriteCleanupReadyMarker,
+    SyncFinalizeDirectory,
+    CleanupFinalizeDirectory,
     SyncTransactionParentAfterCleanup,
 }
 
