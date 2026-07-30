@@ -13,7 +13,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `ARCH-034-R01` | `ARCH-034` | `In Progress` | ADR-053 Accepted 2026-07-31; activation recorded against `43a63e30` | Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior. |
+| `ARCH-034-R01` | `ARCH-034` | `In Progress` | ADR-053 Accepted 2026-07-31; activation recorded against `e539537d` | Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior. |
 
 ### Start Here
 
@@ -138,7 +138,7 @@ If a stop condition occurs:
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-07-31 | Activation | Baseline `43a63e30` (`main` after I168 merge). No other implementation iteration is Active or in Review. ADR-053 Accepted; ARCH-034-R01 moved to In Progress. Primary executor is GPT-5.6 Thinking through the connected GitHub repository workflow. Begin with the additive core contract and red tests; retain all old builders until equivalence evidence passes. |
+| 2026-07-31 | Activation | Baseline `e539537d` (`main` after I168 merge). No other implementation iteration is Active or in Review. ADR-053 Accepted; ARCH-034-R01 moved to In Progress. Primary executor is GPT-5.6 Thinking through the connected GitHub repository workflow. Begin with the additive core contract and red tests; retain all old builders until equivalence evidence passes. |
 
 ## Verification Evidence
 

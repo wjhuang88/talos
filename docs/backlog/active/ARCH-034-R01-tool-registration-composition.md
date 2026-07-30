@@ -11,7 +11,7 @@
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
 | Blocks | Future built-in tool additions and ARCH-031-A feature-boundary work |
-| Selected Iteration | I158 (Active — ADR-053 accepted; baseline `43a63e30`) |
+| Selected Iteration | I158 (Active — ADR-053 accepted; baseline `e539537d`) |
 
 ## Problem
 
