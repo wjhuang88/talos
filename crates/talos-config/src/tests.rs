@@ -2384,35 +2384,72 @@ fn store_unset_credential_not_in_files_after_success() {
 // I157 Recoverable Transaction: failure injection + byte identity
 // ---------------------------------------------------------------------------
 
-use crate::store::{Fs, StdFs};
-use std::cell::Cell;
+use crate::store::{Fs, FsOperation, StdFs};
+use std::cell::RefCell;
 
-struct FaultyFs {
-    fail_at_write: Option<usize>,
-    write_count: Cell<usize>,
+struct FaultPlan {
+    failures: RefCell<std::collections::VecDeque<FsOperation>>,
+    observed: RefCell<Vec<FsOperation>>,
 }
 
-impl FaultyFs {
-    fn new(fail_at_write: Option<usize>) -> Self {
+impl FaultPlan {
+    fn none() -> Self {
         Self {
-            fail_at_write,
-            write_count: Cell::new(0),
+            failures: RefCell::new(std::collections::VecDeque::new()),
+            observed: RefCell::new(Vec::new()),
         }
     }
 
-    fn check(&self) -> Result<(), ConfigError> {
-        let n = self.write_count.get();
-        self.write_count.set(n + 1);
-        if self.fail_at_write == Some(n) {
+    fn fail_once(op: FsOperation) -> Self {
+        let mut failures = std::collections::VecDeque::new();
+        failures.push_back(op);
+        Self {
+            failures: RefCell::new(failures),
+            observed: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn fail_sequence(ops: &[FsOperation]) -> Self {
+        Self {
+            failures: RefCell::new(ops.iter().copied().collect()),
+            observed: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn check(&self, op: FsOperation) -> Result<(), ConfigError> {
+        self.observed.borrow_mut().push(op);
+        if self.failures.borrow().front().is_some_and(|&f| f == op) {
+            self.failures.borrow_mut().pop_front();
             return Err(ConfigError::IoError(std::io::Error::other(
                 "injected failure",
             )));
         }
         Ok(())
     }
+
+    fn assert_all_failures_consumed(&self) {
+        assert!(
+            self.failures.borrow().is_empty(),
+            "planned failures not all consumed: {:?}",
+            self.failures.borrow()
+        );
+    }
+}
+
+struct FaultyFs {
+    plan: FaultPlan,
+}
+
+impl FaultyFs {
+    fn new(plan: FaultPlan) -> Self {
+        Self { plan }
+    }
 }
 
 impl Fs for FaultyFs {
+    fn checkpoint(&self, op: FsOperation) -> Result<(), ConfigError> {
+        self.plan.check(op)
+    }
     fn exists(&self, p: &Path) -> bool {
         p.exists()
     }
@@ -2420,27 +2457,21 @@ impl Fs for FaultyFs {
         std::fs::read(p).map_err(ConfigError::IoError)
     }
     fn atomic_write(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
-        self.check()?;
         crate::atomic_file::durable_replace(p, c)
     }
     fn write_secure(&self, p: &Path, c: &[u8]) -> Result<(), ConfigError> {
-        self.check()?;
         crate::atomic_file::write_file_synced(p, c)
     }
     fn mkdir(&self, p: &Path) -> Result<(), ConfigError> {
-        self.check()?;
         crate::atomic_file::create_dir_secure(p)
     }
     fn remove_file(&self, p: &Path) -> Result<(), ConfigError> {
-        self.check()?;
         std::fs::remove_file(p).map_err(ConfigError::IoError)
     }
     fn remove_dir(&self, p: &Path) -> Result<(), ConfigError> {
-        self.check()?;
         std::fs::remove_dir_all(p).map_err(ConfigError::IoError)
     }
     fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError> {
-        self.check()?;
         std::fs::rename(from, to).map_err(ConfigError::IoError)
     }
     fn sync_dir(&self, _d: &Path) -> Result<(), ConfigError> {
@@ -2500,7 +2531,7 @@ fn config_write_failure_leaves_both_files_byte_identical() {
     let (config_before, creds_before) = write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(0)); // Fail at first write (config)
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::CreatePrepareDirectory));
     let result = store.run("providers.custom-a", &fs);
     assert!(result.is_err(), "must return error on config write failure");
 
@@ -2540,7 +2571,7 @@ fn credentials_write_failure_rolls_back_both_files() {
     // Step 0: mkdir, 1: write config.before, 2: write cred.before,
     // 3: write manifest(Prepared), 4: atomic manifest(Applying),
     // 5: atomic config.toml, 6: atomic credentials.toml → fail here
-    let fs = FaultyFs::new(Some(6));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::PublishActiveDirectory));
     let result = store.run("providers.custom-a", &fs);
     assert!(
         result.is_err(),
@@ -2586,7 +2617,7 @@ fn credentials_removal_failure_rolls_back_both_files() {
     let (config_before, creds_before) = write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(6)); // fail at credentials remove
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::PublishActiveDirectory));
     let result = store.run("providers.only-one", &fs);
     assert!(result.is_err());
 
@@ -2876,7 +2907,7 @@ fn prepare_mkdir_failure_does_not_publish_active() {
     let dir = unique_test_dir("prep-mkdir");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(0));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::CreatePrepareDirectory));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_no_active(&dir);
@@ -2889,7 +2920,7 @@ fn prepare_config_before_failure_does_not_publish_active() {
     let dir = unique_test_dir("prep-cfg-before");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(1));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::WriteConfigBeforeImage));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_no_active(&dir);
@@ -2902,7 +2933,7 @@ fn prepare_manifest_failure_does_not_publish_active() {
     let dir = unique_test_dir("prep-manifest");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(5));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::WritePreparedManifest));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_no_active(&dir);
@@ -2915,7 +2946,7 @@ fn publish_rename_failure_does_not_modify_targets() {
     let dir = unique_test_dir("publish-fail");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(6));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::PublishActiveDirectory));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_no_active(&dir);
@@ -2928,7 +2959,7 @@ fn config_replace_failure_rolls_back() {
     let dir = unique_test_dir("cfg-repl-fail");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(8));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceConfigAfter));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -2940,7 +2971,7 @@ fn credentials_replace_failure_rolls_back() {
     let dir = unique_test_dir("cred-repl-fail");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(9));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceCredentialsAfter));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -2952,7 +2983,7 @@ fn committed_manifest_failure_rolls_back() {
     let dir = unique_test_dir("commit-manifest-fail");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(10));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::WriteCommittedManifest));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -2964,7 +2995,7 @@ fn committed_finalize_rename_failure_returns_success() {
     let dir = unique_test_dir("finalize-rename-fail");
     let (cfg_b, _cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(11));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::PublishFinalizeDirectory));
     let outcome = store.run("providers.custom-a", &fs);
     assert!(
         outcome.is_ok(),
@@ -3177,7 +3208,7 @@ fn builtin_second_file_failure_rolls_back() {
     let (cfg_b, cred_b) = write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(9));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::RemoveCredentialsAfter));
     let err = store.run("providers.anthropic", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -3192,7 +3223,7 @@ fn api_key_second_file_failure_rolls_back() {
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(9));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceCredentialsAfter));
     let err = store.run("providers.custom-a.api_key", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -3206,7 +3237,7 @@ fn rollback_success_cleans_journal() {
     let dir = unique_test_dir("rb-success-clean");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(8));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceConfigAfter));
     let err = store.run("providers.custom-a", &fs);
     assert!(err.is_err());
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
@@ -3261,7 +3292,7 @@ fn transaction_error_does_not_leak_secret() {
     write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    let fs = FaultyFs::new(Some(8));
+    let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceConfigAfter));
     let err = store.run("providers.secret-gw", &fs).unwrap_err();
     assert!(!err.to_string().contains("MARKER-SECRET"));
     assert!(!err.to_string().contains("CREDS-SECRET"));
@@ -3322,9 +3353,19 @@ fn corrupt_credentials_error_does_not_leak_secret() {
     config.provider = "x".to_string();
     config.model = "y".to_string();
     write_both_files(&dir, &config, None);
-    fs::write(dir.join("credentials.toml"), "not valid toml").unwrap();
+    fs::write(
+        dir.join("credentials.toml"),
+        "my-provider = \"sk-MARKER-CORRUPT-CREDENTIAL\"\nbroken = [",
+    )
+    .unwrap();
     let store = make_store(&dir);
     let err = store.load_effective().unwrap_err();
+    let display = err.to_string();
+    let debug = format!("{err:?}");
+    assert!(!display.contains("MARKER-CORRUPT-CREDENTIAL"));
+    assert!(!debug.contains("MARKER-CORRUPT-CREDENTIAL"));
+    assert!(!display.contains("sk-"));
+    assert!(!debug.contains("sk-"));
     let _ = fs::remove_dir_all(&dir);
 }
 

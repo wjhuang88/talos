@@ -461,35 +461,42 @@ fn prepare(fs: &dyn Fs, active_dir: &Path, t: &Txn, txn_id: &str) -> Result<(), 
         }
     };
 
+    fs.checkpoint(FsOperation::CreatePrepareDirectory)?;
     fs.mkdir(&staging_dir)?;
-    if t.cfg_existed
-        && let Err(e) = fs.write_secure(&staging_dir.join("config.before"), &t.cfg_before)
-    {
-        staging_cleanup(fs);
-        return Err(e);
+    if t.cfg_existed {
+        fs.checkpoint(FsOperation::WriteConfigBeforeImage)?;
+        if let Err(e) = fs.write_secure(&staging_dir.join("config.before"), &t.cfg_before) {
+            staging_cleanup(fs);
+            return Err(e);
+        }
     }
-    if t.cred_existed
-        && let Err(e) = fs.write_secure(&staging_dir.join("credentials.before"), &t.cred_before)
-    {
-        staging_cleanup(fs);
-        return Err(e);
+    if t.cred_existed {
+        fs.checkpoint(FsOperation::WriteCredentialsBeforeImage)?;
+        if let Err(e) = fs.write_secure(&staging_dir.join("credentials.before"), &t.cred_before) {
+            staging_cleanup(fs);
+            return Err(e);
+        }
     }
-    if t.cfg_after_exists
-        && let Err(e) = fs.write_secure(&staging_dir.join("config.after"), &t.cfg_after)
-    {
-        staging_cleanup(fs);
-        return Err(e);
+    if t.cfg_after_exists {
+        fs.checkpoint(FsOperation::WriteConfigAfterImage)?;
+        if let Err(e) = fs.write_secure(&staging_dir.join("config.after"), &t.cfg_after) {
+            staging_cleanup(fs);
+            return Err(e);
+        }
     }
-    if t.cred_after_exists
-        && let Err(e) = fs.write_secure(&staging_dir.join("credentials.after"), &t.cred_after)
-    {
-        staging_cleanup(fs);
-        return Err(e);
+    if t.cred_after_exists {
+        fs.checkpoint(FsOperation::WriteCredentialsAfterImage)?;
+        if let Err(e) = fs.write_secure(&staging_dir.join("credentials.after"), &t.cred_after) {
+            staging_cleanup(fs);
+            return Err(e);
+        }
     }
+    fs.checkpoint(FsOperation::WritePreparedManifest)?;
     if let Err(e) = write_manifest(fs, &staging_dir, Phase::Prepared, txn_id, t) {
         staging_cleanup(fs);
         return Err(e);
     }
+    fs.checkpoint(FsOperation::SyncPrepareDirectory)?;
     if let Err(e) = fs.sync_dir(&staging_dir) {
         staging_cleanup(fs);
         return Err(e);
@@ -504,7 +511,9 @@ fn prepare(fs: &dyn Fs, active_dir: &Path, t: &Txn, txn_id: &str) -> Result<(), 
         ));
     }
 
+    fs.checkpoint(FsOperation::PublishActiveDirectory)?;
     fs.rename_dir(&staging_dir, active_dir)?;
+    fs.checkpoint(FsOperation::SyncTransactionParentAfterPublish)?;
     fs.sync_dir(parent)?;
     Ok(())
 }
@@ -517,18 +526,24 @@ fn apply(
     t: &Txn,
     txn_id: &str,
 ) -> Result<(), ConfigError> {
+    fs.checkpoint(FsOperation::WriteApplyingManifest)?;
     write_manifest(fs, dir, Phase::Applying, txn_id, t)?;
+    fs.checkpoint(FsOperation::ReplaceConfigAfter)?;
     fs.atomic_write(cfg, &t.cfg_after)?;
 
     if t.cred_after_exists {
+        fs.checkpoint(FsOperation::ReplaceCredentialsAfter)?;
         fs.atomic_write(cred, &t.cred_after)?;
     } else if fs.exists(cred) {
+        fs.checkpoint(FsOperation::RemoveCredentialsAfter)?;
         fs.remove_file(cred)?;
         if let Some(parent) = cred.parent() {
+            fs.checkpoint(FsOperation::SyncCredentialsParentAfterRemove)?;
             fs.sync_dir(parent)?;
         }
     }
 
+    fs.checkpoint(FsOperation::VerifyConfigAfter)?;
     let cfg_actual = fs.read_opt(cfg)?;
     if cfg_actual.as_deref() != Some(t.cfg_after.as_slice()) {
         return Err(ConfigError::IoError(std::io::Error::other(
@@ -536,6 +551,7 @@ fn apply(
         )));
     }
 
+    fs.checkpoint(FsOperation::VerifyCredentialsAfter)?;
     let cred_actual = fs.read_opt(cred)?;
     let cred_expected: Option<&[u8]> = if t.cred_after_exists {
         Some(&t.cred_after)
@@ -548,6 +564,7 @@ fn apply(
         )));
     }
 
+    fs.checkpoint(FsOperation::WriteCommittedManifest)?;
     write_manifest(fs, dir, Phase::Committed, txn_id, t)?;
     Ok(())
 }
@@ -560,10 +577,12 @@ fn rollback(
     t: &Txn,
     txn_id: &str,
 ) -> Result<(), ConfigError> {
+    fs.checkpoint(FsOperation::WriteRollbackRequiredManifest)?;
     if let Err(e) = write_manifest(fs, dir, Phase::RollbackRequired, txn_id, t) {
         tracing::warn!("failed to write RollbackRequired manifest: {e}");
     }
 
+    fs.checkpoint(FsOperation::RestoreConfigBefore)?;
     restore(
         fs,
         cfg,
@@ -573,6 +592,7 @@ fn rollback(
             None
         },
     )?;
+    fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
     restore(
         fs,
         cred,
@@ -583,7 +603,9 @@ fn rollback(
         },
     )?;
 
+    fs.checkpoint(FsOperation::VerifyConfigBefore)?;
     let cfg_actual = fs.read_opt(cfg)?;
+    fs.checkpoint(FsOperation::VerifyCredentialsBefore)?;
     let cred_actual = fs.read_opt(cred)?;
     if cfg_actual.as_deref()
         != (if t.cfg_existed {
@@ -608,6 +630,7 @@ fn rollback(
         ));
     }
 
+    fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
     write_manifest(fs, dir, Phase::RolledBack, txn_id, t)?;
 
     Ok(())
@@ -642,9 +665,12 @@ fn finalize(fs: &dyn Fs, active_dir: &Path, txn_id: &str) -> Result<(), ConfigEr
         )));
     }
 
+    fs.checkpoint(FsOperation::PublishFinalizeDirectory)?;
     fs.rename_dir(active_dir, &finalize_dir)?;
+    fs.checkpoint(FsOperation::SyncTransactionParentAfterFinalize)?;
     fs.sync_dir(parent)?;
 
+    fs.checkpoint(FsOperation::CleanupFinalizeDirectory)?;
     let _ = fs.remove_dir(&finalize_dir);
     Ok(())
 }
