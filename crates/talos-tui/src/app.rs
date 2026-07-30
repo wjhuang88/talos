@@ -1716,3 +1716,36 @@ impl Drop for Tui {
 #[allow(warnings)]
 #[cfg(test)]
 mod app_tests;
+
+#[cfg(test)]
+mod i168_terminal_tests {
+    use super::*;
+
+    #[test]
+    fn terminal_truncation_tip_is_retained_by_tui() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let text = "Response truncated: provider reached the output token limit. Partial response preserved.";
+        let should_exit = tui.handle_ui_output(UiOutput::Tip {
+            text: text.into(),
+            kind: TipKind::Error,
+        });
+
+        assert!(!should_exit);
+        let tip = tui.state.tip.as_ref().expect("truncation tip");
+        assert_eq!(tip.kind, TipKind::Error);
+        assert_eq!(tip.text, text);
+        assert!(tip.ttl >= Duration::from_secs(4));
+    }
+
+    #[test]
+    fn terminal_processing_clear_status_reaches_tui_state() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let mut status = talos_conversation::StatusSnapshot::default();
+        status.is_processing = false;
+        status.phase = Some(talos_conversation::TurnPhase::Failed);
+        tui.handle_ui_output(UiOutput::Status(status.clone()));
+
+        assert_eq!(tui.state.status, status);
+        assert!(!tui.state.status.is_processing);
+    }
+}

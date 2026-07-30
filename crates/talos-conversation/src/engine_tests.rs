@@ -353,7 +353,7 @@ async fn turn_end_with_empty_text_still_produces_status() {
 }
 
 #[test]
-fn turn_end_max_tokens_waits_for_session_completion() {
+fn terminal_max_tokens_is_visible_and_processing_clears_after_completion() {
     let mut engine = new_engine();
     engine.handle_agent_event(&AgentEvent::TurnStart);
     engine.handle_agent_event(&AgentEvent::TextDelta {
@@ -370,6 +370,13 @@ fn turn_end_max_tokens_waits_for_session_completion() {
     assert_eq!(engine.current_phase, None);
     let status = find_status(&outputs).expect("max-tokens turn end must emit status");
     assert!(status.is_processing);
+    let truncation = outputs.iter().find_map(|output| match output {
+        UiOutput::Tip { text, kind } if *kind == TipKind::Error => Some(text.as_str()),
+        _ => None,
+    });
+    let truncation = truncation.expect("MaxTokens must emit a visible truncation tip");
+    assert!(truncation.contains("truncated"));
+    assert!(truncation.contains("Partial response preserved"));
     assert!(
         engine
             .messages
@@ -2913,4 +2920,54 @@ fn status_snapshot_reflects_attachment_count() {
 
     engine.pending_image_attachments.clear();
     assert_eq!(engine.status_snapshot().attachment_count, 0);
+
+    #[test]
+    fn terminal_explicit_completion_regression_is_quiet() {
+        let mut engine = new_engine();
+        engine.handle_agent_event(&AgentEvent::TurnStart);
+        engine.handle_agent_event(&AgentEvent::TextDelta {
+            delta: "complete".into(),
+        });
+        let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        });
+
+        assert!(
+            outputs
+                .iter()
+                .all(|output| !matches!(output, UiOutput::Tip { .. }))
+        );
+        assert!(engine.messages.iter().any(|message| {
+            message.role == MessageRole::Assistant && message.content == "complete"
+        }));
+    }
+
+    #[test]
+    fn terminal_provider_failure_is_not_reported_as_tool_failure() {
+        let mut engine = new_engine();
+        engine.handle_agent_event(&AgentEvent::TurnStart);
+        engine.handle_agent_event(&AgentEvent::TextDelta {
+            delta: "trailing fragment".into(),
+        });
+        let outputs =
+            engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Error {
+                message: "provider stream closed without explicit terminal signal".into(),
+            });
+
+        let error_text = outputs.iter().find_map(|output| match output {
+            UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text,
+            }) => Some(text.as_str()),
+            _ => None,
+        });
+        let error_text = error_text.expect("terminal provider failure must be visible");
+        assert!(error_text.contains("provider stream closed"));
+        assert!(!error_text.to_ascii_lowercase().contains("tool failed"));
+        assert!(!engine.is_processing);
+        assert!(engine.messages.iter().all(|message| {
+            message.role != MessageRole::Assistant || message.content != "trailing fragment"
+        }));
+    }
 }

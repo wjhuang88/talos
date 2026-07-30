@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use talos_core::message::{AgentEvent, MessageToolResult, Usage};
+use talos_core::message::{AgentEvent, MessageToolResult, StopReason, Usage};
 use talos_core::session::TurnCompletionStatus;
 use talos_core::tool::ToolProvenance;
 
@@ -478,7 +478,7 @@ impl ConversationEngine {
                 self.current_phase = Some(TurnPhase::Generating);
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
-            AgentEvent::TurnEnd { usage, .. } => {
+            AgentEvent::TurnEnd { stop_reason, usage } => {
                 self.close_content(&mut outputs);
                 self.current_phase = None;
                 if let Some(thinking_outputs) = self.finalize_thinking() {
@@ -487,6 +487,12 @@ impl ConversationEngine {
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
+                if matches!(stop_reason, StopReason::MaxTokens) {
+                    outputs.push(UiOutput::Tip {
+                        text: "Response truncated: provider reached the output token limit. Partial response preserved.".into(),
+                        kind: TipKind::Error,
+                    });
+                }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::Error { message } => {
