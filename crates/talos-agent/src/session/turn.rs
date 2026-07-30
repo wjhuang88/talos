@@ -70,14 +70,40 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let progress_session_id = session_id.clone();
     let raw_tool_outputs = Arc::new(Mutex::new(HashMap::<String, String>::new()));
     let progress_raw_tool_outputs = raw_tool_outputs.clone();
+    let diagnostic_persistence = persistence.clone();
+    let diagnostic_failures = Arc::new(Mutex::new(Vec::<String>::new()));
+    let progress_diagnostic_failures = diagnostic_failures.clone();
+    let diagnostic_turn_id = turn_id.clone();
 
     let forwarder = tokio::spawn(async move {
+        let mut response_ordinal = 0_u32;
         loop {
             tokio::select! {
                 _ = cancel_clone.cancelled() => break,
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
+                            let mut forwarded_event = event.clone();
+                            if matches!(event, AgentEvent::TurnEnd { .. } | AgentEvent::Error { .. }) {
+                                response_ordinal = response_ordinal.saturating_add(1);
+                                if let Some(persistence) = &diagnostic_persistence
+                                    && let Some(diagnostic) = talos_session::ProviderTerminalDiagnostic::from_agent_event(
+                                        &diagnostic_turn_id,
+                                        response_ordinal,
+                                        &event,
+                                        persistence.metadata.provider.as_deref(),
+                                        persistence.metadata.model.as_deref(),
+                                    )
+                                    && let Err(error) = persistence.session.append_terminal_diagnostic(&diagnostic)
+                                {
+                                    if let Ok(mut failures) = progress_diagnostic_failures.lock() {
+                                        failures.push(error.to_string());
+                                    }
+                                    forwarded_event = AgentEvent::Error {
+                                        message: "failed to persist provider terminal diagnostic".into(),
+                                    };
+                                }
+                            }
                             if let AgentEvent::ToolResult { result } = &event
                                 && let Ok(mut outputs) = progress_raw_tool_outputs.lock()
                             {
@@ -91,7 +117,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                                 session_id: progress_session_id.clone(),
                                 turn_id: progress_turn_id.clone(),
                                 sequence,
-                                payload: TurnEventPayload::Progress { event },
+                                payload: TurnEventPayload::Progress {
+                                    event: forwarded_event,
+                                },
                             });
                         }
                         None => break,
@@ -130,9 +158,27 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     };
 
     let _ = forwarder.await;
+    let diagnostic_failure = diagnostic_failures
+        .lock()
+        .ok()
+        .and_then(|failures| failures.first().cloned());
 
     match agent_result {
         Ok((Ok(final_text), new_messages)) => {
+            if diagnostic_failure.is_some() {
+                let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+                let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                    session_id,
+                    turn_id,
+                    sequence,
+                    payload: TurnEventPayload::Completed {
+                        status: TurnCompletionStatus::Error {
+                            message: "failed to persist provider terminal diagnostic".into(),
+                        },
+                    },
+                });
+                return;
+            }
             let cloned_messages = new_messages.clone();
             if let Some(persistence) = &persistence
                 && let Err(message) =
@@ -201,6 +247,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             // or fabricated tool results. Durable Runtime (ADR-042) still
             // aborts failed turns: no commit_turn call happens here.
             let mut error_message = e.to_string();
+            if diagnostic_failure.is_some() {
+                error_message.push_str(
+                    "
+[warning: failed to persist provider terminal diagnostic]",
+                );
+            }
             if !partial_messages.is_empty()
                 && let Some(persistence) = &persistence
             {

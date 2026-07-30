@@ -11,6 +11,7 @@ use talos_core::message::{
 };
 use uuid::Uuid;
 
+use crate::diagnostic::is_terminal_diagnostic_content;
 use crate::jsonl::message_parts;
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 
@@ -161,6 +162,7 @@ impl DurableSession {
         Ok(entries
             .into_iter()
             .skip(start)
+            .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
             .take(limit.min(200))
             .map(transcript_entry)
             .collect())

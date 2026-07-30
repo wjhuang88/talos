@@ -3,6 +3,7 @@
 //! Reads session entries via the [`SessionStore`] abstraction, so both
 //! `.jsonl` and `.tlog` sessions are supported transparently.
 
+use crate::diagnostic::is_terminal_diagnostic_content;
 use crate::{SessionEntry, SessionError, SessionMetadata, SessionStore};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -49,7 +50,11 @@ impl From<&SessionEntry> for TranscriptEntry {
 ///
 /// Each element contains `role`, `content`, `timestamp`, and optionally `metadata`.
 pub fn export_json(entries: &[SessionEntry]) -> Result<String, serde_json::Error> {
-    let transcript: Vec<TranscriptEntry> = entries.iter().map(TranscriptEntry::from).collect();
+    let transcript: Vec<TranscriptEntry> = entries
+        .iter()
+        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+        .map(TranscriptEntry::from)
+        .collect();
     serde_json::to_string_pretty(&transcript)
 }
 
@@ -81,10 +86,15 @@ fn export_markdown_filtered(entries: &[SessionEntry], include_thinking: bool) ->
     }
 
     let mut output = String::new();
-    for (i, entry) in entries.iter().enumerate() {
-        if i > 0 {
+    let mut first = true;
+    for entry in entries
+        .iter()
+        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+    {
+        if !first {
             output.push_str("\n\n");
         }
+        first = false;
 
         if include_thinking
             && let Some(ref reasoning) = entry.metadata.reasoning
@@ -118,7 +128,11 @@ pub fn read_transcript(
     file_path: &Path,
 ) -> Result<Vec<TranscriptEntry>, SessionError> {
     let entries = store.read_entries(file_path)?;
-    Ok(entries.iter().map(TranscriptEntry::from).collect())
+    Ok(entries
+        .iter()
+        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+        .map(TranscriptEntry::from)
+        .collect())
 }
 
 #[cfg(test)]

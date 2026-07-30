@@ -1,3 +1,7 @@
+use crate::diagnostic::{
+    ProviderTerminalDiagnostic, decode_terminal_diagnostic, encode_terminal_diagnostic,
+    is_terminal_diagnostic_content,
+};
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
 use std::collections::HashSet;
@@ -23,6 +27,35 @@ impl Session {
         }
         let entry = self.build_entry(&role, &content, metadata)?;
         self.append_entry_locked(&entry)
+    }
+
+    pub fn append_terminal_diagnostic(
+        &self,
+        diagnostic: &ProviderTerminalDiagnostic,
+    ) -> Result<(), SessionError> {
+        let content = encode_terminal_diagnostic(diagnostic)
+            .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+        let entry = self.build_entry(
+            "system",
+            &content,
+            SessionMetadata {
+                turn_id: Some(diagnostic.turn_id.clone()),
+                provider: diagnostic.provider.clone(),
+                model: diagnostic.model.clone(),
+                ..SessionMetadata::default()
+            },
+        )?;
+        self.append_entry_locked(&entry)
+    }
+
+    pub fn read_terminal_diagnostics(
+        &self,
+    ) -> Result<Vec<ProviderTerminalDiagnostic>, SessionError> {
+        Ok(self
+            .read_entries()?
+            .iter()
+            .filter_map(|entry| decode_terminal_diagnostic(&entry.content))
+            .collect())
     }
 
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
@@ -108,7 +141,9 @@ impl Session {
                     .into()
                 }
                 "system" => {
-                    if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
+                    if is_terminal_diagnostic_content(&entry.content) {
+                        None
+                    } else if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
                         Some(Message::System {
                             content: sys_content.to_string(),
                             cache_markers: Vec::new(),
