@@ -149,25 +149,23 @@ impl ConfigStore {
         if !self.config_path.exists() {
             let mut config = Config::default();
             if self.credentials_path.exists() {
-                let raw = std::fs::read_to_string(&self.credentials_path)
-                    .map_err(ConfigError::IoError)?;
+                let raw = std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
                 let creds: Credentials =
-                    toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+                    parse_persisted_toml(&raw, PersistedDocument::Credentials)?;
                 config.merge_credentials(&creds);
             }
             return Ok(config);
         }
 
-        let raw = std::fs::read_to_string(&self.config_path).map_err(ConfigError::IoError)?;
-        let substituted = crate::substitute_env_vars(&raw);
-        let mut config: Config =
-            toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        let raw = std::fs::read(&self.config_path).map_err(ConfigError::IoError)?;
+        let substituted = crate::substitute_env_vars(&String::from_utf8_lossy(&raw));
+        let mut config: Config = toml::from_str(&substituted)
+            .map_err(|_| ConfigError::ParseError("config.toml is not valid TOML".into()))?;
 
         if self.credentials_path.exists() {
-            let raw_creds =
-                std::fs::read_to_string(&self.credentials_path).map_err(ConfigError::IoError)?;
+            let raw_creds = std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
             let creds: Credentials =
-                toml::from_str(&raw_creds).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+                parse_persisted_toml(&raw_creds, PersistedDocument::Credentials)?;
             config.merge_credentials(&creds);
         }
 
@@ -441,9 +439,9 @@ fn write_manifest(
 
 fn parse_manifest(raw: &[u8]) -> Result<Manifest, ConfigError> {
     let s = std::str::from_utf8(raw)
-        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid UTF-8: {e}")))?;
+        .map_err(|_| ConfigError::ParseError("transaction manifest is not valid UTF-8".into()))?;
     let m: Manifest = toml::from_str(s)
-        .map_err(|e| ConfigError::ParseError(format!("manifest is not valid TOML: {e}")))?;
+        .map_err(|_| ConfigError::ParseError("transaction manifest is not valid TOML".into()))?;
     if m.version != MANIFEST_VERSION {
         return Err(ConfigError::InvalidConfig(format!(
             "unsupported manifest version {} — expected {}",
@@ -639,7 +637,9 @@ fn finalize(fs: &dyn Fs, active_dir: &Path, txn_id: &str) -> Result<(), ConfigEr
     let finalize_dir = parent.join(format!(".provider-unset-transaction.finalize.{txn_id}"));
 
     if fs.exists(&finalize_dir) {
-        let _ = fs.remove_dir(&finalize_dir);
+        return Err(ConfigError::InvalidConfig(format!(
+            "ambiguous finalization: both active and finalize directory exist for transaction {txn_id}"
+        )));
     }
 
     fs.rename_dir(active_dir, &finalize_dir)?;
@@ -655,6 +655,69 @@ fn serialize<T: serde::Serialize>(val: &T) -> Result<Vec<u8>, ConfigError> {
         .map_err(|e| ConfigError::SerializeError(e.to_string()))
 }
 
+#[allow(dead_code)]
+pub(crate) enum PersistedDocument {
+    Config,
+    Credentials,
+    TransactionManifest,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum FsOperation {
+    CleanupPrepareResidues,
+    CleanupFinalizeResidues,
+    ReadActiveManifest,
+    ReadConfigBeforeImage,
+    ReadCredentialsBeforeImage,
+    ReadConfigAfterImage,
+    ReadCredentialsAfterImage,
+    CreatePrepareDirectory,
+    WriteConfigBeforeImage,
+    WriteCredentialsBeforeImage,
+    WriteConfigAfterImage,
+    WriteCredentialsAfterImage,
+    WritePreparedManifest,
+    SyncPrepareDirectory,
+    PublishActiveDirectory,
+    SyncTransactionParentAfterPublish,
+    WriteApplyingManifest,
+    ReplaceConfigAfter,
+    ReplaceCredentialsAfter,
+    RemoveCredentialsAfter,
+    SyncCredentialsParentAfterRemove,
+    VerifyConfigAfter,
+    VerifyCredentialsAfter,
+    WriteCommittedManifest,
+    WriteRollbackRequiredManifest,
+    RestoreConfigBefore,
+    RestoreCredentialsBefore,
+    RemoveConfigForBeforeAbsence,
+    RemoveCredentialsForBeforeAbsence,
+    SyncConfigParentAfterRollback,
+    SyncCredentialsParentAfterRollback,
+    VerifyConfigBefore,
+    VerifyCredentialsBefore,
+    WriteRolledBackManifest,
+    PublishFinalizeDirectory,
+    SyncTransactionParentAfterFinalize,
+    CleanupFinalizeDirectory,
+}
+
+fn parse_persisted_toml<T: serde::de::DeserializeOwned>(
+    bytes: &[u8],
+    doc: PersistedDocument,
+) -> Result<T, ConfigError> {
+    let kind = match doc {
+        PersistedDocument::Config => "config.toml",
+        PersistedDocument::Credentials => "credentials.toml",
+        PersistedDocument::TransactionManifest => "transaction manifest",
+    };
+    let s = std::str::from_utf8(bytes)
+        .map_err(|_| ConfigError::ParseError(format!("{kind} is not valid UTF-8")))?;
+    toml::from_str(s).map_err(|_| ConfigError::ParseError(format!("{kind} is not valid TOML")))
+}
+
 fn parse_strict<T>(opt: &Option<Vec<u8>>) -> Result<T, ConfigError>
 where
     T: Default + serde::de::DeserializeOwned,
@@ -662,20 +725,26 @@ where
     match opt {
         None => Ok(T::default()),
         Some(bytes) => {
-            let s = std::str::from_utf8(bytes)
-                .map_err(|e| ConfigError::ParseError(format!("invalid UTF-8: {e}")))?;
-            toml::from_str(s).map_err(|e| ConfigError::ParseError(e.to_string()))
+            let s = std::str::from_utf8(bytes).map_err(|_| {
+                ConfigError::ParseError("persisted document is not valid UTF-8".into())
+            })?;
+            toml::from_str(s)
+                .map_err(|_| ConfigError::ParseError("persisted document is not valid TOML".into()))
         }
     }
 }
 
 fn reparse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<(), ConfigError> {
     toml::from_str::<T>(&String::from_utf8_lossy(bytes))
-        .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        .map_err(|_| ConfigError::ParseError("serialized output is not valid TOML".into()))?;
     Ok(())
 }
 
 pub(crate) trait Fs {
+    #[allow(dead_code)]
+    fn checkpoint(&self, _op: FsOperation) -> Result<(), ConfigError> {
+        Ok(())
+    }
     fn exists(&self, path: &Path) -> bool;
     fn read(&self, path: &Path) -> Result<Vec<u8>, ConfigError>;
     fn read_opt(&self, path: &Path) -> Result<Option<Vec<u8>>, ConfigError> {
