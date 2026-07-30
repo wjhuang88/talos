@@ -3,9 +3,9 @@
 > Document status: In Progress
 > Execution window: 2026-07-28 through 2026-11-28
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
-> Branch mode: direct `main` for I168 under the maintainer's no-parallel-task direction;
+> Branch mode: I168 implementation PR #63 merged to `main`; maintainer-authorized closeout used PR #67;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: I168 / RUNTIME-003 provider terminal-outcome integrity only
+> Current implementation authority: none; ADR-053 review is next and I158 remains blocked
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -70,7 +70,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
 | P1 | Execute I157 / MODEL-010 | provider-unset | P0 | stale-snapshot concurrency acceptance correction | one locked current-state semantic update path across Talos writers | Complete — `5aac6756` |
-| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Active — maintainer resumed 2026-07-30 |
+| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `2eac5b05`; 2673 tests and dual-protocol fixture pass |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -143,7 +143,7 @@ do not record only “green”.
 
 ## Branch, Worktree, And Checkpoint Plan
 
-- Work directly on `main` for I168 under the maintainer's existing no-parallel-task direction.
+- I168 began under the direct-`main` direction; after PR #63 merged, the maintainer authorized branch/PR closeout through PR #67. No force-push or parallel implementation occurred.
 - The 2026-07-28 scale assessment recommends `high-risk`, `release-managed`, and
   `on-demand` worktrees. Reassess and record the branch decision before I158, where the
   architecture/security sequence begins.
@@ -247,3 +247,30 @@ skip to a later mainline package.
 - Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
   the v0.6 program; verify the current Git state; write the required failing provider fixtures
   before production changes; keep I158 blocked.
+
+## I168 Closeout Checkpoint — 2026-07-30
+
+Completed task items:
+- U1 / I168 / RUNTIME-003 Complete at `2eac5b05`.
+
+Current state and artifacts:
+- provider/session/conversation/TUI foundation: PR #63 merge `b5fcaaf3`;
+- print/headless MaxTokens projection: `dda2170f`;
+- deterministic fixture packet: `2eac5b05`;
+- final detailed validation: workflow `30552762936`, artifact `i168-closeout-validation`.
+
+Commands/checks and actual results:
+- all required focused commands exit 0;
+- 2673 workspace tests passed, zero failed;
+- fmt, check, Clippy with `-D warnings`, governance, diff check, source scan, build, and rebuilt-binary fixture exit 0.
+
+Open risks or deviations:
+- the recurring `talos-config` model-compression build-script line is informational, not a Rust/Clippy warning;
+- OBS-002 remains Refinement and is not completed;
+- no implementation iteration is Active.
+
+Next task item:
+- G1 maintainer/architecture review of Proposed ADR-053; I158 remains Blocked.
+
+Recovery or resume instruction:
+- do not activate I158 until ADR-053 is explicitly Accepted and normal activation inventory is repeated.

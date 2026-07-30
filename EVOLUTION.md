@@ -55,8 +55,18 @@ repeating known mistakes.
 | 43 | TUI | Alternate Screen 必须显式捕获滚轮；背景样式和语义空行必须由最终 projection 测试，而不能只检查逻辑字段 | I156/TUI-035 |
 | 44 | TUI | display-only 历史前缀必须与逻辑 Transcript 共享连续导航坐标，否则滚轮边界会跳变且无法返回前缀 | I156/TUI-035 |
 | 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |
+| 46 | Provider / Runtime | transport EOF 不是成功；每个消费者都必须投影明确 terminal outcome | I168/RUNTIME-003 |
 
 ## Lessons
+
+## 2026-07-30 - Provider transport exhaustion is not completion
+
+- Trigger: retained assistant text could be committed as successful after an unknown finish reason or a stream that closed without a terminal frame.
+- Symptom: TUI/session tests could pass while `talos --print` preserved partial MaxTokens output without telling the user it was truncated.
+- Root cause: provider adapters synthesized normal completion from transport exhaustion, and later projection work validated the shared conversation layer but not every product consumer.
+- Fix: require explicit compatible-protocol terminal signals, preserve bounded non-transcript diagnostics, and test TUI plus print mode through deterministic rebuilt-binary fixtures.
+- Prevention: every streaming adapter and every consumer must have a matrix for normal completion, truncation, unknown reason, EOF, decode/transport failure, and tool-continuation failure. A shared projection test is not end-to-end evidence.
+- Promoted to rule/check: I168/RUNTIME-003 Completion Commit `2eac5b05`, `scripts/verify_i168_provider_terminal.sh`, and `docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`.
 
 ## 2026-07-27 - Display-only history prefixes need a shared navigation coordinate
 

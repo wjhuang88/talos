@@ -295,6 +295,8 @@ Run a one-shot prompt in print mode:
 talos -p "summarize this repository"
 ```
 
+If the provider reaches its output-token limit, Talos preserves the partial answer and prints an explicit truncation warning. Unsupported terminal reasons, transport failures, and streams that close without a protocol terminal signal fail instead of being reported as normal completion. See [`docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`](docs/reference/PROVIDER-TERMINAL-OUTCOMES.md).
+
 Attach one or more local images to a print-mode prompt (requires a vision-capable model):
 
 ```bash

@@ -1,6 +1,6 @@
 # Iteration I168: Provider Terminal Outcome Integrity
 
-> Document status: Active — maintainer resumed implementation (2026-07-30)
+> Document status: Complete (2026-07-30)
 > Published plan date: 2026-07-29
 > Planned objective: Stop treating unknown or missing provider terminal signals as normal success, preserve a bounded terminal-cause diagnostic, and show truncation/failure accurately.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -158,17 +158,45 @@ Real paid/provider credentials are not required and must not be introduced.
 |---|---|---|
 | 2026-07-29 | Activation | Inventory at `19d0f2e4` found no Active or Review implementation iteration; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and existing reserve work remains deferred. Maintainer classified silent provider false-success and lost stop-cause evidence as serious. RUNTIME-003 was refined to Ready, selected into I168, then moved to In Progress. I168 is the sole Active implementation authority. |
 | 2026-07-29 | Maintainer pause | The maintainer requested that I168 stop before implementation while they handle the underlying repair context. No implementation work is authorized while paused, no replacement iteration is activated, and resumption requires an explicit maintainer instruction followed by owner/Board/program synchronization. The published objective, scope, acceptance criteria, and P0 priority remain unchanged. |
-| 2026-07-30 | Maintainer resumption | The maintainer explicitly requested I168 activation after the I157 stale-snapshot correction completed at `5aac6756`. Inventory confirms I157/MODEL-010 and I167 are Complete, I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and no competing Active/Review implementation iteration exists. I168/RUNTIME-003 is the sole Active implementation authority on direct `main`. |
+| 2026-07-30 | Maintainer resumption | The maintainer explicitly requested I168 activation after the I157 stale-snapshot correction completed at `5aac6756`. Inventory confirms I157/MODEL-010 and I167 are Complete, I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and no competing Active/Review implementation iteration exists. I168/RUNTIME-003 became the sole Active implementation authority. |
+| 2026-07-30 | Branch variance | After implementation PR #63 merged at `b5fcaaf3`, the maintainer authorized branch/PR closeout. PR #67 used `agent/i168-terminal-closeout`; no direct `main` mutation, force-push, tag, publish, release, or deployment occurred. |
+| 2026-07-30 | Completion | Red-first print-mode proof failed with exit 101 before `dda2170f`; deterministic fixtures and the complete locked matrix passed at validation harness commit `62ae098d`. Completion Commit is the already-existing implementation/fixture commit `2eac5b05`. |
 
 ## Verification Evidence
 
-- Planning/governance validation: pending.
-- Implementation and runtime evidence: pending.
+- Red-first print/headless proof: workflow run `30551626267` checked out `b5fcaaf3` and the new MaxTokens projection assertion failed before production code with exit 101 (`E0425`: missing `terminal_notice_for_stop_reason`).
+- Implementation chain: PR #63 merge `b5fcaaf3`; print/headless truncation projection `dda2170f`; deterministic two-protocol fixture packet `2eac5b05`.
+- Final validation: workflow run `30552762936`, job `90905349923`, validation harness commit `62ae098d`, `OVERALL_EXIT=0`. Standard PR CI run `30552762362` also passed.
+- Runtime fixture command: `scripts/verify_i168_provider_terminal.sh target/debug/talos`. Binary path: `target/debug/talos`. The harness commit differs from Completion Commit only by the temporary validation workflow; production and fixture content are owned by `2eac5b05`.
+- Warning accounting: commands that build `talos-config` emitted one informational build-script line (`models.toml compressed`); Rust check and Clippy produced no code warning and `clippy -D warnings` exited 0.
+
+| Validation command | Exit | Passed | Failed | Ignored | Warning lines |
+|---|---:|---:|---:|---:|---:|
+| `cargo test --locked -p talos-provider terminal` | 0 | 8 | 0 | 0 | 1 |
+| `cargo test --locked -p talos-provider eof` | 0 | 2 | 0 | 0 | 1 |
+| `cargo test --locked -p talos-agent terminal` | 0 | 2 | 0 | 0 | 0 |
+| `cargo test --locked -p talos-session diagnostic` | 0 | 4 | 0 | 0 | 0 |
+| `cargo test --locked -p talos-conversation terminal` | 0 | 2 | 0 | 0 | 0 |
+| `cargo test --locked -p talos-cli terminal` | 0 | 6 | 0 | 0 | 1 |
+| `cargo test --locked -p talos-tui terminal` | 0 | 28 | 0 | 0 | 0 |
+| `cargo fmt --all -- --check` | 0 | 0 | 0 | 0 | 0 |
+| `cargo check --workspace --locked` | 0 | 0 | 0 | 0 | 1 |
+| `cargo clippy --workspace --locked -- -D warnings` | 0 | 0 | 0 | 0 | 1 |
+| `cargo test --workspace --locked` | 0 | 2673 | 0 | 0 | 1 |
+| `scripts/validate_project_governance.sh .` | 0 | 0 | 0 | 0 | 0 |
+| `git diff --check` | 0 | 0 | 0 | 0 | 0 |
+| `cargo build --locked -p talos-cli` | 0 | 0 | 0 | 0 | 1 |
+| provider terminal source scan | 0 | 0 | 0 | 0 | 0 |
+| rebuilt-binary two-protocol fixture | 0 | 0 | 0 | 0 | 0 |
+
+- Fixture outcomes for both OpenAI-compatible and Anthropic-compatible protocols: normal completion exited 0 quietly; MaxTokens exited 0 with partial stdout and truncation stderr; unknown reason, terminal-frame-less EOF, invalid UTF-8, transport failure, and continuation EOF exited 1 with bounded cause. Both continuation requests contained the previously completed tool result.
+- Session tests prove TLOG round trip, compaction retention, turn/response correlation, bounded redaction, and exclusion from messages, provider history, transcript, copy, and export.
 
 ## Completion Evidence
 
-- Completion Commit: pending. I168/RUNTIME-003 must not become Complete without already-existing
-  implementation SHA evidence and rebuilt-binary acceptance.
+- Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.
+- Rebuilt-binary acceptance: PASS for both compatible protocols in workflow run `30552762936`; normal, truncation, unknown, EOF, decode, transport, and tool-continuation outcomes matched the owner acceptance matrix.
+- Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.
 
 ## Variance And Residuals
 
@@ -184,4 +212,7 @@ Real paid/provider credentials are not required and must not be introduced.
 
 ## Retrospective
 
-- Pending.
+- The provider adapters must never infer normal success from transport exhaustion; explicit protocol terminal evidence is the authority.
+- A shared conversation projection test did not prove the separate print-mode consumer. Behavior-facing terminal outcomes require fixture coverage through every product consumer, including headless output.
+- Completion documents must be part of the implementation sequence rather than deferred until after merge; PR #63 was code-complete but not governance-complete.
+- Deterministic local SSE fixtures provide stronger, credential-free evidence than provider-paid smoke tests and are now retained under `scripts/fixtures/`.
