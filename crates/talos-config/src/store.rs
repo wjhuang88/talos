@@ -7,13 +7,11 @@ mod recovery;
 use crate::{
     Config, ConfigError, ConfigUnsetOutcome, Credentials, builtin_provider_config, home_dir,
 };
-use journal::{
-    FinalizeOutcome, Txn, apply, finalize_active, gen_txn_id, prepare, rollback,
-};
+use journal::{FinalizeOutcome, Txn, apply, finalize_active, gen_txn_id, prepare, rollback};
 use std::path::PathBuf;
 
 pub(crate) use fs::{Fs, FsOperation, StdFs};
-pub(crate) use recovery::{RecoveryOutcome, RecoveryPurpose, TerminalPhase};
+pub(crate) use recovery::{RecoveryOutcome, RecoveryPurpose};
 
 pub(crate) const ACTIVE_DIR_NAME: &str = ".provider-unset-transaction";
 pub(crate) const PREPARE_PREFIX: &str = ".provider-unset-transaction.prepare.";
@@ -47,11 +45,7 @@ impl ConfigStore {
         self.run(key, &StdFs)
     }
 
-    pub(crate) fn run(
-        &self,
-        key: &str,
-        fs: &dyn Fs,
-    ) -> Result<ConfigUnsetOutcome, ConfigError> {
+    pub(crate) fn run(&self, key: &str, fs: &dyn Fs) -> Result<ConfigUnsetOutcome, ConfigError> {
         let recovery = self.recover_with_purpose(fs, RecoveryPurpose::Mutation)?;
         if !recovery.allows_mutation() {
             return Err(finalization_pending_error());
@@ -62,8 +56,7 @@ impl ConfigStore {
         let cfg_before = fs.read_opt(&self.config_path)?;
         let cred_before = fs.read_opt(&self.credentials_path)?;
 
-        let mut config: Config =
-            parse_optional_persisted(&cfg_before, PersistedDocument::Config)?;
+        let mut config: Config = parse_optional_persisted(&cfg_before, PersistedDocument::Config)?;
         let mut creds: Credentials =
             parse_optional_persisted(&cred_before, PersistedDocument::Credentials)?;
 
@@ -162,8 +155,7 @@ impl ConfigStore {
         if !self.config_path.exists() {
             let mut config = Config::default();
             if self.credentials_path.exists() {
-                let raw =
-                    std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
+                let raw = std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
                 let creds: Credentials =
                     parse_persisted_toml(&raw, PersistedDocument::Credentials)?;
                 config.merge_credentials(&creds);
@@ -179,10 +171,8 @@ impl ConfigStore {
             .map_err(|_| ConfigError::ParseError("config.toml is not valid TOML".into()))?;
 
         if self.credentials_path.exists() {
-            let raw =
-                std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
-            let creds: Credentials =
-                parse_persisted_toml(&raw, PersistedDocument::Credentials)?;
+            let raw = std::fs::read(&self.credentials_path).map_err(ConfigError::IoError)?;
+            let creds: Credentials = parse_persisted_toml(&raw, PersistedDocument::Credentials)?;
             config.merge_credentials(&creds);
         }
 
@@ -214,8 +204,7 @@ pub(super) fn finalization_pending_error() -> ConfigError {
 
 pub(super) fn ambiguous_finalization_error() -> ConfigError {
     ConfigError::InvalidConfig(
-        "ambiguous provider configuration finalization evidence; manual recovery required"
-            .into(),
+        "ambiguous provider configuration finalization evidence; manual recovery required".into(),
     )
 }
 
@@ -321,8 +310,7 @@ pub(crate) fn parse_persisted_toml<T: serde::de::DeserializeOwned>(
     };
     let string = std::str::from_utf8(bytes)
         .map_err(|_| ConfigError::ParseError(format!("{kind} is not valid UTF-8")))?;
-    toml::from_str(string)
-        .map_err(|_| ConfigError::ParseError(format!("{kind} is not valid TOML")))
+    toml::from_str(string).map_err(|_| ConfigError::ParseError(format!("{kind} is not valid TOML")))
 }
 
 fn parse_optional_persisted<T>(
