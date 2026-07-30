@@ -164,7 +164,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             partial = anthropic_text("fixture partial")
             table = {
-                "normal": ([partial, anthropic_terminal("end_turn")], 0),
+                "normal": ([anthropic_text("fixture normal"), anthropic_terminal("end_turn")], 0),
                 "max-tokens": ([partial, anthropic_terminal("max_tokens")], 0),
                 "unknown": ([partial, anthropic_terminal("pause_turn")], 0),
                 "eof": ([partial], 0),
