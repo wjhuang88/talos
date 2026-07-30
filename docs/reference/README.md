@@ -13,6 +13,7 @@ Stable technical facts about the project. Not procedures or status — those liv
 | `REFERENCE-PROJECTS.md` | Analysis of projects that influenced Talos design |
 | `CRATE-PUBLICATION-MATRIX.md` | crates.io publish readiness, dry-run evidence, install gate |
 | `RUNTIME-SDK-CONTRACT.md` | talos-runtime pre-1.0 embedding support boundary and caveats |
+| `PROVIDER-TERMINAL-OUTCOMES.md` | Explicit completion, truncation, provider terminal errors, and retained diagnostic behavior |
 | `DOCS-SYNC-CHECKLIST.md` | Surfaces that must stay in sync when behavior/install/tools change |
 | `RELEASE-NOTES-DRAFT-2026-07-02.md` | Draft post-v0.2.0 release notes and known gaps |
 | `I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md` | Closeout and residual owner matrix for the direct senior-agent high-risk execution track |

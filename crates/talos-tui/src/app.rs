@@ -1738,6 +1738,27 @@ mod i168_terminal_tests {
     }
 
     #[test]
+    fn terminal_known_provider_policy_tip_is_retained_by_tui() {
+        for text in [
+            "provider response filtered by content policy (finish_reason=content_filter)",
+            "provider paused turn (stop_reason=pause_turn); automatic continuation is not supported",
+            "provider refused request (stop_reason=refusal)",
+            "unsupported provider stop_reason: fixture_unknown_reason",
+        ] {
+            let mut tui = Tui::for_test(TuiState::new(), None);
+            let should_exit = tui.handle_ui_output(UiOutput::Tip {
+                text: text.into(),
+                kind: TipKind::Error,
+            });
+
+            assert!(!should_exit);
+            let tip = tui.state.tip.as_ref().expect("provider policy tip");
+            assert_eq!(tip.kind, TipKind::Error);
+            assert_eq!(tip.text, text);
+        }
+    }
+
+    #[test]
     fn terminal_processing_clear_status_reaches_tui_state() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         let mut status = talos_conversation::StatusSnapshot::default();

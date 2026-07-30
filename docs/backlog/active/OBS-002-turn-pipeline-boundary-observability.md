@@ -35,10 +35,11 @@ Story's broader public progress-contract ADR:
 - interactive TLOG does not retain the terminal cause.
 
 That bounded repair is owned by
-`RUNTIME-003` / `I168`. It uses existing provider/session event semantics, forbids a breaking public
-event contract, and is now the sole Active P0 implementation. OBS-002 remains Refinement for the
-larger live timeline covering tool completion, result acceptance, dispatch, headers, first packet,
-retry, and terminal correlation. Completing RUNTIME-003 does not complete OBS-002.
+`RUNTIME-003` / `I168`. It uses existing provider/session event semantics and forbids a breaking public
+event contract. I168 completed that P0 correction on 2026-07-30 at Completion Commit `86262d02`.
+OBS-002 remains Refinement for the larger live timeline covering tool completion, result acceptance,
+dispatch, headers, first packet, retry, and terminal correlation. Completing RUNTIME-003 does not
+complete OBS-002.
 
 ## Goal
 

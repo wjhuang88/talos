@@ -507,9 +507,18 @@ fn extract_stop_reason(data: &Value) -> Result<Option<StopReason>, String> {
         return Ok(None);
     };
     let stop_reason = match reason {
-        "end_turn" => StopReason::EndTurn,
+        "end_turn" | "stop_sequence" => StopReason::EndTurn,
         "tool_use" => StopReason::ToolUse,
         "max_tokens" => StopReason::MaxTokens,
+        "pause_turn" => {
+            return Err(
+                "provider paused turn (stop_reason=pause_turn); automatic continuation is not supported"
+                    .into(),
+            );
+        }
+        "refusal" => {
+            return Err("provider refused request (stop_reason=refusal)".into());
+        }
         unknown => {
             return Err(format!(
                 "unsupported provider stop_reason: {}",
@@ -1048,6 +1057,16 @@ mod i168_terminal_outcome_tests {
         events
     }
 
+    fn terminal_error(events: &[AgentEvent]) -> &str {
+        events
+            .iter()
+            .find_map(|event| match event {
+                AgentEvent::Error { message } => Some(message.as_str()),
+                _ => None,
+            })
+            .expect("terminal error")
+    }
+
     fn text_event(text: &str) -> String {
         format!(
             "event: content_block_delta\ndata: {{\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"{text}\"}}}}\n\n"
@@ -1077,16 +1096,78 @@ mod i168_terminal_outcome_tests {
     }
 
     #[tokio::test]
-    async fn anthropic_unknown_stop_reason_is_not_end_turn() {
+    async fn anthropic_stop_sequence_is_explicit_completion() {
+        let events = parse_body(format!(
+            "{}{}",
+            text_event("complete"),
+            terminal_event("stop_sequence")
+        ))
+        .await;
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                ..
+            }
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::Error { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn anthropic_pause_turn_uses_known_paused_policy() {
         let events = parse_body(format!(
             "{}{}",
             text_event("partial"),
             terminal_event("pause_turn")
         ))
         .await;
-        assert!(events.iter().any(
-            |event| matches!(event, AgentEvent::Error { message } if message.contains("pause_turn"))
-        ));
+        let message = terminal_error(&events);
+        assert!(message.contains("paused"));
+        assert!(message.contains("pause_turn"));
+        assert!(!message.contains("unsupported provider stop_reason"));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn anthropic_refusal_uses_known_refusal_policy() {
+        let events = parse_body(format!(
+            "{}{}",
+            text_event("partial"),
+            terminal_event("refusal")
+        ))
+        .await;
+        let message = terminal_error(&events);
+        assert!(message.contains("refused"));
+        assert!(message.contains("refusal"));
+        assert!(!message.contains("unsupported provider stop_reason"));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn anthropic_unknown_stop_reason_is_not_end_turn() {
+        let events = parse_body(format!(
+            "{}{}",
+            text_event("partial"),
+            terminal_event("fixture_unknown_reason")
+        ))
+        .await;
+        let message = terminal_error(&events);
+        assert!(message.contains("unsupported provider stop_reason"));
+        assert!(message.contains("fixture_unknown_reason"));
+        assert!(!message.contains("pause_turn"));
+        assert!(!message.contains("refusal"));
         assert!(
             !events
                 .iter()

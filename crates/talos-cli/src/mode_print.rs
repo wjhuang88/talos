@@ -5,7 +5,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_core::message::AgentEvent;
+use talos_core::message::{AgentEvent, StopReason};
 use talos_core::model::ImageInputCapability;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
@@ -166,6 +166,9 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         .context("failed to submit message to session")?;
 
     let mut stdout = io::stdout().lock();
+    let mut terminal_notice = None;
+    let mut saw_stdout = false;
+    let mut stdout_line_open = false;
     while let Some(event) = handle.eq_rx.recv().await {
         match event {
             SessionEvent::TurnEvent {
@@ -175,26 +178,53 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                     },
                 ..
             } => {
-                print!("{delta}");
+                write!(stdout, "{delta}").context("failed to write stdout")?;
                 stdout.flush().context("failed to flush stdout")?;
+                if !delta.is_empty() {
+                    saw_stdout = true;
+                    stdout_line_open = !delta.ends_with('\n');
+                }
+            }
+            SessionEvent::TurnEvent {
+                payload:
+                    TurnEventPayload::Progress {
+                        event: AgentEvent::TurnEnd { stop_reason, .. },
+                    },
+                ..
+            } => {
+                terminal_notice = terminal_notice_for_stop_reason(&stop_reason);
             }
             SessionEvent::TurnEvent {
                 payload: TurnEventPayload::Completed { status },
                 ..
             } => match status {
                 talos_core::session::TurnCompletionStatus::Success { .. } => {
-                    println!();
+                    if stdout_line_open || !saw_stdout {
+                        writeln!(stdout).context("failed to finish stdout line")?;
+                    }
+                    stdout.flush().context("failed to flush stdout")?;
+                    if let Some(notice) = terminal_notice.take() {
+                        eprintln!("{notice}");
+                    }
                     return Ok(());
                 }
                 talos_core::session::TurnCompletionStatus::Cancelled => {
                     return Ok(());
                 }
                 talos_core::session::TurnCompletionStatus::Error { message } => {
+                    if stdout_line_open {
+                        writeln!(stdout).context("failed to finish stdout line")?;
+                        stdout.flush().context("failed to flush stdout")?;
+                    }
                     eprintln!("Error: {message}");
                     std::process::exit(1);
                 }
             },
             SessionEvent::Error { message } => {
+                if stdout_line_open {
+                    writeln!(stdout).context("failed to finish stdout line")?;
+                    stdout.flush().context("failed to flush stdout")?;
+                }
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
@@ -202,6 +232,15 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn terminal_notice_for_stop_reason(stop_reason: &StopReason) -> Option<&'static str> {
+    match stop_reason {
+        StopReason::MaxTokens => Some(
+            "Warning: response truncated because the provider reached the output token limit; partial response preserved.",
+        ),
+        StopReason::EndTurn | StopReason::ToolUse => None,
+    }
 }
 
 /// Choose the SessionOp for print mode based on --attach and the preview
@@ -337,6 +376,20 @@ mod tests {
         let mut cli: Cli = clap::Parser::parse_from(["talos"]);
         cli.attach = paths;
         cli
+    }
+
+    #[test]
+    fn terminal_print_notice_marks_max_tokens_as_truncated() {
+        let notice =
+            terminal_notice_for_stop_reason(&StopReason::MaxTokens).expect("MaxTokens notice");
+        assert!(notice.contains("truncated"));
+        assert!(notice.contains("partial response preserved"));
+    }
+
+    #[test]
+    fn terminal_print_notice_keeps_explicit_completion_quiet() {
+        assert!(terminal_notice_for_stop_reason(&StopReason::EndTurn).is_none());
+        assert!(terminal_notice_for_stop_reason(&StopReason::ToolUse).is_none());
     }
 
     #[test]

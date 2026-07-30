@@ -5,10 +5,10 @@
 | Story ID | RUNTIME-003 |
 | Type | Technical Story (P0 reliability bug fix) |
 | Priority | P0 |
-| Status | In Progress — I168 resumed by maintainer (2026-07-30) |
+| Status | Complete — I168 accepted (2026-07-30) |
 | Source | Maintainer-provided TLOG analysis on 2026-07-29: three assistant responses ended as successful turns after dangling pre-tool text, without durable terminal-cause evidence |
 | Depends On | ADR-039; ADR-042; RUNTIME-002/PROVIDER-002 timeout foundations; SESSION-006 completed-prefix persistence |
-| Selected Iteration | I168 (Active) |
+| Selected Iteration | I168 (Complete) |
 
 ## Identity / Goal / Value
 
@@ -200,26 +200,26 @@ or a transport EOF normalized to `EndTurn`. This Story must make future cases di
 
 ## Acceptance For Technical Work
 
-- [ ] Failing-before-fix fixtures cover OpenAI EOF after partial text, Anthropic EOF after partial
+- [x] Failing-before-fix fixtures cover OpenAI EOF after partial text, Anthropic EOF after partial
       text, unknown finish/stop reasons, byte-stream error, and known normal terminal events.
-- [ ] Agent/session tests cover false-success rejection, `MaxTokens` partial classification, valid
+- [x] Agent/session tests cover false-success rejection, `MaxTokens` partial classification, valid
       completed-prefix recovery, and trailing-fragment exclusion.
-- [ ] Session tests prove terminal-diagnostic TLOG round trip, turn/response correlation,
+- [x] Session tests prove terminal-diagnostic TLOG round trip, turn/response correlation,
       compaction retention, redaction, and exclusion from model-visible messages/copy/export.
-- [ ] Conversation/CLI/TUI integration tests drive the canonical session bridge and prove
+- [x] Conversation/CLI/TUI integration tests drive the canonical session bridge and prove
       processing clears with the correct visible outcome.
-- [ ] Existing explicit `[DONE]`, `end_turn`, `tool_use`, timeout, cancellation, retry, tool-call,
+- [x] Existing explicit `[DONE]`, `end_turn`, `tool_use`, timeout, cancellation, retry, tool-call,
       SESSION-006, ADR-039 ordering, and ADR-042 durable tests remain green.
-- [ ] Source scan proves unknown reason and terminal-frame-less EOF no longer map to
+- [x] Source scan proves unknown reason and terminal-frame-less EOF no longer map to
       `StopReason::EndTurn`.
-- [ ] `cargo fmt --all -- --check` exits 0.
-- [ ] `cargo check --workspace --locked` exits 0 with 0 warnings.
-- [ ] `cargo clippy --workspace --locked -- -D warnings` exits 0 with 0 warnings.
-- [ ] `cargo test --workspace --locked` exits 0; actual test counts are recorded.
-- [ ] `scripts/validate_project_governance.sh .` exits 0 with 0 warnings.
-- [ ] A rebuilt `target/debug/talos` fixture/manual walkthrough demonstrates normal completion,
+- [x] `cargo fmt --all -- --check` exits 0.
+- [x] `cargo check --workspace --locked` exits 0 with 0 warnings.
+- [x] `cargo clippy --workspace --locked -- -D warnings` exits 0 with 0 warnings.
+- [x] `cargo test --workspace --locked` exits 0; actual test counts are recorded.
+- [x] `scripts/validate_project_governance.sh .` exits 0 with 0 warnings.
+- [x] A rebuilt `target/debug/talos` fixture/manual walkthrough demonstrates normal completion,
       `MaxTokens`, terminal-frame-less EOF, and tool-success-then-continuation-failure.
-- [ ] Story, I168, iteration index, program, execution package, Product Backlog, Board, user docs,
+- [x] Story, I168, iteration index, program, execution package, Product Backlog, Board, user docs,
       and residuals are synchronized.
 
 ## Stop And Escalate
@@ -231,3 +231,23 @@ or a transport EOF normalized to `EndTurn`. This Story must make future cases di
 - A new dependency, `unsafe`, global event bus, permission change, or raw provider payload
   persistence is required.
 - Baseline tests reveal an unexplained provider/session regression.
+
+## Completion Evidence
+
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
+- Provider/session/TUI foundation merged through PR #63 at `b5fcaaf3`; print/headless MaxTokens projection landed at `dda2170f`; deterministic fixture scripts landed at `86262d02`.
+- Red-before-green evidence: workflow run `30551626267`, exit 101 before print-mode production implementation.
+- Initial closeout evidence: workflow `30552762936` passed the first matrix. PR #67 review then required explicit known-terminal policies and merged-output ordering.
+- Final review evidence: workflow `30558757429`, job `90925992796`, passed the expanded parser/session/CLI/TUI/workspace and rebuilt-binary matrix; clean-HEAD CI `30558599777`, job `90926266628`, passed Release preflight with 2681 workspace tests and zero failures.
+- Rebuilt `target/debug/talos` passed normal completion, MaxTokens, OpenAI `content_filter` and legacy `function_call`, Anthropic `stop_sequence`, `pause_turn`, and `refusal`, synthetic unknown reasons, EOF, invalid UTF-8, transport failure, and tool continuation. The fixture asserts empty normal stderr, exactly one truncation warning, absence of stale labels, and merged-fd line ordering.
+- Terminal diagnostics remain bounded operational evidence and are excluded from model context, transcript, copy, and export.
+- OBS-002 remains Refinement and is not completed by this Story.
+- Review correction `c570991b` defines the known protocol policy matrix; clean Completion Commit `86262d02` removes transient execution artifacts. Revalidation workflow `30558757429` passed parser/session/CLI/TUI/workspace gates and the exact/negative/merged-fd rebuilt-binary fixture.
+
+### Review-Correction Policy
+
+- Known terminal values are never described as unknown.
+- OpenAI `content_filter` and deprecated `function_call` are bounded provider-error policies.
+- Anthropic `stop_sequence` maps to explicit normal completion; `pause_turn` and `refusal` are bounded provider-error policies because automatic pause continuation is outside this Story.
+- Only unrecognized values such as `fixture_unknown_reason` use `UnsupportedReason`.
+- MaxTokens partial output is newline-terminated and flushed before the single stderr warning, including when descriptors are merged.
