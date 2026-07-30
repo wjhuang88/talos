@@ -61,7 +61,7 @@ The initial I168 completion packet used workflow `30552762936`. Maintainer revie
 known-reason policy and merged-terminal-output gaps. Correction revalidation workflow `30558757429`
 (job `90925992796`) passed all focused tests, workspace fmt/check/Clippy/tests, governance, build,
 and the strengthened rebuilt-binary fixture. Completion Commit `86262d02` owns the clean corrected
-implementation and contains no workflow logs, cache files, or patch scripts.
+implementation and contains no workflow logs, cache files, patch scripts, or CI permission changes.
 
 ## Troubleshooting
 
