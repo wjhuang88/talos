@@ -1,0 +1,55 @@
+name: I168 Review Revalidation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.head_ref == 'agent/i168-terminal-closeout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/i168-terminal-closeout
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run review correction matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'HEAD=%s\n' "$(git rev-parse HEAD)"
+          cargo test --locked -p talos-provider i168_terminal_outcome_tests
+          cargo test --locked -p talos-provider terminal
+          cargo test --locked -p talos-provider eof
+          cargo test --locked -p talos-agent terminal
+          cargo test --locked -p talos-session diagnostic
+          cargo test --locked -p talos-conversation terminal
+          cargo test --locked -p talos-cli terminal
+          cargo test --locked -p talos-tui terminal
+          cargo fmt --all -- --check
+          cargo check --workspace --locked
+          cargo clippy --workspace --locked -- -D warnings
+          cargo test --workspace --locked
+          scripts/validate_project_governance.sh .
+          git diff --check
+          cargo build --locked -p talos-cli
+          scripts/verify_i168_provider_terminal.sh target/debug/talos
+      - name: Upload review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i168-review-revalidation
+          path: |
+            target/debug/talos
+          if-no-files-found: ignore
