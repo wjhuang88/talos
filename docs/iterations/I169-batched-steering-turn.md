@@ -121,8 +121,9 @@
 - Validation: focused tests, full locked workspace gates, governance validator, rebuilt binary
   smoke, and diff review.
 - Remote evidence: `origin/main@b5fcaaf3` was fetched successfully before PR preparation.
-- Residual destination: this iteration and TUI-041; remote sync/PR remains pending unless later
-  authorized and network-accessible.
+- Implementation evidence: `fddee7ac` (governance/ADR), `04a4b781` (transactional structured
+  steering), and `c7ed94f5` (portable validation fixtures).
+- Remote destination: Draft PR #68; push, issue synchronization, and CI evidence are pending.
 
 ## Verification Evidence
 

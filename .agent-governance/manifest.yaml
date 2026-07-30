@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-07-30"
-status_note: "High-risk/release-managed profile confirmed. Draft PR #68 supersedes duplicate #64, but maintainer review requires an I169/TUI-041 core data-flow rework under ADR-056 and G0-G13 before review. Remote main records I168 Active; I164 remains Paused; I158-I162 remain Blocked; ADR-053 remains Proposed. REL-002 remains NO-GO."
+status_note: "High-risk/release-managed profile confirmed. Draft PR #68 now contains the ADR-056 transactional structured steering rework, but I169/TUI-041 remains Active until the Windows workspace-test, real-TUI, and CI portions of G13 pass. Remote main records I168 Active; I164 remains Paused; I158-I162 remain Blocked; ADR-053 remains Proposed. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Replace PR #68's rejected delimiter-join implementation with ADR-056 transactional structured steering and close I169 G0-G13 before Ready for Review"
+    - "Keep PR #68 Draft until the remaining I169 G13 Windows workspace-test, real-TUI, and CI gates pass; do not treat the implemented G0-G12 rework as completion"
     - "Preserve remote-main I168/RUNTIME-003 Active state and keep I169 isolated to its Issue #50 draft PR; keep I164/TUI-038 Paused"
     - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
     - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
