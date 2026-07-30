@@ -1,0 +1,98 @@
+name: I168 Review Evidence Replay
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo replay control
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          def append_once(path, marker, content):
+              p = Path(path)
+              text = p.read_text()
+              if marker not in text:
+                  p.write_text(text.rstrip() + "\n\n" + content.rstrip() + "\n")
+
+          i168 = 'docs/iterations/I168-provider-terminal-outcome-integrity.md'
+          replace(i168, '| `cargo test --locked -p talos-provider terminal` | 0 | 8 | 0 | 0 | 1 |', '| `cargo test --locked -p talos-provider terminal` | 0 | 13 | 0 | 0 | 1 |')
+          replace(i168, '| `cargo test --locked -p talos-cli terminal` | 0 | 6 | 0 | 0 | 1 |', '| `cargo test --locked -p talos-cli terminal` | 0 | 7 | 0 | 0 | 1 |')
+          replace(i168, '| `cargo test --locked -p talos-tui terminal` | 0 | 28 | 0 | 0 | 0 |', '| `cargo test --locked -p talos-tui terminal` | 0 | 29 | 0 | 0 | 0 |')
+          replace(i168, '| `cargo test --workspace --locked` | 0 | 2673 | 0 | 0 | 1 |', '| `cargo test --workspace --locked` | 0 | 2681 | 0 | 0 | 1 |')
+          replace(i168, '- Fixture outcomes for both OpenAI-compatible and Anthropic-compatible protocols: normal completion exited 0 quietly; MaxTokens exited 0 with partial stdout and truncation stderr; unknown reason, terminal-frame-less EOF, invalid UTF-8, transport failure, and continuation EOF exited 1 with bounded cause. Both continuation requests contained the previously completed tool result.', '- Reviewed fixture outcomes: OpenAI normal and MaxTokens exit 0; `content_filter`, legacy `function_call`, synthetic unknown, EOF, invalid UTF-8, transport failure, and continuation EOF exit 1 with distinct bounded causes. Anthropic normal, `stop_sequence`, and MaxTokens exit 0; `pause_turn`, `refusal`, synthetic unknown, EOF, invalid UTF-8, transport failure, and continuation EOF exit 1. Normal stderr is empty, MaxTokens emits exactly one warning, error paths exclude stale truncation text, merged descriptors preserve `partial\\nwarning\\n` ordering, and both continuation requests contain the completed tool result.')
+          replace(i168, '- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.', '- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`. This clean implementation state existed before final review-evidence synchronization and contains corrected implementation `c570991b` as an ancestor.')
+          replace(i168, '- Rebuilt-binary acceptance: PASS for both compatible protocols in workflow run `30552762936`; normal, truncation, unknown, EOF, decode, transport, and tool-continuation outcomes matched the owner acceptance matrix.', '- Rebuilt-binary review acceptance: PASS in workflow `30558757429`, job `90925992796`. The expanded known-policy/synthetic-unknown matrix, exact and negative stdout/stderr assertions, merged-fd ordering, and tool-continuation prefix checks all passed.')
+          replace(i168, '- Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.', '- Final clean-HEAD acceptance: CI run `30558599777`, rerun job `90926266628`, checked the PR merge containing `86262d02`; Release preflight passed with 2681 workspace tests and zero failures. Windows fixture job `90926267367` passed.\n- Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.')
+          append_once(i168, '## Review Correction Evidence', '''## Review Correction Evidence
+
+- PR #67 review required known protocol terminal values to have explicit policies rather than being used as unknown fixtures.
+- OpenAI `content_filter` is a known filtered error and deprecated `function_call` is a known legacy error with `tool_calls` migration guidance. Anthropic `stop_sequence` is normal completion; `pause_turn` and `refusal` are known bounded non-success outcomes. Only `fixture_unknown_reason` uses `UnsupportedReason`.
+- Red evidence recorded parser exit 101 and rebuilt fixture exit 1 before correction, including the rejected merged shape `fixture partialWarning...`.
+- Corrected implementation `c570991b` plus cleanup `86262d02` passed workflow `30558757429`; standard clean-HEAD Release preflight and Windows fixture passed in run `30558599777`.
+''')
+
+          story = 'docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md'
+          replace(story, '- Final evidence: workflow run `30552762936`, job `90905349923`, `OVERALL_EXIT=0`; 2673 workspace tests passed with zero failures; focused counts are recorded in I168.', '- Initial closeout evidence: workflow `30552762936` passed the first matrix. PR #67 review then required explicit known-terminal policies and merged-output ordering.\n- Final review evidence: workflow `30558757429`, job `90925992796`, passed the expanded parser/session/CLI/TUI/workspace and rebuilt-binary matrix; clean-HEAD CI `30558599777`, job `90926266628`, passed Release preflight with 2681 workspace tests and zero failures.')
+          replace(story, '- Rebuilt `target/debug/talos` passed the OpenAI-compatible and Anthropic-compatible matrix for explicit completion, MaxTokens, unknown reason, EOF, invalid UTF-8, transport failure, and tool-success-then-continuation-failure.', '- Rebuilt `target/debug/talos` passed normal completion, MaxTokens, OpenAI `content_filter` and legacy `function_call`, Anthropic `stop_sequence`, `pause_turn`, and `refusal`, synthetic unknown reasons, EOF, invalid UTF-8, transport failure, and tool continuation. The fixture asserts empty normal stderr, exactly one truncation warning, absence of stale labels, and merged-fd line ordering.')
+          append_once(story, '### Review-Correction Policy', '''### Review-Correction Policy
+
+- Known terminal values are never described as unknown.
+- OpenAI `content_filter` and deprecated `function_call` are bounded provider-error policies.
+- Anthropic `stop_sequence` maps to explicit normal completion; `pause_turn` and `refusal` are bounded provider-error policies because automatic pause continuation is outside this Story.
+- Only unrecognized values such as `fixture_unknown_reason` use `UnsupportedReason`.
+- MaxTokens partial output is newline-terminated and flushed before the single stderr warning, including when descriptors are merged.
+''')
+
+          replace('docs/iterations/README.md', 'Completion Commit `86262d02`; 2673 workspace tests and deterministic rebuilt-binary OpenAI/Anthropic terminal-outcome fixtures pass.', 'Completion Commit `86262d02`; 2681 workspace tests and reviewed rebuilt-binary known-policy/ordering fixtures pass.')
+          replace('docs/BOARD.md', 'Completion Commit `86262d02`; explicit terminal classification, bounded non-transcript diagnostics, print/TUI truncation display, 2673 workspace tests, and rebuilt-binary dual-protocol fixtures pass.', 'Completion Commit `86262d02`; reviewed known-terminal policies, bounded diagnostics, stdout/stderr ordering, 2681 workspace tests, and negative dual-protocol fixtures pass.')
+          replace('docs/tasks/2026-07-26-v0.6-runtime-productization-program.md', 'Final locked validation passed: 2673 workspace tests, zero failures, `clippy -D warnings`, governance, diff check, source scan, and rebuilt-binary two-protocol fixtures.', 'Final reviewed validation passed: 2681 workspace tests, zero failures, `clippy -D warnings`, governance, diff check, source scan, known-policy classification, negative assertions, merged-fd ordering, and rebuilt-binary two-protocol fixtures.')
+
+          package = 'docs/tasks/2026-07-28-four-month-v06-execution-package.md'
+          replace(package, 'Complete — `86262d02`; 2673 tests and dual-protocol fixture pass', 'Complete — `86262d02`; 2681 tests and reviewed dual-protocol policy/ordering fixture pass')
+          replace(package, '- 2673 workspace tests passed, zero failed;', '- 2681 workspace tests passed, zero failed;')
+          replace(package, '''- Completed task items: P0 (baseline inventory + package publication) and P1 (I157/MODEL-010,
+  including the stale-snapshot concurrency correction in `5aac6756`).
+- Completion Commit: `5aac675690bf6528d5977521db3dfb6f2abb486d`.
+- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 are Complete;
+  I168/RUNTIME-003 is the sole Active implementation authority; I164 is Paused; I158-I162 are
+  Blocked; ADR-053 is Proposed.
+- Commands/checks and actual results for the I157 correction: locked workspace check, Clippy,
+  tests, formatting, governance validation, and diff checks passed on 2026-07-30. The owner
+  records `5aac6756` as the Completion Commit.
+- External-action authorization: validated `main` push at each phase boundary completed on
+  2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
+- Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
+  authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
+- Next task item: execute U1 / I168 / RUNTIME-003 under its published provider terminal-outcome
+  acceptance. G1 remains deferred.
+- Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
+  the v0.6 program; verify the current Git state; write the required failing provider fixtures
+  before production changes; keep I158 blocked.''', '''- Completed task items: P0, P1, and U1. I157/MODEL-010 and I168/RUNTIME-003 are Complete.
+- Completion Commit for U1: `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
+- Current state and artifacts: I164 is Paused; I158-I162 are Blocked; ADR-053 is Proposed; no implementation iteration is Active.
+- Commands/checks and actual results: reviewed provider/session/CLI/TUI fixtures, 2681 workspace tests, formatting, check, Clippy, governance, diff checks, build, negative assertions, and merged-fd ordering passed.
+- External-action authorization: tag, publish, release, deploy, force-push, and version changes remain unauthorized.
+- Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
+- Next task item: G1 maintainer/architecture review of ADR-053.
+- Recovery or resume instruction: do not activate I158 until ADR-053 is explicitly Accepted and the normal activation inventory is repeated.''')
+
+          replace('docs/reference/PROVIDER-TERMINAL-OUTCOMES.md', 'passed all focused tests, workspace fmt/check/Clippy/tests, governance, build,\nand the strengthened rebuilt-binary fixture.', 'passed all focused tests, 2681 workspace tests, fmt/check/Clippy, governance, build,\nand the strengthened rebuilt-binary fixture.')
+          replace('EVOLUTION.md', '| 46 | Provider / Runtime | transport EOF 不是成功；每个消费者都必须投影明确 terminal outcome | I168/RUNTIME-003 |', '| 46 | Provider / Runtime | transport EOF 不是成功；已知协议终止值必须有独立 policy，不能冒充 unknown；每个消费者都必须投影明确 outcome | I168/RUNTIME-003 |')
+          replace('EVOLUTION.md', '- Prevention: every streaming adapter and every consumer must have a matrix for normal completion, truncation, unknown reason, EOF, decode/transport failure, and tool-continuation failure. A shared projection test is not end-to-end evidence.', '- Prevention: every streaming adapter and consumer must distinguish known policy terminals from truly unknown values and cover normal completion, truncation, filtering/pause/refusal, unknown reason, EOF, decode/transport failure, and tool continuation. Headless tests must assert separate streams and merged-fd ordering; a shared projection test is not end-to-end evidence.')
+
+          subprocess.run(['git', 'checkout', 'origin/main', '--', '.github/workflows/ci.yml'], check=True)
+          Path('.i168-final-docs-trigger').unlink(missing_ok=True)
+          PY
