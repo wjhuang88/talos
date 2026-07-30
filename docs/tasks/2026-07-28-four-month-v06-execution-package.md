@@ -70,7 +70,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
 | P1 | Execute I157 / MODEL-010 | provider-unset | P0 | stale-snapshot concurrency acceptance correction | one locked current-state semantic update path across Talos writers | Complete — `5aac6756` |
-| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `86262d02`; 2673 tests and dual-protocol fixture pass |
+| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `86262d02`; 2681 tests and reviewed dual-protocol policy/ordering fixture pass |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -229,24 +229,14 @@ skip to a later mainline package.
 
 ## Current Checkpoint
 
-- Completed task items: P0 (baseline inventory + package publication) and P1 (I157/MODEL-010,
-  including the stale-snapshot concurrency correction in `5aac6756`).
-- Completion Commit: `5aac675690bf6528d5977521db3dfb6f2abb486d`.
-- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 are Complete;
-  I168/RUNTIME-003 is the sole Active implementation authority; I164 is Paused; I158-I162 are
-  Blocked; ADR-053 is Proposed.
-- Commands/checks and actual results for the I157 correction: locked workspace check, Clippy,
-  tests, formatting, governance validation, and diff checks passed on 2026-07-30. The owner
-  records `5aac6756` as the Completion Commit.
-- External-action authorization: validated `main` push at each phase boundary completed on
-  2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
-- Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
-  authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
-- Next task item: execute U1 / I168 / RUNTIME-003 under its published provider terminal-outcome
-  acceptance. G1 remains deferred.
-- Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
-  the v0.6 program; verify the current Git state; write the required failing provider fixtures
-  before production changes; keep I158 blocked.
+- Completed task items: P0, P1, and U1. I157/MODEL-010 and I168/RUNTIME-003 are Complete.
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95` for U1.
+- Current state and artifacts: I164 is Paused; I158-I162 are Blocked; ADR-053 is Proposed; no implementation iteration is Active.
+- Commands/checks and actual results: reviewed provider/session/CLI/TUI fixtures, 2681 workspace tests, formatting, check, Clippy, governance, diff checks, build, negative assertions, and merged-fd ordering passed.
+- External-action authorization: tag, publish, release, deploy, force-push, and version changes remain unauthorized.
+- Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
+- Next task item: G1 maintainer/architecture review of ADR-053.
+- Recovery or resume instruction: do not activate I158 until ADR-053 is explicitly Accepted and the normal activation inventory is repeated.
 
 ## I168 Closeout Checkpoint — 2026-07-30
 
@@ -261,7 +251,7 @@ Current state and artifacts:
 
 Commands/checks and actual results:
 - all required focused commands exit 0;
-- 2673 workspace tests passed, zero failed;
+- 2681 workspace tests passed, zero failed;
 - fmt, check, Clippy with `-D warnings`, governance, diff check, source scan, build, and rebuilt-binary fixture exit 0.
 
 Open risks or deviations:

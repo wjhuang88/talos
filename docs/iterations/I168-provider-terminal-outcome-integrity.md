@@ -174,30 +174,31 @@ Real paid/provider credentials are not required and must not be introduced.
 
 | Validation command | Exit | Passed | Failed | Ignored | Warning lines |
 |---|---:|---:|---:|---:|---:|
-| `cargo test --locked -p talos-provider terminal` | 0 | 8 | 0 | 0 | 1 |
+| `cargo test --locked -p talos-provider terminal` | 0 | 13 | 0 | 0 | 1 |
 | `cargo test --locked -p talos-provider eof` | 0 | 2 | 0 | 0 | 1 |
 | `cargo test --locked -p talos-agent terminal` | 0 | 2 | 0 | 0 | 0 |
 | `cargo test --locked -p talos-session diagnostic` | 0 | 4 | 0 | 0 | 0 |
 | `cargo test --locked -p talos-conversation terminal` | 0 | 2 | 0 | 0 | 0 |
-| `cargo test --locked -p talos-cli terminal` | 0 | 6 | 0 | 0 | 1 |
-| `cargo test --locked -p talos-tui terminal` | 0 | 28 | 0 | 0 | 0 |
+| `cargo test --locked -p talos-cli terminal` | 0 | 7 | 0 | 0 | 1 |
+| `cargo test --locked -p talos-tui terminal` | 0 | 29 | 0 | 0 | 0 |
 | `cargo fmt --all -- --check` | 0 | 0 | 0 | 0 | 0 |
 | `cargo check --workspace --locked` | 0 | 0 | 0 | 0 | 1 |
 | `cargo clippy --workspace --locked -- -D warnings` | 0 | 0 | 0 | 0 | 1 |
-| `cargo test --workspace --locked` | 0 | 2673 | 0 | 0 | 1 |
+| `cargo test --workspace --locked` | 0 | 2681 | 0 | 0 | 1 |
 | `scripts/validate_project_governance.sh .` | 0 | 0 | 0 | 0 | 0 |
 | `git diff --check` | 0 | 0 | 0 | 0 | 0 |
 | `cargo build --locked -p talos-cli` | 0 | 0 | 0 | 0 | 1 |
 | provider terminal source scan | 0 | 0 | 0 | 0 | 0 |
 | rebuilt-binary two-protocol fixture | 0 | 0 | 0 | 0 | 0 |
 
-- Fixture outcomes for both OpenAI-compatible and Anthropic-compatible protocols: normal completion exited 0 quietly; MaxTokens exited 0 with partial stdout and truncation stderr; unknown reason, terminal-frame-less EOF, invalid UTF-8, transport failure, and continuation EOF exited 1 with bounded cause. Both continuation requests contained the previously completed tool result.
+- Reviewed fixture outcomes: OpenAI normal and MaxTokens exit 0; `content_filter`, legacy `function_call`, synthetic unknown, EOF, invalid UTF-8, transport failure, and continuation EOF exit 1 with distinct bounded causes. Anthropic normal, `stop_sequence`, and MaxTokens exit 0; `pause_turn`, `refusal`, synthetic unknown, EOF, invalid UTF-8, transport failure, and continuation EOF exit 1. Normal stderr is empty, MaxTokens emits exactly one warning, error paths exclude stale truncation text, merged descriptors preserve `partial\nwarning\n` ordering, and both continuation requests contain the completed tool result.
 - Session tests prove TLOG round trip, compaction retention, turn/response correlation, bounded redaction, and exclusion from messages, provider history, transcript, copy, and export.
 
 ## Completion Evidence
 
-- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.
-- Rebuilt-binary acceptance: PASS for both compatible protocols in workflow run `30552762936`; normal, truncation, unknown, EOF, decode, transport, and tool-continuation outcomes matched the owner acceptance matrix.
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`. This clean implementation state existed before final review-evidence synchronization and contains corrected implementation `c570991b` as an ancestor.
+- Rebuilt-binary review acceptance: PASS in workflow `30558757429`, job `90925992796`. The expanded known-policy/synthetic-unknown matrix, exact and negative stdout/stderr assertions, merged-fd ordering, and tool-continuation prefix checks all passed.
+- Final clean-HEAD acceptance: CI run `30558599777`, rerun job `90926266628`, checked the PR merge containing `86262d02`; Release preflight passed with 2681 workspace tests and zero failures. Windows fixture job `90926267367` passed.
 - Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.
 - Review correction evidence: OpenAI `content_filter` and deprecated `function_call` now have explicit bounded non-success policies; Anthropic `stop_sequence` is explicit normal completion while `pause_turn` and `refusal` are explicit bounded non-success policies; only `fixture_unknown_reason` uses the unknown path. Merged-fd fixtures prove partial output and warning/error are line-separated, normal paths are quiet, and no stale truncation warning appears on errors.
 
@@ -219,3 +220,11 @@ Real paid/provider credentials are not required and must not be introduced.
 - A shared conversation projection test did not prove the separate print-mode consumer. Behavior-facing terminal outcomes require fixture coverage through every product consumer, including headless output.
 - Completion documents must be part of the implementation sequence rather than deferred until after merge; PR #63 was code-complete but not governance-complete.
 - Deterministic local SSE fixtures provide stronger, credential-free evidence than provider-paid smoke tests and are now retained under `scripts/fixtures/`.
+
+## Review Correction Evidence
+
+- PR #67 review required known protocol terminal values to have explicit policies rather than being used as unknown fixtures.
+- OpenAI `content_filter` is a known filtered error and deprecated `function_call` is a known legacy error with `tool_calls` migration guidance. Anthropic `stop_sequence` is normal completion; `pause_turn` and `refusal` are known bounded non-success outcomes. Only `fixture_unknown_reason` uses `UnsupportedReason`.
+- Red evidence recorded parser exit 101 and rebuilt fixture exit 1 before correction, including the rejected merged shape `fixture partialWarning...`.
+- Corrected implementation `c570991b` plus cleanup `86262d02` passed workflow `30558757429`; standard clean-HEAD Release preflight and Windows fixture passed in run `30558599777`.
+- Superseded initial Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`; PR review replaced it with clean Completion Commit `86262d0290d821b7e3518a0e6371f0b2d3185e95`.

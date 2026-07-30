@@ -237,8 +237,17 @@ or a transport EOF normalized to `EndTurn`. This Story must make future cases di
 - Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
 - Provider/session/TUI foundation merged through PR #63 at `b5fcaaf3`; print/headless MaxTokens projection landed at `dda2170f`; deterministic fixture scripts landed at `86262d02`.
 - Red-before-green evidence: workflow run `30551626267`, exit 101 before print-mode production implementation.
-- Final evidence: workflow run `30552762936`, job `90905349923`, `OVERALL_EXIT=0`; 2673 workspace tests passed with zero failures; focused counts are recorded in I168.
-- Rebuilt `target/debug/talos` passed the OpenAI-compatible and Anthropic-compatible matrix for explicit completion, MaxTokens, unknown reason, EOF, invalid UTF-8, transport failure, and tool-success-then-continuation-failure.
+- Initial closeout evidence: workflow `30552762936` passed the first matrix. PR #67 review then required explicit known-terminal policies and merged-output ordering.
+- Final review evidence: workflow `30558757429`, job `90925992796`, passed the expanded parser/session/CLI/TUI/workspace and rebuilt-binary matrix; clean-HEAD CI `30558599777`, job `90926266628`, passed Release preflight with 2681 workspace tests and zero failures.
+- Rebuilt `target/debug/talos` passed normal completion, MaxTokens, OpenAI `content_filter` and legacy `function_call`, Anthropic `stop_sequence`, `pause_turn`, and `refusal`, synthetic unknown reasons, EOF, invalid UTF-8, transport failure, and tool continuation. The fixture asserts empty normal stderr, exactly one truncation warning, absence of stale labels, and merged-fd line ordering.
 - Terminal diagnostics remain bounded operational evidence and are excluded from model context, transcript, copy, and export.
 - OBS-002 remains Refinement and is not completed by this Story.
 - Review correction `c570991b` defines the known protocol policy matrix; clean Completion Commit `86262d02` removes transient execution artifacts. Revalidation workflow `30558757429` passed parser/session/CLI/TUI/workspace gates and the exact/negative/merged-fd rebuilt-binary fixture.
+
+### Review-Correction Policy
+
+- Known terminal values are never described as unknown.
+- OpenAI `content_filter` and deprecated `function_call` are bounded provider-error policies.
+- Anthropic `stop_sequence` maps to explicit normal completion; `pause_turn` and `refusal` are bounded provider-error policies because automatic pause continuation is outside this Story.
+- Only unrecognized values such as `fixture_unknown_reason` use `UnsupportedReason`.
+- MaxTokens partial output is newline-terminated and flushed before the single stderr warning, including when descriptors are merged.
