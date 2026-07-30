@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Complete
+> Document status: Active — Ordered Composite Failure And Finalization Durability Correction
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
