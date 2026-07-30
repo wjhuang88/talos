@@ -20,7 +20,7 @@ site_root="$project_root/site"
 readme="$project_root/README.md"
 readme_zh="$project_root/README.zh-CN.md"
 requested_version="${1:-}"
-workspace_version=$(sed -n '/^\[workspace.package\]/,/^\[/p' "$project_root/Cargo.toml" | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1)
+workspace_version=$(sed -n '/^\[workspace.package\]/,/^\[/p' "$project_root/Cargo.toml" | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1 | tr -d '\r')
 
 if [ -z "$workspace_version" ]; then
   echo "public site validation: unable to read workspace version" >&2
@@ -160,7 +160,7 @@ for release_surface in \
   fi
 done
 
-previous_workspace_version=$(git -C "$project_root" show HEAD:Cargo.toml 2>/dev/null | sed -n '/^\[workspace.package\]/,/^\[/p' | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1 || true)
+previous_workspace_version=$(git -C "$project_root" show HEAD:Cargo.toml 2>/dev/null | sed -n '/^\[workspace.package\]/,/^\[/p' | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1 | tr -d '\r' || true)
 if [ -n "$previous_workspace_version" ] && [ "$previous_workspace_version" != "$workspace_version" ]; then
   previous_release_version="v$previous_workspace_version"
   for release_surface in \
