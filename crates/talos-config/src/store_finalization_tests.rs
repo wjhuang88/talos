@@ -1,9 +1,5 @@
-use crate::store::{
-    Fs, FsOperation, RecoveryOutcome, RecoveryPurpose, StdFs,
-};
-use crate::{
-    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ProviderConfig,
-};
+use crate::store::{Fs, FsOperation, RecoveryOutcome, RecoveryPurpose, StdFs};
+use crate::{Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ProviderConfig};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -23,10 +19,7 @@ fn unique_dir(label: &str) -> PathBuf {
 }
 
 fn make_store(dir: &Path) -> ConfigStore {
-    ConfigStore::with_paths(
-        dir.join("config.toml"),
-        dir.join("credentials.toml"),
-    )
+    ConfigStore::with_paths(dir.join("config.toml"), dir.join("credentials.toml"))
 }
 
 fn active_dir(dir: &Path) -> PathBuf {
@@ -47,9 +40,7 @@ fn prepare_entries(dir: &Path) -> Vec<PathBuf> {
         .filter(|path| {
             path.file_name()
                 .and_then(|value| value.to_str())
-                .is_some_and(|name| {
-                    name.starts_with(".provider-unset-transaction.prepare.")
-                })
+                .is_some_and(|name| name.starts_with(".provider-unset-transaction.prepare."))
         })
         .collect()
 }
@@ -109,7 +100,10 @@ fn write_manifest(
 }
 
 fn assert_persisted_bytes(dir: &Path, config: &[u8], credentials: &[u8]) {
-    assert_eq!(std::fs::read(dir.join("config.toml")).unwrap_or_default(), config);
+    assert_eq!(
+        std::fs::read(dir.join("config.toml")).unwrap_or_default(),
+        config
+    );
     assert_eq!(
         std::fs::read(dir.join("credentials.toml")).unwrap_or_default(),
         credentials
@@ -288,8 +282,7 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
     setup_two_providers(&dir);
     let store = make_store(&dir);
 
-    let finalize_plan =
-        FaultPlan::fail_once(FsOperation::SyncTransactionParentAfterFinalize);
+    let finalize_plan = FaultPlan::fail_once(FsOperation::SyncTransactionParentAfterFinalize);
     let finalize_fs = FaultFs::new(finalize_plan.clone());
     let outcome = store.run("providers.custom-a", &finalize_fs).unwrap();
     assert_eq!(
@@ -298,9 +291,7 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
             name: "custom-a".to_string()
         }
     );
-    finalize_plan.assert_consumed_in_order(&[
-        FsOperation::SyncTransactionParentAfterFinalize,
-    ]);
+    finalize_plan.assert_consumed_in_order(&[FsOperation::SyncTransactionParentAfterFinalize]);
     assert!(!active_dir(&dir).exists());
 
     let residues: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -310,18 +301,14 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
         .filter(|path| {
             path.file_name()
                 .and_then(|value| value.to_str())
-                .is_some_and(|name| {
-                    name.starts_with(".provider-unset-transaction.finalize.")
-                })
+                .is_some_and(|name| name.starts_with(".provider-unset-transaction.finalize."))
         })
         .collect();
     assert_eq!(residues.len(), 1);
 
     let retry_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeResidueParent);
     let retry_fs = FaultFs::new(retry_plan.clone());
-    let error = store
-        .run("providers.custom-b", &retry_fs)
-        .unwrap_err();
+    let error = store.run("providers.custom-b", &retry_fs).unwrap_err();
     assert!(error.to_string().contains("finalization is pending"));
     retry_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeResidueParent]);
     assert!(prepare_entries(&dir).is_empty());
@@ -384,15 +371,7 @@ fn ambiguous_active_and_finalize_evidence_fails_closed_and_is_preserved() {
     for journal in [&active, &finalize] {
         std::fs::write(journal.join("config.after"), &config).unwrap();
         std::fs::write(journal.join("credentials.after"), &credentials).unwrap();
-        write_manifest(
-            journal,
-            "Committed",
-            transaction_id,
-            true,
-            true,
-            true,
-            true,
-        );
+        write_manifest(journal, "Committed", transaction_id, true, true, true, true);
     }
 
     let store = make_store(&dir);

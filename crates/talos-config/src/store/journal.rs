@@ -94,14 +94,13 @@ pub(super) fn write_manifest(
         credentials_existed_before: txn.cred_existed,
         credentials_exist_after: txn.cred_after_exists,
     };
-    let serialized =
-        toml::to_string(&manifest).map_err(|error| ConfigError::SerializeError(error.to_string()))?;
+    let serialized = toml::to_string(&manifest)
+        .map_err(|error| ConfigError::SerializeError(error.to_string()))?;
     fs.atomic_write(&dir.join("manifest"), serialized.as_bytes())
 }
 
 pub(super) fn parse_manifest(raw: &[u8]) -> Result<Manifest, ConfigError> {
-    let manifest: Manifest =
-        parse_persisted_toml(raw, PersistedDocument::TransactionManifest)?;
+    let manifest: Manifest = parse_persisted_toml(raw, PersistedDocument::TransactionManifest)?;
     if manifest.version != MANIFEST_VERSION {
         return Err(ConfigError::InvalidConfig(format!(
             "unsupported manifest version {} — expected {}",

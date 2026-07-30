@@ -1,11 +1,9 @@
 use super::journal::{
-    FinalizeOutcome, Manifest, Phase, TerminalPhase as JournalTerminalPhase, Txn,
-    finalize_active, parse_manifest, read_image, restore, validate_terminal_state,
-    verify_state, write_manifest,
+    FinalizeOutcome, Manifest, Phase, TerminalPhase as JournalTerminalPhase, Txn, finalize_active,
+    parse_manifest, read_image, restore, validate_terminal_state, verify_state, write_manifest,
 };
 use super::{
-    ConfigStore, FINALIZE_PREFIX, PREPARE_PREFIX, Fs, FsOperation,
-    ambiguous_finalization_error,
+    ConfigStore, FINALIZE_PREFIX, Fs, FsOperation, PREPARE_PREFIX, ambiguous_finalization_error,
 };
 use crate::ConfigError;
 use std::path::{Path, PathBuf};
@@ -88,9 +86,7 @@ impl ConfigStore {
         let outcome = merge_recovery_outcomes(active_outcome, residue_outcome);
 
         if matches!(purpose, RecoveryPurpose::Mutation) && !outcome.allows_mutation() {
-            tracing::debug!(
-                "provider configuration mutation blocked by pending finalization"
-            );
+            tracing::debug!("provider configuration mutation blocked by pending finalization");
         }
 
         Ok(outcome)
@@ -320,11 +316,7 @@ impl ConfigStore {
         Ok(outcome)
     }
 
-    fn cleanup_prepare_residues(
-        &self,
-        fs: &dyn Fs,
-        parent: &Path,
-    ) -> Result<(), ConfigError> {
+    fn cleanup_prepare_residues(&self, fs: &dyn Fs, parent: &Path) -> Result<(), ConfigError> {
         if !fs.exists(parent) {
             return Ok(());
         }
@@ -363,10 +355,7 @@ fn terminal_phase(manifest: &Manifest) -> Result<TerminalPhase, ConfigError> {
     }
 }
 
-fn map_finalize_outcome(
-    outcome: FinalizeOutcome,
-    phase: TerminalPhase,
-) -> RecoveryOutcome {
+fn map_finalize_outcome(outcome: FinalizeOutcome, phase: TerminalPhase) -> RecoveryOutcome {
     match outcome {
         FinalizeOutcome::Finalized => RecoveryOutcome::Clean,
         FinalizeOutcome::ActiveRenamePending { transaction_id } => {
@@ -394,27 +383,30 @@ fn map_finalize_outcome(
     }
 }
 
-fn merge_recovery_outcomes(
-    left: RecoveryOutcome,
-    right: RecoveryOutcome,
-) -> RecoveryOutcome {
-    use RecoveryOutcome::{
-        Clean, CleanupPending, ParentSyncPending, TerminalActivePending,
-    };
+fn merge_recovery_outcomes(left: RecoveryOutcome, right: RecoveryOutcome) -> RecoveryOutcome {
+    use RecoveryOutcome::{Clean, CleanupPending, ParentSyncPending, TerminalActivePending};
 
     match (left, right) {
-        (TerminalActivePending { transaction_id, phase }, _) => {
+        (
             TerminalActivePending {
                 transaction_id,
                 phase,
-            }
-        }
-        (_, TerminalActivePending { transaction_id, phase }) => {
+            },
+            _,
+        ) => TerminalActivePending {
+            transaction_id,
+            phase,
+        },
+        (
+            _,
             TerminalActivePending {
                 transaction_id,
                 phase,
-            }
-        }
+            },
+        ) => TerminalActivePending {
+            transaction_id,
+            phase,
+        },
         (
             ParentSyncPending {
                 transaction_id,
