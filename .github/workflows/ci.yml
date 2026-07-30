@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,40 +43,3 @@ jobs:
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
-
-  i168-review-evidence:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/i168-terminal-closeout'
-    name: I168 Review Evidence Sync
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: agent/i168-terminal-closeout
-          fetch-depth: 0
-
-      - name: Apply and validate final evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          git merge-base --is-ancestor 86262d0290d821b7e3518a0e6371f0b2d3185e95 HEAD
-          python3 .i168_review_docs.py
-          scripts/validate_project_governance.sh .
-          git diff --check
-          grep -Fq 'Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`' docs/iterations/I168-provider-terminal-outcome-integrity.md
-          grep -Fq '2681 workspace tests' docs/iterations/I168-provider-terminal-outcome-integrity.md
-          grep -Fq 'fixture_unknown_reason' docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md
-          grep -Fq 'Anthropic `stop_sequence`' docs/reference/PROVIDER-TERMINAL-OUTCOMES.md
-
-      - name: Commit final evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f .i168_review_docs.py
-          git checkout origin/main -- .github/workflows/ci.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'docs(iteration): record I168 review correction (#RUNTIME-003 #I168) [model:gpt-5.6-thinking]'
-          git push origin HEAD:agent/i168-terminal-closeout
