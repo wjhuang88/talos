@@ -999,12 +999,21 @@ impl talos_core::tool::AgentTool for EchoTool {
 /// Model that sends a tool call, then on second call sends an error.
 struct ToolCallThenErrorModel {
     call_count: Arc<std::sync::atomic::AtomicU8>,
+    trailing_fragment: bool,
 }
 
 impl ToolCallThenErrorModel {
     fn new() -> Self {
         Self {
             call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            trailing_fragment: false,
+        }
+    }
+
+    fn with_trailing_fragment() -> Self {
+        Self {
+            call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            trailing_fragment: true,
         }
     }
 }
@@ -1013,6 +1022,7 @@ impl LanguageModel for ToolCallThenErrorModel {
     async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(64);
         let count = self.call_count.clone();
+        let trailing_fragment = self.trailing_fragment;
         tokio::spawn(async move {
             let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if n == 0 {
@@ -1034,8 +1044,18 @@ impl LanguageModel for ToolCallThenErrorModel {
                         usage: talos_core::message::Usage::default(),
                     })
                     .await;
+            } else if trailing_fragment {
+                let _ = tx
+                    .send(AgentEvent::TextDelta {
+                        delta: "trailing half-streamed fragment".into(),
+                    })
+                    .await;
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider stream closed without explicit terminal signal ([DONE] or finish_reason)".into(),
+                    })
+                    .await;
             } else {
-                // Second call: simulate provider error
                 let _ = tx
                     .send(AgentEvent::Error {
                         message: "provider server error".into(),
@@ -1050,7 +1070,7 @@ impl LanguageModel for ToolCallThenErrorModel {
 /// Proves SESSION-006 / I135 FIX: when a provider error occurs after tool execution,
 /// the session NOW persists the completed tool exchange for resume.
 #[tokio::test]
-async fn fixture_provider_error_preserves_tool_results() {
+async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fragment() {
     use talos_session::{SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().unwrap();
@@ -1060,7 +1080,10 @@ async fn fixture_provider_error_preserves_tool_results() {
     let mut registry = ToolRegistry::new();
     registry.register(std::sync::Arc::new(EchoTool));
     #[allow(deprecated)]
-    let agent = Agent::new(std::sync::Arc::new(ToolCallThenErrorModel::new()), registry);
+    let agent = Agent::new(
+        std::sync::Arc::new(ToolCallThenErrorModel::with_trailing_fragment()),
+        registry,
+    );
 
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
@@ -1120,6 +1143,26 @@ async fn fixture_provider_error_preserves_tool_results() {
         has_user_msg,
         "user message must be persisted in the partial turn prefix"
     );
+    assert!(
+        persisted.iter().all(|message| !matches!(
+            message,
+            Message::Assistant { content, .. }
+                if content.contains("trailing half-streamed fragment")
+        )),
+        "the failed continuation fragment must not become a completed assistant fact"
+    );
+    let diagnostics = session.read_terminal_diagnostics().unwrap();
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].outcome,
+        talos_session::ProviderTerminalOutcome::ToolUse
+    );
+    assert_eq!(diagnostics[0].response_ordinal, 1);
+    assert_eq!(
+        diagnostics[1].outcome,
+        talos_session::ProviderTerminalOutcome::Error
+    );
+    assert_eq!(diagnostics[1].response_ordinal, 2);
 }
 
 /// Proves ADR-042 is preserved with REAL durable persistence: when both

@@ -74,9 +74,24 @@ pub(crate) async fn parse_sse_stream(
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(s) => s,
-                Err(_) => continue,
+                Err(_) => {
+                    let _ = tx
+                        .send(AgentEvent::Error {
+                            message: "provider stream decode error: invalid UTF-8 byte stream"
+                                .into(),
+                        })
+                        .await;
+                    return;
+                }
             },
-            Err(_) => break,
+            Err(_) => {
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider stream transport read error".into(),
+                    })
+                    .await;
+                return;
+            }
         };
 
         buffer.push_str(&chunk);
@@ -217,7 +232,13 @@ pub(crate) async fn parse_sse_stream(
                         output_tokens = usage.output_tokens;
                         reasoning_tokens = usage.reasoning_tokens;
                     }
-                    if let Some(stop_reason) = extract_stop_reason(&data) {
+                    if let Some(stop_reason) = match extract_stop_reason(&data) {
+                        Ok(reason) => reason,
+                        Err(message) => {
+                            let _ = tx.send(AgentEvent::Error { message }).await;
+                            return;
+                        }
+                    } {
                         // Some Anthropic-compatible providers (including MiniMax)
                         // omit `content_block_stop` before the final tool_use
                         // message delta. Flush any started blocks so the agent
@@ -290,24 +311,9 @@ pub(crate) async fn parse_sse_stream(
         }
     }
 
-    if !reasoning_blocks.is_empty() {
-        let _ = tx
-            .send(AgentEvent::ReasoningComplete {
-                blocks: std::mem::take(&mut reasoning_blocks),
-            })
-            .await;
-    }
-
     let _ = tx
-        .send(AgentEvent::TurnEnd {
-            stop_reason: StopReason::EndTurn,
-            usage: Usage {
-                input_tokens,
-                output_tokens,
-                cache_read_tokens,
-                cache_write_tokens,
-                reasoning_tokens,
-            },
+        .send(AgentEvent::Error {
+            message: "provider stream closed without explicit terminal signal (message_delta stop_reason)".into(),
         })
         .await;
 }
@@ -492,16 +498,40 @@ fn extract_text_delta(data: &Value) -> Option<String> {
         .map(String::from)
 }
 
-fn extract_stop_reason(data: &Value) -> Option<StopReason> {
-    data.get("delta")
+fn extract_stop_reason(data: &Value) -> Result<Option<StopReason>, String> {
+    let Some(reason) = data
+        .get("delta")
         .and_then(|delta| delta.get("stop_reason"))
-        .and_then(|v| v.as_str())
-        .map(|s| match s {
-            "end_turn" => StopReason::EndTurn,
-            "tool_use" => StopReason::ToolUse,
-            "max_tokens" => StopReason::MaxTokens,
-            _ => StopReason::EndTurn,
-        })
+        .and_then(Value::as_str)
+    else {
+        return Ok(None);
+    };
+    let stop_reason = match reason {
+        "end_turn" => StopReason::EndTurn,
+        "tool_use" => StopReason::ToolUse,
+        "max_tokens" => StopReason::MaxTokens,
+        unknown => {
+            return Err(format!(
+                "unsupported provider stop_reason: {}",
+                bounded_terminal_reason(unknown)
+            ));
+        }
+    };
+    Ok(Some(stop_reason))
+}
+
+fn bounded_terminal_reason(reason: &str) -> String {
+    const MAX_REASON_CHARS: usize = 120;
+    let bounded = reason
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(MAX_REASON_CHARS)
+        .collect::<String>();
+    if bounded.is_empty() {
+        "unknown".into()
+    } else {
+        bounded
+    }
 }
 
 fn extract_error_message(data: &Value) -> Option<String> {
@@ -587,7 +617,7 @@ mod tests {
                 "stop_sequence": null
             }
         });
-        assert_eq!(extract_stop_reason(&data), Some(StopReason::EndTurn));
+        assert_eq!(extract_stop_reason(&data), Ok(Some(StopReason::EndTurn)));
     }
 
     #[tokio::test]
@@ -982,6 +1012,107 @@ mod tests {
         assert!(
             result.is_ok(),
             "normal request must not be dispatch-timed-out"
+        );
+    }
+}
+
+#[cfg(test)]
+mod i168_terminal_outcome_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    async fn parse_body(body: String) -> Vec<AgentEvent> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 2048];
+            let _ = socket.read(&mut request).await;
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            socket.write_all(headers.as_bytes()).await.unwrap();
+            socket.write_all(body.as_bytes()).await.unwrap();
+            socket.flush().await.unwrap();
+        });
+
+        let response = reqwest::get(format!("http://{addr}/stream")).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(32);
+        parse_sse_stream(response, tx, Duration::from_secs(5), Duration::from_secs(5)).await;
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    }
+
+    fn text_event(text: &str) -> String {
+        format!(
+            "event: content_block_delta\ndata: {{\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"{text}\"}}}}\n\n"
+        )
+    }
+
+    fn terminal_event(reason: &str) -> String {
+        format!(
+            "event: message_delta\ndata: {{\"delta\":{{\"stop_reason\":\"{reason}\",\"stop_sequence\":null}},\"usage\":{{\"output_tokens\":1}}}}\n\n"
+        )
+    }
+
+    #[tokio::test]
+    async fn anthropic_eof_after_partial_text_is_terminal_error() {
+        let events = parse_body(text_event("partial")).await;
+        assert!(
+            events.iter().any(
+                |event| matches!(event, AgentEvent::TextDelta { delta } if delta == "partial")
+            )
+        );
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("explicit terminal"))));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn anthropic_unknown_stop_reason_is_not_end_turn() {
+        let events = parse_body(format!(
+            "{}{}",
+            text_event("partial"),
+            terminal_event("pause_turn")
+        ))
+        .await;
+        assert!(events.iter().any(
+            |event| matches!(event, AgentEvent::Error { message } if message.contains("pause_turn"))
+        ));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn explicit_provider_completion_regression_is_unchanged() {
+        let events = parse_body(format!(
+            "{}{}",
+            text_event("complete"),
+            terminal_event("end_turn")
+        ))
+        .await;
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                ..
+            }
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::Error { .. }))
         );
     }
 }

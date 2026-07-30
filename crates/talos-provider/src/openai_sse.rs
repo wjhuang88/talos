@@ -116,9 +116,24 @@ pub(crate) async fn parse_sse_stream(
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(s) => s,
-                Err(_) => continue,
+                Err(_) => {
+                    let _ = tx
+                        .send(AgentEvent::Error {
+                            message: "provider stream decode error: invalid UTF-8 byte stream"
+                                .into(),
+                        })
+                        .await;
+                    return;
+                }
             },
-            Err(_) => break,
+            Err(_) => {
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider stream transport read error".into(),
+                    })
+                    .await;
+                return;
+            }
         };
 
         buffer.push_str(&chunk);
@@ -284,13 +299,22 @@ pub(crate) async fn parse_sse_stream(
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,
                     "length" => StopReason::MaxTokens,
-                    _ => StopReason::EndTurn,
+                    unknown => {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: format!(
+                                    "unsupported provider finish_reason: {}",
+                                    bounded_terminal_reason(unknown)
+                                ),
+                            })
+                            .await;
+                        return;
+                    }
                 };
 
                 // Emit accumulated tool calls. Some OpenAI-compatible providers stream
                 // function name/arguments but omit the tool call id; synthesize a stable
                 // per-response id so the following tool result can still be paired.
-                let has_native_tool_calls = tool_call_names.iter().any(|name| !name.is_empty());
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
@@ -311,7 +335,6 @@ pub(crate) async fn parse_sse_stream(
                 }
 
                 let text_calls = parse_text_tool_calls(&text_accumulator);
-                let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
@@ -334,13 +357,7 @@ pub(crate) async fn parse_sse_stream(
 
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
-                        stop_reason: if matches!(requested_stop_reason, StopReason::ToolUse)
-                            && !(has_native_tool_calls || has_text_tool_calls)
-                        {
-                            StopReason::EndTurn
-                        } else {
-                            requested_stop_reason
-                        },
+                        stop_reason: requested_stop_reason,
                         usage: Usage {
                             input_tokens,
                             output_tokens,
@@ -355,60 +372,27 @@ pub(crate) async fn parse_sse_stream(
         }
     }
 
-    // Stream ended without explicit [DONE] or finish_reason
-    let text_calls = parse_text_tool_calls(&text_accumulator);
-    for call in text_calls {
-        let _ = tx
-            .send(AgentEvent::ToolCall {
-                call,
-                provenance: ToolProvenance::Native,
-                summary_fields: vec![],
-            })
-            .await;
-    }
-
-    if !reasoning_text.is_empty() {
-        let _ = tx
-            .send(AgentEvent::ReasoningComplete {
-                blocks: vec![ReasoningBlock::Plain {
-                    text: std::mem::take(&mut reasoning_text),
-                }],
-            })
-            .await;
-    }
-
-    // Emit any accumulated native tool calls.
-    for i in 0..tool_call_ids.len() {
-        if !tool_call_names[i].is_empty() {
-            let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-            let args: Value =
-                serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
-            let _ = tx
-                .send(AgentEvent::ToolCall {
-                    call: ToolCall {
-                        id: tool_call_id,
-                        name: tool_call_names[i].clone(),
-                        input: args,
-                    },
-                    provenance: Default::default(),
-                    summary_fields: vec![],
-                })
-                .await;
-        }
-    }
-
     let _ = tx
-        .send(AgentEvent::TurnEnd {
-            stop_reason: StopReason::EndTurn,
-            usage: Usage {
-                input_tokens,
-                output_tokens,
-                cache_read_tokens: 0,
-                cache_write_tokens: 0,
-                reasoning_tokens,
-            },
+        .send(AgentEvent::Error {
+            message:
+                "provider stream closed without explicit terminal signal ([DONE] or finish_reason)"
+                    .into(),
         })
         .await;
+}
+
+fn bounded_terminal_reason(reason: &str) -> String {
+    const MAX_REASON_CHARS: usize = 120;
+    let bounded = reason
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(MAX_REASON_CHARS)
+        .collect::<String>();
+    if bounded.is_empty() {
+        "unknown".into()
+    } else {
+        bounded
+    }
 }
 
 fn finalized_tool_call_id(raw_id: &str, index: usize) -> String {
@@ -2192,6 +2176,107 @@ mod tests {
         assert!(
             tool_msgs.is_empty(),
             "orphan tool result must be dropped by OpenAI serializer"
+        );
+    }
+}
+
+#[cfg(test)]
+mod i168_terminal_outcome_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    async fn parse_raw_body(body: Vec<u8>) -> Vec<AgentEvent> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 2048];
+            let _ = socket.read(&mut request).await;
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            socket.write_all(headers.as_bytes()).await.unwrap();
+            socket.write_all(&body).await.unwrap();
+            socket.flush().await.unwrap();
+        });
+
+        let response = reqwest::get(format!("http://{addr}/stream")).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(32);
+        parse_sse_stream(response, tx, Duration::from_secs(5), Duration::from_secs(5)).await;
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn openai_eof_after_partial_text_is_terminal_error() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(
+            events.iter().any(
+                |event| matches!(event, AgentEvent::TextDelta { delta } if delta == "partial")
+            )
+        );
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("explicit terminal"))));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn openai_unknown_finish_reason_is_not_end_turn() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"content_filter\"}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message.contains("content_filter"))));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_byte_stream_error_is_terminal_error() {
+        let mut body = b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n".to_vec();
+        body.push(0xff);
+        let events = parse_raw_body(body).await;
+        assert!(events.iter().any(
+            |event| matches!(event, AgentEvent::Error { message } if message.contains("decode"))
+        ));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn explicit_provider_completion_regression_is_unchanged() {
+        let events = parse_raw_body(
+            b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"complete\"},\"finish_reason\":\"stop\"}]}\n\n".to_vec(),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                ..
+            }
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::Error { .. }))
         );
     }
 }
