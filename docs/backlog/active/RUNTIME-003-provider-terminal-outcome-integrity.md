@@ -5,10 +5,10 @@
 | Story ID | RUNTIME-003 |
 | Type | Technical Story (P0 reliability bug fix) |
 | Priority | P0 |
-| Status | Paused — maintainer-requested I168 hold (2026-07-29) |
+| Status | In Progress — I168 resumed by maintainer (2026-07-30) |
 | Source | Maintainer-provided TLOG analysis on 2026-07-29: three assistant responses ended as successful turns after dangling pre-tool text, without durable terminal-cause evidence |
 | Depends On | ADR-039; ADR-042; RUNTIME-002/PROVIDER-002 timeout foundations; SESSION-006 completed-prefix persistence |
-| Selected Iteration | I168 (Paused; explicit maintainer authorization required to resume) |
+| Selected Iteration | I168 (Active) |
 
 ## Identity / Goal / Value
 

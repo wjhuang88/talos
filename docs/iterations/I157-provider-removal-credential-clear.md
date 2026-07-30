@@ -1,6 +1,6 @@
 # Iteration I157: Provider Removal And Credential Clear
 
-> Document status: Complete
+> Document status: Complete — stale-snapshot concurrency correction verified (2026-07-30)
 > Published plan date: 2026-07-26
 > Planned objective: A user can remove a provider entry or clear one credential through `talos config unset ... --confirm` without hand-editing TOML.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -147,6 +147,17 @@ If a stop condition occurs:
 
 ## Verification Evidence
 
+- 2026-07-30 stale-snapshot correction: `ConfigStore::update_config` reloads persisted facts while
+  holding the same cross-process lock as provider unset; all Talos CLI runtime writers now apply
+  bounded semantic changes instead of saving long-lived snapshots. Deterministic tests prove
+  unset waits for an in-flight semantic update, removed providers and credentials do not
+  resurrect, `${ENV}` placeholders remain persisted, and credentials are not copied into
+  `config.toml`.
+- 2026-07-30 validation: `cargo fmt --all -- --check`,
+  `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`,
+  `cargo test --workspace --locked`, and `scripts/validate_project_governance.sh .` all exited 0.
+  Focused results include 213 `talos-config` unit tests and 289 `talos-cli` unit tests, with all
+  CLI integration suites passing.
 - Focused tests: 10 talos-config + 11 talos-cli = 21 new tests, all pass.
 - Full locked validation: `cargo test --workspace --locked` 2566 passed, 0 failed;
   `cargo clippy --workspace --locked -- -D warnings` clean;
@@ -161,6 +172,8 @@ If a stop condition occurs:
 
 ## Completion Evidence
 
+- Completion Commit: `5aac6756` (shared config mutation lock, latest-state semantic updates,
+  runtime writer migration, stale-snapshot and concurrency regressions).
 - Completion Commit: `8055f7ad` (Phase 1 correction: ConfigStore persisted-unset) + `bbe76021` (Phase 2 correction: CLI integration + recovery seam)
 - Previous premature completion: `84e7a6a3` + `46c919ee` (retained as historical implementation; superseded by correction).
 - Phase 1 correction: `ConfigStore` with atomic temp-file-then-rename writes to
@@ -174,6 +187,16 @@ If a stop condition occurs:
 
 ## Variance And Residuals
 
+- 2026-07-30 stale-snapshot concurrency acceptance correction: maintainer review proved that the
+  completed journal implementation checks the before image only once before `apply()`, while
+  Talos runtime paths still retain a `Config` snapshot across interactive work and later call
+  unconditional `Config::save()`. A writer that commits after provider unset can therefore
+  restore the removed provider or inline credential. I157/MODEL-010 is reopened as the sole
+  Active implementation authority while I168 remains Paused. The correction must introduce one
+  shared cross-process write lock, reload the current documents under that lock, express Talos
+  writes as semantic updates against that current state, and prove that an old interactive
+  snapshot cannot overwrite a completed unset. Existing completion commits remain historical
+  evidence and do not satisfy this correction.
 - 2026-07-28 priority shift: maintainer selected and activated I164/TUI-038
   after I163 completed. I157 remains Planned, its published scope and baseline
   are unchanged, and it is deferred until I164 disposition rather than
@@ -255,6 +278,10 @@ If a stop condition occurs:
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: pending
+- Outcome: Complete. Provider unset and every Talos-owned config writer now share one mutation
+  serialization boundary; interactive snapshots are no longer correctness-bearing.
+- Documentation: owner Story, iteration index, Product Backlog, Board, v0.6 program, and execution
+  package synchronized before I168 resumption.
+- Lessons: a transaction-local before-image check does not protect against independent
+  last-writer-wins snapshot APIs. Cross-process serialization must cover every cooperating writer,
+  and interactive flows must express intent against freshly loaded state.

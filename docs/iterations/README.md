@@ -33,7 +33,7 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
-| I168 | Provider Terminal Outcome Integrity | Paused — maintainer-requested hold (2026-07-29) | Pending — published P0 correction is retained unchanged; implementation may resume only after explicit maintainer authorization. |
+| I168 | Provider Terminal Outcome Integrity | Active — maintainer resumed (2026-07-30) | Pending — implement explicit provider terminal classification and bounded non-transcript diagnostic evidence. |
 | I166 | Interrupt Shortcut Reliability | Complete (2026-07-28) | ✅ Ctrl+C local clear/idle exit and Esc active-turn interruption with modal priority. 483 TUI + 2545 workspace tests and the maintainer Alacritty matrix passed. |
 | I164 | Startup Inline Composer Continuity | Paused — superseded target (2026-07-28) | Published post-first-submit bottom-layout target retained as historical evidence; no Completion Commit. |
 | I165 | Growing Conversation Composer Continuity | Complete (2026-07-28) | ✅ Composer follows the short Logo/history flow and becomes bottom-fixed only once the frame overflows. All 9 human acceptance cases PASS. |
@@ -189,7 +189,7 @@ docs/iterations/
 | I156 | TUI Narrow-Viewport And Resize Robustness | Complete — maintainer Alacritty walkthrough 2026-07-27 | TUI-035. All automated gates passed; maintainer performed real-terminal Cases A/B/C/D. Completion commits include `6909675` and the accepted Alternate-Screen correction chain through `d4d95ad`. See `I156-tui-narrow-viewport-resize.md`. |
 | I163 | Policy-Controlled Linked Skill Discovery | Complete (2026-07-28) | SKILL-003. Existing completion commits: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`, `e11481d`, `12ef1e3`. Windows link behavior and Level-2 reference containment remain explicit residuals. See `I163-policy-controlled-linked-skill-discovery.md`. |
 | I166 | Complete (2026-07-28) | TUI-036. Ctrl+C local clear/close and idle exit; Esc active-turn interruption after modal priority. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; 483 TUI + 2545 workspace tests and maintainer Alacritty acceptance passed. See `I166-interrupt-shortcut-reliability.md`. |
-| I157 | **Complete** (2026-07-29 finalization durability) | MODEL-010. Finalize residue preserved, strict UTF-8, recovery checkpoints, composite failures. Commit `ee76977a`; 2640 tests. |
+| I157 | **Complete** (2026-07-30 stale-snapshot concurrency correction) | MODEL-010. Completion commit `5aac6756`; every Talos config writer reloads and mutates current state under one cross-process lock. |
 | I167 | **Complete** (2026-07-29) | TUI-040. Completion implementation `3356aac`; automated validation and maintainer real-terminal review passed. See `I167-approval-option-contrast.md`. |
 | I158 | Tool Registration Composition Consolidation | Blocked | ARCH-034-R01. One explicit tool registration composition model with preserved print/TUI/MCP behavior. Blocked until ADR-053 is Accepted and ARCH-034-R01 is Ready. See `I158-tool-registration-composition.md`. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
@@ -301,7 +301,7 @@ Complete/Superseded dispositions without erasing their published objectives.
 | I164 | Paused (2026-07-28) — superseded target | TUI-038. Published post-first-submit bottom-layout behavior retained as historical evidence; no Completion Commit. |
 | I165 | Complete (2026-07-28) | TUI-039. Composer follows short Logo/history flow; bottom-fixed on overflow. Implementation commits `8e6ffe9`, `dc52b21`, `97267a`. All 9 human acceptance cases PASS. |
 | I166 | Complete (2026-07-28) | TUI-036. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; automated and maintainer Alacritty acceptance passed. |
-| I157 | Complete (2026-07-29 finalization durability) | MODEL-010. Finalize residue, strict UTF-8, recovery checkpoints. Commit `ee76977a`. |
+| I157 | Complete (2026-07-30 acceptance correction) | MODEL-010 stale-snapshot concurrency correction completed by `5aac6756`; earlier finalization evidence retained as historical. |
 | I167 | Complete (2026-07-29) | TUI-040. Completion implementation `3356aac`; scope was only unselected approval-option contrast. |
 | I158 | Blocked — ADR-053 not Accepted | ARCH-034-R01. Blocked until ADR-053 is Accepted by architecture/maintainer review and ARCH-034-R01 is Ready. |
 | I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
@@ -319,7 +319,8 @@ The current execution sequence is the
 listed above.
 
 I165 is Complete. TUI-039 is Complete. I164/TUI-038 is Paused.
-I166/TUI-036, I157/MODEL-010, and I167/TUI-040 are Complete. I164/TUI-038 remains Paused and
+I166/TUI-036, I167/TUI-040, and I157/MODEL-010 are Complete. I168/RUNTIME-003 is Active after
+explicit maintainer resumption. I164/TUI-038 remains Paused and
 I158-I162 remain Blocked.
 I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
 current selection, planning, status, or activation owner.

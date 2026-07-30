@@ -3,9 +3,9 @@
 > Document status: In Progress
 > Execution window: 2026-07-28 through 2026-11-28
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
-> Branch mode: direct `main` for I157 under the maintainer's no-parallel-task direction;
+> Branch mode: direct `main` for I168 under the maintainer's no-parallel-task direction;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: none; I157 finalization durability Complete
+> Current implementation authority: I168 / RUNTIME-003 provider terminal-outcome integrity only
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
 
 ## Outcome
@@ -69,8 +69,8 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
-| P1 | Execute I157 / MODEL-010 | provider-unset | P0 | acceptance | gate | Complete — Completion Commit: `fd35524b` |
-| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Paused — maintainer-requested hold |
+| P1 | Execute I157 / MODEL-010 | provider-unset | P0 | stale-snapshot concurrency acceptance correction | one locked current-state semantic update path across Talos writers | Complete — `5aac6756` |
+| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Active — maintainer resumed 2026-07-30 |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -143,7 +143,7 @@ do not record only “green”.
 
 ## Branch, Worktree, And Checkpoint Plan
 
-- Work directly on `main` for I157 under the maintainer's existing no-parallel-task direction.
+- Work directly on `main` for I168 under the maintainer's existing no-parallel-task direction.
 - The 2026-07-28 scale assessment recommends `high-risk`, `release-managed`, and
   `on-demand` worktrees. Reassess and record the branch decision before I158, where the
   architecture/security sequence begins.
@@ -229,21 +229,21 @@ skip to a later mainline package.
 
 ## Current Checkpoint
 
-- Completed task items: P0 (baseline inventory + package publication), P1 (I157/MODEL-010
-  transaction-corrected implementation).
-- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 Complete; I168/RUNTIME-003 and I164
-  are Paused; no implementation iteration is Active; I158-I162 Blocked; ADR-053 Proposed.
-- Commands/checks and actual results: `cargo test --workspace --locked` 2566 passed, 0 failed;
-  `cargo clippy --workspace --locked -- -D warnings` clean; `cargo fmt --all -- --check` clean;
-  `scripts/validate_project_governance.sh .` 0 warnings. Runtime fixture verified all acceptance
-  criteria including missing-confirm byte-identical, custom/builtin/api_key semantics, active-
-  provider picker recovery, and credential scan.
+- Completed task items: P0 (baseline inventory + package publication) and P1 (I157/MODEL-010,
+  including the stale-snapshot concurrency correction in `5aac6756`).
+- Completion Commit: `5aac675690bf6528d5977521db3dfb6f2abb486d`.
+- Current state and artifacts: I157/MODEL-010 and I167/TUI-040 are Complete;
+  I168/RUNTIME-003 is the sole Active implementation authority; I164 is Paused; I158-I162 are
+  Blocked; ADR-053 is Proposed.
+- Commands/checks and actual results for the I157 correction: locked workspace check, Clippy,
+  tests, formatting, governance validation, and diff checks passed on 2026-07-30. The owner
+  records `5aac6756` as the Completion Commit.
 - External-action authorization: validated `main` push at each phase boundary completed on
   2026-07-28. Tag, publish, release, deploy, force-push, and version changes remain unauthorized.
 - Open risks or deviations: ADR-053 acceptance, I161 independent reviewer, and I162 maintainer
   authorization are external gates. I158 remains Blocked until ADR-053 is Accepted.
-- Next task item: none while I168 is paused. Resume U1 only after explicit maintainer direction;
-  G1 remains deferred.
+- Next task item: execute U1 / I168 / RUNTIME-003 under its published provider terminal-outcome
+  acceptance. G1 remains deferred.
 - Recovery or resume instruction: read RUNTIME-003, I168, OBS-002's scope split, this package, and
   the v0.6 program; verify the current Git state; write the required failing provider fixtures
   before production changes; keep I158 blocked.
