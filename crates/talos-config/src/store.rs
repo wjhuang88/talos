@@ -11,7 +11,9 @@ use journal::{FinalizeOutcome, Txn, apply, finalize_active, gen_txn_id, prepare,
 use std::path::PathBuf;
 
 pub(crate) use fs::{Fs, FsOperation, StdFs};
-pub(crate) use recovery::{RecoveryOutcome, RecoveryPurpose};
+#[cfg(test)]
+pub(crate) use recovery::RecoveryOutcome;
+pub(crate) use recovery::RecoveryPurpose;
 
 pub(crate) const ACTIVE_DIR_NAME: &str = ".provider-unset-transaction";
 pub(crate) const PREPARE_PREFIX: &str = ".provider-unset-transaction.prepare.";
