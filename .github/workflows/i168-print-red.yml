@@ -1,0 +1,57 @@
+name: I168 Print Mode Red Evidence
+
+on:
+  push:
+    branches:
+      - agent/i168-terminal-closeout
+
+permissions:
+  contents: read
+
+jobs:
+  prove-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b5fcaaf3eb98f6f2e6734c1ad7be92701ce026fe
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Add failing print-mode projection test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/talos-cli/src/mode_print.rs')
+          text = path.read_text()
+          marker = '''    #[test]
+              fn submit_op_plain_when_no_attach_and_no_preview() {
+          '''
+          test = '''    #[test]
+              fn terminal_print_notice_marks_max_tokens_as_truncated() {
+                  let notice = terminal_notice_for_stop_reason(&talos_core::message::StopReason::MaxTokens)
+                      .expect("MaxTokens notice");
+                  assert!(notice.contains("truncated"));
+                  assert!(notice.contains("partial response preserved"));
+              }
+
+          '''
+          if text.count(marker) != 1:
+              raise SystemExit(f'marker count: {text.count(marker)}')
+          path.write_text(text.replace(marker, test + marker, 1))
+          PY
+          set +e
+          cargo test --locked -p talos-cli terminal_print_notice_marks_max_tokens_as_truncated \
+            > i168-print-red.log 2>&1
+          status=$?
+          set -e
+          cat i168-print-red.log
+          printf '\nRED_EXIT_CODE=%s\n' "$status"
+          if [[ "$status" -eq 0 ]]; then
+            echo 'Expected the print-mode MaxTokens test to fail before production implementation.' >&2
+            exit 1
+          fi
+          grep -Fq 'terminal_notice_for_stop_reason' i168-print-red.log
