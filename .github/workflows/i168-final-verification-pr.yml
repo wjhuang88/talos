@@ -1,0 +1,50 @@
+name: I168 Final Verification PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-merged-commit:
+    if: github.head_ref == 'verification/i168-final-b5fcaaf'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TARGET_SHA: b5fcaaf3eb98f6f2e6734c1ad7be92701ce026fe
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Checkout verification controls
+        uses: actions/checkout@v4
+        with:
+          ref: verification/i168-final-b5fcaaf
+          path: control
+          fetch-depth: 1
+      - name: Checkout merged target
+        uses: actions/checkout@v4
+        with:
+          ref: b5fcaaf3eb98f6f2e6734c1ad7be92701ce026fe
+          path: target
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: target
+      - name: Execute final matrix
+        working-directory: target
+        env:
+          CONTROL_ROOT: ${{ github.workspace }}/control
+          EVIDENCE_DIR: ${{ github.workspace }}/evidence
+        run: bash "$CONTROL_ROOT/scripts/verification/i168_final_verify.sh"
+      - name: Upload final evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i168-final-verification-b5fcaaf
+          path: evidence
+          if-no-files-found: error
