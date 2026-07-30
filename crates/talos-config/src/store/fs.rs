@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum FsOperation {
-    CleanupPrepareResidues,
     ReadActiveManifest,
     ReadFinalizeManifest,
     ReadCleanupReadyMarker,
@@ -27,7 +26,10 @@ pub(crate) enum FsOperation {
     SyncCredentialsParentAfterRemove,
     VerifyConfigAfter,
     VerifyCredentialsAfter,
+    VerifyConfigBeforeApply,
+    VerifyCredentialsBeforeApply,
     WriteCommittedManifest,
+    WriteAbortedManifest,
     WriteRollbackRequiredManifest,
     RestoreConfigBefore,
     RestoreCredentialsBefore,

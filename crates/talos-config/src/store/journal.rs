@@ -19,12 +19,14 @@ pub(super) enum Phase {
     Committed,
     RollbackRequired,
     RolledBack,
+    Aborted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TerminalPhase {
     Committed,
     RolledBack,
+    Aborted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,6 +135,10 @@ pub(super) fn validate_terminal_state(
     manifest: &Manifest,
     phase: TerminalPhase,
 ) -> Result<(), ConfigError> {
+    if phase == TerminalPhase::Aborted {
+        return Ok(());
+    }
+
     let (config_image, credentials_image) = match phase {
         TerminalPhase::Committed => (
             read_image(
@@ -166,6 +172,7 @@ pub(super) fn validate_terminal_state(
                 FsOperation::ReadCredentialsBeforeImage,
             )?,
         ),
+        TerminalPhase::Aborted => unreachable!("handled above"),
     };
 
     verify_state(
@@ -177,14 +184,17 @@ pub(super) fn validate_terminal_state(
         match phase {
             TerminalPhase::Committed => FsOperation::VerifyConfigAfter,
             TerminalPhase::RolledBack => FsOperation::VerifyConfigBefore,
+            TerminalPhase::Aborted => unreachable!("handled above"),
         },
         match phase {
             TerminalPhase::Committed => FsOperation::VerifyCredentialsAfter,
             TerminalPhase::RolledBack => FsOperation::VerifyCredentialsBefore,
+            TerminalPhase::Aborted => unreachable!("handled above"),
         },
         match phase {
             TerminalPhase::Committed => "Committed recovery",
             TerminalPhase::RolledBack => "RolledBack recovery",
+            TerminalPhase::Aborted => unreachable!("handled above"),
         },
     )
 }

@@ -5,6 +5,7 @@ use super::journal::{
 };
 use super::{
     ConfigStore, FINALIZE_PREFIX, Fs, FsOperation, PREPARE_PREFIX, ambiguous_finalization_error,
+    before_state_matches,
 };
 use crate::ConfigError;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ pub(crate) enum RecoveryPurpose {
 pub(crate) enum TerminalPhase {
     Committed,
     RolledBack,
+    Aborted,
 }
 
 impl From<TerminalPhase> for JournalTerminalPhase {
@@ -26,6 +28,7 @@ impl From<TerminalPhase> for JournalTerminalPhase {
         match value {
             TerminalPhase::Committed => Self::Committed,
             TerminalPhase::RolledBack => Self::RolledBack,
+            TerminalPhase::Aborted => Self::Aborted,
         }
     }
 }
@@ -129,7 +132,7 @@ impl ConfigStore {
                     TerminalPhase::Committed,
                 ))
             }
-            Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {
+            Phase::Prepared => {
                 let cfg_before = read_image(
                     fs,
                     active_dir,
@@ -144,42 +147,55 @@ impl ConfigStore {
                     manifest.credentials_existed_before,
                     FsOperation::ReadCredentialsBeforeImage,
                 )?;
+                let txn = Txn {
+                    cfg_existed: manifest.config_existed_before,
+                    cfg_after_exists: manifest.config_exists_after,
+                    cred_existed: manifest.credentials_existed_before,
+                    cred_after_exists: manifest.credentials_exist_after,
+                    cfg_before: cfg_before.unwrap_or_default(),
+                    cfg_after: Vec::new(),
+                    cred_before: cred_before.unwrap_or_default(),
+                    cred_after: Vec::new(),
+                };
 
-                fs.checkpoint(FsOperation::RestoreConfigBefore)?;
-                restore(
-                    fs,
-                    &self.config_path,
-                    cfg_before.as_deref(),
-                    FsOperation::RemoveConfigForBeforeAbsence,
-                    FsOperation::SyncConfigParentAfterRollback,
-                )?;
-                fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
-                restore(
-                    fs,
-                    &self.credentials_path,
-                    cred_before.as_deref(),
-                    FsOperation::RemoveCredentialsForBeforeAbsence,
-                    FsOperation::SyncCredentialsParentAfterRollback,
-                )?;
+                if !before_state_matches(fs, &self.config_path, &self.credentials_path, &txn)? {
+                    fs.checkpoint(FsOperation::WriteAbortedManifest)?;
+                    write_manifest(
+                        fs,
+                        active_dir,
+                        Phase::Aborted,
+                        &manifest.transaction_id,
+                        &txn,
+                    )?;
+                    return Ok(map_finalize_outcome(
+                        finalize_active(fs, active_dir, &manifest.transaction_id)?,
+                        TerminalPhase::Aborted,
+                    ));
+                }
 
-                verify_state(
-                    fs,
-                    &self.config_path,
-                    &self.credentials_path,
-                    cfg_before.as_deref(),
-                    cred_before.as_deref(),
-                    FsOperation::VerifyConfigBefore,
-                    FsOperation::VerifyCredentialsBefore,
-                    "recovery",
-                )?;
-
-                fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
-                write_manifest(
+                recover_before_state(fs, self, active_dir, &manifest, txn)
+            }
+            Phase::Applying | Phase::RollbackRequired => {
+                let cfg_before = read_image(
                     fs,
                     active_dir,
-                    Phase::RolledBack,
-                    &manifest.transaction_id,
-                    &Txn {
+                    "config.before",
+                    manifest.config_existed_before,
+                    FsOperation::ReadConfigBeforeImage,
+                )?;
+                let cred_before = read_image(
+                    fs,
+                    active_dir,
+                    "credentials.before",
+                    manifest.credentials_existed_before,
+                    FsOperation::ReadCredentialsBeforeImage,
+                )?;
+                recover_before_state(
+                    fs,
+                    self,
+                    active_dir,
+                    &manifest,
+                    Txn {
                         cfg_existed: manifest.config_existed_before,
                         cfg_after_exists: manifest.config_exists_after,
                         cred_existed: manifest.credentials_existed_before,
@@ -189,13 +205,12 @@ impl ConfigStore {
                         cred_before: cred_before.unwrap_or_default(),
                         cred_after: Vec::new(),
                     },
-                )?;
-
-                Ok(map_finalize_outcome(
-                    finalize_active(fs, active_dir, &manifest.transaction_id)?,
-                    TerminalPhase::RolledBack,
-                ))
+                )
             }
+            Phase::Aborted => Ok(map_finalize_outcome(
+                finalize_active(fs, active_dir, &manifest.transaction_id)?,
+                TerminalPhase::Aborted,
+            )),
             Phase::RolledBack => {
                 validate_terminal_state(
                     fs,
@@ -254,6 +269,17 @@ impl ConfigStore {
                     return Err(ConfigError::InvalidConfig(
                         "finalization cleanup marker transaction identifier mismatch".into(),
                     ));
+                }
+                if fs
+                    .checkpoint(FsOperation::SyncFinalizeDirectory)
+                    .and_then(|_| fs.sync_dir(&entry))
+                    .is_err()
+                {
+                    return Ok(RecoveryOutcome::ParentSyncPending {
+                        transaction_id: transaction_id.to_string(),
+                        phase: TerminalPhase::Committed,
+                        finalize_dir: entry,
+                    });
                 }
                 outcome = merge_recovery_outcomes(
                     outcome,
@@ -332,19 +358,80 @@ impl ConfigStore {
                 continue;
             }
 
-            // Preparation residues are unpublished and never interpreted.
-            // Refuse to follow links; cleanup remains best-effort.
-            if !fs.is_real_dir(&entry)? {
-                continue;
-            }
-
-            if fs.checkpoint(FsOperation::CleanupPrepareResidues).is_ok() {
-                let _ = fs.remove_dir(&entry);
-            }
+            // Preparation directories are unpublished but may belong to a live
+            // concurrent process. Never delete an unowned preparation directory.
+            // A future lease/owner-token design may add bounded garbage collection.
+            let _ = fs.is_real_dir(&entry)?;
         }
 
         Ok(())
     }
+}
+
+fn recover_before_state(
+    fs: &dyn Fs,
+    store: &ConfigStore,
+    active_dir: &Path,
+    manifest: &Manifest,
+    txn: Txn,
+) -> Result<RecoveryOutcome, ConfigError> {
+    fs.checkpoint(FsOperation::RestoreConfigBefore)?;
+    restore(
+        fs,
+        &store.config_path,
+        if txn.cfg_existed {
+            Some(txn.cfg_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::RemoveConfigForBeforeAbsence,
+        FsOperation::SyncConfigParentAfterRollback,
+    )?;
+    fs.checkpoint(FsOperation::RestoreCredentialsBefore)?;
+    restore(
+        fs,
+        &store.credentials_path,
+        if txn.cred_existed {
+            Some(txn.cred_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::RemoveCredentialsForBeforeAbsence,
+        FsOperation::SyncCredentialsParentAfterRollback,
+    )?;
+
+    verify_state(
+        fs,
+        &store.config_path,
+        &store.credentials_path,
+        if txn.cfg_existed {
+            Some(txn.cfg_before.as_slice())
+        } else {
+            None
+        },
+        if txn.cred_existed {
+            Some(txn.cred_before.as_slice())
+        } else {
+            None
+        },
+        FsOperation::VerifyConfigBefore,
+        FsOperation::VerifyCredentialsBefore,
+        "recovery",
+    )?;
+
+    fs.checkpoint(FsOperation::WriteRolledBackManifest)?;
+    write_manifest(
+        fs,
+        active_dir,
+        Phase::RolledBack,
+        &manifest.transaction_id,
+        &txn,
+    )?;
+
+    Ok(map_finalize_outcome(
+        finalize_active(fs, active_dir, &manifest.transaction_id)?,
+        TerminalPhase::RolledBack,
+    ))
 }
 
 fn cleanup_ready_residue(
@@ -386,6 +473,7 @@ fn terminal_phase(manifest: &Manifest) -> Result<TerminalPhase, ConfigError> {
     match manifest.phase {
         Phase::Committed => Ok(TerminalPhase::Committed),
         Phase::RolledBack => Ok(TerminalPhase::RolledBack),
+        Phase::Aborted => Ok(TerminalPhase::Aborted),
         _ => Err(ConfigError::InvalidConfig(
             "finalization residue contains a non-terminal manifest".into(),
         )),
