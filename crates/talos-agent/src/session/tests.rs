@@ -114,6 +114,24 @@ impl LanguageModel for PreviewModel {
     }
 }
 
+struct CapturingModel {
+    captured: Arc<Mutex<Vec<Vec<Message>>>>,
+}
+
+#[async_trait]
+impl LanguageModel for CapturingModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured.lock().unwrap().push(messages.to_vec());
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            for event in success_events("captured") {
+                let _ = tx.send(event).await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
 fn make_agent(model: impl LanguageModel + 'static) -> Agent {
     #[allow(deprecated)]
     Agent::new(Arc::new(model), ToolRegistry::new())
@@ -292,6 +310,73 @@ async fn test_multi_turn() {
         success_count >= 1,
         "Should have at least 1 TurnCompleted(Success)"
     );
+}
+
+#[tokio::test]
+async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    let eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: StructuredSubmission {
+                id: "batch_a".into(),
+                source: SubmissionSource::User,
+                items: vec![
+                    SubmissionItem {
+                        id: "item_a".into(),
+                        enqueue_sequence: 1,
+                        kind: SubmissionKind::UserTurn,
+                        text: "first".into(),
+                        attachments: Vec::new(),
+                    },
+                    SubmissionItem {
+                        id: "item_b".into(),
+                        enqueue_sequence: 2,
+                        kind: SubmissionKind::UserTurn,
+                        text: "second".into(),
+                        attachments: Vec::new(),
+                    },
+                ],
+            },
+        })
+        .await
+        .unwrap();
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    let requests = captured.lock().unwrap();
+    let users = requests[0]
+        .iter()
+        .filter_map(|message| match message {
+            Message::User { content } => Some(content.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(users, vec!["first", "second"]);
+    drop(requests);
+
+    let events = collect_events(eq_rx, Duration::from_millis(50)).await;
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionQueued { submission_id, .. } if submission_id == "batch_a"
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionStarted { submission_id, .. } if submission_id == "batch_a"
+    )));
 }
 
 #[tokio::test]
