@@ -49,7 +49,13 @@ known filtered/refused/paused/deprecated reasons, a synthetic unknown reason, te
 EOF, invalid UTF-8, transport failure, and a successful tool result followed by continuation EOF.
 OpenAI `content_filter` is a known filtered failure and deprecated `function_call` is rejected with
 migration guidance. Anthropic `stop_sequence` is normal completion; `pause_turn` and `refusal` are
-explicit bounded non-success outcomes because Talos does not automatically resume server-tool pauses.
+explicit bounded non-success outcomes because Talos does not automatically resume server-tool
+pauses.
+
+The strengthened assertions require normal completion to keep stderr empty, MaxTokens to emit
+exactly one truncation notice, known policy outcomes to avoid the unknown classification, and every
+error path to exclude a stale truncation warning. A merged stdout/stderr run additionally proves the
+partial answer is newline-terminated before the warning.
 
 The initial I168 completion packet used workflow `30552762936`. Maintainer review then exposed
 known-reason policy and merged-terminal-output gaps. Correction revalidation workflow `30558757429`
