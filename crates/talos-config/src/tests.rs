@@ -3194,7 +3194,7 @@ fn recovery_restore_config_succeeds_credentials_fails_retains_journal() {
 }
 
 #[test]
-fn finalize_residue_not_deleted_by_cleanup_residues() {
+fn malformed_finalize_residue_is_preserved_and_fails_closed() {
     let dir = unique_test_dir("finalize-retain");
     let _ = setup_full_fixture(&dir);
     let finalize_dir = dir.join(".provider-unset-transaction.finalize.orphan-3");
@@ -3202,12 +3202,8 @@ fn finalize_residue_not_deleted_by_cleanup_residues() {
     fs::write(finalize_dir.join("manifest"), b"stale").unwrap();
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
-
-    assert!(
-        finalize_dir.exists(),
-        "finalize residue must NOT be deleted by cleanup_residues"
-    );
+    assert!(store.recover(&StdFs).is_err());
+    assert!(finalize_dir.exists());
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -3509,20 +3505,16 @@ fn corrupt_credentials_error_does_not_leak_secret() {
 }
 
 #[test]
-fn finalize_residue_does_not_block_new_mutation() {
-    let dir = unique_test_dir("finalize-residue-ok");
-    let _ = setup_full_fixture(&dir);
+fn malformed_finalize_residue_blocks_new_mutation() {
+    let dir = unique_test_dir("finalize-residue-invalid");
+    let (cfg_before, cred_before) = setup_full_fixture(&dir);
     let residue_dir = dir.join(".provider-unset-transaction.finalize.orphan-1");
     fs::create_dir_all(&residue_dir).unwrap();
     fs::write(residue_dir.join("manifest"), b"stale").unwrap();
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.custom-a").unwrap();
-    assert_eq!(
-        outcome,
-        ConfigUnsetOutcome::CustomProviderRemoved {
-            name: "custom-a".to_string()
-        }
-    );
+    assert!(store.unset_provider("providers.custom-a").is_err());
+    assert_both_unchanged(&dir, &cfg_before, &cred_before);
+    assert!(residue_dir.exists());
     let _ = fs::remove_dir_all(&dir);
 }
 
