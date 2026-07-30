@@ -1125,7 +1125,20 @@ impl ConversationEngine {
         vec![content_block(MessageSource::System, text)]
     }
 
-    /// Drains the entire steering queue into a single batched message (I50).
+    /// Drains the oldest steering message while preserving FIFO order.
+    ///
+    /// This method remains available for downstream callers that need the
+    /// original single-item behavior. Talos's interactive runtime uses
+    /// [`Self::drain_steering_queue_batched`] for TUI-041 / GitHub Issue #50.
+    pub fn drain_steering_queue(&mut self) -> Option<String> {
+        if self.steering_queue.is_empty() {
+            None
+        } else {
+            Some(self.steering_queue.remove(0))
+        }
+    }
+
+    /// Drains the entire steering queue into a single batched message (TUI-041).
     ///
     /// When multiple user inputs accumulate in the steering queue during an
     /// active turn, this method joins them with `\n\n` separators so they are
