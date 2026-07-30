@@ -35,6 +35,7 @@ jobs:
           for line in lines[start:end]:
               body.append(line[10:] if line.startswith('          ') else line)
           script = '\n'.join(body) + '\n'
+
           brittle = 'replace_once("crates/talos-config/src/store/recovery.rs", old_arm, new_arm)'
           robust = '''p = Path("crates/talos-config/src/store/recovery.rs")
           text = p.read_text()
@@ -45,7 +46,21 @@ jobs:
           p.write_text(text[:start_index] + new_arm + text[end_index:])'''
           if brittle not in script:
               raise SystemExit('brittle recovery replacement not found in extracted script')
-          Path('/tmp/apply_i157.py').write_text(script.replace(brittle, robust, 1))
+          script = script.replace(brittle, robust, 1)
+
+          brittle_cleanup = 'replace_once("crates/talos-config/src/store/recovery.rs", old_cleanup, new_cleanup)'
+          robust_cleanup = '''p = Path("crates/talos-config/src/store/recovery.rs")
+          text = p.read_text()
+          start_marker = "            // Preparation residues are unpublished and never interpreted."
+          end_marker = "        }\\n\\n        Ok(())\\n    }"
+          start_index = text.index(start_marker)
+          end_index = text.index(end_marker, start_index)
+          p.write_text(text[:start_index] + new_cleanup + text[end_index:])'''
+          if brittle_cleanup not in script:
+              raise SystemExit('brittle prepare cleanup replacement not found in extracted script')
+          script = script.replace(brittle_cleanup, robust_cleanup, 1)
+
+          Path('/tmp/apply_i157.py').write_text(script)
           PY
           python3 /tmp/apply_i157.py
       - name: Format and focused validation
