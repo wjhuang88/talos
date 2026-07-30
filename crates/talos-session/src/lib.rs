@@ -43,6 +43,7 @@ pub mod sqlite;
 mod store;
 pub mod todo;
 mod tool_compression;
+mod tool_contributions;
 mod topology;
 mod transcript;
 pub use tool_compression::{ToolOutputCompression, compress_tool_output};
@@ -66,6 +67,7 @@ pub use todo::{
     TodoUpdateBatchTool, TodoUpdateInput, TodoUpdateStatusInput, TodoUpdateStatusTool,
     TodoUpdateTool, status_icon,
 };
+pub use tool_contributions::todo_tool_contributions_for_sessions_dir;
 pub use transcript::{TranscriptEntry, export_json, export_markdown, read_transcript};
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
