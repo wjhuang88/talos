@@ -315,7 +315,6 @@ pub(crate) async fn parse_sse_stream(
                 // Emit accumulated tool calls. Some OpenAI-compatible providers stream
                 // function name/arguments but omit the tool call id; synthesize a stable
                 // per-response id so the following tool result can still be paired.
-                let has_native_tool_calls = tool_call_names.iter().any(|name| !name.is_empty());
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
@@ -336,7 +335,6 @@ pub(crate) async fn parse_sse_stream(
                 }
 
                 let text_calls = parse_text_tool_calls(&text_accumulator);
-                let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
