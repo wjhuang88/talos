@@ -854,7 +854,7 @@ fn mock_request_is_model_passthrough_slash_command() {
 }
 
 // ---------------------------------------------------------------------------
-// drain_steering_queue_batched
+// drain_steering_queue / drain_steering_queue_batched
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -876,7 +876,10 @@ fn enqueue_steering_records_queue_and_status() {
 
     let outputs = engine.enqueue_steering("queued".to_string());
 
-    assert_eq!(engine.drain_steering_queue_batched(), Some("queued".to_string()));
+    assert_eq!(
+        engine.drain_steering_queue_batched(),
+        Some("queued".to_string())
+    );
     assert!(outputs.iter().any(|output| matches!(
         output,
         UiOutput::Tip {
@@ -972,6 +975,17 @@ fn drain_steering_queue_batched_joins_all_with_separator() {
         engine.steering_queue.is_empty(),
         "queue must be empty after batched drain"
     );
+}
+
+#[test]
+fn drain_steering_queue_preserves_legacy_single_item_fifo_behavior() {
+    let mut engine = new_engine();
+    engine.steering_queue.push("first".to_string());
+    engine.steering_queue.push("second".to_string());
+
+    assert_eq!(engine.drain_steering_queue(), Some("first".to_string()));
+    assert_eq!(engine.drain_steering_queue(), Some("second".to_string()));
+    assert_eq!(engine.drain_steering_queue(), None);
 }
 
 #[test]

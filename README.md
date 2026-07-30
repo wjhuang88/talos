@@ -486,10 +486,12 @@ Press `Esc` during an active turn to request cancellation. `Ctrl+C` clears the
 composer locally; with an empty idle composer, press `Ctrl+C` twice to exit
 Talos.
 
-If you type a message while the model is still processing, it queues automatically and is sent
-FIFO after the current turn completes. The TUI shows a compact preview of queued messages
-above the composer (up to 6 lines; longer queues show a `+N more` summary). The preview clears
-when the queue empties.
+If you type messages while the model is still processing, they queue automatically. After the
+current turn completes, Talos drains every message currently queued in FIFO order into one
+follow-up user turn, preserving each entry and separating entries with a blank line. Messages that
+arrive during that follow-up form the next batch. The TUI shows a compact preview above the
+composer (up to 6 lines; longer queues show a `+N more` summary), which clears when the batch is
+drained.
 
 Use `/model` to switch among models whose providers are already configured. The picker
 uses **three-level navigation**: Level 1 lists recent models (when available, persisted

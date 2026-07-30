@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-28"
-status_note: "High-risk/release-managed profile confirmed. I156/TUI-035 and I163/SKILL-003 are Complete; I164/TUI-038 is the sole Active implementation iteration; I157 is Planned; I158-I162 are Blocked; ADR-053 is Proposed. SESSION-008 owns GitHub Issue #45 in Refinement. REL-002 remains NO-GO."
+last_audited_at: "2026-07-30"
+status_note: "High-risk/release-managed profile confirmed. I169/TUI-041 implementation and focused gates pass, but it remains Active because pre-existing Windows workspace-test failures block Review. Remote main now records I168 Active after maintainer resumption; I164 remains Paused; I158-I162 remain Blocked; ADR-053 remains Proposed. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,8 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Execute only I164/TUI-038 directly on main under the 2026-07-28 maintainer no-parallel-work exception; restore worktree isolation if parallel work begins"
+    - "Rebase I169 onto fetched origin/main@b5fcaaf3 and rerun focused gates before its draft PR; clear or separately remediate the recorded Windows workspace-test baseline blockers before Review"
+    - "Preserve remote-main I168/RUNTIME-003 Active state and keep I169 isolated to its Issue #50 draft PR; keep I164/TUI-038 Paused"
     - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
     - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"

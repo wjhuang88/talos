@@ -97,3 +97,11 @@ variant 要求下一个 pre-1.0 minor release 和下游 exhaustive-match 迁移�
 - `cargo check --workspace --locked`
 - `cargo clippy --workspace --locked -- -D warnings`
 - `cargo test --workspace --locked`
+
+## Issue #50 Follow-Up (TUI-041 / I169)
+
+TUI-026/I145 remains the completed owner of queue projection and display. Its original execution
+baseline drained one FIFO entry after each authoritative completed turn. GitHub Issue #50 requests
+a different consumption cardinality: drain all entries present at completion into one FIFO
+follow-up turn. TUI-041/I169 owns that later behavior change without rewriting I145 history or
+changing ADR-039/049 ownership, projection, bounded-display, or drain-timing constraints.

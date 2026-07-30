@@ -414,6 +414,154 @@ mod tests {
         loop_handle.abort();
     }
 
+    #[tokio::test]
+    async fn conversation_loop_batches_all_queued_steering_into_one_submit() {
+        let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx: event_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_watch_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
+            },
+        ));
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(output, UiOutput::Status(status) if status.is_processing) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("turn start reaches conversation state");
+
+        for message in ["first", "second", "third"] {
+            user_tx
+                .send(UserInput::Message(message.to_string()))
+                .unwrap();
+        }
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 3
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("all three steering messages reach the authoritative queue");
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 1,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: String::new(),
+                        new_messages: vec![],
+                    },
+                },
+            })
+            .unwrap();
+
+        let first_batch = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("batched submit arrives")
+            .and_then(|op| match op {
+                talos_core::session::SessionOp::Submit { message } => Some(message),
+                _ => None,
+            });
+        assert_eq!(first_batch.as_deref(), Some("first\n\nsecond\n\nthird"));
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), sq_rx.recv())
+                .await
+                .is_err(),
+            "one completed turn must create exactly one follow-up submit"
+        );
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 0
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("queue preview clears after the batch drains");
+
+        user_tx
+            .send(UserInput::Message("later".to_string()))
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 1
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("later steering input forms the next queue batch");
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_2".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: String::new(),
+                        new_messages: vec![],
+                    },
+                },
+            })
+            .unwrap();
+
+        let second_batch = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("later batch submit arrives")
+            .and_then(|op| match op {
+                talos_core::session::SessionOp::Submit { message } => Some(message),
+                _ => None,
+            });
+        assert_eq!(second_batch.as_deref(), Some("later"));
+
+        loop_handle.abort();
+    }
+
     // FS02 / RUNTIME-002: runtime-level integration coverage proving the conversation loop
     // forwards a terminal `UiOutput::Status { is_processing: false }` after provider/tool errors,
     // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
@@ -2011,7 +2159,10 @@ mod steering_snapshot_tests {
         assert_eq!(msg, "a\n\nb\n\nc");
 
         let snap = engine.steering_queue_snapshot();
-        assert_eq!(snap.total_count, 0, "queue must be empty after batched drain");
+        assert_eq!(
+            snap.total_count, 0,
+            "queue must be empty after batched drain"
+        );
         assert!(snap.entries.is_empty());
     }
     #[test]
