@@ -40,7 +40,9 @@ pub(crate) enum FsOperation {
     PublishFinalizeDirectory,
     SyncTransactionParentAfterFinalize,
     SyncFinalizeResidueParent,
-    CleanupFinalizeDirectory,
+    PublishCleanupDirectory,
+    SyncTransactionParentAfterCleanupPublish,
+    CleanupPublishedDirectory,
     SyncTransactionParentAfterCleanup,
 }
 
