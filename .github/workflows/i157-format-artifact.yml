@@ -1,0 +1,32 @@
+name: I157 Format Artifact
+
+on:
+  push:
+    branches:
+      - fix/i157-finalization-durability
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          components: rustfmt
+      - name: Format sources
+        run: cargo fmt --all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: i157-formatted-sources
+          path: |
+            crates/talos-config/src/store.rs
+            crates/talos-config/src/store/fs.rs
+            crates/talos-config/src/store/journal.rs
+            crates/talos-config/src/store/recovery.rs
+            crates/talos-config/src/store_finalization_tests.rs
+            crates/talos-cli/tests/config_unset_finalization.rs
+          if-no-files-found: error
