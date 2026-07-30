@@ -70,7 +70,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 |---|---|---|---|---|---|---|
 | P0 | Publish this execution baseline and activate the first eligible iteration | I157 Active; MODEL-010 In Progress; Board/program/index synchronized | I166 Complete; no other Active/Review implementation iteration | Governance validation and clean staged review | Stop if inventory contradicts owner docs | Complete |
 | P1 | Execute I157 / MODEL-010 | provider-unset | P0 | stale-snapshot concurrency acceptance correction | one locked current-state semantic update path across Talos writers | Complete — `5aac6756` |
-| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `2eac5b05`; 2673 tests and dual-protocol fixture pass |
+| U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `86262d02`; 2673 tests and dual-protocol fixture pass |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
@@ -251,12 +251,12 @@ skip to a later mainline package.
 ## I168 Closeout Checkpoint — 2026-07-30
 
 Completed task items:
-- U1 / I168 / RUNTIME-003 Complete at `2eac5b05`.
+- U1 / I168 / RUNTIME-003 Complete at `86262d02`.
 
 Current state and artifacts:
 - provider/session/conversation/TUI foundation: PR #63 merge `b5fcaaf3`;
 - print/headless MaxTokens projection: `dda2170f`;
-- deterministic fixture packet: `2eac5b05`;
+- deterministic fixture packet: `86262d02`;
 - final detailed validation: workflow `30552762936`, artifact `i168-closeout-validation`.
 
 Commands/checks and actual results:

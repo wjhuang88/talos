@@ -9,7 +9,8 @@ successful response from prose shape or from the transport simply closing.
 |---|---|---|---|
 | Explicit normal completion | Response completes quietly | Response completes quietly | Success |
 | Output token limit (`MaxTokens`) | Partial response remains visible with a truncation notice | Partial stdout remains visible and stderr reports that the response was truncated | Success, but explicitly truncated |
-| Unsupported finish/stop reason | Bounded provider failure | Partial stdout may remain visible; stderr names the bounded unsupported reason | Failure |
+| Known filtered/refused/paused/deprecated reason | Explicit bounded policy result | Partial stdout may remain visible; stderr names the known policy outcome | Failure unless the known reason is normal (`stop_sequence`) |
+| Truly unknown finish/stop reason | Bounded provider failure | Partial stdout may remain visible; stderr names the bounded unsupported reason | Failure |
 | Stream closes without terminal frame | Bounded provider/stream failure | Partial stdout may remain visible; stderr explains the missing explicit terminal signal | Failure |
 | Invalid UTF-8 or transport read failure | Bounded provider/transport failure | stderr identifies decode or transport category | Failure |
 
@@ -44,14 +45,17 @@ scripts/verify_i168_provider_terminal.sh target/debug/talos
 ```
 
 The fixture covers OpenAI-compatible and Anthropic-compatible normal completion, MaxTokens,
-unsupported reasons, terminal-frame-less EOF, invalid UTF-8, transport failure, and a successful
-tool result followed by continuation EOF.
+known filtered/refused/paused/deprecated reasons, a synthetic unknown reason, terminal-frame-less
+EOF, invalid UTF-8, transport failure, and a successful tool result followed by continuation EOF.
+OpenAI `content_filter` is a known filtered failure and deprecated `function_call` is rejected with
+migration guidance. Anthropic `stop_sequence` is normal completion; `pause_turn` and `refusal` are
+explicit bounded non-success outcomes because Talos does not automatically resume server-tool pauses.
 
-The I168 completion packet used workflow run `30552762936` at validation harness commit `62ae098d`.
-All focused commands, source scan, governance validation, build, and the rebuilt-binary fixture
-exited 0; `cargo test --workspace --locked` recorded 2673 passed and zero failed. The governance
-closeout mutation then passed in workflow run `30554255195`. Completion Commit `2eac5b05` predates
-both evidence-recording steps and owns the final implementation plus deterministic fixture scripts.
+The initial I168 completion packet used workflow `30552762936`. Maintainer review then exposed
+known-reason policy and merged-terminal-output gaps. Correction revalidation workflow `30558757429`
+(job `90925992796`) passed all focused tests, workspace fmt/check/Clippy/tests, governance, build,
+and the strengthened rebuilt-binary fixture. Completion Commit `86262d02` owns the clean corrected
+implementation and contains no workflow logs, cache files, or patch scripts.
 
 ## Troubleshooting
 

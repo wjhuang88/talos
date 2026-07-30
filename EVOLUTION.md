@@ -66,7 +66,7 @@ repeating known mistakes.
 - Root cause: provider adapters synthesized normal completion from transport exhaustion, and later projection work validated the shared conversation layer but not every product consumer.
 - Fix: require explicit compatible-protocol terminal signals, preserve bounded non-transcript diagnostics, and test TUI plus print mode through deterministic rebuilt-binary fixtures.
 - Prevention: every streaming adapter and every consumer must have a matrix for normal completion, truncation, unknown reason, EOF, decode/transport failure, and tool-continuation failure. A shared projection test is not end-to-end evidence.
-- Promoted to rule/check: I168/RUNTIME-003 Completion Commit `2eac5b05`, `scripts/verify_i168_provider_terminal.sh`, and `docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`.
+- Promoted to rule/check: I168/RUNTIME-003 Completion Commit `86262d02`, `scripts/verify_i168_provider_terminal.sh`, and `docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`.
 
 ## 2026-07-27 - Display-only history prefixes need a shared navigation coordinate
 

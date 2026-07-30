@@ -160,14 +160,16 @@ Real paid/provider credentials are not required and must not be introduced.
 | 2026-07-29 | Maintainer pause | The maintainer requested that I168 stop before implementation while they handle the underlying repair context. No implementation work is authorized while paused, no replacement iteration is activated, and resumption requires an explicit maintainer instruction followed by owner/Board/program synchronization. The published objective, scope, acceptance criteria, and P0 priority remain unchanged. |
 | 2026-07-30 | Maintainer resumption | The maintainer explicitly requested I168 activation after the I157 stale-snapshot correction completed at `5aac6756`. Inventory confirms I157/MODEL-010 and I167 are Complete, I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and no competing Active/Review implementation iteration exists. I168/RUNTIME-003 became the sole Active implementation authority. |
 | 2026-07-30 | Branch variance | After implementation PR #63 merged at `b5fcaaf3`, the maintainer authorized branch/PR closeout. PR #67 used `agent/i168-terminal-closeout`; no direct `main` mutation, force-push, tag, publish, release, or deployment occurred. |
-| 2026-07-30 | Completion | Red-first print-mode proof failed with exit 101 before `dda2170f`; deterministic fixtures and the complete locked matrix passed at validation harness commit `62ae098d`. Completion Commit is the already-existing implementation/fixture commit `2eac5b05`. |
+| 2026-07-30 | Completion | Red-first print-mode proof failed with exit 101 before `dda2170f`; deterministic fixtures and the complete locked matrix passed at validation harness commit `62ae098d`. Completion Commit is the already-existing implementation/fixture commit `86262d02`. |
+| 2026-07-30 | Review rejection | Maintainer review rejected the first closeout because standard `content_filter` / `pause_turn` values were mislabeled unknown, legacy/known stop policies were incomplete, and merged stdout/stderr could concatenate the MaxTokens warning. I168 returned to corrective Review. |
+| 2026-07-30 | Review correction accepted for re-review | `c570991b` added explicit known policies and consumer tests; `86262d02` removed execution artifacts and is the Completion Commit. Workflow `30558757429`, job `90925992796`, passed the full review matrix and rebuilt-binary fixture. |
 
 ## Verification Evidence
 
 - Red-first print/headless proof: workflow run `30551626267` checked out `b5fcaaf3` and the new MaxTokens projection assertion failed before production code with exit 101 (`E0425`: missing `terminal_notice_for_stop_reason`).
-- Implementation chain: PR #63 merge `b5fcaaf3`; print/headless truncation projection `dda2170f`; deterministic two-protocol fixture packet `2eac5b05`.
+- Implementation chain: PR #63 merge `b5fcaaf3`; print/headless truncation projection `dda2170f`; deterministic two-protocol fixture packet `86262d02`.
 - Final validation: workflow run `30552762936`, job `90905349923`, validation harness commit `62ae098d`, `OVERALL_EXIT=0`. Standard PR CI run `30552762362` also passed.
-- Runtime fixture command: `scripts/verify_i168_provider_terminal.sh target/debug/talos`. Binary path: `target/debug/talos`. The harness commit differs from Completion Commit only by the temporary validation workflow; production and fixture content are owned by `2eac5b05`.
+- Runtime fixture command: `scripts/verify_i168_provider_terminal.sh target/debug/talos`. Binary path: `target/debug/talos`. The harness commit differs from Completion Commit only by the temporary validation workflow; production and fixture content are owned by `86262d02`.
 - Warning accounting: commands that build `talos-config` emitted one informational build-script line (`models.toml compressed`); Rust check and Clippy produced no code warning and `clippy -D warnings` exited 0.
 
 | Validation command | Exit | Passed | Failed | Ignored | Warning lines |
@@ -194,9 +196,10 @@ Real paid/provider credentials are not required and must not be introduced.
 
 ## Completion Evidence
 
-- Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`. This implementation/fixture commit existed before this status update and contains `dda2170f` as an ancestor.
 - Rebuilt-binary acceptance: PASS for both compatible protocols in workflow run `30552762936`; normal, truncation, unknown, EOF, decode, transport, and tool-continuation outcomes matched the owner acceptance matrix.
 - Governance acceptance: owner and derived documents synchronized; I164 remains Paused, I158-I162 remain Blocked, ADR-053 remains Proposed, and OBS-002 remains Refinement.
+- Review correction evidence: OpenAI `content_filter` and deprecated `function_call` now have explicit bounded non-success policies; Anthropic `stop_sequence` is explicit normal completion while `pause_turn` and `refusal` are explicit bounded non-success policies; only `fixture_unknown_reason` uses the unknown path. Merged-fd fixtures prove partial output and warning/error are line-separated, normal paths are quiet, and no stale truncation warning appears on errors.
 
 ## Variance And Residuals
 

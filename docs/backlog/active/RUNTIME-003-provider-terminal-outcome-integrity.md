@@ -234,10 +234,11 @@ or a transport EOF normalized to `EndTurn`. This Story must make future cases di
 
 ## Completion Evidence
 
-- Completion Commit: `2eac5b0523f6d8006318456b631c72cdb5bf9bed`.
-- Provider/session/TUI foundation merged through PR #63 at `b5fcaaf3`; print/headless MaxTokens projection landed at `dda2170f`; deterministic fixture scripts landed at `2eac5b05`.
+- Completion Commit: `86262d0290d821b7e3518a0e6371f0b2d3185e95`.
+- Provider/session/TUI foundation merged through PR #63 at `b5fcaaf3`; print/headless MaxTokens projection landed at `dda2170f`; deterministic fixture scripts landed at `86262d02`.
 - Red-before-green evidence: workflow run `30551626267`, exit 101 before print-mode production implementation.
 - Final evidence: workflow run `30552762936`, job `90905349923`, `OVERALL_EXIT=0`; 2673 workspace tests passed with zero failures; focused counts are recorded in I168.
 - Rebuilt `target/debug/talos` passed the OpenAI-compatible and Anthropic-compatible matrix for explicit completion, MaxTokens, unknown reason, EOF, invalid UTF-8, transport failure, and tool-success-then-continuation-failure.
 - Terminal diagnostics remain bounded operational evidence and are excluded from model context, transcript, copy, and export.
 - OBS-002 remains Refinement and is not completed by this Story.
+- Review correction `c570991b` defines the known protocol policy matrix; clean Completion Commit `86262d02` removes transient execution artifacts. Revalidation workflow `30558757429` passed parser/session/CLI/TUI/workspace gates and the exact/negative/merged-fd rebuilt-binary fixture.
