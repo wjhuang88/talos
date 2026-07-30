@@ -16,6 +16,8 @@ mod env;
 mod error;
 mod store;
 #[cfg(test)]
+mod store_finalization_tests;
+#[cfg(test)]
 #[allow(warnings)]
 mod tests;
 mod types;
