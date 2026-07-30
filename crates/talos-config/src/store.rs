@@ -7,7 +7,10 @@ mod recovery;
 use crate::{
     Config, ConfigError, ConfigUnsetOutcome, Credentials, builtin_provider_config, home_dir,
 };
-use journal::{FinalizeOutcome, Txn, apply, finalize_active, gen_txn_id, prepare, rollback};
+use journal::{
+    FinalizeOutcome, Phase, Txn, apply, finalize_active, gen_txn_id, prepare, rollback,
+    write_manifest,
+};
 use std::path::PathBuf;
 
 pub(crate) use fs::{Fs, FsOperation, StdFs};
@@ -91,6 +94,20 @@ impl ConfigStore {
         let txn_id = gen_txn_id();
 
         prepare(fs, &active_dir, &txn, &txn_id)?;
+
+        if !before_state_matches(fs, &self.config_path, &self.credentials_path, &txn)? {
+            fs.checkpoint(FsOperation::WriteAbortedManifest)?;
+            write_manifest(fs, &active_dir, Phase::Aborted, &txn_id, &txn)?;
+            match finalize_active(fs, &active_dir, &txn_id) {
+                Ok(FinalizeOutcome::Finalized) => {}
+                Ok(pending) => log_finalize_pending("concurrent-abort", &pending),
+                Err(error) => tracing::warn!(
+                    error = %error,
+                    "ambiguous provider configuration finalization after concurrent abort"
+                ),
+            }
+            return Err(concurrent_mutation_error());
+        }
 
         if let Err(apply_err) = apply(
             fs,
@@ -202,6 +219,37 @@ pub(super) fn finalization_pending_error() -> ConfigError {
     ConfigError::InvalidConfig(
         "provider configuration finalization is pending; retry after recovery".into(),
     )
+}
+
+pub(super) fn concurrent_mutation_error() -> ConfigError {
+    ConfigError::InvalidConfig(
+        "provider configuration changed concurrently; retry the mutation".into(),
+    )
+}
+
+pub(in crate::store) fn before_state_matches(
+    fs: &dyn Fs,
+    config_path: &std::path::Path,
+    credentials_path: &std::path::Path,
+    txn: &Txn,
+) -> Result<bool, ConfigError> {
+    fs.checkpoint(FsOperation::VerifyConfigBeforeApply)?;
+    let actual_config = fs.read_opt(config_path)?;
+    fs.checkpoint(FsOperation::VerifyCredentialsBeforeApply)?;
+    let actual_credentials = fs.read_opt(credentials_path)?;
+
+    Ok(actual_config.as_deref()
+        == if txn.cfg_existed {
+            Some(txn.cfg_before.as_slice())
+        } else {
+            None
+        }
+        && actual_credentials.as_deref()
+            == if txn.cred_existed {
+                Some(txn.cred_before.as_slice())
+            } else {
+                None
+            })
 }
 
 pub(super) fn ambiguous_finalization_error() -> ConfigError {

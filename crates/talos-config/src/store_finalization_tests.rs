@@ -1,6 +1,6 @@
 use crate::store::{Fs, FsOperation, RecoveryOutcome, RecoveryPurpose, StdFs};
 use crate::{Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ProviderConfig};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -235,6 +235,213 @@ impl Fs for FaultFs {
             })
             .collect()
     }
+}
+
+struct ConcurrentWriteFs {
+    config_path: PathBuf,
+    credentials_path: PathBuf,
+    config_bytes: Vec<u8>,
+    credential_bytes: Vec<u8>,
+    fired: Cell<bool>,
+}
+
+impl ConcurrentWriteFs {
+    fn new(
+        config_path: PathBuf,
+        credentials_path: PathBuf,
+        config_bytes: Vec<u8>,
+        credential_bytes: Vec<u8>,
+    ) -> Self {
+        Self {
+            config_path,
+            credentials_path,
+            config_bytes,
+            credential_bytes,
+            fired: Cell::new(false),
+        }
+    }
+}
+
+impl Fs for ConcurrentWriteFs {
+    fn checkpoint(&self, operation: FsOperation) -> Result<(), ConfigError> {
+        if operation == FsOperation::VerifyConfigBeforeApply && !self.fired.replace(true) {
+            crate::atomic_file::durable_replace(&self.config_path, &self.config_bytes)?;
+            crate::atomic_file::durable_replace(&self.credentials_path, &self.credential_bytes)?;
+        }
+        Ok(())
+    }
+
+    fn exists(&self, path: &Path) -> bool {
+        path.exists()
+    }
+
+    fn read(&self, path: &Path) -> Result<Vec<u8>, ConfigError> {
+        std::fs::read(path).map_err(ConfigError::IoError)
+    }
+
+    fn atomic_write(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError> {
+        crate::atomic_file::durable_replace(path, content)
+    }
+
+    fn write_secure(&self, path: &Path, content: &[u8]) -> Result<(), ConfigError> {
+        crate::atomic_file::write_file_synced(path, content)
+    }
+
+    fn mkdir(&self, path: &Path) -> Result<(), ConfigError> {
+        crate::atomic_file::create_dir_secure(path)
+    }
+
+    fn remove_file(&self, path: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_file(path).map_err(ConfigError::IoError)
+    }
+
+    fn remove_dir(&self, path: &Path) -> Result<(), ConfigError> {
+        std::fs::remove_dir_all(path).map_err(ConfigError::IoError)
+    }
+
+    fn rename_dir(&self, from: &Path, to: &Path) -> Result<(), ConfigError> {
+        std::fs::rename(from, to).map_err(ConfigError::IoError)
+    }
+
+    fn sync_dir(&self, dir: &Path) -> Result<(), ConfigError> {
+        crate::atomic_file::sync_dir(dir)
+    }
+
+    fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, ConfigError> {
+        std::fs::read_dir(dir)
+            .map_err(ConfigError::IoError)?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.path())
+                    .map_err(ConfigError::IoError)
+            })
+            .collect()
+    }
+}
+
+#[test]
+fn stale_before_snapshot_is_aborted_without_overwriting_concurrent_state() {
+    let dir = unique_dir("stale-before-cas");
+    setup_two_providers(&dir);
+    let store = make_store(&dir);
+
+    let mut concurrent_config: Config =
+        toml::from_str(&std::fs::read_to_string(dir.join("config.toml")).unwrap()).unwrap();
+    concurrent_config.providers.remove("custom-b");
+    let concurrent_config_bytes = toml::to_string_pretty(&concurrent_config)
+        .unwrap()
+        .into_bytes();
+
+    let mut concurrent_credentials: Credentials =
+        toml::from_str(&std::fs::read_to_string(dir.join("credentials.toml")).unwrap()).unwrap();
+    concurrent_credentials.keys.remove("custom-b");
+    let concurrent_credential_bytes = toml::to_string_pretty(&concurrent_credentials)
+        .unwrap()
+        .into_bytes();
+
+    let fs = ConcurrentWriteFs::new(
+        dir.join("config.toml"),
+        dir.join("credentials.toml"),
+        concurrent_config_bytes.clone(),
+        concurrent_credential_bytes.clone(),
+    );
+    let error = store.run("providers.custom-a", &fs).unwrap_err();
+    assert!(error.to_string().contains("changed concurrently"));
+    assert_persisted_bytes(&dir, &concurrent_config_bytes, &concurrent_credential_bytes);
+    assert!(!active_dir(&dir).exists());
+
+    let loaded = store.load_effective().unwrap();
+    assert!(loaded.providers.contains_key("custom-a"));
+    assert!(!loaded.providers.contains_key("custom-b"));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn stale_prepared_journal_recovery_aborts_without_rollback() {
+    let dir = unique_dir("stale-prepared-recovery");
+    let (config_before, credentials_before) = setup_two_providers(&dir);
+    let active = active_dir(&dir);
+    std::fs::create_dir_all(&active).unwrap();
+    std::fs::write(active.join("config.before"), &config_before).unwrap();
+    std::fs::write(active.join("credentials.before"), &credentials_before).unwrap();
+    write_manifest(
+        &active,
+        "Prepared",
+        "stale-prepared",
+        true,
+        true,
+        true,
+        true,
+    );
+
+    let mut newer_config: Config =
+        toml::from_str(&String::from_utf8(config_before.clone()).unwrap()).unwrap();
+    newer_config.providers.remove("custom-b");
+    let newer_config = toml::to_string_pretty(&newer_config).unwrap().into_bytes();
+    let mut newer_credentials: Credentials =
+        toml::from_str(&String::from_utf8(credentials_before.clone()).unwrap()).unwrap();
+    newer_credentials.keys.remove("custom-b");
+    let newer_credentials = toml::to_string_pretty(&newer_credentials)
+        .unwrap()
+        .into_bytes();
+    std::fs::write(dir.join("config.toml"), &newer_config).unwrap();
+    std::fs::write(dir.join("credentials.toml"), &newer_credentials).unwrap();
+
+    make_store(&dir).recover(&StdFs).unwrap();
+    assert_persisted_bytes(&dir, &newer_config, &newer_credentials);
+    assert!(!active.exists());
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cleanup_ready_marker_is_resynced_before_mutation_becomes_safe() {
+    let dir = unique_dir("cleanup-marker-resync");
+    setup_two_providers(&dir);
+    let store = make_store(&dir);
+
+    let first_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
+    store
+        .run("providers.custom-a", &FaultFs::new(first_plan.clone()))
+        .unwrap();
+    first_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
+
+    let second_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
+    let error = store
+        .run("providers.custom-b", &FaultFs::new(second_plan.clone()))
+        .unwrap_err();
+    assert!(error.to_string().contains("finalization is pending"));
+    second_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
+    assert!(prepare_entries(&dir).is_empty());
+
+    let third_plan = FaultPlan::fail_once(FsOperation::CleanupFinalizeDirectory);
+    let outcome = store
+        .run("providers.custom-b", &FaultFs::new(third_plan.clone()))
+        .unwrap();
+    assert_eq!(
+        outcome,
+        ConfigUnsetOutcome::CustomProviderRemoved {
+            name: "custom-b".to_string()
+        }
+    );
+    third_plan.assert_consumed_in_order(&[FsOperation::CleanupFinalizeDirectory]);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn foreign_prepare_directory_is_never_deleted_automatically() {
+    let dir = unique_dir("foreign-prepare");
+    setup_two_providers(&dir);
+    let prepare = dir.join(".provider-unset-transaction.prepare.foreign-process");
+    std::fs::create_dir_all(&prepare).unwrap();
+    std::fs::write(prepare.join("owner"), b"other-process").unwrap();
+
+    make_store(&dir).load_effective().unwrap();
+    assert_eq!(
+        std::fs::read(prepare.join("owner")).unwrap(),
+        b"other-process"
+    );
+    assert!(prepare.exists());
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

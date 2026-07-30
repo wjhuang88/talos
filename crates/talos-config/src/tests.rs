@@ -462,13 +462,20 @@ fn test_log_config_defaults() {
 
 #[test]
 fn test_load_nonexistent_file() {
-    let path = Config::default_path();
-    if path.exists() {
-        return;
-    }
-    let config = Config::load().unwrap();
+    let dir = std::env::temp_dir().join(format!(
+        "talos-config-nonexistent-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let store = ConfigStore::with_paths(dir.join("config.toml"), dir.join("credentials.toml"));
+    let config = store.load_effective().unwrap();
     assert_eq!(config.provider, "anthropic");
     assert!(config.model.is_empty());
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// Regression test: an on-disk `config.toml` with an empty `model` field
