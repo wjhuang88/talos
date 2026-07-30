@@ -1,0 +1,53 @@
+name: I157 correction runner
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  run-correction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i157-post-merge-durability-concurrency
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Extract and apply correction script
+        shell: bash
+        run: |
+          git fetch origin automation/i157-post-merge-fix
+          git show origin/automation/i157-post-merge-fix:.github/workflows/i157-post-merge-fix.yml > /tmp/i157-source.yml
+          python3 <<'PY'
+          from pathlib import Path
+          lines = Path('/tmp/i157-source.yml').read_text().splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == "python3 <<'PY'") + 1
+          end = next(i for i in range(start, len(lines)) if lines[i].strip() == 'PY')
+          body = []
+          for line in lines[start:end]:
+              body.append(line[10:] if line.startswith('          ') else line)
+          Path('/tmp/apply_i157.py').write_text('\n'.join(body) + '\n')
+          PY
+          python3 /tmp/apply_i157.py
+      - name: Format and focused validation
+        run: |
+          cargo fmt --all
+          cargo test --locked -p talos-config
+          cargo test --locked -p talos-cli --test config_unset_finalization
+          cargo clippy --locked -p talos-config -- -D warnings
+      - name: Commit and push correction
+        shell: bash
+        run: |
+          git config user.name "i157-correction-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add crates/talos-config
+          git commit -m "fix(config): prevent stale provider-unset overwrite (#MODEL-010 #I157)"
+          git push origin HEAD:fix/i157-post-merge-durability-concurrency
