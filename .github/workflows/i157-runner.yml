@@ -71,6 +71,15 @@ jobs:
           fs_text = fs_text.replace('    CleanupPrepareResidues,\n', '', 1)
           fs_path.write_text(fs_text)
 
+          store_path = Path('crates/talos-config/src/store.rs')
+          store_text = store_path.read_text()
+          store_text = store_text.replace(
+              'pub(super) fn before_state_matches(',
+              'pub(in crate::store) fn before_state_matches(',
+              1,
+          )
+          store_path.write_text(store_text)
+
           tests_path = Path('crates/talos-config/src/tests.rs')
           tests = tests_path.read_text()
           old = '''#[test]
