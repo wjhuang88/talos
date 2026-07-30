@@ -116,9 +116,24 @@ pub(crate) async fn parse_sse_stream(
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(s) => s,
-                Err(_) => continue,
+                Err(_) => {
+                    let _ = tx
+                        .send(AgentEvent::Error {
+                            message: "provider stream decode error: invalid UTF-8 byte stream"
+                                .into(),
+                        })
+                        .await;
+                    return;
+                }
             },
-            Err(_) => break,
+            Err(_) => {
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider stream transport read error".into(),
+                    })
+                    .await;
+                return;
+            }
         };
 
         buffer.push_str(&chunk);
@@ -284,7 +299,17 @@ pub(crate) async fn parse_sse_stream(
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,
                     "length" => StopReason::MaxTokens,
-                    _ => StopReason::EndTurn,
+                    unknown => {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: format!(
+                                    "unsupported provider finish_reason: {}",
+                                    bounded_terminal_reason(unknown)
+                                ),
+                            })
+                            .await;
+                        return;
+                    }
                 };
 
                 // Emit accumulated tool calls. Some OpenAI-compatible providers stream
@@ -334,13 +359,7 @@ pub(crate) async fn parse_sse_stream(
 
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
-                        stop_reason: if matches!(requested_stop_reason, StopReason::ToolUse)
-                            && !(has_native_tool_calls || has_text_tool_calls)
-                        {
-                            StopReason::EndTurn
-                        } else {
-                            requested_stop_reason
-                        },
+                        stop_reason: requested_stop_reason,
                         usage: Usage {
                             input_tokens,
                             output_tokens,
@@ -355,60 +374,27 @@ pub(crate) async fn parse_sse_stream(
         }
     }
 
-    // Stream ended without explicit [DONE] or finish_reason
-    let text_calls = parse_text_tool_calls(&text_accumulator);
-    for call in text_calls {
-        let _ = tx
-            .send(AgentEvent::ToolCall {
-                call,
-                provenance: ToolProvenance::Native,
-                summary_fields: vec![],
-            })
-            .await;
-    }
-
-    if !reasoning_text.is_empty() {
-        let _ = tx
-            .send(AgentEvent::ReasoningComplete {
-                blocks: vec![ReasoningBlock::Plain {
-                    text: std::mem::take(&mut reasoning_text),
-                }],
-            })
-            .await;
-    }
-
-    // Emit any accumulated native tool calls.
-    for i in 0..tool_call_ids.len() {
-        if !tool_call_names[i].is_empty() {
-            let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-            let args: Value =
-                serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
-            let _ = tx
-                .send(AgentEvent::ToolCall {
-                    call: ToolCall {
-                        id: tool_call_id,
-                        name: tool_call_names[i].clone(),
-                        input: args,
-                    },
-                    provenance: Default::default(),
-                    summary_fields: vec![],
-                })
-                .await;
-        }
-    }
-
     let _ = tx
-        .send(AgentEvent::TurnEnd {
-            stop_reason: StopReason::EndTurn,
-            usage: Usage {
-                input_tokens,
-                output_tokens,
-                cache_read_tokens: 0,
-                cache_write_tokens: 0,
-                reasoning_tokens,
-            },
+        .send(AgentEvent::Error {
+            message:
+                "provider stream closed without explicit terminal signal ([DONE] or finish_reason)"
+                    .into(),
         })
         .await;
+}
+
+fn bounded_terminal_reason(reason: &str) -> String {
+    const MAX_REASON_CHARS: usize = 120;
+    let bounded = reason
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(MAX_REASON_CHARS)
+        .collect::<String>();
+    if bounded.is_empty() {
+        "unknown".into()
+    } else {
+        bounded
+    }
 }
 
 fn finalized_tool_call_id(raw_id: &str, index: usize) -> String {
