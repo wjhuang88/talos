@@ -1,9 +1,9 @@
 name: I168 Print Mode Red Evidence
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/i168-terminal-closeout
+      - main
 
 permissions:
   contents: read
