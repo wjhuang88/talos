@@ -102,6 +102,16 @@ jobs:
         run: |
           set -euo pipefail
           python3 .i168_review_fix.py production
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/talos-cli/src/mode_print.rs')
+          text = path.read_text()
+          broken = "stdout_line_open = !delta.ends_with('\n');"
+          fixed = r"stdout_line_open = !delta.ends_with('\n');"
+          if broken not in text:
+              raise SystemExit('generated newline literal was not found')
+          path.write_text(text.replace(broken, fixed, 1))
+          PY
           cargo fmt --all
           cargo test --locked -p talos-provider i168_terminal_outcome_tests
           cargo test --locked -p talos-provider terminal
