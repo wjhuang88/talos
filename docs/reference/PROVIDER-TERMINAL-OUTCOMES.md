@@ -62,6 +62,8 @@ known-reason policy and merged-terminal-output gaps. Correction revalidation wor
 (job `90925992796`) passed all focused tests, 2681 workspace tests, fmt/check/Clippy, governance, build,
 and the strengthened rebuilt-binary fixture. Completion Commit `86262d02` owns the clean corrected
 implementation and contains no workflow logs, cache files, patch scripts, or CI permission changes.
+The final reviewed PR state is additionally covered by the repository's standard release preflight
+and Windows installer fixture.
 
 ## Troubleshooting
 
