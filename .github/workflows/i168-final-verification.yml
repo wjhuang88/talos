@@ -1,0 +1,315 @@
+name: I168 Final Verification
+
+on:
+  push:
+    branches:
+      - verification/i168-final-b5fcaaf
+
+permissions:
+  contents: read
+
+jobs:
+  verify-merged-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TARGET_SHA: b5fcaaf3eb98f6f2e6734c1ad7be92701ce026fe
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b5fcaaf3eb98f6f2e6734c1ad7be92701ce026fe
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run locked validation matrix
+        id: validation
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p final-verification/logs final-verification/fixture
+          summary="$PWD/final-verification/summary.tsv"
+          printf 'name\texit\tpassed\tfailed\tignored\twarnings\n' > "$summary"
+          overall=0
+
+          metrics() {
+            python3 - "$1" <<'PY'
+          import re, sys
+          text = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+          rows = re.findall(r'test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;', text)
+          passed = sum(int(row[0]) for row in rows)
+          failed = sum(int(row[1]) for row in rows)
+          ignored = sum(int(row[2]) for row in rows)
+          warnings = len(re.findall(r'(?m)^warning(?:\[|:)', text))
+          print(f'{passed}\t{failed}\t{ignored}\t{warnings}')
+          PY
+          }
+
+          run_cmd() {
+            local name="$1"
+            local command="$2"
+            local log="final-verification/logs/${name}.log"
+            printf '\n===== %s =====\n%s\n' "$name" "$command" | tee "$log"
+            set +e
+            bash -lc "$command" >> "$log" 2>&1
+            local status=$?
+            set -e
+            local values
+            values="$(metrics "$log")"
+            printf '%s\t%s\t%s\n' "$name" "$status" "$values" | tee -a "$summary"
+            cat "$log"
+            if [[ "$status" -ne 0 ]]; then
+              overall=1
+            fi
+          }
+
+          set -e
+          printf 'target_sha=%s\nactual_sha=%s\n' "$TARGET_SHA" "$(git rev-parse HEAD)" | tee final-verification/baseline.txt
+          git status --short | tee -a final-verification/baseline.txt
+          git log -8 --oneline | tee -a final-verification/baseline.txt
+          [[ "$(git rev-parse HEAD)" == "$TARGET_SHA" ]] || overall=1
+
+          run_cmd provider_terminal 'cargo test --locked -p talos-provider terminal'
+          run_cmd provider_eof 'cargo test --locked -p talos-provider eof'
+          run_cmd agent_terminal 'cargo test --locked -p talos-agent terminal'
+          run_cmd session_diagnostic 'cargo test --locked -p talos-session diagnostic'
+          run_cmd conversation_terminal 'cargo test --locked -p talos-conversation terminal'
+          run_cmd cli_terminal 'cargo test --locked -p talos-cli terminal'
+          run_cmd tui_terminal 'cargo test --locked -p talos-tui terminal'
+          run_cmd fmt 'cargo fmt --all -- --check'
+          run_cmd workspace_check 'cargo check --workspace --locked'
+          run_cmd workspace_clippy 'cargo clippy --workspace --locked -- -D warnings'
+          run_cmd workspace_test 'cargo test --workspace --locked'
+          run_cmd governance 'scripts/validate_project_governance.sh .'
+          run_cmd diff_check 'git diff --check'
+          run_cmd cli_build 'cargo build --locked -p talos-cli'
+          run_cmd source_scan "rg -n 'unknown|finish_reason|stop_reason|StopReason::EndTurn' crates/talos-provider/src/openai_sse.rs crates/talos-provider/src/anthropic_stream.rs"
+
+          cat > final-verification/fixture/server.py <<'PY'
+          from __future__ import annotations
+          import argparse, json, threading, time
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+
+          counts = {}
+          lock = threading.Lock()
+
+          def sse(event, payload):
+              prefix = f'event: {event}\n' if event else ''
+              return f'{prefix}data: {json.dumps(payload, separators=(",", ":"))}\n\n'.encode()
+
+          def openai_text(text, reason):
+              return sse(None, {'choices':[{'index':0,'delta':{'content':text},'finish_reason':reason}]})
+
+          def openai_tool():
+              return sse(None, {'choices':[{'index':0,'delta':{'tool_calls':[{'index':0,'id':'call_fixture','type':'function','function':{'name':'git_status','arguments':'{}'}}]},'finish_reason':'tool_calls'}]})
+
+          def anthropic_text(text):
+              return sse('content_block_delta', {'index':0,'delta':{'type':'text_delta','text':text}})
+
+          def anthropic_terminal(reason):
+              return sse('message_delta', {'delta':{'stop_reason':reason,'stop_sequence':None},'usage':{'output_tokens':1}})
+
+          def anthropic_tool():
+              return b''.join([
+                  sse('content_block_start', {'index':0,'content_block':{'type':'tool_use','id':'tool_fixture','name':'git_status','input':{}}}),
+                  sse('content_block_stop', {'index':0}),
+                  anthropic_terminal('tool_use'),
+              ])
+
+          def has_tool_result(protocol, messages):
+              for message in messages if isinstance(messages, list) else []:
+                  if not isinstance(message, dict):
+                      continue
+                  if protocol == 'openai' and message.get('role') == 'tool':
+                      return True
+                  content = message.get('content')
+                  if isinstance(content, list) and any(isinstance(block, dict) and block.get('type') == 'tool_result' for block in content):
+                      return True
+              return False
+
+          class Handler(BaseHTTPRequestHandler):
+              protocol_version = 'HTTP/1.1'
+              def log_message(self, fmt, *args):
+                  return
+              def do_POST(self):
+                  length = int(self.headers.get('content-length','0'))
+                  payload = json.loads(self.rfile.read(length) or b'{}')
+                  protocol = 'openai' if self.path.endswith('/chat/completions') else 'anthropic'
+                  model = str(payload.get('model',''))
+                  with lock:
+                      ordinal = counts.get((protocol,model),0) + 1
+                      counts[(protocol,model)] = ordinal
+                      with open(args.log_file,'a',encoding='utf-8') as handle:
+                          handle.write(json.dumps({'protocol':protocol,'model':model,'ordinal':ordinal,'has_tool_result':has_tool_result(protocol,payload.get('messages'))})+'\n')
+                  mode = model.split('-',1)[1]
+                  if protocol == 'openai':
+                      partial = openai_text('fixture partial', None)
+                      table = {
+                          'normal': ([openai_text('fixture normal','stop')],0),
+                          'max-tokens': ([openai_text('fixture partial','length')],0),
+                          'unknown': ([openai_text('fixture partial','content_filter')],0),
+                          'eof': ([partial],0),
+                          'decode-error': ([partial,b'\xff'],0),
+                          'transport-error': ([partial],64),
+                      }
+                      if mode == 'tool-continuation':
+                          segments, extra = ([openai_tool()],0) if ordinal == 1 else ([partial],0)
+                      else:
+                          segments, extra = table[mode]
+                  else:
+                      partial = anthropic_text('fixture partial')
+                      table = {
+                          'normal': ([partial,anthropic_terminal('end_turn')],0),
+                          'max-tokens': ([partial,anthropic_terminal('max_tokens')],0),
+                          'unknown': ([partial,anthropic_terminal('pause_turn')],0),
+                          'eof': ([partial],0),
+                          'decode-error': ([partial,b'\xff'],0),
+                          'transport-error': ([partial],64),
+                      }
+                      if mode == 'tool-continuation':
+                          segments, extra = ([anthropic_tool()],0) if ordinal == 1 else ([partial],0)
+                      else:
+                          segments, extra = table[mode]
+                  actual = sum(len(segment) for segment in segments)
+                  self.send_response(200)
+                  self.send_header('Content-Type','text/event-stream')
+                  self.send_header('Connection','close')
+                  self.send_header('Content-Length',str(actual+extra))
+                  self.end_headers()
+                  for segment in segments:
+                      self.wfile.write(segment)
+                      self.wfile.flush()
+                      time.sleep(0.01)
+                  self.close_connection = True
+
+          parser = argparse.ArgumentParser()
+          parser.add_argument('--port-file', required=True)
+          parser.add_argument('--log-file', required=True)
+          args = parser.parse_args()
+          Path(args.log_file).write_text('',encoding='utf-8')
+          server = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+          Path(args.port_file).write_text(str(server.server_address[1]),encoding='utf-8')
+          server.serve_forever()
+          PY
+
+          cat > final-verification/fixture/run.sh <<'SH'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          binary="$PWD/target/debug/talos"
+          root="$PWD/final-verification/fixture/runtime"
+          mkdir -p "$root"
+          python3 final-verification/fixture/server.py --port-file "$root/port" --log-file "$root/requests.jsonl" &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 100); do [[ -s "$root/port" ]] && break; sleep 0.05; done
+          port="$(cat "$root/port")"
+          failures=0
+          printf 'protocol\tmode\texit\tstdout_match\tstderr_match\n' > "$root/results.tsv"
+
+          run_case() {
+            protocol="$1"; mode="$2"; expected_exit="$3"; stdout_needle="$4"; stderr_needle="$5"
+            case_dir="$root/${protocol}-${mode}"
+            home="$case_dir/home"
+            mkdir -p "$home/.talos"
+            if [[ "$protocol" == openai ]]; then
+              endpoint="http://127.0.0.1:$port/v1"
+              proto="openai-chat"
+            else
+              endpoint="http://127.0.0.1:$port/v1/messages"
+              proto="anthropic-messages"
+            fi
+            cat > "$home/.talos/config.toml" <<EOF
+          provider = "fixture"
+          model = "${protocol}-${mode}"
+
+          [providers.fixture]
+          protocol = "$proto"
+          base_url = "$endpoint"
+          api_key = "fixture-only"
+
+          [providers.fixture.timeout]
+          dispatch_timeout_secs = 5
+          first_packet_timeout_secs = 5
+          stream_idle_timeout_secs = 5
+          max_attempts = 1
+          backoff_base_ms = 1
+          backoff_max_ms = 1
+          EOF
+            set +e
+            HOME="$home" "$binary" --print --provider fixture --model "${protocol}-${mode}" --no-context 'I168 fixture' > "$case_dir/stdout" 2> "$case_dir/stderr"
+            status=$?
+            set -e
+            out_ok=1; err_ok=1
+            [[ -z "$stdout_needle" ]] || grep -Fqi "$stdout_needle" "$case_dir/stdout" || out_ok=0
+            [[ -z "$stderr_needle" ]] || grep -Fqi "$stderr_needle" "$case_dir/stderr" || err_ok=0
+            [[ "$status" -eq "$expected_exit" ]] || failures=$((failures+1))
+            [[ "$out_ok" -eq 1 ]] || failures=$((failures+1))
+            [[ "$err_ok" -eq 1 ]] || failures=$((failures+1))
+            printf '%s\t%s\t%s\t%s\t%s\n' "$protocol" "$mode" "$status" "$out_ok" "$err_ok" | tee -a "$root/results.tsv"
+            printf -- '--- %s/%s stdout ---\n' "$protocol" "$mode"; cat "$case_dir/stdout"
+            printf -- '--- %s/%s stderr ---\n' "$protocol" "$mode"; cat "$case_dir/stderr"
+          }
+
+          for protocol in openai anthropic; do
+            run_case "$protocol" normal 0 'fixture normal' ''
+            run_case "$protocol" max-tokens 0 'fixture partial' 'truncated'
+            if [[ "$protocol" == openai ]]; then
+              run_case "$protocol" unknown 1 'fixture partial' 'content_filter'
+            else
+              run_case "$protocol" unknown 1 'fixture partial' 'pause_turn'
+            fi
+            run_case "$protocol" eof 1 'fixture partial' 'explicit terminal'
+            run_case "$protocol" decode-error 1 '' 'decode error'
+            run_case "$protocol" transport-error 1 'fixture partial' 'transport read error'
+            run_case "$protocol" tool-continuation 1 'fixture partial' 'explicit terminal'
+          done
+
+          python3 - "$root/requests.jsonl" <<'PY'
+          import json, sys
+          records=[json.loads(line) for line in open(sys.argv[1],encoding='utf-8') if line.strip()]
+          failed=False
+          for protocol in ('openai','anthropic'):
+              model=f'{protocol}-tool-continuation'
+              continuation=[record for record in records if record['model']==model and record['ordinal']>=2]
+              ok=bool(continuation) and any(record['has_tool_result'] for record in continuation)
+              print(f'{model}\tcompleted_tool_result_seen={str(ok).lower()}')
+              failed |= not ok
+          raise SystemExit(1 if failed else 0)
+          PY
+          request_status=$?
+          [[ "$request_status" -eq 0 ]] || failures=$((failures+1))
+          printf 'binary=%s\ncommit=%s\nfailures=%s\n' "$binary" "$(git rev-parse HEAD)" "$failures" | tee "$root/metadata.txt"
+          exit "$failures"
+          SH
+          chmod +x final-verification/fixture/run.sh
+          run_cmd rebuilt_binary_fixture 'final-verification/fixture/run.sh'
+
+          cat > final-verification/owner-gate.sh <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          i168=docs/iterations/I168-provider-terminal-outcome-integrity.md
+          story=docs/backlog/active/RUNTIME-003-provider-terminal-outcome-integrity.md
+          ! grep -Fq 'Planning/governance validation: pending.' "$i168"
+          ! grep -Fq 'Implementation and runtime evidence: pending.' "$i168"
+          ! grep -Fq 'Completion Commit: pending.' "$i168"
+          grep -Eq '^> Document status: .*Complete' "$i168"
+          grep -Eq '^\| Status \| Complete' "$story"
+          ! grep -Eq '^- \[ \]' "$story"
+          SH
+          chmod +x final-verification/owner-gate.sh
+          run_cmd owner_evidence_gate 'final-verification/owner-gate.sh'
+
+          printf '\nOVERALL_EXIT=%s\n' "$overall" | tee -a "$summary"
+          cat "$summary"
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
+          exit "$overall"
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i168-final-verification-b5fcaaf
+          path: final-verification
+          if-no-files-found: error
