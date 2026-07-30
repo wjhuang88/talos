@@ -34,7 +34,18 @@ jobs:
           body = []
           for line in lines[start:end]:
               body.append(line[10:] if line.startswith('          ') else line)
-          Path('/tmp/apply_i157.py').write_text('\n'.join(body) + '\n')
+          script = '\n'.join(body) + '\n'
+          brittle = 'replace_once("crates/talos-config/src/store/recovery.rs", old_arm, new_arm)'
+          robust = '''p = Path("crates/talos-config/src/store/recovery.rs")
+          text = p.read_text()
+          start_marker = "            Phase::Prepared | Phase::Applying | Phase::RollbackRequired => {"
+          end_marker = "            Phase::RolledBack => {"
+          start_index = text.index(start_marker)
+          end_index = text.index(end_marker, start_index)
+          p.write_text(text[:start_index] + new_arm + text[end_index:])'''
+          if brittle not in script:
+              raise SystemExit('brittle recovery replacement not found in extracted script')
+          Path('/tmp/apply_i157.py').write_text(script.replace(brittle, robust, 1))
           PY
           python3 /tmp/apply_i157.py
       - name: Format and focused validation
