@@ -5,7 +5,7 @@
 | Story ID | MODEL-010 |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | In Progress — Business Commit And Recovery Evidence (I157 reopened round 8) |
+| Status | Complete (I157 finalization contract — `5c3edd6b`; 2026-07-29) |
 | Source | Maintainer requirement recorded 2026-07-24: "现在是不是没有删除已连接 provider 的能力" → confirmed absent, requested backlog entry |
 | Parent Epic | None (peer to MODEL-008 provider lifecycle work) |
 | Depends on | MODEL-008-A `/connect` wizard (I147); ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
@@ -13,7 +13,8 @@
 | Selected Iteration | I157 (Complete; Phase 1 `84e7a6a3`, Phase 2 `46c919ee`) |
 
 
-> Completion Commit: `7e0f90e4` + `eca1474` — staging→active atomic publication, active→finalize finalization, create_new atomic temp, durable_remove, production load_effective-to-picker evidence chain.
+
+> Completion Commit: `5c3edd6b` — finalization contract: Committed failure returns Ok; RolledBack failure returns original apply error; load_effective documented; active journal allows load but blocks new mutation until recovered.
 
 ## Problem
 
