@@ -38,8 +38,8 @@ jobs:
           set -euo pipefail
           cd target
           test "$(git rev-parse HEAD)" = "92692ec8e839cec0658fb83f825b9e85487ce101"
-          awk '/<<'"'"'PAYLOAD'"'"'/{capture=1;next} /^PAYLOAD$/{capture=0} capture' \
-            ../bridge/.github/workflows/issue-status-doc-export.yml > /tmp/status.patch.xz.b64
+          grep '^PsbJ' ../bridge/.github/workflows/issue-status-doc-export.yml | tr -d '\r\n ' > /tmp/status.patch.xz.b64
+          test "$(wc -c < /tmp/status.patch.xz.b64 | tr -d ' ')" -eq 39216
           base64 -d /tmp/status.patch.xz.b64 > /tmp/status.patch.xz
           echo '6645f424b8e0de79b07d1b334f4a06352bfddef15d64b9f9ed82701b0df54bde  /tmp/status.patch.xz' | sha256sum -c -
           xz -dc /tmp/status.patch.xz > /tmp/status.patch
