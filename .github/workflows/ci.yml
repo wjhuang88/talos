@@ -32,13 +32,13 @@ jobs:
           ref: agent/sync-issue-document-status
           fetch-depth: 0
           path: target
-      - name: Extract and apply validated patch
+      - name: Apply validated document patch
         shell: bash
         run: |
           set -euo pipefail
           cd target
           test "$(git rev-parse HEAD)" = "92692ec8e839cec0658fb83f825b9e85487ce101"
-          grep '^PsbJ' ../bridge/.github/workflows/issue-status-doc-export.yml | tr -d '\r\n ' > /tmp/status.patch.xz.b64
+          cat ../bridge/.github/status-payload/part-* > /tmp/status.patch.xz.b64
           test "$(wc -c < /tmp/status.patch.xz.b64 | tr -d ' ')" -eq 39216
           base64 -d /tmp/status.patch.xz.b64 > /tmp/status.patch.xz
           echo '6645f424b8e0de79b07d1b334f4a06352bfddef15d64b9f9ed82701b0df54bde  /tmp/status.patch.xz' | sha256sum -c -
@@ -63,26 +63,20 @@ jobs:
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Release preflight
         run: ./scripts/release_preflight.sh
 
   windows-installer-fixture:
     name: Windows installer fixture
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
