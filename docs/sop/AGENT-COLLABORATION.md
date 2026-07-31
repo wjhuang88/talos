@@ -6,76 +6,137 @@ Define how human-operated and autonomous agents claim, execute, hand off, and cl
 without duplicating effort or allowing GitHub Issues, owner documents, the Board, and
 implementation state to drift apart.
 
-Use this SOP when an agent:
-
-- claims a GitHub Issue and converts it into a governed task item;
-- claims an existing backlog Story, iteration, or task item;
-- continues work handed off by another agent;
-- uses branches and pull requests for implementation;
-- blocks, releases, completes, cancels, or transfers claimed work.
-
 This SOP governs collaboration ownership. It does not replace requirement intake, iteration
-planning, implementation, change control, testing, or Git workflow SOPs.
+planning, implementation, change control, testing, release, or Git workflow SOPs.
+
+## Adoption And Migration
+
+This document is introduced by bootstrap PR `#83`.
+
+- The collaboration workflow becomes effective at the merge commit and merge date of PR `#83`.
+- PR `#83` itself is an adoption change and is not required to satisfy a workflow that did not yet
+  exist on its target branch.
+- Tasks, iterations, and implementation PRs that already existed before that merge are
+  grandfathered. They may finish under their published governance baseline.
+- A grandfathered owner must add a Collaboration Claim before a new implementation branch or new
+  implementation PR is started after the effective boundary, or when the owner next changes
+  delivery state, claimant, scope, or handoff state.
+- Existing open implementation PRs do not need a retroactive claim PR merely to finish their
+  already-published scope.
+- A mismatch blocks only the affected owner-document chain. Unrelated Board or documentation drift
+  does not stop independent work elsewhere in the repository.
+
+The merge commit recorded by GitHub is the effective commit; the GitHub merge timestamp is the
+effective date.
+
+## Applicability
+
+A governed task and effective claim are required before new committed implementation work when any
+of the following applies:
+
+- product behavior, runtime behavior, API, security, storage, dependency, release, or architecture
+  changes;
+- a GitHub Issue, backlog Story, iteration, task, release owner, ADR, or security finding already
+  owns the scope;
+- work spans multiple implementation commits or PRs;
+- work changes owner-document delivery state or acceptance;
+- work is delegated to an autonomous or separately operated agent.
+
+A separate claim PR is not required when an effective owner-document claim already exists on the
+target branch.
+
+### Bounded Single-PR Maintenance
+
+A single PR may proceed without creating a governed task only when all of these are true:
+
+- the change is a typo, broken link, wording-only documentation correction, formatting cleanup,
+  reviewer-requested correction within the same PR, or mechanically bounded CI/fixture maintenance;
+- it does not change product behavior, public API, security policy, dependency resolution, release
+  authorization, persistent data, or an existing owner-document status;
+- it does not expand the scope of another claimed task;
+- it fits in one reviewable PR and leaves no residual implementation work.
+
+The PR description must state why the bounded-maintenance exception applies. If any condition stops
+being true, pause and establish a governed claim.
+
+### Release And Reviewer Follow-Ups
+
+- Release execution uses its existing release task owner and authorization record. A separate claim
+  PR is unnecessary when that owner and claim already exist on the target branch.
+- A reviewer-only follow-up on the current PR inherits that PR's owner and claim when it does not
+  widen scope. New product scope requires a new or amended claim.
+
+### Emergency Override
+
+A maintainer may bypass the normal claim-first order for an active production incident, exploited or
+credible security issue, repository outage, release-pipeline outage, or other time-critical safety
+repair.
+
+The minimum emergency record is:
+
+- authorizing maintainer;
+- incident or security reference, or a concise reason when disclosure must remain private;
+- exact emergency scope;
+- branch or commit used;
+- validation performed or explicitly deferred;
+- rollback or containment action.
+
+Create or reconcile the owner document, Collaboration Claim, Board/Issue state, and residual work no
+later than two business days after containment. `Authorization Mode` must be `Emergency override`.
+Emergency authority does not waive security review when disclosure and time permit it.
 
 ## Non-Negotiable Rules
 
-1. **Claim before implementation.** No agent may begin committed implementation work for a new
-   task until the task has a merged or directly committed governance claim.
-2. **Owner documents define task truth.** GitHub Issues are intake and discussion surfaces.
-   `docs/BOARD.md` is a derived operating view. Scope, delivery status, ownership, blockers,
-   acceptance, and completion evidence live in the relevant owner document.
-3. **A pending PR is not an effective claim.** Under PR-based development, a claim becomes
-   effective only after the governance claim PR is merged into the target branch.
-4. **One effective claimant per task.** Multiple agents may investigate or review a task, but only
-   one claimant owns implementation unless the owner document defines separate, non-overlapping
-   work slices.
-5. **Claim state and delivery state are different.** A task can be claimed while still `Ready`,
-   `Planned`, `Blocked`, or `Review`. Do not overload delivery status to express collaboration
-   ownership.
-6. **Implementation and claim establishment use separate PRs.** The governance claim PR must merge
-   before the implementation branch is created or implementation changes are committed or pushed.
-7. **Completion requires existing implementation evidence.** A task may be marked `Complete` only
-   after the implementation commit exists on the target branch and is recorded in the owner
-   document as `Completion Commit: <SHA>`.
-8. **Status changes flow outward from the owner document.** Update the owner document first, then
-   inventories and the Board, then synchronize the originating GitHub Issue.
+1. **Target-branch truth establishes ownership.** Proposed branch content and open PRs have no
+   ownership effect until their claim record exists on the target branch.
+2. **Claim before normal implementation.** New committed implementation work starts only after an
+   effective claim, except for the bounded-maintenance and emergency paths above.
+3. **Owner documents define task truth.** GitHub Issues are intake/discussion surfaces and
+   `docs/BOARD.md` is a derived operating view.
+4. **One owner scope, one effective claimant.** Parallel work requires separately identified child
+   owner documents with non-overlapping Work Slice values. Do not place multiple active claim
+   records in one owner document.
+5. **Claim state and delivery state are distinct.** Collaboration state must not be inferred from
+   `Ready`, `Active`, `Review`, `Blocked`, or `Complete`.
+6. **Completion requires existing evidence.** `Complete` requires an already-existing
+   implementation/evidence commit recorded as `Completion Commit: <SHA>`.
+7. **Owner first, derived views second.** Update the owner document, then inventories and Board,
+   then the originating Issue.
 
 ## Sources Of Truth
 
 | Concern | Authoritative Location | Notes |
 |---|---|---|
-| Requirement discussion and external reports | GitHub Issue | Not authoritative for repository delivery status |
+| Requirement discussion and external reports | GitHub Issue | Not authoritative for repository delivery state |
 | Story scope and acceptance | Backlog Story owner document | Usually under `docs/backlog/active/` |
 | Iteration objective and execution | Iteration owner document | Under `docs/iterations/` |
 | Long-running or program execution | Task owner document | Under `docs/tasks/` |
+| Release execution | Release task owner | Usually under `docs/tasks/` |
+| Collaboration ownership | Collaboration Claim in owner document on target branch | Open PR state is derived only |
 | Current operating view | `docs/BOARD.md` | Derived from owner documents |
-| Story inventory | `docs/backlog/PRODUCT-BACKLOG.md` | Must agree with Story owner documents |
-| Iteration inventory | `docs/iterations/README.md` | Must agree with iteration owner documents |
-| Code review and merge state | GitHub Pull Request | Does not replace owner-document status |
-| Completion evidence | Existing implementation commit SHA | Must already exist before `Complete` is recorded |
+| Code review and merge state | GitHub Pull Request | Does not replace owner-document state |
+| Completion evidence | Existing implementation commit SHA | Must predate the closure status change |
 
-When sources disagree, stop implementation and repair the owner-document chain before continuing.
+When sources disagree, repair the affected owner-document chain before continuing that scope.
 
-## Required Preflight
+## Persistent Claim Model
 
-Before claiming any work:
+`Claim Pending` is not a persistent owner-document state. It is a derived GitHub condition meaning
+that an open claim PR proposes ownership but target-branch ownership has not changed.
 
-1. Refresh the target branch and inspect the current repository state.
-2. Read the complete GitHub Issue, including comments, assignees, linked PRs, and closure state.
-3. Search the repository for the Issue number, proposed task ID, matching scope, acceptance
-   language, and existing backlog, iteration, task, proposal, or ADR owners.
-4. Inspect `docs/BOARD.md`, `docs/backlog/PRODUCT-BACKLOG.md`, `docs/iterations/README.md`, and every
-   relevant Active, Review, Planned, and Blocked iteration.
-5. Check open pull requests and branches for overlapping implementation.
-6. Confirm dependencies, activation gates, and required decisions are satisfied.
-7. Determine whether the work already has an owner, needs a new backlog Story, requires refinement,
-   or duplicates or changes existing work.
+Allowed persistent states are:
 
-Do not create a second task item merely because the existing item uses different wording.
+- `Unclaimed`: available for selection.
+- `Claimed`: target branch records an effective claimant and work slice.
+- `Handoff Pending`: current claimant remains responsible while a successor is being established.
+- `Released`: previous claimant stopped and the scope is available again.
+- `Closed`: delivery is Complete or Cancelled and the claim is terminal.
+
+A claim PR directly proposes `Claimed`, but the proposed value has no effect until merge.
 
 ## Collaboration Claim Record
 
-Every claimed task must contain a collaboration record in its owner document:
+Every newly claimed owner uses one record:
 
 ```markdown
 ## Collaboration Claim
@@ -85,250 +146,214 @@ Every claimed task must contain a collaboration record in its owner document:
 | Claim State | Claimed |
 | Responsible Actor | `@github-user` |
 | Executing Agent | `<agent/model or session label>` |
+| Work Slice | `<bounded, non-overlapping scope>` |
 | Claimed At | `YYYY-MM-DD` |
 | Source Issue | `#123` or `None` |
 | Governance Claim PR | `#456` or `Direct commit <SHA>` |
-| Implementation PR | `Not started` |
+| Authorization Mode | `Independent review`, `Single-maintainer merge`, `Direct commit`, or `Emergency override` |
+| Authorization Evidence | `<review, exact-head checks, maintainer reason, or incident record>` |
+| Implementation PR | `Not started`, `#789`, or `None` |
 | Last Updated | `YYYY-MM-DD` |
 | Handoff / Release Condition | `<condition or None>` |
 ```
 
-Allowed claim states:
+Rules:
 
-- `Unclaimed`: available for selection.
-- `Claim Pending`: represented by an open governance PR but not yet effective.
-- `Claimed`: effective ownership is present on the target branch.
-- `Handoff Pending`: current claimant is transferring responsibility.
-- `Released`: claimant stopped and the task is available again.
-- `Closed`: the associated delivery work is Complete or Cancelled.
+- One owner document contains at most one effective Collaboration Claim.
+- Parallel non-overlapping slices require child owner documents with stable IDs.
+- `Claimed` and `Handoff Pending` require complete actor, scope, date, claim reference,
+  authorization, and evidence fields.
+- `Closed` must agree with a Complete or Cancelled delivery state. Complete owners must also contain
+  valid completion commit evidence.
+- A claim does not expire automatically. A maintainer explicitly transfers or releases stale work.
 
-A claim does not expire automatically. A maintainer must explicitly release or transfer a stale
-claim after reviewing repository and GitHub activity.
+## Required Preflight
 
-## Path A: Claim A GitHub Issue And Form A Task Item
+Before proposing a claim:
 
-### 1. Validate The Issue
+1. Refresh the target branch.
+2. Read the complete Issue and all linked PRs/comments when an Issue exists.
+3. Search for the Issue number, proposed task ID, matching scope, owner documents, ADRs, and
+   acceptance language.
+4. Inventory relevant Active, Review, Planned, and Blocked iterations.
+5. Check open PRs and branches for overlapping work.
+6. Confirm dependencies, activation gates, and required decisions.
+7. Decide whether the request maps to an existing owner, needs requirement intake, is duplicate,
+   or is eligible for a bounded-maintenance exception.
 
-Determine whether the Issue is:
+Do not create a second owner merely because wording differs.
 
-- a defect or requirement requiring a new backlog Story;
-- already represented by an existing owner document;
-- a duplicate;
-- insufficiently specified and requiring requirement intake;
-- part of an existing iteration or program;
-- blocked on an ADR, security review, dependency, or other activation gate.
+## Claim A GitHub Issue And Form A Task
 
-### 2. Create Or Select The Owner Document
+1. Validate whether the Issue is new work, duplicate, refinement, continuation, or blocked work.
+2. Select an existing owner or create the appropriate Story/task owner.
+3. Record source Issue, scope/non-goals, dependencies, acceptance, validation, documentation, and
+   the Collaboration Claim.
+4. Update the relevant inventory and Board only after the owner.
+5. Comment on the Issue with owner path, claimant, proposed claim PR, and the statement that the
+   claim is ineffective until target-branch merge.
 
-When no owner exists:
+Issue assignment and labels improve visibility but do not establish repository ownership.
 
-1. Assign a unique Story or task ID using repository conventions.
-2. Create the owner document in the appropriate governance directory.
-3. Record the source Issue, problem, scope, non-goals, dependencies, acceptance criteria,
-   validation, affected user-facing documentation, and collaboration claim record.
-4. Add the item to the relevant inventory.
-5. Add it to the Board only when it belongs in the current operating view.
+## Claim An Existing Task
 
-Do not create an iteration merely to express ownership. Create an iteration only when the work has
-a committed runnable objective and satisfies `START-ITERATION.md`.
+An existing owner may be claimed only when:
 
-### 3. Synchronize The Issue
-
-Post a claim comment containing:
-
-```markdown
-This Issue is being converted into governed task `<TASK-ID>`.
-
-Owner document: `<path>`
-Claimant: `@user` via `<agent>`
-Claim mode: `<PR | direct>`
-Governance claim: `<PR link, commit, or pending>`
-Implementation has not started.
-
-The claim becomes effective only after the governance update is merged or committed to the target
-branch.
-```
-
-Issue assignment and labels may support visibility, but neither replaces the owner-document claim.
-
-## Path B: Claim An Existing Task Item
-
-An existing task may be claimed only when:
-
-- its owner document exists and is internally consistent;
 - its delivery state permits work;
-- dependencies and activation gates are satisfied or explicitly remain Blocked;
-- no effective claimant owns the same implementation scope;
-- no open implementation PR already covers the scope;
-- selecting it does not bypass unresolved iteration governance.
+- dependencies and activation gates are satisfied or explicitly Blocked;
+- no effective claimant owns the same Work Slice;
+- no overlapping implementation PR exists;
+- selection does not bypass unresolved iteration governance.
 
-The claim update must:
+Update the owner first, then inventory/Board, then Issue.
 
-1. update the collaboration claim record;
-2. update delivery status only when its actual lifecycle changes;
-3. activate or create an iteration only when required by iteration governance;
-4. update the relevant inventory;
-5. update the Board after the owner document;
-6. synchronize the originating Issue when one exists.
+## PR-Based Claim Flow
 
-## PR-Based Claim And Development Flow
+### 1. Open A Draft Claim PR
 
-PR-based work uses three distinct phases.
+Create a governance-only branch from the current target branch. Before a PR number exists, the draft
+owner record may remain `Unclaimed` with `Governance Claim PR: Pending`.
 
-### Phase 1: Governance Claim PR
+Open the Draft PR to obtain its number. The draft is not reviewable or mergeable in this state.
 
-Create a governance-only branch from the current target branch. The claim PR may contain:
+### 2. Finalize The Proposed Claim
 
-- creation or correction of the owner document;
-- the collaboration claim record;
-- Story or iteration activation records;
-- backlog and iteration index updates;
-- Board synchronization;
-- documentation links required to make the task discoverable;
-- governance validation fixes directly required by the claim.
+Update the same branch so the exact-head owner record contains:
 
-It must not contain production implementation, implementation tests, unrelated refactoring,
-dependency changes for the future implementation, generated implementation artifacts, or
-speculative API or schema changes.
-
-Suggested title:
-
-```text
-docs(governance): claim <TASK-ID> for <objective> [model:<model-name>]
-```
-
-The PR description must identify the source Issue, owner document, claimant, reserved scope,
-dependencies, activation gate, intended implementation PR, and confirmation that no implementation
-work is included.
+- `Claim State: Claimed`;
+- the actual `Governance Claim PR: #NN`;
+- complete Work Slice and authorization fields;
+- no production implementation, implementation tests, speculative dependencies, or generated
+  implementation artifacts.
 
 Run:
 
 ```bash
 scripts/validate_project_governance.sh .
+scripts/validate_collaboration_claims.sh .
 ```
 
-The claim is not effective while this PR is open.
+Only this finalized exact head may enter claim review.
 
-#### Mandatory Merge Gate
+### 3. Authorization Paths
 
-The governance claim PR must be approved and merged before:
+Use one of these paths:
 
-- creating the implementation branch;
-- committing or pushing implementation code;
-- opening a draft implementation PR;
-- changing production manifests or dependencies for the task.
+1. **Independent review**: an independent maintainer/reviewer approves. This remains mandatory for
+   security-sensitive, sandbox, permission, process-hardening, or otherwise explicitly protected
+   scopes.
+2. **Single-maintainer merge**: when no independent reviewer is available, the maintainer may merge
+   after exact-head CI and both governance validators pass, the PR records why independent review
+   is unavailable, and no unresolved blocking review feedback remains.
+3. **Direct commit**: permitted only when repository policy explicitly allows it and a maintainer
+   records exact validation and reason. It is not a convenience substitute for normal review.
+4. **Emergency override**: follows the emergency section and requires post-containment
+   reconciliation.
 
-Read-only investigation, repository inspection, and uncommitted disposable experiments are allowed,
-but they do not establish ownership and must not be presented as task implementation.
+The PR author does not need to approve their own PR under the single-maintainer path.
 
-The implementation branch must start from the governance claim merge commit or a later target-branch
-commit containing that claim.
+### 4. Mandatory Merge-Time CAS Preflight
 
-### Phase 2: Implementation PR
+Immediately before merge, re-check all of the following against the exact head:
 
-After the governance claim is merged:
+- the claim branch contains the latest target branch or is otherwise reported mergeable without
+  hidden conflicts;
+- the target owner document has not gained another effective claimant;
+- no new overlapping implementation or claim PR exists;
+- the proposed Responsible Actor and Work Slice still match current owner truth;
+- dependencies and activation gates remain satisfied;
+- `Governance Claim PR` matches the actual PR number;
+- exact-head CI and both governance validators passed;
+- required authorization evidence is present;
+- no unresolved blocking review feedback remains.
 
-1. refresh the target branch;
-2. verify the claim is still effective;
-3. create the implementation branch from the updated target branch;
-4. implement only the claimed scope;
-5. append execution and validation evidence to the owner document;
-6. update the claim record with the implementation PR number;
-7. move delivery state to `Review` when implementation is submitted.
+If any check changes, do not merge. Refresh the branch, update the owner, and rerun exact-head
+validation. This is the collaboration compare-and-swap gate.
 
-The implementation PR must reference the source Issue, task ID, owner document, governance claim PR,
-acceptance criteria, validation, residual work, and explicit non-goals.
+### 5. Merge Establishes Ownership
 
-The implementation PR normally must not mark the task `Complete`, because its implementation commit
-does not yet exist on the target branch.
+The claim becomes effective only when the finalized `Claimed` record exists on the target branch.
+The implementation branch starts from that claim merge commit or a later target-branch commit.
 
-### Phase 3: Governance Closure PR
+Do not create the implementation branch, commit/push implementation, change production dependencies,
+or open a draft implementation PR before this point.
 
-After the implementation PR is merged:
+Read-only investigation and disposable uncommitted experiments do not establish ownership and must
+not be represented as implementation progress.
 
-1. obtain the existing implementation or merge commit SHA;
-2. update the owner document first;
-3. record `Completion Commit: <SHA>`;
-4. record accurate acceptance and validation evidence;
-5. set the truthful delivery and claim states;
-6. update backlog and iteration inventories;
-7. update the Board;
-8. comment on the originating Issue with the status and implementation commit;
-9. close the Issue only when repository Issue Sync rules permit closure.
+## Implementation PR
 
-A status-only commit cannot cite itself as completion evidence.
+After claim merge:
 
-## Direct-Commit Flow
+1. refresh the target branch and verify the claim remains effective;
+2. create the implementation branch from the claim merge or later target commit;
+3. implement only the Work Slice;
+4. append execution and validation evidence to the owner;
+5. record the implementation PR number;
+6. move delivery state to `Review` when submitted.
 
-When repository policy explicitly permits direct commits, preserve the same ordering:
+The implementation PR references the Issue, task ID, owner, claim PR, acceptance, validation,
+residuals, and non-goals. It normally does not mark the owner Complete because its implementation
+commit is not yet on the target branch.
 
-1. commit and push the governance claim;
-2. begin implementation only after the claim exists on the target branch;
-3. commit and push implementation;
-4. commit and push governance closure citing the existing implementation SHA.
+## Governance Closure
 
-Combining these steps into one commit is not permitted.
+After implementation merge:
 
-## Execution Updates
+1. obtain the existing implementation or merge SHA;
+2. update the owner first and record `Completion Commit: <SHA>`;
+3. record acceptance and validation evidence;
+4. set truthful delivery and claim states;
+5. update inventories and Board;
+6. synchronize and close the Issue only when Issue Sync rules permit it.
 
-Update governance when scope or acceptance changes, a dependency changes state, ownership transfers,
-work pauses or releases, an implementation PR changes state, validation exposes residual work, or a
-new ADR or security review becomes necessary.
+A status-only commit cannot cite itself.
 
-Do not edit the Board first. Do not use Issue comments as the only record of a blocker or handoff.
+## Direct-Commit Sequence
 
-## Handoff
+When Direct commit is authorized, preserve the same order:
 
-Before handing off claimed work:
+1. commit/push the claim record;
+2. begin implementation only after the claim is on the target branch;
+3. commit/push implementation;
+4. commit/push closure citing the existing implementation SHA.
+
+Do not combine these into one commit.
+
+## Handoff, Release, And Abandonment
+
+For handoff:
 
 1. stop implementation changes;
-2. record current state, completed work, unpublished work, validation, remaining acceptance items,
-   resume instructions, and branch or PR references in the owner document;
-3. set claim state to `Handoff Pending`;
-4. update derived views;
-5. synchronize the Issue;
-6. have the successor establish responsibility through a merged governance update.
+2. record current state, commits, validation, remaining acceptance, branch/PR, and exact resume gate;
+3. set `Handoff Pending`;
+4. keep the current claimant responsible until a successor claim reaches the target branch.
 
-The previous claimant remains responsible until the transfer is recorded on the target branch.
-
-## Release Or Abandonment
-
-When an agent stops work without a successor:
-
-- set claim state to `Released`;
-- return delivery status to its truthful state, usually `Ready`, `Planned`, `Blocked`, or `Partial`;
-- record why work stopped;
-- preserve implementation and validation evidence;
-- correct derived views;
-- update the Issue without closing it unless the task is Cancelled.
-
-Never leave abandoned work `In Progress` solely because work once began.
+For release without a successor, set `Released`, restore truthful delivery state, preserve evidence,
+record why work stopped, and synchronize derived views and Issue. Do not leave abandoned work
+`In Progress` merely because implementation once began.
 
 ## Conflict Resolution
 
-The target branch is authoritative:
+- Target-branch owner truth wins.
+- Open PRs do not reserve work.
+- First compatible merged claim wins.
+- Later overlapping claims must close, narrow, or create separate child owners.
+- Never silently replace another claimant.
+- Maintainer overrides must be recorded with authorization evidence.
 
-- the first compatible claim merged into the target branch wins;
-- an open claim PR does not reserve the task;
-- a later claimant must refresh and repeat preflight before merge;
-- overlapping claim PRs must be closed, narrowed, or converted into explicit non-overlapping slices;
-- never silently overwrite another claimant in the owner document;
-- maintainer direction overrides claimant order and must be recorded in the owner document.
+## Validation And Completion Checklist
 
-## Completion Checklist
+Before claim merge or collaboration closure:
 
-Before declaring collaboration and status closure complete:
-
-- [ ] Owner document contains the final truthful delivery status.
-- [ ] Completion references one or more existing implementation commit SHAs.
-- [ ] Collaboration claim is Closed, Released, or transferred.
-- [ ] Acceptance and validation evidence are recorded.
-- [ ] Backlog and iteration inventories match the owner document.
-- [ ] Board matches the owner document.
-- [ ] Source Issue contains the final status and commit reference.
-- [ ] Issue closure agrees with repository Issue Sync rules.
-- [ ] No stale implementation or claim PR remains open.
-- [ ] Governance validation passes.
+- [ ] Persistent Claim State is allowed; `Claim Pending` is not stored.
+- [ ] Responsible Actor, Work Slice, dates, PR/commit reference, and authorization are complete.
+- [ ] Merge-time CAS preflight was repeated against exact head.
+- [ ] `scripts/validate_project_governance.sh .` passes.
+- [ ] `scripts/validate_collaboration_claims.sh .` passes.
+- [ ] Owner, inventories, Board, and Issue agree.
+- [ ] Complete owners cite existing implementation evidence.
+- [ ] No stale claim or implementation PR remains open.
 
 ## Related SOPs
 
@@ -337,5 +362,6 @@ Before declaring collaboration and status closure complete:
 - `docs/sop/ITERATION-WORKFLOW.md`
 - `docs/sop/CHANGE-CONTROL.md`
 - `docs/sop/GIT-WORKFLOW.md`
+- `docs/sop/LONG-RUNNING-TASK.md`
 - `docs/sop/DOC-CHECK.md`
 - `docs/sop/EVOLUTION-FEEDBACK.md`
