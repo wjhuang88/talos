@@ -49,7 +49,7 @@ pub fn git_mutation_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContr
 /// Builds the single authoritative `read_image` contribution for one explicit
 /// workspace root.
 ///
-/// The tool is contributed independently of model capability. The outer
+/// Contribution ownership is independent of model capability. The outer
 /// product/agent composition remains responsible for permission wrapping and
 /// the existing Supported-model presentation gate.
 #[must_use]
