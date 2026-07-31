@@ -11,194 +11,35 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  repair-pr107-docs:
-    name: Apply PR 107 governance repair
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'repair/pr107-doc-export'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
-      - name: Apply deterministic owner and mirror updates
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin "$BASE_REF"
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_once(text, old, new, label):
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected one match, found {count}")
-              return text.replace(old, new, 1)
-
-          claim = """## Collaboration Claim
-
-          | Field | Value |
-          |---|---|
-          | Claim State | Unclaimed |
-          | Responsible Actor | Not assigned |
-          | Executing Agent | Not assigned |
-          | Work Slice | Not assigned |
-          | Claimed At | Not applicable |
-          | Source Issue | None |
-          | Governance Claim PR | Not applicable |
-          | Authorization Mode | Not applicable |
-          | Authorization Evidence | Not applicable |
-          | Implementation PR | Not started |
-          | Last Updated | 2026-07-31 |
-          | Handoff / Release Condition | None |
-
-          """.replace("          ", "")
-
-          p = Path("docs/backlog/PRODUCT-BACKLOG.md")
-          t = p.read_text()
-          t = replace_once(t,
-              "| 0 | v0.6 Runtime Productization Program | Current execution owner. ADR-053 Accepted and I158 Active on 2026-07-31; I159-I162 remain Blocked behind the ordered composition/publication sequence. | `docs/tasks/2026-07-28-four-month-v06-execution-package.md`; `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`; `docs/decisions/053-tool-registration-composition.md`; `docs/iterations/I158-tool-registration-composition.md` |",
-              "| 0 | v0.6 Runtime Productization Program | Current execution owner. ADR-053 Accepted and I158 Active on 2026-07-31. After I158 reaches Complete or Paused, TUI-037 is the next P1 item to disposition before I159 activation; I159-I162 retain their published baselines and remain Blocked. | `docs/tasks/2026-07-28-four-month-v06-execution-package.md`; `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`; `docs/decisions/053-tool-registration-composition.md`; `docs/iterations/I158-tool-registration-composition.md`; `docs/backlog/active/TUI-037-dashboard-logo-link.md` |\n| 1 | TUI-037 Dashboard Link In Logo Region | Maintainer-raised P1 follow-up. Immediately after I158 disposition, resolve the OSC 8 and token-required loopback navigation gates, then select a dedicated iteration or explicitly record Blocked/Deferred before I159 activation. | `docs/backlog/active/TUI-037-dashboard-logo-link.md`; `docs/decisions/031-web-loopback-dashboard-boundary.md`; `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`; `docs/iterations/I158-tool-registration-composition.md` |",
-              "product backlog priority")
-          t = replace_once(t,
-              "| TUI-037 | Dashboard Link In Logo Region | Refinement — pending design and iteration selection | P2 | Move the dashboard-ready presentation out of the generic tips row into one display-only Logo-prefix line with a terminal-clickable dashboard URL. Keep the URL non-secret, provide a visible fallback for terminals without hyperlink support, and preserve normal tips plus Alternate-Screen transcript isolation. | `docs/backlog/active/TUI-037-dashboard-logo-link.md`; `docs/backlog/active/TUI-005-logo-splash.md`; `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`; `docs/backlog/active/TUI-035-narrow-viewport-and-resize-rendering-robustness.md`; `docs/decisions/031-web-loopback-dashboard-boundary.md`; `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`; `crates/talos-cli/src/mode_runners.rs`; `crates/talos-tui/src/` |",
-              "| TUI-037 | Dashboard Link In Logo Region | Refinement — P1; first post-I158 disposition | P1 | Move successful Dashboard availability from the generic tips row into one display-only Logo-prefix line. Ordinary loopback mode targets a safe clickable token-free URL with complete plain-text fallback. Token-required loopback navigation remains an unresolved design gate, so implementation is not yet authorized. | `docs/backlog/active/TUI-037-dashboard-logo-link.md`; `docs/backlog/active/TUI-005-logo-splash.md`; `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`; `docs/backlog/active/TUI-035-narrow-viewport-and-resize-rendering-robustness.md`; `docs/decisions/031-web-loopback-dashboard-boundary.md`; `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`; `docs/iterations/I158-tool-registration-composition.md`; `crates/talos-cli/src/mode_runners.rs`; `crates/talos-tui/src/` |",
-              "product backlog TUI-037")
-          p.write_text(t)
-
-          p = Path("docs/iterations/README.md")
-          t = p.read_text()
-          t = replace_once(t,
-              "| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |",
-              "| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete and the post-I158 TUI-037 disposition is recorded. See `I159-talos-tools-feature-boundary.md`. |",
-              "iterations I159")
-          note = """
-          > Maintainer sequence disposition (2026-07-31): after I158 reaches a formal Complete or Paused
-          > disposition, TUI-037 is the next P1 product item to disposition before I159 activation. TUI-037
-          > remains Refinement until its OSC 8 and token-required loopback navigation gates are resolved. The
-          > disposition must either select a dedicated iteration or explicitly record Blocked/Deferred.
-          > I159-I162 retain their published baselines.
-          """.replace("          ", "")
-          t = replace_once(t,
-              "| I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | ARCH-031-D. External SDK fixture + metadata-derived closure → explicit v0.6 GO/NO-GO; no real publish. Blocked until I161 Complete and all workspace tests green. See `I162-v0.6-sdk-publication-readiness.md`. |\n\n> Update this table",
-              "| I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | ARCH-031-D. External SDK fixture + metadata-derived closure → explicit v0.6 GO/NO-GO; no real publish. Blocked until I161 Complete and all workspace tests green. See `I162-v0.6-sdk-publication-readiness.md`. |\n" + note + "\n> Update this table",
-              "iterations note")
-          t = replace_once(t,
-              "| I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |",
-              "| I159 | Blocked — I158 incomplete / TUI-037 undispositioned | ARCH-031-A. After I158 disposition, TUI-037 must receive a dedicated-iteration or explicit Blocked/Deferred disposition before I159 activation. |",
-              "iterations inventory")
-          p.write_text(t)
-
-          p = Path("docs/tasks/2026-07-26-v0.6-runtime-productization-program.md")
-          t = p.read_text()
-          t = replace_once(t, "## 1. Purpose\n", claim + "## 1. Purpose\n", "program claim")
-          t = replace_once(t,
-              "> Current active iteration: None — I168 Complete; ADR-053 maintainer review is the next gate\n> Implementation authority: none; ADR-053 remains Proposed and I158 remains blocked",
-              "> Current active iteration: I158 — Tool Registration Composition Consolidation\n> Implementation authority: I158 / ARCH-034-R01; TUI-037 is queued for post-I158 disposition",
-              "program authority")
-          variance = """## 5A. Maintainer Sequence Variance — 2026-07-31
-
-          This variance changes selection order without rewriting the published I159-I162 baselines.
-
-          - I158 remains the sole Active implementation iteration until its formal disposition.
-          - After I158 is Complete or Paused, TUI-037 is the next P1 product item that must receive an
-            explicit disposition before I159 activation.
-          - TUI-037 remains Refinement while OSC 8 capability/sanitization and token-required loopback
-            navigation remain unresolved. This variance does not authorize implementation from Refinement.
-          - The post-I158 inventory must either close those gates and select TUI-037 into a dedicated
-            iteration, or explicitly record TUI-037 as Blocked/Deferred with maintainer rationale.
-          - Only after that disposition may the unchanged I159-I162 sequence resume.
-          - No TUI-037 code may be stacked onto I158 branches or PRs.
-
-          """.replace("          ", "")
-          t = replace_once(t, "## 6. Dependency Graph\n", variance + "## 6. Dependency Graph\n", "program variance")
-          row = "| 2026-07-31 | Maintainer sequence variance | TUI-037 raised to P1. After I158 disposition it must be selected into a dedicated iteration or explicitly recorded Blocked/Deferred before I159 activation. TUI-037 remains Refinement until OSC 8 and token-required loopback navigation gates are resolved; I159-I162 published baselines remain unchanged. |\n"
-          t = replace_once(t, "| Date | Event | Record |\n|---|---|---|\n", "| Date | Event | Record |\n|---|---|---|\n" + row, "program row")
-          p.write_text(t)
-
-          p = Path("docs/tasks/2026-07-28-four-month-v06-execution-package.md")
-          t = p.read_text()
-          t = replace_once(t, "## Outcome\n", claim + "## Outcome\n", "package claim")
-          t = replace_once(t,
-              "> Current implementation authority: none; ADR-053 review is next and I158 remains blocked",
-              "> Current implementation authority: I158 / ARCH-034-R01; TUI-037 is queued for post-I158 disposition",
-              "package authority")
-          variance = """## Maintainer Sequence Variance — 2026-07-31
-
-          The capacity table and P3-P6 published baselines remain historical planning truth. The maintainer
-          inserted one disposition gate after P2/I158 and before P3/I159:
-
-          - TUI-037 is raised to P1 and must be dispositioned immediately after I158 reaches Complete or Paused.
-          - Because TUI-037 remains Refinement, close OSC 8 and token-required loopback navigation design gates before implementation.
-          - Select a dedicated TUI iteration if those gates close; otherwise record explicit Blocked/Deferred disposition.
-          - P3/I159 may activate only after that disposition. I159-I162 scope and acceptance remain unchanged.
-          - Do not stack TUI-037 work onto I158 branches or PRs.
-
-          """.replace("          ", "")
-          t = replace_once(t, "## Ordered Task Items\n", variance + "## Ordered Task Items\n", "package variance")
-          ux = "| UX1 | Disposition TUI-037 / Dashboard Logo Link | P1 post-I158 decision: resolve design gates and select a dedicated iteration, or explicitly record Blocked/Deferred | P2 reaches Complete or Paused | TUI-037 owner, iteration index, program/package, backlog, Board, and Issue #104 synchronized; no implementation from Refinement | Keep TUI-037 Refinement and Blocked/Deferred; do not silently skip to P3 | Planned |\n"
-          p2 = "| P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |\n"
-          t = replace_once(t, p2, p2 + ux, "package UX1")
-          checkpoint = """
-          ## TUI-037 Reprioritization Checkpoint — 2026-07-31
-
-          - I158 remains the sole Active implementation iteration.
-          - TUI-037 is P1 but remains Refinement with Issue #104 and an Unclaimed Collaboration Claim.
-          - After I158 Complete or Paused, resolve its design gates and select a dedicated iteration or explicitly record Blocked/Deferred before I159.
-          - I159-I162 retain their published baselines and remain Blocked.
-          """.replace("          ", "")
-          t = t.rstrip() + "\n\n" + checkpoint
-          p.write_text(t)
-
-          p = Path("docs/BOARD.md")
-          t = p.read_text()
-          t = replace_once(t,
-              "| v0.6 Runtime Productization Program | In Progress — ADR-053 accepted; I158 Active (2026-07-31) | [four-month package](tasks/2026-07-28-four-month-v06-execution-package.md) / [program](tasks/2026-07-26-v0.6-runtime-productization-program.md) / [ARCH-031](backlog/active/ARCH-031-crate-publication-boundary.md) / [ADR-053](decisions/053-tool-registration-composition.md) / [I158](iterations/I158-tool-registration-composition.md) | I158 is the sole Active implementation iteration. Deliver checked contribution contracts and print/TUI/MCP equivalence without changing permission defaults; I159-I162 remain blocked. |",
-              "| v0.6 Runtime Productization Program | In Progress — ADR-053 accepted; I158 Active (2026-07-31) | [four-month package](tasks/2026-07-28-four-month-v06-execution-package.md) / [program](tasks/2026-07-26-v0.6-runtime-productization-program.md) / [ARCH-031](backlog/active/ARCH-031-crate-publication-boundary.md) / [ADR-053](decisions/053-tool-registration-composition.md) / [I158](iterations/I158-tool-registration-composition.md) | I158 is the sole Active implementation iteration. After I158 disposition, TUI-037 is the next P1 item to disposition before I159; I159-I162 retain their published baselines and remain blocked. |",
-              "board gate")
-          header = "## Next\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n"
-          row = "| TUI-037 Dashboard Link In Logo Region | P1 Refinement — first post-I158 disposition | [TUI-037](backlog/active/TUI-037-dashboard-logo-link.md) / [Issue #104](https://github.com/wjhuang88/talos/issues/104) | After I158 Complete or Paused, resolve OSC 8 and token-required loopback navigation gates, then select a dedicated iteration or explicitly record Blocked/Deferred before I159 activation. |\n"
-          t = replace_once(t, header, header + row, "board row")
-          p.write_text(t)
-          PY
-          git show "origin/$BASE_REF:.github/workflows/ci.yml" > .github/workflows/ci.yml
-          scripts/validate_project_governance.sh .
-          bash scripts/validate_collaboration_claims.sh .
-          git diff --check
-          git add docs/backlog/PRODUCT-BACKLOG.md docs/iterations/README.md docs/tasks/2026-07-26-v0.6-runtime-productization-program.md docs/tasks/2026-07-28-four-month-v06-execution-package.md docs/BOARD.md .github/workflows/ci.yml
-          git diff --cached --check
-          git commit -m "docs(tui): synchronize dashboard priority sequence"
-          git push origin "HEAD:$HEAD_REF"
-
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
+
       - uses: Swatinem/rust-cache@v2
+
       - name: Release preflight
         run: ./scripts/release_preflight.sh
 
   windows-installer-fixture:
     name: Windows installer fixture
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
