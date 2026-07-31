@@ -20,10 +20,11 @@ use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use talos_tools::{
-    BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
-    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
-    WebSearchTool, WriteTool, git_mutation_tool_contributions, git_read_tool_contributions,
-    read_image_tool_contribution, snapshot_aware_file_tools, symbol_tool_contributions,
+    BashTool, DiffTool, DocumentExtractTool, ExecTool, FetchUrlTool, GlobTool, GrepTool,
+    HttpRequestTool, SaveUrlTool, StatTool, TreeTool, WebSearchTool,
+    git_mutation_tool_contributions, git_read_tool_contributions, ordinary_file_tool_contributions,
+    read_image_tool_contribution, snapshot_aware_file_tool_contributions,
+    symbol_tool_contributions,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -755,8 +756,6 @@ impl AgentTool for StatusTool {
 pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>) -> ToolRegistry {
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
     let ephemeral_session_id = Uuid::new_v4();
-    let (read_tool, write_tool, edit_tool, delete_tool) =
-        snapshot_aware_file_tools(PathBuf::from("."));
 
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(PermissionAwareTool {
@@ -769,11 +768,18 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         approval: approval.clone(),
         print_mode: true,
     }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(read_tool),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
+    for contribution in snapshot_aware_file_tool_contributions(PathBuf::from(".")) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: true,
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     let read_image = read_image_tool_contribution(PathBuf::from(".")).map_tool(|tool| {
         Arc::new(PermissionAwareTool {
             inner: tool,
@@ -790,32 +796,12 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(write_tool),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(edit_tool),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(GrepTool::new(PathBuf::from("."))),
         approval: approval.clone(),
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(GlobTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(LsTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(delete_tool),
         approval: approval.clone(),
         print_mode: true,
     }));
@@ -902,8 +888,6 @@ pub(crate) fn build_tui_tool_registry(
     delay_tool: Vec<Arc<dyn AgentTool>>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    let (read_tool, write_tool, edit_tool, delete_tool) =
-        snapshot_aware_file_tools(workspace_root.clone());
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(BashTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
@@ -912,10 +896,17 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(ExecTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(read_tool),
-        approval: approval_handler.clone(),
-    }));
+    for contribution in snapshot_aware_file_tool_contributions(workspace_root.clone()) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: approval_handler.clone(),
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     let read_image = read_image_tool_contribution(workspace_root.clone()).map_tool(|tool| {
         Arc::new(TuiPermissionAwareTool {
             inner: tool,
@@ -930,27 +921,11 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(write_tool),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(edit_tool),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(GrepTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(GlobTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(LsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(delete_tool),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -1029,14 +1004,14 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(BashTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ExecTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ReadTool::new(PathBuf::from("."))));
+    for contribution in ordinary_file_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(DocumentExtractTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(EditTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GrepTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GlobTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(LsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(DeleteTool::new(PathBuf::from("."))));
     registry.register(Arc::new(SaveUrlTool::new()));
     registry.register(Arc::new(FetchUrlTool::new()));
     registry.register(Arc::new(DiffTool::new(PathBuf::from("."))));
@@ -1341,6 +1316,47 @@ mod tests {
             assert!(print_registry.get(name).is_some(), "print missing {name}");
             assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
             assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
+        }
+    }
+
+    #[test]
+    fn print_tui_and_mcp_registries_preserve_file_inventory_and_source() {
+        let print_registry = build_print_tool_registry(Vec::new());
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui_registry = build_tui_tool_registry(
+            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+            PathBuf::from("."),
+            Uuid::new_v4(),
+            Vec::new(),
+        );
+        let mcp_registry = build_mcp_tool_registry();
+        let names = ["read", "write", "edit", "ls", "delete"];
+
+        for name in names {
+            assert!(print_registry.get(name).is_some(), "print missing {name}");
+            assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
+            assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
+        }
+
+        for (mode, mut registry) in [
+            ("print", print_registry),
+            ("TUI", tui_registry),
+            ("MCP", mcp_registry),
+        ] {
+            let error = registry
+                .register_contribution(ToolContribution::new(
+                    ToolContributionSource::new("test:duplicate"),
+                    Arc::new(NamedReadTool {
+                        name: "read",
+                        description: "duplicate",
+                    }),
+                ))
+                .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "duplicate tool registration 'read': existing source 'talos-tools:file', incoming source 'test:duplicate'",
+                "{mode} source mismatch"
+            );
         }
     }
 
