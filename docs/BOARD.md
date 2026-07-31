@@ -43,6 +43,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I169 Batched Steering Turn / GitHub Issue #50 | Review — corrections implemented; gates pending (2026-07-31) | [I169](iterations/I169-batched-steering-turn.md) / [TUI-041](backlog/active/TUI-041-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) | Draft PR #68 is rebased on `main@37e369b1`; implementation evidence is `1c81e040`. I170 moved to Draft PR #78. Post-rebase gates, CI, real-TUI evidence, and maintainer review remain pending. |
 | Issue / Doc / Code Status Audit | Complete (2026-07-15) | [status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md) | Commit `a1e9985` recorded the remote-state refresh and owner synchronization. The matrix remains a historical index; each still-open issue has its own active owner. |
 | I115 Runtime Event Semantic Convergence | Complete | [I115](iterations/I115-runtime-event-semantic-convergence.md) / [ARCH-033](backlog/active/ARCH-033-runtime-event-semantic-convergence.md) | Closed after FIFO content, authoritative lifecycle, actor persistence, cross-surface runtime evidence, full tests, clippy, and governance validation passed. |
 

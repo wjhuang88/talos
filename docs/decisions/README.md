@@ -120,3 +120,5 @@ Which Assumptions need validation?]
 - [054: Alternate-Screen Application-Owned Transcript Rendering](054-alternate-screen-app-owned-transcript-rendering.md) — **Accepted** (2026-07-27; reinstated with startup-splash amendment). Talos has one Alternate Screen full-frame renderer; it enters Alternate Screen before drawing the Logo as display-only first-frame content, while TranscriptStore remains the sole conversation-history authority.
 
 - [055: Primary-Screen App-Owned Transcript With Native History Projection](055-primary-screen-app-owned-transcript-native-projection.md) — **Rejected** (2026-07-27). Short-lived one-mode primary-screen trial superseded by the maintainer-selected amended ADR-054 Alternate Screen renderer.
+
+- [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) — **Proposed / Review** (2026-07-31). Defines Issue #50's transactional steering design. Maintainer review is still required before acceptance.

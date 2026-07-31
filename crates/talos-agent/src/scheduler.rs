@@ -7,7 +7,7 @@
 //!
 //! - All types are `pub(crate)` — no public semver-bound API surface.
 //! - The actor (SF101) owns a `HashMap` of active tasks and injects messages
-//!   via the existing `SessionOp::Submit` queue.
+//!   via source-aware `SessionOp::SubmitStructured` operations.
 //! - The `delay` tool (SF102) sends commands through [`SchedulerHandle`].
 //! - No persistence, no cron, no direct tool execution — session-scoped only.
 //!
@@ -25,7 +25,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use talos_core::session::SessionOp;
+use talos_core::session::{
+    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionSource,
+};
 use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -63,6 +65,7 @@ pub(crate) fn validate_delay_secs(delay_secs: u64) -> Result<(), String> {
 
 pub(crate) const MIN_INTERVAL_SECS: u64 = 5;
 pub(crate) const MAX_INTERVAL_SECS: u64 = 3_600;
+const ONE_SHOT_DELIVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) fn validate_interval_secs(interval_secs: u64) -> Result<(), String> {
     if interval_secs < MIN_INTERVAL_SECS {
@@ -84,13 +87,13 @@ pub(crate) fn validate_interval_secs(interval_secs: u64) -> Result<(), String> {
 ///
 /// This label ensures both the user and the model can distinguish a scheduled
 /// follow-up from a user-typed message in the transcript. It is encoded in the
-/// message `String` sent via `SessionOp::Submit` — no public API change is
-/// required.
+/// structured submission text; the source is separately identified as
+/// [`SubmissionSource::Scheduler`].
 pub(crate) const SCHEDULED_FOLLOWUP_LABEL: &str = "[scheduled-followup]";
 
 /// Formats a user message with the scheduled-followup source label.
 ///
-/// The resulting string is sent via `SessionOp::Submit` and appears in the
+/// The resulting string is carried by a structured submission and appears in the
 /// transcript as a visibly labeled message.
 pub(crate) fn label_scheduled_message(message: &str) -> String {
     format!("{SCHEDULED_FOLLOWUP_LABEL} {message}")
@@ -99,6 +102,7 @@ pub(crate) fn label_scheduled_message(message: &str) -> String {
 // ── Task IDs ────────────────────────────────────────────────────────────
 
 static NEXT_TASK_SEQ: AtomicU64 = AtomicU64::new(1);
+static NEXT_FIRE_SEQ: AtomicU64 = AtomicU64::new(1);
 
 /// Generates a deterministic, monotonically increasing task ID.
 ///
@@ -106,6 +110,24 @@ static NEXT_TASK_SEQ: AtomicU64 = AtomicU64::new(1);
 /// and are never persisted or reused after a restart.
 pub(crate) fn next_task_id() -> String {
     format!("sched_{}", NEXT_TASK_SEQ.fetch_add(1, Ordering::Relaxed))
+}
+
+fn scheduled_submission(task_id: &str, message: String) -> SessionOp {
+    let sequence = NEXT_FIRE_SEQ.fetch_add(1, Ordering::Relaxed);
+    SessionOp::SubmitStructured {
+        submission: StructuredSubmission {
+            id: format!("{task_id}_fire_{sequence}"),
+            source: SubmissionSource::Scheduler,
+            sender_generation: 0,
+            items: vec![SubmissionItem {
+                id: format!("{task_id}_item_{sequence}"),
+                enqueue_sequence: sequence,
+                kind: SubmissionKind::UserTurn,
+                text: message,
+                attachments: Vec::new(),
+            }],
+        },
+    }
 }
 
 // ── Schedule kind ───────────────────────────────────────────────────────
@@ -151,6 +173,8 @@ pub(crate) struct ScheduledTaskInfo {
     pub created_at: Instant,
     /// When the task is scheduled to fire.
     pub fire_at: Instant,
+    /// Last bounded one-shot delivery failure, retained for inspection.
+    pub delivery_error: Option<String>,
 }
 
 impl ScheduledTaskInfo {
@@ -304,6 +328,11 @@ struct ActiveTask {
     handle: JoinHandle<()>,
 }
 
+enum TaskFireEvent {
+    Delivered(String),
+    DeliveryFailed { task_id: String, reason: String },
+}
+
 /// Single-owner scheduler actor for session-scoped delayed follow-ups.
 ///
 /// Owns all scheduling state for the current process/session. No persistence,
@@ -315,8 +344,8 @@ pub(crate) struct SchedulerActor {
     sq_tx: mpsc::Sender<SessionOp>,
     cancel_token: CancellationToken,
     tasks: HashMap<String, ActiveTask>,
-    fired_tx: mpsc::UnboundedSender<String>,
-    fired_rx: mpsc::UnboundedReceiver<String>,
+    fired_tx: mpsc::UnboundedSender<TaskFireEvent>,
+    fired_rx: mpsc::UnboundedReceiver<TaskFireEvent>,
 }
 
 impl SchedulerActor {
@@ -382,18 +411,28 @@ impl SchedulerActor {
                     }
                 }
 
-                Some(task_id) = self.fired_rx.recv() => {
-                    let kind = self.tasks.get(&task_id).map(|t| t.info.kind);
-                    match kind {
-                        Some(ScheduleKind::OneShot) => {
-                            self.tasks.remove(&task_id);
-                        }
-                        Some(ScheduleKind::Recurring { interval }) => {
-                            if let Some(task) = self.tasks.get_mut(&task_id) {
-                                task.info.fire_at = Instant::now() + interval;
+                Some(event) = self.fired_rx.recv() => {
+                    match event {
+                        TaskFireEvent::Delivered(task_id) => {
+                            let kind = self.tasks.get(&task_id).map(|task| task.info.kind);
+                            match kind {
+                                Some(ScheduleKind::OneShot) => {
+                                    self.tasks.remove(&task_id);
+                                }
+                                Some(ScheduleKind::Recurring { interval }) => {
+                                    if let Some(task) = self.tasks.get_mut(&task_id) {
+                                        task.info.fire_at = Instant::now() + interval;
+                                    }
+                                }
+                                None => {}
                             }
                         }
-                        None => {}
+                        TaskFireEvent::DeliveryFailed { task_id, reason } => {
+                            if let Some(task) = self.tasks.get_mut(&task_id) {
+                                task.info.delivery_error = Some(reason);
+                                task.info.fire_at = Instant::now();
+                            }
+                        }
                     }
                 }
             }
@@ -429,19 +468,21 @@ impl SchedulerActor {
         let handle = tokio::spawn(async move {
             tokio::time::sleep(delay).await;
 
-            if sq_tx
-                .send(SessionOp::Submit {
-                    message: labeled_for_fire,
-                })
+            let operation = scheduled_submission(&task_id_for_fire, labeled_for_fire);
+            let event = match tokio::time::timeout(ONE_SHOT_DELIVERY_TIMEOUT, sq_tx.send(operation))
                 .await
-                .is_err()
             {
-                tracing::debug!(
-                    task_id = %task_id_for_fire,
-                    "scheduled follow-up fire: session queue closed"
-                );
-            }
-            let _ = fired_tx.send(task_id_for_fire);
+                Ok(Ok(())) => TaskFireEvent::Delivered(task_id_for_fire),
+                Ok(Err(_)) => TaskFireEvent::DeliveryFailed {
+                    task_id: task_id_for_fire,
+                    reason: "session queue closed before one-shot delivery".to_string(),
+                },
+                Err(_) => TaskFireEvent::DeliveryFailed {
+                    task_id: task_id_for_fire,
+                    reason: "timed out waiting for one-shot session queue capacity".to_string(),
+                },
+            };
+            let _ = fired_tx.send(event);
         });
 
         self.tasks.insert(
@@ -453,6 +494,7 @@ impl SchedulerActor {
                     kind: ScheduleKind::OneShot,
                     created_at: now,
                     fire_at,
+                    delivery_error: None,
                 },
                 handle,
             },
@@ -490,20 +532,27 @@ impl SchedulerActor {
             loop {
                 timer.tick().await;
 
-                if sq_tx
-                    .send(SessionOp::Submit {
-                        message: labeled_for_fire.clone(),
-                    })
-                    .await
-                    .is_err()
-                {
-                    tracing::debug!(
-                        task_id = %task_id_for_fire,
-                        "recurring follow-up: session queue closed"
-                    );
-                    break;
+                match sq_tx.try_send(scheduled_submission(
+                    &task_id_for_fire,
+                    labeled_for_fire.clone(),
+                )) {
+                    Ok(()) => {
+                        let _ = fired_tx.send(TaskFireEvent::Delivered(task_id_for_fire.clone()));
+                    }
+                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            task_id = %task_id_for_fire,
+                            "recurring follow-up coalesced: bounded session queue is full"
+                        );
+                    }
+                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                        tracing::debug!(
+                            task_id = %task_id_for_fire,
+                            "recurring follow-up: session queue closed"
+                        );
+                        break;
+                    }
                 }
-                let _ = fired_tx.send(task_id_for_fire.clone());
             }
         });
 
@@ -516,6 +565,7 @@ impl SchedulerActor {
                     kind: ScheduleKind::Recurring { interval },
                     created_at: now,
                     fire_at: now + interval,
+                    delivery_error: None,
                 },
                 handle,
             },
@@ -885,12 +935,19 @@ impl AgentTool for ListScheduledTasksTool {
 
                 let mut text = format!("{total} active task(s):\n");
                 for info in tasks.iter().take(display_count) {
-                    text.push_str(&format!(
-                        "  {} | {} | next: {}s\n",
-                        info.id,
-                        info.kind,
-                        info.remaining().as_secs(),
-                    ));
+                    if let Some(error) = &info.delivery_error {
+                        text.push_str(&format!(
+                            "  {} | {} | delivery failed: {}\n",
+                            info.id, info.kind, error,
+                        ));
+                    } else {
+                        text.push_str(&format!(
+                            "  {} | {} | next: {}s\n",
+                            info.id,
+                            info.kind,
+                            info.remaining().as_secs(),
+                        ));
+                    }
                 }
                 if omitted > 0 {
                     text.push_str(&format!("... and {omitted} more task(s) not shown\n"));
@@ -1064,6 +1121,7 @@ mod tests {
             kind: ScheduleKind::OneShot,
             created_at: now,
             fire_at: now + Duration::from_secs(60),
+            delivery_error: None,
         };
         let remaining = info.remaining();
         // remaining should be close to 60 seconds (within a small tolerance)
@@ -1080,6 +1138,7 @@ mod tests {
             kind: ScheduleKind::OneShot,
             created_at: now - Duration::from_secs(120),
             fire_at: now - Duration::from_secs(60),
+            delivery_error: None,
         };
         assert_eq!(info.remaining(), Duration::ZERO);
     }
@@ -1135,14 +1194,16 @@ mod tests {
             .try_recv()
             .expect("message should have been injected after delay");
         match op {
-            SessionOp::Submit { message } => {
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                let message = &submission.items[0].text;
                 assert!(
                     message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
                     "injected message must carry the source label"
                 );
                 assert!(message.contains("check the build"));
             }
-            other => panic!("expected Submit, got {other:?}"),
+            other => panic!("expected scheduler structured submission, got {other:?}"),
         }
     }
 
@@ -1402,9 +1463,13 @@ mod tests {
             .unwrap();
 
         let snapshot = list_rx.await.unwrap();
+        assert_eq!(snapshot.len(), 1, "failed one-shot remains inspectable");
         assert!(
-            snapshot.is_empty(),
-            "fired task must be cleaned up even when queue is closed"
+            snapshot[0]
+                .delivery_error
+                .as_deref()
+                .is_some_and(|error| error.contains("queue closed")),
+            "closed queue delivery failure must be observable: {snapshot:?}"
         );
     }
 
@@ -1490,8 +1555,15 @@ mod tests {
         let op = sq_rx.try_recv();
         assert!(op.is_ok(), "first fire at ~t=5");
         match op.unwrap() {
-            SessionOp::Submit { message } => assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL)),
-            _ => panic!("expected Submit"),
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                assert!(
+                    submission.items[0]
+                        .text
+                        .starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                );
+            }
+            _ => panic!("expected scheduler structured submission"),
         }
 
         // Second fire at t=10
@@ -1915,7 +1987,9 @@ mod tests {
             .try_recv()
             .expect("one labeled message should be injected after the delay");
         match op {
-            SessionOp::Submit { message } => {
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                let message = &submission.items[0].text;
                 assert!(
                     message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
                     "injected message must carry the scheduled-followup source label"
@@ -1925,7 +1999,7 @@ mod tests {
                     "injected message must contain the original text"
                 );
             }
-            other => panic!("expected SessionOp::Submit, got {other:?}"),
+            other => panic!("expected scheduler structured submission, got {other:?}"),
         }
 
         // Step 4: Verify no second injection (one-shot fires exactly once).
@@ -1966,15 +2040,17 @@ mod tests {
 
         let op = sq_rx.try_recv().expect("message should be injected");
         match op {
-            SessionOp::Submit { message } => {
-                // The injected op is a plain String message.
-                // It carries no permission state, no tool call,
-                // and no pre-approval. The session actor will treat it
-                // identically to a user-typed message — any tool call
-                // in the resulting turn gets a fresh permission decision.
-                assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL));
+            SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.source, SubmissionSource::Scheduler);
+                // Source identity carries no permission grant. Any tool call
+                // in the resulting turn receives a fresh decision.
+                assert!(
+                    submission.items[0]
+                        .text
+                        .starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                );
             }
-            _ => panic!("expected SessionOp::Submit"),
+            _ => panic!("expected scheduler structured submission"),
         }
     }
 

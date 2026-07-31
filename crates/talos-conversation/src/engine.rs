@@ -1,8 +1,12 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use talos_core::message::{AgentEvent, MessageToolResult, StopReason, Usage};
-use talos_core::session::TurnCompletionStatus;
+use talos_core::message::{AgentEvent, ContentPart, MessageToolResult, StopReason, Usage};
+use talos_core::session::{
+    MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_ITEMS, MAX_SUBMISSION_BATCH_BYTES,
+    MAX_SUBMISSION_BATCH_ITEMS, MAX_SUBMISSION_ITEM_BYTES, StructuredSubmission, SubmissionItem,
+    SubmissionKind, SubmissionSource, TurnCompletionStatus,
+};
 use talos_core::tool::ToolProvenance;
 
 use crate::command_registry::{MOCK_REQUEST_COMMAND, command_registry};
@@ -160,7 +164,9 @@ fn parse_todo_command(arg: &str) -> Result<TodoCommandRequest, String> {
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
     pub(crate) current_turn_text: String,
-    pub(crate) steering_queue: Vec<String>,
+    pub(crate) steering_queue: Vec<SubmissionItem>,
+    prepared_steering: Option<(String, Vec<String>)>,
+    next_steering_sequence: u64,
     pub(crate) followup_queue: Vec<String>,
     pub(crate) usage: Usage,
     pub(crate) current_thinking_text: String,
@@ -202,6 +208,8 @@ impl ConversationEngine {
             messages: Vec::new(),
             current_turn_text: String::new(),
             steering_queue: Vec::new(),
+            prepared_steering: None,
+            next_steering_sequence: 0,
             followup_queue: Vec::new(),
             usage: Usage::default(),
             current_thinking_text: String::new(),
@@ -350,15 +358,76 @@ impl ConversationEngine {
     }
 
     pub fn enqueue_steering(&mut self, msg: String) -> Vec<UiOutput> {
-        self.steering_queue.push(msg);
-        vec![
-            UiOutput::Tip {
-                text: "Message queued and will send after current turn.".into(),
-                kind: TipKind::QueueHint,
-            },
-            UiOutput::SteeringQueueSnapshot(self.steering_queue_snapshot()),
-            UiOutput::Status(self.status_snapshot()),
-        ]
+        self.enqueue_structured_steering(msg, SubmissionKind::UserTurn, Vec::new())
+            .1
+    }
+
+    /// Adds one fully classified steering item to the authoritative queue.
+    ///
+    /// Returns whether the item was accepted plus the ordered UI projection.
+    /// Item, queue, and byte limits follow ADR-056 and never truncate input.
+    pub fn enqueue_structured_steering(
+        &mut self,
+        text: String,
+        kind: SubmissionKind,
+        attachments: Vec<ContentPart>,
+    ) -> (bool, Vec<UiOutput>) {
+        let queued_bytes: usize = self
+            .steering_queue
+            .iter()
+            .map(SubmissionItem::text_bytes)
+            .sum();
+        let rejected = if text.len() > MAX_SUBMISSION_ITEM_BYTES {
+            Some(format!(
+                "Queued input rejected: {} bytes exceeds the {} byte per-item limit.",
+                text.len(),
+                MAX_SUBMISSION_ITEM_BYTES
+            ))
+        } else if self.steering_queue.len() >= MAX_STEERING_QUEUE_ITEMS {
+            Some(format!(
+                "Queued input rejected: the steering queue is limited to {MAX_STEERING_QUEUE_ITEMS} items."
+            ))
+        } else if queued_bytes.saturating_add(text.len()) > MAX_STEERING_QUEUE_BYTES {
+            Some(format!(
+                "Queued input rejected: the steering queue is limited to {MAX_STEERING_QUEUE_BYTES} text bytes."
+            ))
+        } else if kind == SubmissionKind::PreviewRequest && !attachments.is_empty() {
+            Some("Request preview cannot be queued with image attachments.".to_string())
+        } else {
+            None
+        };
+
+        if let Some(message) = rejected {
+            return (
+                false,
+                vec![
+                    content_block(MessageSource::Error, format!("[Error] {message}\n")),
+                    UiOutput::SteeringQueueSnapshot(self.steering_queue_snapshot()),
+                    UiOutput::Status(self.status_snapshot()),
+                ],
+            );
+        }
+
+        let enqueue_sequence = self.next_steering_sequence;
+        self.next_steering_sequence = self.next_steering_sequence.saturating_add(1);
+        self.steering_queue.push(SubmissionItem {
+            id: format!("steering_{enqueue_sequence}"),
+            enqueue_sequence,
+            kind,
+            text,
+            attachments,
+        });
+        (
+            true,
+            vec![
+                UiOutput::Tip {
+                    text: "Message queued and will send after current turn.".into(),
+                    kind: TipKind::QueueHint,
+                },
+                UiOutput::SteeringQueueSnapshot(self.steering_queue_snapshot()),
+                UiOutput::Status(self.status_snapshot()),
+            ],
+        )
     }
 
     pub fn cancel_turn(&mut self) -> Vec<UiOutput> {
@@ -1125,12 +1194,132 @@ impl ConversationEngine {
         vec![content_block(MessageSource::System, text)]
     }
 
+    /// Drains the oldest steering message while preserving FIFO order.
+    ///
+    /// This compatibility helper preserves the original single-item behavior.
+    /// Talos interactive runtime uses structured prepare/commit/rollback.
     pub fn drain_steering_queue(&mut self) -> Option<String> {
         if self.steering_queue.is_empty() {
             None
         } else {
-            Some(self.steering_queue.remove(0))
+            self.prepared_steering = None;
+            Some(self.steering_queue.remove(0).text)
         }
+    }
+
+    /// Test-only projection for validating the retired joined-drain behavior.
+    /// Production code must use structured prepare/commit/rollback.
+    #[cfg(test)]
+    pub(crate) fn drain_steering_queue_batched(&mut self) -> Option<String> {
+        if self.steering_queue.is_empty() {
+            None
+        } else {
+            self.prepared_steering = None;
+            let joined = std::mem::take(&mut self.steering_queue)
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            Some(joined)
+        }
+    }
+
+    /// Freezes the next compatible bounded steering prefix without deleting it.
+    ///
+    /// A preview request is always a single-item submission. Normal user-turn
+    /// items batch until the first incompatible kind or ADR-056 item/byte bound.
+    /// Repeated calls return `None` while another transfer is prepared.
+    pub fn prepare_steering_submission(&mut self) -> Option<StructuredSubmission> {
+        if self.prepared_steering.is_some() {
+            return None;
+        }
+        let first = self.steering_queue.first()?;
+        let kind = first.kind;
+        let max_items = if kind == SubmissionKind::PreviewRequest {
+            1
+        } else {
+            MAX_SUBMISSION_BATCH_ITEMS
+        };
+        let mut total_bytes = 0usize;
+        let mut items = Vec::new();
+        for item in &self.steering_queue {
+            if item.kind != kind || items.len() >= max_items {
+                break;
+            }
+            let next_bytes = total_bytes.saturating_add(item.text_bytes());
+            if !items.is_empty() && next_bytes > MAX_SUBMISSION_BATCH_BYTES {
+                break;
+            }
+            if next_bytes > MAX_SUBMISSION_BATCH_BYTES {
+                return None;
+            }
+            total_bytes = next_bytes;
+            items.push(item.clone());
+        }
+        if items.is_empty() {
+            return None;
+        }
+        let batch_sequence = self.next_steering_sequence;
+        self.next_steering_sequence = self.next_steering_sequence.saturating_add(1);
+        let id = format!("steering_batch_{batch_sequence}");
+        self.prepared_steering = Some((
+            id.clone(),
+            items.iter().map(|item| item.id.clone()).collect(),
+        ));
+        Some(StructuredSubmission {
+            id,
+            source: SubmissionSource::User,
+            sender_generation: 0,
+            items,
+        })
+    }
+
+    /// Commits a matching actor-acknowledged preparation and removes its prefix.
+    ///
+    /// Returns `false` without mutation for stale or mismatched acknowledgements.
+    pub fn commit_prepared_steering(&mut self, submission_id: &str) -> bool {
+        let Some((prepared_id, item_ids)) = self.prepared_steering.as_ref() else {
+            return false;
+        };
+        if prepared_id != submission_id
+            || self.steering_queue.len() < item_ids.len()
+            || !self
+                .steering_queue
+                .iter()
+                .zip(item_ids)
+                .all(|(item, id)| &item.id == id)
+        {
+            return false;
+        }
+        self.steering_queue.drain(..item_ids.len());
+        self.prepared_steering = None;
+        true
+    }
+
+    /// Releases a matching failed preparation while preserving every item.
+    pub fn rollback_prepared_steering(&mut self, submission_id: &str) -> bool {
+        if self
+            .prepared_steering
+            .as_ref()
+            .is_some_and(|(prepared_id, _)| prepared_id == submission_id)
+        {
+            self.prepared_steering = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns whether a prepare/send/ack transfer is currently pending.
+    #[must_use]
+    pub fn has_prepared_steering(&self) -> bool {
+        self.prepared_steering.is_some()
+    }
+
+    /// Returns whether any pre-actor steering items remain authoritative here.
+    #[must_use]
+    pub fn has_steering(&self) -> bool {
+        !self.steering_queue.is_empty()
     }
 
     /// Bounded FIFO snapshot of the steering queue (ADR-049).
@@ -1145,7 +1334,8 @@ impl ConversationEngine {
             .steering_queue
             .iter()
             .take(MAX_ENTRIES)
-            .map(|msg| {
+            .map(|item| {
+                let msg = &item.text;
                 if msg.len() > MAX_BYTES {
                     let budget = MAX_BYTES - ELLIPSIS.len();
                     let mut end = budget.min(msg.len());

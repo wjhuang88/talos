@@ -10,7 +10,7 @@ use tracing::error;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 
-use crate::Agent;
+use crate::{Agent, PreparedSessionTurn};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -26,13 +26,19 @@ pub(super) struct DurableTurnPersistence {
 
 pub(super) struct TurnRecord {
     pub(super) new_messages: Vec<Message>,
+    pub(super) status: TurnRecordStatus,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum TurnRecordStatus {
+    Success,
+    Cancelled,
+    Error,
 }
 
 pub(super) struct TurnForwarding {
     pub(super) agent: Arc<Agent>,
-    pub(super) message: String,
-    pub(super) attachments: Option<Vec<talos_core::message::ContentPart>>,
-    pub(super) history: Vec<Message>,
+    pub(super) prepared: PreparedSessionTurn,
     pub(super) event_tx: mpsc::UnboundedSender<AgentEvent>,
     pub(super) event_rx: mpsc::UnboundedReceiver<AgentEvent>,
     pub(super) eq_tx: mpsc::UnboundedSender<SessionEvent>,
@@ -43,14 +49,13 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
+    pub(super) request_context_limit: u32,
 }
 
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let TurnForwarding {
         agent,
-        message,
-        attachments,
-        history,
+        prepared,
         event_tx,
         mut event_rx,
         eq_tx,
@@ -61,6 +66,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         persistence,
         durable_persistence,
         result_tx,
+        request_context_limit,
     } = turn;
 
     let eq_tx_clone = eq_tx.clone();
@@ -130,13 +136,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     });
 
     let mut agent_task = tokio::spawn(async move {
-        if let Some(atts) = attachments {
-            agent
-                .run_for_session_turn_multimodal(message, atts, history, event_tx)
-                .await
-        } else {
-            agent.run_for_session_turn(message, history, event_tx).await
-        }
+        agent
+            .run_prepared_session_turn(prepared, event_tx, request_context_limit)
+            .await
     });
 
     let agent_result = tokio::select! {
@@ -152,6 +154,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 payload: TurnEventPayload::Completed {
                     status: TurnCompletionStatus::Cancelled,
                 },
+            });
+            let _ = result_tx.send(TurnRecord {
+                new_messages: Vec::new(),
+                status: TurnRecordStatus::Cancelled,
             });
             return;
         }
@@ -238,7 +244,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 },
             });
-            let _ = result_tx.send(TurnRecord { new_messages });
+            let _ = result_tx.send(TurnRecord {
+                new_messages,
+                status: TurnRecordStatus::Success,
+            });
         }
         Ok((Err(e), partial_messages)) => {
             // SESSION-006 / I135: persist valid completed tool exchanges even
@@ -279,6 +288,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 },
             });
+            let _ = result_tx.send(TurnRecord {
+                new_messages: partial_messages,
+                status: TurnRecordStatus::Error,
+            });
         }
         Err(_join_error) => {
             error!("agent panicked during turn");
@@ -292,6 +305,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                         message: "agent panicked".into(),
                     },
                 },
+            });
+            let _ = result_tx.send(TurnRecord {
+                new_messages: Vec::new(),
+                status: TurnRecordStatus::Error,
             });
         }
     }

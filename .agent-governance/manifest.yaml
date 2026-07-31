@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-28"
-status_note: "High-risk/release-managed profile confirmed. I156/TUI-035 and I163/SKILL-003 are Complete; I164/TUI-038 is the sole Active implementation iteration; I157 is Planned; I158-I162 are Blocked; ADR-053 is Proposed. SESSION-008 owns GitHub Issue #45 in Refinement. REL-002 remains NO-GO."
+last_audited_at: "2026-07-31"
+status_note: "High-risk/release-managed profile confirmed. I169 is in Review on Draft PR #68, rebased on main@37e369b1; ADR-056 remains Proposed/Review. I170 Windows work is isolated in Draft PR #78. Main records I158 Active, I168 Complete, I164 Paused, and I159-I162 Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,8 +63,10 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Execute only I164/TUI-038 directly on main under the 2026-07-28 maintainer no-parallel-work exception; restore worktree isolation if parallel work begins"
+    - "Keep PR #68 Draft until post-rebase workspace/governance gates, exact-head CI, real-TUI evidence, and maintainer review pass; do not treat local implementation as completion"
+    - "Keep I170 Windows process/fixture changes isolated in Draft PR #78; do not mix them back into PR #68"
+    - "Preserve main's I158 Active, I168 Complete, I164 Paused, and I159-I162 Blocked states while I169 remains isolated in Review on Draft PR #68"
     - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
-    - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
+    - "Keep I159-I162 blocked until their recorded sequential activation gates are satisfied"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

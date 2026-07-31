@@ -88,3 +88,13 @@ this projection into a queue-control API opportunistically.
 - App-level layout reserves fixed rows first, then bounds the modal, composer, and queue allocations with `compress_layout()`. The composer retains one row whenever the remaining content budget permits it.
 - Validation covers engine and bridge lifecycle snapshots, the shared session-boundary event helper, layout allocation, and Buffer+InlineFrame rendering. Exact suite totals are intentionally not recorded here because the workspace test count changes independently of this decision.
 - README (EN + zh-CN) updated with user-facing queued steering documentation.
+- TUI-041/I169 (GitHub Issue #50) later changes post-completion consumption from one queued entry
+  per follow-up turn to one FIFO batch containing every entry present at the drain boundary. Queue
+  ownership, bounded projection, ordered event path, persistence boundary, and authoritative drain
+  timing remain unchanged; the prior public single-item drain API is retained for source
+  compatibility.
+- That initial I169 interpretation was rejected by PR #64/#68 architecture review. ADR-056 now
+  supersedes this record only for the previously deferred control/drain-cardinality semantics:
+  structured item ownership, bridge-accepted cutoff, transactional SQ transfer, actor arbitration,
+  terminal pause, persistence equivalence, and hard bounds. This ADR's engine-owned pre-accept UI
+  projection and single ordered `UiOutput` requirements remain Accepted.

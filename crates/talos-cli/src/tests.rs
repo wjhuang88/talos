@@ -35,15 +35,6 @@ mod tests {
         ) -> Result<(), tokio::sync::mpsc::error::SendError<SessionEvent>> {
             use std::sync::atomic::Ordering;
 
-            if matches!(event, AgentEvent::TurnStart) {
-                self.tx.send(SessionEvent::TurnEvent {
-                    session_id: "session_test".to_string(),
-                    turn_id: "turn_test".to_string(),
-                    sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
-                    payload: TurnEventPayload::Started,
-                })?;
-            }
-
             let terminal = match &event {
                 AgentEvent::TurnEnd { .. } => Some(TurnCompletionStatus::Success {
                     final_text: String::new(),
@@ -69,6 +60,52 @@ mod tests {
                 })?;
             }
             Ok(())
+        }
+
+        fn start_submission(&self, submission_id: String, sender_generation: u64, turn_id: &str) {
+            use std::sync::atomic::Ordering;
+
+            self.sequence.store(1, Ordering::Relaxed);
+            self.tx
+                .send(SessionEvent::SubmissionQueued {
+                    session_id: "session_test".into(),
+                    submission_id: submission_id.clone(),
+                    sender_generation,
+                    source: talos_core::session::SubmissionSource::User,
+                    item_count: 1,
+                    total_text_bytes: 1,
+                })
+                .unwrap();
+            self.tx
+                .send(SessionEvent::TurnEvent {
+                    session_id: "session_test".into(),
+                    turn_id: turn_id.into(),
+                    sequence: 0,
+                    payload: TurnEventPayload::Started,
+                })
+                .unwrap();
+            self.tx
+                .send(SessionEvent::SubmissionStarted {
+                    session_id: "session_test".into(),
+                    submission_id,
+                    sender_generation,
+                    turn_id: turn_id.into(),
+                })
+                .unwrap();
+        }
+
+        fn complete_cancelled(&self) {
+            use std::sync::atomic::Ordering;
+            self.tx
+                .send(SessionEvent::TurnEvent {
+                    session_id: "session_test".into(),
+                    turn_id: "turn_test".into(),
+                    sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+                    payload: TurnEventPayload::Completed {
+                        status: TurnCompletionStatus::Cancelled,
+                    },
+                })
+                .unwrap();
         }
     }
 
@@ -220,6 +257,20 @@ mod tests {
             })
             .unwrap();
 
+        let submitted =
+            tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
+                .await
+                .unwrap()
+                .expect("structured follow-up");
+        let (submission_id, sender_generation) = match submitted {
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.items[0].text, "queued follow-up");
+                (submission.id, submission.sender_generation)
+            }
+            other => panic!("expected structured submission, got {other:?}"),
+        };
+        agent_tx.start_submission(submission_id, sender_generation, "turn_followup");
+
         let mut saw_queued_user_stream = false;
         let mut saw_queue_drained_status = false;
         for _ in 0..20 {
@@ -245,11 +296,6 @@ mod tests {
 
         assert!(saw_queued_user_stream);
         assert!(saw_queue_drained_status);
-        assert!(matches!(
-            interrupt_rx.try_recv(),
-            Ok(talos_core::session::SessionOp::Submit { message }) if message == "queued follow-up"
-        ));
-
         drop(agent_tx);
         drop(user_tx);
         loop_handle.await.unwrap();
@@ -310,6 +356,69 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn conversation_loop_handles_rejection_before_queue_ack() {
+        let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx: event_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_watch_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
+            },
+        ));
+
+        user_tx.send(UserInput::Message("retained".into())).unwrap();
+        let submission = match tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("submission timeout")
+            .expect("submission operation")
+        {
+            talos_core::session::SessionOp::SubmitStructured { submission } => submission,
+            other => panic!("expected structured submission, got {other:?}"),
+        };
+        event_tx
+            .send(SessionEvent::SubmissionRejected {
+                session_id: "session_test".into(),
+                submission_id: submission.id,
+                sender_generation: submission.sender_generation,
+                reason: talos_core::session::SubmissionRejectionReason::LimitExceeded,
+            })
+            .unwrap();
+
+        let error = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            loop {
+                if let Some(UiOutput::Content(talos_conversation::ContentOutput::Block {
+                    source: talos_conversation::MessageSource::Error,
+                    text,
+                })) = ui_rx.recv().await
+                    && text.contains("input was retained")
+                {
+                    break text;
+                }
+            }
+        })
+        .await
+        .expect("visible rejection");
+        assert!(error.contains("rejected"));
+
+        drop(user_tx);
+        loop_handle.abort();
+    }
+
+    #[tokio::test]
     async fn conversation_loop_keeps_steering_queued_across_provider_tool_end() {
         let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
         let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -335,6 +444,36 @@ mod tests {
             },
         ));
 
+        user_tx.send(UserInput::Message("initial".into())).unwrap();
+        let initial_submission =
+            tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+                .await
+                .expect("initial submission arrives")
+                .and_then(|op| match op {
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission)
+                    }
+                    _ => None,
+                })
+                .expect("initial structured submission");
+        event_tx
+            .send(SessionEvent::SubmissionQueued {
+                session_id: "session_test".into(),
+                submission_id: initial_submission.id.clone(),
+                sender_generation: initial_submission.sender_generation,
+                source: talos_core::session::SubmissionSource::User,
+                item_count: 1,
+                total_text_bytes: 7,
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::SubmissionStarted {
+                session_id: "session_test".into(),
+                submission_id: initial_submission.id,
+                sender_generation: initial_submission.sender_generation,
+                turn_id: "turn_1".into(),
+            })
+            .unwrap();
         event_tx
             .send(SessionEvent::TurnEvent {
                 session_id: "session_test".into(),
@@ -405,7 +544,9 @@ mod tests {
                 .await
                 .unwrap()
                 .and_then(|op| match op {
-                    talos_core::session::SessionOp::Submit { message } => Some(message),
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission.items[0].text.clone())
+                    }
                     _ => None,
                 })
                 .as_deref(),
@@ -414,12 +555,228 @@ mod tests {
         loop_handle.abort();
     }
 
+    #[tokio::test]
+    async fn conversation_loop_batches_all_queued_steering_into_one_submit() {
+        let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx: event_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_watch_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
+            },
+        ));
+
+        user_tx.send(UserInput::Message("initial".into())).unwrap();
+        let initial_submission =
+            tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+                .await
+                .expect("initial submission arrives")
+                .and_then(|op| match op {
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission)
+                    }
+                    _ => None,
+                })
+                .expect("initial structured submission");
+        event_tx
+            .send(SessionEvent::SubmissionQueued {
+                session_id: "session_test".into(),
+                submission_id: initial_submission.id.clone(),
+                sender_generation: initial_submission.sender_generation,
+                source: talos_core::session::SubmissionSource::User,
+                item_count: 1,
+                total_text_bytes: 7,
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::SubmissionStarted {
+                session_id: "session_test".into(),
+                submission_id: initial_submission.id,
+                sender_generation: initial_submission.sender_generation,
+                turn_id: "turn_1".into(),
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(output, UiOutput::Status(status) if status.is_processing) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("turn start reaches conversation state");
+
+        for message in ["first", "second", "third"] {
+            user_tx
+                .send(UserInput::Message(message.to_string()))
+                .unwrap();
+        }
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 3
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("all three steering messages reach the authoritative queue");
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 1,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: String::new(),
+                        new_messages: vec![],
+                    },
+                },
+            })
+            .unwrap();
+
+        let first_batch = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("batched submit arrives")
+            .and_then(|op| match op {
+                talos_core::session::SessionOp::SubmitStructured { submission } => Some((
+                    submission.id,
+                    submission.sender_generation,
+                    submission
+                        .items
+                        .into_iter()
+                        .map(|item| item.text)
+                        .collect::<Vec<_>>(),
+                )),
+                _ => None,
+            })
+            .expect("structured batch");
+        assert_eq!(first_batch.2, vec!["first", "second", "third"]);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), sq_rx.recv())
+                .await
+                .is_err(),
+            "one completed turn must create exactly one follow-up submit"
+        );
+
+        event_tx
+            .send(SessionEvent::SubmissionQueued {
+                session_id: "session_test".into(),
+                submission_id: first_batch.0.clone(),
+                sender_generation: first_batch.1,
+                source: talos_core::session::SubmissionSource::User,
+                item_count: 3,
+                total_text_bytes: 16,
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::SubmissionStarted {
+                session_id: "session_test".into(),
+                submission_id: first_batch.0,
+                sender_generation: first_batch.1,
+                turn_id: "turn_2".into(),
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_2".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 0
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("queue preview clears after the batch drains");
+
+        user_tx
+            .send(UserInput::Message("later".to_string()))
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(
+                    output,
+                    UiOutput::SteeringQueueSnapshot(snapshot) if snapshot.total_count == 1
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("later steering input forms the next queue batch");
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_2".into(),
+                sequence: 1,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: String::new(),
+                        new_messages: vec![],
+                    },
+                },
+            })
+            .unwrap();
+
+        let second_batch = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("later batch submit arrives")
+            .and_then(|op| match op {
+                talos_core::session::SessionOp::SubmitStructured { submission } => {
+                    Some(submission.items[0].text.clone())
+                }
+                _ => None,
+            });
+        assert_eq!(second_batch.as_deref(), Some("later"));
+
+        loop_handle.abort();
+    }
+
     // FS02 / RUNTIME-002: runtime-level integration coverage proving the conversation loop
     // forwards a terminal `UiOutput::Status { is_processing: false }` after provider/tool errors,
     // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
     // (`AgentEvent` -> `run_conversation_loop` -> `UiOutput`) rather than the engine in isolation.
 
-    fn spawn_loop_for_runtime_tests(
+    async fn spawn_loop_for_runtime_tests(
         engine: ConversationEngine,
     ) -> (
         tokio::task::JoinHandle<()>,
@@ -427,9 +784,9 @@ mod tests {
         tokio::sync::mpsc::UnboundedReceiver<UiOutput>,
     ) {
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (_user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
             model_name: "test-model".to_string(),
@@ -452,7 +809,23 @@ mod tests {
                 permission_engine: None,
             },
         ));
-        (handle, TestTurnSender::new(agent_tx), ui_rx)
+        let agent_tx = TestTurnSender::new(agent_tx);
+        user_tx
+            .send(UserInput::Message("runtime fixture".into()))
+            .unwrap();
+        let submission =
+            tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
+                .await
+                .expect("initial structured submission arrives")
+                .and_then(|op| match op {
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission)
+                    }
+                    _ => None,
+                })
+                .expect("initial structured submission");
+        agent_tx.start_submission(submission.id, submission.sender_generation, "turn_test");
+        (handle, agent_tx, ui_rx)
     }
 
     async fn collect_terminal_status(
@@ -478,7 +851,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_clears_processing_on_provider_error_after_tool_result() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
@@ -521,7 +894,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_clears_processing_on_timeout_error() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
@@ -544,7 +917,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_clears_processing_on_dispatch_timeout_error() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
@@ -568,7 +941,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_clears_processing_on_max_tokens_turn_end() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
@@ -600,7 +973,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_emits_visible_error_signals_on_terminal_failure() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         let error_message = "provider connection reset".to_string();
         agent_tx.send(AgentEvent::TurnStart).unwrap();
@@ -653,7 +1026,7 @@ mod tests {
     #[tokio::test]
     async fn conversation_loop_normal_end_turn_success_path_unchanged() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
-        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine).await;
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
@@ -695,7 +1068,7 @@ mod tests {
         let agent_tx = TestTurnSender::new(agent_tx);
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
             model_name: "test-model".to_string(),
@@ -719,6 +1092,21 @@ mod tests {
             },
         ));
 
+        user_tx
+            .send(UserInput::Message("cancel fixture".into()))
+            .unwrap();
+        let submission =
+            tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
+                .await
+                .expect("cancel fixture submission arrives")
+                .and_then(|op| match op {
+                    talos_core::session::SessionOp::SubmitStructured { submission } => {
+                        Some(submission)
+                    }
+                    _ => None,
+                })
+                .expect("cancel fixture structured submission");
+        agent_tx.start_submission(submission.id, submission.sender_generation, "turn_test");
         agent_tx.send(AgentEvent::TurnStart).unwrap();
         agent_tx
             .send(AgentEvent::TextDelta {
@@ -729,6 +1117,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         user_tx.send(UserInput::Cancel).unwrap();
+        agent_tx.complete_cancelled();
 
         let mut saw_cancelled_status = false;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -1981,30 +2370,64 @@ mod steering_snapshot_tests {
     }
 
     #[test]
-    fn engine_snapshot_empty_after_drain() {
+    fn engine_snapshot_empty_after_structured_commit() {
         let mut engine = new_engine();
         engine.enqueue_steering("a".into());
         engine.enqueue_steering("b".into());
 
-        let drained1 = engine.drain_steering_queue();
-        let snap1 = engine.steering_queue_snapshot();
-        assert_eq!(drained1, Some("a".into()));
-        assert_eq!(snap1.total_count, 1);
-        assert_eq!(snap1.omitted_count, 0);
-        assert_eq!(snap1.entries.len(), 1);
+        let prepared = engine
+            .prepare_steering_submission()
+            .expect("queued messages should prepare as a structured submission");
+        let texts: Vec<&str> = prepared
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect();
+        assert_eq!(texts, vec!["a", "b"]);
+        assert_eq!(
+            engine.steering_queue_snapshot().total_count,
+            2,
+            "prepare must retain the authoritative queue until acknowledgement"
+        );
+        assert!(engine.commit_prepared_steering(&prepared.id));
 
-        let drained2 = engine.drain_steering_queue();
-        let snap2 = engine.steering_queue_snapshot();
-        assert_eq!(drained2, Some("b".into()));
-        assert_eq!(snap2.total_count, 0);
-        assert_eq!(snap2.omitted_count, 0);
-        assert!(snap2.entries.is_empty());
+        let snap = engine.steering_queue_snapshot();
+        assert_eq!(snap.total_count, 0);
+        assert_eq!(snap.omitted_count, 0);
+        assert!(snap.entries.is_empty());
 
         let empty = build_empty_snapshot();
         assert_eq!(empty.total_count, 0);
         assert!(empty.entries.is_empty());
     }
 
+    #[test]
+    fn engine_structured_prepare_preserves_multiple_messages() {
+        let mut engine = new_engine();
+        engine.enqueue_steering("a".into());
+        engine.enqueue_steering("b".into());
+        engine.enqueue_steering("c".into());
+
+        let prepared = engine
+            .prepare_steering_submission()
+            .expect("queued messages should prepare as one structured submission");
+        let texts: Vec<&str> = prepared
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect();
+        assert_eq!(texts, vec!["a", "b", "c"]);
+        assert_eq!(
+            engine.steering_queue_snapshot().total_count,
+            3,
+            "prepare must not destructively drain the authoritative queue"
+        );
+        assert!(engine.commit_prepared_steering(&prepared.id));
+
+        let snap = engine.steering_queue_snapshot();
+        assert_eq!(snap.total_count, 0, "queue must be empty after commit");
+        assert!(snap.entries.is_empty());
+    }
     #[test]
     fn non_empty_snapshot_preserved_on_error_path() {
         // On error/cancel paths, the engine does NOT clear the steering queue.
@@ -2102,10 +2525,14 @@ mod steering_snapshot_tests {
             "must receive a SessionOp within timeout"
         );
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::SubmitMultimodal { text, attachments } => {
-                assert_eq!(text, "describe this image");
-                assert_eq!(attachments.len(), 1);
-                match &attachments[0] {
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(
+                    submission.source,
+                    talos_core::session::SubmissionSource::User
+                );
+                assert_eq!(submission.items[0].text, "describe this image");
+                assert_eq!(submission.items[0].attachments.len(), 1);
+                match &submission.items[0].attachments[0] {
                     ContentPart::Image { mime, .. } => {
                         assert_eq!(mime, "image/png");
                     }
@@ -2113,7 +2540,7 @@ mod steering_snapshot_tests {
                 }
             }
             other => panic!(
-                "expected SubmitMultimodal, got {:?}",
+                "expected SubmitStructured, got {:?}",
                 std::mem::discriminant(&other)
             ),
         }
@@ -2170,10 +2597,14 @@ mod steering_snapshot_tests {
 
         assert!(received_op.is_ok());
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::Submit { message } => {
-                assert_eq!(message, "plain text message");
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(
+                    submission.source,
+                    talos_core::session::SubmissionSource::User
+                );
+                assert_eq!(submission.items[0].text, "plain text message");
             }
-            other => panic!("expected Submit, got {:?}", other),
+            other => panic!("expected SubmitStructured, got {:?}", other),
         }
     }
 
