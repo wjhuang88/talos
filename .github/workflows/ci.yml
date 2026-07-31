@@ -19,13 +19,13 @@ env:
 jobs:
   i158-symbol-test-repair:
     name: I158 symbol composition repair
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/i158-cli-symbol-contributions'
+    if: github.event_name == 'pull_request' && github.head_ref == 'automation/i158-symbol-test-repair'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feature/i158-cli-symbol-contributions
+          ref: automation/i158-symbol-test-repair
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@master
@@ -39,6 +39,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
 
           path = Path("crates/talos-cli/src/registry.rs")
           text = path.read_text()
@@ -50,9 +51,9 @@ jobs:
                   raise SystemExit(f"expected one match, found {count}: {old[:120]!r}")
               text = text.replace(old, new, 1)
 
-          anchor = '''/// Builds the tool registry for print/inline/RPC modes.
-'''
-          helper = '''fn register_symbol_tool_contributions(
+          anchor = "/// Builds the tool registry for print/inline/RPC modes.\n"
+          helper = dedent('''\
+          fn register_symbol_tool_contributions(
               registry: &mut ToolRegistry,
               workspace_root: PathBuf,
               wrap: impl Fn(Arc<dyn AgentTool>) -> Arc<dyn AgentTool>,
@@ -65,98 +66,64 @@ jobs:
               }
           }
 
-'''
+          ''')
           replace_once(anchor, helper + anchor)
 
-          direct = '''    for contribution in symbol_tool_contributions(PathBuf::from(".")) {
-              registry
-                  .register_contribution(contribution)
-                  .unwrap_or_else(|error| panic!("{error}"));
-          }
-'''
-          direct_replacement = '''    register_symbol_tool_contributions(
-              &mut registry,
-              PathBuf::from("."),
-              |tool| tool,
-          );
-'''
+          direct = dedent('''\
+              for contribution in symbol_tool_contributions(PathBuf::from(".")) {
+                  registry
+                      .register_contribution(contribution)
+                      .unwrap_or_else(|error| panic!("{error}"));
+              }
+          ''')
+          direct_replacement = dedent('''\
+              register_symbol_tool_contributions(
+                  &mut registry,
+                  PathBuf::from("."),
+                  |tool| tool,
+              );
+          ''')
           count = text.count(direct)
           if count != 2:
               raise SystemExit(f"expected print and MCP symbol blocks, found {count}")
           text = text.replace(direct, direct_replacement)
 
-          tui = '''    for contribution in symbol_tool_contributions(workspace_root.clone()) {
-              let contribution = contribution.map_tool(|tool| {
-                  Arc::new(TuiPermissionAwareTool {
-                      inner: tool,
-                      approval: approval_handler.clone(),
-                  })
-              });
-              registry
-                  .register_contribution(contribution)
-                  .unwrap_or_else(|error| panic!("{error}"));
-          }
-'''
-          tui_replacement = '''    register_symbol_tool_contributions(
-              &mut registry,
-              workspace_root.clone(),
-              |tool| -> Arc<dyn AgentTool> {
-                  Arc::new(TuiPermissionAwareTool {
-                      inner: tool,
-                      approval: approval_handler.clone(),
-                  })
-              },
-          );
-'''
+          tui = dedent('''\
+              for contribution in symbol_tool_contributions(workspace_root.clone()) {
+                  let contribution = contribution.map_tool(|tool| {
+                      Arc::new(TuiPermissionAwareTool {
+                          inner: tool,
+                          approval: approval_handler.clone(),
+                      })
+                  });
+                  registry
+                      .register_contribution(contribution)
+                      .unwrap_or_else(|error| panic!("{error}"));
+              }
+          ''')
+          tui_replacement = dedent('''\
+              register_symbol_tool_contributions(
+                  &mut registry,
+                  workspace_root.clone(),
+                  |tool| -> Arc<dyn AgentTool> {
+                      Arc::new(TuiPermissionAwareTool {
+                          inner: tool,
+                          approval: approval_handler.clone(),
+                      })
+                  },
+              );
+          ''')
           replace_once(tui, tui_replacement)
 
-          old_test = '''    #[test]
-              fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
-                  let print_registry = build_print_tool_registry(Vec::new());
-                  let (tx, _rx) = mpsc::unbounded_channel();
-                  let tui_registry = build_tui_tool_registry(
-                      Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
-                      PathBuf::from("."),
-                      Uuid::new_v4(),
-                      Vec::new(),
-                  );
-                  let mcp_registry = build_mcp_tool_registry();
-                  let names = [
-                      "find_symbol",
-                      "find_references",
-                      "list_symbols",
-                      "list_imports",
-                  ];
-
-                  for name in names {
-                      assert!(print_registry.get(name).is_some(), "print missing {name}");
-                      assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
-                      assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
-                  }
-
-                  for (mode, mut registry) in [
-                      ("print", print_registry),
-                      ("TUI", tui_registry),
-                      ("MCP", mcp_registry),
-                  ] {
-                      let error = registry
-                          .register_contribution(ToolContribution::new(
-                              ToolContributionSource::new("test:duplicate"),
-                              Arc::new(NamedReadTool {
-                                  name: "find_symbol",
-                                  description: "duplicate",
-                              }),
-                          ))
-                          .unwrap_err();
-                      assert_eq!(
-                          error.to_string(),
-                          "duplicate tool registration 'find_symbol': existing source 'talos-tools:symbol', incoming source 'test:duplicate'",
-                          "{mode} source mismatch"
-                      );
-                  }
-              }
-'''
-          new_test = '''    #[test]
+          test_start = text.index(
+              "    #[test]\n    fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source()"
+          )
+          test_end = text.index(
+              "    #[test]\n    fn read_image_profile_is_print_and_tui_only()",
+              test_start,
+          )
+          new_test = dedent('''\
+              #[test]
               fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
                   let mut print_registry = ToolRegistry::new();
                   register_symbol_tool_contributions(
@@ -223,8 +190,9 @@ jobs:
                       );
                   }
               }
-'''
-          replace_once(old_test, new_test)
+
+          ''')
+          text = text[:test_start] + new_test + text[test_end:]
           path.write_text(text)
           PY
           cargo fmt --all
@@ -237,7 +205,7 @@ jobs:
           cargo clippy --locked -p talos-cli --bin talos -- -D warnings
           cargo fmt --all -- --check
 
-      - name: Replace branch with one clean commit
+      - name: Replace formal branch with one clean commit
         run: |
           git fetch origin main
           git checkout origin/main -- .github/workflows/ci.yml
@@ -256,7 +224,7 @@ jobs:
 
   preflight:
     name: Format + Check + Clippy + Test
-    if: github.head_ref != 'feature/i158-cli-symbol-contributions'
+    if: github.head_ref != 'automation/i158-symbol-test-repair'
     runs-on: macos-14
 
     steps:
@@ -273,7 +241,7 @@ jobs:
 
   windows-installer-fixture:
     name: Windows installer fixture
-    if: github.head_ref != 'feature/i158-cli-symbol-contributions'
+    if: github.head_ref != 'automation/i158-symbol-test-repair'
     runs-on: windows-latest
 
     steps:
