@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use talos_core::tool::{AgentTool, ToolContribution, ToolContributionSource};
 
-use crate::ReadImageTool;
 use crate::file_tools::{
     DeleteTool, EditTool, LsTool, ReadTool, WriteTool, snapshot_aware_file_tools,
 };
@@ -12,11 +11,18 @@ use crate::git::{
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
 };
 use crate::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
+use crate::{
+    BashTool, DiffTool, DocumentExtractTool, ExecTool, FetchUrlTool, GlobTool, GrepTool,
+    HttpRequestTool, ReadImageTool, SaveUrlTool, StatTool, TreeTool, WebSearchTool,
+};
 
 const FILE_CONTRIBUTION_SOURCE: &str = "talos-tools:file";
 const GIT_CONTRIBUTION_SOURCE: &str = "talos-tools:git";
+const NETWORK_CONTRIBUTION_SOURCE: &str = "talos-tools:network";
+const SHELL_CONTRIBUTION_SOURCE: &str = "talos-tools:shell";
 const IMAGE_CONTRIBUTION_SOURCE: &str = "talos-tools:image";
 const SYMBOL_CONTRIBUTION_SOURCE: &str = "talos-tools:symbol";
+const WORKSPACE_CONTRIBUTION_SOURCE: &str = "talos-tools:workspace";
 
 fn contribution(source: &'static str, tool: Arc<dyn AgentTool>) -> ToolContribution {
     ToolContribution::new(ToolContributionSource::new(source), tool)
@@ -28,6 +34,73 @@ fn file_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
 
 fn git_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
     contribution(GIT_CONTRIBUTION_SOURCE, tool)
+}
+
+/// Builds the shell/command tool group for one explicit workspace root.
+///
+/// Permission and sandbox policy remain outer-composition concerns.
+#[must_use]
+pub fn shell_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
+    vec![
+        contribution(
+            SHELL_CONTRIBUTION_SOURCE,
+            Arc::new(BashTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            SHELL_CONTRIBUTION_SOURCE,
+            Arc::new(ExecTool::new(workspace_root)),
+        ),
+    ]
+}
+
+/// Builds workspace-scoped search, inspection, and document tools.
+///
+/// These instances carry only the explicit workspace root. Product permission
+/// wrappers remain at the outer composition root.
+#[must_use]
+pub fn workspace_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
+    vec![
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(DocumentExtractTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(GrepTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(GlobTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(DiffTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(StatTool::new(workspace_root.clone())),
+        ),
+        contribution(
+            WORKSPACE_CONTRIBUTION_SOURCE,
+            Arc::new(TreeTool::new(workspace_root)),
+        ),
+    ]
+}
+
+/// Builds the network/web tool group.
+///
+/// Selection and permission wrapping remain explicit product decisions.
+#[must_use]
+pub fn network_tool_contributions() -> Vec<ToolContribution> {
+    vec![
+        contribution(NETWORK_CONTRIBUTION_SOURCE, Arc::new(SaveUrlTool::new())),
+        contribution(NETWORK_CONTRIBUTION_SOURCE, Arc::new(FetchUrlTool::new())),
+        contribution(
+            NETWORK_CONTRIBUTION_SOURCE,
+            Arc::new(HttpRequestTool::new()),
+        ),
+        contribution(NETWORK_CONTRIBUTION_SOURCE, Arc::new(WebSearchTool::new())),
+    ]
 }
 
 /// Builds the core file tool group with one shared model-private snapshot registry.
@@ -145,6 +218,36 @@ mod tests {
                 .iter()
                 .all(|contribution| contribution.source().as_str() == expected)
         );
+    }
+
+    #[test]
+    fn shell_group_has_stable_inventory_and_source() {
+        let contributions = shell_tool_contributions(PathBuf::from("workspace"));
+
+        assert_eq!(names(&contributions), ["bash", "exec"]);
+        assert_source(&contributions, SHELL_CONTRIBUTION_SOURCE);
+    }
+
+    #[test]
+    fn workspace_group_has_stable_inventory_and_source() {
+        let contributions = workspace_tool_contributions(PathBuf::from("workspace"));
+
+        assert_eq!(
+            names(&contributions),
+            ["document_extract", "grep", "glob", "diff", "stat", "tree"]
+        );
+        assert_source(&contributions, WORKSPACE_CONTRIBUTION_SOURCE);
+    }
+
+    #[test]
+    fn network_group_has_stable_inventory_and_source() {
+        let contributions = network_tool_contributions();
+
+        assert_eq!(
+            names(&contributions),
+            ["save_url", "fetch_url", "http_request", "web_search"]
+        );
+        assert_source(&contributions, NETWORK_CONTRIBUTION_SOURCE);
     }
 
     #[test]
