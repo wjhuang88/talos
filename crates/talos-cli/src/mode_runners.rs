@@ -7,7 +7,7 @@ pub(crate) use session_handlers::*;
 mod mode_interactive;
 pub(crate) use mode_interactive::run_interactive_mode;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -29,8 +29,8 @@ use talos_core::tool::{ToolPresentationPolicy, ToolRegistry};
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_plugin::HookRegistry;
 use talos_tools::{
-    BashTool, DiffTool, GlobTool, GrepTool, LsTool, StatTool, TreeTool,
-    git_mutation_tool_contributions, git_read_tool_contributions,
+    bash_tool_contribution, git_mutation_tool_contributions, git_read_tool_contributions,
+    snapshot_aware_file_tool_contributions, workspace_non_document_tool_contributions,
 };
 use talos_tui::Tui;
 use tokio::sync::{mpsc, watch};

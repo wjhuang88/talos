@@ -36,20 +36,74 @@ fn git_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
     contribution(GIT_CONTRIBUTION_SOURCE, tool)
 }
 
+fn workspace_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
+    contribution(WORKSPACE_CONTRIBUTION_SOURCE, tool)
+}
+
+/// Builds the single authoritative Bash contribution for one explicit workspace root.
+///
+/// Product composition roots can select Bash without constructing the excluded `exec` tool.
+#[must_use]
+pub fn bash_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    contribution(
+        SHELL_CONTRIBUTION_SOURCE,
+        Arc::new(BashTool::new(workspace_root)),
+    )
+}
+
+fn exec_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    contribution(
+        SHELL_CONTRIBUTION_SOURCE,
+        Arc::new(ExecTool::new(workspace_root)),
+    )
+}
+
 /// Builds the shell/command tool group for one explicit workspace root.
 ///
 /// Permission and sandbox policy remain outer-composition concerns.
 #[must_use]
 pub fn shell_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
     vec![
-        contribution(
-            SHELL_CONTRIBUTION_SOURCE,
-            Arc::new(BashTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            SHELL_CONTRIBUTION_SOURCE,
-            Arc::new(ExecTool::new(workspace_root)),
-        ),
+        bash_tool_contribution(workspace_root.clone()),
+        exec_tool_contribution(workspace_root),
+    ]
+}
+
+fn document_extract_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(DocumentExtractTool::new(workspace_root)))
+}
+
+fn grep_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(GrepTool::new(workspace_root)))
+}
+
+fn glob_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(GlobTool::new(workspace_root)))
+}
+
+fn diff_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(DiffTool::new(workspace_root)))
+}
+
+fn stat_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(StatTool::new(workspace_root)))
+}
+
+fn tree_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    workspace_contribution(Arc::new(TreeTool::new(workspace_root)))
+}
+
+/// Builds workspace-scoped search and inspection tools without constructing document extraction.
+///
+/// The legacy interactive profile uses this explicit group because `document_extract` is excluded.
+#[must_use]
+pub fn workspace_non_document_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
+    vec![
+        grep_tool_contribution(workspace_root.clone()),
+        glob_tool_contribution(workspace_root.clone()),
+        diff_tool_contribution(workspace_root.clone()),
+        stat_tool_contribution(workspace_root.clone()),
+        tree_tool_contribution(workspace_root),
     ]
 }
 
@@ -59,32 +113,9 @@ pub fn shell_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution
 /// wrappers remain at the outer composition root.
 #[must_use]
 pub fn workspace_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
-    vec![
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(DocumentExtractTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(GrepTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(GlobTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(DiffTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(StatTool::new(workspace_root.clone())),
-        ),
-        contribution(
-            WORKSPACE_CONTRIBUTION_SOURCE,
-            Arc::new(TreeTool::new(workspace_root)),
-        ),
-    ]
+    let mut contributions = vec![document_extract_tool_contribution(workspace_root.clone())];
+    contributions.extend(workspace_non_document_tool_contributions(workspace_root));
+    contributions
 }
 
 /// Builds the network/web tool group.
@@ -237,6 +268,17 @@ mod tests {
             ["document_extract", "grep", "glob", "diff", "stat", "tree"]
         );
         assert_source(&contributions, WORKSPACE_CONTRIBUTION_SOURCE);
+    }
+
+    #[test]
+    fn selective_groups_exclude_tools_without_constructing_full_groups() {
+        let shell = vec![bash_tool_contribution(PathBuf::from("workspace"))];
+        assert_eq!(names(&shell), ["bash"]);
+        assert_source(&shell, SHELL_CONTRIBUTION_SOURCE);
+
+        let workspace = workspace_non_document_tool_contributions(PathBuf::from("workspace"));
+        assert_eq!(names(&workspace), ["grep", "glob", "diff", "stat", "tree"]);
+        assert_source(&workspace, WORKSPACE_CONTRIBUTION_SOURCE);
     }
 
     #[test]
