@@ -1,1 +1,0 @@
-Temporary CI trigger for PR #100. This file is deleted in the next commit.
