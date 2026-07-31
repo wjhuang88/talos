@@ -3,7 +3,7 @@ from pathlib import Path
 path = Path('crates/talos-cli/src/tests.rs')
 text = path.read_text()
 
-old_first = '''    #[test]
+old_first = r'''    #[test]
     fn engine_snapshot_empty_after_drain() {
         let mut engine = new_engine();
         engine.enqueue_steering("a".into());
@@ -58,7 +58,7 @@ if old_first in text:
 elif new_first not in text:
     raise SystemExit('expected first legacy batched-drain CLI test')
 
-old_second = '''    #[test]
+old_second = r'''    #[test]
     fn engine_batched_drain_joins_multiple_messages() {
         let mut engine = new_engine();
         engine.enqueue_steering("a".into());
