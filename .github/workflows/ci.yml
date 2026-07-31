@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,6 +24,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff whitespace validation
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          zero_sha="0000000000000000000000000000000000000000"
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            base_sha="${PR_BASE_SHA}"
+          else
+            base_sha="${PUSH_BEFORE_SHA}"
+          fi
+          if [[ -z "${base_sha}" || "${base_sha}" == "${zero_sha}" ]]; then
+            base_sha="HEAD^"
+          fi
+          git diff --check "${base_sha}...HEAD"
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -32,6 +53,18 @@ jobs:
 
       - name: Release preflight
         run: ./scripts/release_preflight.sh
+
+  remote-governance-reconciliation:
+    name: Remote issue / owner reconciliation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate open Issue ownership and synchronization comments
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/validate_remote_issue_owners.py
 
   windows-installer-fixture:
     name: Windows installer fixture
