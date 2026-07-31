@@ -104,39 +104,20 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         approval: approval.clone(),
         print_mode: false,
     }));
-    registry.register(Arc::new(GitStatusTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(GitDiffTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(GitLogTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(GitShowTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(GitBranchListTool::new(
-        workspace_root.to_path_buf(),
-    )));
+    for contribution in git_read_tool_contributions(workspace_root.to_path_buf()) {
+        registry.register_contribution(contribution)?;
+    }
     registry.register(Arc::new(TreeTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
+    for contribution in git_mutation_tool_contributions(workspace_root.to_path_buf()) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: false,
+            })
+        });
+        registry.register_contribution(contribution)?;
+    }
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);

@@ -18,15 +18,12 @@ use talos_core::tool::{
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
-use talos_tools::git::{
-    GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
-    GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
-};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
     GlobTool, GrepTool, HttpRequestTool, LsTool, ReadImageTool, ReadTool, SaveUrlTool, StatTool,
-    TreeTool, WebSearchTool, WriteTool, snapshot_aware_file_tools,
+    TreeTool, WebSearchTool, WriteTool, git_mutation_tool_contributions,
+    git_read_tool_contributions, snapshot_aware_file_tools,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -824,37 +821,24 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
+    for contribution in git_read_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
+    for contribution in git_mutation_tool_contributions(PathBuf::from(".")) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: true,
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(HttpRequestTool::new()),
         approval: approval.clone(),
@@ -973,32 +957,23 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(ListImportsTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
-    registry.register(Arc::new(GitStatusTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitDiffTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
+    for contribution in git_read_tool_contributions(workspace_root.clone()) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(TreeTool::new(workspace_root.clone())));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(workspace_root)),
-        approval: approval_handler.clone(),
-    }));
+    for contribution in git_mutation_tool_contributions(workspace_root) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: approval_handler.clone(),
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(HttpRequestTool::new()),
         approval: approval_handler.clone(),
@@ -1048,18 +1023,18 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
+    for contribution in git_read_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(HttpRequestTool::new()));
     registry.register(Arc::new(WebSearchTool::new()));
-    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitAddTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitCommitTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitPushTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitPullTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitCheckoutTool::new(PathBuf::from("."))));
+    for contribution in git_mutation_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
     registry
 }
@@ -1210,6 +1185,37 @@ mod tests {
         let schema = edit.parameters().to_string();
         assert!(schema.contains("snapshot_id"));
         assert!(schema.contains("replace_range"));
+    }
+
+    #[test]
+    fn print_tui_and_mcp_registries_preserve_git_inventory() {
+        let print_registry = build_print_tool_registry(Vec::new());
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui_registry = build_tui_tool_registry(
+            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+            PathBuf::from("."),
+            Uuid::new_v4(),
+            Vec::new(),
+        );
+        let mcp_registry = build_mcp_tool_registry();
+        let names = [
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_show",
+            "git_branch_list",
+            "git_add",
+            "git_commit",
+            "git_push",
+            "git_pull",
+            "git_checkout",
+        ];
+
+        for name in names {
+            assert!(print_registry.get(name).is_some(), "print missing {name}");
+            assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
+            assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
+        }
     }
 
     #[test]
