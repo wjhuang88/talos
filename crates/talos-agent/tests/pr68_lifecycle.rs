@@ -119,11 +119,7 @@ fn config(context_limit: u32) -> SessionConfig {
     }
 }
 
-fn submission(
-    batch_id: &str,
-    item_id: &str,
-    source: SubmissionSource,
-) -> StructuredSubmission {
+fn submission(batch_id: &str, item_id: &str, source: SubmissionSource) -> StructuredSubmission {
     StructuredSubmission {
         id: batch_id.into(),
         source,
@@ -225,8 +221,10 @@ async fn context_rejection_releases_item_identity_for_retry() {
 #[tokio::test]
 async fn active_failure_returns_pending_user_identity_for_retry() {
     let release_first = Arc::new(Notify::new());
-    let (handle, mut actor) =
-        AppServerSession::new(controlled_failure_agent(release_first.clone()), config(128_000));
+    let (handle, mut actor) = AppServerSession::new(
+        controlled_failure_agent(release_first.clone()),
+        config(128_000),
+    );
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -309,10 +307,7 @@ async fn scheduler_submission_exposes_bounded_external_projection() {
 
     assert_eq!(projection.0, "scheduler_batch");
     assert_eq!(projection.1, SubmissionSource::Scheduler);
-    assert_eq!(
-        projection.2,
-        vec!["[scheduled-followup] inspect the build"]
-    );
+    assert_eq!(projection.2, vec!["[scheduled-followup] inspect the build"]);
 
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
