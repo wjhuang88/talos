@@ -1,0 +1,25 @@
+name: Issue Status Document Export
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/issue-status-doc-export.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Export current status documents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-status-docs
+          retention-days: 1
+          path: |
+            docs/backlog/PRODUCT-BACKLOG.md
+            docs/backlog/active/REL-001-release-installer-readiness.md
+            docs/backlog/active/DATA-001-local-data-lifecycle-storage-hygiene.md
+            docs/backlog/active/TOOL-024-background-command-jobs.md
