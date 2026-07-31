@@ -225,13 +225,39 @@ impl AppServerSession {
                         pending_images = pending_images.saturating_sub(images);
                         pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
                     }
-                    match completed.and_then(Result::ok).flatten() {
+                    let succeeded = match completed.and_then(Result::ok).flatten() {
                         Some(record) => {
                             let status = record.status;
                             self.commit_turn_record(record);
-                            paused = status != TurnRecordStatus::Success;
+                            status == TurnRecordStatus::Success
                         }
-                        None => paused = true,
+                        None => false,
+                    };
+                    paused = !succeeded;
+                    if !succeeded {
+                        let mut retained_scheduler = VecDeque::new();
+                        while let Some(submission) = pending.pop_front() {
+                            if submission.source == SubmissionSource::Scheduler {
+                                retained_scheduler.push_back(submission);
+                                continue;
+                            }
+                            pending_items = pending_items.saturating_sub(submission.items.len());
+                            pending_bytes = pending_bytes.saturating_sub(submission.total_text_bytes());
+                            let (images, image_bytes) = submission.image_totals();
+                            pending_images = pending_images.saturating_sub(images);
+                            pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
+                            release_active_submission(
+                                &submission,
+                                &mut active_submission_ids,
+                                &mut active_item_ids,
+                            );
+                            self.reject_submission(
+                                &submission.id,
+                                submission.sender_generation,
+                                SubmissionRejectionReason::Cancelled,
+                            );
+                        }
+                        pending = retained_scheduler;
                     }
                 }
                 op = self.sq_rx.recv(), if !shutting_down => {
