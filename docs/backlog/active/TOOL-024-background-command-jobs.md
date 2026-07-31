@@ -3,10 +3,11 @@
 **Status**: Refinement (2026-07-29)
 **Priority**: P1
 **Type**: Epic
-**Source**: Maintainer request — long-running `bash`, Windows PowerShell, and `exec` work must not
-block an interactive conversation; bounded completion output must return to that same conversation.
-**Depends on**: TOOL-023-C for the Windows PowerShell shell identity; TOOL-024-A decision output
-before any production implementation.
+**Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
+long-running `bash`, Windows PowerShell, and `exec` work must not block an interactive conversation;
+bounded completion output must remain model-readable through supervised job controls.
+**Depends on**: TOOL-023-C for Windows PowerShell identity; TOOL-024-A decision output; RUNTIME-005
+for bounded resource finalization; PERM-006-C before the final cross-surface permission integration.
 
 ## Outcome
 

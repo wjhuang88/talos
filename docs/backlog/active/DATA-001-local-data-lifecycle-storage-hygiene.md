@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | DATA-001 |
 | Priority | P1 |
-| Status | Active (I049 user-facing CLI complete; memory retention dry-run deferred to I053) |
+| Status | Complete — I049 storage CLI and I053 memory retention dry-run delivered (2026-06-26) |
 | Depends On | I047 release closeout; MEM-001-A starter; SESSION-002 delete/reconcile support |
 | Origin | Post-I047 storage review, 2026-06-26 |
 
@@ -81,8 +81,8 @@ Required capabilities:
 - [x] Session SQLite maintenance can checkpoint WAL and vacuum through an explicit command/API.
 - [x] `talos-memory` enables SQLite foreign-key enforcement.
 - [x] Evidence insertion for a nonexistent memory ID fails.
-- [ ] Memory cleanup policy supports dry-run and is documented as maintenance, not semantic
-      overwrite. *(Deferred to I053 — retention dry-run is scoped to I053 memory quality gate)*
+- [x] Memory cleanup policy supports dry-run and is documented as maintenance, not semantic
+      overwrite. *(Delivered by I053 as a non-destructive retention-candidate report.)*
 - [x] I019 activation docs explicitly depend on DATA-001 or record a change-control exception.
 
 ## Suggested Slices
@@ -126,8 +126,10 @@ I049 delivered the user-facing CLI for DATA-001-A through D:
 - `SessionManager::get_forks()` public API added for fork visibility.
 - 7 CLI tests + end-to-end runtime smoke test with real binary verified.
 
-Deferred to I053: memory retention dry-run (DATA-001-E memory cleanup policy). The memory store
-remains library-only per I047 boundary; no memory DB file is created by the runtime yet.
+I053 subsequently delivered DATA-001-E: `talos memory retention` reports bounded dry-run
+candidates without deleting semantic/procedural rows, while missing or corrupt stores degrade with
+actionable status. The storage lifecycle objective is therefore complete; destructive memory cleanup
+remains intentionally outside this Story.
 
 ## Required Reads
 
@@ -144,3 +146,12 @@ remains library-only per I047 boundary; no memory DB file is created by the runt
 - `crates/talos-session/src/`
 - `crates/talos-memory/src/lib.rs`
 - `crates/talos-cli/src/`
+
+
+## Completion Evidence
+
+- Completion Commit: `20f9b3e63b482b81b0639b916bae0d58e131c13a` — storage status, cleanup,
+  fork visibility, and explicit maintenance commands.
+- Additional completion commit: `e745e2c906737403a5af8e6238e353cc00993c99` — memory status and
+  retention-candidate dry-run with missing/corrupt-store tolerance.
+- I049 and I053 record focused, end-to-end, workspace, and governance validation.

@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-004 |
 | Priority | P1 |
-| Status | Complete — ADR-038 file-write trust delivered; ADR-040 command access evidence is diagnostic-only and never changes permission decisions (I117, 2026-07-12) |
+| Status | Partial — bounded repo-contained file-write trust delivered; command/network/destructive-operation sandbox scope remains open |
 | Source | [GitHub Issue #22](https://github.com/wjhuang88/talos/issues/22) |
 | Depends On | `PERM-002`, `PERM-003`, `TOOL-017`, `VALIDATION-001` |
 
@@ -45,6 +45,10 @@ workspace `.git` check rather than claiming arbitrary repository discovery, and 
 per-command because Talos cannot yet prove touched paths, child-process access, or unknown access.
 Those security requirements belong to PERM-005. No future agent may interpret this first slice as
 repo-wide `bash`/`exec` permission.
+
+GitHub Issue #22 remains open by design. It owns the broader workspace-trust and sandbox-policy
+residuals; PERM-006 owns pipeline convergence and must preserve this Story's strict external-path,
+Deny-precedence, and no-automatic-broadening constraints.
 
 ## Acceptance
 

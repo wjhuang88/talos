@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | REL-001 |
 | Priority | P1 |
-| Status | Planned |
+| Status | Complete — v0.1.2 release preparation and closeout delivered (2026-06-25) |
 | Depends On | I046 release follow-up record |
 | Estimate | M |
 | Origin | 2026-06-25 handoff audit: existing `v0.1.1` Release kept old binaries and old archive names; next stable release should be `v0.1.2` |
@@ -50,17 +50,17 @@ tag untouched.
 
 ## Acceptance Criteria
 
-- [ ] `v0.1.2` release plan explicitly preserves `v0.1.1` history and does not move the old tag.
-- [ ] `build.sh`, `.github/workflows/release.yml`, `install/install.sh`, and `install/install.ps1`
+- [x] `v0.1.2` release plan explicitly preserves `v0.1.1` history and does not move the old tag.
+- [x] `build.sh`, `.github/workflows/release.yml`, `install/install.sh`, and `install/install.ps1`
       agree on archive names.
-- [ ] Linux release artifacts are built from the `musl` targets and published as
+- [x] Linux release artifacts are built from the `musl` targets and published as
       `talos-x86_64-linux.tar.gz` and `talos-aarch64-linux.tar.gz`.
-- [ ] Windows x86_64 installer uses `talos-x86_64-windows.zip`; Windows ARM64 either remains
+- [x] Windows x86_64 installer uses `talos-x86_64-windows.zip`; Windows ARM64 either remains
       unsupported with a clear message or has a separately validated target.
-- [ ] Local packaging smoke verifies the expected files and `checksum.sha256`.
-- [ ] Installer dry-run or mocked-download validation proves URL construction before tagging.
-- [ ] Release notes and README installation instructions match the actual asset names.
-- [ ] Release workflow succeeds from a fresh `v0.1.2` tag.
+- [x] Local packaging smoke verifies the expected files and `checksum.sha256`.
+- [x] Installer dry-run or mocked-download validation proves URL construction before tagging.
+- [x] Release notes and README installation instructions match the actual asset names.
+- [x] Release workflow succeeds from a fresh `v0.1.2` tag.
 
 ## Required Reads
 
@@ -89,3 +89,12 @@ tag untouched.
   only after the release state is audited.
 - If an installer resolves the wrong archive name, treat it as release-blocking even if the binary
   artifacts are otherwise valid.
+
+
+## Completion Evidence
+
+- Completion Commit: `89bbcbbf221cc383bd974d24837013a9bc5f3c33`.
+- The workspace version moved to `v0.1.2`; I047 recorded clean fmt/check/clippy/test/governance
+  evidence and preserved the existing `v0.1.1` tag/history boundary.
+- Later releases supersede this historical release-readiness target; changed release objectives require
+  a new Story rather than reopening REL-001.
