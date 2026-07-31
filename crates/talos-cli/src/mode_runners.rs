@@ -28,11 +28,10 @@ use talos_core::session::{
 use talos_core::tool::{ToolPresentationPolicy, ToolRegistry};
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_plugin::HookRegistry;
-use talos_tools::git::{
-    GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
-    GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
+use talos_tools::{
+    BashTool, DiffTool, GlobTool, GrepTool, LsTool, StatTool, TreeTool,
+    git_mutation_tool_contributions, git_read_tool_contributions,
 };
-use talos_tools::{BashTool, DiffTool, GlobTool, GrepTool, LsTool, StatTool, TreeTool};
 use talos_tui::Tui;
 use tokio::sync::{mpsc, watch};
 
