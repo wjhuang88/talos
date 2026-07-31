@@ -3,12 +3,14 @@ use std::sync::Arc;
 
 use talos_core::tool::{AgentTool, ToolContribution, ToolContributionSource};
 
+use crate::ReadImageTool;
 use crate::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
 };
 
 const GIT_CONTRIBUTION_SOURCE: &str = "talos-tools:git";
+const IMAGE_CONTRIBUTION_SOURCE: &str = "talos-tools:image";
 
 fn git_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
     ToolContribution::new(ToolContributionSource::new(GIT_CONTRIBUTION_SOURCE), tool)
@@ -42,6 +44,20 @@ pub fn git_mutation_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContr
         git_contribution(Arc::new(GitPullTool::new(workspace_root.clone()))),
         git_contribution(Arc::new(GitCheckoutTool::new(workspace_root))),
     ]
+}
+
+/// Builds the single authoritative `read_image` contribution for one explicit
+/// workspace root.
+///
+/// Contribution ownership is independent of model capability. The outer
+/// product/agent composition remains responsible for permission wrapping and
+/// the existing Supported-model presentation gate.
+#[must_use]
+pub fn read_image_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
+    ToolContribution::new(
+        ToolContributionSource::new(IMAGE_CONTRIBUTION_SOURCE),
+        Arc::new(ReadImageTool::new(workspace_root)),
+    )
 }
 
 #[cfg(test)]
@@ -102,5 +118,14 @@ mod tests {
                 .iter()
                 .all(|contribution| !contribution.tool().is_read_only())
         );
+    }
+
+    #[test]
+    fn read_image_has_one_stable_authoritative_contribution() {
+        let contribution = read_image_tool_contribution(PathBuf::from("workspace"));
+
+        assert_eq!(contribution.name(), "read_image");
+        assert_eq!(contribution.source().as_str(), IMAGE_CONTRIBUTION_SOURCE);
+        assert!(contribution.tool().is_read_only());
     }
 }

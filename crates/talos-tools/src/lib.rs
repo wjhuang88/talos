@@ -43,7 +43,9 @@ pub use bash_tool::{BashError, BashInput, BashTool};
 pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
-pub use contributions::{git_mutation_tool_contributions, git_read_tool_contributions};
+pub use contributions::{
+    git_mutation_tool_contributions, git_read_tool_contributions, read_image_tool_contribution,
+};
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 pub use document_extract::{DocumentExtractError, DocumentExtractInput, DocumentExtractTool};
 pub use exec_tool::{ExecError, ExecInput, ExecTool};
