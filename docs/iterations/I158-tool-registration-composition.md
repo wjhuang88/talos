@@ -1,6 +1,6 @@
 # Iteration I158: Tool Registration Composition Consolidation
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-26
 > Planned objective: Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / active maintainer session 2026-07-31 |
 | Work Slice | Correct the interactive contribution migration without eagerly constructing excluded tools; add final deterministic Print/TUI/MCP inventory and set-equivalence evidence; synchronize I158 acceptance, verification, delivery state, and derived views after implementation merge. |
@@ -20,9 +20,9 @@
 | Governance Claim PR | #112 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer-authorized active session on 2026-07-31; no independent reviewer is presently available; claim merge requires exact-head CI, both governance validators, merge-time overlap/dependency CAS, and no unresolved blocking feedback. |
-| Implementation PR | `#102`, `#105` (Draft; refresh from the claim merge commit or later main before implementation continues) |
+| Implementation PR | #102 merged as `9d2926ed04a6c4666d7895fbb6bdb4099907daf8`; #105 merged as `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14` |
 | Last Updated | 2026-07-31 |
-| Handoff / Release Condition | Release or hand off before widening scope; close only after implementation commits exist on main and I158 acceptance/evidence is synchronized. |
+| Handoff / Release Condition | Released after the bounded #102/#105 work slice and review synchronization. Resume only through a new compatible claim that resolves the scheduler/status contribution decision and documentation/finding residuals. |
 
 ## Published Baseline
 
@@ -156,23 +156,28 @@ If a stop condition occurs:
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-31 | Activation | Baseline `e539537d` (`main` after I168 merge). No other implementation iteration is Active or in Review. ADR-053 Accepted; ARCH-034-R01 moved to In Progress. Primary executor is GPT-5.6 Thinking through the connected GitHub repository workflow. Begin with the additive core contract and red tests; retain all old builders until equivalence evidence passes. |
+| 2026-07-31 | Implementation | Contribution/collision contract and owning-crate factories landed through #77, #82, #85, #93, #95, #98, #99, #100, #101, and #102. Interactive composition was rebuilt from effective Claim #112 and merged as `9d2926ed04a6c4666d7895fbb6bdb4099907daf8` without constructing excluded `exec` or `document_extract`. |
+| 2026-07-31 | Evidence | Deterministic exact Print/TUI/MCP profile inventory evidence merged through #105 as `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`. Exact-head CI run `30626150159` passed macOS release preflight and the Windows installer fixture. |
+| 2026-07-31 | Review disposition | Implementation and profile-equivalence slices are merged. I158 moves to Review, not Complete: scheduler/status contribution ownership and final ARCHITECTURE/TOOL-003/F01 documentation disposition remain unresolved. Claim #112 is Released after this bounded synchronization. |
 
 ## Verification Evidence
 
-- Focused tests: pending
-- Full locked validation: pending
-- Runtime evidence: pending
-- Governance validation: pending
+- Focused tests: contribution source/inventory tests, symbol-only isolation, selective interactive profile construction, exact 21-tool interactive inventory, and deterministic full Print/TUI/MCP inventories passed in their implementation PRs.
+- Full locked validation: exact-head CI passed for #100 (`30623638710`), #102 (`30625383505`), and #105 (`30626150159`); the final implementation evidence commit is `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`.
+- Runtime/composition evidence: the Print/TUI/MCP builders expose exact sorted inventories; duplicate registration reports both sources; the full Print composition executes snapshot-aware `read`; existing permission, presentation, `read_image`, plugin, MCP, and one-shot continuation tests remained green.
+- Governance validation: project-governance and Collaboration Claim validators passed on Claim #112 and each post-claim implementation slice.
 
 ## Completion Evidence
 
-- Completion Commit: pending
-- Do not cite a status-only documentation commit as implementation completion.
-- Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
+- Completion Commit: not yet assigned; delivery remains Review.
+- Existing implementation/evidence commits on `main`: `9d2926ed04a6c4666d7895fbb6bdb4099907daf8` and `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`; earlier contribution chain is recorded under Actual Activation And Execution.
+- Complete is blocked until the remaining acceptance and documentation residuals below are resolved and revalidated. This status-only synchronization does not cite itself as implementation completion.
 
 ## Variance And Residuals
 
-- None recorded at planning time.
+- The accepted contribution model is implemented for tool-owning groups and product profiles, but scheduler tools and the CLI-owned MCP `status` tool remain explicit raw registrations. Architecture/maintainer review must either record these as justified runtime/profile exceptions or migrate them through focused authoritative contributions before Complete.
+- `docs/reference/ARCHITECTURE.md`, developer-facing TOOL-003 extension guidance, ARCH-034-F01 disposition, and parent-program closure language still require a dedicated documentation/finding closeout slice.
+- No user-visible inventory or permission behavior changed. TUI-037 remains blocked because its gate requires I158 Complete or Paused; Review is not sufficient.
 
 ## REL-002 Execution Record
 
@@ -183,6 +188,6 @@ If a stop condition occurs:
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: pending
+- Outcome: implementation and deterministic profile-equivalence evidence merged; iteration is in Review pending final exception/documentation disposition.
+- Documentation: owner and derived operating views synchronized by this review transition; architecture, extension guidance, and F01 closure remain explicit residuals.
+- Lessons: profile exclusion must prevent construction, not merely filter after eager factory creation; environment-dependent registry inputs need explicit deterministic test seams.

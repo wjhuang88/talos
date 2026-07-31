@@ -5,13 +5,13 @@
 | Story ID | ARCH-034-R01 |
 | Type | Architecture / Technical Story |
 | Parent Epic | ARCH-034 |
-| Status | In Progress — I158 Active; ADR-053 Accepted 2026-07-31 |
+| Status | Review — implementation and deterministic profile evidence merged; exception/documentation closeout pending |
 | Priority | P1 |
 | Source | ARCH-034-F01 audit finding; maintainer requirement, 2026-07-22 |
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
 | Blocks | Future built-in tool additions and ARCH-031-A feature-boundary work |
-| Selected Iteration | I158 (Active — ADR-053 accepted; baseline `e539537d`) |
+| Selected Iteration | I158 (Review — implementation evidence through `ec4d918f`; not Complete) |
 
 ## Problem
 
@@ -167,6 +167,20 @@ sole Active implementation iteration and this Story is now In Progress.
   builder” instruction in `TOOL-003` and related docs.
 - User-facing README/site changes are not expected unless tool availability changes; record a
   residual rather than inventing user-facing documentation.
+
+
+## Review Evidence (2026-07-31)
+
+- Contribution and collision contracts, transactional plugin registration, owning-crate file/image/symbol/shell/workspace/network factories, Print/TUI/MCP composition, and the selective legacy interactive profile are merged on `main`.
+- #102 merged as `9d2926ed04a6c4666d7895fbb6bdb4099907daf8` and proves excluded interactive tools are not eagerly constructed while preserving the exact 21-tool inventory and wrappers.
+- #105 merged as `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14` and proves deterministic complete Print/TUI equality plus MCP's explicit `status` / no-`read_image` / no-Todo differences.
+- Exact-head CI runs `30625383505` and `30626150159` passed release preflight and the Windows fixture; existing permission, plugin, MCP, presentation, `read_image`, safe projection, and one-shot continuation tests remained green.
+
+## Remaining Review Gates
+
+- Decide and document whether runtime-supplied scheduler tools and the CLI-owned MCP `status` tool are justified explicit profile/runtime exceptions to “every built-in has one authoritative contribution,” or migrate them in a new bounded implementation slice.
+- Update `docs/reference/ARCHITECTURE.md`, TOOL-003 developer extension guidance, and ARCH-034-F01 finding disposition to match the implemented model.
+- Re-run the complete validation ladder after those gates, record an existing completion commit, then synchronize parent/derived views to Complete. Until then the Story remains Review.
 
 ## Risks / Rollback
 

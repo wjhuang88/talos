@@ -191,7 +191,7 @@ docs/iterations/
 | I166 | Complete (2026-07-28) | TUI-036. Ctrl+C local clear/close and idle exit; Esc active-turn interruption after modal priority. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; 483 TUI + 2545 workspace tests and maintainer Alacritty acceptance passed. See `I166-interrupt-shortcut-reliability.md`. |
 | I157 | **Complete** (2026-07-30 stale-snapshot concurrency correction) | MODEL-010. Completion commit `5aac6756`; every Talos config writer reloads and mutates current state under one cross-process lock. |
 | I167 | **Complete** (2026-07-29) | TUI-040. Completion implementation `3356aac`; automated validation and maintainer real-terminal review passed. See `I167-approval-option-contrast.md`. |
-| I158 | Tool Registration Composition Consolidation | **Active** (2026-07-31) | ARCH-034-R01. ADR-053 accepted; additive checked contributions and print/TUI/MCP registry-equivalence migration underway from baseline `e539537d`. See `I158-tool-registration-composition.md`. |
+| I158 | Tool Registration Composition Consolidation | **Review** (2026-07-31) | Implementation commits `9d2926ed` and `ec4d918f`; exact inventories and full CI pass. Complete remains blocked on scheduler/status exception disposition and final architecture/tool-extension/finding documentation. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete and the post-I158 TUI-037 disposition is recorded. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | ARCH-031-C. Fail-closed sandbox fallback + explicit coding preset that cannot weaken permission/sandbox. Blocked until I160 Complete and an independent security review is scheduled. See `I161-sandbox-fallback-and-coding-preset.md`. |
@@ -309,7 +309,7 @@ Complete/Superseded dispositions without erasing their published objectives.
 | I166 | Complete (2026-07-28) | TUI-036. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; automated and maintainer Alacritty acceptance passed. |
 | I157 | Complete (2026-07-30 acceptance correction) | MODEL-010 stale-snapshot concurrency correction completed by `5aac6756`; earlier finalization evidence retained as historical. |
 | I167 | Complete (2026-07-29) | TUI-040. Completion implementation `3356aac`; scope was only unselected approval-option contrast. |
-| I158 | Active (2026-07-31) | ARCH-034-R01. ADR-053 Accepted; implement checked contributions first, preserve old builders until registry-set and wrapper equivalence passes. |
+| I158 | Review (2026-07-31) | ARCH-034-R01. Implementation and deterministic profile evidence are merged. Complete remains blocked on scheduler/status contribution exception ownership and final ARCHITECTURE/TOOL-003/F01 documentation. |
 | I159 | Blocked — I158 incomplete / TUI-037 undispositioned | ARCH-031-A. After I158 disposition, TUI-037 must receive a dedicated-iteration or explicit Blocked/Deferred disposition before I159 activation. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
 | I161 | Blocked — I160 incomplete and security reviewer not assigned | ARCH-031-C. Blocked until I160 Complete and an independent security review is scheduled. |
@@ -326,8 +326,8 @@ listed above.
 
 I165 is Complete. TUI-039 is Complete. I164/TUI-038 is Paused.
 I166/TUI-036, I167/TUI-040, I157/MODEL-010, and I168/RUNTIME-003 are Complete.
-I164/TUI-038 remains Paused. I158/ARCH-034-R01 is Active after ADR-053 acceptance;
-I159-I162 remain Blocked.
+I164/TUI-038 remains Paused. I158/ARCH-034-R01 is in Review after implementation and deterministic profile evidence merged;
+I159-I162 remain Blocked, and TUI-037 still requires I158 Complete or Paused.
 I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
 current selection, planning, status, or activation owner.
 
