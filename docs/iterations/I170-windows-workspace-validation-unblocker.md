@@ -33,7 +33,7 @@
 - Branch: `codex/i170-windows-shell`
 - Worktree: `C:/Users/12261/Documents/talos-worktrees/i170-windows-shell`
 - Merge target: `main`
-- Pull request: pending independent draft PR creation
+- Pull request: [Draft PR #78](https://github.com/wjhuang88/talos/pull/78)
 
 ### Scope
 
@@ -94,6 +94,7 @@
 | 2026-07-31 | Reproduction | `cargo test -p talos-tools --locked -- --test-threads=1` produced 27 failures: 19 shell-spawn/semantics, four long/recursive ls, and four glob/grep path assertions. |
 | 2026-07-31 | Main integration | Independent branch created from `origin/main@e539537d`; I169 and ADR-056 were excluded from the split. |
 | 2026-07-31 | Corrective follow-up | Latest-main Windows failures were resolved without skips: Unix-only symlink fixtures are target-gated, benchmark artifact comparison normalizes CRLF, and permission fixtures use the platform temp directory. |
+| 2026-07-31 | Review handoff | Independent Draft PR #78 opened against latest `main`; #68 can now remove this scope and retain only I169 steering changes. |
 
 ## Verification Evidence
 
