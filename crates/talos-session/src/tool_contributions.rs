@@ -4,7 +4,7 @@ use std::sync::Arc;
 use talos_core::tool::{AgentTool, ToolContribution, ToolContributionSource};
 use uuid::Uuid;
 
-use crate::{
+use crate::todo::{
     TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool, TodoQueryTool,
     TodoRemoveDependencyTool, TodoUpdateBatchTool, TodoUpdateStatusTool, TodoUpdateTool,
 };
@@ -19,6 +19,7 @@ fn todo_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
 ///
 /// The outer product composition root remains responsible for selecting this group,
 /// applying permission wrappers, and registering it into the executable registry.
+#[must_use]
 pub fn todo_tool_contributions_for_sessions_dir(
     sessions_dir: &Path,
     session_id: Uuid,
@@ -69,10 +70,8 @@ mod tests {
 
     #[test]
     fn todo_contribution_group_has_stable_names_order_and_source() {
-        let contributions = todo_tool_contributions_for_sessions_dir(
-            Path::new("/tmp/talos-session-contributions"),
-            Uuid::nil(),
-        );
+        let contributions =
+            todo_tool_contributions_for_sessions_dir(Path::new("sessions"), Uuid::nil());
 
         let names = contributions
             .iter()
