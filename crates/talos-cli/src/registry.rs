@@ -777,8 +777,18 @@ fn register_symbol_tool_contributions(
 /// exists, so todo tools are bound to a fresh in-process session id — scoped to
 /// this one run and discarded on exit, not persisted across invocations.
 pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>) -> ToolRegistry {
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
     let ephemeral_session_id = Uuid::new_v4();
+    build_print_tool_registry_with_todo_contributions(
+        scheduler_tools,
+        default_todo_tool_contributions(ephemeral_session_id),
+    )
+}
+
+fn build_print_tool_registry_with_todo_contributions(
+    scheduler_tools: Vec<Arc<dyn AgentTool>>,
+    todo_contributions: Vec<ToolContribution>,
+) -> ToolRegistry {
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
 
     let mut registry = ToolRegistry::new();
     for contribution in shell_tool_contributions(PathBuf::from(".")) {
@@ -857,7 +867,7 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in default_todo_tool_contributions(ephemeral_session_id) {
+    for contribution in todo_contributions {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -885,6 +895,20 @@ pub(crate) fn build_tui_tool_registry(
     workspace_root: PathBuf,
     session_id: Uuid,
     delay_tool: Vec<Arc<dyn AgentTool>>,
+) -> ToolRegistry {
+    build_tui_tool_registry_with_todo_contributions(
+        approval_handler,
+        workspace_root,
+        delay_tool,
+        default_todo_tool_contributions(session_id),
+    )
+}
+
+fn build_tui_tool_registry_with_todo_contributions(
+    approval_handler: Arc<TuiApprovalHandler>,
+    workspace_root: PathBuf,
+    delay_tool: Vec<Arc<dyn AgentTool>>,
+    todo_contributions: Vec<ToolContribution>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     for contribution in shell_tool_contributions(workspace_root.clone()) {
@@ -966,7 +990,7 @@ pub(crate) fn build_tui_tool_registry(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in default_todo_tool_contributions(session_id) {
+    for contribution in todo_contributions {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -1302,6 +1326,118 @@ mod tests {
             assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
             assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
         }
+    }
+
+    fn sorted_registry_names(registry: &ToolRegistry) -> Vec<String> {
+        let mut names = registry
+            .list()
+            .into_iter()
+            .map(|tool| tool.name().to_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn product_registries_have_exact_sorted_inventories() {
+        let temp = tempfile::tempdir().unwrap();
+        let sessions_dir = temp.path().join("sessions");
+        let session_id = Uuid::nil();
+
+        let print_registry = build_print_tool_registry_with_todo_contributions(
+            Vec::new(),
+            todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+        );
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui_registry = build_tui_tool_registry_with_todo_contributions(
+            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+            PathBuf::from("."),
+            Vec::new(),
+            todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+        );
+        let mcp_registry = build_mcp_tool_registry();
+
+        let print_tui_inventory = vec![
+            "bash",
+            "delete",
+            "diff",
+            "document_extract",
+            "edit",
+            "exec",
+            "fetch_url",
+            "find_references",
+            "find_symbol",
+            "git_add",
+            "git_branch_list",
+            "git_checkout",
+            "git_commit",
+            "git_diff",
+            "git_log",
+            "git_pull",
+            "git_push",
+            "git_show",
+            "git_status",
+            "glob",
+            "grep",
+            "http_request",
+            "list_imports",
+            "list_symbols",
+            "ls",
+            "read",
+            "read_image",
+            "save_url",
+            "stat",
+            "todo_add_dependency",
+            "todo_create",
+            "todo_create_batch",
+            "todo_delete",
+            "todo_query",
+            "todo_remove_dependency",
+            "todo_update",
+            "todo_update_batch",
+            "todo_update_status",
+            "tree",
+            "web_search",
+            "write",
+        ];
+        let mcp_inventory = vec![
+            "bash",
+            "delete",
+            "diff",
+            "document_extract",
+            "edit",
+            "exec",
+            "fetch_url",
+            "find_references",
+            "find_symbol",
+            "git_add",
+            "git_branch_list",
+            "git_checkout",
+            "git_commit",
+            "git_diff",
+            "git_log",
+            "git_pull",
+            "git_push",
+            "git_show",
+            "git_status",
+            "glob",
+            "grep",
+            "http_request",
+            "list_imports",
+            "list_symbols",
+            "ls",
+            "read",
+            "save_url",
+            "stat",
+            "status",
+            "tree",
+            "web_search",
+            "write",
+        ];
+
+        assert_eq!(sorted_registry_names(&print_registry), print_tui_inventory);
+        assert_eq!(sorted_registry_names(&tui_registry), print_tui_inventory);
+        assert_eq!(sorted_registry_names(&mcp_registry), mcp_inventory);
     }
 
     struct DescriptionMarkerTool {
