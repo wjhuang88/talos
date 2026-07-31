@@ -46,6 +46,25 @@ jobs:
           echo '371966fe8bc6dba7d66932570bb1c85b9032b90ec8c1c5f5014e92a57ab735dd  /tmp/status.patch' | sha256sum -c -
           git apply --check /tmp/status.patch
           git apply /tmp/status.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('docs/backlog/active/DATA-001-local-data-lifecycle-storage-hygiene.md')
+          text = path.read_text()
+          old = '''- Completion Commits:
+            - `20f9b3e63b482b81b0639b916bae0d58e131c13a` — storage status, cleanup,
+              fork visibility, and explicit maintenance commands.
+            - `e745e2c906737403a5af8e6238e353cc00993c99` — memory status and
+              retention-candidate dry-run with corruption/missing-store tolerance.
+          '''
+          new = '''- Completion Commit: `20f9b3e63b482b81b0639b916bae0d58e131c13a` — storage status, cleanup,
+            fork visibility, and explicit maintenance commands.
+          - Additional completion commit: `e745e2c906737403a5af8e6238e353cc00993c99` — memory status and
+            retention-candidate dry-run with corruption/missing-store tolerance.
+          '''
+          if old not in text:
+              raise SystemExit('DATA-001 completion evidence anchor not found')
+          path.write_text(text.replace(old, new))
+          PY
           scripts/validate_project_governance.sh .
           bash scripts/validate_collaboration_claims.sh .
           git diff --check
