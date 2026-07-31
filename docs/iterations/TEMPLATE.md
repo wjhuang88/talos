@@ -6,6 +6,26 @@
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: {runnable and testable user- or operator-visible result}
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | YYYY-MM-DD |
+| Handoff / Release Condition | None |
+
+Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. A claim PR proposes `Claimed`, but the
+claim is effective only after the finalized record is merged into the target branch.
+
 ## Published Baseline
 
 ### Selected Stories
@@ -49,7 +69,7 @@
 
 | Date | Type | Record |
 |---|---|---|
-| YYYY-MM-DD | Activation | {dependency inventory and activation decision} |
+| YYYY-MM-DD | Activation | {dependency inventory, merge-time CAS result, and activation decision} |
 
 ## Verification Evidence
 

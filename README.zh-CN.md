@@ -524,6 +524,16 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 
 ## 贡献与本地检查
 
+PR `#83` 采用之后新启动的受治理实现，应先遵循
+[智能体协作与任务认领](docs/sop/AGENT-COLLABORATION.md)：在 owner document 中回填真实的
+claim PR 编号，通过允许的授权路径合并认领，再从包含该认领记录的目标分支创建实现分支。
+仍处于 Open 状态的 claim PR 不构成任务占用。
+
+采用前已经存在的工作按原治理基线完成。仅修改措辞、修复链接或格式、同一 PR 范围内的
+reviewer follow-up，以及不改变行为、API、安全、依赖、发布授权、持久化数据或 owner 状态的
+机械性 CI/fixture 维护，可以使用单 PR。紧急事故与安全响应可使用文档规定的 emergency
+override，但应在完成遏制后的两个工作日内补齐治理状态。
+
 常用检查命令：
 
 ```bash
@@ -577,6 +587,7 @@ Talos 正从核心运行时实现阶段进入产品化加固和差异化体验�
 | 决策记录 | [docs/decisions/](docs/decisions/) |
 | 本地开发 | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
 | 测试策略 | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
+| 智能体协作与任务认领 | [docs/sop/AGENT-COLLABORATION.md](docs/sop/AGENT-COLLABORATION.md) |
 | Git 工作流 | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
 | 公开产品站 | [https://talos.hwj.zone](https://talos.hwj.zone) &mdash; 静态 GitHub Pages 站点（源码见 [`site/`](site/)） |
 

@@ -760,6 +760,18 @@ RUST_LOG=talos=debug talos
 
 ## Contributing And Local Checks
 
+For governed implementation started after the adoption of PR `#83`, follow
+[Agent Collaboration And Task Claiming](docs/sop/AGENT-COLLABORATION.md): finalize the
+owner-document claim with the actual claim PR number, merge it through an authorized path, and
+create the implementation branch from that target-branch claim. An open claim PR does not reserve
+work.
+
+Existing pre-adoption work is grandfathered. Wording-only documentation fixes, broken links,
+formatting, reviewer follow-ups within the same scope, and mechanically bounded CI/fixture
+maintenance may use one PR when they do not change behavior, API, security, dependencies, release
+authorization, persistent data, or owner status. Time-critical incident and security response may
+use the documented emergency override, with governance reconciled within two business days.
+
 Common checks:
 
 ```bash
@@ -815,6 +827,7 @@ For current engineering status, use the project governance docs instead of this 
 | Decisions | [docs/decisions/](docs/decisions/) |
 | Local development | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
 | Testing | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
+| Agent collaboration and task claiming | [docs/sop/AGENT-COLLABORATION.md](docs/sop/AGENT-COLLABORATION.md) |
 | Git workflow | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
 | Public product site | [https://talos.hwj.zone](https://talos.hwj.zone) &mdash; static GitHub Pages site (source under [`site/`](site/)) |
 

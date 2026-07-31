@@ -36,6 +36,7 @@ These are immutable facts that every change must respect:
     tests, and release builds. Before creating or pushing a release tag, run
     `./scripts/release_preflight.sh vX.Y.Z`; do not substitute an ad-hoc command set. A failed tag
     is immutable: fix the source and publish a new patch tag instead of moving or force-pushing it.
+
 ## Coding Behavior
 
 ### Accuracy Over Approval
@@ -88,6 +89,10 @@ These are immutable facts that every change must respect:
   new iteration ID, even when it continues the same product area.
 - Every iteration must name a runnable, testable deliverable and affected user-facing
   documentation. Infrastructure-only exceptions must be explicit and cannot claim user behavior.
+- For governed work after collaboration-workflow adoption, verify an effective target-branch
+  Collaboration Claim before creating the implementation branch. Pre-adoption work, bounded
+  maintenance, reviewer follow-ups, and emergency overrides follow the explicit rules in
+  `docs/sop/AGENT-COLLABORATION.md`.
 - **Completion evidence is mandatory.** An iteration, backlog Story, or long-task phase may be
   marked `Complete` only in its owner document and only with a `Completion Commit:` field naming
   one or more already-existing implementation commit SHA(s). A commit that merely changes status
@@ -125,13 +130,20 @@ These are immutable facts that every change must respect:
 4. **Never commit secrets.** Check for API keys, tokens, passwords.
 5. **Never force-push to main.**
 6. **Commit messages reference iteration/story IDs** when applicable: `feat(agent): implement turn loop (#I1-S3)`
+7. **Use executable collaboration governance.** For governed work, follow
+   `docs/sop/AGENT-COLLABORATION.md`: `Claim Pending` is open-PR metadata only; a proposed
+   `Claimed` record becomes effective only on the target branch; backfill the actual claim PR
+   number, run both governance validators, repeat merge-time CAS checks, and use an allowed
+   authorization path. Do not apply the normal path retroactively to grandfathered work or use it
+   to block bounded maintenance or emergency response outside the SOP's applicability rules.
 
 ### Standard Build And Release Flow
 
 All agents follow this sequence for compile, merge, and release work:
 
 1. Read `rust-toolchain.toml` and use the pinned Rust/Clippy toolchain.
-2. Run `./scripts/release_preflight.sh` for workspace-level validation.
+2. Run `./scripts/release_preflight.sh` for workspace-level validation. It includes project
+   governance and Collaboration Claim validation.
 3. Use `--locked` for workspace checks, Clippy, tests, and release builds; do not delete
    `Cargo.lock` to bypass a failure.
 4. For a release, synchronize the workspace version and all internal path dependency versions,
@@ -145,6 +157,7 @@ All agents follow this sequence for compile, merge, and release work:
 | Task Type | Route To |
 |-----------|----------|
 | "I want to add a new feature" | `docs/sop/REQUIREMENT-INTAKE.md` → `docs/sop/NEW-FEATURE.md` |
+| "Claim a GitHub Issue, claim an existing task, coordinate agents, use bounded maintenance, or handle an emergency" | `docs/sop/AGENT-COLLABORATION.md` |
 | "Start the next iteration" | `docs/sop/START-ITERATION.md` |
 | "How do I implement during an iteration?" | `docs/sop/ITERATION-WORKFLOW.md` |
 | "A requirement changed mid-iteration" | `docs/sop/CHANGE-CONTROL.md` |
@@ -163,7 +176,7 @@ All agents follow this sequence for compile, merge, and release work:
 | "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
 | "What is the inline api_key security boundary?" | `docs/decisions/023-inline-api-key-boundary.md` (persisted in TOML, masked in all display surfaces) |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
-| "Governance drift, repair, or skill upgrade" | `docs/sop/DOC-CHECK.md` → refresh audit against current `agent-project-governance` skill, then run `scripts/validate_project_governance.sh .` and `scripts/assess_project_scale.sh .` |
+| "Governance drift, repair, or skill upgrade" | `docs/sop/DOC-CHECK.md` → refresh audit against current `agent-project-governance` skill, then run both governance validators and `scripts/assess_project_scale.sh .` |
 | "A session exposed a reusable lesson, failed validation, or user correction" | `docs/sop/EVOLUTION-FEEDBACK.md` → `EVOLUTION.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |
@@ -174,29 +187,26 @@ All agents follow this sequence for compile, merge, and release work:
 
 Before ending a session, verify:
 
-1. **Status sync**: Update backlog story status, iteration progress in `docs/iterations/`. Before
-   setting any owner to `Complete`, record `Completion Commit: <SHA>` for the already-pushed
-   implementation evidence; otherwise retain a non-complete status.
-2. **Verification evidence**: Did tests pass? Did you run `cargo check --workspace`?
-3. **Residual work**: Record incomplete items in the backlog or iteration notes.
-4. **Lessons / decisions**: For non-obvious problems, failed validation, or user correction, follow
-   `docs/sop/EVOLUTION-FEEDBACK.md`; record Soft/Assumption choices in `docs/decisions/`.
-5. **Commit readiness**: Staged diff reviewed? No secrets? Conventional commit message? No
-   orphaned changes?
-6. **README / Board sync**: Update README for user-visible changes; update `docs/BOARD.md` after
-   owner docs when active/review/paused/next work changes.
-7. **Issue sync**: If any backlog item sourced from a GitHub issue changed status this session,
-   post a comment to the originating issue with the new status, commit reference, and one-line
-   summary. Close the issue only when the story reaches Complete or Cancelled in the owner doc.
-   See `docs/backlog/PRODUCT-BACKLOG.md` § Issue Sync Rule.
-8. **Governance / long task recovery**: If governance files changed, run
-   `scripts/validate_project_governance.sh .`; run `scripts/assess_project_scale.sh .` when
-   profile, branch mode, worktree mode, or governance depth changes. If a long task is active,
-   append validation evidence, current state, next item, and recovery/resume instructions.
+1. **Status sync**: Update owner status first, then backlog/iteration indexes and Board. Before
+   Complete, record `Completion Commit: <SHA>` for already-pushed implementation evidence.
+2. **Claim sync**: For post-adoption governed work, does the owner contain one valid Collaboration
+   Claim with current Work Slice, actor, authorization, implementation PR, and lifecycle state?
+3. **Verification evidence**: Did locked checks and required runtime validation pass?
+4. **Residual work**: Record incomplete items in the owner or declared residual destination.
+5. **Lessons / decisions**: Follow `docs/sop/EVOLUTION-FEEDBACK.md` for non-obvious failures or user
+   correction; record Soft/Assumption choices in ADRs when required.
+6. **Commit readiness**: Staged diff reviewed? No secrets? Conventional message? No orphaned changes?
+7. **README / Board sync**: Update user-facing docs; update Board only after owners.
+8. **Issue sync**: Comment with new status, commit, and summary; close only at Complete/Cancelled.
+9. **Governance / recovery**: If governance files changed, run
+   `scripts/validate_project_governance.sh .` and
+   `bash scripts/validate_collaboration_claims.sh .`; run scale assessment when profile/branch/
+   worktree assumptions change. For a long task, append validation, state, next item, and resume
+   instructions.
 
 ## Current Known Traps
 
-- **Greenfield**: No existing code to reference for patterns. Every crate is new. Follow the architecture doc strictly.
-- **Crate boundary coupling**: It's tempting to put everything in one crate. Resist. Each crate must have a clear single responsibility.
-- ** premature async abstraction**: Don't over-abstract async patterns before the core loop works. Get the simplest turn loop working first.
-- **Reference project translation**: Patterns from TypeScript projects (Pi, Claude Code, OpenCode) need Rust-idiomatic reimplementation, not literal translation.
+- **Greenfield**: No existing code to reference for patterns. Every crate is new. Follow architecture strictly.
+- **Crate boundary coupling**: Do not collapse responsibilities into one crate.
+- **Premature async abstraction**: Get the simplest turn loop working before abstracting.
+- **Reference project translation**: Reimplement TypeScript patterns idiomatically in Rust.
