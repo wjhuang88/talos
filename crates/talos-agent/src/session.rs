@@ -143,6 +143,8 @@ impl AppServerSession {
         let mut pending_bytes = 0_usize;
         let mut pending_images = 0_usize;
         let mut pending_image_bytes = 0_u64;
+        let mut active_submission_ids = HashSet::<String>::new();
+        let mut active_item_ids = HashSet::<String>::new();
         let mut recent_submission_ids = VecDeque::<String>::new();
         let mut recent_item_ids = VecDeque::<String>::new();
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
@@ -163,14 +165,38 @@ impl AppServerSession {
                     images,
                     image_bytes,
                 );
+                let submission_id = submission.id.clone();
+                let item_ids = submission
+                    .items
+                    .iter()
+                    .map(|item| item.id.clone())
+                    .collect::<Vec<_>>();
                 turn_counter = turn_counter.saturating_add(1);
                 match self.start_submission(submission, turn_counter).await {
                     Some((handle, token)) => {
+                        active_submission_ids.remove(&submission_id);
+                        record_recent_identity(
+                            &mut recent_submission_ids,
+                            submission_id,
+                            MAX_RECENT_SUBMISSION_IDS,
+                        );
+                        for item_id in item_ids {
+                            active_item_ids.remove(&item_id);
+                            record_recent_identity(
+                                &mut recent_item_ids,
+                                item_id,
+                                MAX_RECENT_ITEM_IDS,
+                            );
+                        }
                         current_turn = Some(handle);
                         current_submission_size = Some(submission_size);
                         cancel_token = Some(token);
                     }
                     None => {
+                        active_submission_ids.remove(&submission_id);
+                        for item_id in item_ids {
+                            active_item_ids.remove(&item_id);
+                        }
                         pending_items = pending_items.saturating_sub(submission_size.0);
                         pending_bytes = pending_bytes.saturating_sub(submission_size.1);
                         pending_images = pending_images.saturating_sub(submission_size.2);
@@ -213,6 +239,11 @@ impl AppServerSession {
                         shutting_down = true;
                         if let Some(token) = cancel_token.take() { token.cancel(); }
                         for submission in pending.drain(..) {
+                            release_active_submission(
+                                &submission,
+                                &mut active_submission_ids,
+                                &mut active_item_ids,
+                            );
                             self.reject_submission(
                                 &submission.id,
                                 submission.sender_generation,
@@ -236,6 +267,8 @@ impl AppServerSession {
                         &mut pending_bytes,
                         &mut pending_images,
                         &mut pending_image_bytes,
+                        &mut active_submission_ids,
+                        &mut active_item_ids,
                         &mut recent_submission_ids,
                         &mut recent_item_ids,
                         paused,
@@ -251,6 +284,8 @@ impl AppServerSession {
                         &mut pending_bytes,
                         &mut pending_images,
                         &mut pending_image_bytes,
+                        &mut active_submission_ids,
+                        &mut active_item_ids,
                         &mut recent_submission_ids,
                         &mut recent_item_ids,
                         paused,
@@ -266,6 +301,8 @@ impl AppServerSession {
                         &mut pending_bytes,
                         &mut pending_images,
                         &mut pending_image_bytes,
+                        &mut active_submission_ids,
+                        &mut active_item_ids,
                         &mut recent_submission_ids,
                         &mut recent_item_ids,
                         paused,
@@ -280,6 +317,8 @@ impl AppServerSession {
                         &mut pending_bytes,
                         &mut pending_images,
                         &mut pending_image_bytes,
+                        &mut active_submission_ids,
+                        &mut active_item_ids,
                         &mut recent_submission_ids,
                         &mut recent_item_ids,
                         paused,
@@ -294,6 +333,11 @@ impl AppServerSession {
                         let (images, image_bytes) = submission.image_totals();
                         pending_images = pending_images.saturating_sub(images);
                         pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
+                        release_active_submission(
+                            &submission,
+                            &mut active_submission_ids,
+                            &mut active_item_ids,
+                        );
                         self.reject_submission(
                             &submission.id,
                             submission.sender_generation,
@@ -327,6 +371,11 @@ impl AppServerSession {
                     shutting_down = true;
                     if let Some(token) = &cancel_token { token.cancel(); }
                     for submission in pending.drain(..) {
+                        release_active_submission(
+                            &submission,
+                            &mut active_submission_ids,
+                            &mut active_item_ids,
+                        );
                         self.reject_submission(
                             &submission.id,
                             submission.sender_generation,
@@ -360,6 +409,8 @@ impl AppServerSession {
         pending_bytes: &mut usize,
         pending_images: &mut usize,
         pending_image_bytes: &mut u64,
+        active_submission_ids: &mut HashSet<String>,
+        active_item_ids: &mut HashSet<String>,
         recent_submission_ids: &mut VecDeque<String>,
         recent_item_ids: &mut VecDeque<String>,
         paused: bool,
@@ -368,11 +419,11 @@ impl AppServerSession {
             self.reject_submission(&submission.id, submission.sender_generation, reason);
             return false;
         }
-        if recent_submission_ids.contains(&submission.id)
-            || submission
-                .items
-                .iter()
-                .any(|item| recent_item_ids.contains(&item.id))
+        if active_submission_ids.contains(&submission.id)
+            || recent_submission_ids.contains(&submission.id)
+            || submission.items.iter().any(|item| {
+                active_item_ids.contains(&item.id) || recent_item_ids.contains(&item.id)
+            })
         {
             self.reject_submission(
                 &submission.id,
@@ -440,15 +491,27 @@ impl AppServerSession {
         {
             return false;
         }
-
-        record_recent_identity(
-            recent_submission_ids,
-            submission.id.clone(),
-            MAX_RECENT_SUBMISSION_IDS,
-        );
-        for item in &submission.items {
-            record_recent_identity(recent_item_ids, item.id.clone(), MAX_RECENT_ITEM_IDS);
+        if submission.source != SubmissionSource::User
+            && self
+                .eq_tx
+                .send(SessionEvent::ExternalSubmissionQueued {
+                    session_id: self.session_id.clone(),
+                    submission_id: submission.id.clone(),
+                    sender_generation: submission.sender_generation,
+                    source: submission.source,
+                    item_texts: submission
+                        .items
+                        .iter()
+                        .map(|item| item.text.clone())
+                        .collect(),
+                })
+                .is_err()
+        {
+            return false;
         }
+
+        active_submission_ids.insert(submission.id.clone());
+        active_item_ids.extend(submission.items.iter().map(|item| item.id.clone()));
         *pending_items = next_items;
         *pending_bytes = next_bytes;
         *pending_images = next_images;
@@ -754,6 +817,17 @@ fn compatibility_submission(
             text,
             attachments,
         }],
+    }
+}
+
+fn release_active_submission(
+    submission: &StructuredSubmission,
+    active_submission_ids: &mut HashSet<String>,
+    active_item_ids: &mut HashSet<String>,
+) {
+    active_submission_ids.remove(&submission.id);
+    for item in &submission.items {
+        active_item_ids.remove(&item.id);
     }
 }
 
