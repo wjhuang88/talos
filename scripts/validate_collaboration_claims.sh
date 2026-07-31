@@ -224,7 +224,7 @@ validate_changed_active_owners() {
   local base="$1"
   local changed
   changed="$(git -C "$root" diff --name-only "$base" HEAD -- docs/iterations docs/tasks docs/backlog/active 2>/dev/null || true)"
-  [[ -n "$changed" ]] || return
+  [[ -n "$changed" ]] || return 0
 
   local relative file
   while IFS= read -r relative; do
