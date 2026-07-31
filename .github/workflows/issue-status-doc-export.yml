@@ -18,8 +18,11 @@ jobs:
         with:
           name: issue-status-docs
           retention-days: 1
+          overwrite: true
           path: |
+            docs/BOARD.md
             docs/backlog/PRODUCT-BACKLOG.md
+            docs/backlog/active/PERM-004-workspace-trust-sandbox.md
             docs/backlog/active/REL-001-release-installer-readiness.md
             docs/backlog/active/DATA-001-local-data-lifecycle-storage-hygiene.md
             docs/backlog/active/TOOL-024-background-command-jobs.md
