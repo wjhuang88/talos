@@ -192,10 +192,16 @@ docs/iterations/
 | I157 | **Complete** (2026-07-30 stale-snapshot concurrency correction) | MODEL-010. Completion commit `5aac6756`; every Talos config writer reloads and mutates current state under one cross-process lock. |
 | I167 | **Complete** (2026-07-29) | TUI-040. Completion implementation `3356aac`; automated validation and maintainer real-terminal review passed. See `I167-approval-option-contrast.md`. |
 | I158 | Tool Registration Composition Consolidation | **Active** (2026-07-31) | ARCH-034-R01. ADR-053 accepted; additive checked contributions and print/TUI/MCP registry-equivalence migration underway from baseline `e539537d`. See `I158-tool-registration-composition.md`. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete. See `I159-talos-tools-feature-boundary.md`. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete and the post-I158 TUI-037 disposition is recorded. See `I159-talos-tools-feature-boundary.md`. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | ARCH-031-C. Fail-closed sandbox fallback + explicit coding preset that cannot weaken permission/sandbox. Blocked until I160 Complete and an independent security review is scheduled. See `I161-sandbox-fallback-and-coding-preset.md`. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | ARCH-031-D. External SDK fixture + metadata-derived closure → explicit v0.6 GO/NO-GO; no real publish. Blocked until I161 Complete and all workspace tests green. See `I162-v0.6-sdk-publication-readiness.md`. |
+
+> Maintainer sequence disposition (2026-07-31): after I158 reaches a formal Complete or Paused
+> disposition, TUI-037 is the next P1 product item to disposition before I159 activation. TUI-037
+> remains Refinement until its OSC 8 and token-required loopback navigation gates are resolved. The
+> disposition must either select a dedicated iteration or explicitly record Blocked/Deferred.
+> I159-I162 retain their published baselines.
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -304,7 +310,7 @@ Complete/Superseded dispositions without erasing their published objectives.
 | I157 | Complete (2026-07-30 acceptance correction) | MODEL-010 stale-snapshot concurrency correction completed by `5aac6756`; earlier finalization evidence retained as historical. |
 | I167 | Complete (2026-07-29) | TUI-040. Completion implementation `3356aac`; scope was only unselected approval-option contrast. |
 | I158 | Active (2026-07-31) | ARCH-034-R01. ADR-053 Accepted; implement checked contributions first, preserve old builders until registry-set and wrapper equivalence passes. |
-| I159 | Blocked — I158 incomplete | ARCH-031-A. Blocked until I158 Complete. |
+| I159 | Blocked — I158 incomplete / TUI-037 undispositioned | ARCH-031-A. After I158 disposition, TUI-037 must receive a dedicated-iteration or explicit Blocked/Deferred disposition before I159 activation. |
 | I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
 | I161 | Blocked — I160 incomplete and security reviewer not assigned | ARCH-031-C. Blocked until I160 Complete and an independent security review is scheduled. |
 | I162 | Blocked — I161 incomplete and version/readiness gate not authorized | ARCH-031-D. Blocked until I161 Complete and the version/readiness maintainer gate is authorized. Readiness only; no real publish. |
