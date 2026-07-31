@@ -75,10 +75,19 @@ async fn mcp_server_e2e() {
         tools.tools.len()
     );
 
+    #[cfg(windows)]
+    let shell_tool = "powershell";
+    #[cfg(not(windows))]
+    let shell_tool = "bash";
+    assert!(
+        tools.tools.iter().any(|tool| tool.name == shell_tool),
+        "expected platform shell tool '{shell_tool}' in tools/list"
+    );
+
     let denied = client
         .peer()
         .call_tool(
-            CallToolRequestParams::new("bash").with_arguments(
+            CallToolRequestParams::new(shell_tool).with_arguments(
                 serde_json::json!({"command": "echo denied"})
                     .as_object()
                     .cloned()

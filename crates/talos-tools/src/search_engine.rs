@@ -184,11 +184,7 @@ impl SearchEngine for LegacySearchEngine {
                 Err(_) => continue,
             };
 
-            let display_path = file_path
-                .strip_prefix(&root)
-                .unwrap_or(file_path)
-                .to_string_lossy()
-                .to_string();
+            let display_path = crate::workspace_relative_display(file_path, &root);
 
             for (i, line) in content.lines().enumerate() {
                 if matches.len() >= max_results {
@@ -354,11 +350,7 @@ impl SearchEngine for RipgrepSearchEngine {
             stats.input_bytes += metadata.len();
             stats.files_searched += 1;
 
-            let display_path = file_path
-                .strip_prefix(&root)
-                .unwrap_or(file_path)
-                .to_string_lossy()
-                .to_string();
+            let display_path = crate::workspace_relative_display(file_path, &root);
 
             let matches_ref = Arc::clone(&matches);
             let max_results_ref = Arc::clone(&max_results);

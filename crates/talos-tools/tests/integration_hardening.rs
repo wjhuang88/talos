@@ -5,10 +5,14 @@
 //! 2. Resource limits (e.g. `RLIMIT_CORE`) are **active** in the child.
 //! 3. The parent process is **not** affected by child-side hardening.
 
+#[cfg(unix)]
 use std::env;
+#[cfg(unix)]
 use std::path::PathBuf;
 
+#[cfg(unix)]
 use talos_core::tool::AgentTool;
+#[cfg(unix)]
 use talos_tools::BashTool;
 
 /// Test that `LD_PRELOAD` set in the parent is NOT visible in the child.

@@ -450,7 +450,8 @@ Talos 自带一组面向编码 Agent 工作流的工具：
 - Git：`git_status`、`git_diff`、`git_log`、`git_show`、`git_branch_list`、`git_add`、`git_commit`、`git_push`、`git_pull`、`git_checkout`
 - 网络：`fetch_url`（有边界的 URL 上下文读取 — 公开页面、HTML 提取、JSON）、`http_request`（按需披露的高级 HTTP/API 检查 — 自定义方法/请求头/请求体，通过 continuation 触发）、`save_url`（下载 URL 到本地文件 — 网络+写入双重权限）、`web_search`
 - 图片读取：`read_image`（模型主动调用的图片读取工具，仅面向支持图片输入的模型；通过共享安全校验模块验证 PNG/JPEG/GIF/WebP；精确路径授权；返回安全摘要和一次性 provider continuation artifact（ADR-051）；仅当当前模型 catalog 元数据确认 `image_input = true` 时才呈现给模型）
-- Shell 兜底：`bash`
+- Shell 兜底：Unix 使用 `bash`（通过 `sh -c`），Windows 使用 `powershell`
+  （通过 `powershell.exe -NoProfile -NonInteractive`）；两者都经过执行权限管线
 
 默认提示词会要求模型优先使用内置工具，只有在原生工具无法覆盖任务时才使用 Shell 命令兜底。
 它也强调准确性优先于迎合：不能奉承、编造引用，证据不足时不能隐藏不确定性。

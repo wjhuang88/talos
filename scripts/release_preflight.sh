@@ -2,7 +2,7 @@
 set -euo pipefail
 
 tag_name="${1:-}"
-workspace_version="$(sed -n '/^\[workspace.package\]/,/^\[/p' Cargo.toml | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1)"
+workspace_version="$(sed -n '/^\[workspace.package\]/,/^\[/p' Cargo.toml | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1 | tr -d '\r')"
 
 if [[ -z "${workspace_version}" ]]; then
   echo "release preflight: unable to read workspace version" >&2

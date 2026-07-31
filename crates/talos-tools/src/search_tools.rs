@@ -280,11 +280,7 @@ impl GlobTool {
         {
             let path =
                 entry.map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
-            let display_path = path
-                .strip_prefix(&canonical_root)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .to_string();
+            let display_path = crate::workspace_relative_display(&path, &canonical_root);
             paths.push(display_path);
         }
 
