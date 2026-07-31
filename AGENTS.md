@@ -125,6 +125,9 @@ These are immutable facts that every change must respect:
 4. **Never commit secrets.** Check for API keys, tokens, passwords.
 5. **Never force-push to main.**
 6. **Commit messages reference iteration/story IDs** when applicable: `feat(agent): implement turn loop (#I1-S3)`
+7. **Claim before implementation.** Follow `docs/sop/AGENT-COLLABORATION.md`. Under PR-based
+   development, the governance claim PR must be merged before the implementation branch is created
+   or implementation changes are committed or pushed. An open claim PR does not reserve the task.
 
 ### Standard Build And Release Flow
 
@@ -145,6 +148,7 @@ All agents follow this sequence for compile, merge, and release work:
 | Task Type | Route To |
 |-----------|----------|
 | "I want to add a new feature" | `docs/sop/REQUIREMENT-INTAKE.md` → `docs/sop/NEW-FEATURE.md` |
+| "Claim a GitHub Issue, claim an existing task, or coordinate work between agents" | `docs/sop/AGENT-COLLABORATION.md` |
 | "Start the next iteration" | `docs/sop/START-ITERATION.md` |
 | "How do I implement during an iteration?" | `docs/sop/ITERATION-WORKFLOW.md` |
 | "A requirement changed mid-iteration" | `docs/sop/CHANGE-CONTROL.md` |
