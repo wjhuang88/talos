@@ -6,8 +6,9 @@ Define the process for beginning a new development iteration from the product ba
 
 ## Prerequisites
 
-- A product backlog with ready stories exists at `docs/backlog/PRODUCT-BACKLOG.md`
-- The implementation roadmap exists at `docs/roadmap/IMPLEMENTATION-ROADMAP.md`
+- A product backlog with ready Stories exists at `docs/backlog/PRODUCT-BACKLOG.md`.
+- The implementation roadmap exists at `docs/roadmap/IMPLEMENTATION-ROADMAP.md`.
+- `docs/sop/AGENT-COLLABORATION.md` has been applied to the selected Work Slice.
 
 ## Process
 
@@ -15,67 +16,79 @@ Define the process for beginning a new development iteration from the product ba
 
 Before selecting new work, check `docs/iterations/` for:
 
-- **Active** iterations — must be completed or explicitly paused first
-- **Review** iterations — must pass verification before starting new work
-- **Planned** iterations — activate, defer, or continue blocking
-- **Blocked** iterations — resolve or explicitly continue blocking
+- **Active** iterations — complete or explicitly pause first;
+- **Review** iterations — verify or explicitly retain in Review;
+- **Planned** iterations — activate, defer, block, or supersede;
+- **Blocked** iterations — resolve or explicitly continue blocking.
 
 Do not bypass unresolved iterations to start fresh work.
 
-Record the inventory and disposition in `docs/iterations/README.md` or the activation record. A
-`Planned` item must be activated, explicitly deferred, kept blocked with its blocker, or marked
-superseded before unrelated backlog work is selected.
+Record inventory and disposition in `docs/iterations/README.md` or the activation record. A Planned
+item must be activated, deferred, kept blocked with its blocker, or superseded before unrelated work
+is selected.
 
 ### 2. Select Stories
 
 1. Review the implementation roadmap for the current phase.
-2. Select stories from the backlog that:
-   - Are in "Ready" status
-   - Have all dependencies met
-   - Fit within the iteration timebox (typically 2-3 weeks)
-3. Prioritize by: dependency order, risk reduction, user value.
+2. Select Stories that:
+   - are Ready;
+   - have dependencies met;
+   - fit the timebox;
+   - produce a runnable, testable deliverable.
+3. Prioritize dependency order, risk reduction, then user value.
+4. Confirm no overlapping effective claimant or open implementation PR owns the same Work Slice.
 
 ### 3. Create Iteration Plan
 
-Create `docs/iterations/I{NNN}-{slug}.md` with:
+Create `docs/iterations/I{NNN}-{slug}.md` from `docs/iterations/TEMPLATE.md`.
 
-```markdown
-# Iteration I{NNN}: {Title}
+The committed plan preserves:
 
-> Document status: Planned
-> Published plan date: YYYY-MM-DD
-> Planned objective: ...
-> Baseline rule: preserve this target; changed targets use a new iteration ID.
-> MVP deliverable: the runnable/testable result produced by this iteration.
+- selected Stories and parent relationship;
+- dependencies and execution order;
+- scope and non-goals;
+- acceptance and planned validation;
+- risks and rollback assumptions;
+- user-facing documentation targets.
 
-## Published Baseline
-- Selected ready Stories and parent relationship
-- Dependencies and execution order
-- Scope and explicit non-goals
-- Acceptance and planned validation
-- Risks and rollback assumptions
-- User-facing documentation to update
+Do not replace a committed plan with a newer objective.
 
-## Actual Activation And Execution
-| Date | Type | Record |
-|---|---|---|
-```
+### 4. Establish The Collaboration Claim
 
-Use `docs/iterations/TEMPLATE.md`; do not replace a committed plan with a newer objective.
+Before activation:
 
-### 4. Begin Work
+1. Create or update the iteration Collaboration Claim.
+2. Record one bounded Work Slice and one Responsible Actor.
+3. Use the Draft-PR number backfill sequence from `AGENT-COLLABORATION.md`.
+4. Run both governance validators and exact-head CI.
+5. Repeat the merge-time CAS check immediately before claim merge.
+6. Use an allowed independent-review, single-maintainer, direct-commit, or emergency authorization
+   path.
 
-- Mark selected stories as "In Progress" in the backlog.
-- Follow `ITERATION-WORKFLOW.md` for daily execution.
+An effective Collaboration Claim exists only when the finalized Claimed record is on the target
+branch. `Claim Pending` is never stored in the iteration owner.
+
+### 5. Activate And Begin Work
+
+After the effective claim exists:
+
+- refresh the target branch;
+- create the implementation branch from the claim merge commit or a later target commit;
+- mark selected Stories In Progress and the iteration Active;
+- append the activation date, claim PR/commit, authorization, dependency inventory, and merge-time
+  CAS result;
+- follow `ITERATION-WORKFLOW.md`.
 
 ## Rules
 
 - One active iteration at a time unless explicitly approved.
-- Iteration scope changes require `CHANGE-CONTROL.md`.
-- Record results by appending to the iteration file, not overwriting the plan.
-- Before marking an iteration Complete, first commit and push the implementation/evidence, then
-  append `Completion Commit: <SHA>` to the iteration owner. A status-only commit cannot cite
-  itself. Missing SHA evidence means the iteration remains Review, Partial, or Blocked.
-- Select ready child Stories, not a multi-stage parent Epic with unresolved children.
-- The selected set must produce a runnable, testable deliverable. If it cannot, refine the slice
-  or record an explicit infrastructure-only exception.
+- Parallel non-overlapping work uses separately owned child iterations/Stories, not multiple active
+  claim records in one owner.
+- Scope changes require `CHANGE-CONTROL.md`.
+- Record execution by appending; do not overwrite the published baseline.
+- Before Complete, commit/push implementation evidence, then append
+  `Completion Commit: <SHA>`. A status-only commit cannot cite itself.
+- Missing completion evidence keeps the iteration Review, Partial, or Blocked.
+- Select ready child Stories, not an unresolved Epic parent.
+- Bounded-maintenance and emergency exceptions follow `AGENT-COLLABORATION.md` and must not be used
+  to silently activate an iteration.
