@@ -167,6 +167,20 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// The actor accepted a non-user submission and exposed its bounded,
+    /// model-visible item projection so a product bridge can adopt the turn.
+    ExternalSubmissionQueued {
+        /// Session that accepted the external submission.
+        session_id: String,
+        /// Opaque producer-assigned submission identity.
+        submission_id: String,
+        /// Sender generation echoed from the accepted submission.
+        sender_generation: u64,
+        /// External source used for arbitration and diagnostics.
+        source: SubmissionSource,
+        /// Original item texts in FIFO order. Submission limits bound this data.
+        item_texts: Vec<String>,
+    },
     /// The actor accepted ownership of one structured submission from the SQ.
     SubmissionQueued {
         /// Session that accepted the submission.
@@ -437,6 +451,13 @@ mod tests {
     #[test]
     fn session_event_serde_roundtrip() {
         let events = vec![
+            SessionEvent::ExternalSubmissionQueued {
+                session_id: "session_1".into(),
+                submission_id: "scheduler_1".into(),
+                sender_generation: 0,
+                source: SubmissionSource::Scheduler,
+                item_texts: vec!["[scheduled-followup] check".into()],
+            },
             SessionEvent::SubmissionQueued {
                 session_id: "session_1".into(),
                 submission_id: "batch_1".into(),
