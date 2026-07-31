@@ -4,11 +4,11 @@
 | --- | --- |
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
-| Priority | P2 |
-| Status | Refinement — pending design and iteration selection |
-| Source | Maintainer request 2026-07-27 |
+| Priority | P1 |
+| Status | Ready — first implementation candidate after I158 disposition |
+| Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; GitHub Issue #104 |
 | Parent Epic | None |
-| Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054 |
+| Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 disposition before activation |
 | Blocks | None |
 
 ## Identity / Goal / Value
@@ -17,6 +17,19 @@ When the local Dashboard becomes available, show one concise Dashboard line in
 the display-only Logo region instead of the generic tips row. Its URL should be
 clickable in terminals that support hyperlinks, making the Dashboard reachable
 without copying an address manually.
+
+## Priority And Sequencing
+
+The maintainer raised this story from P2 to P1 on 2026-07-31.
+
+- I158 remains the sole Active implementation iteration. Do not stack this UI
+  change onto the active tool-registration composition branches or PRs.
+- After I158 reaches a formal Complete or Paused disposition, TUI-037 is the
+  first implementation candidate to select into a new iteration.
+- Select TUI-037 before activating I159-I162 unless the maintainer explicitly
+  changes the order after a fresh repository and dependency inventory.
+- GitHub Issue #104 is the remote execution tracker; this owner document remains
+  authoritative for scope, acceptance, and status.
 
 ## Scope
 
@@ -37,6 +50,18 @@ without copying an address manually.
   lifecycle, hyperlink escape safety, and click/fallback behavior in at least
   the real-terminal matrix named by the story.
 
+## Planned Implementation Slices
+
+1. Introduce or reuse structured, token-free Dashboard availability metadata at
+   the CLI-to-TUI boundary without making the URL a transcript fact.
+2. Project one bounded Dashboard row as part of the existing ADR-054 Logo
+   virtual-history prefix and remove the Dashboard-ready message from generic
+   info tips.
+3. Add OSC 8 hyperlink emission at the terminal rendering boundary with strict
+   target sanitization and a complete visible URL fallback.
+4. Add focused state/projection/full-frame tests, locked workspace validation,
+   documentation updates, and rebuilt-binary terminal acceptance.
+
 ## Exclusions
 
 - No Dashboard route, data model, authentication, bind-address, or remote
@@ -47,6 +72,7 @@ without copying an address manually.
   or OSC 8 hyperlink targets.
 - No change to normal TipsComponent behavior other than removing the dashboard
   availability notice from it.
+- No I159-I162 implementation or v0.6 release action in the TUI-037 slice.
 
 ## Decision Links And Constraints
 
@@ -59,21 +85,32 @@ without copying an address manually.
   enum, create the required compatibility/decision record before implementation
   rather than extending the protocol implicitly.
 
-## Uncertainty And Validation Path
+## Hyperlink And Safe-Fallback Policy
 
-Confirm the exact `crossterm`/`ratatui` hyperlink capability and terminal
-compatibility before marking Ready. The fallback URL is mandatory; OSC 8 click
-activation is validated manually in Alacritty, Kitty or WezTerm, macOS Terminal
-or iTerm2, and tmux. For authenticated non-loopback Dashboard configurations,
-the story must establish a usable non-secret navigation URL or explicitly omit
-the click target rather than exposing the token.
+- A loopback Dashboard URL may be rendered as an OSC 8 target only after it is
+  verified to contain no userinfo, bearer token, credential, session secret, or
+  secret query parameter.
+- The visible text always contains a complete copyable token-free URL; OSC 8 is
+  an enhancement, not the only navigation path.
+- If a terminal/backend cannot safely preserve OSC 8 sequences, render plain
+  text without emitting a partial or malformed escape sequence.
+- For authenticated non-loopback configurations, emit a clickable target only
+  when a usable non-secret URL is available. Otherwise render a non-clickable
+  `Dashboard available — see terminal output` fallback and never expose or
+  embed the token.
+- Manual acceptance covers Alacritty, Kitty or WezTerm, macOS Terminal or
+  iTerm2, and tmux, recording hyperlink activation or the plain-text fallback
+  for each environment.
 
 ## State / Status Owners
 
 - Dashboard startup and safe availability metadata: `talos-cli` / Dashboard
   boundary.
 - Logo-prefix projection and hyperlink rendering: `talos-tui`.
-- Story status: this document; iteration selection is a future owner.
+- Remote execution tracking: GitHub Issue #104.
+- Story priority, scope, acceptance, and status: this document.
+- A new iteration owner is created only after I158 has a formal disposition and
+  the activation inventory confirms no conflicting Active iteration.
 
 ## User-Facing Documentation
 
@@ -90,6 +127,7 @@ the click target rather than exposing the token.
 - `docs/backlog/active/TUI-035-narrow-viewport-and-resize-rendering-robustness.md`
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`
+- `docs/iterations/I158-tool-registration-composition.md`
 - `crates/talos-cli/src/mode_runners.rs`
 - `crates/talos-tui/src/app.rs`
 - `crates/talos-tui/src/splash.rs`
@@ -114,13 +152,14 @@ the click target rather than exposing the token.
   normal error tip and no misleading clickable Logo link appears.
 - Given an authenticated non-loopback Dashboard configuration, when no
   non-secret usable URL is available, then no token is displayed or embedded in
-  a hyperlink target and the chosen fallback is documented.
+  a hyperlink target and the documented non-clickable fallback is shown.
 - Unit/full-frame tests and the specified real-terminal hyperlink matrix pass;
   `cargo test --workspace --locked` passes.
 
 ## Residuals
 
-- OSC 8 support and the safe authenticated-Dashboard navigation behavior must
-  be resolved before this story becomes Ready.
-- Selection requires an explicitly sequenced future iteration; it is not
-  selected automatically by I156/TUI-035 completion.
+- Implementation has not started; the exact public/internal event shape remains
+  an implementation decision constrained by the existing compatibility rules.
+- Activation waits for I158 Complete or Paused disposition and a fresh inventory.
+- I159-I162 retain their published baselines but are sequenced after TUI-037 by
+  the 2026-07-31 maintainer priority decision unless explicitly reordered.
