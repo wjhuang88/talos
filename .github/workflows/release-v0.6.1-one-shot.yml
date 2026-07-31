@@ -1,0 +1,533 @@
+name: Release v0.6.1 (one shot)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-v0.6.1-one-shot.yml'
+
+concurrency:
+  group: release-v0.6.1-one-shot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_VERSION: 0.6.1
+  RELEASE_TAG: v0.6.1
+  PREVIOUS_VERSION: 0.6.0
+  PREVIOUS_TAG: v0.6.0
+  ONE_SHOT_WORKFLOW: .github/workflows/release-v0.6.1-one-shot.yml
+
+jobs:
+  prepare:
+    name: Prepare and tag v0.6.1
+    runs-on: macos-14
+    outputs:
+      release_sha: ${{ steps.commit.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify release boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          current_version="$(sed -n '/^\[workspace.package\]/,/^\[/p' Cargo.toml | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1)"
+          test "$current_version" = "$PREVIOUS_VERSION"
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release tag already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
+      - name: Synchronize release version and public surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          old = os.environ["PREVIOUS_VERSION"]
+          new = os.environ["RELEASE_VERSION"]
+          old_tag = os.environ["PREVIOUS_TAG"]
+          new_tag = os.environ["RELEASE_TAG"]
+
+          root = Path("Cargo.toml")
+          text = root.read_text()
+          pattern = re.compile(r'(?ms)(^\[workspace\.package\]\n.*?^version = ")' + re.escape(old) + r'(")')
+          text, count = pattern.subn(r'\g<1>' + new + r'\2', text, count=1)
+          if count != 1:
+              raise SystemExit("unable to update [workspace.package] version")
+          root.write_text(text)
+
+          manifest_updates = 0
+          for path in sorted(Path("crates").glob("talos-*/Cargo.toml")):
+              text = path.read_text()
+              updated, count = re.subn(
+                  r'(version\s*=\s*")' + re.escape(old) + r'(")',
+                  r'\g<1>' + new + r'\2',
+                  text,
+              )
+              if count:
+                  path.write_text(updated)
+                  manifest_updates += count
+          if manifest_updates == 0:
+              raise SystemExit("no internal Cargo dependency versions were updated")
+
+          lock = Path("Cargo.lock")
+          lock_text = lock.read_text()
+          blocks = re.split(r'(?=^\[\[package\]\]\n)', lock_text, flags=re.MULTILINE)
+          lock_updates = 0
+          for index, block in enumerate(blocks):
+              if re.search(r'^name = "talos-[^"]+"$', block, flags=re.MULTILINE):
+                  block, count = re.subn(
+                      r'^version = "' + re.escape(old) + r'"$',
+                      f'version = "{new}"',
+                      block,
+                      count=1,
+                      flags=re.MULTILINE,
+                  )
+                  if count != 1:
+                      raise SystemExit("Talos Cargo.lock package is not at the expected previous version")
+                  blocks[index] = block
+                  lock_updates += 1
+          if lock_updates == 0:
+              raise SystemExit("no Talos Cargo.lock package versions were updated")
+          lock.write_text("".join(blocks))
+
+          required_surfaces = [
+              "README.md",
+              "README.zh-CN.md",
+              "site/index.html",
+              "site/zh/index.html",
+              "site/docs.html",
+              "site/zh/docs.html",
+              "site/install.html",
+              "site/zh/install.html",
+              "site/capabilities.html",
+              "site/zh/capabilities.html",
+              "site/safety.html",
+              "site/zh/safety.html",
+              "site/roadmap.html",
+              "site/zh/roadmap.html",
+              "site/releases.html",
+              "site/zh/releases.html",
+          ]
+          for name in required_surfaces:
+              path = Path(name)
+              text = path.read_text()
+              if old_tag not in text:
+                  raise SystemExit(f"required release surface does not name {old_tag}: {name}")
+              path.write_text(text.replace(old_tag, new_tag))
+
+          for name in ["site/README.md", "install/install.sh", "install/install.ps1"]:
+              path = Path(name)
+              if not path.exists():
+                  continue
+              text = path.read_text()
+              if old_tag in text:
+                  path.write_text(text.replace(old_tag, new_tag))
+
+          notes = Path(f"docs/releases/{new_tag}.md")
+          if notes.exists():
+              raise SystemExit(f"release notes already exist: {notes}")
+          notes.write_text(
+              """## Highlights
+
+1. **Transactional, source-aware tool composition.** Tool factories now carry stable contribution
+   identities, checked registration rejects collisions deterministically, and multi-tool batches
+   apply atomically across core, session, tools, CLI, and explicit local plugins.
+2. **Provider terminal-outcome integrity.** OpenAI- and Anthropic-compatible streaming paths now
+   preserve known terminal outcomes, bound diagnostics, and keep stdout/stderr ordering explicit
+   under malformed or dual-protocol responses.
+3. **Durable configuration mutation.** Provider removal and credential clearing use shared mutation
+   locking, journaled recovery, and latest-state semantic updates so stale interactive snapshots do
+   not restore deleted configuration.
+4. **Terminal interaction reliability.** Composer continuity, interrupt handling, approval contrast,
+   resize behavior, and terminal closeout received additional regression and real-terminal evidence.
+
+Talos remains pre-1.0. This patch release is a local developer product snapshot; it does not claim
+REL-002 readiness, stable 1.0 SDK guarantees, crates.io publication, or completion of the active
+v0.6 Runtime Productization Program.
+"""
+          )
+
+          workflow = Path(os.environ["ONE_SHOT_WORKFLOW"])
+          if not workflow.exists():
+              raise SystemExit("one-shot workflow is missing")
+          workflow.unlink()
+          PY
+
+      - name: Release preflight
+        shell: bash
+        run: ./scripts/release_preflight.sh "$RELEASE_TAG"
+
+      - name: Governance and diff validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/validate_project_governance.sh .
+          git diff --check
+
+      - name: Commit, push, and tag
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(release): prepare $RELEASE_TAG [model:gpt-5.6-thinking]"
+          release_sha="$(git rev-parse HEAD)"
+          git fetch origin main
+          expected_parent="$(git rev-parse HEAD^)"
+          remote_main="$(git rev-parse origin/main)"
+          if [ "$expected_parent" != "$remote_main" ]; then
+            echo "main moved during release validation; refusing non-fast-forward release" >&2
+            exit 1
+          fi
+          git push origin HEAD:main
+          git tag -a "$RELEASE_TAG" -m "Talos $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+
+  build-macos-arm:
+    name: Build macOS ARM64
+    needs: prepare
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-061-aarch64-apple-darwin
+      - name: Build
+        run: cargo build --release --locked --target aarch64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar -czf talos-aarch64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-darwin
+          path: target/aarch64-apple-darwin/release/talos-aarch64-darwin.tar.gz
+
+  build-macos-intel:
+    name: Build macOS x86_64
+    needs: prepare
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-061-x86_64-apple-darwin
+      - name: Build
+        run: cargo build --release --locked --target x86_64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-apple-darwin/release
+          tar -czf talos-x86_64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-darwin
+          path: target/x86_64-apple-darwin/release/talos-x86_64-darwin.tar.gz
+
+  build-linux-x86:
+    name: Build Linux x86_64 (musl)
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-061-x86_64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: cargo build --release --locked --target x86_64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-unknown-linux-musl/release
+          tar -czf talos-x86_64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-linux
+          path: target/x86_64-unknown-linux-musl/release/talos-x86_64-linux.tar.gz
+
+  build-linux-arm:
+    name: Build Linux ARM64 (musl)
+    needs: prepare
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-061-aarch64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_aarch64_unknown_linux_musl: musl-gcc
+        run: cargo build --release --locked --target aarch64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-unknown-linux-musl/release
+          tar -czf talos-aarch64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-linux
+          path: target/aarch64-unknown-linux-musl/release/talos-aarch64-linux.tar.gz
+
+  build-windows:
+    name: Build Windows x86_64
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-061-x86_64-pc-windows-msvc
+      - name: Build
+        run: cargo build --release --locked -p talos-cli
+      - name: Package
+        shell: pwsh
+        run: |
+          cd target/release
+          Compress-Archive -Path talos.exe -DestinationPath talos-x86_64-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-windows
+          path: target/release/talos-x86_64-windows.zip
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, build-macos-arm, build-macos-intel, build-linux-x86, build-linux-arm, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Build release body and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum talos-* > checksum.sha256
+          cd ..
+          release_url_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          raw_url_base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${RELEASE_TAG}"
+          commit_url_base="https://github.com/${GITHUB_REPOSITORY}/commit"
+          {
+            cat "docs/releases/${RELEASE_TAG}.md"
+            echo
+            echo "## Changes since \`${PREVIOUS_TAG}\`"
+            echo
+            git log --pretty=format:'%s%x09%h%x09%H' "${PREVIOUS_TAG}..${RELEASE_TAG}" |
+              sed -E 's/ \[model:[^]]+\]//g' |
+              while IFS="$(printf '\t')" read -r subject short_hash full_hash || [ -n "$subject" ]; do
+                [ -n "$subject" ] || continue
+                case "$subject" in
+                  "chore(release): add one-shot v0.6.1 automation"*) continue ;;
+                esac
+                echo "- ${subject} ([${short_hash}](${commit_url_base}/${full_hash}))"
+              done
+            echo
+            echo
+            echo "Compare: [\`${PREVIOUS_TAG}...${RELEASE_TAG}\`](https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${RELEASE_TAG})"
+            echo
+            echo "## Downloads"
+            echo
+            echo "| Platform | Architecture | File |"
+            echo "|----------|-------------|------|"
+            echo "| Linux | x86_64 | [\`talos-x86_64-linux.tar.gz\`](${release_url_base}/talos-x86_64-linux.tar.gz) |"
+            echo "| Linux | ARM64 | [\`talos-aarch64-linux.tar.gz\`](${release_url_base}/talos-aarch64-linux.tar.gz) |"
+            echo "| macOS | Apple Silicon | [\`talos-aarch64-darwin.tar.gz\`](${release_url_base}/talos-aarch64-darwin.tar.gz) |"
+            echo "| macOS | Intel | [\`talos-x86_64-darwin.tar.gz\`](${release_url_base}/talos-x86_64-darwin.tar.gz) |"
+            echo "| Windows | x86_64 | [\`talos-x86_64-windows.zip\`](${release_url_base}/talos-x86_64-windows.zip) |"
+            echo
+            echo "Checksums: [\`checksum.sha256\`](${release_url_base}/checksum.sha256)"
+            echo
+            echo "### Install"
+            echo
+            echo '```bash'
+            echo "curl -fsSL ${raw_url_base}/install/install.sh | sh"
+            echo "curl -fsSL ${raw_url_base}/install/install.sh | TALOS_VERSION=${RELEASE_TAG} sh"
+            echo '```'
+            echo
+            echo '```powershell'
+            echo "irm ${raw_url_base}/install/install.ps1 | iex"
+            echo "\$env:TALOS_VERSION = '${RELEASE_TAG}'; irm ${raw_url_base}/install/install.ps1 | iex; Remove-Item Env:TALOS_VERSION"
+            echo '```'
+          } > RELEASE_BODY.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.6.1
+          name: v0.6.1
+          fail_on_unmatched_files: true
+          body_path: RELEASE_BODY.md
+          prerelease: false
+          files: dist/*
+
+  closeout:
+    name: Record release closeout
+    needs: [prepare, release]
+    if: ${{ always() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Record immutable release evidence
+        env:
+          RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          if [ "$RELEASE_RESULT" = "success" ]; then
+            status="Complete — validated tag and GitHub Release published (2026-07-31)"
+            result_text="The one-shot GitHub workflow completed all five platform builds, generated checksums, and published the GitHub Release."
+          else
+            status="Tag pushed — GitHub Release workflow failed (2026-07-31)"
+            result_text="The release tag is immutable, but the one-shot GitHub workflow did not complete successfully. A corrective patch version is required; do not move the tag."
+          fi
+
+          cat > docs/tasks/2026-07-31-release-0.6.1-closeout.md <<EOF
+          # Release 0.6.1 Closeout
+
+          **Status**: ${status}
+
+          **Release Commit:** \`${RELEASE_SHA}\`
+
+          ## Objective
+
+          Publish \`${RELEASE_TAG}\` as a patch release after \`${PREVIOUS_TAG}\`, carrying the accepted
+          provider terminal-outcome hardening, durable configuration mutation, terminal reliability,
+          and source-aware transactional tool-composition work on \`main\`.
+
+          ## Release Boundary
+
+          - Includes commits reachable from \`main\` at \`${RELEASE_SHA}\`.
+          - Includes synchronized workspace/internal dependency versions and EN/zh-CN release surfaces.
+          - Includes five platform archives plus SHA-256 checksums.
+          - Excludes crates.io publication, stable 1.0 SDK guarantees, and any REL-002 readiness claim.
+
+          ## Validation And Publication
+
+          - \`./scripts/release_preflight.sh ${RELEASE_TAG}\` passed on macOS with Rust 1.97.0.
+          - Governance validation and \`git diff --check\` passed before the release commit.
+          - Annotated tag \`${RELEASE_TAG}\` points to \`${RELEASE_SHA}\` and was pushed without force.
+          - ${result_text}
+
+          ## Evidence
+
+          - Workflow: [${GITHUB_RUN_ID}](${workflow_url})
+          - Release: [${RELEASE_TAG}](${release_url})
+          - Release commit: [\`${RELEASE_SHA}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${RELEASE_SHA})
+
+          ## Failure Rule
+
+          If any published artifact is later found invalid, preserve \`${RELEASE_TAG}\` and publish a new
+          patch version after correcting source. Never move or force-push a release tag.
+          EOF
+
+          python3 <<'PY'
+          from pathlib import Path
+          import os
+
+          board = Path("docs/BOARD.md")
+          text = board.read_text()
+          if "| Release 0.6.1 Closeout |" not in text:
+              marker = "| Release 0.6.0 Closeout |"
+              lines = text.splitlines()
+              for index, line in enumerate(lines):
+                  if line.startswith(marker):
+                      result = os.environ["RELEASE_RESULT"]
+                      if result == "success":
+                          state = "Complete — validated tag and GitHub Release published (2026-07-31)"
+                          gate = "Annotated `v0.6.1` and all five platform archives plus checksums were published by the one-shot GitHub workflow. Talos remains pre-1.0; REL-002 remains NO-GO."
+                      else:
+                          state = "Tag pushed — release publication failed (2026-07-31)"
+                          gate = "Annotated `v0.6.1` is immutable, but publication failed; use a corrective patch version and never move the tag."
+                      row = f"| Release 0.6.1 Closeout | {state} | [release task](tasks/2026-07-31-release-0.6.1-closeout.md) / [release highlights](releases/v0.6.1.md) | {gate} |"
+                      lines.insert(index + 1, row)
+                      board.write_text("\n".join(lines) + "\n")
+                      break
+              else:
+                  raise SystemExit("Release 0.6.0 Board row not found")
+          PY
+
+      - name: Validate and commit closeout
+        env:
+          RELEASE_RESULT: ${{ needs.release.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/validate_project_governance.sh .
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/BOARD.md docs/tasks/2026-07-31-release-0.6.1-closeout.md
+          git commit -m "docs(release): close out $RELEASE_TAG [model:gpt-5.6-thinking]"
+          git push origin HEAD:main
+          if [ "$RELEASE_RESULT" != "success" ]; then
+            exit 1
+          fi
