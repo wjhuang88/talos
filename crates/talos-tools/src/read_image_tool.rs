@@ -434,13 +434,13 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn execute_authorized_rejects_symlink_retarget() {
         let dir = tempfile::tempdir().unwrap();
         let real_png = dir.path().join("real.png");
         std::fs::write(&real_png, MINIMAL_PNG).unwrap();
         let link = dir.path().join("link.png");
-        #[cfg(unix)]
         std::os::unix::fs::symlink(&real_png, &link).unwrap();
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
@@ -455,19 +455,16 @@ mod tests {
             .unwrap(),
         ];
 
-        #[cfg(unix)]
-        {
-            std::fs::remove_file(&link).unwrap();
-            std::os::unix::fs::symlink(dir.path().join("not_a_file.txt"), &link).unwrap();
-            let output = tool
-                .execute_authorized_with_output(
-                    serde_json::json!({"path": link.to_string_lossy()}),
-                    &auth,
-                )
-                .await;
-            assert!(output.result.is_error, "symlink retarget must be rejected");
-            assert!(output.next_provider_parts.is_empty());
-        }
+        std::fs::remove_file(&link).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("not_a_file.txt"), &link).unwrap();
+        let output = tool
+            .execute_authorized_with_output(
+                serde_json::json!({"path": link.to_string_lossy()}),
+                &auth,
+            )
+            .await;
+        assert!(output.result.is_error, "symlink retarget must be rejected");
+        assert!(output.next_provider_parts.is_empty());
     }
 
     #[tokio::test]
