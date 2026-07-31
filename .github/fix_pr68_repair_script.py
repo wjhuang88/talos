@@ -56,4 +56,20 @@ if modified < 4:
 '''
 if text.count(old) != 1:
     raise SystemExit('expected one structural matcher block')
-path.write_text(text.replace(old, new, 1))
+updated = text.replace(old, new, 1)
+footer_old = 'path.write_text(text)\n'
+footer_new = '''old_recurring_event = "                        let _ = fired_tx.send(task_id_for_fire.clone());\\n"
+new_recurring_event = (
+    "                        let _ = fired_tx.send(TaskFireEvent::Delivered(\\n"
+    "                            task_id_for_fire.clone(),\\n"
+    "                        ));\\n"
+)
+if text.count(old_recurring_event) != 1:
+    raise SystemExit("expected exactly one recurring fire event send")
+text = text.replace(old_recurring_event, new_recurring_event, 1)
+
+path.write_text(text)
+'''
+if updated.count(footer_old) != 1:
+    raise SystemExit('expected one repair script footer')
+path.write_text(updated.replace(footer_old, footer_new, 1))
