@@ -5,8 +5,25 @@
 > Baseline commit: `2bb2b6185f2f9ca35af269efa63c618076f4a32e`
 > Branch mode: I168 implementation PR #63 merged to `main`; maintainer-authorized closeout used PR #67;
 > reassess release-managed/on-demand worktree mode before I158
-> Current implementation authority: none; ADR-053 review is next and I158 remains blocked
+> Current implementation authority: I158 / ARCH-034-R01; TUI-037 is queued for post-I158 disposition
 > Program owner: `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-07-31 |
+| Handoff / Release Condition | None |
 
 ## Outcome
 
@@ -64,6 +81,17 @@ window.
 Dates are forecasts. A package starts only after its dependency owner records the gate as
 satisfied. Finishing early does not authorize pulling a blocked package forward.
 
+## Maintainer Sequence Variance — 2026-07-31
+
+The capacity table and P3-P6 published baselines remain historical planning truth. The maintainer
+inserted one disposition gate after P2/I158 and before P3/I159:
+
+- TUI-037 is raised to P1 and must be dispositioned immediately after I158 reaches Complete or Paused.
+- Because TUI-037 remains Refinement, close OSC 8 and token-required loopback navigation design gates before implementation.
+- Select a dedicated TUI iteration if those gates close; otherwise record explicit Blocked/Deferred disposition.
+- P3/I159 may activate only after that disposition. I159-I162 scope and acceptance remain unchanged.
+- Do not stack TUI-037 work onto I158 branches or PRs.
+
 ## Ordered Task Items
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
@@ -73,6 +101,7 @@ satisfied. Finishing early does not authorize pulling a blocked package forward.
 | U1 | Execute I168 / RUNTIME-003 P0 terminal-outcome correction | Unknown/missing provider terminal signals cannot become normal success; MaxTokens is explicit; bounded terminal cause survives interactive TLOG outside transcript/model/export | Explicit maintainer resumption; P1 Complete; no competing Active/Review iteration | I168 acceptance, two-protocol fixture matrix, TLOG round trip/compaction/exclusion, canonical bridge tests, rebuilt-binary evidence, full locked validation | Stop on public break/ADR-042 conflict; do not degrade to intent heuristics or silently fold into OBS-002 | Complete — `86262d02`; 2681 tests and reviewed dual-protocol policy/ordering fixture pass |
 | G1 | Review ADR-053 and ARCH-034-R01 readiness | Explicit accepted/rejected/revision-required decision and synchronized story state | P1 Complete | ADR-053 Accepted and ARCH-034-R01 Ready before I158 activation | Select a reserve packet through a new iteration; never implement I158 around the gate | Planned |
 | P2 | Execute I158 / ARCH-034-R01 | Explicit contribution contract, deterministic collisions, equivalent tool sets/wrappers across modes | G1 passed | I158 acceptance and full equivalence/runtime evidence | Block and use reserve queue if ADR or API contract remains unresolved | Blocked |
+| UX1 | Disposition TUI-037 / Dashboard Logo Link | P1 post-I158 decision: resolve design gates and select a dedicated iteration, or explicitly record Blocked/Deferred | P2 reaches Complete or Paused | TUI-037 owner, iteration index, program/package, backlog, Board, and Issue #104 synchronized; no implementation from Refinement | Keep TUI-037 Refinement and Blocked/Deferred; do not silently skip to P3 | Planned |
 | P3 | Execute I159 / ARCH-031-A | Optional dependencies and gated modules/re-exports with a lightweight read-only boundary | P2 Complete | Feature/build matrix and unchanged CLI product behavior | Keep existing default intact and record unsupported feature split | Blocked |
 | P4 | Execute I160 / ARCH-031-B | One shared internal composition implementation with separate CLI/runtime entrypoints | P3 Complete | Cross-entrypoint equivalence and dependency-direction checks | Preserve previous builders until equivalence passes | Blocked |
 | G2 | Schedule I161 independent security review | Named reviewer, review packet, threat model, evidence commands | P4 approaching completion | Reviewer and acceptance protocol recorded before I161 activation | Pause mainline and use reserve queue | Planned |
@@ -264,3 +293,11 @@ Next task item:
 
 Recovery or resume instruction:
 - do not activate I158 until ADR-053 is explicitly Accepted and normal activation inventory is repeated.
+
+
+## TUI-037 Reprioritization Checkpoint — 2026-07-31
+
+- I158 remains the sole Active implementation iteration.
+- TUI-037 is P1 but remains Refinement with Issue #104 and an Unclaimed Collaboration Claim.
+- After I158 Complete or Paused, resolve its design gates and select a dedicated iteration or explicitly record Blocked/Deferred before I159.
+- I159-I162 retain their published baselines and remain Blocked.
