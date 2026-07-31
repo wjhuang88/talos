@@ -1273,6 +1273,7 @@ impl ConversationEngine {
         Some(StructuredSubmission {
             id,
             source: SubmissionSource::User,
+            sender_generation: 0,
             items,
         })
     }

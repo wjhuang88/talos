@@ -89,6 +89,7 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
+const REQUEST_OUTPUT_RESERVE_TOKENS: u32 = 4096;
 
 #[derive(Debug, Clone)]
 struct PendingToolCall {
@@ -118,6 +119,15 @@ pub enum AgentError {
     /// The turn exceeds the maximum allowed tool call budget.
     #[error("turn budget exceeded: maximum of {MAX_TOOL_CALLS_PER_TURN} tool calls per turn")]
     TurnBudgetExceeded,
+
+    /// The next provider request would exceed the configured model context.
+    #[error("request context budget exceeded: estimated {estimated} tokens, limit {limit}")]
+    ContextBudgetExceeded {
+        /// Estimated request tokens, including tool definitions and output reserve.
+        estimated: u32,
+        /// Configured model context limit.
+        limit: u32,
+    },
 
     /// A potential doom loop was detected — the same tool was called with
     /// identical arguments multiple times in a single turn.
@@ -314,6 +324,7 @@ impl Agent {
         items: Vec<talos_core::session::SubmissionItem>,
         history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
+        request_context_limit: u32,
     ) -> (AgentResult<String>, Vec<Message>) {
         let memory_query = items
             .iter()
@@ -335,8 +346,84 @@ impl Agent {
                 }
             })
             .collect();
-        self.run_inner_with_messages(memory_query, input_messages, history, Some(event_tx))
-            .await
+        self.run_inner_with_messages(
+            memory_query,
+            input_messages,
+            history,
+            Some(event_tx),
+            Some(request_context_limit),
+        )
+        .await
+    }
+
+    /// Estimates the initial provider request produced for a structured
+    /// session submission, including dynamic prompt sections, workspace
+    /// context, native tool definitions, multimodal inputs, and an output
+    /// reserve. The session actor calls this after compaction and before it
+    /// acknowledges that a turn started.
+    pub(crate) async fn estimate_session_request_tokens(
+        &self,
+        items: &[talos_core::session::SubmissionItem],
+        history: Vec<Message>,
+    ) -> AgentResult<u32> {
+        let memory_query = items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let hook_ctx = HookContext::new(TurnId::new(), self.workspace_root.clone());
+        let (mut messages, _) = self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await?;
+        messages.pop();
+        messages.extend(items.iter().map(|item| {
+            if item.attachments.is_empty() {
+                Message::User {
+                    content: item.text.clone(),
+                }
+            } else {
+                let mut parts = Vec::with_capacity(item.attachments.len() + 1);
+                if !item.text.is_empty() {
+                    parts.push(talos_core::message::ContentPart::Text {
+                        text: item.text.clone(),
+                    });
+                }
+                parts.extend(item.attachments.clone());
+                Message::Multimodal { parts }
+            }
+        }));
+
+        let (_, mut tool_definitions, _) =
+            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
+        if !self.image_input_supported {
+            tool_definitions.retain(|definition| definition.name != "read_image");
+        }
+        Ok(Self::estimate_provider_request_tokens(
+            &messages,
+            &tool_definitions,
+        ))
+    }
+
+    fn estimate_provider_request_tokens(
+        messages: &[Message],
+        tool_definitions: &[talos_core::provider::ToolDefinition],
+    ) -> u32 {
+        let tool_tokens = tool_definitions.iter().fold(0_u32, |total, definition| {
+            total
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.name,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.description,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.parameters.to_string(),
+                ))
+        });
+        crate::token::TokenEstimator::new()
+            .estimate(messages)
+            .saturating_add(tool_tokens)
+            .saturating_add(REQUEST_OUTPUT_RESERVE_TOKENS)
     }
 
     /// Builds a provider request preview without calling the provider.
@@ -497,7 +584,7 @@ impl Agent {
                 content: user_message.clone(),
             }]
         };
-        self.run_inner_with_messages(user_message, input_messages, history, event_tx)
+        self.run_inner_with_messages(user_message, input_messages, history, event_tx, None)
             .await
     }
 
@@ -507,6 +594,7 @@ impl Agent {
         input_messages: Vec<Message>,
         history: Vec<Message>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        request_context_limit: Option<u32>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
@@ -610,6 +698,19 @@ impl Agent {
                 continuation_overlay = msgs;
                 continuation_overlay.as_slice()
             };
+
+            if let Some(limit) = request_context_limit {
+                let estimated = Self::estimate_provider_request_tokens(
+                    provider_messages,
+                    &active_tool_definitions,
+                );
+                if estimated > limit {
+                    break 'turn_loop (
+                        Err(AgentError::ContextBudgetExceeded { estimated, limit }),
+                        TurnStatus::Denied,
+                    );
+                }
+            }
 
             let mut rx = match self
                 .provider

@@ -132,6 +132,31 @@ impl LanguageModel for CapturingModel {
     }
 }
 
+struct CapturingSequenceModel {
+    captured: Arc<Mutex<Vec<Vec<Message>>>>,
+    responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+}
+
+#[async_trait]
+impl LanguageModel for CapturingSequenceModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured.lock().unwrap().push(messages.to_vec());
+        let events = self
+            .responses
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_default();
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            for event in events {
+                let _ = tx.send(event).await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
 fn make_agent(model: impl LanguageModel + 'static) -> Agent {
     #[allow(deprecated)]
     Agent::new(Arc::new(model), ToolRegistry::new())
@@ -167,6 +192,76 @@ async fn collect_events(
     events
 }
 
+fn structured_submission(
+    id: &str,
+    item_id: &str,
+    sender_generation: u64,
+    text: &str,
+    source: SubmissionSource,
+) -> StructuredSubmission {
+    StructuredSubmission {
+        id: id.into(),
+        source,
+        sender_generation,
+        items: vec![SubmissionItem {
+            id: item_id.into(),
+            enqueue_sequence: sender_generation,
+            kind: SubmissionKind::UserTurn,
+            text: text.into(),
+            attachments: Vec::new(),
+        }],
+    }
+}
+
+#[test]
+fn structured_submission_rejects_unbounded_image_metadata() {
+    let images = (0..=MAX_SUBMISSION_IMAGE_COUNT)
+        .map(|index| talos_core::message::ContentPart::Image {
+            path: std::path::PathBuf::from(format!("image_{index}.png")),
+            mime: "image/png".into(),
+            byte_count: 1,
+            content_digest: talos_core::message::ContentDigest::default(),
+        })
+        .collect();
+    let submission = StructuredSubmission {
+        id: "image_batch".into(),
+        source: SubmissionSource::User,
+        sender_generation: 1,
+        items: vec![SubmissionItem {
+            id: "image_item".into(),
+            enqueue_sequence: 1,
+            kind: SubmissionKind::UserTurn,
+            text: "images".into(),
+            attachments: images,
+        }],
+    };
+
+    assert_eq!(
+        validate_submission(&submission),
+        Err(SubmissionRejectionReason::LimitExceeded)
+    );
+}
+
+async fn collect_until_completions(
+    eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    completion_count: usize,
+) -> Vec<SessionEvent> {
+    let mut events = Vec::new();
+    while events
+        .iter()
+        .filter(|event| completed_status(event).is_some())
+        .count()
+        < completion_count
+    {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("turn completion event timeout")
+            .expect("session event channel closed before completion");
+        events.push(event);
+    }
+    events
+}
+
 #[tokio::test]
 async fn test_submit_and_receive() {
     let agent = make_agent(MockModel::new(vec![success_events("hello")]));
@@ -178,7 +273,7 @@ async fn test_submit_and_receive() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -190,10 +285,9 @@ async fn test_submit_and_receive() {
         .await
         .unwrap();
 
+    let events = collect_until_completions(&mut eq_rx, 1).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
     assert!(
         events.iter().any(is_turn_started),
@@ -223,7 +317,7 @@ async fn set_skill_context_reaches_request_preview() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
     let actor_task = tokio::spawn(async move { actor.run().await });
 
@@ -240,10 +334,9 @@ async fn set_skill_context_reaches_request_preview() {
         })
         .await
         .unwrap();
+    let events = collect_until_completions(&mut eq_rx, 1).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
     let preview_text = events
         .iter()
         .find_map(|event| match progress_event(event) {
@@ -270,7 +363,7 @@ async fn test_multi_turn() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -289,10 +382,9 @@ async fn test_multi_turn() {
         .await
         .unwrap();
 
+    let events = collect_until_completions(&mut eq_rx, 2).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
     let turn_started_count = events.iter().filter(|e| is_turn_started(e)).count();
     assert_eq!(turn_started_count, 2, "Should have 2 TurnStarted events");
@@ -326,7 +418,7 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     let sq_tx = handle.sq_tx;
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -334,6 +426,7 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
             submission: StructuredSubmission {
                 id: "batch_a".into(),
                 source: SubmissionSource::User,
+                sender_generation: 7,
                 items: vec![
                     SubmissionItem {
                         id: "item_a".into(),
@@ -354,8 +447,12 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
         })
         .await
         .unwrap();
+    let mut events = collect_until_completions(&mut eq_rx, 1).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
+    while let Ok(event) = eq_rx.try_recv() {
+        events.push(event);
+    }
 
     let requests = captured.lock().unwrap();
     let users = requests[0]
@@ -368,7 +465,6 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
     assert_eq!(users, vec!["first", "second"]);
     drop(requests);
 
-    let events = collect_events(eq_rx, Duration::from_millis(50)).await;
     assert!(events.iter().any(|event| matches!(
         event,
         SessionEvent::SubmissionQueued { submission_id, .. } if submission_id == "batch_a"
@@ -377,6 +473,312 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
         event,
         SessionEvent::SubmissionStarted { submission_id, .. } if submission_id == "batch_a"
     )));
+}
+
+#[tokio::test]
+async fn duplicate_submission_and_item_identity_execute_at_most_once() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+    let submission = structured_submission(
+        "duplicate_batch",
+        "duplicate_item",
+        11,
+        "once",
+        SubmissionSource::User,
+    );
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: submission.clone(),
+        })
+        .await
+        .unwrap();
+    sq_tx
+        .send(SessionOp::SubmitStructured { submission })
+        .await
+        .unwrap();
+
+    let mut events = collect_until_completions(&mut eq_rx, 1).await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    while let Ok(event) = eq_rx.try_recv() {
+        events.push(event);
+    }
+
+    assert_eq!(captured.lock().unwrap().len(), 1);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionRejected {
+            submission_id,
+            sender_generation: 11,
+            reason: SubmissionRejectionReason::Duplicate,
+            ..
+        } if submission_id == "duplicate_batch"
+    )));
+}
+
+#[tokio::test]
+async fn closed_eq_never_transfers_submission_ownership_to_actor_queue() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    drop(handle.eq_rx);
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "lost_ack_batch",
+                "lost_ack_item",
+                12,
+                "must not run",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+    tokio::task::yield_now().await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    assert!(captured.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn context_budget_rejects_before_submission_started() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 64,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "over_budget_batch",
+                "over_budget_item",
+                13,
+                "request",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+
+    let mut events = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("budget rejection timeout")
+            .expect("session event channel");
+        let rejected = matches!(
+            event,
+            SessionEvent::SubmissionRejected {
+                reason: SubmissionRejectionReason::ContextBudgetExceeded,
+                ..
+            }
+        );
+        events.push(event);
+        if rejected {
+            break;
+        }
+    }
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, SessionEvent::SubmissionStarted { .. }))
+    );
+    assert!(captured.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
+    let agent = make_agent(SlowModel {
+        delay: Duration::from_secs(30),
+        events: success_events("too late"),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    for batch in 0..=4_u64 {
+        let submission = StructuredSubmission {
+            id: format!("bounded_batch_{batch}"),
+            source: SubmissionSource::User,
+            sender_generation: 21,
+            items: (0..MAX_SUBMISSION_BATCH_ITEMS)
+                .map(|item| SubmissionItem {
+                    id: format!("bounded_item_{batch}_{item}"),
+                    enqueue_sequence: batch * MAX_SUBMISSION_BATCH_ITEMS as u64 + item as u64,
+                    kind: SubmissionKind::UserTurn,
+                    text: "x".into(),
+                    attachments: Vec::new(),
+                })
+                .collect(),
+        };
+        sq_tx
+            .send(SessionOp::SubmitStructured { submission })
+            .await
+            .unwrap();
+    }
+
+    let rejected = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(SessionEvent::SubmissionRejected {
+                submission_id,
+                reason: SubmissionRejectionReason::LimitExceeded,
+                ..
+            }) = eq_rx.recv().await
+            {
+                break submission_id;
+            }
+        }
+    })
+    .await
+    .expect("aggregate limit rejection");
+    assert_eq!(rejected, "bounded_batch_4");
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    let mut closed = Vec::new();
+    while let Ok(event) = eq_rx.try_recv() {
+        if let SessionEvent::SubmissionRejected {
+            submission_id,
+            reason: SubmissionRejectionReason::SessionClosed,
+            ..
+        } = event
+        {
+            closed.push(submission_id);
+        }
+    }
+    assert_eq!(closed.len(), 3, "shutdown must reject every pending batch");
+}
+
+#[tokio::test]
+async fn paused_user_submission_runs_before_retained_scheduler_work() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let responses = Arc::new(Mutex::new(VecDeque::from(vec![
+        vec![AgentEvent::Error {
+            message: "pause".into(),
+        }],
+        success_events("user resumed"),
+        success_events("scheduler resumed"),
+    ])));
+    let agent = make_agent(CapturingSequenceModel {
+        captured: captured.clone(),
+        responses,
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "failing_batch",
+                "failing_item",
+                31,
+                "fail first",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+    let _ = collect_until_completions(&mut eq_rx, 1).await;
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "scheduler_batch",
+                "scheduler_item",
+                31,
+                "scheduler retained",
+                SubmissionSource::Scheduler,
+            ),
+        })
+        .await
+        .unwrap();
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "user_batch",
+                "user_item",
+                31,
+                "user resumes",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+    let _ = collect_until_completions(&mut eq_rx, 2).await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    let calls = captured.lock().unwrap();
+    let last_users = calls
+        .iter()
+        .map(|messages| {
+            messages
+                .iter()
+                .rev()
+                .find_map(|message| match message {
+                    Message::User { content } => Some(content.as_str()),
+                    _ => None,
+                })
+                .expect("provider call has user message")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        last_users,
+        vec!["fail first", "user resumes", "scheduler retained"]
+    );
 }
 
 #[tokio::test]
@@ -403,7 +805,7 @@ async fn test_interrupt() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -690,7 +1092,7 @@ async fn test_multi_turn_with_history() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -720,10 +1122,9 @@ async fn test_multi_turn_with_history() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
+    let events = collect_until_completions(&mut eq_rx, 3).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
     let success_count = events
         .iter()
         .filter(|e| {

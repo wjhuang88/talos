@@ -117,6 +117,7 @@ fn scheduled_submission(task_id: &str, message: String) -> SessionOp {
         submission: StructuredSubmission {
             id: format!("{task_id}_fire_{sequence}"),
             source: SubmissionSource::Scheduler,
+            sender_generation: 0,
             items: vec![SubmissionItem {
                 id: format!("{task_id}_item_{sequence}"),
                 enqueue_sequence: sequence,
@@ -449,15 +450,20 @@ impl SchedulerActor {
         let handle = tokio::spawn(async move {
             tokio::time::sleep(delay).await;
 
-            if sq_tx
-                .send(scheduled_submission(&task_id_for_fire, labeled_for_fire))
-                .await
-                .is_err()
-            {
-                tracing::debug!(
-                    task_id = %task_id_for_fire,
-                    "scheduled follow-up fire: session queue closed"
-                );
+            match sq_tx.try_send(scheduled_submission(&task_id_for_fire, labeled_for_fire)) {
+                Ok(()) => {}
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!(
+                        task_id = %task_id_for_fire,
+                        "scheduled follow-up dropped: bounded session queue is full"
+                    );
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    tracing::debug!(
+                        task_id = %task_id_for_fire,
+                        "scheduled follow-up fire: session queue closed"
+                    );
+                }
             }
             let _ = fired_tx.send(task_id_for_fire);
         });
@@ -508,21 +514,27 @@ impl SchedulerActor {
             loop {
                 timer.tick().await;
 
-                if sq_tx
-                    .send(scheduled_submission(
-                        &task_id_for_fire,
-                        labeled_for_fire.clone(),
-                    ))
-                    .await
-                    .is_err()
-                {
-                    tracing::debug!(
-                        task_id = %task_id_for_fire,
-                        "recurring follow-up: session queue closed"
-                    );
-                    break;
+                match sq_tx.try_send(scheduled_submission(
+                    &task_id_for_fire,
+                    labeled_for_fire.clone(),
+                )) {
+                    Ok(()) => {
+                        let _ = fired_tx.send(task_id_for_fire.clone());
+                    }
+                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            task_id = %task_id_for_fire,
+                            "recurring follow-up coalesced: bounded session queue is full"
+                        );
+                    }
+                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                        tracing::debug!(
+                            task_id = %task_id_for_fire,
+                            "recurring follow-up: session queue closed"
+                        );
+                        break;
+                    }
                 }
-                let _ = fired_tx.send(task_id_for_fire.clone());
             }
         });
 

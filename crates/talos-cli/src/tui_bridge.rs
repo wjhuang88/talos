@@ -24,7 +24,12 @@ use talos_core::session::{
 #[derive(Debug)]
 enum BridgeTurnState {
     Idle,
-    Submitting(StructuredSubmission),
+    Submitting {
+        submission: StructuredSubmission,
+        session_id: Option<String>,
+        sender_generation: u64,
+        cancel_requested: bool,
+    },
     Running {
         session_id: String,
         turn_id: String,
@@ -46,6 +51,12 @@ impl BridgeTurnState {
     fn blocks_session_mutation(&self) -> bool {
         !matches!(self, Self::Idle)
     }
+}
+
+fn session_mutation_blocked(state: &BridgeTurnState, engine: &ConversationEngine) -> bool {
+    state.blocks_session_mutation()
+        || engine.has_steering()
+        || !engine.pending_image_attachments.is_empty()
 }
 
 pub(crate) struct ConversationLoopIo {
@@ -70,7 +81,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
         mut agent_rx,
         mut user_rx,
         ui_tx,
-        sq_tx_watch,
+        mut sq_tx_watch,
         mut model_info_watch,
         session_tx,
         runtime_skills,
@@ -83,9 +94,33 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     engine.set_model_info(&model_info_watch.borrow().clone());
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     let mut turn_state = BridgeTurnState::Idle;
+    let mut sender_generation = 0_u64;
+    let mut known_sender = sq_tx_watch.borrow().clone();
+    // Attachments supplied while constructing the conversation engine belong to
+    // the initial session sender. Attachments added later are rebound explicitly
+    // by the `/attach` path below.
+    let mut pending_attachment_generation =
+        (!engine.pending_image_attachments.is_empty()).then_some(sender_generation);
 
     loop {
         tokio::select! {
+            changed = sq_tx_watch.changed() => {
+                if changed.is_ok() {
+                    let current_sender = sq_tx_watch.borrow().clone();
+                    if !known_sender.same_channel(&current_sender) {
+                        sender_generation = sender_generation.saturating_add(1);
+                        known_sender = current_sender;
+                        if !engine.pending_image_attachments.is_empty() {
+                            engine.pending_image_attachments.clear();
+                            pending_attachment_generation = None;
+                            emit_bridge_error(
+                                &ui_tx,
+                                "pending attachments were discarded after the session sender changed",
+                            );
+                        }
+                    }
+                }
+            }
             changed = model_info_watch.changed() => {
                 if changed.is_ok() {
                     let info = model_info_watch.borrow().clone();
@@ -95,9 +130,37 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             }
             event = agent_rx.recv() => {
                 match event {
-                    Some(SessionEvent::SubmissionStarted { session_id, submission_id, turn_id }) => {
-                        let BridgeTurnState::Submitting(submission) = &turn_state else { continue; };
-                        if submission.id != submission_id { continue; }
+                    Some(SessionEvent::SubmissionQueued { session_id, submission_id, sender_generation, .. }) => {
+                        let BridgeTurnState::Submitting {
+                            submission,
+                            session_id: expected_session,
+                            sender_generation: expected_generation,
+                            ..
+                        } = &mut turn_state else { continue; };
+                        if submission.id != submission_id || *expected_generation != sender_generation {
+                            continue;
+                        }
+                        match expected_session {
+                            Some(expected) if expected != &session_id => {
+                                emit_bridge_error(&ui_tx, "ignored submission acknowledgement from another session");
+                            }
+                            Some(_) => {}
+                            None => *expected_session = Some(session_id),
+                        }
+                    }
+                    Some(SessionEvent::SubmissionStarted { session_id, submission_id, sender_generation, turn_id }) => {
+                        let BridgeTurnState::Submitting {
+                            submission,
+                            session_id: Some(expected_session),
+                            sender_generation: expected_generation,
+                            cancel_requested,
+                        } = &turn_state else { continue; };
+                        if submission.id != submission_id
+                            || expected_session != &session_id
+                            || *expected_generation != sender_generation
+                        {
+                            continue;
+                        }
                         let submission = submission.clone();
                         if !engine.commit_prepared_steering(&submission_id) { continue; }
                         for item in &submission.items {
@@ -106,49 +169,40 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             }
                         }
                         let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(engine.steering_queue_snapshot()));
-                        turn_state = BridgeTurnState::Running {
-                            session_id,
-                            turn_id,
-                            next_sequence: 0,
+                        turn_state = if *cancel_requested {
+                            BridgeTurnState::Cancelling {
+                                session_id,
+                                turn_id,
+                                next_sequence: 0,
+                            }
+                        } else {
+                            BridgeTurnState::Running {
+                                session_id,
+                                turn_id,
+                                next_sequence: 0,
+                            }
                         };
                     }
-                    Some(SessionEvent::SubmissionRejected { submission_id, .. }) => {
-                        if matches!(&turn_state, BridgeTurnState::Submitting(submission) if submission.id == submission_id) {
-                            engine.rollback_prepared_steering(&submission_id);
-                            turn_state = BridgeTurnState::PausedAfterFailure;
-                            emit_bridge_error(&ui_tx, "session rejected the queued submission; input was retained");
+                    Some(SessionEvent::SubmissionRejected { session_id, submission_id, sender_generation, .. }) => {
+                        let BridgeTurnState::Submitting {
+                            submission,
+                            session_id: expected_session,
+                            sender_generation: expected_generation,
+                            ..
+                        } = &mut turn_state else { continue; };
+                        if submission.id != submission_id || *expected_generation != sender_generation {
+                            continue;
                         }
+                        if expected_session.as_ref().is_some_and(|expected| expected != &session_id) {
+                            emit_bridge_error(&ui_tx, "ignored submission rejection from another session");
+                            continue;
+                        }
+                        *expected_session = Some(session_id);
+                        engine.rollback_prepared_steering(&submission_id);
+                        turn_state = BridgeTurnState::PausedAfterFailure;
+                        emit_bridge_error(&ui_tx, "session rejected the queued submission; input was retained");
                     }
                     Some(SessionEvent::TurnEvent { session_id, turn_id, sequence, payload }) => {
-                        if sequence == 0 && matches!(payload, TurnEventPayload::Started)
-                            && matches!(turn_state, BridgeTurnState::Idle)
-                        {
-                            turn_state = BridgeTurnState::Running {
-                                session_id: session_id.clone(),
-                                turn_id: turn_id.clone(),
-                                next_sequence: 0,
-                            };
-                        }
-                        // Compatibility window for older session producers that
-                        // do not emit SubmissionStarted. In-tree actors always
-                        // use the explicit correlation event above.
-                        if sequence == 0 && matches!(payload, TurnEventPayload::Started)
-                            && let BridgeTurnState::Submitting(submission) = &turn_state
-                        {
-                            let submission = submission.clone();
-                            if engine.commit_prepared_steering(&submission.id) {
-                                for item in &submission.items {
-                                    for output in engine.start_user_message(&item.text) {
-                                        let _ = ui_tx.send(output);
-                                    }
-                                }
-                                turn_state = BridgeTurnState::Running {
-                                    session_id: session_id.clone(),
-                                    turn_id: turn_id.clone(),
-                                    next_sequence: 0,
-                                };
-                            }
-                        }
                         let matching = match &turn_state {
                             BridgeTurnState::Running { session_id: active_session, turn_id: active_turn, next_sequence, .. }
                             | BridgeTurnState::Cancelling { session_id: active_session, turn_id: active_turn, next_sequence } => {
@@ -188,16 +242,19 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             turn_state = if success { BridgeTurnState::Idle } else { BridgeTurnState::PausedAfterFailure };
                             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(engine.steering_queue_snapshot()));
                             if success {
-                                dispatch_prepared_submission(&mut engine, &mut turn_state, &sq_tx_watch, &ui_tx).await;
+                                dispatch_prepared_submission(
+                                    &mut engine,
+                                    &mut turn_state,
+                                    &sq_tx_watch,
+                                    &mut known_sender,
+                                    &mut sender_generation,
+                                    &ui_tx,
+                                ).await;
                             }
                         }
                     }
                     Some(SessionEvent::Error { message }) => {
-                        for output in engine.handle_turn_completed(
-                            &talos_core::session::TurnCompletionStatus::Error { message },
-                        ) {
-                            let _ = ui_tx.send(output);
-                        }
+                        emit_bridge_error(&ui_tx, &message);
                     }
                     Some(_) => {}
                     None => break,
@@ -217,29 +274,35 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         return;
                                     }
                                     UiOutput::SessionNew(req) => {
-                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                        if session_mutation_blocked(&turn_state, &engine) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::New(req)); }
                                     }
                                     UiOutput::SessionResume(req) => {
-                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                        if session_mutation_blocked(&turn_state, &engine) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Resume(req)); }
                                     }
                                     UiOutput::SessionFork(req) => {
-                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                        if session_mutation_blocked(&turn_state, &engine) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Fork(req)); }
                                     }
                                     UiOutput::SessionDelete(req) => {
-                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                        if session_mutation_blocked(&turn_state, &engine) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Delete(req)); }
                                     }
                                     UiOutput::TodoCommand(req) => {
-                                        let _ = session_tx.send(SessionLifecycleRequest::Todo(req));
+                                        if session_mutation_blocked(&turn_state, &engine) {
+                                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing session state");
+                                        } else { let _ = session_tx.send(SessionLifecycleRequest::Todo(req)); }
                                     }
                                     UiOutput::ModelSwitchRequest(req) => {
+                                        if session_mutation_blocked(&turn_state, &engine) {
+                                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing models");
+                                            continue;
+                                        }
                                         if req.model_id.trim().is_empty() {
                                             let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
                                         } else {
@@ -260,6 +323,10 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         }
                                     }
                                     UiOutput::ConnectProviderRequest { provider } => {
+                                        if session_mutation_blocked(&turn_state, &engine) {
+                                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
+                                            continue;
+                                        }
                                         if provider.trim().is_empty() {
                                             let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
                                         } else {
@@ -276,15 +343,23 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         }
                                     }
                                     UiOutput::SkillCommand(req) => {
-                                        handle_skill_command(
-                                            req,
-                                            &mut engine,
-                                            &ui_tx,
-                                            &sq_tx_watch,
-                                            runtime_skills.clone(),
-                                        ).await;
+                                        if session_mutation_blocked(&turn_state, &engine) {
+                                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing skills");
+                                        } else {
+                                            handle_skill_command(
+                                                req,
+                                                &mut engine,
+                                                &ui_tx,
+                                                &sq_tx_watch,
+                                                runtime_skills.clone(),
+                                            ).await;
+                                        }
                                     }
                                     UiOutput::AttachImageRequest { path } => {
+                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing attachments");
+                                            continue;
+                                        }
                                         if !engine.image_input_capability.allows_attachment() {
                                             let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                                                 source: MessageSource::Error,
@@ -315,6 +390,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                                     _ => String::new(),
                                                 };
                                                 engine.pending_image_attachments.push(content_part);
+                                                pending_attachment_generation = Some(sender_generation);
                                                 let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                                                     source: MessageSource::System,
                                                     text: format!("[System] Attached image: {summary}\n"),
@@ -337,7 +413,16 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 Some(payload) => (SubmissionKind::PreviewRequest, payload),
                                 None => (SubmissionKind::UserTurn, msg),
                             };
+                            if !engine.pending_image_attachments.is_empty()
+                                && pending_attachment_generation != Some(sender_generation)
+                            {
+                                engine.pending_image_attachments.clear();
+                                pending_attachment_generation = None;
+                                emit_bridge_error(&ui_tx, "pending attachments belonged to a stale session sender");
+                                continue;
+                            }
                             let attachments = std::mem::take(&mut engine.pending_image_attachments);
+                            let attachment_generation = pending_attachment_generation.take();
                             let (accepted, outputs) = engine.enqueue_structured_steering(
                                 text,
                                 kind,
@@ -345,26 +430,42 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             );
                             if !accepted {
                                 engine.pending_image_attachments = attachments;
+                                pending_attachment_generation = attachment_generation;
                             }
                             for output in outputs {
                                 let _ = ui_tx.send(output);
                             }
                             if !turn_state.accepts_queued_input() {
-                                dispatch_prepared_submission(&mut engine, &mut turn_state, &sq_tx_watch, &ui_tx).await;
+                                dispatch_prepared_submission(
+                                    &mut engine,
+                                    &mut turn_state,
+                                    &sq_tx_watch,
+                                    &mut known_sender,
+                                    &mut sender_generation,
+                                    &ui_tx,
+                                ).await;
                             }
                         }
                     }
                     UserInput::Credential(resp) => {
-                        if resp.connect_mode {
+                        if session_mutation_blocked(&turn_state, &engine) {
+                            emit_bridge_error(&ui_tx, "finish or cancel queued work before applying credentials");
+                        } else if resp.connect_mode {
                             let _ = session_tx.send(SessionLifecycleRequest::ConnectWithCredential(resp));
                         } else {
                             let _ = session_tx.send(SessionLifecycleRequest::ModelSwitchWithCredential(resp));
                         }
                     }
                     UserInput::ProviderSetup(provider) => {
-                        let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider));
+                        if session_mutation_blocked(&turn_state, &engine) {
+                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
+                        } else { let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider)); }
                     }
                     UserInput::SwitchModel { provider, model_id, variant } => {
+                        if session_mutation_blocked(&turn_state, &engine) {
+                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing models");
+                            continue;
+                        }
                         let value = match variant {
                             Some(v) if !v.is_empty() => format!("{model_id}@{v}"),
                             _ => model_id,
@@ -378,25 +479,42 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         ));
                     }
                     UserInput::ConnectSelect { provider } => {
-                        let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
+                        if session_mutation_blocked(&turn_state, &engine) {
+                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
+                        } else { let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider }); }
                     }
                     UserInput::RegisterCustomProvider { name, protocol, base_url, api_key } => {
-                        let _ = session_tx.send(SessionLifecycleRequest::RegisterCustomProvider {
-                            name,
-                            protocol,
-                            base_url,
-                            api_key,
-                        });
+                        if session_mutation_blocked(&turn_state, &engine) {
+                            emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
+                        } else {
+                            let _ = session_tx.send(SessionLifecycleRequest::RegisterCustomProvider {
+                                name,
+                                protocol,
+                                base_url,
+                                api_key,
+                            });
+                        }
                     }
                     UserInput::Cancel => {
                         let sq_tx = sq_tx_watch.borrow().clone();
-                        let _ = sq_tx.send(talos_core::session::SessionOp::Interrupt).await;
-                        if let BridgeTurnState::Running { session_id, turn_id, next_sequence, .. } = &turn_state {
-                            turn_state = BridgeTurnState::Cancelling {
-                                session_id: session_id.clone(),
-                                turn_id: turn_id.clone(),
-                                next_sequence: *next_sequence,
-                            };
+                        match sq_tx.try_send(talos_core::session::SessionOp::Interrupt) {
+                            Ok(()) => match &mut turn_state {
+                                BridgeTurnState::Submitting { cancel_requested, .. } => {
+                                    *cancel_requested = true;
+                                }
+                                BridgeTurnState::Running { session_id, turn_id, next_sequence, .. } => {
+                                    turn_state = BridgeTurnState::Cancelling {
+                                        session_id: session_id.clone(),
+                                        turn_id: turn_id.clone(),
+                                        next_sequence: *next_sequence,
+                                    };
+                                }
+                                _ => {}
+                            },
+                            Err(_) => emit_bridge_error(
+                                &ui_tx,
+                                "session command channel is busy; cancel was not accepted",
+                            ),
                         }
                     }
                     UserInput::Exit => {
@@ -413,13 +531,26 @@ async fn dispatch_prepared_submission(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
+    known_sender: &mut tokio::sync::mpsc::Sender<SessionOp>,
+    sender_generation: &mut u64,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
-    let Some(submission) = engine.prepare_steering_submission() else {
+    let current_sender = sq_tx_watch.borrow().clone();
+    if !known_sender.same_channel(&current_sender) {
+        *sender_generation = (*sender_generation).saturating_add(1);
+        *known_sender = current_sender;
+    }
+    let Some(mut submission) = engine.prepare_steering_submission() else {
         return;
     };
+    submission.sender_generation = *sender_generation;
     let submission_id = submission.id.clone();
-    *turn_state = BridgeTurnState::Submitting(submission.clone());
+    *turn_state = BridgeTurnState::Submitting {
+        submission: submission.clone(),
+        session_id: None,
+        sender_generation: *sender_generation,
+        cancel_requested: false,
+    };
     let sender = sq_tx_watch.borrow().clone();
     let reserve = tokio::time::timeout(
         std::time::Duration::from_secs(1),
