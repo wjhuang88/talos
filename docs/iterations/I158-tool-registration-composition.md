@@ -7,6 +7,23 @@
 > MVP deliverable: Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / active maintainer session 2026-07-31 |
+| Work Slice | Correct the interactive contribution migration without eagerly constructing excluded tools; add final deterministic Print/TUI/MCP inventory and set-equivalence evidence; synchronize I158 acceptance, verification, delivery state, and derived views after implementation merge. |
+| Claimed At | 2026-07-31 |
+| Source Issue | None |
+| Governance Claim PR | #112 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer-authorized active session on 2026-07-31; no independent reviewer is presently available; claim merge requires exact-head CI, both governance validators, merge-time overlap/dependency CAS, and no unresolved blocking feedback. |
+| Implementation PR | `#102`, `#105` (Draft; refresh from the claim merge commit or later main before implementation continues) |
+| Last Updated | 2026-07-31 |
+| Handoff / Release Condition | Release or hand off before widening scope; close only after implementation commits exist on main and I158 acceptance/evidence is synchronized. |
+
 ## Published Baseline
 
 ### Selected Stories
