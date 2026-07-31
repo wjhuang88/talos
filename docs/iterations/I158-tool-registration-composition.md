@@ -12,12 +12,12 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / active maintainer session 2026-07-31 |
 | Work Slice | Correct the interactive contribution migration without eagerly constructing excluded tools; add final deterministic Print/TUI/MCP inventory and set-equivalence evidence; synchronize I158 acceptance, verification, delivery state, and derived views after implementation merge. |
 | Claimed At | 2026-07-31 |
 | Source Issue | None |
-| Governance Claim PR | `#112` |
+| Governance Claim PR | #112 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer-authorized active session on 2026-07-31; no independent reviewer is presently available; claim merge requires exact-head CI, both governance validators, merge-time overlap/dependency CAS, and no unresolved blocking feedback. |
 | Implementation PR | `#102`, `#105` (Draft; refresh from the claim merge commit or later main before implementation continues) |
