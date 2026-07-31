@@ -121,4 +121,4 @@ Which Assumptions need validation?]
 
 - [055: Primary-Screen App-Owned Transcript With Native History Projection](055-primary-screen-app-owned-transcript-native-projection.md) — **Rejected** (2026-07-27). Short-lived one-mode primary-screen trial superseded by the maintainer-selected amended ADR-054 Alternate Screen renderer.
 
-- [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) — **Accepted** (2026-07-30). Defines Issue #50's bridge-accepted cutoff, structured per-item steering, transactional SQ ownership transfer, actor-owned source-aware arbitration without implicit preemption, matching canonical turn identity, Cancel/Error pause semantics, persistence/replay equivalence, hard bounds, and deterministic validation gates. Supersedes ADR-049 only for the queue-control/drain-cardinality behavior it previously deferred.
+- [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) — **Proposed / Review** (2026-07-31). Defines Issue #50's transactional steering design. Maintainer review is still required before acceptance.

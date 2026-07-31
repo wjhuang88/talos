@@ -5,7 +5,7 @@
 | Story ID | TUI-041 |
 | Type | Product / State Story |
 | Priority | P1 |
-| Status | In Progress — implementation committed; G13 blocked (2026-07-30) |
+| Status | Review — PR #68 corrections implemented; post-rebase gates pending (2026-07-31) |
 | Source | [GitHub Issue #50](https://github.com/wjhuang88/talos/issues/50) |
 | Depends On | TUI-026/I145; ADR-005; ADR-006; ADR-039; ADR-049; ADR-056 |
 | Selected Iteration | I169 |

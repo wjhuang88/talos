@@ -1,6 +1,6 @@
 # Iteration I169: Batched Steering Turn
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-30
 > Planned objective: deliver GitHub Issue #50 by consolidating all steering inputs queued during an
 > active turn into one FIFO follow-up turn after authoritative completion.
@@ -110,42 +110,47 @@
 | 2026-07-30 | Replacement implementation | Added ADR-056 structured submissions, actor-owned FIFO arbitration without implicit preemption, distinct per-item provider/persistence messages, source-aware scheduler input, bridge identity/sequence validation, transactional prepare/reserve/send/start-ack/commit, bounded queue/batch/context checks, and paused Cancel/Error behavior. |
 | 2026-07-30 | Deterministic validation | Core/agent/conversation and all 290 CLI binary tests pass, including distinct-message capture, attachment/kind separation, send acknowledgement, cancellation terminal handling, and a 1,000-step fixed-seed queue invariant stress test. |
 | 2026-07-30 | Windows baseline audit | Repaired Unix-only image fixture compilation, CRLF artifact comparison, and hard-coded `/tmp` permission fixtures. Full workspace tests now stop at 27 pre-existing `talos-tools` Windows failures caused by unavailable `sh` plus Unix path/permission output assumptions. Process-boundary behavior is outside TUI-041 and remains a Ready-for-Review blocker. |
+| 2026-07-31 | Scope correction | Removed all I170 process/fixture changes from PR #68 and moved them to independent Draft PR #78. ADR-056 was returned from Accepted to Proposed/Review because requested changes are not maintainer acceptance. |
+| 2026-07-31 | Review correction | Bound lifecycle events to sender generation and session identity, removed uncorrelated start fallback, added bounded identity dedupe and actor aggregate limits, implemented paused user priority, completed cancel/shutdown/preview behavior, centralized mutation gates, and added full provider-request budgeting for initial and continuation calls. Implementation evidence: `1c81e040`. |
+| 2026-07-31 | Main integration | Rebased the six I169-only commits onto exact `main@37e369b1`; seven mainline contribution commits are ancestors rather than duplicated PR commits. |
 
 ## Closure Ledger
 
 - Requested outcome: develop GitHub Issue #50 under project governance.
 - Artifacts: TUI-041, I169, compatible engine/bridge implementation, focused tests, user docs, and
   synchronized indexes.
-- Existing assets preserved: I145/TUI-026 history, ADR-039/049 boundaries, I168 pause, I164 pause,
-  I158-I162 blockers, and unrelated `LOCAL-DEV.md` work in the original worktree.
-- Validation: focused tests, full locked workspace gates, governance validator, rebuilt binary
-  smoke, and diff review.
-- Remote evidence: `origin/main@b5fcaaf3` was fetched successfully before PR preparation.
-- Implementation evidence: `fddee7ac` (governance/ADR), `04a4b781` (transactional structured
-  steering), and `c7ed94f5` (portable validation fixtures).
+- Existing assets preserved: I145/TUI-026 history, ADR-039/049 boundaries, main's I158 Active and
+  I168 Complete states, I164 pause, I159-I162 blockers, and unrelated work outside this worktree.
+- Validation: focused locked tests, workspace check/Clippy, governance validation, diff review, and
+  a passing combined #68+#78 locked workspace test.
+- Remote evidence: GitHub API and reconstructed signed Git objects verified exact `main@37e369b1`;
+  the branch is six commits ahead and zero behind that head.
+- Implementation evidence: `1c81e040` contains the PR-review corrections on top of the rebased
+  transactional implementation. I170 evidence is owned only by Draft PR #78.
 - Remote destination: Draft PR #68; push, issue synchronization, and CI evidence are pending.
 
 ## Verification Evidence
 
-- PASS — `cargo test -p talos-agent --locked`: 297 passed.
-- PASS — `cargo test -p talos-cli --bin talos --locked`: 290 passed.
-- PASS — `cargo test -p talos-memory --locked`: 68 passed.
-- PASS — `cargo test -p talos-permission --locked`: 112 passed.
-- PASS — `cargo fmt --all -- --check`.
-- PASS — `cargo check --workspace --locked`.
-- PASS — `cargo clippy --workspace --locked -- -D warnings`.
-- RESOLVED — the prior Windows blockers in `talos-provider`, `talos-memory`, and
-  `talos-permission` were repaired with portable test fixtures and normalized artifact comparison.
-- BLOCKED — `cargo test --workspace --locked` reaches `talos-tools` but reports 27 Windows-only
-  baseline failures: BashTool tests cannot spawn host `sh`, and file/search assertions assume Unix
-  separators or permission strings. This write-capable tool/process boundary requires its own
-  security-reviewed scope and remains a Ready-for-Review blocker for G13.
-- PASS — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate_project_governance.ps1 .`: 0 warnings.
-- PASS — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assess_project_scale.ps1 .`:
-  high-risk, release-managed, worktree required.
-- PASS — `git diff --check`.
-- PASS — `cargo build --locked -p talos-cli`.
-- PASS — rebuilt `target/debug/talos.exe --mock --print --no-init --no-context "steering batch smoke"` returned the mock-provider response.
+- PASS — pre-rebase `cargo check --workspace --locked`.
+- PASS — pre-rebase `cargo clippy --workspace --locked -- -D warnings`.
+- PASS — pre-rebase `cargo test -p talos-core -p talos-agent -p talos-cli --locked`, including 304
+  `talos-agent` tests, 293 CLI binary tests, integration tests, and doctests.
+- PASS — deterministic actor tests cover duplicate IDs, lost EQ acknowledgement, aggregate queue
+  limits, pending shutdown rejection, paused scheduler/user priority, pre-start context rejection,
+  and attachment metadata limits.
+- PASS — deterministic bridge tests cover rejection-before-queue-ack, lifecycle correlation,
+  cancellation terminal handling, batching, tool-use non-terminal behavior, and attachments.
+- PASS — post-rebase `cargo fmt --all -- --check`, `cargo check --workspace --locked`, and
+  `cargo clippy --workspace --locked -- -D warnings`.
+- PASS — post-rebase `cargo test -p talos-core -p talos-agent -p talos-cli --locked`.
+- PASS — governance validator (0 warnings), scale assessment (high-risk/release-managed/worktree),
+  and `git diff --check`.
+- EXPECTED DEPENDENCY FAILURE — standalone PR #68 `cargo test --workspace --locked` stops while
+  compiling the Unix-only `talos-provider` symlink fixture on Windows. Those fixes are intentionally
+  excluded from #68 and owned by Draft PR #78.
+- PASS — integration head `0383221d` (PR #68 implementation `1c81e040` plus the five I170 code/test
+  commits from PR #78) completes `cargo test --workspace --locked` with exit 0.
+- PENDING — exact-head CI, rebuilt real-TUI transcript, and maintainer review.
 
 ## Completion Evidence
 
@@ -156,10 +161,9 @@
 
 - The candidate code arrived before governance intake; I169 records rather than conceals that
   variance.
-- I169 remains Active rather than Review because the repository-mandated full workspace test gate
-  is not green on Windows. The remaining `talos-tools` process/path baseline requires separately
-  scoped, security-reviewed remediation or a successful run on a supported environment; real TUI
-  acceptance and CI are also pending, so no completion claim is made here.
+- I169 is in Review because implementation evidence exists but post-rebase validation, real-TUI
+  acceptance, CI, and maintainer review remain pending. Windows process/path remediation is
+  independently owned by Draft PR #78, so no completion claim is made here.
 - The original baseline described one `A\n\nB\n\nC` string and excluded scheduler, session switch,
   attachment, persistence, and context interactions. Maintainer review proved those exclusions do
   not remove real runtime coupling. They are accepted as a material same-objective correction;
@@ -167,7 +171,7 @@
 
 ## PR #64/#68 G0-G13 Execution Gate
 
-- G0: ADR-056, TUI-041, TUI-026, ADR-049, PR description, and iteration evidence synchronized.
+- G0: ADR-056 is Proposed/Review; TUI-041, TUI-026, ADR-049, and iteration evidence are synchronized.
 - G1: bridge-accepted cutoff documented and deterministically tested with both channels ready.
 - G2: active session/turn/sequence and actor-owned submission correlation enforced.
 - G3: explicit Idle/Submitting/Running/Cancelling/PausedAfterFailure state transitions tested.
@@ -179,8 +183,9 @@
 - G10: item/queue/batch/context hard limits and visible non-truncating overflow behavior.
 - G11: content-free structured lifecycle/stale/rollback diagnostics.
 - G12: barrier/oneshot/paused-time matrix plus fixed-seed stress invariant test.
-- G13: locked workspace format/check/Clippy/test, Windows fixtures, governance, CI, and rebuilt real
-  TUI transcript all green before Ready for Review.
+- G13: post-rebase locked format/check/Clippy, focused tests, and governance checks pass. Standalone
+  Windows workspace portability is isolated in PR #78 and passes in combined validation; exact-head
+  CI and rebuilt real-TUI transcript remain required.
 
 ## Retrospective
 
