@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted for TUI-041/I169 implementation on 2026-07-30 after the maintainer's architecture review
-on PRs #64 and #68. This decision supersedes ADR-049 only where ADR-049 deferred queue-control and
-drain-cardinality semantics; its single-owner UI projection rule remains in force.
+Proposed / Review for TUI-041/I169. The maintainer's reviews on PRs #64 and #68 define required
+constraints, but do not constitute acceptance of this decision. If accepted, this decision
+supersedes ADR-049 only where ADR-049 deferred queue-control and drain-cardinality semantics; its
+single-owner UI projection rule remains in force.
 
 ## Context
 

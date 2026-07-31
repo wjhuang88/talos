@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-30"
-status_note: "High-risk/release-managed profile confirmed. Draft PR #68 now contains the ADR-056 transactional structured steering rework, but I169/TUI-041 remains Active until the Windows workspace-test, real-TUI, and CI portions of G13 pass. Remote main records I168 Active; I164 remains Paused; I158-I162 remain Blocked; ADR-053 remains Proposed. REL-002 remains NO-GO."
+last_audited_at: "2026-07-31"
+status_note: "High-risk/release-managed profile confirmed. I169 is in Review on Draft PR #68, rebased on main@37e369b1; ADR-056 remains Proposed/Review. I170 Windows work is isolated in Draft PR #78. Main records I158 Active, I168 Complete, I164 Paused, and I159-I162 Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,9 +63,10 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Keep PR #68 Draft until the remaining I169 G13 Windows workspace-test, real-TUI, and CI gates pass; do not treat the implemented G0-G12 rework as completion"
-    - "Preserve remote-main I168/RUNTIME-003 Active state and keep I169 isolated to its Issue #50 draft PR; keep I164/TUI-038 Paused"
+    - "Keep PR #68 Draft until post-rebase workspace/governance gates, exact-head CI, real-TUI evidence, and maintainer review pass; do not treat local implementation as completion"
+    - "Keep I170 Windows process/fixture changes isolated in Draft PR #78; do not mix them back into PR #68"
+    - "Preserve main's I158 Active, I168 Complete, I164 Paused, and I159-I162 Blocked states while I169 remains isolated in Review on Draft PR #68"
     - "Refine SESSION-008 through an ADR and migration decision before iteration selection or implementation"
-    - "Keep I158-I162 blocked until their recorded ADR and sequential activation gates are satisfied"
+    - "Keep I159-I162 blocked until their recorded sequential activation gates are satisfied"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
