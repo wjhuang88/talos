@@ -409,3 +409,102 @@ async fn authoritative_turn_start_precedes_submission_ack() {
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
 }
+
+struct CapturingModel {
+    requests: Arc<Mutex<Vec<Vec<Message>>>>,
+}
+
+#[async_trait]
+impl LanguageModel for CapturingModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        self.requests
+            .lock()
+            .expect("capturing model lock")
+            .push(messages.to_vec());
+        let (tx, rx) = mpsc::channel(16);
+        tokio::spawn(async move {
+            let _ = tx.send(AgentEvent::TurnStart).await;
+            let _ = tx
+                .send(AgentEvent::TextDelta {
+                    delta: "snapshot reused".into(),
+                })
+                .await;
+            let _ = tx
+                .send(AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                })
+                .await;
+        });
+        Ok(rx)
+    }
+}
+
+#[tokio::test]
+async fn session_preflight_reuses_dynamic_prompt_snapshot() {
+    let memory_calls = Arc::new(AtomicUsize::new(0));
+    let todo_calls = Arc::new(AtomicUsize::new(0));
+    let requests = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
+
+    #[allow(deprecated)]
+    let mut agent = Agent::new(
+        Arc::new(CapturingModel {
+            requests: requests.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let memory_counter = memory_calls.clone();
+    agent.set_memory_provider(Arc::new(move |_| {
+        let call = memory_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        Some(format!("memory-snapshot-{call}"))
+    }));
+    let todo_counter = todo_calls.clone();
+    agent.set_todo_section_provider(Arc::new(move || {
+        let call = todo_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        Some(format!("todo-snapshot-{call}"))
+    }));
+
+    let (handle, mut actor) = AppServerSession::new(agent, config(128_000));
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: submission(
+                "prepared_snapshot_batch",
+                "prepared_snapshot_item",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("prepared snapshot completion timeout")
+            .expect("session event channel");
+        if matches!(
+            event,
+            SessionEvent::TurnEvent {
+                payload: talos_core::session::TurnEventPayload::Completed { .. },
+                ..
+            }
+        ) {
+            break;
+        }
+    }
+
+    assert_eq!(memory_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(todo_calls.load(Ordering::SeqCst), 1);
+    let captured = requests.lock().expect("captured requests lock");
+    assert_eq!(captured.len(), 1, "one provider request expected");
+    let rendered = format!("{:?}", captured[0]);
+    assert!(rendered.contains("memory-snapshot-1"));
+    assert!(rendered.contains("todo-snapshot-1"));
+    assert!(!rendered.contains("snapshot-2"));
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+}

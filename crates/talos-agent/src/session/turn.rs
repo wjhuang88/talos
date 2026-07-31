@@ -8,9 +8,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{SessionEvent, SubmissionItem, TurnCompletionStatus, TurnEventPayload};
+use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 
-use crate::Agent;
+use crate::{Agent, PreparedSessionTurn};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -38,8 +38,7 @@ pub(super) enum TurnRecordStatus {
 
 pub(super) struct TurnForwarding {
     pub(super) agent: Arc<Agent>,
-    pub(super) items: Vec<SubmissionItem>,
-    pub(super) history: Vec<Message>,
+    pub(super) prepared: PreparedSessionTurn,
     pub(super) event_tx: mpsc::UnboundedSender<AgentEvent>,
     pub(super) event_rx: mpsc::UnboundedReceiver<AgentEvent>,
     pub(super) eq_tx: mpsc::UnboundedSender<SessionEvent>,
@@ -56,8 +55,7 @@ pub(super) struct TurnForwarding {
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let TurnForwarding {
         agent,
-        items,
-        history,
+        prepared,
         event_tx,
         mut event_rx,
         eq_tx,
@@ -139,7 +137,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     let mut agent_task = tokio::spawn(async move {
         agent
-            .run_for_session_turn_items(items, history, event_tx, request_context_limit)
+            .run_prepared_session_turn(prepared, event_tx, request_context_limit)
             .await
     });
 

@@ -97,6 +97,22 @@ struct PendingToolCall {
     provenance: ToolProvenance,
 }
 
+/// Frozen first-provider-request state for one structured session turn.
+///
+/// Dynamic prompt callbacks and prompt hooks run exactly once while this value
+/// is prepared. Context compaction may replace only the history prefix; the
+/// dynamic system/context/input suffix, hook identity, and tool presentation
+/// remain identical for preflight and the first provider call.
+pub(crate) struct PreparedSessionTurn {
+    messages: Vec<Message>,
+    persist_start: usize,
+    history_len: usize,
+    hook_ctx: HookContext,
+    tool_presentation_policy: ToolPresentationPolicy,
+    tool_definitions: Vec<talos_core::provider::ToolDefinition>,
+    presented_tool_names: HashSet<String>,
+}
+
 /// Errors that can occur during agent execution.
 #[derive(Debug, Error)]
 pub enum AgentError {
@@ -315,93 +331,89 @@ impl Agent {
         .await
     }
 
-    /// Runs one actor turn from an ordered structured submission.
+    /// Prepares the exact initial provider request for a structured session turn.
     ///
-    /// Each item remains a distinct persisted user message. Text projection is
-    /// used only for memory lookup; it is never the authoritative transcript.
-    pub(crate) async fn run_for_session_turn_items(
+    /// The returned snapshot is the unique source for both context-budget
+    /// preflight and the first provider call. Dynamic memory/todo sections and
+    /// prompt hooks are therefore not evaluated again during execution.
+    pub(crate) async fn prepare_session_turn(
         &self,
-        items: Vec<talos_core::session::SubmissionItem>,
+        items: &[talos_core::session::SubmissionItem],
         history: Vec<Message>,
-        event_tx: mpsc::UnboundedSender<AgentEvent>,
-        request_context_limit: u32,
-    ) -> (AgentResult<String>, Vec<Message>) {
+    ) -> AgentResult<PreparedSessionTurn> {
         let memory_query = items
             .iter()
             .map(|item| item.text.as_str())
             .collect::<Vec<_>>()
             .join("\n");
         let input_messages = items
-            .into_iter()
+            .iter()
             .map(|item| {
                 if item.attachments.is_empty() {
-                    Message::User { content: item.text }
+                    Message::User {
+                        content: item.text.clone(),
+                    }
                 } else {
                     let mut parts = Vec::with_capacity(item.attachments.len() + 1);
                     if !item.text.is_empty() {
-                        parts.push(talos_core::message::ContentPart::Text { text: item.text });
+                        parts.push(talos_core::message::ContentPart::Text {
+                            text: item.text.clone(),
+                        });
                     }
-                    parts.extend(item.attachments);
+                    parts.extend(item.attachments.clone());
                     Message::Multimodal { parts }
                 }
             })
             .collect();
-        self.run_inner_with_messages(
-            memory_query,
-            input_messages,
-            history,
-            Some(event_tx),
-            Some(request_context_limit),
-        )
-        .await
+        let hook_ctx = HookContext::new(TurnId::new(), self.workspace_root.clone());
+        self.prepare_turn_with_messages(memory_query, input_messages, history, hook_ctx)
+            .await
     }
 
-    /// Estimates the initial provider request produced for a structured
-    /// session submission, including dynamic prompt sections, workspace
-    /// context, native tool definitions, multimodal inputs, and an output
-    /// reserve. The session actor calls this after compaction and before it
-    /// acknowledges that a turn started.
-    pub(crate) async fn estimate_session_request_tokens(
-        &self,
-        items: &[talos_core::session::SubmissionItem],
-        history: Vec<Message>,
-    ) -> AgentResult<u32> {
-        let memory_query = items
-            .iter()
-            .map(|item| item.text.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
-        let hook_ctx = HookContext::new(TurnId::new(), self.workspace_root.clone());
-        let (mut messages, _) = self
-            .build_provider_messages(memory_query, history, &hook_ctx)
-            .await?;
-        messages.pop();
-        messages.extend(items.iter().map(|item| {
-            if item.attachments.is_empty() {
-                Message::User {
-                    content: item.text.clone(),
-                }
-            } else {
-                let mut parts = Vec::with_capacity(item.attachments.len() + 1);
-                if !item.text.is_empty() {
-                    parts.push(talos_core::message::ContentPart::Text {
-                        text: item.text.clone(),
-                    });
-                }
-                parts.extend(item.attachments.clone());
-                Message::Multimodal { parts }
-            }
-        }));
+    pub(crate) fn prepared_session_request_tokens(&self, prepared: &PreparedSessionTurn) -> u32 {
+        Self::estimate_provider_request_tokens(&prepared.messages, &prepared.tool_definitions)
+    }
 
-        let (_, mut tool_definitions, _) =
-            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
-        if !self.image_input_supported {
-            tool_definitions.retain(|definition| definition.name != "read_image");
-        }
-        Ok(Self::estimate_provider_request_tokens(
-            &messages,
-            &tool_definitions,
-        ))
+    pub(crate) fn prepared_session_fixed_tokens(&self, prepared: &PreparedSessionTurn) -> u32 {
+        Self::estimate_provider_request_tokens(
+            &prepared.messages[prepared.history_len..],
+            &prepared.tool_definitions,
+        )
+    }
+
+    pub(crate) fn replace_prepared_session_history(
+        prepared: &mut PreparedSessionTurn,
+        history: Vec<Message>,
+    ) {
+        let non_history_prefix_len = prepared.persist_start - prepared.history_len;
+        let suffix = prepared.messages.split_off(prepared.history_len);
+        prepared.messages = history;
+        prepared.history_len = prepared.messages.len();
+        prepared.messages.extend(suffix);
+        prepared.persist_start = prepared.history_len + non_history_prefix_len;
+    }
+
+    pub(crate) async fn run_prepared_session_turn(
+        &self,
+        prepared: PreparedSessionTurn,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+        request_context_limit: u32,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        self.run_inner_prepared(prepared, Some(event_tx), Some(request_context_limit))
+            .await
+    }
+
+    pub(crate) fn preview_prepared_session_turn(
+        &self,
+        prepared: &PreparedSessionTurn,
+    ) -> Option<String> {
+        self.provider
+            .request_preview(&prepared.messages)
+            .map(|preview| {
+                let snapshot =
+                    serde_json::to_string_pretty(&preview).unwrap_or_else(|_| preview.to_string());
+                format!("Request preview (no API call made):\n\n```json\n{snapshot}\n```")
+            })
     }
 
     fn estimate_provider_request_tokens(
@@ -598,30 +610,71 @@ impl Agent {
     ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
-
-        let (mut messages, persist_start) = match self
-            .build_provider_messages(memory_query, history, &hook_ctx)
+        let prepared = match self
+            .prepare_turn_with_messages(memory_query, input_messages, history, hook_ctx.clone())
             .await
         {
-            Ok(messages) => messages,
+            Ok(prepared) => prepared,
             Err(error) => {
                 self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
                 return (Err(error), Vec::new());
             }
         };
+        self.run_inner_prepared(prepared, event_tx, request_context_limit)
+            .await
+    }
+
+    async fn prepare_turn_with_messages(
+        &self,
+        memory_query: String,
+        input_messages: Vec<Message>,
+        history: Vec<Message>,
+        hook_ctx: HookContext,
+    ) -> AgentResult<PreparedSessionTurn> {
+        let history_len = history.len();
+        let (mut messages, persist_start) = self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await?;
         messages.pop();
         messages.extend(input_messages);
 
+        let tool_presentation_policy = self.tool_presentation_policy.clone();
+        let (_, mut tool_definitions, mut presented_tool_names) =
+            describe_presented_tools(&self.tools, &tool_presentation_policy);
+        if !self.image_input_supported {
+            tool_definitions.retain(|definition| definition.name != "read_image");
+            presented_tool_names.retain(|name| name != "read_image");
+        }
+
+        Ok(PreparedSessionTurn {
+            messages,
+            persist_start,
+            history_len,
+            hook_ctx,
+            tool_presentation_policy,
+            tool_definitions,
+            presented_tool_names,
+        })
+    }
+
+    async fn run_inner_prepared(
+        &self,
+        prepared: PreparedSessionTurn,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        request_context_limit: Option<u32>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let PreparedSessionTurn {
+            mut messages,
+            persist_start,
+            history_len: _,
+            hook_ctx,
+            tool_presentation_policy: mut active_tool_presentation_policy,
+            tool_definitions: mut active_tool_definitions,
+            presented_tool_names: mut active_presented_tool_names,
+        } = prepared;
+        let turn_id = hook_ctx.turn_id;
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
-        let mut active_tool_presentation_policy = self.tool_presentation_policy.clone();
-        let (_, mut active_tool_definitions, mut active_presented_tool_names) =
-            describe_presented_tools(&self.tools, &active_tool_presentation_policy);
-
-        if !self.image_input_supported {
-            active_tool_definitions.retain(|td| td.name != "read_image");
-            active_presented_tool_names.retain(|n| n != "read_image");
-        }
 
         // Transient continuation parts collected from tool execution (ADR-051).
         // Consumed once by the next stream_with_tools call as a

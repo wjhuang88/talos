@@ -569,6 +569,13 @@ impl AppServerSession {
         submission: StructuredSubmission,
         turn_counter: u64,
     ) -> Option<(JoinHandle<Option<TurnRecord>>, CancellationToken)> {
+        let submission_kind = submission.common_kind();
+        if submission_kind != Some(SubmissionKind::PreviewRequest)
+            && let Some(agent_mut) = Arc::get_mut(&mut self.agent)
+        {
+            agent_mut.set_append_prompt_opt(None);
+        }
+
         if self.compactor.should_compact(&self.history) {
             let compacted = self.compactor.apply_budget(self.history.clone());
             let compacted = self.compactor.apply_trim(compacted);
@@ -586,40 +593,44 @@ impl AppServerSession {
             }
         }
 
-        let mut request_tokens = self
+        let mut prepared = match self
             .agent
-            .estimate_session_request_tokens(&submission.items, self.history.clone())
-            .await;
-        if matches!(request_tokens, Ok(tokens) if tokens > self.model_context_limit) {
-            let fixed_tokens = self
-                .agent
-                .estimate_session_request_tokens(&submission.items, Vec::new())
-                .await;
-            if let Ok(fixed_tokens) = fixed_tokens {
-                let history_budget = self.model_context_limit.saturating_sub(fixed_tokens);
-                let mut projected_compactor = Compactor::new(TokenEstimator::new(), history_budget);
-                let compacted = match projected_compactor
-                    .compact(self.history.clone(), self.agent.provider())
-                    .await
-                {
-                    Ok(history) => history,
-                    Err(_) => {
-                        projected_compactor
-                            .compact_deterministic(self.history.clone())
-                            .0
-                    }
-                };
-                self.history = compacted;
-                request_tokens = self
-                    .agent
-                    .estimate_session_request_tokens(&submission.items, self.history.clone())
-                    .await;
-                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                    let _ = self.try_archive_session(file, dir, &self.history);
+            .prepare_session_turn(&submission.items, self.history.clone())
+            .await
+        {
+            Ok(prepared) => prepared,
+            Err(_) => {
+                self.reject_submission(
+                    &submission.id,
+                    submission.sender_generation,
+                    SubmissionRejectionReason::ContextBudgetExceeded,
+                );
+                return None;
+            }
+        };
+        let mut request_tokens = self.agent.prepared_session_request_tokens(&prepared);
+        if request_tokens > self.model_context_limit {
+            let fixed_tokens = self.agent.prepared_session_fixed_tokens(&prepared);
+            let history_budget = self.model_context_limit.saturating_sub(fixed_tokens);
+            let mut projected_compactor = Compactor::new(TokenEstimator::new(), history_budget);
+            self.history = match projected_compactor
+                .compact(self.history.clone(), self.agent.provider())
+                .await
+            {
+                Ok(history) => history,
+                Err(_) => {
+                    projected_compactor
+                        .compact_deterministic(self.history.clone())
+                        .0
                 }
+            };
+            Agent::replace_prepared_session_history(&mut prepared, self.history.clone());
+            request_tokens = self.agent.prepared_session_request_tokens(&prepared);
+            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+                let _ = self.try_archive_session(file, dir, &self.history);
             }
         }
-        if !matches!(request_tokens, Ok(tokens) if tokens <= self.model_context_limit) {
+        if request_tokens > self.model_context_limit {
             self.reject_submission(
                 &submission.id,
                 submission.sender_generation,
@@ -654,12 +665,10 @@ impl AppServerSession {
             return None;
         }
 
-        if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+        if submission_kind == Some(SubmissionKind::PreviewRequest) {
             let agent = self.agent.clone();
             let eq_tx = self.eq_tx.clone();
-            let history = self.history.clone();
             let session_id = self.session_id.clone();
-            let message = submission.items[0].text.clone();
             let token = CancellationToken::new();
             let preview_token = token.clone();
             let handle = tokio::spawn(async move {
@@ -678,7 +687,7 @@ impl AppServerSession {
                             status: TurnRecordStatus::Cancelled,
                         });
                     }
-                    result = agent.preview_request(message, history) => result,
+                    result = async { Ok::<Option<String>, crate::AgentError>(agent.preview_prepared_session_turn(&prepared)) } => result,
                 };
                 let (status, record_status) = match result {
                     Ok(Some(preview)) => {
@@ -750,28 +759,21 @@ impl AppServerSession {
             return Some((handle, token));
         }
 
-        if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
-            agent_mut.set_append_prompt_opt(None);
-        }
-
         let sequence = Arc::new(AtomicU64::new(1));
         let token = CancellationToken::new();
         let token_clone = token.clone();
         let agent = self.agent.clone();
         let eq_tx = self.eq_tx.clone();
-        let history = self.history.clone();
         let persistence = self.persistence.clone();
         let durable_persistence = self.durable_persistence.clone();
         let session_id = self.session_id.clone();
-        let items = submission.items;
         let request_context_limit = self.model_context_limit;
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
             let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                 agent,
-                items,
-                history,
+                prepared,
                 event_tx,
                 event_rx,
                 eq_tx,
