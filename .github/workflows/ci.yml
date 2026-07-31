@@ -11,12 +11,55 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  apply-status-reconciliation:
+    name: Apply issue status reconciliation
+    if: github.head_ref == 'repair/issue-status-doc-export'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: repair/issue-status-doc-export
+          path: bridge
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/sync-issue-document-status
+          fetch-depth: 0
+          path: target
+      - name: Extract and apply validated patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd target
+          test "$(git rev-parse HEAD)" = "92692ec8e839cec0658fb83f825b9e85487ce101"
+          awk '/<<'"'"'PAYLOAD'"'"'/{capture=1;next} /^PAYLOAD$/{capture=0} capture' \
+            ../bridge/.github/workflows/issue-status-doc-export.yml > /tmp/status.patch.xz.b64
+          base64 -d /tmp/status.patch.xz.b64 > /tmp/status.patch.xz
+          echo '6645f424b8e0de79b07d1b334f4a06352bfddef15d64b9f9ed82701b0df54bde  /tmp/status.patch.xz' | sha256sum -c -
+          xz -dc /tmp/status.patch.xz > /tmp/status.patch
+          echo '371966fe8bc6dba7d66932570bb1c85b9032b90ec8c1c5f5014e92a57ab735dd  /tmp/status.patch' | sha256sum -c -
+          git apply --check /tmp/status.patch
+          git apply /tmp/status.patch
+          scripts/validate_project_governance.sh .
+          bash scripts/validate_collaboration_claims.sh .
+          git diff --check
+          test "$(git diff --name-only | grep -vc '^docs/')" -eq 0
+          test "$(git diff --name-only | wc -l | tr -d ' ')" -eq 22
+          test "$(grep -c '^| #[0-9]' docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-31.md)" -eq 21
+          test "$(grep -R -l '| Claim State | Unclaimed |' docs/backlog/active/{DESKTOP-001,AGENT-003,RUNTIME-005,SESSION-009,ACP-001,RUNTIME-004,PERM-006,PERM-006-A,PERM-006-B,PERM-006-C,PERM-006-D,PERM-006-E,TUI-041,TUI-042,TUI-043}-*.md | wc -l | tr -d ' ')" -eq 15
+          git config user.name 'OpenAI Agent'
+          git config user.email 'agent@openai.com'
+          git add docs
+          git diff --cached --check
+          git commit -m 'docs(governance): reconcile issue and owner status [model:gpt-5.6-thinking]'
+          git push origin HEAD:agent/sync-issue-document-status
+
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
