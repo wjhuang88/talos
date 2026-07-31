@@ -45,6 +45,7 @@ pub use browser_page::{
 };
 pub use contributions::{
     git_mutation_tool_contributions, git_read_tool_contributions, read_image_tool_contribution,
+    symbol_tool_contributions,
 };
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 pub use document_extract::{DocumentExtractError, DocumentExtractInput, DocumentExtractTool};
