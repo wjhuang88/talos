@@ -44,7 +44,8 @@ pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
 pub use contributions::{
-    git_mutation_tool_contributions, git_read_tool_contributions, read_image_tool_contribution,
+    git_mutation_tool_contributions, git_read_tool_contributions, ordinary_file_tool_contributions,
+    read_image_tool_contribution, snapshot_aware_file_tool_contributions,
     symbol_tool_contributions,
 };
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
