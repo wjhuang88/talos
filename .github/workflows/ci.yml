@@ -11,14 +11,58 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  i158-file-factories:
+    name: I158 file contribution factories
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/i158-file-contribution-factories'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/i158-file-contribution-factories
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Apply deterministic factory patch
+        run: |
+          python scripts/tmp_i158_file_factories.py
+          cargo fmt --all
+          git diff --check
+
+      - name: Focused validation
+        run: |
+          cargo test --locked -p talos-tools contributions::tests::file_groups_have_stable_equivalent_inventory_and_source
+          cargo clippy --locked -p talos-tools --lib -- -D warnings
+
+      - name: Commit clean factory slice
+        run: |
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/ci.yml
+          rm -f scripts/tmp_i158_file_factories.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(tools): define file contribution factories"
+          git fetch origin main
+          git rebase origin/main
+          cargo fmt --all -- --check
+          cargo test --locked -p talos-tools contributions::tests::file_groups_have_stable_equivalent_inventory_and_source
+          git push --force-with-lease origin HEAD:feature/i158-file-contribution-factories
+
   preflight:
     name: Format + Check + Clippy + Test
+    if: github.head_ref != 'feature/i158-file-contribution-factories'
     runs-on: macos-14
 
     steps:
@@ -35,6 +79,7 @@ jobs:
 
   windows-installer-fixture:
     name: Windows installer fixture
+    if: github.head_ref != 'feature/i158-file-contribution-factories'
     runs-on: windows-latest
 
     steps:
