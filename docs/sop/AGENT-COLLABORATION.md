@@ -11,23 +11,26 @@ planning, implementation, change control, testing, release, or Git workflow SOPs
 
 ## Adoption And Migration
 
-This document is introduced by bootstrap PR `#83`.
+This document was introduced by bootstrap PR `#83`.
 
-- The collaboration workflow becomes effective at the merge commit and merge date of PR `#83`.
+- **Effective commit**: `51e0683efc1044f1016d58fa2377965213031f0c` (the squash-merge commit on `main`).
+- **Effective timestamp (UTC)**: `2026-07-31T06:49:24Z`.
+- **Effective timestamp (Asia/Singapore)**: `2026-07-31 14:49:24 +08:00`.
 - PR `#83` itself is an adoption change and is not required to satisfy a workflow that did not yet
   exist on its target branch.
-- Tasks, iterations, and implementation PRs that already existed before that merge are
+- Tasks, iterations, and implementation PRs that existed before the effective timestamp are
   grandfathered. They may finish under their published governance baseline.
 - A grandfathered owner must add a Collaboration Claim before a new implementation branch or new
   implementation PR is started after the effective boundary, or when the owner next changes
   delivery state, claimant, scope, or handoff state.
-- Existing open implementation PRs do not need a retroactive claim PR merely to finish their
-  already-published scope.
+- Existing implementation PRs opened before the effective timestamp do not need a retroactive claim
+  PR merely to finish their already-published scope.
 - A mismatch blocks only the affected owner-document chain. Unrelated Board or documentation drift
   does not stop independent work elsewhere in the repository.
 
-The merge commit recorded by GitHub is the effective commit; the GitHub merge timestamp is the
-effective date.
+The commit and timestamps above are the canonical offline audit boundary. GitHub PR `#83` remains
+supporting provenance, but auditors do not need the PR page to determine whether work is pre- or
+post-adoption.
 
 ## Applicability
 
