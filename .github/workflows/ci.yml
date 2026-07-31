@@ -19,13 +19,13 @@ env:
 jobs:
   i158-symbol-test-repair:
     name: I158 symbol composition repair
-    if: github.event_name == 'pull_request' && github.head_ref == 'automation/i158-symbol-test-repair'
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'automation/i158-symbol-test-repair')
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: automation/i158-symbol-test-repair
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@master
@@ -39,7 +39,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          from textwrap import dedent
+          from textwrap import dedent, indent
 
           path = Path("crates/talos-cli/src/registry.rs")
           text = path.read_text()
@@ -69,50 +69,50 @@ jobs:
           ''')
           replace_once(anchor, helper + anchor)
 
-          direct = dedent('''\
-              for contribution in symbol_tool_contributions(PathBuf::from(".")) {
-                  registry
-                      .register_contribution(contribution)
-                      .unwrap_or_else(|error| panic!("{error}"));
-              }
-          ''')
-          direct_replacement = dedent('''\
-              register_symbol_tool_contributions(
-                  &mut registry,
-                  PathBuf::from("."),
-                  |tool| tool,
-              );
-          ''')
+          direct = (
+              '    for contribution in symbol_tool_contributions(PathBuf::from(".")) {\n'
+              '        registry\n'
+              '            .register_contribution(contribution)\n'
+              '            .unwrap_or_else(|error| panic!("{error}"));\n'
+              '    }\n'
+          )
+          direct_replacement = (
+              '    register_symbol_tool_contributions(\n'
+              '        &mut registry,\n'
+              '        PathBuf::from("."),\n'
+              '        |tool| tool,\n'
+              '    );\n'
+          )
           count = text.count(direct)
           if count != 2:
               raise SystemExit(f"expected print and MCP symbol blocks, found {count}")
           text = text.replace(direct, direct_replacement)
 
-          tui = dedent('''\
-              for contribution in symbol_tool_contributions(workspace_root.clone()) {
-                  let contribution = contribution.map_tool(|tool| {
-                      Arc::new(TuiPermissionAwareTool {
-                          inner: tool,
-                          approval: approval_handler.clone(),
-                      })
-                  });
-                  registry
-                      .register_contribution(contribution)
-                      .unwrap_or_else(|error| panic!("{error}"));
-              }
-          ''')
-          tui_replacement = dedent('''\
-              register_symbol_tool_contributions(
-                  &mut registry,
-                  workspace_root.clone(),
-                  |tool| -> Arc<dyn AgentTool> {
-                      Arc::new(TuiPermissionAwareTool {
-                          inner: tool,
-                          approval: approval_handler.clone(),
-                      })
-                  },
-              );
-          ''')
+          tui = (
+              '    for contribution in symbol_tool_contributions(workspace_root.clone()) {\n'
+              '        let contribution = contribution.map_tool(|tool| {\n'
+              '            Arc::new(TuiPermissionAwareTool {\n'
+              '                inner: tool,\n'
+              '                approval: approval_handler.clone(),\n'
+              '            })\n'
+              '        });\n'
+              '        registry\n'
+              '            .register_contribution(contribution)\n'
+              '            .unwrap_or_else(|error| panic!("{error}"));\n'
+              '    }\n'
+          )
+          tui_replacement = (
+              '    register_symbol_tool_contributions(\n'
+              '        &mut registry,\n'
+              '        workspace_root.clone(),\n'
+              '        |tool| -> Arc<dyn AgentTool> {\n'
+              '            Arc::new(TuiPermissionAwareTool {\n'
+              '                inner: tool,\n'
+              '                approval: approval_handler.clone(),\n'
+              '            })\n'
+              '        },\n'
+              '    );\n'
+          )
           replace_once(tui, tui_replacement)
 
           test_start = text.index(
@@ -122,76 +122,76 @@ jobs:
               "    #[test]\n    fn read_image_profile_is_print_and_tui_only()",
               test_start,
           )
-          new_test = dedent('''\
-              #[test]
-              fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
-                  let mut print_registry = ToolRegistry::new();
-                  register_symbol_tool_contributions(
-                      &mut print_registry,
-                      PathBuf::from("."),
-                      |tool| tool,
-                  );
+          new_test = indent(dedent('''\
+          #[test]
+          fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
+              let mut print_registry = ToolRegistry::new();
+              register_symbol_tool_contributions(
+                  &mut print_registry,
+                  PathBuf::from("."),
+                  |tool| tool,
+              );
 
-                  let (tx, _rx) = mpsc::unbounded_channel();
-                  let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
-                  let mut tui_registry = ToolRegistry::new();
-                  register_symbol_tool_contributions(
-                      &mut tui_registry,
-                      PathBuf::from("."),
-                      |tool| -> Arc<dyn AgentTool> {
-                          Arc::new(TuiPermissionAwareTool {
-                              inner: tool,
-                              approval: approval.clone(),
-                          })
-                      },
-                  );
+              let (tx, _rx) = mpsc::unbounded_channel();
+              let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
+              let mut tui_registry = ToolRegistry::new();
+              register_symbol_tool_contributions(
+                  &mut tui_registry,
+                  PathBuf::from("."),
+                  |tool| -> Arc<dyn AgentTool> {
+                      Arc::new(TuiPermissionAwareTool {
+                          inner: tool,
+                          approval: approval.clone(),
+                      })
+                  },
+              );
 
-                  let mut mcp_registry = ToolRegistry::new();
-                  register_symbol_tool_contributions(
-                      &mut mcp_registry,
-                      PathBuf::from("."),
-                      |tool| tool,
-                  );
+              let mut mcp_registry = ToolRegistry::new();
+              register_symbol_tool_contributions(
+                  &mut mcp_registry,
+                  PathBuf::from("."),
+                  |tool| tool,
+              );
 
-                  let names = [
-                      "find_symbol",
-                      "find_references",
-                      "list_symbols",
-                      "list_imports",
-                  ];
+              let names = [
+                  "find_symbol",
+                  "find_references",
+                  "list_symbols",
+                  "list_imports",
+              ];
 
-                  for name in names {
-                      assert!(print_registry.get(name).is_some(), "print missing {name}");
-                      let tui_tool = tui_registry
-                          .get(name)
-                          .unwrap_or_else(|| panic!("TUI missing {name}"));
-                      assert!(tui_tool.is_read_only(), "TUI wrapper changed {name} policy");
-                      assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
-                  }
-
-                  for (mode, mut registry) in [
-                      ("print", print_registry),
-                      ("TUI", tui_registry),
-                      ("MCP", mcp_registry),
-                  ] {
-                      let error = registry
-                          .register_contribution(ToolContribution::new(
-                              ToolContributionSource::new("test:duplicate"),
-                              Arc::new(NamedReadTool {
-                                  name: "find_symbol",
-                                  description: "duplicate",
-                              }),
-                          ))
-                          .unwrap_err();
-                      assert_eq!(
-                          error.to_string(),
-                          "duplicate tool registration 'find_symbol': existing source 'talos-tools:symbol', incoming source 'test:duplicate'",
-                          "{mode} source mismatch"
-                      );
-                  }
+              for name in names {
+                  assert!(print_registry.get(name).is_some(), "print missing {name}");
+                  let tui_tool = tui_registry
+                      .get(name)
+                      .unwrap_or_else(|| panic!("TUI missing {name}"));
+                  assert!(tui_tool.is_read_only(), "TUI wrapper changed {name} policy");
+                  assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
               }
 
-          ''')
+              for (mode, mut registry) in [
+                  ("print", print_registry),
+                  ("TUI", tui_registry),
+                  ("MCP", mcp_registry),
+              ] {
+                  let error = registry
+                      .register_contribution(ToolContribution::new(
+                          ToolContributionSource::new("test:duplicate"),
+                          Arc::new(NamedReadTool {
+                              name: "find_symbol",
+                              description: "duplicate",
+                          }),
+                      ))
+                      .unwrap_err();
+                  assert_eq!(
+                      error.to_string(),
+                      "duplicate tool registration 'find_symbol': existing source 'talos-tools:symbol', incoming source 'test:duplicate'",
+                      "{mode} source mismatch"
+                  );
+              }
+          }
+
+          '''), '    ')
           text = text[:test_start] + new_test + text[test_end:]
           path.write_text(text)
           PY
@@ -224,7 +224,7 @@ jobs:
 
   preflight:
     name: Format + Check + Clippy + Test
-    if: github.head_ref != 'automation/i158-symbol-test-repair'
+    if: ${{ !startsWith(github.head_ref, 'automation/i158-symbol-test-repair') }}
     runs-on: macos-14
 
     steps:
@@ -241,7 +241,7 @@ jobs:
 
   windows-installer-fixture:
     name: Windows installer fixture
-    if: github.head_ref != 'automation/i158-symbol-test-repair'
+    if: ${{ !startsWith(github.head_ref, 'automation/i158-symbol-test-repair') }}
     runs-on: windows-latest
 
     steps:
