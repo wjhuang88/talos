@@ -22,9 +22,9 @@ use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
-    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadImageTool, ReadTool, SaveUrlTool, StatTool,
-    TreeTool, WebSearchTool, WriteTool, git_mutation_tool_contributions,
-    git_read_tool_contributions, snapshot_aware_file_tools,
+    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
+    WebSearchTool, WriteTool, git_mutation_tool_contributions, git_read_tool_contributions,
+    read_image_tool_contribution, snapshot_aware_file_tools,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -775,11 +775,16 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         approval: approval.clone(),
         print_mode: true,
     }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadImageTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
+    let read_image = read_image_tool_contribution(PathBuf::from(".")).map_tool(|tool| {
+        Arc::new(PermissionAwareTool {
+            inner: tool,
+            approval: approval.clone(),
+            print_mode: true,
+        })
+    });
+    registry
+        .register_contribution(read_image)
+        .unwrap_or_else(|error| panic!("{error}"));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(DocumentExtractTool::new(PathBuf::from("."))),
         approval: approval.clone(),
@@ -911,10 +916,15 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(read_tool),
         approval: approval_handler.clone(),
     }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ReadImageTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
+    let read_image = read_image_tool_contribution(workspace_root.clone()).map_tool(|tool| {
+        Arc::new(TuiPermissionAwareTool {
+            inner: tool,
+            approval: approval_handler.clone(),
+        })
+    });
+    registry
+        .register_contribution(read_image)
+        .unwrap_or_else(|error| panic!("{error}"));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(DocumentExtractTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
@@ -1070,6 +1080,7 @@ pub(crate) fn highlight_snippet(snippet: &str) -> String {
 mod tests {
     use super::*;
     use talos_core::tool::{ToolNature, ToolProvenance};
+    use talos_tools::ReadImageTool;
 
     struct NamedReadTool {
         name: &'static str,
@@ -1335,6 +1346,23 @@ mod tests {
             assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
             assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
         }
+    }
+
+    #[test]
+    fn read_image_profile_is_print_and_tui_only() {
+        let print_registry = build_print_tool_registry(Vec::new());
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui_registry = build_tui_tool_registry(
+            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+            PathBuf::from("."),
+            Uuid::new_v4(),
+            Vec::new(),
+        );
+        let mcp_registry = build_mcp_tool_registry();
+
+        assert!(print_registry.get("read_image").is_some());
+        assert!(tui_registry.get("read_image").is_some());
+        assert!(mcp_registry.get("read_image").is_none());
     }
 
     #[test]

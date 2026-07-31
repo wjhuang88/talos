@@ -2,7 +2,7 @@
 #
 # Usage:
 #   iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
-#   $env:TALOS_VERSION = 'v0.6.0'
+#   $env:TALOS_VERSION = 'v0.6.1'
 #   iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 #   Remove-Item Env:TALOS_VERSION
 #
