@@ -17,6 +17,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  export-pr107-docs:
+    name: Export PR 107 governance docs
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'repair/pr107-doc-export'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr107-governance-docs
+          path: |
+            docs/backlog/PRODUCT-BACKLOG.md
+            docs/iterations/README.md
+            docs/tasks/2026-07-26-v0.6-runtime-productization-program.md
+            docs/tasks/2026-07-28-four-month-v06-execution-package.md
+            docs/BOARD.md
+          if-no-files-found: error
+          retention-days: 1
+
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
