@@ -1,36 +1,289 @@
-name: I158 CLI Todo Wiring
+name: Release
 
 on:
   push:
-    branches:
-      - feature/i158-cli-todo-contributions
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  apply:
+  # ── Gate: fmt + check + clippy + test ───────────────────────────────────
+  gate:
+    name: Release preflight
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Release preflight
+        run: ./scripts/release_preflight.sh "${GITHUB_REF_NAME}"
+
+  # ── macOS ARM64 ─────────────────────────────────────────────────────────
+  build-macos-arm:
+    name: Build macOS ARM64
+    needs: gate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-apple-darwin
+      - name: Build
+        run: cargo build --release --target aarch64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar -czf talos-aarch64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-darwin
+          path: target/aarch64-apple-darwin/release/talos-aarch64-darwin.tar.gz
+
+  # ── macOS x86_64 ────────────────────────────────────────────────────────
+  build-macos-intel:
+    name: Build macOS x86_64
+    needs: gate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-apple-darwin
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-apple-darwin/release
+          tar -czf talos-x86_64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-darwin
+          path: target/x86_64-apple-darwin/release/talos-x86_64-darwin.tar.gz
+
+  # ── Linux x86_64 musl ───────────────────────────────────────────────────
+  build-linux-x86:
+    name: Build Linux x86_64 (musl)
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: cargo build --release --target x86_64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-unknown-linux-musl/release
+          tar -czf talos-x86_64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-linux
+          path: target/x86_64-unknown-linux-musl/release/talos-x86_64-linux.tar.gz
+
+  # ── Linux ARM64 musl ────────────────────────────────────────────────────
+  build-linux-arm:
+    name: Build Linux ARM64 (musl)
+    needs: gate
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_aarch64_unknown_linux_musl: musl-gcc
+        run: cargo build --release --target aarch64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-unknown-linux-musl/release
+          tar -czf talos-aarch64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-linux
+          path: target/aarch64-unknown-linux-musl/release/talos-aarch64-linux.tar.gz
+
+  # ── Windows x86_64 ──────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows x86_64
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-pc-windows-msvc
+      - name: Build
+        run: cargo build --release -p talos-cli
+      - name: Package
+        shell: pwsh
+        run: |
+          cd target/release
+          Compress-Archive -Path talos.exe -DestinationPath talos-x86_64-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-windows
+          path: target/release/talos-x86_64-windows.zip
+
+  # ── Release: collect artifacts, checksum, publish ───────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [build-macos-arm, build-macos-intel, build-linux-x86, build-linux-arm, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feature/i158-cli-todo-contributions
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@master
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          toolchain: 1.97.0
-      - name: Apply and format CLI wiring
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksum
         run: |
-          python scripts/tmp_i158_cli_todo_contributions.py
-          cargo fmt --all
-          git diff --check
-      - name: Commit clean implementation tree
+          cd dist
+          sha256sum talos-* > checksum.sha256
+          echo "=== Artifacts ==="
+          ls -lh
+          echo "=== Checksums ==="
+          cat checksum.sha256
+
+      - name: Detect pre-release
+        id: prerelease
         run: |
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/release.yml
-          rm -f scripts/tmp_i158_cli_todo_contributions.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "feat(cli): consume session todo contributions"
-          git push origin HEAD:feature/i158-cli-todo-contributions
+          TAG="${GITHUB_REF_NAME}"
+          if echo "$TAG" | grep -qE '^v[0-9]+(\.[0-9]+)*-(alpha|beta|rc|pre|dev)\.'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build release notes
+        env:
+          IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
+          RELEASE_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          RAW_URL_BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}"
+          TAG_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/tag"
+          COMMIT_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/commit"
+
+          format_commits() {
+            git log --pretty=format:'%s%x09%h%x09%H' "$@" |
+              sed -E 's/ \[model:[^]]+\]//g' |
+              while IFS="$(printf '\t')" read -r subject short_hash full_hash || [ -n "$subject" ]; do
+                [ -n "$subject" ] || continue
+                echo "- ${subject} ([${short_hash}](${COMMIT_URL_BASE}/${full_hash}))"
+              done
+          }
+
+          {
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**"
+              echo
+            fi
+
+            NOTES_FILE="docs/releases/${TAG}.md"
+            if [ -f "$NOTES_FILE" ]; then
+              cat "$NOTES_FILE"
+              echo
+            fi
+
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "## Changes since [\`$PREVIOUS_TAG\`](${TAG_URL_BASE}/${PREVIOUS_TAG})"
+              echo
+              format_commits "${PREVIOUS_TAG}..${TAG}"
+              echo
+              echo
+              echo "Compare: [\`${PREVIOUS_TAG}...${TAG}\`](https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG})"
+            else
+              echo "## Initial release"
+              echo
+              format_commits "$TAG"
+            fi
+
+            echo
+            echo "## Downloads"
+            echo
+            echo "| Platform | Architecture | File |"
+            echo "|----------|-------------|------|"
+            echo "| Linux | x86_64 | [\`talos-x86_64-linux.tar.gz\`](${RELEASE_URL_BASE}/talos-x86_64-linux.tar.gz) |"
+            echo "| Linux | ARM64 | [\`talos-aarch64-linux.tar.gz\`](${RELEASE_URL_BASE}/talos-aarch64-linux.tar.gz) |"
+            echo "| macOS | Apple Silicon | [\`talos-aarch64-darwin.tar.gz\`](${RELEASE_URL_BASE}/talos-aarch64-darwin.tar.gz) |"
+            echo "| macOS | Intel | [\`talos-x86_64-darwin.tar.gz\`](${RELEASE_URL_BASE}/talos-x86_64-darwin.tar.gz) |"
+            echo "| Windows | x86_64 | [\`talos-x86_64-windows.zip\`](${RELEASE_URL_BASE}/talos-x86_64-windows.zip) |"
+            echo
+            echo "Checksums: [\`checksum.sha256\`](${RELEASE_URL_BASE}/checksum.sha256)"
+            echo
+            echo "### Install"
+            echo
+            echo '```bash'
+            echo "# macOS / Linux"
+            echo "curl -fsSL ${RAW_URL_BASE}/install/install.sh | sh"
+            echo "# Install or roll back to this release"
+            echo "curl -fsSL ${RAW_URL_BASE}/install/install.sh | TALOS_VERSION=${TAG} sh"
+            echo '```'
+            echo
+            echo '```powershell'
+            echo '# Windows (PowerShell)'
+            echo "irm ${RAW_URL_BASE}/install/install.ps1 | iex"
+            echo "\$env:TALOS_VERSION = '${TAG}'; irm ${RAW_URL_BASE}/install/install.ps1 | iex; Remove-Item Env:TALOS_VERSION"
+            echo '```'
+            echo
+            echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."
+          } > RELEASE_BODY.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          body_path: RELEASE_BODY.md
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          files: dist/*
