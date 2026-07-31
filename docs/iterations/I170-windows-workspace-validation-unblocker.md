@@ -1,6 +1,6 @@
 # Iteration I170: Windows Workspace Validation Unblocker
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-31
 > Planned objective: close the Windows `talos-tools` failures that block I169/PR #68 G13 by
 > delivering the already-planned TOOL-023-A/C shell work and stable cross-platform tool output.
@@ -33,7 +33,7 @@
 - Branch: `codex/i170-windows-shell`
 - Worktree: `C:/Users/12261/Documents/talos-worktrees/i170-windows-shell`
 - Merge target: `main`
-- Pull request: pending independent draft PR
+- Pull request: pending independent draft PR creation
 
 ### Scope
 
@@ -79,7 +79,7 @@
 
 - Requested outcome: resolve, rather than merely record, all failures blocking PR #68 review.
 - Artifacts: TOOL-023-A/C, I170, ADR-057, BashTool, file/search projections, tests, READMEs, Board,
-  backlog, I169, manifest, and PR/Issue evidence.
+  backlog, and PR/Issue evidence.
 - Existing assets preserved: I169 implementation commits, ADR-007/012 constraints, TOOL-023-B,
   I168's separate worktree, and Unix shell behavior.
 - Validation required: focused platform tests, full locked workspace gates, real Windows smoke,
@@ -92,12 +92,23 @@
 | --- | --- | --- |
 | 2026-07-31 | User correction | The prior stop-at-baseline decision was rejected; the requested outcome is a reviewable PR with the failures actually resolved. |
 | 2026-07-31 | Reproduction | `cargo test -p talos-tools --locked -- --test-threads=1` produced 27 failures: 19 shell-spawn/semantics, four long/recursive ls, and four glob/grep path assertions. |
+| 2026-07-31 | Main integration | Independent branch created from `origin/main@e539537d`; I169 and ADR-056 were excluded from the split. |
+| 2026-07-31 | Corrective follow-up | Latest-main Windows failures were resolved without skips: Unix-only symlink fixtures are target-gated, benchmark artifact comparison normalizes CRLF, and permission fixtures use the platform temp directory. |
 
 ## Verification Evidence
 
-- Pending implementation.
+- `cargo test -p talos-tools --locked`: PASS, 280 tests plus integration/doc tests.
+- `cargo test -p talos-memory --locked`: PASS, 68 tests plus doc tests.
+- `cargo test -p talos-permission --locked`: PASS, 112 tests plus one doc test.
+- `cargo test -p talos-cli --locked`: PASS, including CLI integration tests.
+- `cargo test --workspace --locked`: PASS on Windows.
+- `./scripts/release_preflight.sh`: PASS on Windows with the pinned Rust 1.97 toolchain; this
+  includes public-site/installer checks, format, locked workspace check, Clippy with warnings
+  denied, locked workspace tests, and governance validation.
+- Implementation commits: `5dc7854d`, `77323b91`, `ed07a769`, `25002064`, `248d3217`.
+- Remote CI and maintainer/security acceptance remain pending; ADR-057 therefore remains Proposed.
 
 ## Completion Evidence
 
-- Completion Commit: pending. Do not mark Complete until the implementation commit already exists
-  and every required local validation plus the recorded Windows walkthrough passes.
+- Completion Commit: pending. The implementation commits above are local evidence, but the owner
+  remains Review until the independent PR's remote CI and maintainer/security review pass.

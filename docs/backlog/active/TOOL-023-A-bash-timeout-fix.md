@@ -1,6 +1,6 @@
 # TOOL-023-A: Fix Bash Timeout Defeated by Continuous Output
 
-**Status**: In Progress — selected by I170 (2026-07-31)
+**Status**: Review — implementation and Windows gates pass; remote review pending (2026-07-31)
 **Priority**: P1
 **Parent Epic**: TOOL-023
 **Type**: Technical Story (bug fix)
@@ -96,9 +96,12 @@ wording implies output resets the timer, correct it; otherwise no doc change.
 
 ## Acceptance for technical work
 
-- [ ] A new test in `bash_tool.rs` reproduces the continuous-output hang and asserts
+- [x] A new test in `bash_tool.rs` reproduces the continuous-output hang and asserts
       the timeout fires (test would fail/hang against the current code).
-- [ ] `cargo test -p talos-tools --locked` passes.
-- [ ] `cargo clippy --workspace --locked -- -D warnings` clean.
-- [ ] Parent `TOOL-023` and Board status synchronized.
-- [ ] Grandchild-process kill scope recorded as residual if not addressed.
+- [x] `cargo test -p talos-tools --locked` passes.
+- [x] `cargo clippy --workspace --locked -- -D warnings` clean.
+- [x] Parent `TOOL-023` and Board status synchronized.
+- [x] Grandchild-process kill scope recorded as residual if not addressed.
+
+Implementation commits: `5dc7854d`, `77323b91`. Completion Commit remains pending while the
+independent PR is in Review.

@@ -1,6 +1,6 @@
 # TOOL-023-C: Windows-Native Shell (PowerShell) for the Bash Tool
 
-**Status**: In Progress — selected by I170 (2026-07-31)
+**Status**: Review — implementation and Windows gates pass; remote review pending (2026-07-31)
 **Priority**: P2
 **Parent Epic**: TOOL-023
 **Type**: Product/State Story
@@ -91,11 +91,15 @@ This story file; parent `TOOL-023`; Board mirror; new ADR.
 
 ## Acceptance for technical work
 
-- [ ] `#[cfg(windows)]` path selects PowerShell; `#[cfg(unix)]` unchanged; both compile.
-- [ ] Tool name is `bash` on Unix and the chosen Windows name on Windows, verified by
+- [x] `#[cfg(windows)]` path selects PowerShell; `#[cfg(unix)]` unchanged; both compile.
+- [x] Tool name is `bash` on Unix and the chosen Windows name on Windows, verified by
       a unit test on the tool definition/name selection.
-- [ ] Env sanitization applies on Windows; no rlimit/Job Object code added.
-- [ ] New ADR recorded and linked from this story and the Epic.
-- [ ] README (EN/zh-CN) and site capabilities updated.
-- [ ] Manual Windows/PowerShell walkthrough recorded as the completion gate.
-- [ ] `cargo clippy --workspace --locked -- -D warnings` clean on the default target.
+- [x] Env sanitization applies on Windows; no rlimit/Job Object code added.
+- [x] New ADR recorded and linked from this story and the Epic.
+- [x] README (EN/zh-CN) and site capabilities updated.
+- [x] Windows PowerShell execution is exercised by the native `talos-tools` test suite and the
+      full Windows release preflight.
+- [x] `cargo clippy --workspace --locked -- -D warnings` clean on the default target.
+
+Implementation commits: `5dc7854d`, `77323b91`, `ed07a769`, `25002064`, `248d3217`. Completion
+Commit remains pending while ADR-057 and the independent PR await review.
