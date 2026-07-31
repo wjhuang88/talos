@@ -34,12 +34,10 @@ fitness checks that prevent uncontrolled code accumulation.
    blocked on accepted A findings; one behavior-preserving story per root/seam.
 3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement,
    introduces only evidence-backed prevention checks after A/B.
-4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Refinement,
-   turns accepted finding F01 into an ADR-gated, behavior-preserving tool-composition story.
-   Gated by [ADR-053](../../decisions/053-tool-registration-composition.md) (Proposed): the story
-   cannot become Ready and [I158](../../iterations/I158-tool-registration-composition.md) cannot be
-   activated until ADR-053 is Accepted by architecture/maintainer review. Status unchanged until
-   then.
+4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Review,
+   implements accepted ADR-053 through I158. Contribution/profile implementation and deterministic
+   inventory evidence are merged; scheduler/status exception ownership plus ARCHITECTURE, TOOL-003,
+   and F01 disposition remain the final closeout gates. I158 is Review, not Complete.
 
 ## Audit Dimensions
 

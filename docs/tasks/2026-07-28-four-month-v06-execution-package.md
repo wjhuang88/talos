@@ -301,3 +301,11 @@ Recovery or resume instruction:
 - TUI-037 is P1 but remains Refinement with Issue #104 and an Unclaimed Collaboration Claim.
 - After I158 Complete or Paused, resolve its design gates and select a dedicated iteration or explicitly record Blocked/Deferred before I159.
 - I159-I162 retain their published baselines and remain Blocked.
+
+## 2026-07-31 I158 Review Checkpoint
+
+- I158 contribution/profile implementation merged through #102 (`9d2926ed04a6c4666d7895fbb6bdb4099907daf8`) and deterministic exact inventory evidence through #105 (`ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`).
+- Exact-head CI passed for both final slices; project-governance and Collaboration Claim validation passed.
+- I158 is Review, not Complete. Remaining gates are scheduler/status contribution exception ownership and final ARCHITECTURE, TOOL-003, and ARCH-034-F01 documentation/disposition.
+- Claim #112 is Released after the bounded implementation/evidence and owner synchronization work slice.
+- TUI-037 remains blocked until I158 reaches a formal Complete or Paused state; I159-I162 retain their published baselines and remain blocked.
