@@ -5,120 +5,104 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | Ready — first implementation candidate after I158 disposition |
-| Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; GitHub Issue #104 |
+| Status | Refinement — first post-I158 disposition; design gates unresolved |
+| Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; Issue #104 |
 | Parent Epic | None |
-| Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 disposition before activation |
-| Blocks | None |
+| Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 disposition |
+| Blocks | I159 activation until TUI-037 receives an explicit disposition |
 
 ## Identity / Goal / Value
 
-When the local Dashboard becomes available, show one concise Dashboard line in
-the display-only Logo region instead of the generic tips row. Its URL should be
-clickable in terminals that support hyperlinks, making the Dashboard reachable
-without copying an address manually.
+When the local Dashboard becomes available, show one concise Dashboard line in the display-only Logo region instead of the generic tips row. In ordinary loopback mode, the token-free URL should be clickable where terminal hyperlink support is safe and remain fully copyable everywhere else.
 
 ## Priority And Sequencing
 
-The maintainer raised this story from P2 to P1 on 2026-07-31.
+The maintainer raised this Story from P2 to P1 on 2026-07-31.
 
-- I158 remains the sole Active implementation iteration. Do not stack this UI
-  change onto the active tool-registration composition branches or PRs.
-- After I158 reaches a formal Complete or Paused disposition, TUI-037 is the
-  first implementation candidate to select into a new iteration.
-- Select TUI-037 before activating I159-I162 unless the maintainer explicitly
-  changes the order after a fresh repository and dependency inventory.
-- GitHub Issue #104 is the remote execution tracker; this owner document remains
-  authoritative for scope, acceptance, and status.
+- I158 remains the sole Active implementation iteration; do not stack this UI change onto I158 branches or PRs.
+- After I158 reaches Complete or Paused, TUI-037 is the first product item to disposition before I159 may activate.
+- TUI-037 remains Refinement while the hyperlink and token-required loopback navigation gates below are unresolved; this document does not authorize implementation.
+- The post-I158 inventory must either resolve the gates and select a dedicated iteration, or explicitly record TUI-037 as Blocked or Deferred.
+- I159-I162 retain their published baselines.
 
 ## Scope
 
-- Replace the current `Dashboard ready: …` generic `TipKind::Info` path with a
-  structured, non-secret dashboard-availability presentation owned by the
-  Logo-prefix renderer.
-- Add exactly one Dashboard line to the Logo prefix, with a concise label and
-  visible URL/fallback text.
-- Encode the URL as an OSC 8 terminal hyperlink when the renderer/backend can
-  do so safely; terminals without hyperlink support must still show a complete,
-  copyable URL.
-- Keep the line display-only: it scrolls with the Logo prefix, never enters
-  `TranscriptStore`, session persistence, export, or primary-screen
-  scrollback.
-- Preserve ordinary tips for non-dashboard information, warnings, errors,
-  queue feedback, and approval results.
-- Test wide/narrow Logo layouts, URL clipping/wrapping, Alternate Screen
-  lifecycle, hyperlink escape safety, and click/fallback behavior in at least
-  the real-terminal matrix named by the story.
-
-## Planned Implementation Slices
-
-1. Introduce or reuse structured, token-free Dashboard availability metadata at
-   the CLI-to-TUI boundary without making the URL a transcript fact.
-2. Project one bounded Dashboard row as part of the existing ADR-054 Logo
-   virtual-history prefix and remove the Dashboard-ready message from generic
-   info tips.
-3. Add OSC 8 hyperlink emission at the terminal rendering boundary with strict
-   target sanitization and a complete visible URL fallback.
-4. Add focused state/projection/full-frame tests, locked workspace validation,
-   documentation updates, and rebuilt-binary terminal acceptance.
+- Replace the successful Dashboard-ready info-tip path with structured, non-secret availability state projected by the Logo-prefix renderer.
+- Add exactly one Dashboard line to the display-only Logo prefix.
+- In ordinary loopback mode, show the complete token-free URL and optionally encode it as OSC 8 after validation.
+- Keep the Logo line out of transcript, session persistence, export, logs, and primary-screen scrollback.
+- Preserve normal tips for other information, warnings, errors, queue feedback, and approval results.
+- Test wide and narrow layouts, wrapping, Alternate Screen lifecycle, escape safety, and click/plain-text behavior.
 
 ## Exclusions
 
-- No Dashboard route, data model, authentication, bind-address, or remote
-  access change.
-- No browser automation or OS-level URL opener; the terminal owns hyperlink
-  activation.
-- No bearer token, credential, session secret, or query token in visible text
-  or OSC 8 hyperlink targets.
-- No change to normal TipsComponent behavior other than removing the dashboard
-  availability notice from it.
-- No I159-I162 implementation or v0.6 release action in the TUI-037 slice.
+- No Dashboard route, data model, authentication, bind-address, or remote-access change.
+- No browser automation or OS-level URL opener.
+- No secret value in visible text, hyperlink targets, logs, sessions, or export.
+- No I159-I162 implementation, release, tag, publish, or version action.
 
 ## Decision Links And Constraints
 
-- ADR-031: Dashboard remains loopback-first; its existing token/loopback
-  boundary is unchanged.
-- ADR-054: Logo is a display-only virtual history prefix in the Alternate
-  Screen renderer. Dashboard presentation must share that prefix rather than
-  becoming a second renderer or a transcript fact.
-- If a structured dashboard notice requires changing a public conversation UI
-  enum, create the required compatibility/decision record before implementation
-  rather than extending the protocol implicitly.
+- ADR-031 keeps Dashboard loopback-bound. When `dashboard.loopback_only = false`, Dashboard is still loopback-bound but requires an additional token; this Story calls that the token-required loopback configuration.
+- ADR-054 defines Logo as a display-only virtual history prefix. Dashboard state must share that prefix rather than become a second renderer or transcript fact.
+- A public conversation UI enum change requires the normal compatibility and decision record before implementation.
 
-## Hyperlink And Safe-Fallback Policy
+## Display And Hyperlink Policy
 
-- A loopback Dashboard URL may be rendered as an OSC 8 target only after it is
-  verified to contain no userinfo, bearer token, credential, session secret, or
-  secret query parameter.
-- The visible text always contains a complete copyable token-free URL; OSC 8 is
-  an enhancement, not the only navigation path.
-- If a terminal/backend cannot safely preserve OSC 8 sequences, render plain
-  text without emitting a partial or malformed escape sequence.
-- For authenticated non-loopback configurations, emit a clickable target only
-  when a usable non-secret URL is available. Otherwise render a non-clickable
-  `Dashboard available — see terminal output` fallback and never expose or
-  embed the token.
-- Manual acceptance covers Alacritty, Kitty or WezTerm, macOS Terminal or
-  iTerm2, and tmux, recording hyperlink activation or the plain-text fallback
-  for each environment.
+### Ordinary loopback configuration
+
+- Show the complete token-free Dashboard URL.
+- Emit OSC 8 only after validating that the target contains no userinfo or secret value.
+- Without safe OSC 8 support, show the same complete URL as plain text and emit no malformed escape sequence.
+
+### Token-required loopback configuration
+
+- Show the complete token-free base URL plus `authentication required`.
+- Keep the row non-clickable under the current unresolved design baseline.
+- Do not treat terminal output as a verified token-delivery boundary.
+- Never place the token in visible text, OSC 8, logs, transcript, session state, or export.
+- Before Ready, document and validate a safe navigation/authentication boundary, or explicitly accept the non-clickable token-free base URL as the complete supported behavior.
+
+### Failure behavior
+
+Dashboard startup failure remains a normal error tip and creates no Logo link.
+
+## Uncertainty And Validation Path
+
+Before Ready:
+
+- confirm the exact crossterm/ratatui OSC 8 capability and sanitization boundary;
+- resolve the token-required loopback navigation decision;
+- define manual validation for Alacritty, Kitty or WezTerm, macOS Terminal or iTerm2, and tmux.
 
 ## State / Status Owners
 
-- Dashboard startup and safe availability metadata: `talos-cli` / Dashboard
-  boundary.
+- Dashboard startup and safe availability state: `talos-cli` / Dashboard boundary.
 - Logo-prefix projection and hyperlink rendering: `talos-tui`.
-- Remote execution tracking: GitHub Issue #104.
-- Story priority, scope, acceptance, and status: this document.
-- A new iteration owner is created only after I158 has a formal disposition and
-  the activation inventory confirms no conflicting Active iteration.
+- Remote tracking: Issue #104.
+- Priority, scope, acceptance, and status: this document.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | #104 |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-07-31 |
+| Handoff / Release Condition | None |
 
 ## User-Facing Documentation
 
-- Update Dashboard configuration/usage documentation and the TUI keyboard/UI
-  guide to state where the Dashboard URL appears and how terminal hyperlink
-  fallback works.
-- Document that the URL contains no Dashboard token and may need manual copy in
-  terminals that do not activate OSC 8 links.
+- Update Dashboard and TUI documentation with the final display location and hyperlink fallback.
+- Document ordinary and token-required loopback behavior without implying an unsafe token-delivery path.
 
 ## Required Reads
 
@@ -128,38 +112,25 @@ The maintainer raised this story from P2 to P1 on 2026-07-31.
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`
 - `docs/iterations/I158-tool-registration-composition.md`
+- `docs/tasks/2026-07-26-v0.6-runtime-productization-program.md`
+- `docs/tasks/2026-07-28-four-month-v06-execution-package.md`
 - `crates/talos-cli/src/mode_runners.rs`
-- `crates/talos-tui/src/app.rs`
-- `crates/talos-tui/src/splash.rs`
-- `crates/talos-tui/src/inline_terminal.rs`
+- `crates/talos-tui/src/`
 
 ## Acceptance
 
-- Given a loopback Dashboard starts successfully, when the first or later TUI
-  frame is rendered, then the Logo prefix contains one Dashboard line and the
-  generic tips row does not contain the dashboard-ready message.
-- Given a hyperlink-capable terminal, when the Dashboard URL is activated, then
-  the terminal opens the exact loopback Dashboard URL without a token.
-- Given a terminal without OSC 8 support, when the Logo line is rendered, then
-  a complete copyable URL remains visible and no malformed escape sequence is
-  emitted.
-- Given a narrow Logo layout, when the Dashboard line is projected, then it is
-  width-bounded and does not corrupt Logo, history, composer, or status rows.
-- Given history grows or the user scrolls, when Logo rows leave or re-enter the
-  history rectangle, then the Dashboard line follows the Logo prefix and never
-  becomes a transcript/session/export fact.
-- Given Dashboard startup fails, when the error is rendered, then it remains a
-  normal error tip and no misleading clickable Logo link appears.
-- Given an authenticated non-loopback Dashboard configuration, when no
-  non-secret usable URL is available, then no token is displayed or embedded in
-  a hyperlink target and the documented non-clickable fallback is shown.
-- Unit/full-frame tests and the specified real-terminal hyperlink matrix pass;
-  `cargo test --workspace --locked` passes.
+- Ordinary loopback success renders exactly one Dashboard Logo line and no dashboard-ready generic tip.
+- Safe OSC 8 activation opens the exact token-free loopback URL.
+- Without safe OSC 8 support, the complete copyable URL remains visible and no malformed escape sequence is emitted.
+- Token-required loopback renders the complete token-free base URL plus `authentication required`, remains non-clickable under the current baseline, and exposes no token.
+- Narrow layouts do not corrupt Logo, history, composer, or status rows.
+- Scrolling keeps the Dashboard row with the Logo prefix and never persists it.
+- Startup failure remains an error tip and creates no misleading link.
+- Focused/full-frame tests, the real-terminal matrix, and `cargo test --workspace --locked` pass.
 
 ## Residuals
 
-- Implementation has not started; the exact public/internal event shape remains
-  an implementation decision constrained by the existing compatibility rules.
-- Activation waits for I158 Complete or Paused disposition and a fresh inventory.
-- I159-I162 retain their published baselines but are sequenced after TUI-037 by
-  the 2026-07-31 maintainer priority decision unless explicitly reordered.
+- OSC 8 capability, sanitization, and terminal compatibility remain design gates.
+- Token-required loopback navigation remains a design gate.
+- TUI-037 stays Refinement until both gates are resolved.
+- After I158 disposition, TUI-037 must be selected into a dedicated iteration or explicitly recorded Blocked/Deferred before I159 activation.
