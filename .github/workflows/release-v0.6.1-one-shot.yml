@@ -146,24 +146,21 @@ jobs:
           if notes.exists():
               raise SystemExit(f"release notes already exist: {notes}")
           notes.write_text(
-              """## Highlights
-
-1. **Transactional, source-aware tool composition.** Tool factories now carry stable contribution
-   identities, checked registration rejects collisions deterministically, and multi-tool batches
-   apply atomically across core, session, tools, CLI, and explicit local plugins.
-2. **Provider terminal-outcome integrity.** OpenAI- and Anthropic-compatible streaming paths now
-   preserve known terminal outcomes, bound diagnostics, and keep stdout/stderr ordering explicit
-   under malformed or dual-protocol responses.
-3. **Durable configuration mutation.** Provider removal and credential clearing use shared mutation
-   locking, journaled recovery, and latest-state semantic updates so stale interactive snapshots do
-   not restore deleted configuration.
-4. **Terminal interaction reliability.** Composer continuity, interrupt handling, approval contrast,
-   resize behavior, and terminal closeout received additional regression and real-terminal evidence.
-
-Talos remains pre-1.0. This patch release is a local developer product snapshot; it does not claim
-REL-002 readiness, stable 1.0 SDK guarantees, crates.io publication, or completion of the active
-v0.6 Runtime Productization Program.
-"""
+              "## Highlights\n\n"
+              "1. **Transactional, source-aware tool composition.** Tool factories now carry stable contribution\n"
+              "   identities, checked registration rejects collisions deterministically, and multi-tool batches\n"
+              "   apply atomically across core, session, tools, CLI, and explicit local plugins.\n"
+              "2. **Provider terminal-outcome integrity.** OpenAI- and Anthropic-compatible streaming paths now\n"
+              "   preserve known terminal outcomes, bound diagnostics, and keep stdout/stderr ordering explicit\n"
+              "   under malformed or dual-protocol responses.\n"
+              "3. **Durable configuration mutation.** Provider removal and credential clearing use shared mutation\n"
+              "   locking, journaled recovery, and latest-state semantic updates so stale interactive snapshots do\n"
+              "   not restore deleted configuration.\n"
+              "4. **Terminal interaction reliability.** Composer continuity, interrupt handling, approval contrast,\n"
+              "   resize behavior, and terminal closeout received additional regression and real-terminal evidence.\n\n"
+              "Talos remains pre-1.0. This patch release is a local developer product snapshot; it does not claim\n"
+              "REL-002 readiness, stable 1.0 SDK guarantees, crates.io publication, or completion of the active\n"
+              "v0.6 Runtime Productization Program.\n"
           )
 
           workflow = Path(os.environ["ONE_SHOT_WORKFLOW"])
