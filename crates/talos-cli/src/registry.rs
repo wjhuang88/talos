@@ -12,16 +12,12 @@ use serde_json::Value;
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
-    AgentTool, ToolAuthorizationScope, ToolBackend, ToolExecutionAuthorization,
+    AgentTool, ToolAuthorizationScope, ToolBackend, ToolContribution, ToolExecutionAuthorization,
     ToolExecutionOutput, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
-use talos_session::{
-    SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
-    TodoQueryTool, TodoRemoveDependencyTool, TodoUpdateBatchTool, TodoUpdateStatusTool,
-    TodoUpdateTool,
-};
+use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -183,40 +179,11 @@ impl TuiApprovalHandler {
     }
 }
 
-fn default_todo_tools(session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
+fn default_todo_tool_contributions(session_id: Uuid) -> Vec<ToolContribution> {
     let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
         return Vec::new();
     };
-    todo_tools_for_sessions_dir(&sessions_dir, session_id)
-}
-
-fn todo_tools_for_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
-    vec![
-        Arc::new(TodoCreateTool::from_sessions_dir(sessions_dir, session_id)),
-        Arc::new(TodoCreateBatchTool::from_sessions_dir(
-            sessions_dir,
-            session_id,
-        )),
-        Arc::new(TodoUpdateStatusTool::from_sessions_dir(
-            sessions_dir,
-            session_id,
-        )),
-        Arc::new(TodoUpdateTool::from_sessions_dir(sessions_dir, session_id)),
-        Arc::new(TodoUpdateBatchTool::from_sessions_dir(
-            sessions_dir,
-            session_id,
-        )),
-        Arc::new(TodoDeleteTool::from_sessions_dir(sessions_dir, session_id)),
-        Arc::new(TodoAddDependencyTool::from_sessions_dir(
-            sessions_dir,
-            session_id,
-        )),
-        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(
-            sessions_dir,
-            session_id,
-        )),
-        Arc::new(TodoQueryTool::from_sessions_dir(sessions_dir, session_id)),
-    ]
+    todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id)
 }
 
 /// Permission-aware tool wrapper for TUI mode.
@@ -898,12 +865,17 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         approval: approval.clone(),
         print_mode: true,
     }));
-    for tool in default_todo_tools(ephemeral_session_id) {
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: tool,
-            approval: approval.clone(),
-            print_mode: true,
-        }));
+    for contribution in default_todo_tool_contributions(ephemeral_session_id) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: true,
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in scheduler_tools {
         registry.register(Arc::new(PermissionAwareTool {
@@ -1035,11 +1007,16 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(WebSearchTool::new()),
         approval: approval_handler.clone(),
     }));
-    for tool in default_todo_tools(session_id) {
-        registry.register(Arc::new(TuiPermissionAwareTool {
-            inner: tool,
-            approval: approval_handler.clone(),
-        }));
+    for contribution in default_todo_tool_contributions(session_id) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: approval_handler.clone(),
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in delay_tool {
         registry.register(Arc::new(TuiPermissionAwareTool {
@@ -1242,8 +1219,8 @@ mod tests {
         let session_id = Uuid::new_v4();
 
         let mut print_registry = ToolRegistry::new();
-        for tool in todo_tools_for_sessions_dir(&sessions_dir, session_id) {
-            print_registry.register(tool);
+        for contribution in todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id) {
+            print_registry.register_contribution(contribution).unwrap();
         }
         assert!(print_registry.get("todo_create").is_some());
         assert!(print_registry.get("todo_create_batch").is_some());
@@ -1258,11 +1235,14 @@ mod tests {
         let (tx, _rx) = mpsc::unbounded_channel();
         let tui_approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
         let mut tui_registry = ToolRegistry::new();
-        for tool in todo_tools_for_sessions_dir(&sessions_dir, session_id) {
-            tui_registry.register(Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: tui_approval.clone(),
-            }));
+        for contribution in todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id) {
+            let contribution = contribution.map_tool(|tool| {
+                Arc::new(TuiPermissionAwareTool {
+                    inner: tool,
+                    approval: tui_approval.clone(),
+                })
+            });
+            tui_registry.register_contribution(contribution).unwrap();
         }
         assert!(tui_registry.get("todo_create").is_some());
         assert!(tui_registry.get("todo_create_batch").is_some());
@@ -1285,22 +1265,24 @@ mod tests {
         let sessions_dir = dir.path().join("sessions");
         let session_id = Uuid::new_v4();
 
-        let before_tools = todo_tools_for_sessions_dir(&sessions_dir, session_id);
+        let before_tools = todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id);
         let create_tool = before_tools
             .iter()
-            .find(|t| t.name() == "todo_create")
-            .unwrap();
+            .find(|contribution| contribution.name() == "todo_create")
+            .unwrap()
+            .tool();
         let created = create_tool
             .execute(serde_json::json!({ "title": "survive model switch" }))
             .await;
         assert!(!created.is_error, "{}", created.content);
 
         // "After" registry: same session_id, entirely new tool instances.
-        let after_tools = todo_tools_for_sessions_dir(&sessions_dir, session_id);
+        let after_tools = todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id);
         let query_tool = after_tools
             .iter()
-            .find(|t| t.name() == "todo_query")
-            .unwrap();
+            .find(|contribution| contribution.name() == "todo_query")
+            .unwrap()
+            .tool();
         let queried = query_tool.execute(serde_json::json!({})).await;
         assert!(queried.content.contains("survive model switch"));
     }
