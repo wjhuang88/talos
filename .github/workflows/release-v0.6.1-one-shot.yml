@@ -183,7 +183,7 @@ v0.6 Runtime Productization Program.
           ./scripts/validate_project_governance.sh .
           git diff --check
 
-      - name: Commit, push, and tag
+      - name: Commit, revalidate latest main, push, and tag
         id: commit
         shell: bash
         run: |
@@ -193,14 +193,23 @@ v0.6 Runtime Productization Program.
           git add -A
           git diff --cached --check
           git commit -m "chore(release): prepare $RELEASE_TAG [model:gpt-5.6-thinking]"
-          release_sha="$(git rev-parse HEAD)"
+
           git fetch origin main
           expected_parent="$(git rev-parse HEAD^)"
           remote_main="$(git rev-parse origin/main)"
           if [ "$expected_parent" != "$remote_main" ]; then
-            echo "main moved during release validation; refusing non-fast-forward release" >&2
+            echo "main advanced during validation; rebasing the release commit onto $remote_main"
+            git rebase origin/main
+            ./scripts/release_preflight.sh "$RELEASE_TAG"
+            ./scripts/validate_project_governance.sh .
+            git diff --check
+          fi
+
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release tag appeared during validation: $RELEASE_TAG" >&2
             exit 1
           fi
+          release_sha="$(git rev-parse HEAD)"
           git push origin HEAD:main
           git tag -a "$RELEASE_TAG" -m "Talos $RELEASE_TAG"
           git push origin "$RELEASE_TAG"
