@@ -143,7 +143,12 @@ impl TokenEstimator {
                         talos_core::message::ContentPart::Image {
                             mime, byte_count, ..
                         } => {
-                            Self::estimate_text(mime) + Self::estimate_text(&byte_count.to_string())
+                            let payload_tokens =
+                                u32::try_from(byte_count.saturating_add(1023) / 1024)
+                                    .unwrap_or(u32::MAX);
+                            Self::estimate_text(mime)
+                                .saturating_add(payload_tokens)
+                                .saturating_add(85)
                         }
                     })
                     .sum(),
@@ -461,6 +466,24 @@ mod tests {
         // total = 3
         let tokens = estimator.estimate(&messages);
         assert_eq!(tokens, 3);
+    }
+
+    #[test]
+    fn multimodal_estimate_reserves_payload_tokens() {
+        let messages = vec![Message::Multimodal {
+            parts: vec![talos_core::message::ContentPart::Image {
+                path: std::path::PathBuf::from("fixture.png"),
+                mime: "image/png".into(),
+                byte_count: 10 * 1024,
+                content_digest: talos_core::message::ContentDigest::default(),
+            }],
+        }];
+
+        let tokens = TokenEstimator::new().estimate(&messages);
+        assert!(
+            tokens >= 95,
+            "image detail and payload reserve must be counted"
+        );
     }
 
     #[test]

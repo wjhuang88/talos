@@ -18,10 +18,20 @@ pub const MAX_SUBMISSION_ITEM_BYTES: usize = 64 * 1024;
 pub const MAX_STEERING_QUEUE_ITEMS: usize = 128;
 /// Maximum UTF-8 text bytes retained in one interactive steering queue (ADR-056).
 pub const MAX_STEERING_QUEUE_BYTES: usize = 1024 * 1024;
+/// Maximum image attachments owned by the actor across running and pending work.
+pub const MAX_STEERING_QUEUE_IMAGES: usize = 16;
+/// Maximum declared image bytes owned across running and pending work.
+pub const MAX_STEERING_QUEUE_IMAGE_BYTES: u64 = 100 * 1024 * 1024;
 /// Maximum compatible items projected into one actor turn (ADR-056).
 pub const MAX_SUBMISSION_BATCH_ITEMS: usize = 32;
 /// Maximum UTF-8 text bytes projected into one actor turn (ADR-056).
 pub const MAX_SUBMISSION_BATCH_BYTES: usize = 256 * 1024;
+/// Maximum image attachments accepted in one structured submission.
+pub const MAX_SUBMISSION_IMAGE_COUNT: usize = 4;
+/// Maximum declared bytes for one image attachment.
+pub const MAX_SUBMISSION_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+/// Maximum declared image bytes across one structured submission.
+pub const MAX_SUBMISSION_TOTAL_IMAGE_BYTES: u64 = 50 * 1024 * 1024;
 
 /// Origin of a structured session submission (ADR-056).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,6 +86,10 @@ pub struct StructuredSubmission {
     pub id: String,
     /// Producer/source used by actor arbitration and diagnostics.
     pub source: SubmissionSource,
+    /// Producer-side sender generation used to reject stale acknowledgements
+    /// after a session command channel is replaced.
+    #[serde(default)]
+    pub sender_generation: u64,
     /// Ordered recoverable items. A batch never mixes dispatch kinds.
     pub items: Vec<SubmissionItem>,
 }
@@ -85,6 +99,20 @@ impl StructuredSubmission {
     #[must_use]
     pub fn total_text_bytes(&self) -> usize {
         self.items.iter().map(SubmissionItem::text_bytes).sum()
+    }
+
+    /// Returns image attachment count and declared bytes across the batch.
+    #[must_use]
+    pub fn image_totals(&self) -> (usize, u64) {
+        self.items.iter().flat_map(|item| &item.attachments).fold(
+            (0_usize, 0_u64),
+            |(count, bytes), part| match part {
+                crate::message::ContentPart::Image { byte_count, .. } => {
+                    (count.saturating_add(1), bytes.saturating_add(*byte_count))
+                }
+                crate::message::ContentPart::Text { .. } => (count, bytes),
+            },
+        )
     }
 
     /// Returns the common dispatch kind when the batch is non-empty and homogeneous.
@@ -145,6 +173,8 @@ pub enum SessionEvent {
         session_id: String,
         /// Opaque producer-assigned submission identity.
         submission_id: String,
+        /// Sender generation echoed from the accepted submission.
+        sender_generation: u64,
         /// Source used by actor arbitration.
         source: SubmissionSource,
         /// Number of original recoverable items.
@@ -158,6 +188,8 @@ pub enum SessionEvent {
         session_id: String,
         /// Submission that started.
         submission_id: String,
+        /// Sender generation echoed from the accepted submission.
+        sender_generation: u64,
         /// Canonical actor turn identity.
         turn_id: String,
     },
@@ -167,6 +199,8 @@ pub enum SessionEvent {
         session_id: String,
         /// Submission that was rejected.
         submission_id: String,
+        /// Sender generation echoed from the rejected submission.
+        sender_generation: u64,
         /// Bounded, content-free rejection reason.
         reason: SubmissionRejectionReason,
     },
@@ -223,6 +257,10 @@ pub enum SessionEvent {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionRejectionReason {
+    /// The submission or one of its items was already accepted recently.
+    Duplicate,
+    /// The submission was cancelled before its turn started.
+    Cancelled,
     /// The submission was empty or mixed incompatible dispatch kinds.
     InvalidStructure,
     /// An item or batch exceeded a hard byte/item budget.
@@ -373,6 +411,7 @@ mod tests {
                 submission: StructuredSubmission {
                     id: "batch_1".into(),
                     source: SubmissionSource::User,
+                    sender_generation: 7,
                     items: vec![SubmissionItem {
                         id: "item_1".into(),
                         enqueue_sequence: 1,
@@ -401,6 +440,7 @@ mod tests {
             SessionEvent::SubmissionQueued {
                 session_id: "session_1".into(),
                 submission_id: "batch_1".into(),
+                sender_generation: 7,
                 source: SubmissionSource::User,
                 item_count: 1,
                 total_text_bytes: 10,
@@ -408,11 +448,13 @@ mod tests {
             SessionEvent::SubmissionStarted {
                 session_id: "session_1".into(),
                 submission_id: "batch_1".into(),
+                sender_generation: 7,
                 turn_id: "turn_1".into(),
             },
             SessionEvent::SubmissionRejected {
                 session_id: "session_1".into(),
                 submission_id: "batch_2".into(),
+                sender_generation: 7,
                 reason: SubmissionRejectionReason::LimitExceeded,
             },
             SessionEvent::TurnEvent {

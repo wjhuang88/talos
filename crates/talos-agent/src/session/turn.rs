@@ -50,6 +50,7 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
+    pub(super) request_context_limit: u32,
 }
 
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
@@ -67,6 +68,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         persistence,
         durable_persistence,
         result_tx,
+        request_context_limit,
     } = turn;
 
     let eq_tx_clone = eq_tx.clone();
@@ -137,7 +139,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     let mut agent_task = tokio::spawn(async move {
         agent
-            .run_for_session_turn_items(items, history, event_tx)
+            .run_for_session_turn_items(items, history, event_tx, request_context_limit)
             .await
     });
 
