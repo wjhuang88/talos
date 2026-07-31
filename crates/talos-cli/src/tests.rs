@@ -77,19 +77,19 @@ mod tests {
                 })
                 .unwrap();
             self.tx
-                .send(SessionEvent::SubmissionStarted {
-                    session_id: "session_test".into(),
-                    submission_id,
-                    sender_generation,
-                    turn_id: turn_id.into(),
-                })
-                .unwrap();
-            self.tx
                 .send(SessionEvent::TurnEvent {
                     session_id: "session_test".into(),
                     turn_id: turn_id.into(),
                     sequence: 0,
                     payload: TurnEventPayload::Started,
+                })
+                .unwrap();
+            self.tx
+                .send(SessionEvent::SubmissionStarted {
+                    session_id: "session_test".into(),
+                    submission_id,
+                    sender_generation,
+                    turn_id: turn_id.into(),
                 })
                 .unwrap();
         }
@@ -2370,14 +2370,28 @@ mod steering_snapshot_tests {
     }
 
     #[test]
-    fn engine_snapshot_empty_after_drain() {
+    fn engine_snapshot_empty_after_structured_commit() {
         let mut engine = new_engine();
         engine.enqueue_steering("a".into());
         engine.enqueue_steering("b".into());
 
-        let drained = engine.drain_steering_queue_batched();
+        let prepared = engine
+            .prepare_steering_submission()
+            .expect("queued messages should prepare as a structured submission");
+        let texts: Vec<&str> = prepared
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect();
+        assert_eq!(texts, vec!["a", "b"]);
+        assert_eq!(
+            engine.steering_queue_snapshot().total_count,
+            2,
+            "prepare must retain the authoritative queue until acknowledgement"
+        );
+        assert!(engine.commit_prepared_steering(&prepared.id));
+
         let snap = engine.steering_queue_snapshot();
-        assert_eq!(drained, Some("a\n\nb".into()));
         assert_eq!(snap.total_count, 0);
         assert_eq!(snap.omitted_count, 0);
         assert!(snap.entries.is_empty());
@@ -2388,22 +2402,30 @@ mod steering_snapshot_tests {
     }
 
     #[test]
-    fn engine_batched_drain_joins_multiple_messages() {
+    fn engine_structured_prepare_preserves_multiple_messages() {
         let mut engine = new_engine();
         engine.enqueue_steering("a".into());
         engine.enqueue_steering("b".into());
         engine.enqueue_steering("c".into());
 
-        let msg = engine
-            .drain_steering_queue_batched()
-            .expect("batched drain should join all messages");
-        assert_eq!(msg, "a\n\nb\n\nc");
+        let prepared = engine
+            .prepare_steering_submission()
+            .expect("queued messages should prepare as one structured submission");
+        let texts: Vec<&str> = prepared
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect();
+        assert_eq!(texts, vec!["a", "b", "c"]);
+        assert_eq!(
+            engine.steering_queue_snapshot().total_count,
+            3,
+            "prepare must not destructively drain the authoritative queue"
+        );
+        assert!(engine.commit_prepared_steering(&prepared.id));
 
         let snap = engine.steering_queue_snapshot();
-        assert_eq!(
-            snap.total_count, 0,
-            "queue must be empty after batched drain"
-        );
+        assert_eq!(snap.total_count, 0, "queue must be empty after commit");
         assert!(snap.entries.is_empty());
     }
     #[test]

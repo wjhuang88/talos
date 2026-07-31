@@ -631,11 +631,11 @@ impl AppServerSession {
         let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
         if self
             .eq_tx
-            .send(SessionEvent::SubmissionStarted {
+            .send(SessionEvent::TurnEvent {
                 session_id: self.session_id.clone(),
-                submission_id: submission.id.clone(),
-                sender_generation: submission.sender_generation,
                 turn_id: turn_id.clone(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
             })
             .is_err()
         {
@@ -643,11 +643,11 @@ impl AppServerSession {
         }
         if self
             .eq_tx
-            .send(SessionEvent::TurnEvent {
+            .send(SessionEvent::SubmissionStarted {
                 session_id: self.session_id.clone(),
+                submission_id: submission.id.clone(),
+                sender_generation: submission.sender_generation,
                 turn_id: turn_id.clone(),
-                sequence: 0,
-                payload: TurnEventPayload::Started,
             })
             .is_err()
         {

@@ -366,3 +366,46 @@ async fn one_shot_waits_for_session_queue_capacity() {
 
     scheduler_task.abort();
 }
+
+#[tokio::test]
+async fn authoritative_turn_start_precedes_submission_ack() {
+    let (handle, mut actor) = AppServerSession::new(make_agent(), config(128_000));
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: submission("ordered_batch", "ordered_item", SubmissionSource::User),
+        })
+        .await
+        .unwrap();
+
+    let mut saw_canonical_start = false;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("start ordering timeout")
+            .expect("session event channel");
+        match event {
+            SessionEvent::TurnEvent {
+                sequence: 0,
+                payload: talos_core::session::TurnEventPayload::Started,
+                ..
+            } => saw_canonical_start = true,
+            SessionEvent::SubmissionStarted { submission_id, .. }
+                if submission_id == "ordered_batch" =>
+            {
+                assert!(
+                    saw_canonical_start,
+                    "canonical Started must be queued before ownership acknowledgement"
+                );
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+}

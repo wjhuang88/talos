@@ -243,6 +243,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     let _ = ui_tx.send(output);
                                 }
                             }
+                            for output in engine.handle_turn_started() {
+                                let _ = ui_tx.send(output);
+                            }
                             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                                 engine.steering_queue_snapshot(),
                             ));
@@ -250,13 +253,13 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 BridgeTurnState::Cancelling {
                                     session_id,
                                     turn_id,
-                                    next_sequence: 0,
+                                    next_sequence: 1,
                                 }
                             } else {
                                 BridgeTurnState::Running {
                                     session_id,
                                     turn_id,
-                                    next_sequence: 0,
+                                    next_sequence: 1,
                                 }
                             };
                             continue;
@@ -277,10 +280,13 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 let _ = ui_tx.send(output);
                             }
                         }
+                        for output in engine.handle_turn_started() {
+                            let _ = ui_tx.send(output);
+                        }
                         external_turn = Some(ExternalTurnState {
                             session_id,
                             turn_id,
-                            next_sequence: 0,
+                            next_sequence: 1,
                         });
                     }
                     Some(SessionEvent::SubmissionRejected {
@@ -330,6 +336,26 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         sequence,
                         payload,
                     }) => {
+                        let awaiting_submission_ack = sequence == 0
+                            && matches!(&payload, TurnEventPayload::Started)
+                            && (matches!(
+                                &turn_state,
+                                BridgeTurnState::Submitting {
+                                    session_id: expected_session,
+                                    ..
+                                } if expected_session
+                                    .as_ref()
+                                    .is_none_or(|expected| expected == &session_id)
+                            ) || external_pending
+                                .iter()
+                                .any(|pending| pending.session_id == session_id));
+                        if awaiting_submission_ack {
+                            // The actor queues canonical Started before emitting the
+                            // correlated SubmissionStarted acknowledgement. Ownership
+                            // remains prepared until that acknowledgement arrives.
+                            continue;
+                        }
+
                         let local_matching = match &turn_state {
                             BridgeTurnState::Running {
                                 session_id: active_session,
