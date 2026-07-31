@@ -19,12 +19,11 @@ use talos_core::tool::{
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
-use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
     GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
     WebSearchTool, WriteTool, git_mutation_tool_contributions, git_read_tool_contributions,
-    read_image_tool_contribution, snapshot_aware_file_tools,
+    read_image_tool_contribution, snapshot_aware_file_tools, symbol_tool_contributions,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -840,10 +839,11 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         approval: approval.clone(),
         print_mode: true,
     }));
-    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
+    for contribution in symbol_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     for contribution in git_read_tool_contributions(PathBuf::from(".")) {
         registry
             .register_contribution(contribution)
@@ -969,22 +969,17 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(StatTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(FindSymbolTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(FindReferencesTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ListSymbolsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ListImportsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
+    for contribution in symbol_tool_contributions(workspace_root.clone()) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: approval_handler.clone(),
+            })
+        });
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     for contribution in git_read_tool_contributions(workspace_root.clone()) {
         registry
             .register_contribution(contribution)
@@ -1047,10 +1042,11 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(DiffTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatusTool));
-    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
+    for contribution in symbol_tool_contributions(PathBuf::from(".")) {
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
     for contribution in git_read_tool_contributions(PathBuf::from(".")) {
         registry
             .register_contribution(contribution)
@@ -1345,6 +1341,52 @@ mod tests {
             assert!(print_registry.get(name).is_some(), "print missing {name}");
             assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
             assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
+        }
+    }
+
+    #[test]
+    fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
+        let print_registry = build_print_tool_registry(Vec::new());
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui_registry = build_tui_tool_registry(
+            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+            PathBuf::from("."),
+            Uuid::new_v4(),
+            Vec::new(),
+        );
+        let mcp_registry = build_mcp_tool_registry();
+        let names = [
+            "find_symbol",
+            "find_references",
+            "list_symbols",
+            "list_imports",
+        ];
+
+        for name in names {
+            assert!(print_registry.get(name).is_some(), "print missing {name}");
+            assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
+            assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
+        }
+
+        for (mode, mut registry) in [
+            ("print", print_registry),
+            ("TUI", tui_registry),
+            ("MCP", mcp_registry),
+        ] {
+            let error = registry
+                .register_contribution(ToolContribution::new(
+                    ToolContributionSource::new("test:duplicate"),
+                    Arc::new(NamedReadTool {
+                        name: "find_symbol",
+                        description: "duplicate",
+                    }),
+                ))
+                .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "duplicate tool registration 'find_symbol': existing source 'talos-tools:symbol', incoming source 'test:duplicate'",
+                "{mode} source mismatch"
+            );
         }
     }
 

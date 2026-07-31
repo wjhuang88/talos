@@ -4,12 +4,16 @@ use std::sync::Arc;
 use talos_core::tool::{AgentTool, ToolContribution, ToolContributionSource};
 
 use crate::ReadImageTool;
+use crate::file_tools::{
+    DeleteTool, EditTool, LsTool, ReadTool, WriteTool, snapshot_aware_file_tools,
+};
 use crate::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
 };
 use crate::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 
+const FILE_CONTRIBUTION_SOURCE: &str = "talos-tools:file";
 const GIT_CONTRIBUTION_SOURCE: &str = "talos-tools:git";
 const IMAGE_CONTRIBUTION_SOURCE: &str = "talos-tools:image";
 const SYMBOL_CONTRIBUTION_SOURCE: &str = "talos-tools:symbol";
@@ -18,8 +22,42 @@ fn contribution(source: &'static str, tool: Arc<dyn AgentTool>) -> ToolContribut
     ToolContribution::new(ToolContributionSource::new(source), tool)
 }
 
+fn file_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
+    contribution(FILE_CONTRIBUTION_SOURCE, tool)
+}
+
 fn git_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
     contribution(GIT_CONTRIBUTION_SOURCE, tool)
+}
+
+/// Builds the core file tool group with one shared model-private snapshot registry.
+///
+/// Print and TUI composition use this variant to preserve snapshot-bound write,
+/// edit, and delete behavior. Permission wrappers remain an outer-product policy.
+#[must_use]
+pub fn snapshot_aware_file_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
+    let (read, write, edit, delete) = snapshot_aware_file_tools(workspace_root.clone());
+    vec![
+        file_contribution(Arc::new(read)),
+        file_contribution(Arc::new(write)),
+        file_contribution(Arc::new(edit)),
+        file_contribution(Arc::new(LsTool::new(workspace_root))),
+        file_contribution(Arc::new(delete)),
+    ]
+}
+
+/// Builds the core file tool group with ordinary independent constructors.
+///
+/// MCP composition uses this variant to preserve its current registry behavior.
+#[must_use]
+pub fn ordinary_file_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
+    vec![
+        file_contribution(Arc::new(ReadTool::new(workspace_root.clone()))),
+        file_contribution(Arc::new(WriteTool::new(workspace_root.clone()))),
+        file_contribution(Arc::new(EditTool::new(workspace_root.clone()))),
+        file_contribution(Arc::new(LsTool::new(workspace_root.clone()))),
+        file_contribution(Arc::new(DeleteTool::new(workspace_root))),
+    ]
 }
 
 /// Builds the read-only Git tool group for one explicit workspace root.
@@ -107,6 +145,18 @@ mod tests {
                 .iter()
                 .all(|contribution| contribution.source().as_str() == expected)
         );
+    }
+
+    #[test]
+    fn file_groups_have_stable_equivalent_inventory_and_source() {
+        let snapshot = snapshot_aware_file_tool_contributions(PathBuf::from("workspace"));
+        let ordinary = ordinary_file_tool_contributions(PathBuf::from("workspace"));
+        let expected = ["read", "write", "edit", "ls", "delete"];
+
+        assert_eq!(names(&snapshot), expected);
+        assert_eq!(names(&ordinary), expected);
+        assert_source(&snapshot, FILE_CONTRIBUTION_SOURCE);
+        assert_source(&ordinary, FILE_CONTRIBUTION_SOURCE);
     }
 
     #[test]
