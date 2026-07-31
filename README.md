@@ -760,6 +760,20 @@ RUST_LOG=talos=debug talos
 
 ## Contributing And Local Checks
 
+Before starting implementation, claim the GitHub Issue or existing governed task through
+[Agent Collaboration And Task Claiming](docs/sop/AGENT-COLLABORATION.md).
+
+For PR-based work, task claiming and implementation are separate stages:
+
+1. Submit and merge a governance-only claim PR.
+2. Create the implementation branch from the updated target branch and submit the implementation
+   PR.
+3. After implementation merges, submit the governance closure update with the existing
+   implementation commit as completion evidence.
+
+An open claim PR does not reserve the task, and implementation must not begin before the claim is
+present on the target branch.
+
 Common checks:
 
 ```bash
@@ -815,6 +829,7 @@ For current engineering status, use the project governance docs instead of this 
 | Decisions | [docs/decisions/](docs/decisions/) |
 | Local development | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
 | Testing | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
+| Agent collaboration and task claiming | [docs/sop/AGENT-COLLABORATION.md](docs/sop/AGENT-COLLABORATION.md) |
 | Git workflow | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
 | Public product site | [https://talos.hwj.zone](https://talos.hwj.zone) &mdash; static GitHub Pages site (source under [`site/`](site/)) |
 
