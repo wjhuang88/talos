@@ -32,7 +32,8 @@ A Story is ready to implement when:
       structural evidence.
 - [ ] Affected crates and dependencies are identified.
 - [ ] No blocking assumptions remain unvalidated.
-- [ ] Governing ADRs/specs are linked with implementation constraints and acceptance impact.
+- [ ] Decision links and governing ADRs/specs are recorded with implementation constraints and
+      acceptance impact.
 - [ ] Minimum validation, state/status owners, residual destination, and user-facing documentation
       are identified.
 - [ ] Mandatory implementation context appears under `Required Reads`.
