@@ -2,11 +2,10 @@
 
 ## Purpose
 
-Define commit, branching, and PR conventions for the Talos project.
+Define commit, branching, review, and PR conventions for the Talos project.
 
-Task ownership and the required governance-before-implementation sequence are defined by
-[`AGENT-COLLABORATION.md`](AGENT-COLLABORATION.md). This SOP must not be used to bypass that claim
-gate.
+Task ownership, adoption, exceptions, authorization, and the governance-before-implementation
+sequence are defined by [`AGENT-COLLABORATION.md`](AGENT-COLLABORATION.md).
 
 ## Commit Rules
 
@@ -14,24 +13,26 @@ gate.
 
 1. **Review the staged diff**: `git diff --cached`
 2. **Verify**: No secrets, no unintended changes, no debug code
-3. **Check**: Does every changed line trace to a requirement?
+3. **Check**: Does every changed line trace to a requirement or an allowed bounded-maintenance
+   exception?
 4. **Run**: `cargo check --locked --workspace && cargo clippy --locked --workspace -- -D warnings && cargo test --locked --workspace`
 
-For workspace or release validation, prefer `./scripts/release_preflight.sh` so local and CI
-checks cannot drift. The pinned toolchain is defined in `rust-toolchain.toml`.
+For workspace or release validation, prefer `./scripts/release_preflight.sh` so local and CI checks
+cannot drift. The pinned toolchain is defined in `rust-toolchain.toml`.
 
 When governance files change, also run:
 
 ```bash
 scripts/validate_project_governance.sh .
+scripts/validate_collaboration_claims.sh .
 ```
 
 ### Commit Messages
 
 Format: `type(scope): description (#story-id) [model:<model-name>]`
 
-- `(#story-id)` may be omitted for project-level changes with no associated story.
-- `[model:<model-name>]` is required when an Agent authored or co-authored the commit, identifying the AI model used.
+- `(#story-id)` may be omitted for project-level or bounded single-PR maintenance with no owner.
+- `[model:<model-name>]` is required when an Agent authored or co-authored the commit.
 
 Types:
 
@@ -50,21 +51,17 @@ Scopes: crate name (`core`, `agent`, `tools`, `sandbox`, `permission`, `provider
 Examples:
 
 ```
-feat(agent): implement SQ/EQ turn loop (#E2-S1)
-fix(sandbox): prevent symlink escape in bwrap (#E3-S1)
-refactor(provider): extract streaming trait (#E2-S3)
-docs(reference): add crate dependency graph
-test(core): add proptest for message serialization (#E1-S2)
-chore(workspace): set up CI pipeline (#E1-S5)
+feat(agent): implement SQ/EQ turn loop (#E2-S1) [model:gpt-5.6-thinking]
+fix(sandbox): prevent symlink escape (#E3-S1) [model:gpt-5.6-thinking]
+docs(reference): correct broken architecture link [model:gpt-5.6-thinking]
 ```
 
 ### Commit Hygiene
 
 - One logical change per commit. No mixed concerns.
-- Never commit secrets. Check for API keys, tokens, passwords.
+- Never commit secrets.
 - Never force-push to `main`.
-- Never move or force-push a release tag. If a tag workflow fails, correct the source and use a new
-  patch version/tag.
+- Never move or force-push a release tag. Correct source and use a new patch tag.
 - Keep commits atomic and reorderable.
 
 ## Branching
@@ -80,43 +77,107 @@ feature/E2-S1-sq-eq-turn-loop
 fix/E3-S1-symlink-escape
 ```
 
-### Workflow
+### Governed Workflow
 
-For a newly claimed Issue or task item:
+For new governed work:
 
-1. Complete the preflight in `AGENT-COLLABORATION.md`.
+1. Complete `AGENT-COLLABORATION.md` preflight.
 2. Create a governance-only claim branch from the current target branch.
-3. Submit and merge the governance claim PR. An open claim PR does not reserve the task.
-4. Refresh the target branch after the claim merges.
-5. Create the implementation branch from the claim merge commit or a later target-branch commit
-   containing the effective claim.
-6. Implement and commit with Story or iteration ID references.
-7. Run full verification before the implementation PR.
-8. Create the implementation PR linking the source Issue, owner document, and governance claim PR.
-9. After implementation merges, submit a separate governance closure update citing the existing
-   implementation commit as completion evidence.
+3. Open a Draft claim PR to obtain its number.
+4. Finalize the owner record on that branch with `Claim State: Claimed`, the real PR number,
+   bounded Work Slice, and authorization fields.
+5. Run both governance validators and exact-head CI.
+6. Repeat the merge-time compare-and-swap preflight.
+7. Merge using an allowed authorization path.
+8. Refresh the target branch.
+9. Create the implementation branch from the claim merge commit or a later target commit.
+10. Implement, validate, and open the implementation PR.
+11. After implementation merge, submit governance closure citing the existing implementation SHA.
 
-Do not create the implementation branch, commit or push implementation changes, change production
-dependencies for the task, or open a draft implementation PR before the governance claim is present
-on the target branch.
+An open claim PR does not reserve the task. Proposed `Claimed` content is ineffective until it
+exists on the target branch.
 
-Read-only investigation and disposable uncommitted experiments are permitted before claim merge,
-but they do not establish ownership and must not be represented as implementation progress.
+Do not create the implementation branch, commit/push implementation, change production dependencies,
+or open a draft implementation PR before the effective claim, except for an authorized emergency.
 
-For work that is already effectively claimed on the target branch, begin at step 4 after verifying
-the claim remains valid and no overlapping implementation PR exists.
+Read-only investigation and disposable uncommitted experiments are allowed before claim merge but do
+not establish ownership.
+
+For work already effectively claimed on the target branch, begin at step 8 after verifying the
+claim, Work Slice, and absence of overlapping PRs.
+
+### Bounded Maintenance And Existing-PR Follow-Ups
+
+A bounded single-PR exception or reviewer-only follow-up follows the applicability rules in
+`AGENT-COLLABORATION.md`. The PR description must name the exception and explain why it does not
+change behavior, API, security, dependencies, release authorization, persistent data, owner state,
+or scope.
+
+### Emergency Workflow
+
+Emergency changes may implement before the normal claim merge only with maintainer authorization and
+the minimum emergency record required by `AGENT-COLLABORATION.md`. Reconcile governance within two
+business days after containment.
+
+## Authorization And Review
+
+Use one of these merge paths:
+
+- **Independent review**: preferred for normal work and mandatory for security-sensitive, sandbox,
+  permission, process-hardening, or explicitly protected scope.
+- **Single-maintainer merge**: allowed when no independent reviewer is available and exact-head CI,
+  `validate_project_governance.sh`, and `validate_collaboration_claims.sh` pass; the PR records the
+  reason and has no unresolved blocking review feedback.
+- **Direct commit**: allowed only when repository policy explicitly permits it and a maintainer
+  records reason and validation. It is not a normal review bypass.
+- **Emergency override**: limited to the emergency conditions and reconciliation requirements in
+  `AGENT-COLLABORATION.md`.
+
+The PR author does not approve their own PR under the single-maintainer path. Security-sensitive code
+still requires independent security review unless the emergency path explicitly applies.
+
+## Merge-Time CAS Checklist
+
+Immediately before merging a claim PR:
+
+- [ ] Branch includes the latest target branch or GitHub reports it cleanly mergeable.
+- [ ] Target owner still has no conflicting effective claimant.
+- [ ] No new overlapping claim or implementation PR exists.
+- [ ] Responsible Actor and Work Slice still match owner truth.
+- [ ] Dependencies and activation gates remain satisfied.
+- [ ] Governance Claim PR field matches the actual PR.
+- [ ] Exact-head CI and both governance validators passed.
+- [ ] Authorization mode and evidence are complete.
+- [ ] No unresolved blocking review feedback remains.
+
+Any changed item invalidates the previous review/validation snapshot and requires refresh.
 
 ## PR Rules
 
-- A governance claim PR and its implementation PR are separate changes.
-- A governance claim PR contains no production implementation or implementation tests.
-- A pending governance claim PR is not an effective reservation.
-- An implementation PR must reference the backlog Story or iteration ID, source Issue when one
-  exists, owner document, and merged governance claim PR.
-- The implementation PR normally leaves delivery status at `Review`; it cannot use its unmerged
-  implementation commit as `Completion Commit` evidence.
-- Governance closure occurs after implementation merge and cites an already-existing target-branch
-  implementation or merge commit.
-- All CI checks must pass.
-- No merge without review (at least one reviewer for security-sensitive code).
-- Sandbox/permission changes require explicit security review sign-off.
+### Governance Claim PR
+
+- Governance-only: owner creation/correction, claim record, inventories, Board, and directly required
+  governance validation changes.
+- No production implementation, implementation tests, speculative dependencies, or generated
+  implementation artifacts.
+- Draft until the actual PR number is backfilled and the proposed claim is complete.
+- Must pass the merge-time CAS checklist.
+
+### Implementation PR
+
+- References Story/iteration/task ID, source Issue when present, owner document, and merged claim PR.
+- Implements only the recorded Work Slice.
+- Records validation and residuals.
+- Normally leaves delivery state at `Review`; an unmerged commit cannot be Completion Commit evidence.
+
+### Governance Closure
+
+- Occurs after implementation merge.
+- Cites an already-existing target-branch implementation or merge SHA.
+- Synchronizes owner, inventories, Board, and Issue in that order.
+
+### General
+
+- All required CI checks must pass.
+- Security-sensitive changes require explicit security review sign-off unless an emergency override
+  is recorded.
