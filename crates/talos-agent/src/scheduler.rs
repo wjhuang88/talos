@@ -65,6 +65,7 @@ pub(crate) fn validate_delay_secs(delay_secs: u64) -> Result<(), String> {
 
 pub(crate) const MIN_INTERVAL_SECS: u64 = 5;
 pub(crate) const MAX_INTERVAL_SECS: u64 = 3_600;
+const ONE_SHOT_DELIVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) fn validate_interval_secs(interval_secs: u64) -> Result<(), String> {
     if interval_secs < MIN_INTERVAL_SECS {
@@ -172,6 +173,8 @@ pub(crate) struct ScheduledTaskInfo {
     pub created_at: Instant,
     /// When the task is scheduled to fire.
     pub fire_at: Instant,
+    /// Last bounded one-shot delivery failure, retained for inspection.
+    pub delivery_error: Option<String>,
 }
 
 impl ScheduledTaskInfo {
@@ -325,6 +328,11 @@ struct ActiveTask {
     handle: JoinHandle<()>,
 }
 
+enum TaskFireEvent {
+    Delivered(String),
+    DeliveryFailed { task_id: String, reason: String },
+}
+
 /// Single-owner scheduler actor for session-scoped delayed follow-ups.
 ///
 /// Owns all scheduling state for the current process/session. No persistence,
@@ -336,8 +344,8 @@ pub(crate) struct SchedulerActor {
     sq_tx: mpsc::Sender<SessionOp>,
     cancel_token: CancellationToken,
     tasks: HashMap<String, ActiveTask>,
-    fired_tx: mpsc::UnboundedSender<String>,
-    fired_rx: mpsc::UnboundedReceiver<String>,
+    fired_tx: mpsc::UnboundedSender<TaskFireEvent>,
+    fired_rx: mpsc::UnboundedReceiver<TaskFireEvent>,
 }
 
 impl SchedulerActor {
@@ -403,18 +411,28 @@ impl SchedulerActor {
                     }
                 }
 
-                Some(task_id) = self.fired_rx.recv() => {
-                    let kind = self.tasks.get(&task_id).map(|t| t.info.kind);
-                    match kind {
-                        Some(ScheduleKind::OneShot) => {
-                            self.tasks.remove(&task_id);
-                        }
-                        Some(ScheduleKind::Recurring { interval }) => {
-                            if let Some(task) = self.tasks.get_mut(&task_id) {
-                                task.info.fire_at = Instant::now() + interval;
+                Some(event) = self.fired_rx.recv() => {
+                    match event {
+                        TaskFireEvent::Delivered(task_id) => {
+                            let kind = self.tasks.get(&task_id).map(|task| task.info.kind);
+                            match kind {
+                                Some(ScheduleKind::OneShot) => {
+                                    self.tasks.remove(&task_id);
+                                }
+                                Some(ScheduleKind::Recurring { interval }) => {
+                                    if let Some(task) = self.tasks.get_mut(&task_id) {
+                                        task.info.fire_at = Instant::now() + interval;
+                                    }
+                                }
+                                None => {}
                             }
                         }
-                        None => {}
+                        TaskFireEvent::DeliveryFailed { task_id, reason } => {
+                            if let Some(task) = self.tasks.get_mut(&task_id) {
+                                task.info.delivery_error = Some(reason);
+                                task.info.fire_at = Instant::now();
+                            }
+                        }
                     }
                 }
             }
@@ -450,22 +468,21 @@ impl SchedulerActor {
         let handle = tokio::spawn(async move {
             tokio::time::sleep(delay).await;
 
-            match sq_tx.try_send(scheduled_submission(&task_id_for_fire, labeled_for_fire)) {
-                Ok(()) => {}
-                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                    tracing::warn!(
-                        task_id = %task_id_for_fire,
-                        "scheduled follow-up dropped: bounded session queue is full"
-                    );
-                }
-                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
-                    tracing::debug!(
-                        task_id = %task_id_for_fire,
-                        "scheduled follow-up fire: session queue closed"
-                    );
-                }
-            }
-            let _ = fired_tx.send(task_id_for_fire);
+            let operation = scheduled_submission(&task_id_for_fire, labeled_for_fire);
+            let event = match tokio::time::timeout(ONE_SHOT_DELIVERY_TIMEOUT, sq_tx.send(operation))
+                .await
+            {
+                Ok(Ok(())) => TaskFireEvent::Delivered(task_id_for_fire),
+                Ok(Err(_)) => TaskFireEvent::DeliveryFailed {
+                    task_id: task_id_for_fire,
+                    reason: "session queue closed before one-shot delivery".to_string(),
+                },
+                Err(_) => TaskFireEvent::DeliveryFailed {
+                    task_id: task_id_for_fire,
+                    reason: "timed out waiting for one-shot session queue capacity".to_string(),
+                },
+            };
+            let _ = fired_tx.send(event);
         });
 
         self.tasks.insert(
@@ -477,6 +494,7 @@ impl SchedulerActor {
                     kind: ScheduleKind::OneShot,
                     created_at: now,
                     fire_at,
+                    delivery_error: None,
                 },
                 handle,
             },
@@ -519,7 +537,7 @@ impl SchedulerActor {
                     labeled_for_fire.clone(),
                 )) {
                     Ok(()) => {
-                        let _ = fired_tx.send(task_id_for_fire.clone());
+                        let _ = fired_tx.send(TaskFireEvent::Delivered(task_id_for_fire.clone()));
                     }
                     Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
                         tracing::warn!(
@@ -547,6 +565,7 @@ impl SchedulerActor {
                     kind: ScheduleKind::Recurring { interval },
                     created_at: now,
                     fire_at: now + interval,
+                    delivery_error: None,
                 },
                 handle,
             },
@@ -916,12 +935,19 @@ impl AgentTool for ListScheduledTasksTool {
 
                 let mut text = format!("{total} active task(s):\n");
                 for info in tasks.iter().take(display_count) {
-                    text.push_str(&format!(
-                        "  {} | {} | next: {}s\n",
-                        info.id,
-                        info.kind,
-                        info.remaining().as_secs(),
-                    ));
+                    if let Some(error) = &info.delivery_error {
+                        text.push_str(&format!(
+                            "  {} | {} | delivery failed: {}\n",
+                            info.id, info.kind, error,
+                        ));
+                    } else {
+                        text.push_str(&format!(
+                            "  {} | {} | next: {}s\n",
+                            info.id,
+                            info.kind,
+                            info.remaining().as_secs(),
+                        ));
+                    }
                 }
                 if omitted > 0 {
                     text.push_str(&format!("... and {omitted} more task(s) not shown\n"));
@@ -1095,6 +1121,7 @@ mod tests {
             kind: ScheduleKind::OneShot,
             created_at: now,
             fire_at: now + Duration::from_secs(60),
+            delivery_error: None,
         };
         let remaining = info.remaining();
         // remaining should be close to 60 seconds (within a small tolerance)
@@ -1111,6 +1138,7 @@ mod tests {
             kind: ScheduleKind::OneShot,
             created_at: now - Duration::from_secs(120),
             fire_at: now - Duration::from_secs(60),
+            delivery_error: None,
         };
         assert_eq!(info.remaining(), Duration::ZERO);
     }
@@ -1435,9 +1463,13 @@ mod tests {
             .unwrap();
 
         let snapshot = list_rx.await.unwrap();
+        assert_eq!(snapshot.len(), 1, "failed one-shot remains inspectable");
         assert!(
-            snapshot.is_empty(),
-            "fired task must be cleaned up even when queue is closed"
+            snapshot[0]
+                .delivery_error
+                .as_deref()
+                .is_some_and(|error| error.contains("queue closed")),
+            "closed queue delivery failure must be observable: {snapshot:?}"
         );
     }
 
