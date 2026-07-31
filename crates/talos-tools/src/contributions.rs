@@ -49,10 +49,7 @@ mod tests {
     use super::*;
 
     fn names(contributions: &[ToolContribution]) -> Vec<&str> {
-        contributions
-            .iter()
-            .map(ToolContribution::name)
-            .collect()
+        contributions.iter().map(ToolContribution::name).collect()
     }
 
     fn assert_git_source(contributions: &[ToolContribution]) {
