@@ -2,68 +2,91 @@
 
 ## Purpose
 
-Keep documentation honest. Documentation drift — where docs claim a state the code does not
-have — is a correctness defect, not cosmetic. This SOP defines the checks that keep the
-governance and user-facing docs synchronized with the actual codebase.
+Keep documentation honest. Documentation drift—where docs claim a state the code or governance
+owners do not have—is a correctness defect, not cosmetic.
 
-> Originating lesson (I008): the iteration doc, README, and roadmap all marked the
-> self-evolution engine COMPLETE while the feature was never wired into the binary. Status
-> claims must trace to runtime reality.
+> Originating lesson (I008): iteration, README, and roadmap marked self-evolution COMPLETE while the
+> feature was not wired into the binary. Status claims must trace to runtime reality.
 
 ## When to Run
 
-- Before marking any story or iteration Done.
-- At the Session End Checklist (see `AGENTS.md`).
+- Before marking any Story, iteration, or task Complete.
+- Before merging a governance claim or closure.
+- At the Session End Checklist.
 - During a governance audit.
 
 ## Authoritative Status Sources
 
-There is exactly one source of truth for each fact. All other mentions must agree with it:
-
 | Fact | Source of truth |
-|------|-----------------|
-| Iteration state (Planned/Active/Review/Complete) | `docs/iterations/README.md` table + the iteration file |
-| What the user can do per iteration | `docs/iterations/IXXX-*.md` (with runtime evidence) |
-| Test count / overall status | `cargo test --workspace` output |
+|---|---|
+| Iteration state | Iteration owner document; `docs/iterations/README.md` mirrors it |
+| Story/task scope and acceptance | Owner under `docs/backlog/active/`, `docs/iterations/`, or `docs/tasks/` |
+| Collaboration ownership | Collaboration Claim in owner document on target branch |
+| Open claim pending state | GitHub open PR only; never persisted as Claim State |
+| User-visible behavior | Runtime evidence plus affected user documentation |
+| Test count / overall status | Actual locked workspace validation output |
 | Governance capability state | `.agent-governance/manifest.yaml` |
-| Governance skill refresh state | `.agent-governance/manifest.yaml` `governance.skill_version` and `governance.last_refresh` |
-| Governance profile / branch / worktree recommendation | `scripts/assess_project_scale.sh .` output |
+| Governance profile recommendation | `scripts/assess_project_scale.sh .` output |
 | Public-facing status | `README.md` / `README.zh-CN.md` |
 
 ## Checklist
 
-- [ ] `README.md` "Status" line agrees with the iterations table (no I004-vs-I008 contradiction).
-- [ ] `README.md` and `README.zh-CN.md` say the same thing (bilingual parity).
-- [ ] Every iteration marked Complete has recorded **runtime** evidence, not only unit tests
-      (see `ITERATION-WORKFLOW.md` §3a).
-- [ ] Every iteration, backlog Story, and long-task phase marked Complete records
-      `Completion Commit: <SHA>` in its owner document. The SHA identifies an already-existing
-      implementation/evidence commit, not the documentation-only status commit itself.
-- [ ] A missing, malformed, or unresolved completion SHA keeps the owner at Review, Partial, or
-      Blocked. `docs/BOARD.md` is derived and cannot provide completion evidence on an owner's
-      behalf.
-- [ ] `docs/iterations/README.md` "Current Iterations" table reflects every existing iteration.
-- [ ] Every Active, Review, Planned, and Blocked iteration has a current disposition before new
-      backlog work is activated.
-- [ ] Published iteration objectives, dependencies, exclusions, acceptance, validation, and
-      documentation targets remain visible; replacement work has a different iteration ID.
-- [ ] Every non-infrastructure iteration identifies a runnable, testable deliverable and records
-      end-to-end evidence for it.
-- [ ] `.agent-governance/manifest.yaml` `status`, `last_audited_at`, `governance.skill_version`, `governance.last_refresh`, and `next_actions` are current.
-- [ ] If the governing skill was updated, the affected capability was compared with the current `agent-project-governance` references before trusting existing SOPs.
-- [ ] `scripts/assess_project_scale.sh .` still supports the manifest profile, branch mode, and worktree mode assumptions.
-- [ ] Test counts cited in docs match actual `cargo test --workspace` output.
-- [ ] No doc claims a feature works that produces a `never used` / `never constructed` warning
-      on its core type.
-- [ ] ADRs referenced from docs exist under `docs/decisions/`.
+### Delivery And Completion
+
+- [ ] README status agrees with current owner documents.
+- [ ] README and README.zh-CN maintain bilingual parity for shared claims.
+- [ ] Every Complete iteration has runtime evidence, not only unit tests.
+- [ ] Every Complete iteration, Story, and long-task phase records
+      `Completion Commit: <SHA>` in its owner document.
+- [ ] Completion SHA identifies an already-existing implementation/evidence commit, not the
+      documentation-only closure commit.
+- [ ] Missing/malformed completion evidence keeps the owner Review, Partial, or Blocked.
+- [ ] Published objectives, dependencies, exclusions, acceptance, validation, and docs targets
+      remain visible.
+- [ ] Non-infrastructure iterations identify runnable, testable deliverables and end-to-end evidence.
+
+### Collaboration Claim
+
+- [ ] `Claim Pending` is not persisted in an owner document.
+- [ ] A Claimed/Handoff Pending/Closed record has Responsible Actor, Executing Agent, Work Slice,
+      concrete dates, claim PR/commit, Authorization Mode, and Authorization Evidence.
+- [ ] Governance Claim PR matches the actual `#NN`, or Direct commit references a real SHA.
+- [ ] One owner document has at most one effective claim; parallel slices use child owners.
+- [ ] Closed claim agrees with Complete or Cancelled delivery state.
+- [ ] Grandfathered pre-adoption work is handled according to `AGENT-COLLABORATION.md` and is not
+      retroactively blocked without a triggering new branch/PR or owner lifecycle change.
+- [ ] Immediately before claim merge, target branch, overlapping PRs, claimant/scope, dependencies,
+      exact-head CI, authorization, and review feedback were rechecked as the merge-time CAS gate.
+- [ ] Single-maintainer merges record why independent review was unavailable and show exact-head CI
+      plus both governance validators.
+- [ ] Emergency overrides contain the minimum incident/security record and a reconciliation owner
+      due within two business days.
+
+### Inventories And Governance
+
+- [ ] `docs/iterations/README.md` reflects every iteration.
+- [ ] Active, Review, Planned, and Blocked iterations have current dispositions before new work is
+      activated.
+- [ ] Board mirrors owner documents and never substitutes for owner evidence.
+- [ ] `.agent-governance/manifest.yaml` status, audit date, skill version/refresh, and next actions
+      are current.
+- [ ] `scripts/assess_project_scale.sh .` supports current profile/branch/worktree assumptions.
+- [ ] Test counts cited in docs match actual output.
+- [ ] No doc claims behavior contradicted by dead-code warnings or runtime absence.
+- [ ] Referenced ADRs exist.
 
 ## Validation
 
-Run the project-local governance validator before trusting the doc state:
+Run both governance validators:
 
 ```bash
 scripts/validate_project_governance.sh .
+bash scripts/validate_collaboration_claims.sh .
 ```
+
+The collaboration validator checks templates/SOP integration, persistent Claim State values,
+required fields, authorization consistency, Closed/completion consistency, and changed active owners
+that must migrate after adoption.
 
 When profile, branch mode, worktree mode, or governance depth may have changed, also run:
 
@@ -71,5 +94,5 @@ When profile, branch mode, worktree mode, or governance depth may have changed, 
 scripts/assess_project_scale.sh .
 ```
 
-A failing check, a stale status owner, a missing completion commit, or an unregistered residual
-gap means documentation is **not** in sync — fix before claiming completion.
+A failing check, stale owner, invalid claim, missing completion commit, or unowned residual means
+documentation is not in sync. Repair before claiming completion or merging ownership.
