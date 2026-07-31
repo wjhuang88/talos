@@ -7,6 +7,24 @@
 > MVP deliverable: Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
 
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Pending: interactive contribution migration, final profile inventory/equivalence evidence, and I158 acceptance/state synchronization |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Active maintainer session on 2026-07-31 authorized preparing the formal claim; ownership remains ineffective until finalized claim merge. |
+| Implementation PR | `#102`, `#105` (both must remain Draft until claim merge and branch refresh) |
+| Last Updated | 2026-07-31 |
+| Handoff / Release Condition | None |
+
 ## Published Baseline
 
 ### Selected Stories
