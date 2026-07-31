@@ -524,8 +524,10 @@ fn send_bridge_stream(
 #[cfg(test)]
 mod attachment_authorization_tests {
     use super::*;
+    #[cfg(unix)]
     use talos_core::ApprovalChoice;
 
+    #[cfg(unix)]
     fn write_png(path: &std::path::Path, width: u32) {
         image::RgbaImage::new(width, 1)
             .save_with_format(path, image::ImageFormat::Png)
