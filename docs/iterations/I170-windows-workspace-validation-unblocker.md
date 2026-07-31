@@ -22,8 +22,8 @@
 
 - I169 remains outside this independent change; after I170 merges, its branch must rebase onto the
   updated `main` before claiming the locked workspace gate.
-- I168 remains Active in its separate provider-terminal worktree and is not modified by I170.
-- I164 remains Paused; I158-I162 remain Blocked under their existing owners.
+- I168 remains Complete and is not modified by I170.
+- I164 remains Paused; I158 remains Active on main; I159-I162 remain Blocked under their owners.
 - No Review or Planned iteration is selected or superseded by this corrective slice.
 - The user explicitly corrected the prior decision to stop at the Windows baseline. TOOL-023-A/C
   were already Ready, but their deferred task note is overridden only for this bounded unblocker.
@@ -95,6 +95,7 @@
 | 2026-07-31 | Main integration | Independent branch created from `origin/main@e539537d`; I169 and ADR-056 were excluded from the split. |
 | 2026-07-31 | Corrective follow-up | Latest-main Windows failures were resolved without skips: Unix-only symlink fixtures are target-gated, benchmark artifact comparison normalizes CRLF, and permission fixtures use the platform temp directory. |
 | 2026-07-31 | Review handoff | Independent Draft PR #78 opened against latest `main`; #68 can now remove this scope and retain only I169 steering changes. |
+| 2026-07-31 | Main refresh | Rebased the independent eight-commit I170 series onto exact `main@37e369b1`; no I169 commit is included. |
 
 ## Verification Evidence
 
@@ -106,7 +107,7 @@
 - `./scripts/release_preflight.sh`: PASS on Windows with the pinned Rust 1.97 toolchain; this
   includes public-site/installer checks, format, locked workspace check, Clippy with warnings
   denied, locked workspace tests, and governance validation.
-- Implementation commits: `5dc7854d`, `77323b91`, `ed07a769`, `25002064`, `248d3217`.
+- Rebased implementation commits: `b6783f70`, `669984a4`, `75acac96`, `80cc820d`, `56b4cf7e`.
 - Remote CI and maintainer/security acceptance remain pending; ADR-057 therefore remains Proposed.
 
 ## Completion Evidence
