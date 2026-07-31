@@ -68,7 +68,7 @@ jobs:
           scripts/validate_project_governance.sh .
           bash scripts/validate_collaboration_claims.sh .
           git diff --check
-          test "$(git diff --name-only | grep -vc '^docs/')" -eq 0
+          test "$(git diff --name-only | sed '/^docs\//d' | wc -l | tr -d ' ')" -eq 0
           test "$(git diff --name-only | wc -l | tr -d ' ')" -eq 22
           test "$(grep -c '^| #[0-9]' docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-31.md)" -eq 21
           test "$(grep -R -l '| Claim State | Unclaimed |' docs/backlog/active/{DESKTOP-001,AGENT-003,RUNTIME-005,SESSION-009,ACP-001,RUNTIME-004,PERM-006,PERM-006-A,PERM-006-B,PERM-006-C,PERM-006-D,PERM-006-E,TUI-041,TUI-042,TUI-043}-*.md | wc -l | tr -d ' ')" -eq 15
