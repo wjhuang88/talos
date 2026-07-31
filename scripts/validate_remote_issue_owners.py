@@ -25,7 +25,10 @@ ROW_RE = re.compile(
     r"\[(?P<owner>[^]]+)\]\((?P<path>[^)]+)\) \| "
     r"(?P<status>[^|]+?) \|"
 )
-SOURCE_RE = re.compile(r"(?:GitHub Issue|Source Issue)\s*#?(?P<issue>\d+)", re.IGNORECASE)
+SOURCE_RE = re.compile(
+    r"(?:GitHub Issue|Source Issue|Issue)[^\d#]*#?(?P<issue>\d+)",
+    re.IGNORECASE,
+)
 
 
 class ValidationError(RuntimeError):
