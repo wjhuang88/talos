@@ -3,6 +3,7 @@
 //! Contains the conversation loop that mediates between agent events,
 //! user input, and UI output channels.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -17,8 +18,8 @@ use talos_conversation::{
 };
 use talos_core::message::AgentEvent;
 use talos_core::session::{
-    SessionEvent, SessionOp, StructuredSubmission, SubmissionKind, TurnCompletionStatus,
-    TurnEventPayload,
+    SessionEvent, SessionOp, StructuredSubmission, SubmissionKind, SubmissionSource,
+    TurnCompletionStatus, TurnEventPayload,
 };
 
 #[derive(Debug)]
@@ -43,6 +44,21 @@ enum BridgeTurnState {
     PausedAfterFailure,
 }
 
+#[derive(Debug)]
+struct ExternalSubmissionState {
+    session_id: String,
+    submission_id: String,
+    sender_generation: u64,
+    item_texts: Vec<String>,
+}
+
+#[derive(Debug)]
+struct ExternalTurnState {
+    session_id: String,
+    turn_id: String,
+    next_sequence: u64,
+}
+
 impl BridgeTurnState {
     fn accepts_queued_input(&self) -> bool {
         !matches!(self, Self::Idle | Self::PausedAfterFailure)
@@ -53,8 +69,13 @@ impl BridgeTurnState {
     }
 }
 
-fn session_mutation_blocked(state: &BridgeTurnState, engine: &ConversationEngine) -> bool {
+fn session_mutation_blocked(
+    state: &BridgeTurnState,
+    engine: &ConversationEngine,
+    external_busy: bool,
+) -> bool {
     state.blocks_session_mutation()
+        || external_busy
         || engine.has_steering()
         || !engine.pending_image_attachments.is_empty()
 }
@@ -94,6 +115,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     engine.set_model_info(&model_info_watch.borrow().clone());
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     let mut turn_state = BridgeTurnState::Idle;
+    let mut external_pending = VecDeque::<ExternalSubmissionState>::new();
+    let mut external_turn: Option<ExternalTurnState> = None;
     let mut sender_generation = 0_u64;
     let mut known_sender = sq_tx_watch.borrow().clone();
     // Attachments supplied while constructing the conversation engine belong to
@@ -108,6 +131,17 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 if changed.is_ok() {
                     let current_sender = sq_tx_watch.borrow().clone();
                     if !known_sender.same_channel(&current_sender) {
+                        if let BridgeTurnState::Submitting { submission, .. } = &turn_state {
+                            let submission_id = submission.id.clone();
+                            engine.rollback_prepared_steering(&submission_id);
+                            turn_state = BridgeTurnState::PausedAfterFailure;
+                            emit_bridge_error(
+                                &ui_tx,
+                                "session sender changed before submission acknowledgement; queued input was retained",
+                            );
+                        }
+                        external_pending.clear();
+                        external_turn = None;
                         sender_generation = sender_generation.saturating_add(1);
                         known_sender = current_sender;
                         if !engine.pending_image_attachments.is_empty() {
@@ -130,14 +164,46 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             }
             event = agent_rx.recv() => {
                 match event {
-                    Some(SessionEvent::SubmissionQueued { session_id, submission_id, sender_generation, .. }) => {
+                    Some(SessionEvent::ExternalSubmissionQueued {
+                        session_id,
+                        submission_id,
+                        sender_generation: event_generation,
+                        source,
+                        item_texts,
+                    }) => {
+                        if source == SubmissionSource::User {
+                            continue;
+                        }
+                        let duplicate = external_pending.iter().any(|pending| {
+                            pending.session_id == session_id
+                                && pending.submission_id == submission_id
+                                && pending.sender_generation == event_generation
+                        });
+                        if !duplicate {
+                            external_pending.push_back(ExternalSubmissionState {
+                                session_id,
+                                submission_id,
+                                sender_generation: event_generation,
+                                item_texts,
+                            });
+                        }
+                    }
+                    Some(SessionEvent::SubmissionQueued {
+                        session_id,
+                        submission_id,
+                        sender_generation: event_generation,
+                        ..
+                    }) => {
                         let BridgeTurnState::Submitting {
                             submission,
                             session_id: expected_session,
                             sender_generation: expected_generation,
                             ..
                         } = &mut turn_state else { continue; };
-                        if submission.id != submission_id || *expected_generation != sender_generation {
+                        if submission.id != submission_id
+                            || *expected_generation != event_generation
+                            || event_generation != sender_generation
+                        {
                             continue;
                         }
                         match expected_session {
@@ -148,100 +214,203 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             None => *expected_session = Some(session_id),
                         }
                     }
-                    Some(SessionEvent::SubmissionStarted { session_id, submission_id, sender_generation, turn_id }) => {
-                        let BridgeTurnState::Submitting {
-                            submission,
-                            session_id: Some(expected_session),
-                            sender_generation: expected_generation,
-                            cancel_requested,
-                        } = &turn_state else { continue; };
-                        if submission.id != submission_id
-                            || expected_session != &session_id
-                            || *expected_generation != sender_generation
-                        {
+                    Some(SessionEvent::SubmissionStarted {
+                        session_id,
+                        submission_id,
+                        sender_generation: event_generation,
+                        turn_id,
+                    }) => {
+                        let local = match &turn_state {
+                            BridgeTurnState::Submitting {
+                                submission,
+                                session_id: Some(expected_session),
+                                sender_generation: expected_generation,
+                                cancel_requested,
+                            } if submission.id == submission_id
+                                && expected_session == &session_id
+                                && *expected_generation == event_generation
+                                && event_generation == sender_generation => {
+                                Some((submission.clone(), *cancel_requested))
+                            }
+                            _ => None,
+                        };
+                        if let Some((submission, cancel_requested)) = local {
+                            if !engine.commit_prepared_steering(&submission_id) {
+                                continue;
+                            }
+                            for item in &submission.items {
+                                for output in engine.start_user_message(&item.text) {
+                                    let _ = ui_tx.send(output);
+                                }
+                            }
+                            let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+                                engine.steering_queue_snapshot(),
+                            ));
+                            turn_state = if cancel_requested {
+                                BridgeTurnState::Cancelling {
+                                    session_id,
+                                    turn_id,
+                                    next_sequence: 0,
+                                }
+                            } else {
+                                BridgeTurnState::Running {
+                                    session_id,
+                                    turn_id,
+                                    next_sequence: 0,
+                                }
+                            };
                             continue;
                         }
-                        let submission = submission.clone();
-                        if !engine.commit_prepared_steering(&submission_id) { continue; }
-                        for item in &submission.items {
-                            for output in engine.start_user_message(&item.text) {
+
+                        let Some(index) = external_pending.iter().position(|pending| {
+                            pending.session_id == session_id
+                                && pending.submission_id == submission_id
+                                && pending.sender_generation == event_generation
+                        }) else {
+                            continue;
+                        };
+                        let external = external_pending
+                            .remove(index)
+                            .expect("external submission index must remain valid");
+                        for text in external.item_texts {
+                            for output in engine.start_user_message(&text) {
                                 let _ = ui_tx.send(output);
                             }
                         }
-                        let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(engine.steering_queue_snapshot()));
-                        turn_state = if *cancel_requested {
-                            BridgeTurnState::Cancelling {
-                                session_id,
-                                turn_id,
-                                next_sequence: 0,
-                            }
-                        } else {
+                        external_turn = Some(ExternalTurnState {
+                            session_id,
+                            turn_id,
+                            next_sequence: 0,
+                        });
+                    }
+                    Some(SessionEvent::SubmissionRejected {
+                        session_id,
+                        submission_id,
+                        sender_generation: event_generation,
+                        reason,
+                    }) => {
+                        let local_match = matches!(
+                            &turn_state,
+                            BridgeTurnState::Submitting {
+                                submission,
+                                session_id: expected_session,
+                                sender_generation: expected_generation,
+                                ..
+                            } if submission.id == submission_id
+                                && *expected_generation == event_generation
+                                && event_generation == sender_generation
+                                && expected_session
+                                    .as_ref()
+                                    .is_none_or(|expected| expected == &session_id)
+                        );
+                        if local_match {
+                            engine.rollback_prepared_steering(&submission_id);
+                            turn_state = BridgeTurnState::PausedAfterFailure;
+                            emit_bridge_error(
+                                &ui_tx,
+                                "session rejected the queued submission; input was retained",
+                            );
+                            continue;
+                        }
+                        if let Some(index) = external_pending.iter().position(|pending| {
+                            pending.session_id == session_id
+                                && pending.submission_id == submission_id
+                                && pending.sender_generation == event_generation
+                        }) {
+                            external_pending.remove(index);
+                            emit_bridge_error(
+                                &ui_tx,
+                                &format!("external submission was rejected: {reason:?}"),
+                            );
+                        }
+                    }
+                    Some(SessionEvent::TurnEvent {
+                        session_id,
+                        turn_id,
+                        sequence,
+                        payload,
+                    }) => {
+                        let local_matching = match &turn_state {
                             BridgeTurnState::Running {
-                                session_id,
-                                turn_id,
-                                next_sequence: 0,
+                                session_id: active_session,
+                                turn_id: active_turn,
+                                next_sequence,
                             }
-                        };
-                    }
-                    Some(SessionEvent::SubmissionRejected { session_id, submission_id, sender_generation, .. }) => {
-                        let BridgeTurnState::Submitting {
-                            submission,
-                            session_id: expected_session,
-                            sender_generation: expected_generation,
-                            ..
-                        } = &mut turn_state else { continue; };
-                        if submission.id != submission_id || *expected_generation != sender_generation {
-                            continue;
-                        }
-                        if expected_session.as_ref().is_some_and(|expected| expected != &session_id) {
-                            emit_bridge_error(&ui_tx, "ignored submission rejection from another session");
-                            continue;
-                        }
-                        *expected_session = Some(session_id);
-                        engine.rollback_prepared_steering(&submission_id);
-                        turn_state = BridgeTurnState::PausedAfterFailure;
-                        emit_bridge_error(&ui_tx, "session rejected the queued submission; input was retained");
-                    }
-                    Some(SessionEvent::TurnEvent { session_id, turn_id, sequence, payload }) => {
-                        let matching = match &turn_state {
-                            BridgeTurnState::Running { session_id: active_session, turn_id: active_turn, next_sequence, .. }
-                            | BridgeTurnState::Cancelling { session_id: active_session, turn_id: active_turn, next_sequence } => {
-                                active_session == &session_id && active_turn == &turn_id && *next_sequence == sequence
+                            | BridgeTurnState::Cancelling {
+                                session_id: active_session,
+                                turn_id: active_turn,
+                                next_sequence,
+                            } => {
+                                active_session == &session_id
+                                    && active_turn == &turn_id
+                                    && *next_sequence == sequence
                             }
                             _ => false,
                         };
-                        if !matching {
+                        let external_matching = external_turn.as_ref().is_some_and(|turn| {
+                            turn.session_id == session_id
+                                && turn.turn_id == turn_id
+                                && turn.next_sequence == sequence
+                        });
+                        if !local_matching && !external_matching {
                             emit_bridge_error(&ui_tx, "ignored stale or out-of-order session event");
                             continue;
                         }
-                        match &mut turn_state {
-                            BridgeTurnState::Running { next_sequence, .. }
-                            | BridgeTurnState::Cancelling { next_sequence, .. } => {
-                                *next_sequence = next_sequence.saturating_add(1);
+                        if local_matching {
+                            match &mut turn_state {
+                                BridgeTurnState::Running { next_sequence, .. }
+                                | BridgeTurnState::Cancelling { next_sequence, .. } => {
+                                    *next_sequence = next_sequence.saturating_add(1);
+                                }
+                                _ => {}
                             }
-                            _ => {}
+                        } else if let Some(turn) = external_turn.as_mut() {
+                            turn.next_sequence = turn.next_sequence.saturating_add(1);
                         }
+
                         let terminal = match payload {
                             TurnEventPayload::Started => {
-                                for output in engine.handle_turn_started() { let _ = ui_tx.send(output); }
+                                for output in engine.handle_turn_started() {
+                                    let _ = ui_tx.send(output);
+                                }
                                 None
                             }
-                            TurnEventPayload::Progress { event: AgentEvent::Error { .. } } => None,
+                            TurnEventPayload::Progress {
+                                event: AgentEvent::Error { .. },
+                            } => None,
                             TurnEventPayload::Progress { event } => {
-                                for output in engine.handle_agent_event(&event) { let _ = ui_tx.send(output); }
+                                for output in engine.handle_agent_event(&event) {
+                                    let _ = ui_tx.send(output);
+                                }
                                 None
                             }
                             TurnEventPayload::Completed { status } => {
-                                for output in engine.handle_turn_completed(&status) { let _ = ui_tx.send(output); }
+                                for output in engine.handle_turn_completed(&status) {
+                                    let _ = ui_tx.send(output);
+                                }
                                 Some(status)
                             }
                             _ => None,
                         };
                         if let Some(status) = terminal {
                             let success = matches!(status, TurnCompletionStatus::Success { .. });
-                            turn_state = if success { BridgeTurnState::Idle } else { BridgeTurnState::PausedAfterFailure };
-                            let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(engine.steering_queue_snapshot()));
-                            if success {
+                            if local_matching {
+                                turn_state = if success {
+                                    BridgeTurnState::Idle
+                                } else {
+                                    BridgeTurnState::PausedAfterFailure
+                                };
+                            } else {
+                                external_turn = None;
+                            }
+                            let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+                                engine.steering_queue_snapshot(),
+                            ));
+                            if success
+                                && matches!(&turn_state, BridgeTurnState::Idle)
+                                && external_turn.is_none()
+                                && external_pending.is_empty()
+                            {
                                 dispatch_prepared_submission(
                                     &mut engine,
                                     &mut turn_state,
@@ -249,7 +418,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     &mut known_sender,
                                     &mut sender_generation,
                                     &ui_tx,
-                                ).await;
+                                )
+                                .await;
                             }
                         }
                     }
@@ -261,6 +431,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 }
             }
             Some(input) = user_rx.recv() => {
+                let external_busy = external_turn.is_some() || !external_pending.is_empty();
                 match input {
                     UserInput::Message(msg) => {
                         if msg.starts_with('/')
@@ -274,32 +445,32 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         return;
                                     }
                                     UiOutput::SessionNew(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::New(req)); }
                                     }
                                     UiOutput::SessionResume(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Resume(req)); }
                                     }
                                     UiOutput::SessionFork(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Fork(req)); }
                                     }
                                     UiOutput::SessionDelete(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing sessions");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Delete(req)); }
                                     }
                                     UiOutput::TodoCommand(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing session state");
                                         } else { let _ = session_tx.send(SessionLifecycleRequest::Todo(req)); }
                                     }
                                     UiOutput::ModelSwitchRequest(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing models");
                                             continue;
                                         }
@@ -323,7 +494,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         }
                                     }
                                     UiOutput::ConnectProviderRequest { provider } => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
                                             continue;
                                         }
@@ -343,7 +514,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         }
                                     }
                                     UiOutput::SkillCommand(req) => {
-                                        if session_mutation_blocked(&turn_state, &engine) {
+                                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing skills");
                                         } else {
                                             handle_skill_command(
@@ -356,7 +527,10 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         }
                                     }
                                     UiOutput::AttachImageRequest { path } => {
-                                        if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                        if turn_state.blocks_session_mutation()
+                                            || external_busy
+                                            || engine.has_steering()
+                                        {
                                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing attachments");
                                             continue;
                                         }
@@ -435,7 +609,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             for output in outputs {
                                 let _ = ui_tx.send(output);
                             }
-                            if !turn_state.accepts_queued_input() {
+                            if !turn_state.accepts_queued_input() && !external_busy {
                                 dispatch_prepared_submission(
                                     &mut engine,
                                     &mut turn_state,
@@ -448,7 +622,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         }
                     }
                     UserInput::Credential(resp) => {
-                        if session_mutation_blocked(&turn_state, &engine) {
+                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                             emit_bridge_error(&ui_tx, "finish or cancel queued work before applying credentials");
                         } else if resp.connect_mode {
                             let _ = session_tx.send(SessionLifecycleRequest::ConnectWithCredential(resp));
@@ -457,12 +631,12 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         }
                     }
                     UserInput::ProviderSetup(provider) => {
-                        if session_mutation_blocked(&turn_state, &engine) {
+                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
                         } else { let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider)); }
                     }
                     UserInput::SwitchModel { provider, model_id, variant } => {
-                        if session_mutation_blocked(&turn_state, &engine) {
+                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing models");
                             continue;
                         }
@@ -479,12 +653,12 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         ));
                     }
                     UserInput::ConnectSelect { provider } => {
-                        if session_mutation_blocked(&turn_state, &engine) {
+                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
                         } else { let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider }); }
                     }
                     UserInput::RegisterCustomProvider { name, protocol, base_url, api_key } => {
-                        if session_mutation_blocked(&turn_state, &engine) {
+                        if session_mutation_blocked(&turn_state, &engine, external_busy) {
                             emit_bridge_error(&ui_tx, "finish or cancel queued work before changing providers");
                         } else {
                             let _ = session_tx.send(SessionLifecycleRequest::RegisterCustomProvider {
