@@ -27,6 +27,7 @@ fi
 echo "release preflight: Talos version ${workspace_version}"
 ./scripts/validate_public_site.sh "v${workspace_version}"
 ./scripts/validate_installers.sh
+# Validate both the existing owner-document model and the collaboration claim extension.
 ./scripts/validate_project_governance.sh .
 bash ./scripts/validate_collaboration_claims.sh .
 cargo fmt --all -- --check
