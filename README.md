@@ -760,19 +760,17 @@ RUST_LOG=talos=debug talos
 
 ## Contributing And Local Checks
 
-Before starting implementation, claim the GitHub Issue or existing governed task through
-[Agent Collaboration And Task Claiming](docs/sop/AGENT-COLLABORATION.md).
+For governed implementation started after the adoption of PR `#83`, follow
+[Agent Collaboration And Task Claiming](docs/sop/AGENT-COLLABORATION.md): finalize the
+owner-document claim with the actual claim PR number, merge it through an authorized path, and
+create the implementation branch from that target-branch claim. An open claim PR does not reserve
+work.
 
-For PR-based work, task claiming and implementation are separate stages:
-
-1. Submit and merge a governance-only claim PR.
-2. Create the implementation branch from the updated target branch and submit the implementation
-   PR.
-3. After implementation merges, submit the governance closure update with the existing
-   implementation commit as completion evidence.
-
-An open claim PR does not reserve the task, and implementation must not begin before the claim is
-present on the target branch.
+Existing pre-adoption work is grandfathered. Wording-only documentation fixes, broken links,
+formatting, reviewer follow-ups within the same scope, and mechanically bounded CI/fixture
+maintenance may use one PR when they do not change behavior, API, security, dependencies, release
+authorization, persistent data, or owner status. Time-critical incident and security response may
+use the documented emergency override, with governance reconciled within two business days.
 
 Common checks:
 
