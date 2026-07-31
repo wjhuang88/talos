@@ -758,6 +758,19 @@ fn map_workspace_contribution(
     }
 }
 
+fn register_symbol_tool_contributions(
+    registry: &mut ToolRegistry,
+    workspace_root: PathBuf,
+    wrap: impl Fn(Arc<dyn AgentTool>) -> Arc<dyn AgentTool>,
+) {
+    for contribution in symbol_tool_contributions(workspace_root) {
+        let contribution = contribution.map_tool(|tool| wrap(tool));
+        registry
+            .register_contribution(contribution)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
 /// Builds the tool registry for print/inline/RPC modes.
 ///
 /// These modes construct a registry before any durable [`talos_session::Session`]
@@ -826,11 +839,7 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in symbol_tool_contributions(PathBuf::from(".")) {
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
+    register_symbol_tool_contributions(&mut registry, PathBuf::from("."), |tool| tool);
     for contribution in git_read_tool_contributions(PathBuf::from(".")) {
         registry
             .register_contribution(contribution)
@@ -931,17 +940,16 @@ pub(crate) fn build_tui_tool_registry(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in symbol_tool_contributions(workspace_root.clone()) {
-        let contribution = contribution.map_tool(|tool| {
+    register_symbol_tool_contributions(
+        &mut registry,
+        workspace_root.clone(),
+        |tool| -> Arc<dyn AgentTool> {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
                 approval: approval_handler.clone(),
             })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
+        },
+    );
     for contribution in git_read_tool_contributions(workspace_root.clone()) {
         registry
             .register_contribution(contribution)
@@ -1001,11 +1009,7 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
             .unwrap_or_else(|error| panic!("{error}"));
     }
     registry.register(Arc::new(StatusTool));
-    for contribution in symbol_tool_contributions(PathBuf::from(".")) {
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
+    register_symbol_tool_contributions(&mut registry, PathBuf::from("."), |tool| tool);
     for contribution in git_read_tool_contributions(PathBuf::from(".")) {
         registry
             .register_contribution(contribution)
@@ -1445,15 +1449,26 @@ mod tests {
 
     #[test]
     fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
-        let print_registry = build_print_tool_registry(Vec::new());
+        let mut print_registry = ToolRegistry::new();
+        register_symbol_tool_contributions(&mut print_registry, PathBuf::from("."), |tool| tool);
+
         let (tx, _rx) = mpsc::unbounded_channel();
-        let tui_registry = build_tui_tool_registry(
-            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+        let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
+        let mut tui_registry = ToolRegistry::new();
+        register_symbol_tool_contributions(
+            &mut tui_registry,
             PathBuf::from("."),
-            Uuid::new_v4(),
-            Vec::new(),
+            |tool| -> Arc<dyn AgentTool> {
+                Arc::new(TuiPermissionAwareTool {
+                    inner: tool,
+                    approval: approval.clone(),
+                })
+            },
         );
-        let mcp_registry = build_mcp_tool_registry();
+
+        let mut mcp_registry = ToolRegistry::new();
+        register_symbol_tool_contributions(&mut mcp_registry, PathBuf::from("."), |tool| tool);
+
         let names = [
             "find_symbol",
             "find_references",
@@ -1463,7 +1478,10 @@ mod tests {
 
         for name in names {
             assert!(print_registry.get(name).is_some(), "print missing {name}");
-            assert!(tui_registry.get(name).is_some(), "TUI missing {name}");
+            let tui_tool = tui_registry
+                .get(name)
+                .unwrap_or_else(|| panic!("TUI missing {name}"));
+            assert!(tui_tool.is_read_only(), "TUI wrapper changed {name} policy");
             assert!(mcp_registry.get(name).is_some(), "MCP missing {name}");
         }
 
