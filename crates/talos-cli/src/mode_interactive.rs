@@ -2,6 +2,63 @@
 
 use super::*;
 
+fn register_interactive_builtin_contributions(
+    registry: &mut ToolRegistry,
+    approval: Arc<std::sync::Mutex<ApprovalPrompt>>,
+    workspace_root: &Path,
+) -> Result<()> {
+    let bash = bash_tool_contribution(workspace_root.to_path_buf()).map_tool(|tool| {
+        Arc::new(PermissionAwareTool {
+            inner: tool,
+            approval: approval.clone(),
+            print_mode: false,
+        })
+    });
+    registry.register_contribution(bash)?;
+
+    for contribution in snapshot_aware_file_tool_contributions(workspace_root.to_path_buf()) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: false,
+            })
+        });
+        registry.register_contribution(contribution)?;
+    }
+
+    for contribution in workspace_non_document_tool_contributions(workspace_root.to_path_buf()) {
+        let contribution = if contribution.name() == "tree" {
+            contribution
+        } else {
+            contribution.map_tool(|tool| {
+                Arc::new(PermissionAwareTool {
+                    inner: tool,
+                    approval: approval.clone(),
+                    print_mode: false,
+                })
+            })
+        };
+        registry.register_contribution(contribution)?;
+    }
+
+    for contribution in git_read_tool_contributions(workspace_root.to_path_buf()) {
+        registry.register_contribution(contribution)?;
+    }
+    for contribution in git_mutation_tool_contributions(workspace_root.to_path_buf()) {
+        let contribution = contribution.map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: false,
+            })
+        });
+        registry.register_contribution(contribution)?;
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
 
@@ -45,8 +102,6 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
     let mut registry = ToolRegistry::new();
-    let (read_tool, write_tool, edit_tool, delete_tool) =
-        talos_tools::snapshot_aware_file_tools(workspace_root.to_path_buf());
     for tool in sched_tools {
         registry.register(Arc::new(PermissionAwareTool {
             inner: tool,
@@ -54,70 +109,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
             print_mode: false,
         }));
     }
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(read_tool),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(write_tool),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(edit_tool),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GrepTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GlobTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(LsTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(delete_tool),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DiffTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(StatTool::new(workspace_root.to_path_buf())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    for contribution in git_read_tool_contributions(workspace_root.to_path_buf()) {
-        registry.register_contribution(contribution)?;
-    }
-    registry.register(Arc::new(TreeTool::new(workspace_root.to_path_buf())));
-    for contribution in git_mutation_tool_contributions(workspace_root.to_path_buf()) {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: false,
-            })
-        });
-        registry.register_contribution(contribution)?;
-    }
+    register_interactive_builtin_contributions(&mut registry, approval.clone(), &workspace_root)?;
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
@@ -198,4 +190,54 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
     event_loop.run().await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn interactive_builtin_profile_preserves_current_inventory() {
+        let mut registry = ToolRegistry::new();
+        let approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
+            talos_permission::PermissionEngine::new(),
+        )));
+        register_interactive_builtin_contributions(&mut registry, approval, Path::new("."))
+            .unwrap();
+
+        let mut names = registry
+            .list()
+            .into_iter()
+            .map(|tool| tool.name().to_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                "bash",
+                "delete",
+                "diff",
+                "edit",
+                "git_add",
+                "git_branch_list",
+                "git_checkout",
+                "git_commit",
+                "git_diff",
+                "git_log",
+                "git_pull",
+                "git_push",
+                "git_show",
+                "git_status",
+                "glob",
+                "grep",
+                "ls",
+                "read",
+                "stat",
+                "tree",
+                "write",
+            ]
+        );
+        assert!(registry.get("exec").is_none());
+        assert!(registry.get("document_extract").is_none());
+    }
 }
