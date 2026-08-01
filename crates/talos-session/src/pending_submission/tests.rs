@@ -3,14 +3,11 @@ use talos_core::submission::{SubmissionItem, SubmissionKind, SubmissionSource};
 
 fn submission() -> StructuredSubmission {
     StructuredSubmission {
-        batch_id: "batch-1".into(),
-        reservation_id: "reservation-1".into(),
-        transfer_attempt_id: "attempt-1".into(),
-        session_id: "session-1".into(),
-        session_generation: 3,
+        id: "batch-1".into(),
         source: SubmissionSource::User,
+        sender_generation: 3,
         items: vec![SubmissionItem {
-            item_id: "item-1".into(),
+            id: "item-1".into(),
             enqueue_sequence: 1,
             kind: SubmissionKind::UserTurn,
             text: "hello".into(),
@@ -49,7 +46,7 @@ fn invalid_submission_does_not_create_custody() {
     let store =
         PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let mut payload = submission();
-    payload.session_generation = 0;
+    payload.items.clear();
     let (receipt, result) = store.accept(&payload).unwrap();
     assert!(receipt.is_empty());
     assert_eq!(
@@ -86,9 +83,9 @@ fn transcript_finalization_order_is_recoverable() {
         PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let payload = submission();
     store.accept(&payload).unwrap();
-    store.mark_running(&payload.batch_id, "turn-1").unwrap();
-    store.mark_committed(&payload.batch_id, "turn-1").unwrap();
-    let record = store.get(&payload.batch_id).unwrap().unwrap();
+    store.mark_running(&payload.id, "turn-1").unwrap();
+    store.mark_committed(&payload.id, "turn-1").unwrap();
+    let record = store.get(&payload.id).unwrap().unwrap();
     assert_eq!(record.state, PendingSubmissionState::Committed);
     assert_eq!(record.turn_id.as_deref(), Some("turn-1"));
     assert!(!record.payload_fingerprint.is_empty());
@@ -102,18 +99,16 @@ fn unstarted_work_can_pause_and_recover_in_fifo_order() {
         PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let first = submission();
     let mut second = submission();
-    second.batch_id = "batch-2".into();
-    second.reservation_id = "reservation-2".into();
-    second.transfer_attempt_id = "attempt-2".into();
-    second.items[0].item_id = "item-2".into();
+    second.id = "batch-2".into();
+    second.items[0].id = "item-2".into();
     second.items[0].enqueue_sequence = 2;
     store.accept(&first).unwrap();
     store.accept(&second).unwrap();
     assert_eq!(store.pause_unstarted().unwrap(), 2);
     let recovered = store.recover_unstarted().unwrap();
     assert_eq!(recovered.len(), 2);
-    assert_eq!(recovered[0].submission.batch_id, "batch-1");
-    assert_eq!(recovered[1].submission.batch_id, "batch-2");
+    assert_eq!(recovered[0].submission.id, "batch-1");
+    assert_eq!(recovered[1].submission.id, "batch-2");
     assert!(
         recovered
             .iter()
