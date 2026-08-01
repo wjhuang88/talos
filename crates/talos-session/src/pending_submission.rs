@@ -341,6 +341,7 @@ impl PendingSubmissionStore {
         }
         let connection = Connection::open(self.path.as_ref())?;
         connection.busy_timeout(Duration::from_secs(5))?;
+        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
         Ok(connection)
     }
 }
@@ -442,9 +443,7 @@ fn exceeds_pending_bounds(
 
 fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> {
     connection.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous = FULL;
-         CREATE TABLE IF NOT EXISTS pending_journal_meta (
+        "CREATE TABLE IF NOT EXISTS pending_journal_meta (
              key TEXT PRIMARY KEY, value INTEGER NOT NULL
          );
          CREATE TABLE IF NOT EXISTS pending_submissions (
