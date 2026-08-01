@@ -18,6 +18,39 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  i170-shell-template-safety-patch:
+    name: I170 shell template safety patch
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/i170-windows-shell-portability-20260801'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply exact patch
+        run: python3 scripts/i170_shell_template_safety_patch.py
+
+      - name: Validate patch
+        run: |
+          cargo fmt --all -- --check
+          git diff --check
+
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No patch required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/talos-tools/src/bash_tool.rs docs/decisions/057-windows-powershell-process-boundary.md docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md
+          git commit -m "fix(permission): keep shell expansions on exact resources [i170-template-safety]"
+          git push origin HEAD:${{ github.head_ref }}
+
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
@@ -78,9 +111,10 @@ jobs:
       - name: Clippy workspace
         run: cargo clippy --workspace --locked -- -D warnings
 
-      - name: Focused PowerShell process and timeout tests
+      - name: Focused PowerShell process, permission, and timeout tests
         run: |
           cargo test -p talos-tools --locked platform_command_removes_dangerous_environment_variables -- --nocapture
+          cargo test -p talos-tools --locked test_shell_template_rejects_cross_platform_path_expansion -- --nocapture
           cargo test -p talos-tools --locked continuous_output_does_not_reset_timeout_deadline -- --nocapture
           cargo test -p talos-tools --locked timeout_does_not_wait_for_descendant_pipe_eof -- --nocapture
           cargo test -p talos-tools --locked test_shell_metacharacters_pipe -- --nocapture
