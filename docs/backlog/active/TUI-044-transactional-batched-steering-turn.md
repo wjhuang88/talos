@@ -14,13 +14,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed — eligible for explicit activation |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
 | Work Slice | TUI-044/I169 only: transactional structured steering queue transfer, lifecycle correlation, Actor arbitration, complete request budgets and durable replay parity after the merged I170 baseline. |
 | Claimed At | 2026-08-01 |
 | Source Issue | #119 |
-| Governance Claim PR | #123 — merged |
+| Governance Claim PR | #123 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #123 established the owner chain. I170 then completed in PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`, satisfying the published prerequisite. A separate explicit activation is still required before implementation begins. |
 | Implementation PR | Not started |
