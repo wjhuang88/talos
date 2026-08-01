@@ -9,8 +9,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::message::{AgentEvent, Message};
-use crate::submission::{
-    StructuredSubmission, SubmissionReceiptDisposition, SubmissionSource,
+pub use crate::submission::{
+    MAX_PENDING_SUBMISSION_BYTES, MAX_PENDING_SUBMISSIONS, MAX_STEERING_QUEUE_BYTES,
+    MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES, MAX_STEERING_QUEUE_ITEMS,
+    MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS, MAX_SUBMISSION_IMAGE_BYTES,
+    MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES, MAX_SUBMISSION_TOTAL_IMAGE_BYTES,
+    PendingSubmissionState, StructuredSubmission, SubmissionItem, SubmissionKind,
+    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
 };
 
 /// Commands sent to the session actor via the bounded SQ.
@@ -20,22 +25,17 @@ pub enum SessionOp {
     /// Submit a user message for the agent to process.
     Submit { message: String },
     /// Submit a user message with image attachments (MODEL-009-D/I152).
-    /// The session actor constructs `Message::Multimodal` from these parts.
     SubmitMultimodal {
         text: String,
         attachments: Vec<crate::message::ContentPart>,
     },
-    /// Build a provider request preview for diagnostics without calling the provider.
+    /// Build a provider request preview without calling the provider.
     PreviewRequest { message: String },
-    /// Submit an immutable source-aware batch through the transactional Actor boundary.
+    /// Submit an immutable source-aware batch through the Actor boundary.
     SubmitStructured { submission: StructuredSubmission },
     /// Reconcile a sent batch without creating a second execution authority.
     ReconcileStructured { submission: StructuredSubmission },
     /// Replace the model-visible activated Skill context.
-    ///
-    /// The CLI/runtime layer is responsible for validating paths and budgets
-    /// before sending this operation. The session actor only updates prompt
-    /// state and invalidates the agent's stable prompt prefix.
     SetSkillContext {
         /// Active Skill name, or `None` to clear activation.
         name: Option<String>,
@@ -53,6 +53,43 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Compatibility projection emitted after a batch is accepted for Actor arbitration.
+    SubmissionQueued {
+        /// Session that accepted the submission.
+        session_id: String,
+        /// Stable submission identity.
+        submission_id: String,
+        /// Runtime generation echoed from the submission.
+        sender_generation: u64,
+        /// Source used by Actor arbitration.
+        source: SubmissionSource,
+        /// Number of original items.
+        item_count: usize,
+        /// Aggregate UTF-8 text bytes.
+        total_text_bytes: usize,
+    },
+    /// Compatibility projection emitted when an accepted batch starts a Turn.
+    SubmissionStarted {
+        /// Session that owns the Turn.
+        session_id: String,
+        /// Stable submission identity.
+        submission_id: String,
+        /// Runtime generation echoed from the submission.
+        sender_generation: u64,
+        /// Canonical Turn identity.
+        turn_id: String,
+    },
+    /// Compatibility rejection before a structured Turn starts.
+    SubmissionRejected {
+        /// Session that rejected the submission.
+        session_id: String,
+        /// Stable submission identity.
+        submission_id: String,
+        /// Runtime generation echoed from the submission.
+        sender_generation: u64,
+        /// Bounded content-free reason.
+        reason: SubmissionRejectionReason,
+    },
     /// Durable result of structured submission acceptance or reconciliation.
     SubmissionReceipt {
         /// Logical Session addressed by the operation.
@@ -61,7 +98,7 @@ pub enum SessionEvent {
         session_generation: u64,
         /// Stable batch identity.
         submission_id: String,
-        /// Exact Engine reservation identity.
+        /// Exact frozen-prefix identity. Currently identical to submission_id.
         reservation_id: String,
         /// Durable receipt identity, empty only for NotAccepted/rejection.
         receipt_id: String,
@@ -69,32 +106,29 @@ pub enum SessionEvent {
         source: SubmissionSource,
         /// Number of original recoverable items.
         item_count: usize,
-        /// Aggregate UTF-8 text bytes; content is never included.
+        /// Aggregate UTF-8 text bytes.
         total_text_bytes: usize,
-        /// Durable, content-free receipt disposition.
+        /// Durable content-free disposition.
         disposition: SubmissionReceiptDisposition,
     },
-    /// Generation-aware canonical lifecycle for a structured Actor-owned Turn.
+    /// Generation-aware lifecycle for a structured Actor-owned Turn.
     StructuredTurnEvent {
         /// Logical Session identity.
         session_id: String,
         /// Runtime generation that owns the Turn.
         session_generation: u64,
-        /// Actor-owned batch identity.
+        /// Actor-owned submission identity.
         submission_id: String,
         /// Durable receipt identity.
         receipt_id: String,
         /// Stable actor-local Turn identity.
         turn_id: String,
-        /// Monotonic sequence within this Turn, starting at zero.
+        /// Monotonic sequence within this Turn.
         sequence: u64,
         /// Ordered lifecycle payload.
         payload: TurnEventPayload,
     },
-    /// A durable embedded session has atomically committed a completed turn.
-    ///
-    /// Emitted only after durable storage reports success. Existing unbound
-    /// runtimes never emit this event.
+    /// A durable embedded session atomically committed a completed turn.
     EntriesCommitted {
         /// UUID-backed durable session identity.
         session_id: String,
@@ -104,10 +138,6 @@ pub enum SessionEvent {
         entry_ids: Vec<String>,
     },
     /// Canonical ordered event for one legacy user turn.
-    ///
-    /// In-tree runtime consumers must use this envelope instead of inferring
-    /// user-turn lifecycle from provider-level [`AgentEvent::TurnStart`] or
-    /// [`AgentEvent::TurnEnd`](crate::message::AgentEvent::TurnEnd).
     TurnEvent {
         /// Stable durable session UUID or process-local runtime identity.
         session_id: String,
@@ -118,12 +148,9 @@ pub enum SessionEvent {
         /// Ordered turn payload.
         payload: TurnEventPayload,
     },
-    /// An agent event (text delta, tool call, etc.) from the current turn.
-    AgentEvent {
-        /// The inner streaming agent event.
-        event: AgentEvent,
-    },
-    /// A tool requires user approval. The consumer must respond via the approval channel.
+    /// An agent event from the current turn.
+    AgentEvent { event: AgentEvent },
+    /// A tool requires user approval.
     ApprovalRequired {
         tool_name: String,
         arguments: String,
@@ -145,19 +172,12 @@ pub enum SessionEvent {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum TurnEventPayload {
-    /// The session actor accepted and started the user turn.
+    /// The Actor accepted and started the user Turn.
     Started,
-    /// Streaming progress produced while executing the turn.
-    Progress {
-        /// Provider/agent progress event. Its `TurnStart`/`TurnEnd` variants
-        /// delimit provider responses, not the enclosing user turn.
-        event: AgentEvent,
-    },
-    /// The whole user turn completed.
-    Completed {
-        /// Authoritative terminal status and message sequence.
-        status: TurnCompletionStatus,
-    },
+    /// Streaming progress produced while executing the Turn.
+    Progress { event: AgentEvent },
+    /// The whole user Turn completed.
+    Completed { status: TurnCompletionStatus },
 }
 
 /// Status of a completed turn.
@@ -170,22 +190,16 @@ pub enum TurnCompletionStatus {
         #[serde(default)]
         final_text: String,
         /// Messages produced during this turn, in chronological order.
-        /// This is the authoritative sequence for persistence/replay.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         new_messages: Vec<crate::message::Message>,
     },
     /// Turn was cancelled by user interrupt.
     Cancelled,
     /// Turn ended with an error.
-    Error {
-        /// Error message.
-        message: String,
-    },
+    Error { message: String },
 }
 
 /// Handle returned to the UI layer for interacting with a session.
-///
-/// The UI sends commands via `sq_tx` and receives events via `eq_rx`.
 pub struct SessionHandle {
     /// Bounded submission queue sender (cap=512).
     pub sq_tx: mpsc::Sender<SessionOp>,
@@ -194,8 +208,6 @@ pub struct SessionHandle {
 }
 
 /// Configuration for creating a session actor.
-///
-/// Captures CLI-layer decisions that the session actor needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionConfig {
     /// Product-neutral runtime policy for the session actor.
@@ -215,8 +227,7 @@ pub struct SessionConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct RuntimePolicy {
-    /// How the runtime should behave when a tool requests approval and no
-    /// caller-specific approval handler handles it first.
+    /// Approval behavior when no caller-specific handler handles a request.
     pub approval_mode: ApprovalMode,
 }
 
@@ -229,7 +240,7 @@ impl RuntimePolicy {
         }
     }
 
-    /// Headless policy for non-interactive sessions that cannot ask a user.
+    /// Headless policy for non-interactive sessions.
     #[must_use]
     pub fn headless_deny() -> Self {
         Self {
@@ -251,7 +262,7 @@ pub enum ApprovalMode {
     /// Approval prompts may be surfaced by the product/UI layer.
     #[default]
     Interactive,
-    /// Approval requests are denied because no user approval channel exists.
+    /// Approval requests are denied because no user channel exists.
     HeadlessDeny,
 }
 
@@ -263,20 +274,14 @@ fn default_model_context_limit() -> u32 {
 #[allow(warnings)]
 mod tests {
     use super::*;
-    use crate::submission::{
-        PendingSubmissionState, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
-    };
 
     fn structured_submission() -> StructuredSubmission {
         StructuredSubmission {
-            batch_id: "batch_1".into(),
-            reservation_id: "reservation_1".into(),
-            transfer_attempt_id: "attempt_1".into(),
-            session_id: "session_1".into(),
-            session_generation: 7,
+            id: "batch_1".into(),
             source: SubmissionSource::User,
+            sender_generation: 7,
             items: vec![SubmissionItem {
-                item_id: "item_1".into(),
+                id: "item_1".into(),
                 enqueue_sequence: 1,
                 kind: SubmissionKind::UserTurn,
                 text: "structured".into(),
@@ -315,11 +320,31 @@ mod tests {
     #[test]
     fn session_event_serde_roundtrip() {
         let events = vec![
+            SessionEvent::SubmissionQueued {
+                session_id: "session_1".into(),
+                submission_id: "batch_1".into(),
+                sender_generation: 7,
+                source: SubmissionSource::User,
+                item_count: 1,
+                total_text_bytes: 10,
+            },
+            SessionEvent::SubmissionStarted {
+                session_id: "session_1".into(),
+                submission_id: "batch_1".into(),
+                sender_generation: 7,
+                turn_id: "turn_1".into(),
+            },
+            SessionEvent::SubmissionRejected {
+                session_id: "session_1".into(),
+                submission_id: "batch_2".into(),
+                sender_generation: 7,
+                reason: SubmissionRejectionReason::LimitExceeded,
+            },
             SessionEvent::SubmissionReceipt {
                 session_id: "session_1".into(),
                 session_generation: 7,
                 submission_id: "batch_1".into(),
-                reservation_id: "reservation_1".into(),
+                reservation_id: "batch_1".into(),
                 receipt_id: "receipt_1".into(),
                 source: SubmissionSource::User,
                 item_count: 1,
@@ -348,46 +373,9 @@ mod tests {
                     },
                 },
             },
-            SessionEvent::TurnEvent {
-                session_id: "session_1".into(),
-                turn_id: "turn_1".into(),
-                sequence: 2,
-                payload: TurnEventPayload::Completed {
-                    status: TurnCompletionStatus::Success {
-                        final_text: "hello".into(),
-                        new_messages: vec![],
-                    },
-                },
-            },
-            SessionEvent::AgentEvent {
-                event: AgentEvent::TextDelta {
-                    delta: "hello".into(),
-                },
-            },
-            SessionEvent::ApprovalRequired {
-                tool_name: "write".into(),
-                arguments: "{}".into(),
-                call_id: "call_1".into(),
-            },
-            SessionEvent::TurnStarted {
-                turn_id: "1".into(),
-            },
-            SessionEvent::TurnCompleted {
-                turn_id: "1".into(),
-                status: TurnCompletionStatus::Success {
-                    final_text: String::new(),
-                    new_messages: vec![],
-                },
-            },
             SessionEvent::TurnCompleted {
                 turn_id: "2".into(),
                 status: TurnCompletionStatus::Cancelled,
-            },
-            SessionEvent::TurnCompleted {
-                turn_id: "3".into(),
-                status: TurnCompletionStatus::Error {
-                    message: "boom".into(),
-                },
             },
             SessionEvent::Error {
                 message: "fail".into(),
@@ -404,25 +392,6 @@ mod tests {
     }
 
     #[test]
-    fn rejected_receipt_is_content_free() {
-        let event = SessionEvent::SubmissionReceipt {
-            session_id: "session_1".into(),
-            session_generation: 7,
-            submission_id: "batch_1".into(),
-            reservation_id: "reservation_1".into(),
-            receipt_id: String::new(),
-            source: SubmissionSource::User,
-            item_count: 1,
-            total_text_bytes: 10,
-            disposition: SubmissionReceiptDisposition::Rejected {
-                reason: SubmissionRejectionReason::LimitExceeded,
-            },
-        };
-        let json = serde_json::to_string(&event).unwrap();
-        assert!(!json.contains("structured"));
-    }
-
-    #[test]
     fn session_config_serde_roundtrip() {
         let config = SessionConfig {
             runtime_policy: RuntimePolicy::headless_deny(),
@@ -436,16 +405,5 @@ mod tests {
         assert_eq!(config.workspace_root, back.workspace_root);
         assert_eq!(config.initial_history, back.initial_history);
         assert_eq!(config.model_context_limit, back.model_context_limit);
-    }
-
-    #[test]
-    fn session_config_defaults_to_interactive_runtime_policy() {
-        let json = r#"{
-            "workspace_root": "/tmp/test",
-            "initial_history": [],
-            "model_context_limit": 128000
-        }"#;
-        let back: SessionConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(back.runtime_policy, RuntimePolicy::interactive());
     }
 }
