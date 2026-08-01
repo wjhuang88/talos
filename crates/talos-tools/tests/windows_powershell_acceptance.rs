@@ -11,21 +11,19 @@ use std::env;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use talos_core::tool::AgentTool;
 use talos_tools::BashTool;
+use tokio::sync::Mutex;
 
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
+static ENVIRONMENT_LOCK: Mutex<()> = Mutex::const_new(());
 
 const LD_PRELOAD_SENTINEL: &str = "talos-i170-parent-ld-preload";
 const DYLD_INSERT_LIBRARIES_SENTINEL: &str = "talos-i170-parent-dyld-insert-libraries";
 
-const NORMAL_COMMAND: &str =
-    r#"Write-Output "stdout-ok"; [Console]::Error.WriteLine("stderr-ok"); (Get-Location).Path; exit 7"#;
-const TIMEOUT_COMMAND: &str =
-    r#"Write-Output "before-timeout"; Write-Output "direct-child-pid=$PID"; Start-Sleep -Seconds 10; Write-Output "after-timeout""#;
+const NORMAL_COMMAND: &str = r#"Write-Output "stdout-ok"; [Console]::Error.WriteLine("stderr-ok"); (Get-Location).Path; exit 7"#;
+const TIMEOUT_COMMAND: &str = r#"Write-Output "before-timeout"; Write-Output "direct-child-pid=$PID"; Start-Sleep -Seconds 10; Write-Output "after-timeout""#;
 
 struct EnvironmentRestore {
     original: Vec<(&'static str, Option<OsString>)>,
@@ -71,6 +69,23 @@ fn test_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+fn checked_out_head() -> String {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(test_dir())
+        .output()
+        .expect("failed to read the checked-out Git Head");
+    assert!(
+        output.status.success(),
+        "git rev-parse HEAD failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("git rev-parse HEAD returned non-UTF-8 output")
+        .trim()
+        .to_owned()
+}
+
 fn captured_output(content: &str) -> &str {
     content.split_once('\n').map_or(content, |(_, body)| body)
 }
@@ -105,6 +120,7 @@ fn runner_value(name: &str) -> String {
 
 #[tokio::test]
 async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_environment() {
+    let _environment_lock = ENVIRONMENT_LOCK.lock().await;
     let original = [
         ("LD_PRELOAD", env::var_os("LD_PRELOAD")),
         (
@@ -114,15 +130,9 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
     ];
 
     {
-        let _environment_lock = ENVIRONMENT_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let _restore = EnvironmentRestore::set(&[
             ("LD_PRELOAD", LD_PRELOAD_SENTINEL),
-            (
-                "DYLD_INSERT_LIBRARIES",
-                DYLD_INSERT_LIBRARIES_SENTINEL,
-            ),
+            ("DYLD_INSERT_LIBRARIES", DYLD_INSERT_LIBRARIES_SENTINEL),
         ]);
 
         let tool = BashTool::new(test_dir());
@@ -137,11 +147,7 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
             result.content
         );
         assert!(result.content.contains("LD_PRELOAD=<missing>"));
-        assert!(
-            result
-                .content
-                .contains("DYLD_INSERT_LIBRARIES=<missing>")
-        );
+        assert!(result.content.contains("DYLD_INSERT_LIBRARIES=<missing>"));
         assert!(!result.content.contains(LD_PRELOAD_SENTINEL));
         assert!(!result.content.contains(DYLD_INSERT_LIBRARIES_SENTINEL));
 
@@ -158,7 +164,7 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
         println!(
             "I170_ENV_ISOLATION parent_DYLD_INSERT_LIBRARIES={DYLD_INSERT_LIBRARIES_SENTINEL}"
         );
-        println!("I170_ENV_ISOLATION locking=process-local-static-mutex");
+        println!("I170_ENV_ISOLATION locking=process-local-static-async-mutex");
         println!("I170_ENV_ISOLATION cleanup=drop-guard-restores-present-or-absent-state");
     }
 
@@ -173,7 +179,8 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
 
 #[tokio::test]
 async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_evidence() {
-    let head = runner_value("GITHUB_SHA");
+    let event_sha = runner_value("GITHUB_SHA");
+    let head = checked_out_head();
     if let Ok(expected_head) = env::var("I170_EXPECTED_HEAD") {
         assert_eq!(
             head, expected_head,
@@ -182,6 +189,7 @@ async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_ev
     }
 
     println!("I170_WALKTHROUGH exact_head={head}");
+    println!("I170_WALKTHROUGH event_sha={event_sha}");
     println!("I170_WALKTHROUGH runner_os={}", runner_value("RUNNER_OS"));
     println!(
         "I170_WALKTHROUGH runner_name={}",
@@ -225,7 +233,7 @@ async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_ev
     println!("{}", normal.content);
     println!("I170_WALKTHROUGH normal_result_end");
 
-    let timeout_tool = BashTool::new(working_dir).with_timeout(Duration::from_secs(1));
+    let timeout_tool = BashTool::new(working_dir).with_timeout(Duration::from_secs(2));
     let started = Instant::now();
     let timeout = timeout_tool
         .execute(serde_json::json!({ "command": TIMEOUT_COMMAND }))
@@ -242,7 +250,7 @@ async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_ev
         timeout.content
     );
     assert!(
-        elapsed < Duration::from_secs(5),
+        elapsed < Duration::from_secs(6),
         "timeout walkthrough exceeded the bounded deadline: {elapsed:?}"
     );
 
