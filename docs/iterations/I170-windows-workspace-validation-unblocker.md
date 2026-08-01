@@ -1,6 +1,6 @@
 # Iteration I170: Windows Workspace Validation Unblocker
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-01
 > Planned objective: restore the still-missing Windows-native shell and cross-platform workspace validation behavior preserved by recovery PR #121, without mixing I169 steering semantics or restoring obsolete registration code.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,12 +18,10 @@
 | Source Issue | #119 (dependency recovery context; I170 remains an independent implementation slice) |
 | Governance Claim PR | #122 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Repository owner explicitly instructed implementation to begin after the current-main recovery audit on 2026-08-01; claim merge still requires exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback. |
-| Implementation PR | Not started |
+| Authorization Evidence | Repository owner explicitly instructed implementation to begin after the current-main recovery audit on 2026-08-01; claim merge passed exact-head CI, both governance validators, remote reconciliation, merge-time CAS, and no blocking review feedback. |
+| Implementation PR | #126 |
 | Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Release only by an explicit maintainer handoff or after an I170 implementation PR is merged and completion evidence is recorded. |
-
-The claim proposed by PR #122 is ineffective until this exact finalized record is merged into `main`.
+| Handoff / Release Condition | Release only by an explicit maintainer handoff or after PR #126 is merged and completion evidence is recorded. |
 
 ## Published Baseline
 
@@ -40,7 +38,7 @@ The claim proposed by PR #122 is ineffective until this exact finalized record i
 - Historical recovery PR: #121, archival only and never mergeable as-is.
 - Historical exact head: `e1da5dd893418a3f6e3737ec900aabe9967b1dda`.
 - Historical branch: `recovery/pr-78-i170-20260731`; it must not be rebased, rewritten, or used for continued development.
-- Fresh development baseline rechecked on 2026-08-01: `main@126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`.
+- Governance claim merged at `455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; PR #126 starts from that exact current-main baseline.
 - TUI-044/I169 current owner chain was established by merged governance PR #123 at `ba5a564b4be81366bc3d3e68fd83e7c1d8ce3a4f`; I170 remains an independent prerequisite implementation slice.
 - Recovery classification: behavior remains missing; old CLI registration shape is superseded by the current `talos-tools` contribution and outer composition architecture.
 
@@ -108,14 +106,16 @@ The claim proposed by PR #122 is ineffective until this exact finalized record i
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-01 | Recovery audit | Current main still hardcodes `sh -c`, resets timeout sleeps inside the output loop, lacks Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
-| 2026-08-01 | Claim proposal | Draft governance PR #122 proposes the bounded I170 work slice. No production implementation may begin until the exact finalized claim is merged into `main`. |
-| 2026-08-01 | Current-main refresh | TUI-044 Claim PR #123 merged. Main then advanced through two externally created noop/add-remove pairs with no net file change; the exact development baseline is re-bound to `126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`. |
+| 2026-08-01 | Recovery audit | Current main still hardcoded `sh -c`, reset timeout sleeps inside the output loop, lacked Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
+| 2026-08-01 | Claim | Governance PR #122 merged after exact-head release preflight, Windows fixture, collaboration and remote owner validation. |
+| 2026-08-01 | Activation | Created `fix/i170-windows-shell-portability-20260801` from exact `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; no recovery branch was modified. |
+| 2026-08-01 | Implementation slice | Added platform shell identity/process construction, child env scrub, one absolute timeout, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
+| 2026-08-01 | Draft handoff | Opened Draft PR #126. Contribution inventory, remaining hard-coded consumers, fixtures, ADR/security evidence and platform CI remain in progress. |
 
 ## Verification Evidence
 
-- Previous claim-head release preflight, format/check/Clippy/tests and Windows installer fixture passed, but its merge ref predated the TUI-044 Issue matrix.
-- Pending fresh exact-head CI against `main@126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`.
+- Claim-head release preflight, format/check/Clippy/tests, Windows installer fixture and remote Issue/Owner reconciliation passed before activation.
+- Implementation exact-head CI for PR #126 is pending and historical recovery validation is not reused as current evidence.
 
 ## Completion Evidence
 
