@@ -22,20 +22,16 @@ fn submission() -> StructuredSubmission {
 #[test]
 fn accept_is_durable_and_idempotent() {
     let dir = tempfile::tempdir().unwrap();
-    let store = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let payload = submission();
     let (receipt, first) = store.accept(&payload).unwrap();
     assert!(!receipt.is_empty());
     assert_eq!(first, SubmissionReceiptDisposition::AcceptedPending);
     drop(store);
 
-    let reopened = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let reopened =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let (same_receipt, second) = reopened.accept(&payload).unwrap();
     assert_eq!(receipt, same_receipt);
     assert_eq!(
@@ -50,10 +46,8 @@ fn accept_is_durable_and_idempotent() {
 #[test]
 fn invalid_submission_does_not_create_custody() {
     let dir = tempfile::tempdir().unwrap();
-    let store = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let mut payload = submission();
     payload.session_generation = 0;
     let (receipt, result) = store.accept(&payload).unwrap();
@@ -70,10 +64,8 @@ fn invalid_submission_does_not_create_custody() {
 #[test]
 fn identity_conflict_fails_closed() {
     let dir = tempfile::tempdir().unwrap();
-    let store = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let payload = submission();
     store.accept(&payload).unwrap();
     let mut conflict = payload.clone();
@@ -90,10 +82,8 @@ fn identity_conflict_fails_closed() {
 #[test]
 fn transcript_finalization_order_is_recoverable() {
     let dir = tempfile::tempdir().unwrap();
-    let store = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let payload = submission();
     store.accept(&payload).unwrap();
     store.mark_running(&payload.batch_id, "turn-1").unwrap();
@@ -108,10 +98,8 @@ fn transcript_finalization_order_is_recoverable() {
 #[test]
 fn unstarted_work_can_pause_and_recover_in_fifo_order() {
     let dir = tempfile::tempdir().unwrap();
-    let store = PendingSubmissionStore::for_session_file(
-        &dir.path().join("session.tlog"),
-        "session-1",
-    );
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let first = submission();
     let mut second = submission();
     second.batch_id = "batch-2".into();
@@ -126,7 +114,9 @@ fn unstarted_work_can_pause_and_recover_in_fifo_order() {
     assert_eq!(recovered.len(), 2);
     assert_eq!(recovered[0].submission.batch_id, "batch-1");
     assert_eq!(recovered[1].submission.batch_id, "batch-2");
-    assert!(recovered
-        .iter()
-        .all(|record| record.state == PendingSubmissionState::PausedPending));
+    assert!(
+        recovered
+            .iter()
+            .all(|record| record.state == PendingSubmissionState::PausedPending)
+    );
 }
