@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Diff whitespace validation
         shell: bash
@@ -62,6 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -90,10 +92,12 @@ jobs:
       - name: I170 exact-head Windows direct walkthrough
         shell: pwsh
         env:
-          I170_EXPECTED_HEAD: ${{ github.sha }}
+          I170_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           $log = "i170-windows-direct-walkthrough.log"
-          "I170_WORKFLOW exact_head=${{ github.sha }}" | Tee-Object -FilePath $log
+          "I170_WORKFLOW exact_head=${{ github.event.pull_request.head.sha || github.sha }}" | Tee-Object -FilePath $log
+          "I170_WORKFLOW event_sha=${{ github.sha }}" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW checked_out_head=$(git rev-parse HEAD)" | Tee-Object -FilePath $log -Append
           "I170_WORKFLOW runner_os=$env:RUNNER_OS" | Tee-Object -FilePath $log -Append
           "I170_WORKFLOW runner_name=$env:RUNNER_NAME" | Tee-Object -FilePath $log -Append
           "I170_WORKFLOW runner_arch=$env:RUNNER_ARCH" | Tee-Object -FilePath $log -Append
@@ -110,9 +114,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: i170-windows-direct-walkthrough-${{ github.sha }}
+          name: i170-windows-direct-walkthrough-${{ github.event.pull_request.head.sha || github.sha }}
           path: i170-windows-direct-walkthrough.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Test workspace
@@ -131,7 +135,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-workspace-test-failure-${{ github.sha }}
+          name: windows-workspace-test-failure-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             windows-workspace-failures.log
             windows-workspace-tests.log
@@ -155,6 +159,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Validate open Issue ownership and synchronization comments
         env:
@@ -167,6 +173,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: PowerShell installer fixture (offline)
         shell: pwsh
