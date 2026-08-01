@@ -24,8 +24,8 @@
 | Governance Claim PR | #123 |
 | Preactivation Architecture PR | #129 |
 | Implementation PR | #131 |
-| Authorization Mode | Explicit single-maintainer instruction |
-| Authorization Evidence | Maintainer instructed “正式激活并实施 I169” on 2026-08-02. PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`. |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The repository owner explicitly instructed “正式激活并实施 I169” on 2026-08-02. PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae` before this fresh implementation branch and PR were created. |
 | Implementation Baseline | `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae` |
 | Implementation Branch | `feat/i169-tui-044-transactional-steering` |
 | Last Updated | 2026-08-02 |
