@@ -27,6 +27,33 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: GitHub Actions workflow inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(mktemp)"
+          actual="$(mktemp)"
+          unexpected="$(mktemp)"
+
+          cat > "${expected}" <<'EOF'
+          .github/workflows/actions-maintenance.yml
+          .github/workflows/ci.yml
+          .github/workflows/pages.yml
+          .github/workflows/release.yml
+          EOF
+
+          find .github/workflows -maxdepth 1 -type f \
+            \( -name '*.yml' -o -name '*.yaml' \) \
+            | sort > "${actual}"
+          comm -13 "${expected}" "${actual}" > "${unexpected}"
+
+          if [[ -s "${unexpected}" ]]; then
+            echo "Unexpected GitHub Actions workflows are not allowed:" >&2
+            cat "${unexpected}" >&2
+            echo "Use an existing persistent workflow, a normal branch/PR, or repository scripts instead of a one-off workflow." >&2
+            exit 1
+          fi
+
       - name: Diff whitespace validation
         shell: bash
         env:
