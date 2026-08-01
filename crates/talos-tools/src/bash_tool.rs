@@ -460,6 +460,10 @@ fn is_simple_shell_token(token: &str) -> bool {
         && !token.contains('\'')
         && !token.contains('"')
         && !token.contains('\\')
+        // Shell/provider expansion must never inherit a reusable cwd-scoped grant.
+        && !token.contains('$')
+        && !token.contains(':')
+        && !token.starts_with('~')
 }
 
 fn read_only_template_key(program: &str, args: &[&str]) -> Option<String> {
@@ -920,6 +924,29 @@ mod tests {
                 .starts_with(&resource_prefix("read_only_inspection", "template"))
         );
         assert!(first[0].resource.as_deref().unwrap().ends_with(":cat"));
+    }
+
+    #[test]
+    fn test_shell_template_rejects_cross_platform_path_expansion() {
+        let tool = BashTool::new(test_dir());
+        let commands = [
+            "cat $HOME/secret",
+            "cat ~/secret",
+            "cat C:/Windows/System32/drivers/etc/hosts",
+            "cat Env:PATH",
+        ];
+
+        for command in commands {
+            let profile = tool.permission_profile(&serde_json::json!({ "command": command }));
+            assert!(
+                profile[0]
+                    .resource
+                    .as_deref()
+                    .unwrap()
+                    .starts_with(&resource_prefix("read_only_inspection", "exact")),
+                "{command} unexpectedly received a reusable template grant"
+            );
+        }
     }
 
     #[test]

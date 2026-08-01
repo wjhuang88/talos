@@ -44,7 +44,7 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 - No Windows-specific duplicate contribution or CLI registry construction is added.
 - Outer print/TUI/MCP composition continues to select and permission-wrap the contribution.
 - Tool nature/family remain `Execute` / `Shell`.
-- Permission resource prefixes and descriptions use the actual platform tool name. Unknown or complex commands remain exact resources; this decision does not grant reusable trust to PowerShell grammar.
+- Permission resource prefixes and descriptions use the actual platform tool name. Unknown or complex commands remain exact resources. Reusable shell templates reject variable/home expansion and colon-bearing Windows drive or PowerShell provider tokens, so cwd-scoped grants cannot authorize external paths through platform expansion.
 
 ### Child hardening
 

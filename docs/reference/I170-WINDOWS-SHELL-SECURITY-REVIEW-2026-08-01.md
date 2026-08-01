@@ -73,7 +73,7 @@ Required checks:
 - Windows inventory is `powershell` plus `exec`, Unix inventory is `bash` plus `exec`;
 - no CLI registry constructs an additional shell tool;
 - denied shell calls remain denied through MCP and product modes;
-- high-risk commands do not acquire reusable permission templates merely because of the platform rename.
+- high-risk commands do not acquire reusable permission templates merely because of the platform rename; drive/provider paths and `$`/`~` expansion fall back to exact resources.
 
 ### Portable output and fixtures
 
