@@ -33,6 +33,7 @@ docs/iterations/
 
 | ID | Codename | State | Deliverable verified end-to-end? |
 |----|----------|-------|----------------------------------|
+| I170 | Windows Workspace Validation Unblocker | Active — Draft PR #126 (2026-08-01) | PowerShell/absolute-timeout/portability implementation exists; exact-head Windows/macOS CI and security/maintainer acceptance remain pending. |
 | I168 | Provider Terminal Outcome Integrity | Complete (2026-07-30) | ✅ Completion Commit `86262d02`; 2681 workspace tests and reviewed rebuilt-binary known-policy/ordering fixtures pass. |
 | I166 | Interrupt Shortcut Reliability | Complete (2026-07-28) | ✅ Ctrl+C local clear/idle exit and Esc active-turn interruption with modal priority. 483 TUI + 2545 workspace tests and the maintainer Alacritty matrix passed. |
 | I164 | Startup Inline Composer Continuity | Paused — superseded target (2026-07-28) | Published post-first-submit bottom-layout target retained as historical evidence; no Completion Commit. |
