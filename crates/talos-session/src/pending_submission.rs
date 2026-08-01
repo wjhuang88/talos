@@ -192,7 +192,11 @@ impl PendingSubmissionStore {
     }
 
     /// Marks an accepted submission as the active Turn.
-    pub fn mark_running(&self, batch_id: &str, turn_id: &str) -> Result<(), PendingSubmissionError> {
+    pub fn mark_running(
+        &self,
+        batch_id: &str,
+        turn_id: &str,
+    ) -> Result<(), PendingSubmissionError> {
         self.transition(
             batch_id,
             PendingSubmissionState::Running,
@@ -258,7 +262,9 @@ impl PendingSubmissionStore {
     }
 
     /// Returns unstarted work in durable FIFO order.
-    pub fn recover_unstarted(&self) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
+    pub fn recover_unstarted(
+        &self,
+    ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
         let _guard = self.guard()?;
         let connection = self.connection()?;
         ensure_schema(&connection)?;
@@ -425,10 +431,13 @@ fn exceeds_pending_bounds(
         [],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
     )?;
-    Ok(current.0.saturating_add(1) > to_i64(MAX_PENDING_SUBMISSIONS)
-        || current.1.saturating_add(to_i64(text_bytes)) > to_i64(MAX_PENDING_SUBMISSION_BYTES)
-        || current.2.saturating_add(to_i64(image_count)) > to_i64(MAX_STEERING_QUEUE_IMAGES)
-        || current.3.saturating_add(to_i64(image_bytes)) > to_i64(MAX_STEERING_QUEUE_IMAGE_BYTES))
+    Ok(
+        current.0.saturating_add(1) > to_i64(MAX_PENDING_SUBMISSIONS)
+            || current.1.saturating_add(to_i64(text_bytes)) > to_i64(MAX_PENDING_SUBMISSION_BYTES)
+            || current.2.saturating_add(to_i64(image_count)) > to_i64(MAX_STEERING_QUEUE_IMAGES)
+            || current.3.saturating_add(to_i64(image_bytes))
+                > to_i64(MAX_STEERING_QUEUE_IMAGE_BYTES),
+    )
 }
 
 fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> {
