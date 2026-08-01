@@ -89,6 +89,7 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
+const REQUEST_OUTPUT_RESERVE_TOKENS: u32 = 4096;
 
 #[derive(Debug, Clone)]
 struct PendingToolCall {
@@ -118,6 +119,15 @@ pub enum AgentError {
     /// The turn exceeds the maximum allowed tool call budget.
     #[error("turn budget exceeded: maximum of {MAX_TOOL_CALLS_PER_TURN} tool calls per turn")]
     TurnBudgetExceeded,
+
+    /// The next provider request would exceed the configured model context.
+    #[error("request context budget exceeded: estimated {estimated} tokens, limit {limit}")]
+    ContextBudgetExceeded {
+        /// Estimated request tokens, including tool definitions and output reserve.
+        estimated: u32,
+        /// Configured model context limit.
+        limit: u32,
+    },
 
     /// A potential doom loop was detected — the same tool was called with
     /// identical arguments multiple times in a single turn.
@@ -270,6 +280,7 @@ impl Agent {
     /// assistant/tool messages. On error, this may contain a valid prefix
     /// of completed exchanges that should be persisted; incomplete streamed
     /// assistant fragments are never included.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn(
         &self,
         user_message: String,
@@ -283,6 +294,7 @@ impl Agent {
     /// Session turn with multimodal content (MODEL-009-D/I152).
     /// Constructs `Message::Multimodal` instead of `Message::User`
     /// when image attachments are present.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn_multimodal(
         &self,
         user_message: String,
@@ -301,6 +313,117 @@ impl Agent {
             },
         )
         .await
+    }
+
+    /// Runs one actor turn from an ordered structured submission.
+    ///
+    /// Each item remains a distinct persisted user message. Text projection is
+    /// used only for memory lookup; it is never the authoritative transcript.
+    pub(crate) async fn run_for_session_turn_items(
+        &self,
+        items: Vec<talos_core::session::SubmissionItem>,
+        history: Vec<Message>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+        request_context_limit: u32,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let memory_query = items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let input_messages = items
+            .into_iter()
+            .map(|item| {
+                if item.attachments.is_empty() {
+                    Message::User { content: item.text }
+                } else {
+                    let mut parts = Vec::with_capacity(item.attachments.len() + 1);
+                    if !item.text.is_empty() {
+                        parts.push(talos_core::message::ContentPart::Text { text: item.text });
+                    }
+                    parts.extend(item.attachments);
+                    Message::Multimodal { parts }
+                }
+            })
+            .collect();
+        self.run_inner_with_messages(
+            memory_query,
+            input_messages,
+            history,
+            Some(event_tx),
+            Some(request_context_limit),
+        )
+        .await
+    }
+
+    /// Estimates the initial provider request produced for a structured
+    /// session submission, including dynamic prompt sections, workspace
+    /// context, native tool definitions, multimodal inputs, and an output
+    /// reserve. The session actor calls this after compaction and before it
+    /// acknowledges that a turn started.
+    pub(crate) async fn estimate_session_request_tokens(
+        &self,
+        items: &[talos_core::session::SubmissionItem],
+        history: Vec<Message>,
+    ) -> AgentResult<u32> {
+        let memory_query = items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let hook_ctx = HookContext::new(TurnId::new(), self.workspace_root.clone());
+        let (mut messages, _) = self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await?;
+        messages.pop();
+        messages.extend(items.iter().map(|item| {
+            if item.attachments.is_empty() {
+                Message::User {
+                    content: item.text.clone(),
+                }
+            } else {
+                let mut parts = Vec::with_capacity(item.attachments.len() + 1);
+                if !item.text.is_empty() {
+                    parts.push(talos_core::message::ContentPart::Text {
+                        text: item.text.clone(),
+                    });
+                }
+                parts.extend(item.attachments.clone());
+                Message::Multimodal { parts }
+            }
+        }));
+
+        let (_, mut tool_definitions, _) =
+            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
+        if !self.image_input_supported {
+            tool_definitions.retain(|definition| definition.name != "read_image");
+        }
+        Ok(Self::estimate_provider_request_tokens(
+            &messages,
+            &tool_definitions,
+        ))
+    }
+
+    fn estimate_provider_request_tokens(
+        messages: &[Message],
+        tool_definitions: &[talos_core::provider::ToolDefinition],
+    ) -> u32 {
+        let tool_tokens = tool_definitions.iter().fold(0_u32, |total, definition| {
+            total
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.name,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.description,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.parameters.to_string(),
+                ))
+        });
+        crate::token::TokenEstimator::new()
+            .estimate(messages)
+            .saturating_add(tool_tokens)
+            .saturating_add(REQUEST_OUTPUT_RESERVE_TOKENS)
     }
 
     /// Builds a provider request preview without calling the provider.
@@ -406,6 +529,7 @@ impl Agent {
 
     /// Like `build_provider_messages` but pushes `Message::Multimodal`
     /// instead of `Message::User` when attachments are present.
+    #[allow(dead_code)]
     async fn build_provider_messages_with_attachments(
         &self,
         user_message: String,
@@ -446,22 +570,47 @@ impl Agent {
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         attachments: Option<Vec<talos_core::message::ContentPart>>,
     ) -> (AgentResult<String>, Vec<Message>) {
+        let input_messages = if let Some(atts) = attachments {
+            let mut parts = Vec::with_capacity(atts.len() + 1);
+            if !user_message.is_empty() {
+                parts.push(talos_core::message::ContentPart::Text {
+                    text: user_message.clone(),
+                });
+            }
+            parts.extend(atts);
+            vec![Message::Multimodal { parts }]
+        } else {
+            vec![Message::User {
+                content: user_message.clone(),
+            }]
+        };
+        self.run_inner_with_messages(user_message, input_messages, history, event_tx, None)
+            .await
+    }
+
+    async fn run_inner_with_messages(
+        &self,
+        memory_query: String,
+        input_messages: Vec<Message>,
+        history: Vec<Message>,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        request_context_limit: Option<u32>,
+    ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
-        let (mut messages, persist_start) = match if let Some(atts) = attachments {
-            self.build_provider_messages_with_attachments(user_message, history, &hook_ctx, atts)
-                .await
-        } else {
-            self.build_provider_messages(user_message, history, &hook_ctx)
-                .await
-        } {
+        let (mut messages, persist_start) = match self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await
+        {
             Ok(messages) => messages,
             Err(error) => {
                 self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
                 return (Err(error), Vec::new());
             }
         };
+        messages.pop();
+        messages.extend(input_messages);
 
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -549,6 +698,19 @@ impl Agent {
                 continuation_overlay = msgs;
                 continuation_overlay.as_slice()
             };
+
+            if let Some(limit) = request_context_limit {
+                let estimated = Self::estimate_provider_request_tokens(
+                    provider_messages,
+                    &active_tool_definitions,
+                );
+                if estimated > limit {
+                    break 'turn_loop (
+                        Err(AgentError::ContextBudgetExceeded { estimated, limit }),
+                        TurnStatus::Denied,
+                    );
+                }
+            }
 
             let mut rx = match self
                 .provider
@@ -959,9 +1121,7 @@ impl Agent {
                             ),
                             ..ui_result.clone()
                         }
-                    } else if self.bash_compression_enabled
-                        && matches!(observed.call.name.as_str(), "bash" | "powershell")
-                    {
+                    } else if self.bash_compression_enabled && observed.call.name == "bash" {
                         let compressed =
                             BashOutputCompressor::new().compress(&projection.model_content);
                         MessageToolResult {

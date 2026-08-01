@@ -5,6 +5,7 @@
 //! - Drives agent turns via [`Agent::run_streaming`]
 //! - Emits [`SessionEvent`] on the unbounded EQ
 
+use std::collections::{HashSet, VecDeque};
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,7 +18,12 @@ use tokio_util::sync::CancellationToken;
 
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{
-    SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnEventPayload,
+    MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
+    MAX_STEERING_QUEUE_ITEMS, MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS,
+    MAX_SUBMISSION_IMAGE_BYTES, MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES,
+    MAX_SUBMISSION_TOTAL_IMAGE_BYTES, SessionConfig, SessionEvent, SessionHandle, SessionOp,
+    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
+    SubmissionSource, TurnCompletionStatus, TurnEventPayload,
 };
 
 use crate::compaction::Compactor;
@@ -31,10 +37,13 @@ mod turn;
 mod tests;
 
 use turn::{
-    DurableTurnPersistence, TurnForwarding, TurnPersistence, TurnRecord, run_turn_with_forwarding,
+    DurableTurnPersistence, TurnForwarding, TurnPersistence, TurnRecord, TurnRecordStatus,
+    run_turn_with_forwarding,
 };
 
 static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
+const MAX_RECENT_SUBMISSION_IDS: usize = 1024;
+const MAX_RECENT_ITEM_IDS: usize = 4096;
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
@@ -52,6 +61,7 @@ pub struct AppServerSession {
     durable_persistence: Option<DurableTurnPersistence>,
     session_id: String,
     turn_prefix: String,
+    model_context_limit: u32,
 }
 
 impl AppServerSession {
@@ -84,6 +94,7 @@ impl AppServerSession {
             // Keep durable turn IDs unique across Runtime reconstruction. A host that
             // needs retry idempotency supplies the stable ID to `DurableSession`.
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
+            model_context_limit: config.model_context_limit,
         };
 
         (handle, actor)
@@ -126,276 +137,173 @@ impl AppServerSession {
     /// [`SessionOp::Shutdown`] exits the loop.
     pub async fn run(&mut self) {
         let mut turn_counter: u64 = 0;
+        let mut submission_counter: u64 = 0;
+        let mut pending = VecDeque::<StructuredSubmission>::new();
+        let mut pending_items = 0_usize;
+        let mut pending_bytes = 0_usize;
+        let mut pending_images = 0_usize;
+        let mut pending_image_bytes = 0_u64;
+        let mut recent_submission_ids = VecDeque::<String>::new();
+        let mut recent_item_ids = VecDeque::<String>::new();
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
+        let mut current_submission_size: Option<(usize, usize, usize, u64)> = None;
         let mut cancel_token: Option<CancellationToken> = None;
+        let mut paused = false;
+        let mut shutting_down = false;
 
-        while let Some(op) = self.sq_rx.recv().await {
+        loop {
+            if current_turn.is_none()
+                && !paused
+                && let Some(submission) = pending.pop_front()
+            {
+                let (images, image_bytes) = submission.image_totals();
+                let submission_size = (
+                    submission.items.len(),
+                    submission.total_text_bytes(),
+                    images,
+                    image_bytes,
+                );
+                turn_counter = turn_counter.saturating_add(1);
+                match self.start_submission(submission, turn_counter).await {
+                    Some((handle, token)) => {
+                        current_turn = Some(handle);
+                        current_submission_size = Some(submission_size);
+                        cancel_token = Some(token);
+                    }
+                    None => {
+                        pending_items = pending_items.saturating_sub(submission_size.0);
+                        pending_bytes = pending_bytes.saturating_sub(submission_size.1);
+                        pending_images = pending_images.saturating_sub(submission_size.2);
+                        pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
+                        paused = true;
+                    }
+                }
+            }
+
+            if shutting_down && current_turn.is_none() && pending.is_empty() {
+                break;
+            }
+
+            tokio::select! {
+                completed = async {
+                    match current_turn.as_mut() {
+                        Some(turn) => Some(turn.await),
+                        None => None,
+                    }
+                }, if current_turn.is_some() => {
+                    current_turn = None;
+                    cancel_token = None;
+                    if let Some((items, bytes, images, image_bytes)) = current_submission_size.take() {
+                        pending_items = pending_items.saturating_sub(items);
+                        pending_bytes = pending_bytes.saturating_sub(bytes);
+                        pending_images = pending_images.saturating_sub(images);
+                        pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
+                    }
+                    match completed.and_then(Result::ok).flatten() {
+                        Some(record) => {
+                            let status = record.status;
+                            self.commit_turn_record(record);
+                            paused = status != TurnRecordStatus::Success;
+                        }
+                        None => paused = true,
+                    }
+                }
+                op = self.sq_rx.recv(), if !shutting_down => {
+                    let Some(op) = op else {
+                        shutting_down = true;
+                        if let Some(token) = cancel_token.take() { token.cancel(); }
+                        for submission in pending.drain(..) {
+                            self.reject_submission(
+                                &submission.id,
+                                submission.sender_generation,
+                                SubmissionRejectionReason::SessionClosed,
+                            );
+                        }
+                        pending_items = current_submission_size.map_or(0, |size| size.0);
+                        pending_bytes = current_submission_size.map_or(0, |size| size.1);
+                        pending_images = current_submission_size.map_or(0, |size| size.2);
+                        pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
+                        continue;
+                    };
             match op {
                 SessionOp::Submit { message } => {
-                    if let Some(token) = cancel_token.take() {
-                        token.cancel();
-                    }
-                    if let Some(handle) = current_turn.take() {
-                        self.commit_finished_turn(handle).await;
-                    }
-
-                    turn_counter += 1;
-                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
-
-                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                        session_id: self.session_id.clone(),
-                        turn_id: turn_id.clone(),
-                        sequence: 0,
-                        payload: TurnEventPayload::Started,
-                    });
-                    let sequence = Arc::new(AtomicU64::new(1));
-
-                    let token = CancellationToken::new();
-                    cancel_token = Some(token.clone());
-
-                    if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
-                        agent_mut.set_append_prompt_opt(None);
-                    }
-
-                    // Apply compaction layers 1-3 before the turn if needed.
-                    if self.compactor.should_compact(&self.history) {
-                        let compacted = self.compactor.apply_budget(self.history.clone());
-                        let compacted = self.compactor.apply_trim(compacted);
-                        let compacted = self.compactor.apply_microcompact(compacted);
-
-                        let compacted = match self
-                            .compactor
-                            .compact(compacted, self.agent.provider())
-                            .await
-                        {
-                            Ok(c) => c,
-                            Err(_) => {
-                                let (c, _) =
-                                    self.compactor.compact_deterministic(self.history.clone());
-                                c
-                            }
-                        };
-
-                        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                            let _ = self.try_archive_session(file, dir, &compacted);
-                        }
-
-                        self.history = compacted;
-                    }
-
-                    let agent = self.agent.clone();
-                    let eq_tx = self.eq_tx.clone();
-                    let turn_id_clone = turn_id.clone();
-                    let token_clone = token.clone();
-                    let history = self.history.clone();
-                    let persistence = self.persistence.clone();
-                    let durable_persistence = self.durable_persistence.clone();
-                    let session_id = self.session_id.clone();
-
-                    let handle = tokio::spawn(async move {
-                        let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
-                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
-
-                        let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
-                            agent,
-                            message,
-                            attachments: None,
-                            history,
-                            event_tx,
-                            event_rx,
-                            eq_tx,
-                            cancel_token: token_clone,
-                            turn_id: turn_id_clone,
-                            session_id,
-                            sequence,
-                            persistence,
-                            durable_persistence,
-                            result_tx,
-                        }))
-                        .catch_unwind()
-                        .await;
-
-                        result_rx.await.ok()
-                    });
-
-                    current_turn = Some(handle);
+                    submission_counter = submission_counter.saturating_add(1);
+                    let submission = compatibility_submission(submission_counter, SubmissionKind::UserTurn, message, Vec::new());
+                    if self.accept_submission(
+                        submission,
+                        &mut pending,
+                        &mut pending_items,
+                        &mut pending_bytes,
+                        &mut pending_images,
+                        &mut pending_image_bytes,
+                        &mut recent_submission_ids,
+                        &mut recent_item_ids,
+                        paused,
+                    ) { paused = false; }
                 }
                 SessionOp::SubmitMultimodal { text, attachments } => {
-                    if let Some(token) = cancel_token.take() {
-                        token.cancel();
-                    }
-                    if let Some(handle) = current_turn.take() {
-                        self.commit_finished_turn(handle).await;
-                    }
-
-                    turn_counter += 1;
-                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
-
-                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                        session_id: self.session_id.clone(),
-                        turn_id: turn_id.clone(),
-                        sequence: 0,
-                        payload: TurnEventPayload::Started,
-                    });
-                    let sequence = Arc::new(AtomicU64::new(1));
-
-                    let token = CancellationToken::new();
-                    cancel_token = Some(token.clone());
-
-                    if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
-                        agent_mut.set_append_prompt_opt(None);
-                    }
-
-                    if self.compactor.should_compact(&self.history) {
-                        let compacted = self.compactor.apply_budget(self.history.clone());
-                        let compacted = self.compactor.apply_trim(compacted);
-                        let compacted = self.compactor.apply_microcompact(compacted);
-                        self.history = compacted;
-                    }
-
-                    let agent = self.agent.clone();
-                    let eq_tx = self.eq_tx.clone();
-                    let turn_id_clone = turn_id.clone();
-                    let token_clone = token.clone();
-                    let history = self.history.clone();
-                    let persistence = self.persistence.clone();
-                    let durable_persistence = self.durable_persistence.clone();
-                    let session_id = self.session_id.clone();
-
-                    let handle = tokio::spawn(async move {
-                        let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
-                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
-
-                        let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
-                            agent,
-                            message: text,
-                            attachments: Some(attachments),
-                            history,
-                            event_tx,
-                            event_rx,
-                            eq_tx,
-                            cancel_token: token_clone,
-                            turn_id: turn_id_clone,
-                            session_id,
-                            sequence,
-                            persistence,
-                            durable_persistence,
-                            result_tx,
-                        }))
-                        .catch_unwind()
-                        .await;
-
-                        result_rx.await.ok()
-                    });
-
-                    current_turn = Some(handle);
+                    submission_counter = submission_counter.saturating_add(1);
+                    let submission = compatibility_submission(submission_counter, SubmissionKind::UserTurn, text, attachments);
+                    if self.accept_submission(
+                        submission,
+                        &mut pending,
+                        &mut pending_items,
+                        &mut pending_bytes,
+                        &mut pending_images,
+                        &mut pending_image_bytes,
+                        &mut recent_submission_ids,
+                        &mut recent_item_ids,
+                        paused,
+                    ) { paused = false; }
                 }
                 SessionOp::PreviewRequest { message } => {
-                    if let Some(token) = cancel_token.take() {
-                        token.cancel();
-                    }
-                    if let Some(handle) = current_turn.take() {
-                        self.commit_finished_turn(handle).await;
-                    }
-
-                    turn_counter += 1;
-                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
-
-                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                        session_id: self.session_id.clone(),
-                        turn_id: turn_id.clone(),
-                        sequence: 0,
-                        payload: TurnEventPayload::Started,
-                    });
-                    let mut sequence = 1;
-
-                    match self
-                        .agent
-                        .preview_request(message, self.history.clone())
-                        .await
-                    {
-                        Ok(Some(preview)) => {
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id: turn_id.clone(),
-                                sequence,
-                                payload: TurnEventPayload::Progress {
-                                    event: AgentEvent::TurnStart,
-                                },
-                            });
-                            sequence += 1;
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id: turn_id.clone(),
-                                sequence,
-                                payload: TurnEventPayload::Progress {
-                                    event: AgentEvent::TextDelta {
-                                        delta: preview.clone(),
-                                    },
-                                },
-                            });
-                            sequence += 1;
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id: turn_id.clone(),
-                                sequence,
-                                payload: TurnEventPayload::Progress {
-                                    event: AgentEvent::TurnEnd {
-                                        stop_reason: talos_core::message::StopReason::EndTurn,
-                                        usage: talos_core::message::Usage::default(),
-                                    },
-                                },
-                            });
-                            sequence += 1;
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id,
-                                sequence,
-                                payload: TurnEventPayload::Completed {
-                                    status: talos_core::session::TurnCompletionStatus::Success {
-                                        final_text: preview,
-                                        new_messages: vec![],
-                                    },
-                                },
-                            });
-                        }
-                        Ok(None) => {
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id,
-                                sequence,
-                                payload: TurnEventPayload::Completed {
-                                    status: talos_core::session::TurnCompletionStatus::Error {
-                                        message: "request preview is unavailable for this provider"
-                                            .into(),
-                                    },
-                                },
-                            });
-                        }
-                        Err(error) => {
-                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
-                                session_id: self.session_id.clone(),
-                                turn_id,
-                                sequence,
-                                payload: TurnEventPayload::Completed {
-                                    status: talos_core::session::TurnCompletionStatus::Error {
-                                        message: error.to_string(),
-                                    },
-                                },
-                            });
-                        }
-                    }
+                    submission_counter = submission_counter.saturating_add(1);
+                    let submission = compatibility_submission(submission_counter, SubmissionKind::PreviewRequest, message, Vec::new());
+                    if self.accept_submission(
+                        submission,
+                        &mut pending,
+                        &mut pending_items,
+                        &mut pending_bytes,
+                        &mut pending_images,
+                        &mut pending_image_bytes,
+                        &mut recent_submission_ids,
+                        &mut recent_item_ids,
+                        paused,
+                    ) { paused = false; }
+                }
+                SessionOp::SubmitStructured { submission } => {
+                    let resumes = submission.source != SubmissionSource::Scheduler;
+                    if self.accept_submission(
+                        submission,
+                        &mut pending,
+                        &mut pending_items,
+                        &mut pending_bytes,
+                        &mut pending_images,
+                        &mut pending_image_bytes,
+                        &mut recent_submission_ids,
+                        &mut recent_item_ids,
+                        paused,
+                    ) && resumes { paused = false; }
                 }
                 SessionOp::Interrupt => {
-                    if let Some(token) = cancel_token.take() {
+                    if let Some(token) = &cancel_token {
                         token.cancel();
+                    } else if let Some(submission) = pending.pop_front() {
+                        pending_items = pending_items.saturating_sub(submission.items.len());
+                        pending_bytes = pending_bytes.saturating_sub(submission.total_text_bytes());
+                        let (images, image_bytes) = submission.image_totals();
+                        pending_images = pending_images.saturating_sub(images);
+                        pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
+                        self.reject_submission(
+                            &submission.id,
+                            submission.sender_generation,
+                            SubmissionRejectionReason::Cancelled,
+                        );
                     }
-                    if let Some(handle) = current_turn.take() {
-                        self.commit_finished_turn(handle).await;
-                    }
+                    paused = true;
                 }
                 SessionOp::SetSkillContext { name, content } => {
-                    if current_turn.is_some() {
+                    if current_turn.is_some() || !pending.is_empty() {
                         let _ = self.eq_tx.send(SessionEvent::Error {
                             message: "cannot change active skill while a turn is active".into(),
                         });
@@ -416,23 +324,382 @@ impl AppServerSession {
                     }
                 }
                 SessionOp::Shutdown => {
-                    if let Some(handle) = current_turn.take() {
-                        self.commit_finished_turn(handle).await;
+                    shutting_down = true;
+                    if let Some(token) = &cancel_token { token.cancel(); }
+                    for submission in pending.drain(..) {
+                        self.reject_submission(
+                            &submission.id,
+                            submission.sender_generation,
+                            SubmissionRejectionReason::SessionClosed,
+                        );
                     }
-                    break;
+                    pending_items = current_submission_size.map_or(0, |size| size.0);
+                    pending_bytes = current_submission_size.map_or(0, |size| size.1);
+                    pending_images = current_submission_size.map_or(0, |size| size.2);
+                    pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
+                    paused = false;
+                }
+            }
                 }
             }
         }
     }
 
-    async fn commit_finished_turn(&mut self, handle: JoinHandle<Option<TurnRecord>>) {
-        let Some(record) = handle.await.ok().flatten() else {
-            return;
-        };
-
+    fn commit_turn_record(&mut self, record: TurnRecord) {
         for msg in record.new_messages {
             self.history.push(msg);
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn accept_submission(
+        &self,
+        submission: StructuredSubmission,
+        pending: &mut VecDeque<StructuredSubmission>,
+        pending_items: &mut usize,
+        pending_bytes: &mut usize,
+        pending_images: &mut usize,
+        pending_image_bytes: &mut u64,
+        recent_submission_ids: &mut VecDeque<String>,
+        recent_item_ids: &mut VecDeque<String>,
+        paused: bool,
+    ) -> bool {
+        if let Err(reason) = validate_submission(&submission) {
+            self.reject_submission(&submission.id, submission.sender_generation, reason);
+            return false;
+        }
+        if recent_submission_ids.contains(&submission.id)
+            || submission
+                .items
+                .iter()
+                .any(|item| recent_item_ids.contains(&item.id))
+        {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::Duplicate,
+            );
+            return false;
+        }
+        let Some(next_items) = pending_items.checked_add(submission.items.len()) else {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::LimitExceeded,
+            );
+            return false;
+        };
+        let Some(next_bytes) = pending_bytes.checked_add(submission.total_text_bytes()) else {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::LimitExceeded,
+            );
+            return false;
+        };
+        let (submission_images, submission_image_bytes) = submission.image_totals();
+        let Some(next_images) = pending_images.checked_add(submission_images) else {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::LimitExceeded,
+            );
+            return false;
+        };
+        let Some(next_image_bytes) = pending_image_bytes.checked_add(submission_image_bytes) else {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::LimitExceeded,
+            );
+            return false;
+        };
+        if next_items > MAX_STEERING_QUEUE_ITEMS
+            || next_bytes > MAX_STEERING_QUEUE_BYTES
+            || next_images > MAX_STEERING_QUEUE_IMAGES
+            || next_image_bytes > MAX_STEERING_QUEUE_IMAGE_BYTES
+        {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::LimitExceeded,
+            );
+            return false;
+        }
+        if self
+            .eq_tx
+            .send(SessionEvent::SubmissionQueued {
+                session_id: self.session_id.clone(),
+                submission_id: submission.id.clone(),
+                sender_generation: submission.sender_generation,
+                source: submission.source,
+                item_count: submission.items.len(),
+                total_text_bytes: submission.total_text_bytes(),
+            })
+            .is_err()
+        {
+            return false;
+        }
+
+        record_recent_identity(
+            recent_submission_ids,
+            submission.id.clone(),
+            MAX_RECENT_SUBMISSION_IDS,
+        );
+        for item in &submission.items {
+            record_recent_identity(recent_item_ids, item.id.clone(), MAX_RECENT_ITEM_IDS);
+        }
+        *pending_items = next_items;
+        *pending_bytes = next_bytes;
+        *pending_images = next_images;
+        *pending_image_bytes = next_image_bytes;
+        if paused && submission.source != SubmissionSource::Scheduler {
+            pending.push_front(submission);
+        } else {
+            pending.push_back(submission);
+        }
+        true
+    }
+
+    fn reject_submission(
+        &self,
+        submission_id: &str,
+        sender_generation: u64,
+        reason: SubmissionRejectionReason,
+    ) {
+        let _ = self.eq_tx.send(SessionEvent::SubmissionRejected {
+            session_id: self.session_id.clone(),
+            submission_id: submission_id.to_owned(),
+            sender_generation,
+            reason,
+        });
+    }
+
+    async fn start_submission(
+        &mut self,
+        submission: StructuredSubmission,
+        turn_counter: u64,
+    ) -> Option<(JoinHandle<Option<TurnRecord>>, CancellationToken)> {
+        if self.compactor.should_compact(&self.history) {
+            let compacted = self.compactor.apply_budget(self.history.clone());
+            let compacted = self.compactor.apply_trim(compacted);
+            let compacted = self.compactor.apply_microcompact(compacted);
+            self.history = match self
+                .compactor
+                .compact(compacted, self.agent.provider())
+                .await
+            {
+                Ok(history) => history,
+                Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
+            };
+            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+                let _ = self.try_archive_session(file, dir, &self.history);
+            }
+        }
+
+        let mut request_tokens = self
+            .agent
+            .estimate_session_request_tokens(&submission.items, self.history.clone())
+            .await;
+        if matches!(request_tokens, Ok(tokens) if tokens > self.model_context_limit) {
+            let fixed_tokens = self
+                .agent
+                .estimate_session_request_tokens(&submission.items, Vec::new())
+                .await;
+            if let Ok(fixed_tokens) = fixed_tokens {
+                let history_budget = self.model_context_limit.saturating_sub(fixed_tokens);
+                let mut projected_compactor = Compactor::new(TokenEstimator::new(), history_budget);
+                let compacted = match projected_compactor
+                    .compact(self.history.clone(), self.agent.provider())
+                    .await
+                {
+                    Ok(history) => history,
+                    Err(_) => {
+                        projected_compactor
+                            .compact_deterministic(self.history.clone())
+                            .0
+                    }
+                };
+                self.history = compacted;
+                request_tokens = self
+                    .agent
+                    .estimate_session_request_tokens(&submission.items, self.history.clone())
+                    .await;
+                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+                    let _ = self.try_archive_session(file, dir, &self.history);
+                }
+            }
+        }
+        if !matches!(request_tokens, Ok(tokens) if tokens <= self.model_context_limit) {
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::ContextBudgetExceeded,
+            );
+            return None;
+        }
+
+        let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
+        if self
+            .eq_tx
+            .send(SessionEvent::SubmissionStarted {
+                session_id: self.session_id.clone(),
+                submission_id: submission.id.clone(),
+                sender_generation: submission.sender_generation,
+                turn_id: turn_id.clone(),
+            })
+            .is_err()
+        {
+            return None;
+        }
+        if self
+            .eq_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: self.session_id.clone(),
+                turn_id: turn_id.clone(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .is_err()
+        {
+            return None;
+        }
+
+        if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+            let agent = self.agent.clone();
+            let eq_tx = self.eq_tx.clone();
+            let history = self.history.clone();
+            let session_id = self.session_id.clone();
+            let message = submission.items[0].text.clone();
+            let token = CancellationToken::new();
+            let preview_token = token.clone();
+            let handle = tokio::spawn(async move {
+                let result = tokio::select! {
+                    () = preview_token.cancelled() => {
+                        let _ = eq_tx.send(SessionEvent::TurnEvent {
+                            session_id,
+                            turn_id,
+                            sequence: 1,
+                            payload: TurnEventPayload::Completed {
+                                status: TurnCompletionStatus::Cancelled,
+                            },
+                        });
+                        return Some(TurnRecord {
+                            new_messages: Vec::new(),
+                            status: TurnRecordStatus::Cancelled,
+                        });
+                    }
+                    result = agent.preview_request(message, history) => result,
+                };
+                let (status, record_status) = match result {
+                    Ok(Some(preview)) => {
+                        let _ = eq_tx.send(SessionEvent::TurnEvent {
+                            session_id: session_id.clone(),
+                            turn_id: turn_id.clone(),
+                            sequence: 1,
+                            payload: TurnEventPayload::Progress {
+                                event: AgentEvent::TurnStart,
+                            },
+                        });
+                        let _ = eq_tx.send(SessionEvent::TurnEvent {
+                            session_id: session_id.clone(),
+                            turn_id: turn_id.clone(),
+                            sequence: 2,
+                            payload: TurnEventPayload::Progress {
+                                event: AgentEvent::TextDelta {
+                                    delta: preview.clone(),
+                                },
+                            },
+                        });
+                        let _ = eq_tx.send(SessionEvent::TurnEvent {
+                            session_id: session_id.clone(),
+                            turn_id: turn_id.clone(),
+                            sequence: 3,
+                            payload: TurnEventPayload::Progress {
+                                event: AgentEvent::TurnEnd {
+                                    stop_reason: talos_core::message::StopReason::EndTurn,
+                                    usage: talos_core::message::Usage::default(),
+                                },
+                            },
+                        });
+                        (
+                            TurnCompletionStatus::Success {
+                                final_text: preview,
+                                new_messages: Vec::new(),
+                            },
+                            TurnRecordStatus::Success,
+                        )
+                    }
+                    Ok(None) => (
+                        TurnCompletionStatus::Error {
+                            message: "request preview is unavailable for this provider".into(),
+                        },
+                        TurnRecordStatus::Error,
+                    ),
+                    Err(error) => (
+                        TurnCompletionStatus::Error {
+                            message: error.to_string(),
+                        },
+                        TurnRecordStatus::Error,
+                    ),
+                };
+                let _ = eq_tx.send(SessionEvent::TurnEvent {
+                    session_id,
+                    turn_id,
+                    sequence: if record_status == TurnRecordStatus::Success {
+                        4
+                    } else {
+                        1
+                    },
+                    payload: TurnEventPayload::Completed { status },
+                });
+                Some(TurnRecord {
+                    new_messages: Vec::new(),
+                    status: record_status,
+                })
+            });
+            return Some((handle, token));
+        }
+
+        if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
+            agent_mut.set_append_prompt_opt(None);
+        }
+
+        let sequence = Arc::new(AtomicU64::new(1));
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+        let agent = self.agent.clone();
+        let eq_tx = self.eq_tx.clone();
+        let history = self.history.clone();
+        let persistence = self.persistence.clone();
+        let durable_persistence = self.durable_persistence.clone();
+        let session_id = self.session_id.clone();
+        let items = submission.items;
+        let request_context_limit = self.model_context_limit;
+        let handle = tokio::spawn(async move {
+            let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
+            let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
+            let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
+                agent,
+                items,
+                history,
+                event_tx,
+                event_rx,
+                eq_tx,
+                cancel_token: token_clone,
+                turn_id,
+                session_id,
+                sequence,
+                persistence,
+                durable_persistence,
+                result_tx,
+                request_context_limit,
+            }))
+            .catch_unwind()
+            .await;
+            result_rx.await.ok()
+        });
+        Some((handle, token))
     }
 
     fn try_archive_session(
@@ -468,4 +735,76 @@ impl AppServerSession {
 
         Ok(())
     }
+}
+
+fn compatibility_submission(
+    sequence: u64,
+    kind: SubmissionKind,
+    text: String,
+    attachments: Vec<talos_core::message::ContentPart>,
+) -> StructuredSubmission {
+    StructuredSubmission {
+        id: format!("compatibility_{sequence}"),
+        source: SubmissionSource::Compatibility,
+        sender_generation: 0,
+        items: vec![SubmissionItem {
+            id: format!("compatibility_item_{sequence}"),
+            enqueue_sequence: sequence,
+            kind,
+            text,
+            attachments,
+        }],
+    }
+}
+
+fn record_recent_identity(identities: &mut VecDeque<String>, id: String, capacity: usize) {
+    while identities.len() >= capacity {
+        identities.pop_front();
+    }
+    identities.push_back(id);
+}
+
+fn validate_submission(submission: &StructuredSubmission) -> Result<(), SubmissionRejectionReason> {
+    if submission.id.is_empty()
+        || submission.items.is_empty()
+        || submission.items.len() > MAX_SUBMISSION_BATCH_ITEMS
+        || submission.common_kind().is_none()
+        || (submission.common_kind() == Some(SubmissionKind::PreviewRequest)
+            && (submission.items.len() != 1 || !submission.items[0].attachments.is_empty()))
+    {
+        return Err(SubmissionRejectionReason::InvalidStructure);
+    }
+    if submission.total_text_bytes() > MAX_SUBMISSION_BATCH_BYTES
+        || submission
+            .items
+            .iter()
+            .any(|item| item.id.is_empty() || item.text.len() > MAX_SUBMISSION_ITEM_BYTES)
+    {
+        return Err(SubmissionRejectionReason::LimitExceeded);
+    }
+    let mut image_count = 0_usize;
+    let mut total_image_bytes = 0_u64;
+    for item in &submission.items {
+        for attachment in &item.attachments {
+            if let talos_core::message::ContentPart::Image { byte_count, .. } = attachment {
+                image_count = image_count.saturating_add(1);
+                total_image_bytes = total_image_bytes.saturating_add(*byte_count);
+                if image_count > MAX_SUBMISSION_IMAGE_COUNT
+                    || *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                    || total_image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
+                {
+                    return Err(SubmissionRejectionReason::LimitExceeded);
+                }
+            }
+        }
+    }
+    let mut item_ids = HashSet::with_capacity(submission.items.len());
+    if submission
+        .items
+        .iter()
+        .any(|item| !item_ids.insert(item.id.as_str()))
+    {
+        return Err(SubmissionRejectionReason::Duplicate);
+    }
+    Ok(())
 }
