@@ -44,7 +44,9 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 - No Windows-specific duplicate contribution or CLI registry construction is added.
 - Outer print/TUI/MCP composition continues to select and permission-wrap the contribution.
 - Tool nature/family remain `Execute` / `Shell`.
-- Permission resource prefixes and descriptions use the actual platform tool name. Unknown or complex commands remain exact resources. Reusable shell templates reject variable/home expansion and colon-bearing Windows drive or PowerShell provider tokens, so cwd-scoped grants cannot authorize external paths through platform expansion.
+- Permission resource prefixes and descriptions use the actual platform tool name. Unknown or complex commands remain exact resources.
+- On Windows, reusable cwd-scoped parameter templates accept only inert ASCII alphanumeric path/option tokens plus `-`, `_`, `.`, `/`, and `=`. PowerShell grouping, call operators, arrays, variables, member expressions, quoting, provider/drive syntax, home expansion and other computed forms therefore fail closed to exact resources until a reviewed PowerShell lexer/parser exists.
+- Parent and absolute paths remain ineligible for cwd-scoped reusable grants after token validation.
 
 ### Child hardening
 
@@ -80,6 +82,7 @@ Merge requires the review's automated and manual gates. Historical PR #121 valid
 - **Search for Git-for-Windows `sh.exe`.** This preserves an undeclared optional dependency and presents POSIX semantics on a native Windows product surface.
 - **Register both `bash` and `powershell` on Windows.** This creates ambiguous duplicate authority and inconsistent permission/prompt behavior.
 - **Translate POSIX commands.** Translation is not semantics-preserving and can change permission meaning.
+- **Maintain an expanding PowerShell syntax denylist for reusable templates.** PowerShell has too many expression and invocation forms for a denylist to establish a conservative cwd boundary; an explicit inert-token allowlist fails closed.
 - **Mutate the parent environment before spawn.** Process-wide mutation races with concurrent tool execution and can leak or remove credentials from unrelated work.
 - **Reset timeout whenever output arrives.** That changes an absolute operation budget into an unbounded inactivity timer.
 - **Claim Job Object/process-tree supervision now.** That requires a separate process lifecycle and security design.
@@ -90,12 +93,13 @@ Before acceptance:
 
 - Unix focused tests prove `bash`, `sh -c`, existing hardening and timeout behavior remain intact.
 - Windows focused tests prove the `powershell` identity, native commands, child env removal, stdout/stderr/exit status, working directory and continuous-output deadline.
+- Windows permission regressions prove ordinary safe relative path/options may retain reviewed templates while `cat (Join-Path (Get-Item ..).FullName secret.txt)` and adjacent grouping, call, array, variable and member-expression forms receive exact resources.
 - Current contribution inventories prove exactly one platform shell contribution and no duplicate registry path.
 - Permission, MCP, prompt and Agent output surfaces use the actual platform identity.
 - Full locked workspace format/check/Clippy/tests pass on Windows and macOS/Unix.
 - Governance, collaboration-claim, diff and release-preflight gates pass on the exact Head.
 - A rebuilt Windows CLI and direct PowerShell tool walkthrough are recorded.
-- Independent security/maintainer review accepts the direct-child limitation and residuals.
+- Independent security/maintainer review accepts the permission boundary, direct-child limitation and residuals.
 
 ## Residual And Reversal Triggers
 
