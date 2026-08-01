@@ -93,9 +93,21 @@ jobs:
           $testExit = $LASTEXITCODE
           if ($testExit -ne 0) {
             Write-Host "=== Windows workspace failure summary ==="
-            Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed" -Context 2,4
+            Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed|panicked at" -Context 3,8 |
+              Tee-Object -FilePath windows-workspace-failures.log
             exit $testExit
           }
+
+      - name: Upload Windows workspace failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-workspace-test-failure-${{ github.sha }}
+          path: |
+            windows-workspace-failures.log
+            windows-workspace-tests.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Validate project governance
         shell: pwsh
