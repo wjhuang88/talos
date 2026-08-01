@@ -22,8 +22,10 @@ static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
 const LD_PRELOAD_SENTINEL: &str = "talos-i170-parent-ld-preload";
 const DYLD_INSERT_LIBRARIES_SENTINEL: &str = "talos-i170-parent-dyld-insert-libraries";
 
-const NORMAL_COMMAND: &str = r#"Write-Output "stdout-ok"; [Console]::Error.WriteLine("stderr-ok"); (Get-Location).Path; exit 7"#;
-const TIMEOUT_COMMAND: &str = r#"Write-Output "before-timeout"; Write-Output "direct-child-pid=$PID"; Start-Sleep -Seconds 10; Write-Output "after-timeout""#;
+const NORMAL_COMMAND: &str =
+    r#"Write-Output "stdout-ok"; [Console]::Error.WriteLine("stderr-ok"); (Get-Location).Path; exit 7"#;
+const TIMEOUT_COMMAND: &str =
+    r#"Write-Output "before-timeout"; Write-Output "direct-child-pid=$PID"; Start-Sleep -Seconds 10; Write-Output "after-timeout""#;
 
 struct EnvironmentRestore {
     original: Vec<(&'static str, Option<OsString>)>,
@@ -143,10 +145,10 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
         assert!(!result.content.contains(LD_PRELOAD_SENTINEL));
         assert!(!result.content.contains(DYLD_INSERT_LIBRARIES_SENTINEL));
 
-        assert_eq!(env::var("LD_PRELOAD").as_deref(), Ok(LD_PRELOAD_SENTINEL));
+        assert_eq!(env::var("LD_PRELOAD").unwrap(), LD_PRELOAD_SENTINEL);
         assert_eq!(
-            env::var("DYLD_INSERT_LIBRARIES").as_deref(),
-            Ok(DYLD_INSERT_LIBRARIES_SENTINEL)
+            env::var("DYLD_INSERT_LIBRARIES").unwrap(),
+            DYLD_INSERT_LIBRARIES_SENTINEL
         );
 
         println!("I170_ENV_ISOLATION production_path=BashTool::execute");
@@ -181,7 +183,10 @@ async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_ev
 
     println!("I170_WALKTHROUGH exact_head={head}");
     println!("I170_WALKTHROUGH runner_os={}", runner_value("RUNNER_OS"));
-    println!("I170_WALKTHROUGH runner_name={}", runner_value("RUNNER_NAME"));
+    println!(
+        "I170_WALKTHROUGH runner_name={}",
+        runner_value("RUNNER_NAME")
+    );
     println!("I170_WALKTHROUGH image_os={}", runner_value("ImageOS"));
     println!(
         "I170_WALKTHROUGH image_version={}",
@@ -193,16 +198,17 @@ async fn windows_direct_powershell_walkthrough_records_exact_head_and_timeout_ev
     let normal = tool
         .execute(serde_json::json!({ "command": NORMAL_COMMAND }))
         .await;
+    let normal_output = captured_output(&normal.content);
+    let expected_cwd = working_dir.to_string_lossy().to_ascii_lowercase();
 
     assert!(normal.is_error, "exit 7 must be surfaced as a tool error");
-    assert!(normal.content.contains("stdout-ok"));
-    assert!(normal.content.contains("stderr-ok"));
-    assert!(normal.content.ends_with("[exit 7]"));
+    assert!(normal_output.contains("stdout-ok"));
+    assert!(normal_output.contains("stderr-ok"));
+    assert!(normal_output.ends_with("[exit 7]"));
     assert!(
-        normal
-            .content
+        normal_output
             .to_ascii_lowercase()
-            .contains(&working_dir.to_string_lossy().to_ascii_lowercase()),
+            .contains(expected_cwd.as_str()),
         "PowerShell did not report the configured working directory: {}",
         normal.content
     );
