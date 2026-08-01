@@ -2,13 +2,24 @@
 
 ## Status
 
-Proposed / Review for TOOL-023-C and I170 on 2026-08-01. Implementation is in Draft PR #126; acceptance requires exact-head Windows and Unix/macOS CI plus independent process/security review.
+Accepted on 2026-08-01 for TOOL-023-C and I170.
+
+Acceptance evidence:
+
+- exact implementation Head `8cfe8edb2dbda581244f583fb809591391a54298`;
+- exact-head CI run `30705366763` (`CI` run 718), all macOS/Windows/governance jobs successful;
+- Windows walkthrough artifact `8820174164`;
+- merged PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`;
+- final review closed the computed-expression permission blocker;
+- the repository owner explicitly authorized readiness and merge after reviewing the final evidence.
+
+The accepted residual is direct-child-only timeout cleanup. This decision does not authorize or claim full descendant process-tree supervision.
 
 ## Context
 
-The authoritative shell contribution currently constructs `BashTool`, which historically invoked `sh -c` on every platform and exposed the name `bash`. Stock Windows does not provide that process contract. The recovered I170 evidence preserved a Windows-native PowerShell design, but the old recovery PR #121 is archival and cannot establish current-main architecture or validation.
+The authoritative shell contribution historically constructed `BashTool`, invoked `sh -c` on every platform and exposed the name `bash`. Stock Windows does not provide that process contract. The recovered I170 evidence preserved a Windows-native PowerShell design, but recovery PR #121 is archival and does not establish current-main architecture or validation.
 
-Current main also moved built-in tool construction into `talos-tools` contributions with outer composition roots responsible for selection and permission wrapping. The Windows fix must therefore change the single contributed tool's platform identity and process construction, not add a second registry path.
+Current architecture moves built-in tool construction into `talos-tools` contributions with outer composition roots responsible for selection and permission wrapping. The Windows fix therefore changes the single contributed tool's platform identity and process construction rather than adding a second registry path.
 
 ## Constraint Decomposition
 
@@ -45,7 +56,8 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 - Outer print/TUI/MCP composition continues to select and permission-wrap the contribution.
 - Tool nature/family remain `Execute` / `Shell`.
 - Permission resource prefixes and descriptions use the actual platform tool name. Unknown or complex commands remain exact resources.
-- On Windows, reusable cwd-scoped parameter templates accept only inert ASCII alphanumeric path/option tokens plus `-`, `_`, `.`, `/`, and `=`. PowerShell grouping, call operators, arrays, variables, member expressions, quoting, provider/drive syntax, home expansion and other computed forms therefore fail closed to exact resources until a reviewed PowerShell lexer/parser exists.
+- On Windows, reusable cwd-scoped parameter templates accept only inert ASCII alphanumeric path/option tokens plus `-`, `_`, `.`, `/`, and `=`.
+- PowerShell grouping, call operators, script blocks, arrays, variables, member/index expressions, quoting, provider/drive syntax, home expansion, wildcard syntax, backslashes, splatting, comma lists and stop-parsing forms fail closed to exact resources until a reviewed PowerShell lexer/parser exists.
 - Parent and absolute paths remain ineligible for cwd-scoped reusable grants after token validation.
 
 ### Child hardening
@@ -58,7 +70,8 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 
 - A single Tokio sleep future is created and pinned before stdout/stderr/wait arbitration.
 - Reading output cannot recreate or extend the deadline.
-- The same deadline covers direct-child completion and stdout/stderr closure. Talos completes normally only after the direct child and both pipes finish; otherwise it kills/waits the direct child when still running, preserves output already received, appends `[timeout]`, and returns without waiting for descendant-held pipe EOF.
+- The same deadline covers direct-child completion and stdout/stderr closure.
+- Talos completes normally only after the direct child and both pipes finish; otherwise it kills and waits for the direct child when still running, preserves output already received, appends `[timeout]`, and returns without waiting for descendant-held pipe EOF.
 - This is a direct-child guarantee only. It does not claim termination of every descendant process created by a shell command.
 
 ### Portable presentation and fixtures
@@ -70,11 +83,11 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 
 ## Security Review
 
-Current review evidence is recorded in:
+Accepted review evidence is recorded in:
 
-- `docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md`
+- `docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md`.
 
-Merge requires the review's automated and manual gates. Historical PR #121 validation is provenance only and does not satisfy current exact-head requirements.
+The original high-severity reusable-template finding was corrected with the explicit Windows inert-token allowlist and exact-resource regressions. No unresolved high-severity finding remains in the I170 scope.
 
 ## Rejected Alternatives
 
@@ -87,19 +100,16 @@ Merge requires the review's automated and manual gates. Historical PR #121 valid
 - **Reset timeout whenever output arrives.** That changes an absolute operation budget into an unbounded inactivity timer.
 - **Claim Job Object/process-tree supervision now.** That requires a separate process lifecycle and security design.
 
-## Validation Gate
-
-Before acceptance:
+## Validation Evidence
 
 - Unix focused tests prove `bash`, `sh -c`, existing hardening and timeout behavior remain intact.
 - Windows focused tests prove the `powershell` identity, native commands, child env removal, stdout/stderr/exit status, working directory and continuous-output deadline.
 - Windows permission regressions prove ordinary safe relative path/options may retain reviewed templates while `cat (Join-Path (Get-Item ..).FullName secret.txt)` and adjacent grouping, call, array, variable and member-expression forms receive exact resources.
 - Current contribution inventories prove exactly one platform shell contribution and no duplicate registry path.
 - Permission, MCP, prompt and Agent output surfaces use the actual platform identity.
-- Full locked workspace format/check/Clippy/tests pass on Windows and macOS/Unix.
-- Governance, collaboration-claim, diff and release-preflight gates pass on the exact Head.
-- A rebuilt Windows CLI and direct PowerShell tool walkthrough are recorded.
-- Independent security/maintainer review accepts the permission boundary, direct-child limitation and residuals.
+- Full locked workspace format/check/Clippy/tests passed on Windows and macOS/Unix.
+- Governance, collaboration-claim, diff and release-preflight gates passed on the exact Head.
+- The rebuilt Windows CLI and direct PowerShell walkthrough were recorded in artifact `8820174164`.
 
 ## Residual And Reversal Triggers
 
