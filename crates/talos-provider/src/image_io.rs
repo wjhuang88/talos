@@ -182,6 +182,7 @@ mod tests {
         assert!(matches!(result, ImageRead::Omit));
     }
 
+    #[cfg(unix)]
     #[test]
     fn symlink_swap_is_detected_and_omitted() {
         // The guard compares the stored path against the freshly
