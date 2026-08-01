@@ -38,7 +38,7 @@ pub struct BashInput {
     pub timeout_secs: Option<u64>,
 }
 
-/// A tool that executes shell commands via `sh -c`.
+/// A tool that executes commands via PowerShell on Windows and `sh -c` elsewhere.
 ///
 /// Commands are run with a configurable timeout and working directory.
 /// Output is captured from both stdout and stderr.
@@ -54,6 +54,33 @@ enum BashCommandClass {
     PackageManagerOrNetwork,
     WriteOrMutating,
     ComplexShell,
+}
+
+#[cfg(windows)]
+const SHELL_TOOL_NAME: &str = "powershell";
+#[cfg(not(windows))]
+const SHELL_TOOL_NAME: &str = "bash";
+
+fn platform_shell_command(command: &str) -> Command {
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+            .arg(command);
+        cmd
+    };
+
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg(command);
+        cmd
+    };
+
+    for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
+        cmd.env_remove(name);
+    }
+    cmd
 }
 
 impl BashCommandClass {
@@ -101,10 +128,8 @@ impl BashTool {
     }
 
     async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c")
-            .arg(command)
-            .current_dir(&self.working_dir)
+        let mut cmd = platform_shell_command(command);
+        cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -171,29 +196,36 @@ impl BashTool {
         let mut output = String::new();
         output.push_str(&format!("$ {command}\n"));
 
+        let deadline = tokio::time::sleep(timeout_duration);
+        tokio::pin!(deadline);
+        let mut stdout_open = true;
+        let mut stderr_open = true;
+
         let exit_status = loop {
             tokio::select! {
-                line_result = stdout_reader.next_line() => {
+                line_result = stdout_reader.next_line(), if stdout_open => {
                     match line_result {
                         Ok(Some(line)) => {
                             output.push_str(&line);
                             output.push('\n');
                         }
-                        Ok(None) => {} // stdout closed
+                        Ok(None) => stdout_open = false,
                         Err(e) => {
                             output.push_str(&format!("[stdout error: {e}]\n"));
+                            stdout_open = false;
                         }
                     }
                 }
-                line_result = stderr_reader.next_line() => {
+                line_result = stderr_reader.next_line(), if stderr_open => {
                     match line_result {
                         Ok(Some(line)) => {
                             output.push_str(&line);
                             output.push('\n');
                         }
-                        Ok(None) => {} // stderr closed
+                        Ok(None) => stderr_open = false,
                         Err(e) => {
                             output.push_str(&format!("[stderr error: {e}]\n"));
+                            stderr_open = false;
                         }
                     }
                 }
@@ -209,7 +241,7 @@ impl BashTool {
                     }
                     break status;
                 }
-                _ = tokio::time::sleep(timeout_duration) => {
+                _ = &mut deadline => {
                     let _ = child.kill().await;
                     let _ = child.wait().await;
                     // Drain any remaining output after kill
@@ -252,7 +284,7 @@ impl BashTool {
 #[async_trait]
 impl AgentTool for BashTool {
     fn name(&self) -> &str {
-        "bash"
+        SHELL_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -287,7 +319,7 @@ impl AgentTool for BashTool {
                 self.permission_resource_for_command(command),
                 ToolResourceKind::Command,
             )
-            .with_description(format!("bash {}", class.as_str())),
+            .with_description(format!("{} {}", self.name(), class.as_str())),
         ]
     }
 
@@ -341,7 +373,12 @@ fn bash_permission_resource(command: &str, cwd: &PathBuf) -> String {
     let mut hasher = DefaultHasher::new();
     cwd.hash(&mut hasher);
     normalized.hash(&mut hasher);
-    format!("bash:{}:exact:{:016x}", class.as_str(), hasher.finish())
+    format!(
+        "{}:{}:exact:{:016x}",
+        SHELL_TOOL_NAME,
+        class.as_str(),
+        hasher.finish()
+    )
 }
 
 fn normalize_bash_command(command: &str) -> String {
@@ -408,7 +445,8 @@ fn bash_permission_template(
     let mut hasher = DefaultHasher::new();
     cwd.hash(&mut hasher);
     Some(format!(
-        "bash:{}:template:{:016x}:{}",
+        "{}:{}:template:{:016x}:{}",
+        SHELL_TOOL_NAME,
         class.as_str(),
         hasher.finish(),
         template
@@ -667,6 +705,10 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     }
 
+    fn resource_prefix(class: &str, kind: &str) -> String {
+        format!("{SHELL_TOOL_NAME}:{class}:{kind}:")
+    }
+
     #[tokio::test]
     async fn test_echo_returns_stdout() {
         let tool = BashTool::new(test_dir());
@@ -709,23 +751,29 @@ mod tests {
     #[tokio::test]
     async fn test_shell_metacharacters_pipe() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "'hello' | ForEach-Object { $_.ToUpperInvariant() }";
+        #[cfg(not(windows))]
+        let command = "echo hello | tr a-z A-Z";
         let result = tool
-            .execute(serde_json::json!({ "command": "echo hello | tr a-z A-Z" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
         assert!(result.content.contains("HELLO"));
-        assert!(result.content.starts_with("$ echo hello | tr a-z A-Z\n"));
+        assert!(result.content.starts_with(&format!("$ {command}\n")));
         assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
     async fn test_shell_metacharacters_redirect() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "$p = Join-Path ([System.IO.Path]::GetTempPath()) 'talos_shell_test.txt'; 'test123' | Set-Content $p; Get-Content $p; Remove-Item $p";
+        #[cfg(not(windows))]
+        let command = "echo test123 > /tmp/talos_bash_test.txt && cat /tmp/talos_bash_test.txt && rm /tmp/talos_bash_test.txt";
         let result = tool
-            .execute(serde_json::json!({
-                "command": "echo test123 > /tmp/talos_bash_test.txt && cat /tmp/talos_bash_test.txt && rm /tmp/talos_bash_test.txt"
-            }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -736,8 +784,12 @@ mod tests {
     #[tokio::test]
     async fn test_working_directory_restriction() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "(Get-Location).Path | Split-Path -Leaf";
+        #[cfg(not(windows))]
+        let command = "basename $(pwd)";
         let result = tool
-            .execute(serde_json::json!({ "command": "basename $(pwd)" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -766,7 +818,25 @@ mod tests {
     #[test]
     fn test_bash_tool_name() {
         let tool = BashTool::new(test_dir());
-        assert_eq!(tool.name(), "bash");
+        assert_eq!(tool.name(), SHELL_TOOL_NAME);
+    }
+
+    #[test]
+    fn platform_command_removes_dangerous_environment_variables() {
+        let command = platform_shell_command("echo safe");
+        let removed: Vec<_> = command
+            .as_std()
+            .get_envs()
+            .filter_map(|(name, value)| {
+                value
+                    .is_none()
+                    .then_some(name.to_string_lossy().to_string())
+            })
+            .collect();
+
+        for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
+            assert!(removed.iter().any(|removed_name| removed_name == &name));
+        }
     }
 
     #[test]
@@ -798,7 +868,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:read_only_inspection:"))
         );
     }
 
@@ -851,7 +921,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:template:")
+                .starts_with(&resource_prefix("read_only_inspection", "template"))
         );
         assert!(first[0].resource.as_deref().unwrap().ends_with(":cat"));
     }
@@ -872,14 +942,14 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             absolute[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
     }
 
@@ -898,7 +968,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:validation_build:template:")
+                .starts_with(&resource_prefix("validation_build", "template"))
         );
         assert!(
             first[0]
@@ -927,21 +997,21 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             complex[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:complex_shell:exact:")
+                .starts_with(&resource_prefix("complex_shell", "exact"))
         );
         assert!(
             write[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:write_or_mutating:exact:")
+                .starts_with(&resource_prefix("write_or_mutating", "exact"))
         );
     }
 
@@ -982,7 +1052,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:complex_shell:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:complex_shell:"))
         );
     }
 
@@ -1021,7 +1091,13 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_exit_code_success() {
         let tool = BashTool::new(test_dir());
-        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
+        #[cfg(windows)]
+        let command = "$null";
+        #[cfg(not(windows))]
+        let command = "true";
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
 
         assert!(!result.is_error);
         assert!(result.content.ends_with("[exit 0]"));
@@ -1041,8 +1117,12 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_multiline_output() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "Write-Output 'line1','line2','line3'";
+        #[cfg(not(windows))]
+        let command = "printf 'line1\nline2\nline3\n'";
         let result = tool
-            .execute(serde_json::json!({ "command": "printf 'line1\\nline2\\nline3\\n'" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -1054,8 +1134,12 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_stderr_captured() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "[Console]::Error.WriteLine('stderr_msg')";
+        #[cfg(not(windows))]
+        let command = "echo stderr_msg >&2";
         let result = tool
-            .execute(serde_json::json!({ "command": "echo stderr_msg >&2" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -1065,10 +1149,13 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_timeout_preserves_partial_output() {
         let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(500));
+        #[cfg(windows)]
+        let command =
+            "Write-Output before_sleep; Start-Sleep -Seconds 10; Write-Output after_sleep";
+        #[cfg(not(windows))]
+        let command = "echo before_sleep && sleep 10 && echo after_sleep";
         let result = tool
-            .execute(serde_json::json!({
-                "command": "echo before_sleep && sleep 10 && echo after_sleep"
-            }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(result.is_error);
@@ -1077,12 +1164,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn continuous_output_does_not_reset_timeout_deadline() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(300));
+        #[cfg(windows)]
+        let command = "1..100 | ForEach-Object { Write-Output tick; Start-Sleep -Milliseconds 50 }";
+        #[cfg(not(windows))]
+        let command = "i=0; while [ $i -lt 100 ]; do echo tick; sleep 0.05; i=$((i+1)); done";
+        let started = std::time::Instant::now();
+
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("tick"));
+        assert!(result.content.contains("[timeout]"));
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "continuous output reset the timeout deadline"
+        );
+    }
+
+    #[tokio::test]
     async fn test_streaming_empty_output() {
         let tool = BashTool::new(test_dir());
-        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
+        #[cfg(windows)]
+        let command = "$null";
+        #[cfg(not(windows))]
+        let command = "true";
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
 
         assert!(!result.is_error);
-        assert!(result.content.starts_with("$ true\n"));
+        assert!(result.content.starts_with(&format!("$ {command}\n")));
         assert!(result.content.ends_with("[exit 0]"));
     }
 
@@ -1136,6 +1251,7 @@ mod tests {
         assert!(result.content.ends_with("[exit 1]"));
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_diff_difference_is_not_error() {
         let tool = BashTool::new(test_dir());
@@ -1186,6 +1302,7 @@ mod tests {
         assert!(result.content.ends_with("[exit 1]"));
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_diff_trouble_exit_2_is_error() {
         let tool = BashTool::new(test_dir());
@@ -1199,6 +1316,7 @@ mod tests {
         assert!(result.is_error);
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_grep_exit_2_is_error() {
         let tool = BashTool::new(test_dir());
