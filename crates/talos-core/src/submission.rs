@@ -59,7 +59,7 @@ pub enum SubmissionKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SubmissionItem {
     /// Opaque producer-assigned item identity.
-    pub item_id: String,
+    pub id: String,
     /// Monotonic producer-side FIFO order.
     pub enqueue_sequence: u64,
     /// Dispatch kind fixed before queue admission.
@@ -82,62 +82,57 @@ impl SubmissionItem {
 /// An immutable compatible queue prefix prepared for one Actor Turn.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StructuredSubmission {
-    /// Stable identity shared by retries and receipt reconciliation.
-    pub batch_id: String,
-    /// Identity of the exact Engine prefix frozen for transfer.
-    pub reservation_id: String,
-    /// Identity of this bounded send or reconciliation attempt.
-    pub transfer_attempt_id: String,
-    /// Logical Session that may accept this submission.
-    pub session_id: String,
-    /// Runtime generation of that logical Session.
-    pub session_generation: u64,
+    /// Stable identity shared by preparation, retries, receipt and reconciliation.
+    pub id: String,
     /// Source used by Actor arbitration.
     pub source: SubmissionSource,
+    /// Runtime generation of the addressed logical Session.
+    #[serde(default)]
+    pub sender_generation: u64,
     /// Ordered, homogeneous, individually recoverable items.
     pub items: Vec<SubmissionItem>,
 }
 
 impl StructuredSubmission {
-    /// Returns aggregate UTF-8 text bytes with checked overflow semantics.
+    /// Returns aggregate UTF-8 text bytes using saturating accounting.
     #[must_use]
-    pub fn total_text_bytes(&self) -> Option<usize> {
+    pub fn total_text_bytes(&self) -> usize {
         self.items
             .iter()
-            .try_fold(0usize, |total, item| total.checked_add(item.text_bytes()))
+            .fold(0usize, |total, item| total.saturating_add(item.text_bytes()))
     }
 
-    /// Returns attachment count, declared bytes, and metadata bytes.
+    /// Returns attachment count and declared bytes using saturating accounting.
     #[must_use]
-    pub fn image_totals(&self) -> Option<(usize, u64, usize)> {
+    pub fn image_totals(&self) -> (usize, u64) {
         self.items
             .iter()
             .flat_map(|item| &item.attachments)
-            .try_fold(
-                (0usize, 0u64, 0usize),
-                |(count, bytes, metadata), part| match part {
-                    ContentPart::Image {
-                        path,
-                        mime,
-                        byte_count,
-                        ..
-                    } => {
-                        let attachment_metadata = path
-                            .as_os_str()
-                            .to_string_lossy()
-                            .len()
-                            .checked_add(mime.len())?
-                            .checked_add(std::mem::size_of::<u64>())?
-                            .checked_add(32)?;
-                        Some((
-                            count.checked_add(1)?,
-                            bytes.checked_add(*byte_count)?,
-                            metadata.checked_add(attachment_metadata)?,
-                        ))
-                    }
-                    ContentPart::Text { .. } => None,
-                },
-            )
+            .fold((0usize, 0u64), |(count, bytes), part| match part {
+                ContentPart::Image { byte_count, .. } => (
+                    count.saturating_add(1),
+                    bytes.saturating_add(*byte_count),
+                ),
+                ContentPart::Text { .. } => (count, bytes),
+            })
+    }
+
+    /// Returns total attachment metadata bytes or `None` on arithmetic overflow.
+    #[must_use]
+    pub fn attachment_metadata_bytes(&self) -> Option<usize> {
+        self.items
+            .iter()
+            .flat_map(|item| &item.attachments)
+            .try_fold(0usize, |total, part| match part {
+                ContentPart::Image {
+                    path, mime, ..
+                } => total
+                    .checked_add(path.as_os_str().to_string_lossy().len())?
+                    .checked_add(mime.len())?
+                    .checked_add(std::mem::size_of::<u64>())?
+                    .checked_add(32),
+                ContentPart::Text { .. } => None,
+            })
     }
 
     /// Returns the common dispatch kind for a non-empty homogeneous batch.
@@ -150,13 +145,9 @@ impl StructuredSubmission {
             .then_some(first)
     }
 
-    /// Validates immutable identity, ordering, compatibility, and hard bounds.
+    /// Validates immutable identity, ordering, compatibility and hard bounds.
     pub fn validate(&self) -> Result<(), SubmissionRejectionReason> {
-        if self.batch_id.is_empty()
-            || self.reservation_id.is_empty()
-            || self.transfer_attempt_id.is_empty()
-            || self.session_id.is_empty()
-            || self.session_generation == 0
+        if self.id.is_empty()
             || self.items.is_empty()
             || self.items.len() > MAX_SUBMISSION_BATCH_ITEMS
             || self.common_kind().is_none()
@@ -167,11 +158,11 @@ impl StructuredSubmission {
         let mut previous_sequence = None;
         let mut item_ids = std::collections::HashSet::with_capacity(self.items.len());
         for item in &self.items {
-            if item.item_id.is_empty() {
+            if item.id.is_empty() {
                 return Err(SubmissionRejectionReason::InvalidStructure);
             }
-            if !item_ids.insert(item.item_id.as_str()) {
-                return Err(SubmissionRejectionReason::IdentityConflict);
+            if !item_ids.insert(item.id.as_str()) {
+                return Err(SubmissionRejectionReason::Duplicate);
             }
             if item.text_bytes() > MAX_SUBMISSION_ITEM_BYTES {
                 return Err(SubmissionRejectionReason::LimitExceeded);
@@ -182,44 +173,42 @@ impl StructuredSubmission {
             previous_sequence = Some(item.enqueue_sequence);
         }
 
-        if self
-            .total_text_bytes()
-            .is_none_or(|bytes| bytes > MAX_SUBMISSION_BATCH_BYTES)
-        {
+        if self.total_text_bytes() > MAX_SUBMISSION_BATCH_BYTES {
             return Err(SubmissionRejectionReason::LimitExceeded);
         }
-
-        let has_attachments = self.items.iter().any(|item| !item.attachments.is_empty());
-        if self.common_kind() == Some(SubmissionKind::PreviewRequest) && has_attachments {
+        if self.common_kind() == Some(SubmissionKind::PreviewRequest)
+            && (self.items.len() != 1 || !self.items[0].attachments.is_empty())
+        {
             return Err(SubmissionRejectionReason::InvalidStructure);
         }
 
-        let Some((image_count, image_bytes, metadata_bytes)) = self.image_totals() else {
-            return Err(SubmissionRejectionReason::InvalidStructure);
-        };
-        let oversized_attachment =
-            self.items
-                .iter()
-                .flat_map(|item| &item.attachments)
-                .any(|part| match part {
-                    ContentPart::Image {
-                        path,
-                        mime,
-                        byte_count,
-                        ..
-                    } => {
-                        let metadata = path
-                            .as_os_str()
-                            .to_string_lossy()
-                            .len()
-                            .saturating_add(mime.len())
-                            .saturating_add(std::mem::size_of::<u64>())
-                            .saturating_add(32);
-                        *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                            || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
-                    }
-                    ContentPart::Text { .. } => true,
-                });
+        let (image_count, image_bytes) = self.image_totals();
+        let metadata_bytes = self
+            .attachment_metadata_bytes()
+            .ok_or(SubmissionRejectionReason::InvalidStructure)?;
+        let oversized_attachment = self
+            .items
+            .iter()
+            .flat_map(|item| &item.attachments)
+            .any(|part| match part {
+                ContentPart::Image {
+                    path,
+                    mime,
+                    byte_count,
+                    ..
+                } => {
+                    let metadata = path
+                        .as_os_str()
+                        .to_string_lossy()
+                        .len()
+                        .saturating_add(mime.len())
+                        .saturating_add(std::mem::size_of::<u64>())
+                        .saturating_add(32);
+                    *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                        || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
+                }
+                ContentPart::Text { .. } => true,
+            });
         if image_count > MAX_SUBMISSION_IMAGE_COUNT
             || image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
             || metadata_bytes > MAX_SUBMISSION_TOTAL_ATTACHMENT_METADATA_BYTES
@@ -262,6 +251,10 @@ pub enum SubmissionRejectionReason {
     WrongGeneration,
     /// The identity already exists with different immutable content.
     IdentityConflict,
+    /// The exact identity was accepted already.
+    Duplicate,
+    /// The pending submission was explicitly cancelled before start.
+    Cancelled,
     /// The submission is empty or mixes incompatible kinds.
     InvalidStructure,
     /// An item, batch, attachment, queue, or journal bound was exceeded.
@@ -301,14 +294,11 @@ mod tests {
 
     fn submission() -> StructuredSubmission {
         StructuredSubmission {
-            batch_id: "batch-1".into(),
-            reservation_id: "reservation-1".into(),
-            transfer_attempt_id: "attempt-1".into(),
-            session_id: "session-1".into(),
-            session_generation: 1,
+            id: "batch-1".into(),
             source: SubmissionSource::User,
+            sender_generation: 1,
             items: vec![SubmissionItem {
-                item_id: "item-1".into(),
+                id: "item-1".into(),
                 enqueue_sequence: 1,
                 kind: SubmissionKind::UserTurn,
                 text: "hello".into(),
@@ -321,14 +311,13 @@ mod tests {
     fn valid_submission_preserves_item_boundaries() {
         let mut value = submission();
         value.items.push(SubmissionItem {
-            item_id: "item-2".into(),
+            id: "item-2".into(),
             enqueue_sequence: 2,
             kind: SubmissionKind::UserTurn,
             text: "world".into(),
             attachments: Vec::new(),
         });
         assert_eq!(value.validate(), Ok(()));
-
         let encoded = serde_json::to_string(&value).unwrap();
         let decoded: StructuredSubmission = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded.items.len(), 2);
@@ -340,23 +329,20 @@ mod tests {
     fn duplicate_item_identity_fails_closed() {
         let mut value = submission();
         value.items.push(SubmissionItem {
-            item_id: "item-1".into(),
+            id: "item-1".into(),
             enqueue_sequence: 2,
             kind: SubmissionKind::UserTurn,
             text: "again".into(),
             attachments: Vec::new(),
         });
-        assert_eq!(
-            value.validate(),
-            Err(SubmissionRejectionReason::IdentityConflict)
-        );
+        assert_eq!(value.validate(), Err(SubmissionRejectionReason::Duplicate));
     }
 
     #[test]
     fn incompatible_kinds_and_regressive_sequence_fail_closed() {
         let mut value = submission();
         value.items.push(SubmissionItem {
-            item_id: "item-2".into(),
+            id: "item-2".into(),
             enqueue_sequence: 1,
             kind: SubmissionKind::PreviewRequest,
             text: "preview".into(),
