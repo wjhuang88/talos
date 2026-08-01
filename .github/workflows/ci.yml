@@ -18,6 +18,37 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  i170-review-evidence-sync:
+    name: I170 automated review evidence sync
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/i170-windows-shell-portability-20260801'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply exact review evidence patch
+        run: python3 scripts/i170_review_evidence_patch.py
+
+      - name: Validate documentation patch
+        run: git diff --check
+
+      - name: Commit review evidence
+        run: |
+          if git diff --quiet; then
+            echo "No evidence patch required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .agent-governance/manifest.yaml docs/BOARD.md docs/backlog/PRODUCT-BACKLOG.md docs/backlog/active/TOOL-023-A-bash-timeout-fix.md docs/backlog/active/TOOL-023-C-windows-powershell.md docs/backlog/active/TOOL-023-cross-platform-shell-and-timeout.md docs/iterations/I170-windows-workspace-validation-unblocker.md docs/iterations/README.md docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md
+          git commit -m "docs(i170): record automated review evidence [i170-review-sync]"
+          git push origin HEAD:${{ github.head_ref }}
+
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
