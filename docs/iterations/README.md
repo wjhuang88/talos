@@ -6,7 +6,7 @@ Track current iteration plans, execution state, verification evidence, and retro
 iteration's own document is authoritative for its scope and lifecycle.
 
 The complete pre-closeout index is preserved unchanged at
-[`archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
+[`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
@@ -79,7 +79,7 @@ I169 may be selected only after all of the following are true at activation time
 
 The prior full iteration registry and non-terminal inventory remain available at:
 
-- [`archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md)
+- [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md)
 
 Individual plans and completion records remain under `docs/iterations/`; this compact index does not
 replace or rewrite them.
