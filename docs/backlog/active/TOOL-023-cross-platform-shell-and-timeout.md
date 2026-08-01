@@ -1,6 +1,6 @@
 # TOOL-023: Cross-Platform Shell Execution And Reliable Timeout
 
-**Status**: Partial / Review — TOOL-023-A/C passed automated I170 review gates in Draft PR #126; independent review remains pending and TOOL-023-B remains separately unimplemented (2026-08-01)
+**Status**: Partial — TOOL-023-A/C Complete through I170; TOOL-023-B remains Ready and separately unimplemented (2026-08-01)
 **Priority**: P1 bug fix / P2 platform and configuration follow-ups
 **Source**: User request 2026-07-24
 **Type**: Epic
@@ -18,15 +18,15 @@ Talos shell execution must be portable and bounded:
 
 | ID | Title | Current State | Depends On |
 |---|---|---|---|
-| `TOOL-023-A` | Absolute shell timeout under continuous output | In Progress — implemented in PR #126; exact-head validation pending | None |
+| `TOOL-023-A` | Absolute shell timeout under continuous output | Complete — PR #126 / `592254d73a98166df48da0139a02df67e9cd2cd6` | None |
 | `TOOL-023-B` | Configurable execution timeout with 300s default | Ready / not selected by I170 | TOOL-023-A |
-| `TOOL-023-C` | Windows-native PowerShell shell | In Progress — implemented in PR #126; exact-head validation and security acceptance pending | TOOL-023-A |
+| `TOOL-023-C` | Windows-native PowerShell shell | Complete — PR #126 / `592254d73a98166df48da0139a02df67e9cd2cd6` | TOOL-023-A |
 
 ## I170 Boundary
 
-I170 selects only TOOL-023-A, TOOL-023-C and the portability fixtures required to validate them. It does not change the 120-second default, add global timeout configuration or complete TOOL-023-B.
+I170 selected and completed only TOOL-023-A, TOOL-023-C and the portability fixtures required to validate them. It did not change the 120-second default, add global timeout configuration or complete TOOL-023-B.
 
-Implemented I170 behavior:
+Completed I170 behavior:
 
 - one pinned absolute timeout independent of stdout/stderr activity;
 - Windows `powershell.exe -NoLogo -NoProfile -NonInteractive -Command` with tool name `powershell`;
@@ -34,6 +34,7 @@ Implemented I170 behavior:
 - child-local dangerous environment removal without parent mutation;
 - one authoritative shell contribution under the current composition architecture;
 - platform-aware prompts, permission resources, MCP/product inventories and Agent output handling;
+- explicit Windows inert-token allowlist for reusable cwd templates, with computed PowerShell expressions falling back to exact resources;
 - stable `/` workspace-relative paths and conservative Windows long-list metadata;
 - CRLF, Unix-only symlink/hardening and portable temporary-directory fixture corrections;
 - full Windows Rust CI in addition to the installer fixture.
@@ -51,14 +52,18 @@ Implemented I170 behavior:
 - ADR-007 preserves Unix hardening.
 - ADR-012 preserves conservative exact permission fallback for complex commands.
 - ADR-053 preserves the authoritative contribution/outer composition boundary.
-- ADR-057 proposes the Windows process, platform identity, environment and direct-child timeout boundary.
-- I170 execution/evidence lives in `docs/iterations/I170-windows-workspace-validation-unblocker.md`.
-- Current security review: `docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md`.
+- ADR-057 is Accepted for the Windows process, platform identity, environment, permission-template and direct-child timeout boundary.
+- I170 completion/evidence lives in `docs/iterations/I170-windows-workspace-validation-unblocker.md`.
+- Accepted security review: `docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md`.
+- Exact implementation Head: `8cfe8edb2dbda581244f583fb809591391a54298`.
+- Exact-head CI: `30705366763`.
+- Walkthrough artifact: `8820174164`.
+- Completion merge: `592254d73a98166df48da0139a02df67e9cd2cd6`.
 - Historical recovery PR #121 remains archival only.
 
 ## Completion Condition
 
-The Epic is not Complete until every selected child has exact Completion Commit evidence and TOOL-023-B is either completed or explicitly re-scoped/deferred by its owner. PR #126 may complete A/C without claiming the configuration child.
+The Epic remains Partial because TOOL-023-B is not implemented or explicitly deferred by its owner. I170 completed A/C without claiming the configuration child.
 
 ## Residual Destination
 

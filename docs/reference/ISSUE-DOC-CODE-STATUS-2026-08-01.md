@@ -1,6 +1,7 @@
 # GitHub Issue / Owner Document Status Reconciliation — 2026-08-01
 
-**Repository baseline**: `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`
+**Original repository baseline**: `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`
+**Post-I170 reconciliation baseline**: `main@592254d73a98166df48da0139a02df67e9cd2cd6`
 **Remote scope**: all 26 open GitHub Issues observed on 2026-08-01
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
@@ -10,6 +11,7 @@
 - No open Issue is closed by this reconciliation: none has a Complete owner that also matches the remaining remote scope.
 - Deferred, Refinement, Ready, Partial, and Blocked remain open states; “registered” does not mean “scheduled”.
 - Recovered Issue #119 is assigned to TUI-044 because current main already assigns TUI-041 to Issue #69.
+- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite, but TUI-044/I169 implementation is not started and Issue #119 remains open.
 - New Intake Issues #124 and #125 are registered as unclaimed Refinement owners MODEL-011 and TUI-045; this reconciliation does not authorize implementation.
 - REL-001 and DATA-001 historical owner drift is corrected to Complete; they are not currently open GitHub Issues.
 
@@ -40,7 +42,7 @@
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Ready | Bounded fix; iteration/claim still required. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
-| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Ready | Recovery owner established; implementation remains gated by merged claim, I170 baseline, current-main validation and separate Draft PR. |
+| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Ready — prerequisite satisfied | Keep open: claim is established and I170 completed, but activation, fresh current-main implementation, ADR-056 review, exact-head CI and a separate implementation PR remain required. |
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Intake registered; probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Intake registered; layout ownership and real-terminal acceptance remain unclaimed. |
 
@@ -51,6 +53,7 @@
 - `DATA-001`: corrected from Active/Deferred to Complete with I049/I053 commits `20f9b3e63b482b81b0639b916bae0d58e131c13a` and `e745e2c906737403a5af8e6238e353cc00993c99`.
 - `TOOL-024`: linked explicitly to Issue #59 and to RUNTIME-005/PERM-006 lifecycle and permission prerequisites.
 - `TUI-044`: added for recovered Issue #119; historical TUI-041 steering ownership is not restored because TUI-041 currently belongs to Issue #69.
+- `I170`: completed in merged PR #126; this clears only TUI-044's prerequisite and does not complete or close Issue #119.
 - `MODEL-011` and `TUI-045`: registered from new Intake Issues #124/#125 as unclaimed Refinement owners only.
 
 ## Closure Rule

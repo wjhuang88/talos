@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for TUI-044/I169 on 2026-08-01. This decision recovers the reviewed architecture constraints preserved by Draft PR #120, but it is not accepted merely because the historical implementation or tests existed.
+Proposed for TUI-044/I169 on 2026-08-01. The I170 prerequisite completed through PR #126 at `main@592254d73a98166df48da0139a02df67e9cd2cd6`; I169 is selectable but not active. This decision recovers the reviewed architecture constraints preserved by Draft PR #120, but it is not accepted merely because the historical implementation or tests existed.
 
 If accepted, this decision supersedes ADR-049 only for queue consumption, ownership transfer, turn arbitration, terminal handling, structured persistence and request-budget semantics. ADR-049's engine-owned read-only queue projection before acknowledgement remains in force.
 
@@ -33,7 +33,7 @@ Current main also assigns historical Story ID TUI-041 to Issue #69. TUI-044 is t
 | Public API/protocol changes are additive or require migration | `AGENTS.md` |
 | One explicit owned flow; no new global event bus | ADR-006 |
 | Queue cutoff cannot claim unobservable wall-clock/source-time ordering | cross-channel correctness |
-| I170 Windows process portability remains a separate PR | recovery scope split |
+| Completed I170 Windows process portability remains a separate prerequisite baseline | recovery scope split |
 
 ## Decision
 
@@ -179,7 +179,17 @@ No historical CI or recovery-branch test result satisfies a current-main gate.
 
 ## Relationship To I170
 
-I170 owns Windows PowerShell, timeout, environment, path, long-list and portability fixture behavior. I169 may consume the merged I170 baseline but may not include I170 implementation files or restore its historical commits.
+I170 completed the Windows PowerShell, timeout, environment, path, long-list and portability fixture baseline in PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`. A fresh I169 implementation may consume the current main containing that completion but may not include I170 scope, continue PR #120, or restore historical commits. Satisfying this prerequisite does not accept ADR-056 or activate implementation automatically.
+
+## Activation Gate
+
+Before implementation:
+
+- re-read current `main`, Issue #119, open PRs/branches and owner documents;
+- confirm no newer or overlapping steering authority exists;
+- create a fresh branch from the exact current `main`;
+- move I169/TUI-044 to Active before code mutation;
+- keep recovery PR #120 and its branch immutable.
 
 ## Rollback
 

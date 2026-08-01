@@ -1,6 +1,6 @@
 # TOOL-023-A: Fix Shell Timeout Defeated by Continuous Output
 
-**Status**: Review — implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed cross-platform automation in CI run `30686493121`; independent process/security and maintainer review remain pending (2026-08-01)
+**Status**: Complete (2026-08-01) — merged in PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`
 **Priority**: P1
 **Parent Epic**: TOOL-023
 **Type**: Technical Story (bug fix)
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
 | Work Slice | TOOL-023-A within I170: one absolute shell timeout, partial-output preservation and direct-child cleanup without changing timeout defaults or I169 semantics. |
@@ -19,10 +19,10 @@
 | Source Issue | #119 (I170 dependency recovery context) |
 | Governance Claim PR | #122 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | PR #122 merged the I170 claim after exact-head governance, collaboration, remote-owner and CI validation; its recorded I170 slice explicitly includes the absolute shell timeout. |
-| Implementation PR | #126 |
+| Authorization Evidence | PR #126 passed exact-head macOS/Windows validation and the repository owner explicitly authorized readiness and merge on 2026-08-01. |
+| Implementation PR | #126 — merged |
 | Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Release only through the I170 claim owner after PR #126 merges and exact Completion Commit evidence is recorded. |
+| Handoff / Release Condition | Satisfied by merge commit `592254d73a98166df48da0139a02df67e9cd2cd6` and I170 completion evidence. |
 
 ## Problem
 
@@ -49,7 +49,7 @@ The platform shell escape hatch enforces one absolute wall-clock deadline from s
 ## Decision Links And Constraints
 
 - ADR-007 preserves Unix pre-exec hardening.
-- ADR-057 defines the cross-platform process and direct-child timeout boundary.
+- ADR-057 defines the accepted cross-platform process and direct-child timeout boundary.
 - External process failures return bounded tool errors; they do not crash Talos.
 
 ## State / Status Owners
@@ -57,7 +57,7 @@ The platform shell escape hatch enforces one absolute wall-clock deadline from s
 - Story status and acceptance: this file.
 - Execution/evidence: `docs/iterations/I170-windows-workspace-validation-unblocker.md`.
 - Process decision: `docs/decisions/057-windows-powershell-process-boundary.md`.
-- Implementation: Draft PR #126.
+- Implementation: merged PR #126.
 
 ## Acceptance For Behavior
 
@@ -73,11 +73,18 @@ The platform shell escape hatch enforces one absolute wall-clock deadline from s
 - [x] Fixed regression test emits continuous output and asserts a bounded timeout.
 - [x] Partial-output timeout behavior is tested.
 - [x] Direct-child/process-tree limitation is documented in ADR-057 and the security review.
-- [x] Implementation Head passes focused Unix and Windows tests.
-- [x] Implementation Head passes full locked workspace format/check/Clippy/tests on macOS and Windows.
+- [x] Final Head passes focused Unix and Windows tests.
+- [x] Final Head passes full locked workspace format/check/Clippy/tests on macOS and Windows.
 - [x] Governance, collaboration, release preflight, remote reconciliation and rebuilt Windows smoke pass.
-- [ ] Independent process/security and maintainer review accepts the direct-child/process-tree residual.
+- [x] Process/security review closed the timeout blocker and the maintainer accepted the direct-child/process-tree residual.
+
+## Completion Evidence
+
+- Exact implementation Head: `8cfe8edb2dbda581244f583fb809591391a54298`.
+- Exact-head CI: `30705366763`.
+- Windows walkthrough artifact: `8820174164`.
+- Completion Commit: `592254d73a98166df48da0139a02df67e9cd2cd6`.
 
 ## Residual Destination
 
-Descendant process-tree supervision belongs to a separately reviewed process-runtime/TOOL-024 slice. I170 must not claim it through direct-child `kill()`.
+Descendant process-tree supervision belongs to a separately reviewed process-runtime/TOOL-024 slice. I170 does not claim it through direct-child `kill()`.

@@ -1,0 +1,126 @@
+# Architecture Decision Records
+
+## Purpose
+
+Record significant technical decisions that affect Soft or Assumption constraints. Not for
+routine implementation choices that follow established patterns.
+
+## Naming Convention
+
+```
+docs/decisions/
+├── README.md           (this file)
+├── 001-<slug>.md       (decision record)
+├── 002-<slug>.md
+└── ...
+```
+
+## Template
+
+```markdown
+# [Decision Title]
+
+## Context
+[Why a decision is needed]
+
+## Constraint Decomposition
+
+| Constraint | Type | Source | Can Change? |
+| --- | --- | --- | --- |
+| [constraint] | Hard / Soft / Assumption | [source] | No / Yes / Maybe |
+
+## Reasoning
+[What is the simplest approach satisfying Hard constraints?
+Why deviate if we chose to?
+Which Assumptions need validation?]
+
+## Decision
+[What was chosen and what was rejected]
+
+## Reversal Trigger
+[Under what conditions should this be revisited?]
+```
+
+## When to Write
+
+| Trigger | Example |
+| --- | --- |
+| Choosing between approaches satisfying Hard constraints | Async runtime choice |
+| Proceeding based on unvalidated Assumption | "WASM is fast enough for plugins" |
+| Overriding a Soft constraint | "Using dynamic dispatch despite preferring static" |
+| A Hard constraint forces an unpopular choice | "No unsafe without ADR" |
+
+## Current Decisions
+
+1. [001: Self-Evolution as Runtime Primitive](001-runtime-self-evolution.md) — Evolution is a first-class runtime capability (Observe → Learn → Adapt), not just a skill system feature.
+2. [002: Local Storage Architecture](002-local-storage-architecture.md) — Progressive storage strategy: pure files first, SQLite introduced only where query patterns (FTS, aggregation) demand it.
+3. [003: TUI Progressive Evolution](003-tui-progressive-evolution.md) — Accepted. TUI grows incrementally from I005 onward rather than landing all at once in a final polish iteration.
+4. [004: Production-Grade Event Loop Architecture](004-event-loop-architecture.md) — Accepted (amended by ADR-005). Single-mpsc `AppEvent` bus + explicit `AppState` state machine for the TUI-internal event loop.
+5. [005: Canonical TUI Event Architecture](005-tui-event-architecture.md) — Accepted. Two-layer model: retain ADR-004's L1 mpsc bus; add an `AppServerSession` L2 seam (bounded SQ / unbounded EQ) so the TUI never spawns the agent loop directly. Phased migration deferred to I010.
+6. [006: Event Architecture Boundary](006-event-architecture-boundary.md) — Accepted. Adopt the single-consumer event loop (A, ADR-004) and the `AppServerSession` session seam (B, ADR-005); **reject** a global publish/subscribe event bus (C) on Simplicity-First, security-auditability, and hidden-coupling grounds. Guardrail for implementers.
+7. [007: `unsafe` in Process Hardening](007-process-hardening-unsafe.md) — Accepted. Records and justifies the four production `unsafe` sites in `talos-sandbox/hardening.rs` (`env::remove_var` + 3× `libc::setrlimit`), approves `libc` for OS syscalls, and pre-authorizes child-process `pre_exec` hardening. Satisfies Hard Constraint #2.
+8. [008: Bundled SQLite for Local Storage](008-sqlite-bundled-storage.md) — Accepted. Approves `rusqlite/bundled` as a scoped exception to the no-C/C++-bindings rule for local storage only; SQLite is statically linked so Talos does not require a system SQLite installation.
+9. [009: Tool Provenance Tracking](009-tool-provenance.md) — Accepted. Adds typed provenance for native and MCP-remote tools so TUI/RPC/plugin consumers can distinguish tool sources without changing the agent loop.
+10. [010: Git and Search Tool Dependency Boundary](010-git-search-tool-dependency-boundary.md) — Accepted. Rejects `git2`/libgit2 for the first I012 search/Git slices; search starts Rust-native, read-only Git tools target `gix`, and host `git` is fallback/temporary bridge only.
+11. [011: Guardian Approval Boundary](011-guardian-approval-boundary.md) — Accepted. Keeps Guardian AI inside the existing permission pipeline, disabled by default, and forbids first-slice write-capable auto-approval.
+12. [012: Exec Policy DSL Boundary](012-exec-policy-dsl-boundary.md) — Accepted. Defines the policy DSL as typed permission input, not a shell parser; complex shell features fail back to Ask.
+13. [013: Provider Config Schema Boundary](013-provider-config-schema-boundary.md) — Accepted. Limits provider openness to schema/config in #I011-S2 and defers dynamic provider loading to a future ADR.
+14. [014: Log Retention and Rotation Boundary](014-log-retention-and-rotation.md) — Accepted. Requires bounded local log files and in-process rotation/cleanup for #ARCH-S8 R2.
+15. [015: Embedded Prompt Asset Boundary](015-embedded-prompt-assets.md) — Accepted. Extracts built-in prompts into standalone files embedded at compile time.
+16. [016: Layered Agent Memory Architecture](016-layered-memory-architecture.md) — Accepted for architecture. Defines working, episodic, semantic, and procedural memory with explicit consolidation.
+17. [017: Exploration and Library Storage Architecture](017-exploration-library-storage.md) — Accepted for direction. Starts research-library storage on SQLite/FTS with vector/graph stores gated by Spike.
+18. [018: `unsafe` in TUI Job Control](018-tui-job-control-unsafe.md) — Accepted (drafted for I022). Records and justifies the single `unsafe` site in `talos-tui/src/tui/job_control.rs` (`libc::raise(SIGTSTP)`) for foreground suspend on Ctrl+Z. Follow-on to [ADR-007](007-process-hardening-unsafe.md); reuses the same `libc` FFI discipline in a different module, with no new top-level dependencies.
+19. [019: TUI Splash Scrollback-Only Boundary](019-tui-splash-scrollback-boundary.md) — Superseded (2026-07-27 by amended ADR-054). Historical primary-screen splash boundary; the single Alternate Screen renderer now draws the Logo after screen entry in its first frame.
+20. [020: Tree-sitter Code Analysis](020-tree-sitter-code-analysis.md) — Accepted (2026-06-15). Approves tree-sitter via `arborium` for code analysis and TUI syntax highlighting.
+21. [021: Tool Call Protocol Architecture](021-tool-call-protocol-architecture.md) — Accepted (2026-06-17). Defines the tool call protocol pipeline: schema validation, dedup, fence handling, and ToolNature.
+22. [022: Agent Config Compatibility Boundary](022-agent-config-compatibility-boundary.md) — Accepted (2026-06-19). Supports `~/.agents/` as read-only, lowest-priority config source; `~/.talos` remains Talos-owned; one-way import via `talos-config::agents` module.
+23. [023: Inline API Key Storage and Display Boundary](023-inline-api-key-boundary.md) — Accepted (2026-06-25). Persists `api_key` as a normal serializable field in `~/.talos/config.toml`; masks it in all non-file output surfaces (CLI display, Debug, logs) via custom `Debug` impls and `mask_secrets`/`is_secret_key`. Rejects `skip_serializing` (caused data loss) and OS keychain (deferred).
+24. [024: Embeddable Runtime API Boundary](024-embeddable-runtime-api-boundary.md) — Accepted (2026-06-28). Creates a dedicated `talos-runtime` facade crate for SDK-style embedding while keeping `talos-agent` as the turn-loop implementation crate and `talos-core` as the protocol/trait foundation.
+25. [025: Ripgrep Library Search Engine](025-ripgrep-library-search-engine.md) — Accepted (2026-06-28). Uses ripgrep's library crates (`grep-searcher`, `grep-regex`, `grep-matcher`, `ignore`) as the preferred Talos `grep` engine target; rejects top-level `ripgrep` CLI crate and host `rg` as runtime primary paths.
+26. [026: Multi-Resource Tool Permissions](026-multi-resource-tool-permissions.md) — Accepted (2026-06-28). Adds invocation-specific permission profiles so hybrid tools such as `save_url`, `git_push`, and `git_pull` can expose every relevant risk facet before execution.
+27. [027: Plugin Runtime Boundary](027-plugin-runtime-boundary.md) — Accepted (2026-06-30). Unblocks PLUGIN-001's first runtime slice: WASM-only v1, `wasmtime` preferred pending focused dependency review, local explicit packages only, dylib rejected, Lua deferred.
+28. [028: Plugin Tool Provenance Extension](028-plugin-tool-provenance-extension.md) — Accepted (2026-06-30). Extends ADR-009 with future `ToolProvenance::Plugin { name, version, carrier }` so plugin tools do not masquerade as native or MCP tools.
+29. [029: Extensibility Atomic Component Model](029-extensibility-atomic-component-model.md) — Accepted (2026-06-30). Defines skill, MCP, and hook as config-introduced atomic components; plugin is a package format that bundles components plus tools.
+30. [030: Extensibility Command Taxonomy](030-extensibility-command-taxonomy.md) — Accepted (2026-06-30). Moves MCP status to `/mcp`, reserves `/plugins` for real plugin packages with a transition notice, and adds `/hooks` when hook diagnostics land.
+31. [031: WEB-001 Loopback Dashboard Boundary](031-web-loopback-dashboard-boundary.md) — Accepted (2026-07-01; amended 2026-07-02). Clears the WEB-001 design gate for a default-on TUI loopback-only, read-only dashboard MVP with config opt-out. The per-process bearer token is opt-in via `[dashboard] loopback_only = false`; default is loopback-bind-only for the common single-user case. No remote access, write routes, approvals, or browser automation.
+32. [032: Wasmtime Dependency and Security Review](032-wasmtime-dependency-security-review.md) — Accepted (2026-07-01). Clears ADR-027's focused `wasmtime` review gate for the first local explicit read-only WASM plugin MVP after manifest parsing; host calls denied by default and resource/failure tests required.
+33. [033: Associative Memory Injection Policy](033-associative-memory-injection-policy.md) — Accepted (2026-07-02). Rejects default-on associative memory injection for v1 readiness, keeps graph recall explicit, and requires a separate default-disabled experiment plus benchmark evidence before any automatic associative prompt section.
+34. [034: Provider Reasoning / Thinking Boundary](034-reasoning-thinking-boundary.md) — Accepted (2026-07-03; v4 revised 2026-07-10). Keeps structured `ReasoningBlock`/`AssistantReasoning` persistence, signatures/redacted payloads, origin-gated replay, and provider mappings intact. V4 approves TUI-029's bounded visible-history projection: only displayable Thinking/Plain text may enter static scrollback or explicit `--include-thinking` export; signatures and redacted payloads remain opaque, default copy/export excludes reasoning, and no duplicate session payload is introduced.
+35. [035: TUI Conversation History Scrollback Boundary](035-tui-history-scrollback-boundary.md) — Superseded (2026-07-27 by amended ADR-054). Historical native-history boundary; TUI-035 supplied the concrete resize/isolation reversal trigger and the current renderer owns full-frame history reflow.
+36. [036: zstd Compression for Session Log Archival](036-zstd-compression-dependency.md) — Accepted (2026-07-09). Approves `zstd` (gyscos/zstd-rs, C binding) as a scoped exception to the no-C-bindings rule for session log segment archival compression only, following the ADR-008 bundled SQLite pattern. zstd is statically linked, behind a `SegmentCompressor` trait, and degrades gracefully on failure. Pure Rust alternatives tracked in COMP-001.
+37. [037: Compact Text Session Log Format and Archival Architecture](037-compact-text-session-log-format.md) — Accepted (2026-07-09). Replaces JSONL with a compact text format (TSV header + length-prefixed content, `*.tlog`) for new sessions; JSONL remains as legacy read-only compatibility. Introduces segment-chain archival (LSM-style) for session compaction: frozen segments are zstd-compressed (ADR-036), new active segment holds compacted records. Separates tool output compression (Mechanism A, per-request `raw_flag`) from session compaction (Mechanism B, episodic archival). Fork uses snapshot references with `ref_count`-protected immutable archived segments.
+38. [038: Workspace Trust Sandbox Boundary](038-workspace-trust-sandbox-boundary.md) — Accepted (2026-07-09). Approves Git repo root as a logical permission trust boundary after explicit user approval. File and Git operations within repo root get trust-based Allow; bash/exec, network, push/publish, out-of-repo, credentials, and destructive operations remain strictly gated. Deny rules always override trust. Trust persists in `~/.talos/trusted_workspaces.toml`. OS-level sandbox enforcement deferred to PERM-005.
+39. [039: Runtime Event Semantic Single-Flow Boundary](039-runtime-event-semantic-single-flow.md) — Accepted (2026-07-11). Makes session lifecycle authoritative, requires one ordered live UI queue and actor-owned persistence, converges all runtime surfaces on the session protocol, and retains `UiOutput::Stream` only as a deprecated semver compatibility input during migration.
+40. [040: Command Access Evidence and Logical Sandbox Enforcement](040-command-access-evidence-sandbox.md) — Accepted (2026-07-12). Defines declared/observed/unknown command access evidence, canonical repo-root boundary enforcement, and safe fallback to strict behavior when access is unobservable. Evidence is observation, not authority. OS-level sandbox remains deferred. bash/exec with unknown or out-of-repo access never inherits workspace trust.
+41. [041: Scheduler Minimal Public API Boundary](041-scheduler-minimal-public-api.md) — Accepted (2026-07-14). Records the maintainer-approved I124 baseline variance for exactly two additive `talos-agent` composition exports; all scheduler commands, handles, task types, and future I125-I127 surfaces remain crate-private or separately gated.
+42. [042: Embedded Durable Runtime Session Boundary](042-embedded-durable-runtime-session-boundary.md) — Accepted (2026-07-15). Makes `talos-session` the host-directory durable transcript boundary, uses opaque external-ID bindings to UUID TLOG files, commits only complete successful turns atomically, and keeps runtime dependency direction acyclic.
+
+- [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — task runtime not implemented; reusable components identified; defer due to no product need.
+
+- [044: Defer Multi-Instance Discovery And Communication](044-defer-multi-instance-discovery.md) — no product need; five threat-model risks unresolved; all paths violate P140 non-goals.
+
+- [045: Transient Model-Private Tool Projection](045-transient-model-private-tool-projection.md) — additive AgentTool projections let transient snapshot coordination reach only the active model while UI, approvals, Session/TLOG, and replay receive sanitized content; permission evaluation still uses original input.
+
+- [046: Surprise-Selected Memory Admission](046-surprise-selected-memory-admission.md) — replaces keyword/message-length admission direction with a benchmark-gated `novelty × committed_utility` policy, narrows recency to freshness/version resolution, and permits only an optional content-free sparse index over TLOG exact episodes. No HOLA simulation, extra memory layer, automatic injection, or new dependency.
+
+- [047: External-Path Tool Authorization](047-external-path-tool-authorization.md) — allows an explicitly approved external file operation through an exact tool/nature/normalized-path capability while preserving Deny precedence, headless fail-closed behavior, symlink revalidation, and raw-tool workspace confinement.
+
+- [048: MODEL-007 Variant Representation And Compatibility](048-model-variant-representation.md) — Accepted (2026-07-17). Answers the MODEL-007 architecture/compatibility gate: variants are catalog metadata projected from `ReasoningOptions`; persisted identity is `provider + model + variant_id` with `"default"` fallback; unknown variant resolves to default with a diagnostic; no `talos-config` / `talos-conversation` dependency cycle. Maintainer-amended 2026-07-18 during I141 planning: the variant picker stage is conditional (a model with no declared variants skips stage 3 and switches immediately on Enter), and the picker UX must mirror the existing `/connect` flow rather than invent a new one.
+
+- [049: Steering Queue Projection Boundary](049-steering-queue-projection-boundary.md) — Accepted (2026-07-20). Keeps steering queue ownership in `ConversationEngine` and projects bounded FIFO previews through the existing ordered `UiOutput` stream. The public enum addition requires a pre-1.0 minor release and downstream match migration; no TUI-local queue, side channel, global bus, persistence, or queue-control API is introduced.
+
+- [050: Multimodal Image Input Architecture And Security Boundary](050-multimodal-image-input-architecture.md) — Accepted (2026-07-20). Decides all 10 safety-critical points for MODEL-009: Talos-owned typed content parts (no provider JSON in core), path-reference storage (no embedded bytes), SEC-001/ADR-047 path authorization reuse, `image` crate (pure Rust, MIT/Apache-2.0) with `catch_unwind`, PNG/JPEG/GIF/WebP with magic-byte + byte/pixel/count limits, OpenAI data URL and Anthropic base64 wire mapping in adapters, `Supported`/`Unsupported`/`Unknown` capability provenance (no name-based inference, no probing), custom/discovered default `Unknown`. Hard gate for I150-I152.
+
+- [051: One-Shot Multimodal Tool Continuation Boundary](051-one-shot-multimodal-tool-continuation.md) — Accepted (2026-07-22). Defines I154's additive `ToolExecutionOutput` boundary, exact `read_image` authorization, shared safe ingestion, non-persistent one-shot provider overlay, and protocol-valid OpenAI/Anthropic tool-result/image ordering. Hard implementation gate for MODEL-009-E.
+
+- [052: SDK Publication And Runtime Composition Boundary](052-sdk-publication-and-composition-boundary.md) — Accepted (2026-07-24). Answers the ARCH-031 SDK/composition gate: complete `talos-runtime` publication via route A in dependency order (`talos-sandbox` → `talos-tools` → `talos-agent` → `talos-runtime`); publish `talos-agent` as an implementation dependency only (not a supported SDK); add caller-selected `SandboxFallbackPolicy` (`Deny`/`Ask`/`AllowUnsandboxed`, default `Deny`); lightweight read-only `talos-tools` defaults with opt-in write/shell/git/network/image/code-intelligence; an explicit overridable `RuntimePreset::coding()` that never bypasses permissions; separate CLI and SDK entrypoints sharing one internal composition (no new crate authorized yet); and defer a general-purpose UI SDK (keep `talos-conversation` experimental/product-oriented). Not authorization to publish; activated through ARCH-031 and iteration governance.
+
+- [053: Explicit Tool Registration Contributions And Product Composition](053-tool-registration-composition.md) — **Accepted** (2026-07-31). Adds checked instance contributions with stable source identity, deterministic duplicate diagnostics, explicit tool-crate factories, and outer-root print/TUI/MCP composition while preserving permissions and capability gates.
+
+- [054: Alternate-Screen Application-Owned Transcript Rendering](054-alternate-screen-app-owned-transcript-rendering.md) — **Accepted** (2026-07-27; reinstated with startup-splash amendment). Talos has one Alternate Screen full-frame renderer; it enters Alternate Screen before drawing the Logo as display-only first-frame content, while TranscriptStore remains the sole conversation-history authority.
+
+- [055: Primary-Screen App-Owned Transcript With Native History Projection](055-primary-screen-app-owned-transcript-native-projection.md) — **Rejected** (2026-07-27). Short-lived one-mode primary-screen trial superseded by the maintainer-selected amended ADR-054 Alternate Screen renderer.
+
+- [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) — **Proposed / Review** (2026-08-01). Current TUI-044/I169 design for structured transactional steering; implementation remains blocked on merged I170.
+
+- [057: Windows PowerShell Process Boundary](057-windows-powershell-process-boundary.md) — **Proposed / Review** (2026-08-01). Draft PR #126 defines one authoritative platform shell contribution, child-local environment scrub, absolute direct-child timeout and explicit process-tree residuals.

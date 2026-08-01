@@ -1,6 +1,6 @@
 # Iteration I170: Windows Workspace Validation Unblocker
 
-> Document status: Review
+> Document status: Complete (2026-08-01)
 > Published plan date: 2026-08-01
 > Planned objective: restore the still-missing Windows-native shell and cross-platform workspace validation behavior preserved by recovery PR #121, without mixing I169 steering semantics or restoring obsolete registration code.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
 | Work Slice | I170 only: Windows PowerShell process boundary, absolute shell timeout, child environment scrub, portable path/long-list projections, and cross-platform fixture corrections on current main. |
 | Claimed At | 2026-08-01 |
-| Source Issue | #119 (dependency recovery context; I170 remains an independent implementation slice) |
+| Source Issue | #119 (dependency recovery context; I170 remained an independent implementation slice) |
 | Governance Claim PR | #122 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Repository owner explicitly instructed implementation to begin after the current-main recovery audit on 2026-08-01; claim merge passed exact-head CI, both governance validators, remote reconciliation, merge-time CAS, and no blocking review feedback. |
-| Implementation PR | #126 |
+| Authorization Evidence | The repository owner authorized implementation, accepted the final exact-head review outcome and explicitly authorized readiness and merge on 2026-08-01. |
+| Implementation PR | #126 — merged |
 | Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Release only by an explicit maintainer handoff or after PR #126 is merged and completion evidence is recorded. |
+| Handoff / Release Condition | Satisfied by merged PR #126 and the exact completion evidence recorded below. |
 
 ## Published Baseline
 
@@ -37,11 +37,10 @@
 
 - Historical recovery PR: #121, archival only and never mergeable as-is.
 - Historical exact head: `e1da5dd893418a3f6e3737ec900aabe9967b1dda`.
-- Historical branch: `recovery/pr-78-i170-20260731`; it must not be rebased, rewritten, or used for continued development.
-- Governance claim merged at `455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; PR #126 starts from that exact current-main baseline.
-- The implementation branch merged current `main@5520800be081447663cb690ba78fd17d1374e01e` without rebasing or rewriting its existing commits.
-- TUI-044/I169 current owner chain was established by merged governance PR #123 at `ba5a564b4be81366bc3d3e68fd83e7c1d8ce3a4f`; I170 remains an independent prerequisite implementation slice.
-- Recovery classification: behavior remains missing; old CLI registration shape is superseded by the current `talos-tools` contribution and outer composition architecture.
+- Historical branch: `recovery/pr-78-i170-20260731`; it remains immutable and was not used for continued development.
+- Governance claim merged at `455bfbd5c5316862675aa68c62f1b62bff2e5cc7`.
+- Fresh implementation PR #126 was built on current-main architecture and merged independently of recovery PR #121.
+- TUI-044/I169 remains a separate implementation slice; I170 completion only satisfies its Windows/current-main prerequisite.
 
 ### Scope
 
@@ -70,8 +69,9 @@
 - Windows recursive `ls`, glob and grep paths use `/`; long listing begins with one type character and nine conservative permission characters.
 - Cross-platform fixtures compile and run without broad skips or reduced assertions.
 - Current contribution inventories, permission routing, MCP/CLI presentation and shell output compression remain coherent on both platforms.
+- Windows reusable templates fail closed for computed PowerShell expressions and retain only the reviewed inert-token allowlist.
 
-### Planned Validation
+### Validation Matrix
 
 - `cargo fmt --all -- --check`
 - `cargo check --workspace --locked`
@@ -80,64 +80,71 @@
 - focused `talos-tools`, permission, MCP and CLI shell tests on Unix and Windows
 - direct-child completion plus descendant-held-pipe timeout regression on Unix and Windows
 - `git diff --check`
-- `scripts/validate_project_governance.sh .`
-- `scripts/validate_collaboration_claims.sh .`
-- `./scripts/release_preflight.sh`
-- rebuilt Unix mock smoke and rebuilt Windows PowerShell walkthrough
+- project-governance and collaboration-claim validators
+- release preflight
+- rebuilt Windows direct PowerShell walkthrough and Windows CLI mock smoke
 - exact-head Windows and Unix/macOS CI
-- independent process/security review before merge
-
-### Documentation To Update
-
-- `docs/backlog/active/TOOL-023-A-bash-timeout-fix.md`
-- `docs/backlog/active/TOOL-023-C-windows-powershell.md`
-- `docs/decisions/057-windows-powershell-process-boundary.md`
-- `docs/iterations/README.md`
-- `docs/backlog/PRODUCT-BACKLOG.md`
-- `docs/BOARD.md`
-- README and public capability surfaces only after behavior exists
+- process/security and maintainer review before merge
 
 ### Risks And Rollback
 
-- Risk: platform naming diverges from permission or contribution identity. Gate every inventory and wrapper surface.
-- Risk: direct-child exit does not imply inherited pipes are closed. Keep the absolute deadline active until direct-child completion and both pipes finish; at expiry return without waiting for descendant-held EOF.
-- Risk: direct-child kill does not supervise descendants. Keep that residual explicit; do not claim process-tree termination.
-- Risk: restoring historical registry code creates duplicate contributions. Use only current contribution factories.
-- Rollback: revert the I170 implementation commits and retain the prior Unix-only shell baseline; never rewrite the recovery branch.
+- Risk: platform naming diverges from permission or contribution identity. The final inventory and wrapper tests passed on both platforms.
+- Risk: direct-child exit does not imply inherited pipes are closed. The one absolute deadline remains active through pipe completion and returns without waiting indefinitely for descendant-held EOF.
+- Risk: direct-child kill does not supervise descendants. That residual remains explicit and outside I170.
+- Risk: restoring historical registry code creates duplicate contributions. PR #126 used only the current contribution factories.
+- Rollback: revert merge commit `592254d73a98166df48da0139a02df67e9cd2cd6`; never rewrite a recovery branch.
 
 ## Actual Activation And Execution
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-01 | Recovery audit | Current main still hardcoded `sh -c`, reset timeout sleeps inside the output loop, lacked Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
+| 2026-08-01 | Recovery audit | Current main still hardcoded `sh -c`, reset timeout sleeps inside the output loop, lacked Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remained archival. |
 | 2026-08-01 | Claim | Governance PR #122 merged after exact-head release preflight, Windows fixture, collaboration and remote owner validation. |
-| 2026-08-01 | Activation | Created `fix/i170-windows-shell-portability-20260801` from exact `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; no recovery branch was modified. |
-| 2026-08-01 | Implementation slice | Added platform shell identity/process construction, child env scrub, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
-| 2026-08-01 | Current-main refresh | Merged `main@5520800be081447663cb690ba78fd17d1374e01e` into the implementation branch as a normal two-parent merge after Issue #124/#125 reconciliation. |
-| 2026-08-01 | Validation correction | Earlier Windows full-workspace failures exposed platform-sorted inventory expectations and document fixtures outside their explicit workspace. Expected inventories now sort independently, successful document fixtures execute inside their own workspace, and external-path rejection remains unchanged. |
-| 2026-08-01 | Security correction | Audit found that waiting for pipe EOF after direct-shell exit can let descendants extend the operation beyond its deadline. The active correction keeps one deadline over both process completion and pipe closure and adds a descendant-held-pipe regression. |
-| 2026-08-01 | Automated review gate | Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121`: macOS release preflight; Windows format/check/Clippy, focused PowerShell/permission/deadline tests, complete locked workspace tests, project governance, collaboration claims and rebuilt CLI mock smoke; remote Issue/Owner reconciliation; and the Windows installer fixture. |
-| 2026-08-01 | Review handoff | PR #126 remains Draft until this documentation synchronization Head repeats the same exact-head gates and independent process/security plus maintainer review accepts ADR-057 and the direct-child residual. |
+| 2026-08-01 | Activation | Created `fix/i170-windows-shell-portability-20260801` from the exact current-main claim baseline; no recovery branch was modified. |
+| 2026-08-01 | Implementation | Added platform shell identity/process construction, child env scrub, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
+| 2026-08-01 | Timeout correction | Kept one deadline across direct-shell completion and pipe closure and added continuous-output plus descendant-held-pipe regressions. |
+| 2026-08-01 | Permission review blocker | Review found that parenthesized/computed PowerShell expressions could receive a reusable cwd template under the prior denylist. |
+| 2026-08-01 | Permission correction | Replaced the Windows denylist boundary with an inert-token allowlist and added exact-resource regressions for grouping, call, array, variable, member/index and adjacent expression forms. |
+| 2026-08-01 | Current-main alignment | Removed the completed one-shot workflow from the branch so current workflow-inventory governance remained authoritative; no product behavior was changed by this alignment. |
+| 2026-08-01 | Exact-head validation | Final implementation Head `8cfe8edb2dbda581244f583fb809591391a54298` passed CI run `30705366763` (`CI` run 718) on macOS and Windows. |
+| 2026-08-01 | Review acceptance | The exact-head re-review closed the prior permission blocker and recommended approval. The repository owner then explicitly authorized readiness and merge. |
+| 2026-08-01 | Completion | PR #126 was squash-merged into `main` as `592254d73a98166df48da0139a02df67e9cd2cd6`. |
 
 ## Verification Evidence
 
-- Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121` with all four jobs green.
-- macOS evidence: `git diff --check` plus release preflight, including locked workspace format/check/Clippy/tests and governance validators.
-- Windows evidence: format, locked workspace check, Clippy, focused native PowerShell/environment/permission/continuous-output/descendant-held-pipe deadline tests, full locked workspace tests, project governance, collaboration claims, and rebuilt CLI mock smoke.
-- Remote evidence: all 26 open Issues reconciled to owner documents and the Windows installer fixture passed.
-- Earlier failing Windows inventory and document-boundary fixtures were repaired without deleting, ignoring, weakening, or bypassing external-path checks.
-- This Review synchronization commit must repeat the exact-head CI gates before the PR is made ready. Recovery PR #121 evidence is not reused as current proof.
+- Final implementation Head: `8cfe8edb2dbda581244f583fb809591391a54298`.
+- Exact-head CI: run `30705366763` (`CI` run 718), all jobs successful.
+- macOS evidence: approved workflow inventory, diff whitespace validation, release preflight, locked workspace format/check/Clippy/tests and governance checks.
+- Windows evidence: format, locked workspace check, Clippy, focused native PowerShell/environment/permission/deadline tests, full locked workspace tests, project governance, collaboration claims, rebuilt CLI mock smoke and installer fixture.
+- Remote evidence: open-Issue/Owner reconciliation passed.
+- Exact-head walkthrough artifact: `8820174164`, named `i170-windows-direct-walkthrough-8cfe8edb2dbda581244f583fb809591391a54298`.
+- Artifact digest: `sha256:7bf5936d6b390588b082197f877d5c8c1b8fe6414973b4bb49a6f291c92e42d2`.
+- Walkthrough recorded matching exact/checked-out Heads, stdout, stderr, working directory, exit code `7`, retained pre-timeout output, `[timeout]`, bounded elapsed time, no post-timeout completion output, direct-child cleanup, and the direct-child-only residual.
+- The reviewed `fetch_url` corrections remained test-only; production proxy behavior was unchanged.
 
 ## Completion Evidence
 
-- Completion Commit: pending.
+- Completion Commit: `592254d73a98166df48da0139a02df67e9cd2cd6`.
+- Implementation PR: #126, merged 2026-08-01.
+- Exact implementation Head: `8cfe8edb2dbda581244f583fb809591391a54298`.
+- Final exact-head CI: `30705366763`.
+- Windows walkthrough artifact: `8820174164`.
+- Accepted decision: ADR-057.
+- Completed Stories: TOOL-023-A and TOOL-023-C.
+- Recovery PRs #120/#121 and their branches remain archival and untouched.
 
 ## Variance And Residuals
 
-- ADR-057 and all historical validation claims remain proposed evidence only until re-established on a fresh exact head.
-- Process-tree supervision remains outside I170 and must not be inferred from direct-child timeout handling.
-- The absolute operation deadline must remain bounded even when an unsupervised descendant inherits the direct shell child's stdout/stderr handles.
+- The Windows reusable-template boundary is intentionally conservative. Safe but unusual arguments containing spaces, Unicode or unreviewed punctuation may receive exact prompts.
+- PowerShell grammar-aware reusable permissions require a separately reviewed lexer/parser decision.
+- Windows PowerShell 7 selection remains outside this iteration.
+- Process-tree supervision remains outside I170. Talos guarantees timeout cleanup of the direct shell child, not the entire descendant process tree.
+- I169/TUI-044 is now eligible for fresh selection from current main, but no I169 implementation was started by this closeout.
 
 ## Retrospective
 
-- Pending.
+- Recovery branches are useful provenance but cannot substitute for a fresh current-main implementation and exact-head evidence.
+- Cross-platform process work needs production-path Windows CI, not only installer fixtures.
+- Shell permission reuse must be based on a reviewed allowlist/parser boundary; extending syntax denylists is not a defensible PowerShell security strategy.
+- Timeout acceptance must cover process completion and inherited pipe behavior while stating descendant cleanup limits precisely.
+- Governance closeout belongs in a separate post-merge change so implementation evidence and completion-state transitions remain auditable.
