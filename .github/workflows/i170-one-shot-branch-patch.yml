@@ -1,0 +1,109 @@
+name: I170 one-shot branch patch
+
+on:
+  push:
+    branches:
+      - fix/i170-windows-shell-portability-20260801
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[i170-auto-patch]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i170-windows-shell-portability-20260801
+          fetch-depth: 0
+
+      - name: Apply exact platform-shell replacements
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          registry = Path("crates/talos-cli/src/registry.rs")
+          text = registry.read_text(encoding="utf-8")
+
+          insertion = "    use talos_tools::ReadImageTool;\n"
+          constants = """
+
+              #[cfg(windows)]
+              const SHELL_TOOL_NAME: &str = "powershell";
+              #[cfg(not(windows))]
+              const SHELL_TOOL_NAME: &str = "bash";
+          """.replace("          ", "")
+          if text.count(insertion) != 1:
+              raise SystemExit(f"unexpected ReadImageTool insertion count: {text.count(insertion)}")
+          text = text.replace(insertion, insertion + constants, 1)
+
+          replacements = [
+              (
+                  '        let print_tui_inventory = vec![\n            "bash",\n',
+                  '        let print_tui_inventory = vec![\n            SHELL_TOOL_NAME,\n',
+              ),
+              (
+                  '        let mcp_inventory = vec![\n            "bash",\n',
+                  '        let mcp_inventory = vec![\n            SHELL_TOOL_NAME,\n',
+              ),
+              (
+                  '            ("talos-tools:shell", &["bash", "exec"][..]),',
+                  '            ("talos-tools:shell", &[SHELL_TOOL_NAME, "exec"][..]),',
+              ),
+              (
+                  '                ("talos-tools:shell", "bash"),',
+                  '                ("talos-tools:shell", SHELL_TOOL_NAME),',
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"unexpected replacement count {count}: {old!r}")
+              text = text.replace(old, new, 1)
+
+          test_section = text.split("#[cfg(test)]\nmod tests {", 1)[1]
+          remaining = [line for line in test_section.splitlines() if '"bash"' in line]
+          allowed = {
+              '    const SHELL_TOOL_NAME: &str = "bash";',
+          }
+          unexpected = [line for line in remaining if line not in allowed]
+          if unexpected:
+              raise SystemExit("unexpected hard-coded bash test literals:\n" + "\n".join(unexpected))
+
+          registry.write_text(text, encoding="utf-8")
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          old = "- Process execution: `exec` (argv-only single process, no shell parsing), `bash` (shell escape hatch)"
+          new = "- Process execution: `exec` (argv-only single process, no shell parsing), plus the permission-gated platform shell escape hatch: `bash` through `sh -c` on Unix and `powershell` through `powershell.exe -NoProfile -NonInteractive` on Windows"
+          if text.count(old) != 1:
+              raise SystemExit(f"unexpected README shell line count: {text.count(old)}")
+          readme.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          readme_zh = Path("README.zh-CN.md")
+          text = readme_zh.read_text(encoding="utf-8")
+          old = "- Shell 兜底：`bash`"
+          new = "- Shell 兜底：Unix 使用 `bash`（通过 `sh -c`），Windows 使用 `powershell`（通过 `powershell.exe -NoProfile -NonInteractive`）；两者都经过执行权限管线"
+          if text.count(old) != 1:
+              raise SystemExit(f"unexpected Chinese README shell line count: {text.count(old)}")
+          readme_zh.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          cargo fmt --all -- --check
+          git diff --check
+
+      - name: Commit exact branch patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No patch required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/talos-cli/src/registry.rs README.md README.zh-CN.md
+          git commit -m "fix(i170): align platform shell inventories [i170-auto-patch]"
+          git push origin HEAD:fix/i170-windows-shell-portability-20260801
