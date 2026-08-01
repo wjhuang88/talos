@@ -196,6 +196,11 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    const SHELL_TOOL_NAME: &str = "powershell";
+    #[cfg(not(windows))]
+    const SHELL_TOOL_NAME: &str = "bash";
+
     #[test]
     fn interactive_builtin_profile_preserves_current_inventory() {
         let mut registry = ToolRegistry::new();
@@ -214,7 +219,7 @@ mod tests {
         assert_eq!(
             names,
             [
-                "bash",
+                SHELL_TOOL_NAME,
                 "delete",
                 "diff",
                 "edit",
