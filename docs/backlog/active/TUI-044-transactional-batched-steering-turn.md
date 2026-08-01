@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed — Active |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / I169 implementation session 2026-08-02 |
 | Work Slice | TUI-044/I169 only: structured queue admission, transactional Engine-to-Actor transfer, durable pending custody and receipts, lifecycle correlation, Actor arbitration, exact Provider request planning and replay parity. |
