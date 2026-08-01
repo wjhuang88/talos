@@ -36,9 +36,15 @@ fn cleanup(path: &PathBuf) {
     let _ = std::fs::remove_file(path);
 }
 
-fn run_extract(tool: &DocumentExtractTool, path: &str) -> String {
+fn run_extract(path: &PathBuf) -> String {
+    let workspace_root = path.parent().expect("fixture file has a parent directory");
+    let relative_path = path
+        .file_name()
+        .expect("fixture file has a name")
+        .to_string_lossy();
+    let tool = DocumentExtractTool::new(workspace_root.to_path_buf());
     let input = serde_json::json!({
-        "path": path,
+        "path": relative_path,
         "format": "auto",
     });
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -319,11 +325,9 @@ fn test_manual_composition_save_then_extract() {
     // Step 1: Create a local file simulating "saved" content.
     let content = r#"{"name": "test", "value": 42}"#;
     let saved_path = create_temp_file("composed.json", content);
-    let path_str = saved_path.to_string_lossy().to_string();
 
-    // Step 2: Use document_extract on the saved file.
-    let extract_tool = DocumentExtractTool::new(PathBuf::from("/"));
-    let output = run_extract(&extract_tool, &path_str);
+    // Step 2: Use document_extract on the saved file within its fixture workspace.
+    let output = run_extract(&saved_path);
 
     // Verify the extract worked on the locally saved file.
     assert!(output.contains("Format: json"), "Should detect JSON format");
@@ -344,10 +348,7 @@ fn test_manual_composition_save_then_extract() {
 fn test_extract_html_strips_tags() {
     let content = "<!DOCTYPE html>\n<html><head><title>Test Page</title></head>\n<body><h1>Hello World</h1><p>This is a test.</p></body>\n</html>";
     let path = create_temp_file("test.html", content);
-    let path_str = path.to_string_lossy().to_string();
-
-    let tool = DocumentExtractTool::new(PathBuf::from("/"));
-    let output = run_extract(&tool, &path_str);
+    let output = run_extract(&path);
 
     assert!(
         output.contains("Hello World"),
@@ -369,10 +370,7 @@ fn test_extract_html_strips_tags() {
 fn test_extract_json_pretty_prints() {
     let content = r#"{"name":"test","value":42,"items":[1,2,3],"nested":{"key":"value"}}"#;
     let path = create_temp_file("test.json", content);
-    let path_str = path.to_string_lossy().to_string();
-
-    let tool = DocumentExtractTool::new(PathBuf::from("/"));
-    let output = run_extract(&tool, &path_str);
+    let output = run_extract(&path);
 
     // Verify pretty-printing (indented output).
     assert!(
@@ -396,10 +394,7 @@ fn test_extract_json_pretty_prints() {
 fn test_extract_binary_returns_metadata_only() {
     let bytes: Vec<u8> = (0..=255).cycle().take(1024).collect();
     let path = create_temp_binary("test.bin", &bytes);
-    let path_str = path.to_string_lossy().to_string();
-
-    let tool = DocumentExtractTool::new(PathBuf::from("/"));
-    let output = run_extract(&tool, &path_str);
+    let output = run_extract(&path);
 
     // Binary should return metadata, not content dump.
     assert!(output.contains("binary"), "Should identify as binary");
@@ -420,11 +415,15 @@ fn test_extract_binary_returns_metadata_only() {
 fn test_extract_truncation_marker() {
     let content = "x".repeat(1000);
     let path = create_temp_file("large.txt", &content);
-    let path_str = path.to_string_lossy().to_string();
+    let workspace_root = path.parent().expect("fixture file has a parent directory");
+    let relative_path = path
+        .file_name()
+        .expect("fixture file has a name")
+        .to_string_lossy();
 
-    let tool = DocumentExtractTool::new(PathBuf::from("/"));
+    let tool = DocumentExtractTool::new(workspace_root.to_path_buf());
     let input = serde_json::json!({
-        "path": path_str,
+        "path": relative_path,
         "format": "auto",
         "max_bytes": 100,
     });

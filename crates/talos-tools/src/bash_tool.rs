@@ -38,7 +38,7 @@ pub struct BashInput {
     pub timeout_secs: Option<u64>,
 }
 
-/// A tool that executes shell commands via `sh -c`.
+/// A tool that executes commands via PowerShell on Windows and `sh -c` elsewhere.
 ///
 /// Commands are run with a configurable timeout and working directory.
 /// Output is captured from both stdout and stderr.
@@ -54,6 +54,33 @@ enum BashCommandClass {
     PackageManagerOrNetwork,
     WriteOrMutating,
     ComplexShell,
+}
+
+#[cfg(windows)]
+const SHELL_TOOL_NAME: &str = "powershell";
+#[cfg(not(windows))]
+const SHELL_TOOL_NAME: &str = "bash";
+
+fn platform_shell_command(command: &str) -> Command {
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+            .arg(command);
+        cmd
+    };
+
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg(command);
+        cmd
+    };
+
+    for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
+        cmd.env_remove(name);
+    }
+    cmd
 }
 
 impl BashCommandClass {
@@ -101,10 +128,8 @@ impl BashTool {
     }
 
     async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c")
-            .arg(command)
-            .current_dir(&self.working_dir)
+        let mut cmd = platform_shell_command(command);
+        cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -171,56 +196,59 @@ impl BashTool {
         let mut output = String::new();
         output.push_str(&format!("$ {command}\n"));
 
+        let deadline = tokio::time::sleep(timeout_duration);
+        tokio::pin!(deadline);
+        let mut stdout_open = true;
+        let mut stderr_open = true;
+
+        let mut completed_status = None;
         let exit_status = loop {
+            if completed_status.as_ref().is_some_and(Result::is_err)
+                || (completed_status.is_some() && !stdout_open && !stderr_open)
+            {
+                break completed_status
+                    .take()
+                    .expect("completed status checked above");
+            }
+
             tokio::select! {
-                line_result = stdout_reader.next_line() => {
+                line_result = stdout_reader.next_line(), if stdout_open => {
                     match line_result {
                         Ok(Some(line)) => {
                             output.push_str(&line);
                             output.push('\n');
                         }
-                        Ok(None) => {} // stdout closed
+                        Ok(None) => stdout_open = false,
                         Err(e) => {
                             output.push_str(&format!("[stdout error: {e}]\n"));
+                            stdout_open = false;
                         }
                     }
                 }
-                line_result = stderr_reader.next_line() => {
+                line_result = stderr_reader.next_line(), if stderr_open => {
                     match line_result {
                         Ok(Some(line)) => {
                             output.push_str(&line);
                             output.push('\n');
                         }
-                        Ok(None) => {} // stderr closed
+                        Ok(None) => stderr_open = false,
                         Err(e) => {
                             output.push_str(&format!("[stderr error: {e}]\n"));
+                            stderr_open = false;
                         }
                     }
                 }
-                status = child.wait() => {
-                    // Drain any remaining output after child exits
-                    while let Ok(Some(line)) = stdout_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
-                    while let Ok(Some(line)) = stderr_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
-                    break status;
+                status = child.wait(), if completed_status.is_none() => {
+                    completed_status = Some(status);
                 }
-                _ = tokio::time::sleep(timeout_duration) => {
-                    let _ = child.kill().await;
-                    let _ = child.wait().await;
-                    // Drain any remaining output after kill
-                    while let Ok(Some(line)) = stdout_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
+                _ = &mut deadline => {
+                    if completed_status.is_none() {
+                        let _ = child.kill().await;
+                        let _ = child.wait().await;
                     }
-                    while let Ok(Some(line)) = stderr_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
+                    // Preserve output already received before the absolute deadline. Descendants
+                    // can inherit stdout/stderr handles and outlive the direct shell child, so
+                    // waiting for EOF here would defeat the operation timeout.
                     output.push_str("[timeout]");
                     return ToolResult::error(output);
                 }
@@ -252,7 +280,7 @@ impl BashTool {
 #[async_trait]
 impl AgentTool for BashTool {
     fn name(&self) -> &str {
-        "bash"
+        SHELL_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -287,7 +315,7 @@ impl AgentTool for BashTool {
                 self.permission_resource_for_command(command),
                 ToolResourceKind::Command,
             )
-            .with_description(format!("bash {}", class.as_str())),
+            .with_description(format!("{} {}", self.name(), class.as_str())),
         ]
     }
 
@@ -341,7 +369,12 @@ fn bash_permission_resource(command: &str, cwd: &PathBuf) -> String {
     let mut hasher = DefaultHasher::new();
     cwd.hash(&mut hasher);
     normalized.hash(&mut hasher);
-    format!("bash:{}:exact:{:016x}", class.as_str(), hasher.finish())
+    format!(
+        "{}:{}:exact:{:016x}",
+        SHELL_TOOL_NAME,
+        class.as_str(),
+        hasher.finish()
+    )
 }
 
 fn normalize_bash_command(command: &str) -> String {
@@ -408,7 +441,8 @@ fn bash_permission_template(
     let mut hasher = DefaultHasher::new();
     cwd.hash(&mut hasher);
     Some(format!(
-        "bash:{}:template:{:016x}:{}",
+        "{}:{}:template:{:016x}:{}",
+        SHELL_TOOL_NAME,
         class.as_str(),
         hasher.finish(),
         template
@@ -416,16 +450,37 @@ fn bash_permission_template(
 }
 
 fn is_simple_shell_token(token: &str) -> bool {
-    !token.is_empty()
-        && !token.contains('*')
-        && !token.contains('?')
-        && !token.contains('[')
-        && !token.contains(']')
-        && !token.contains('{')
-        && !token.contains('}')
-        && !token.contains('\'')
-        && !token.contains('"')
-        && !token.contains('\\')
+    if token.is_empty() {
+        return false;
+    }
+
+    #[cfg(windows)]
+    {
+        // PowerShell has many expression and invocation forms that are unsafe to approximate with
+        // a denylist. Reusable cwd-scoped templates therefore accept only inert path/option token
+        // characters; grouping, call operators, arrays, variables and member expressions become
+        // exact resources until a reviewed PowerShell lexer/parser exists.
+        token
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '='))
+    }
+
+    #[cfg(not(windows))]
+    {
+        !token.contains('*')
+            && !token.contains('?')
+            && !token.contains('[')
+            && !token.contains(']')
+            && !token.contains('{')
+            && !token.contains('}')
+            && !token.contains('\'')
+            && !token.contains('"')
+            && !token.contains('\\')
+            // Shell/provider expansion must never inherit a reusable cwd-scoped grant.
+            && !token.contains('$')
+            && !token.contains(':')
+            && !token.starts_with('~')
+    }
 }
 
 fn read_only_template_key(program: &str, args: &[&str]) -> Option<String> {
@@ -667,6 +722,10 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     }
 
+    fn resource_prefix(class: &str, kind: &str) -> String {
+        format!("{SHELL_TOOL_NAME}:{class}:{kind}:")
+    }
+
     #[tokio::test]
     async fn test_echo_returns_stdout() {
         let tool = BashTool::new(test_dir());
@@ -709,23 +768,29 @@ mod tests {
     #[tokio::test]
     async fn test_shell_metacharacters_pipe() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "'hello' | ForEach-Object { $_.ToUpperInvariant() }";
+        #[cfg(not(windows))]
+        let command = "echo hello | tr a-z A-Z";
         let result = tool
-            .execute(serde_json::json!({ "command": "echo hello | tr a-z A-Z" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
         assert!(result.content.contains("HELLO"));
-        assert!(result.content.starts_with("$ echo hello | tr a-z A-Z\n"));
+        assert!(result.content.starts_with(&format!("$ {command}\n")));
         assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
     async fn test_shell_metacharacters_redirect() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "$p = Join-Path ([System.IO.Path]::GetTempPath()) 'talos_shell_test.txt'; 'test123' | Set-Content $p; Get-Content $p; Remove-Item $p";
+        #[cfg(not(windows))]
+        let command = "echo test123 > /tmp/talos_bash_test.txt && cat /tmp/talos_bash_test.txt && rm /tmp/talos_bash_test.txt";
         let result = tool
-            .execute(serde_json::json!({
-                "command": "echo test123 > /tmp/talos_bash_test.txt && cat /tmp/talos_bash_test.txt && rm /tmp/talos_bash_test.txt"
-            }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -736,8 +801,12 @@ mod tests {
     #[tokio::test]
     async fn test_working_directory_restriction() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "(Get-Location).Path | Split-Path -Leaf";
+        #[cfg(not(windows))]
+        let command = "basename $(pwd)";
         let result = tool
-            .execute(serde_json::json!({ "command": "basename $(pwd)" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -766,7 +835,25 @@ mod tests {
     #[test]
     fn test_bash_tool_name() {
         let tool = BashTool::new(test_dir());
-        assert_eq!(tool.name(), "bash");
+        assert_eq!(tool.name(), SHELL_TOOL_NAME);
+    }
+
+    #[test]
+    fn platform_command_removes_dangerous_environment_variables() {
+        let command = platform_shell_command("echo safe");
+        let removed: Vec<_> = command
+            .as_std()
+            .get_envs()
+            .filter_map(|(name, value)| {
+                value
+                    .is_none()
+                    .then_some(name.to_string_lossy().to_string())
+            })
+            .collect();
+
+        for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
+            assert!(removed.iter().any(|removed_name| removed_name == &name));
+        }
     }
 
     #[test]
@@ -798,7 +885,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:read_only_inspection:"))
         );
     }
 
@@ -851,9 +938,59 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:template:")
+                .starts_with(&resource_prefix("read_only_inspection", "template"))
         );
         assert!(first[0].resource.as_deref().unwrap().ends_with(":cat"));
+    }
+
+    #[test]
+    fn test_shell_template_rejects_cross_platform_path_expansion() {
+        let tool = BashTool::new(test_dir());
+        let commands = [
+            "cat $HOME/secret",
+            "cat ~/secret",
+            "cat C:/Windows/System32/drivers/etc/hosts",
+            "cat Env:PATH",
+        ];
+
+        for command in commands {
+            let profile = tool.permission_profile(&serde_json::json!({ "command": command }));
+            assert!(
+                profile[0]
+                    .resource
+                    .as_deref()
+                    .unwrap()
+                    .starts_with(&resource_prefix("read_only_inspection", "exact")),
+                "{command} unexpectedly received a reusable template grant"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_shell_template_rejects_computed_powershell_expressions() {
+        let tool = BashTool::new(test_dir());
+        let commands = [
+            "cat (Join-Path (Get-Item ..).FullName secret.txt)",
+            "cat (& { Join-Path (Get-Item ..).FullName secret.txt })",
+            "cat @((Join-Path (Get-Item ..).FullName secret.txt))",
+            "cat (Get-Item ..).FullName",
+            "cat $items[0]",
+            "cat ('..' + '/secret.txt')",
+        ];
+
+        for command in commands {
+            let profile = tool.permission_profile(&serde_json::json!({ "command": command }));
+            let resource = profile[0].resource.as_deref().unwrap();
+            assert!(
+                resource.contains(":exact:"),
+                "{command} unexpectedly received a reusable template grant: {resource}"
+            );
+            assert!(
+                !resource.contains(":template:"),
+                "{command} unexpectedly received a reusable template grant: {resource}"
+            );
+        }
     }
 
     #[test]
@@ -872,14 +1009,14 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             absolute[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
     }
 
@@ -898,7 +1035,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:validation_build:template:")
+                .starts_with(&resource_prefix("validation_build", "template"))
         );
         assert!(
             first[0]
@@ -927,21 +1064,21 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:read_only_inspection:exact:")
+                .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             complex[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:complex_shell:exact:")
+                .starts_with(&resource_prefix("complex_shell", "exact"))
         );
         assert!(
             write[0]
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:write_or_mutating:exact:")
+                .starts_with(&resource_prefix("write_or_mutating", "exact"))
         );
     }
 
@@ -982,7 +1119,7 @@ mod tests {
                 .resource
                 .as_deref()
                 .unwrap()
-                .starts_with("bash:complex_shell:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:complex_shell:"))
         );
     }
 
@@ -1021,7 +1158,13 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_exit_code_success() {
         let tool = BashTool::new(test_dir());
-        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
+        #[cfg(windows)]
+        let command = "$null";
+        #[cfg(not(windows))]
+        let command = "true";
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
 
         assert!(!result.is_error);
         assert!(result.content.ends_with("[exit 0]"));
@@ -1041,8 +1184,12 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_multiline_output() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "Write-Output 'line1','line2','line3'";
+        #[cfg(not(windows))]
+        let command = "printf 'line1\nline2\nline3\n'";
         let result = tool
-            .execute(serde_json::json!({ "command": "printf 'line1\\nline2\\nline3\\n'" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -1054,8 +1201,12 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_stderr_captured() {
         let tool = BashTool::new(test_dir());
+        #[cfg(windows)]
+        let command = "[Console]::Error.WriteLine('stderr_msg')";
+        #[cfg(not(windows))]
+        let command = "echo stderr_msg >&2";
         let result = tool
-            .execute(serde_json::json!({ "command": "echo stderr_msg >&2" }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(!result.is_error);
@@ -1065,10 +1216,13 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_timeout_preserves_partial_output() {
         let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(500));
+        #[cfg(windows)]
+        let command =
+            "Write-Output before_sleep; Start-Sleep -Seconds 10; Write-Output after_sleep";
+        #[cfg(not(windows))]
+        let command = "echo before_sleep && sleep 10 && echo after_sleep";
         let result = tool
-            .execute(serde_json::json!({
-                "command": "echo before_sleep && sleep 10 && echo after_sleep"
-            }))
+            .execute(serde_json::json!({ "command": command }))
             .await;
 
         assert!(result.is_error);
@@ -1077,12 +1231,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn continuous_output_does_not_reset_timeout_deadline() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(300));
+        #[cfg(windows)]
+        let command = "1..100 | ForEach-Object { Write-Output tick; Start-Sleep -Milliseconds 50 }";
+        #[cfg(not(windows))]
+        let command = "i=0; while [ $i -lt 100 ]; do echo tick; sleep 0.05; i=$((i+1)); done";
+        let started = std::time::Instant::now();
+
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("tick"));
+        assert!(result.content.contains("[timeout]"));
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "continuous output reset the timeout deadline"
+        );
+    }
+
+    #[tokio::test]
+    async fn timeout_does_not_wait_for_descendant_pipe_eof() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(300));
+        #[cfg(windows)]
+        let command = "$child = Start-Process powershell.exe -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 10' -NoNewWindow -PassThru; Start-Sleep -Seconds 10";
+        #[cfg(not(windows))]
+        let command = "sleep 10 &";
+        let started = std::time::Instant::now();
+
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("[timeout]"));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "absolute deadline waited for descendant-held pipe EOF"
+        );
+    }
+
+    #[tokio::test]
     async fn test_streaming_empty_output() {
         let tool = BashTool::new(test_dir());
-        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
+        #[cfg(windows)]
+        let command = "$null";
+        #[cfg(not(windows))]
+        let command = "true";
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
 
         assert!(!result.is_error);
-        assert!(result.content.starts_with("$ true\n"));
+        assert!(result.content.starts_with(&format!("$ {command}\n")));
         assert!(result.content.ends_with("[exit 0]"));
     }
 
@@ -1136,6 +1339,7 @@ mod tests {
         assert!(result.content.ends_with("[exit 1]"));
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_diff_difference_is_not_error() {
         let tool = BashTool::new(test_dir());
@@ -1186,6 +1390,7 @@ mod tests {
         assert!(result.content.ends_with("[exit 1]"));
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_diff_trouble_exit_2_is_error() {
         let tool = BashTool::new(test_dir());
@@ -1199,6 +1404,7 @@ mod tests {
         assert!(result.is_error);
     }
 
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn test_grep_exit_2_is_error() {
         let tool = BashTool::new(test_dir());

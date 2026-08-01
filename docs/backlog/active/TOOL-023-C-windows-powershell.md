@@ -1,99 +1,92 @@
-# TOOL-023-C: Windows-Native Shell (PowerShell) for the Bash Tool
+# TOOL-023-C: Windows-Native Shell (PowerShell)
 
-**Status**: Ready (2026-07-24)
+**Status**: Review — implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed cross-platform automation in CI run `30686493121`; independent process/security and maintainer acceptance remain pending (2026-08-01)
 **Priority**: P2
 **Parent Epic**: TOOL-023
-**Type**: Product/State Story
-**Depends on**: TOOL-023-A (shares the repaired execution path)
+**Type**: Product / State Story
+**Depends on**: TOOL-023-A
+**Selected Iteration**: I170
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
+| Work Slice | TOOL-023-C within I170: one Windows PowerShell process/tool boundary, child environment scrub and portable presentation while preserving Unix behavior and current contribution ownership. |
+| Claimed At | 2026-08-01 |
+| Source Issue | #119 (I170 dependency recovery context) |
+| Governance Claim PR | #122 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #122 merged the I170 claim after exact-head governance, collaboration, remote-owner and CI validation; its recorded I170 slice explicitly includes Windows PowerShell and portability corrections. |
+| Implementation PR | #126 |
+| Last Updated | 2026-08-01 |
+| Handoff / Release Condition | Release only through the I170 claim owner after PR #126 merges and exact Completion Commit plus security/maintainer acceptance are recorded. |
 
 ## Problem
 
-`crates/talos-tools/src/bash_tool.rs::run_command` hardcodes `Command::new("sh")`
-with `-c` on all platforms. Stock Windows has no `sh`, so the `bash` tool fails to
-spawn there. The tool must invoke a Windows-native interpreter.
+The authoritative shell tool historically invoked `sh -c` and exposed `bash` on every platform. Stock Windows does not provide that process contract, so the registered write-capable shell was unusable and its tests encoded Unix-only assumptions.
 
 ## Goal / Value
 
-On Windows, the shell tool runs commands through PowerShell and presents itself to
-the model under a Windows-appropriate name, so the model emits PowerShell-compatible
-commands and the tool works on Windows hosts.
+Windows users receive one native, permission-gated `powershell` tool while Unix users retain the existing `bash` / `sh -c` behavior. Tool definitions, prompts, permissions, MCP, output handling and product inventories agree on the platform identity.
 
 ## Scope
 
-- Add a `#[cfg(windows)]` execution path selecting PowerShell
-  (`powershell -NoProfile -Command <cmd>`, or `pwsh` if a decision to prefer it is
-  recorded). Keep `sh -c` on `#[cfg(unix)]`.
-- On Windows, expose the tool to the model under a Windows-appropriate name
-  (`shell` or `powershell`, requester chose to rename) so prompt/tool definitions
-  signal PowerShell syntax. Unix keeps `bash`. Ensure the name flows into the tool
-  definition/prompt and permission descriptions consistently.
-- Process hardening on Windows: environment-variable sanitization only (reuse
-  `ProcessHardening::dangerous_env_var_names`), no `RLIMIT_*` / Job Object resource
-  limits — consistent with ADR-007.
-- New ADR: record the Windows shell substitution decision (interpreter choice,
-  tool-name-per-platform, env-scrub-only hardening, quoting caveats), analogous to
-  how ADR-007 scoped Unix hardening.
+- Windows invokes `powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>` and presents the tool as `powershell`.
+- Unix/non-Windows keeps `bash`, `sh -c` and ADR-007 pre-exec hardening.
+- Child command construction removes the canonical dangerous inherited environment names without mutating the Talos parent environment.
+- One authoritative `talos-tools:shell` contribution remains; no second CLI/registry registration path is introduced.
+- Permission resource prefixes/descriptions, prompts, Agent output compression, MCP listing and exact product inventories use the actual platform name.
+- Workspace-relative file/search output uses `/`; Windows long listing uses one type character plus nine conservative permission characters.
+- CRLF, Unix-only symlink/hardening fixtures and temporary-directory assumptions are corrected without deleting or weakening tests.
 
 ## Exclusions
 
-- No `exec` change (argv-only, already cross-platform).
-- No Windows resource limits (Job Objects) — explicitly out per ADR-007.
-- No shell-selection config (`pwsh` vs `cmd`): PowerShell only.
-- No attempt to translate model-emitted POSIX command strings into PowerShell; the
-  tool-name change is the mechanism by which the model adapts syntax.
+- No `exec` behavior change.
+- No POSIX-to-PowerShell translation, `cmd.exe` fallback, shell-selection config, PowerShell parser, Windows rlimit, Job Object or descendant process-tree claim.
+- No parent environment mutation.
+- No I169 steering implementation.
 
 ## Decision Links And Constraints
 
-- ADR-007: Windows children get env sanitization only; no rlimits.
-- ADR-012: shell command classification for the permission pipeline. Verify the
-  classifier's assumptions (pipes/redirects/globs meaning) still hold under
-  PowerShell, or record the difference as a residual/ADR note.
-- Permission pipeline: the tool remains `ToolNature::Execute` / `ToolFamily::Shell`;
-  a per-platform tool-name change must not weaken permission routing.
+- ADR-007: Unix hardening and approved unsafe remain unchanged.
+- ADR-012: complex/unknown shell commands remain exact permission resources.
+- ADR-053: current Tool Contribution and outer composition ownership remain authoritative.
+- ADR-057: platform process, identity, environment and timeout boundary.
 
-## Uncertainty And Validation Path
+## State / Status Owners
 
-Windows CI is not part of the current release workflow (macOS runner). Real
-Windows/PowerShell execution is therefore a manual gate. Automated coverage on
-non-Windows hosts is limited to compile-time `#[cfg(windows)]` correctness and
-name/definition selection unit tests. Record the manual Windows walkthrough as the
-Ready → Complete gate.
+- Story status and acceptance: this file.
+- Execution/evidence: `docs/iterations/I170-windows-workspace-validation-unblocker.md`.
+- Process decision: `docs/decisions/057-windows-powershell-process-boundary.md`.
+- Security review: `docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md`.
+- Implementation: Draft PR #126.
+- Historical evidence only: recovery Draft PR #121 at `e1da5dd893418a3f6e3737ec900aabe9967b1dda`.
 
-## State/Status Owners
+## Acceptance For Behavior
 
-This story file; parent `TOOL-023`; Board mirror; new ADR.
+- Windows presents exactly one `powershell` shell contribution and executes native PowerShell commands with stdout, stderr, exit code, current directory and bounded timeout behavior.
+- Unix presents exactly one `bash` shell contribution and retains `sh -c` behavior.
+- Dangerous environment variables are absent from the child and unchanged in the parent.
+- Permissions and prompts use the presented platform tool name without broadening high-risk trust.
+- Windows path and long-list projections are deterministic and do not invent Unix metadata.
 
-## User-Facing Documentation
+## Acceptance For Technical Work
 
-- `README.md` / `README.zh-CN.md`: document that on Windows the shell tool runs
-  PowerShell and is named `shell`/`powershell`.
-- Public site capabilities page if it enumerates the `bash` tool.
+- [x] Platform process construction and tool identity implemented.
+- [x] Child-local environment removal implemented without new unsafe.
+- [x] Current contribution inventory remains singular and platform-aware.
+- [x] Permission, prompt, Agent and MCP surfaces accept the platform name.
+- [x] Portable path/metadata and fixture corrections implemented.
+- [x] README EN/zh-CN platform behavior updated.
+- [x] ADR-057 and current security review recorded as Proposed/Review.
+- [x] A full Windows Rust CI job covers format/check/Clippy/focused tests/full workspace/governance/mock smoke.
+- [x] Implementation Head passes Windows and macOS/Unix CI.
+- [x] Native PowerShell process/permission/deadline tests and rebuilt Windows CLI mock smoke are recorded in CI run `30686493121`.
+- [ ] Independent process/security and maintainer acceptance are recorded.
 
-## Required Reads
+## Residual Destination
 
-- `crates/talos-tools/src/bash_tool.rs` (`run_command`, `name()`, cfg blocks)
-- `crates/talos-sandbox/src/hardening.rs` (env scrub source; Windows boundary)
-- `docs/decisions/007-process-hardening-unsafe.md`
-- `docs/decisions/012-exec-policy-dsl-boundary.md`
-
-## Acceptance for behavior
-
-- Given a Windows host
-  When the model invokes the shell tool with a PowerShell command
-  Then it runs via PowerShell, returns output and exit status, and the child receives
-  environment sanitization.
-
-- Given a Unix host
-  When the shell tool is invoked
-  Then behavior is unchanged (`sh -c`, tool name `bash`) — no regression.
-
-## Acceptance for technical work
-
-- [ ] `#[cfg(windows)]` path selects PowerShell; `#[cfg(unix)]` unchanged; both compile.
-- [ ] Tool name is `bash` on Unix and the chosen Windows name on Windows, verified by
-      a unit test on the tool definition/name selection.
-- [ ] Env sanitization applies on Windows; no rlimit/Job Object code added.
-- [ ] New ADR recorded and linked from this story and the Epic.
-- [ ] README (EN/zh-CN) and site capabilities updated.
-- [ ] Manual Windows/PowerShell walkthrough recorded as the completion gate.
-- [ ] `cargo clippy --workspace --locked -- -D warnings` clean on the default target.
+PowerShell grammar-aware reusable permissions, PowerShell 7 selection and descendant process-tree supervision require separate decisions and owners.

@@ -154,7 +154,7 @@ fn residual_gate_registry() -> Vec<ResidualGate> {
         },
         ResidualGate {
             id: "PERM-005",
-            summary: "bash/exec remains per-command Ask/Deny (evidence is diagnostic-only)",
+            summary: "shell/exec remains per-command Ask/Deny (evidence is diagnostic-only)",
         },
         ResidualGate {
             id: "PERM-004",

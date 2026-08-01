@@ -196,6 +196,11 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    const SHELL_TOOL_NAME: &str = "powershell";
+    #[cfg(not(windows))]
+    const SHELL_TOOL_NAME: &str = "bash";
+
     #[test]
     fn interactive_builtin_profile_preserves_current_inventory() {
         let mut registry = ToolRegistry::new();
@@ -211,32 +216,31 @@ mod tests {
             .map(|tool| tool.name().to_owned())
             .collect::<Vec<_>>();
         names.sort();
-        assert_eq!(
-            names,
-            [
-                "bash",
-                "delete",
-                "diff",
-                "edit",
-                "git_add",
-                "git_branch_list",
-                "git_checkout",
-                "git_commit",
-                "git_diff",
-                "git_log",
-                "git_pull",
-                "git_push",
-                "git_show",
-                "git_status",
-                "glob",
-                "grep",
-                "ls",
-                "read",
-                "stat",
-                "tree",
-                "write",
-            ]
-        );
+        let mut expected = vec![
+            SHELL_TOOL_NAME,
+            "delete",
+            "diff",
+            "edit",
+            "git_add",
+            "git_branch_list",
+            "git_checkout",
+            "git_commit",
+            "git_diff",
+            "git_log",
+            "git_pull",
+            "git_push",
+            "git_show",
+            "git_status",
+            "glob",
+            "grep",
+            "ls",
+            "read",
+            "stat",
+            "tree",
+            "write",
+        ];
+        expected.sort();
+        assert_eq!(names, expected);
         assert!(registry.get("exec").is_none());
         assert!(registry.get("document_extract").is_none());
     }

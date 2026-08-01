@@ -40,9 +40,10 @@ fn workspace_contribution(tool: Arc<dyn AgentTool>) -> ToolContribution {
     contribution(WORKSPACE_CONTRIBUTION_SOURCE, tool)
 }
 
-/// Builds the single authoritative Bash contribution for one explicit workspace root.
+/// Builds the single authoritative platform-shell contribution for one explicit workspace root.
 ///
-/// Product composition roots can select Bash without constructing the excluded `exec` tool.
+/// Product composition roots can select the shell escape hatch without constructing the excluded
+/// `exec` tool. The contribution is named `bash` on Unix and `powershell` on Windows by the tool.
 #[must_use]
 pub fn bash_tool_contribution(workspace_root: PathBuf) -> ToolContribution {
     contribution(
@@ -239,6 +240,11 @@ mod tests {
     use super::*;
     use talos_core::tool::ToolFamily;
 
+    #[cfg(windows)]
+    const SHELL_TOOL_NAME: &str = "powershell";
+    #[cfg(not(windows))]
+    const SHELL_TOOL_NAME: &str = "bash";
+
     fn names(contributions: &[ToolContribution]) -> Vec<&str> {
         contributions.iter().map(ToolContribution::name).collect()
     }
@@ -255,7 +261,7 @@ mod tests {
     fn shell_group_has_stable_inventory_and_source() {
         let contributions = shell_tool_contributions(PathBuf::from("workspace"));
 
-        assert_eq!(names(&contributions), ["bash", "exec"]);
+        assert_eq!(names(&contributions), [SHELL_TOOL_NAME, "exec"]);
         assert_source(&contributions, SHELL_CONTRIBUTION_SOURCE);
     }
 
@@ -273,7 +279,7 @@ mod tests {
     #[test]
     fn selective_groups_exclude_tools_without_constructing_full_groups() {
         let shell = vec![bash_tool_contribution(PathBuf::from("workspace"))];
-        assert_eq!(names(&shell), ["bash"]);
+        assert_eq!(names(&shell), [SHELL_TOOL_NAME]);
         assert_source(&shell, SHELL_CONTRIBUTION_SOURCE);
 
         let workspace = workspace_non_document_tool_contributions(PathBuf::from("workspace"));

@@ -32,7 +32,8 @@ state what changed.
 
 ## Tool Selection Rules
 
-Always prefer dedicated built-in tools over `bash` for file operations:
+Always prefer dedicated built-in tools over the presented shell escape hatch (`bash` on Unix,
+`powershell` on Windows) for file operations:
 
 - Use the built-in `grep` tool instead of shelling out to `grep`, `rg`, or `sed -n`
 - Use the built-in `glob` tool instead of shelling out to `find` or `fd`
@@ -41,9 +42,9 @@ Always prefer dedicated built-in tools over `bash` for file operations:
 - Use the built-in `write` tool instead of shell redirection, `cat >`, or `tee`
 - Use the built-in `edit` tool instead of shelling out to `sed -i`, `perl -i`, or `patch`
 - Use the built-in `delete` tool instead of shelling out to `rm`
-- Use built-in Git tools such as `git_status`, `git_diff`, `git_log`, and `git_branch_list` for read-only Git inspection instead of `bash git ...`
+- Use built-in Git tools such as `git_status`, `git_diff`, `git_log`, and `git_branch_list` for read-only Git inspection instead of shelling out to Git
 
-Only use `bash` when no dedicated tool covers the operation — e.g. running builds, tests, package managers, or multi-step pipelines. Host shell Git is an explicit fallback only when no structured Git tool covers the operation and the user approves that specific command.
+Only use the shell tool presented in the active tool definitions when no dedicated tool covers the operation — e.g. running builds, tests, package managers, or multi-step pipelines. Host shell Git is an explicit fallback only when no structured Git tool covers the operation and the user approves that specific command.
 
 ## Tool Behavior
 

@@ -420,7 +420,8 @@ mod tests {
         assert_eq!(first, second);
         let artifact =
             include_str!("../../../docs/reference/MEM-009-BENCHMARK-RESULT-2026-07-17.json");
-        assert_eq!(first.trim(), artifact.trim());
+        let normalized_artifact = artifact.replace("\r\n", "\n");
+        assert_eq!(first.trim(), normalized_artifact.trim());
         serde_json::from_str::<serde_json::Value>(artifact).expect("artifact is valid JSON");
     }
 }

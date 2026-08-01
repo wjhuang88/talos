@@ -112,7 +112,7 @@ fn run_trust_command(command: TrustCommand) -> Result<()> {
                     "  Trust effect: repo-contained file writes auto-allow (Deny rules still win)."
                 );
                 println!(
-                    "  Bash/exec: still per-command unless access evidence proves repo-local read (ADR-040)."
+                    "  Shell/exec: still per-command unless access evidence proves repo-local read (ADR-040)."
                 );
             } else {
                 println!("  Trust is not active. Use --trust during session start to grant it.");
@@ -203,7 +203,7 @@ fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPr
         notes: vec![
             "Preflight is read-only: it does not execute tools or install allow rules.".to_string(),
             "Choosing always later installs session-scoped allow rules; configured deny rules still win.".to_string(),
-            "High-risk bash commands stay exact unless their audited template policy says otherwise.".to_string(),
+            "High-risk shell commands stay exact unless their audited template policy says otherwise.".to_string(),
         ],
     })
 }
@@ -273,6 +273,18 @@ fn packet_to_json(packet: &PermissionPreflightPacket) -> Value {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    const SHELL_TOOL_NAME: &str = "powershell";
+    #[cfg(not(windows))]
+    const SHELL_TOOL_NAME: &str = "bash";
+
+    fn shell_operation(command: &str) -> ParsedOperation {
+        ParsedOperation {
+            tool: SHELL_TOOL_NAME.to_string(),
+            input: json!({ "command": command }),
+        }
+    }
+
     #[test]
     fn parse_operation_accepts_tool_json() {
         let parsed = parse_operation(r#"bash={"command":"cat Cargo.toml"}"#).unwrap();
@@ -284,8 +296,8 @@ mod tests {
     #[test]
     fn preflight_packet_reports_reusable_bash_template() {
         let operations = vec![
-            parse_operation(r#"bash={"command":"cat src/main.rs"}"#).unwrap(),
-            parse_operation(r#"bash={"command":"cat Cargo.toml"}"#).unwrap(),
+            shell_operation("cargo test first_filter"),
+            shell_operation("cargo test second_filter"),
         ];
 
         let packet = build_preflight_packet(&operations).unwrap();
@@ -299,13 +311,17 @@ mod tests {
         assert!(
             packet.operations[0].always_scopes[0]
                 .resource
-                .starts_with("bash:read_only_inspection:template:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:validation_build:template:"))
         );
     }
 
     #[test]
     fn preflight_packet_keeps_high_risk_bash_exact() {
-        let operations = vec![parse_operation(r#"bash={"command":"rm generated.txt"}"#).unwrap()];
+        #[cfg(windows)]
+        let command = "Remove-Item generated.txt";
+        #[cfg(not(windows))]
+        let command = "rm generated.txt";
+        let operations = vec![shell_operation(command)];
 
         let packet = build_preflight_packet(&operations).unwrap();
 
@@ -313,14 +329,18 @@ mod tests {
         assert!(
             packet.operations[0].always_scopes[0]
                 .resource
-                .starts_with("bash:write_or_mutating:exact:")
+                .starts_with(&format!("{SHELL_TOOL_NAME}:"))
+        );
+        assert!(
+            packet.operations[0].always_scopes[0]
+                .resource
+                .contains(":exact:")
         );
     }
 
     #[test]
     fn render_preflight_packet_explains_no_execution_or_rule_install() {
-        let operations =
-            vec![parse_operation(r#"bash={"command":"cargo test approval"}"#).unwrap()];
+        let operations = vec![shell_operation("cargo test approval")];
         let packet = build_preflight_packet(&operations).unwrap();
 
         let rendered = render_preflight_packet(&packet);

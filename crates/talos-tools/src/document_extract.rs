@@ -612,16 +612,21 @@ mod tests {
     }
 
     fn run_extract(path: &Path, format_hint: Option<&str>, max_bytes: Option<usize>) -> String {
-        let tool = DocumentExtractTool::new(PathBuf::from("/"));
+        let workspace_root = path.parent().expect("fixture file has a parent directory");
+        let relative_path = path
+            .file_name()
+            .expect("fixture file has a name")
+            .to_string_lossy();
+        let tool = DocumentExtractTool::new(workspace_root.to_path_buf());
         let input = if let Some(mb) = max_bytes {
             serde_json::json!({
-                "path": path.to_string_lossy(),
+                "path": relative_path,
                 "format": format_hint.unwrap_or("auto"),
                 "max_bytes": mb,
             })
         } else {
             serde_json::json!({
-                "path": path.to_string_lossy(),
+                "path": relative_path,
                 "format": format_hint.unwrap_or("auto"),
             })
         };

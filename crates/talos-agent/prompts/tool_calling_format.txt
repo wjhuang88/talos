@@ -5,8 +5,9 @@ To call a tool, output a fenced code block with the language tag `json-tool`:
 {"name": "<tool_name>", "args": {<parameters>}}
 ```
 
-Example — to run a command:
+Example — use the exact shell tool name presented in the active tool definitions (`bash` on Unix
+or `powershell` on Windows):
 
 ```json-tool
-{"name": "bash", "args": {"command": "ls -la"}}
+{"name": "<presented_shell_tool>", "args": {"command": "<platform-native command>"}}
 ```

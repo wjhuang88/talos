@@ -1062,6 +1062,11 @@ mod tests {
     use talos_core::tool::{ToolNature, ToolProvenance};
     use talos_tools::ReadImageTool;
 
+    #[cfg(windows)]
+    const SHELL_TOOL_NAME: &str = "powershell";
+    #[cfg(not(windows))]
+    const SHELL_TOOL_NAME: &str = "bash";
+
     struct NamedReadTool {
         name: &'static str,
         description: &'static str,
@@ -1357,8 +1362,8 @@ mod tests {
         );
         let mcp_registry = build_mcp_tool_registry();
 
-        let print_tui_inventory = vec![
-            "bash",
+        let mut print_tui_inventory = vec![
+            SHELL_TOOL_NAME,
             "delete",
             "diff",
             "document_extract",
@@ -1400,8 +1405,8 @@ mod tests {
             "web_search",
             "write",
         ];
-        let mcp_inventory = vec![
-            "bash",
+        let mut mcp_inventory = vec![
+            SHELL_TOOL_NAME,
             "delete",
             "diff",
             "document_extract",
@@ -1434,6 +1439,9 @@ mod tests {
             "web_search",
             "write",
         ];
+
+        print_tui_inventory.sort();
+        mcp_inventory.sort();
 
         assert_eq!(sorted_registry_names(&print_registry), print_tui_inventory);
         assert_eq!(sorted_registry_names(&tui_registry), print_tui_inventory);
@@ -1498,7 +1506,7 @@ mod tests {
         );
         let mcp_registry = build_mcp_tool_registry();
         let groups = [
-            ("talos-tools:shell", &["bash", "exec"][..]),
+            ("talos-tools:shell", &[SHELL_TOOL_NAME, "exec"][..]),
             (
                 "talos-tools:workspace",
                 &["document_extract", "grep", "glob", "diff", "stat", "tree"][..],
@@ -1523,7 +1531,7 @@ mod tests {
             ("MCP", mcp_registry),
         ] {
             for (source, name) in [
-                ("talos-tools:shell", "bash"),
+                ("talos-tools:shell", SHELL_TOOL_NAME),
                 ("talos-tools:workspace", "document_extract"),
                 ("talos-tools:network", "save_url"),
             ] {
