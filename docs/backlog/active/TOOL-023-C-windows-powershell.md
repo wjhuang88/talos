@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Completed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
 | Work Slice | TOOL-023-C within I170: one Windows PowerShell process/tool boundary, child environment scrub and portable presentation while preserving Unix behavior and current contribution ownership. |
