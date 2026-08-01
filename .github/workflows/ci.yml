@@ -80,11 +80,40 @@ jobs:
 
       - name: Focused PowerShell process, permission, and timeout tests
         run: |
+          cargo test -p talos-tools --locked windows_spawned_powershell_child_cannot_observe_dangerous_parent_environment -- --nocapture
           cargo test -p talos-tools --locked platform_command_removes_dangerous_environment_variables -- --nocapture
           cargo test -p talos-tools --locked test_shell_template_rejects_cross_platform_path_expansion -- --nocapture
           cargo test -p talos-tools --locked continuous_output_does_not_reset_timeout_deadline -- --nocapture
           cargo test -p talos-tools --locked timeout_does_not_wait_for_descendant_pipe_eof -- --nocapture
           cargo test -p talos-tools --locked test_shell_metacharacters_pipe -- --nocapture
+
+      - name: I170 exact-head Windows direct walkthrough
+        shell: pwsh
+        env:
+          I170_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          $log = "i170-windows-direct-walkthrough.log"
+          "I170_WORKFLOW exact_head=${{ github.sha }}" | Tee-Object -FilePath $log
+          "I170_WORKFLOW runner_os=$env:RUNNER_OS" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW runner_name=$env:RUNNER_NAME" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW runner_arch=$env:RUNNER_ARCH" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW image_os=$env:ImageOS" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW image_version=$env:ImageVersion" | Tee-Object -FilePath $log -Append
+          cargo test -p talos-tools --locked windows_direct_powershell_walkthrough_records_exact_head_and_timeout_evidence -- --nocapture 2>&1 |
+            Tee-Object -FilePath $log -Append
+          $walkthroughExit = $LASTEXITCODE
+          if ($walkthroughExit -ne 0) {
+            exit $walkthroughExit
+          }
+
+      - name: Upload I170 Windows direct walkthrough
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i170-windows-direct-walkthrough-${{ github.sha }}
+          path: i170-windows-direct-walkthrough.log
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test workspace
         shell: pwsh
