@@ -2,365 +2,84 @@
 
 ## Purpose
 
-Track iteration plans, execution progress, and retrospectives.
+Track current iteration plans, execution state, verification evidence, and retrospectives. Each
+iteration's own document is authoritative for its scope and lifecycle.
 
-## Naming Convention
-
-```
-docs/iterations/
-├── README.md           (this file)
-├── R0-<slug>.md        (remediation gate / execution round)
-├── I001-<slug>.md      (iteration plan + execution record)
-├── I002-<slug>.md
-└── ...
-```
+The complete pre-closeout index is preserved unchanged at
+[`archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
+That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
 
-1. **Planned** — Iteration created with scope, selected stories, and acceptance criteria.
-2. **Active** — Work in progress. Update story status as work proceeds.
-3. **Review** — All stories implemented. Run verification checklist.
-4. **Complete** — Verification passed, retrospective written.
+1. **Planned** — objective, selected stories, acceptance and activation gate are published.
+2. **Active** — explicitly activated work is in progress on a fresh current-main branch.
+3. **Review** — implementation exists and required evidence/review is pending.
+4. **Complete** — verification, acceptance, completion commit and retrospective are recorded.
+5. **Paused / Blocked / Superseded** — non-active states with an explicit resume or replacement gate.
 
 ## Rules
 
-- Each iteration has a unique ID (`I001`, `I002`, ...).
-- Published iteration baselines must not be silently overwritten by later execution.
-- Start a new iteration only after inventorying all existing active, review, planned, and blocked iterations.
-- Record execution results by appending to the plan, not replacing it.
+- Every iteration has a unique ID.
+- Published baselines are not silently repurposed; changed objectives use a new ID.
+- Before activation, inventory current Issues, PRs, branches, owner docs and other non-terminal work.
+- Ready/Planned does not mean Active.
+- Recovery branches and PRs are provenance only unless a new current-main plan explicitly says otherwise.
+- Complete requires runtime/acceptance evidence appropriate to the scope, not unit tests alone.
 
-## Current Iterations
+## Current Operating Set
 
-| ID | Codename | State | Deliverable verified end-to-end? |
-|----|----------|-------|----------------------------------|
-| I170 | Windows Workspace Validation Unblocker | Review — Draft PR #126 (2026-08-01) | Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121`; final synchronization CI and independent security/maintainer acceptance remain pending. |
-| I168 | Provider Terminal Outcome Integrity | Complete (2026-07-30) | ✅ Completion Commit `86262d02`; 2681 workspace tests and reviewed rebuilt-binary known-policy/ordering fixtures pass. |
-| I166 | Interrupt Shortcut Reliability | Complete (2026-07-28) | ✅ Ctrl+C local clear/idle exit and Esc active-turn interruption with modal priority. 483 TUI + 2545 workspace tests and the maintainer Alacritty matrix passed. |
-| I164 | Startup Inline Composer Continuity | Paused — superseded target (2026-07-28) | Published post-first-submit bottom-layout target retained as historical evidence; no Completion Commit. |
-| I165 | Growing Conversation Composer Continuity | Complete (2026-07-28) | ✅ Composer follows the short Logo/history flow and becomes bottom-fixed only once the frame overflows. All 9 human acceptance cases PASS. |
-| I001 | Project Scaffold | Complete | ✅ |
-| I002 | Hello Agent | Complete | ✅ |
-| I003 | Tool User | Complete | ✅ |
-| I004 | Safe Agent | Complete | ✅ Original #I004-S5 runtime-hardening gap was closed by R0/#ARCH-S3; see `R0-remediation-gate.md` and ADR-007 |
-| I005 | Smart Agent | Complete | ✅ |
-| I006 | Data Agent | Complete | ✅ Session index, fork identity, and search highlight residuals were closed by R0/#ARCH-S5..S7; dead event-loop variant removal remains scoped to I010-S7 |
-| I007 | Skilled Agent | Complete | ✅ |
-| I008 | Learning Agent | **Complete** (2026-06-03) | Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). R1 Review Closure recorded runtime evidence 2026-06-03 (519 tests). See `I008-learning-agent.md`. |
-| R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
-| R1 | Review Closure | **Complete** (2026-06-03) | I008/I009 moved to Complete; I009 TUI consumer work deferred to #I009-S6. I010 R2 is the next mainline slice. See `R1-review-closure.md`. |
-| I009 | Extensible Agent | **Complete** (2026-06-03) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers). TUI consumer markers + `/plugins` deferred to #I009-S6. See `I009-extensible-agent.md`. |
-| I010 | Polished Agent | **Complete** (2026-06-04; status repaired 2026-06-19) | R2 and R3 evidence is preserved; later command/session/TUI residuals have separate owners. See `I010-polished-agent.md`. |
-| I011 | Open Providers | **Complete** (S1 delivered; S2 superseded by I015) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped (S1). S2 (provider plugin architecture foundation) superseded by I015, which delivered the typed schema + opencode import under ADR-013 (PROV-001 Complete). Closed 2026-06-30. See `I011-open-providers.md`. |
-| I012 | Portable Tools | **Superseded** (2026-06-19 mapping) | Umbrella split into I016/I017; actual deliveries mapped to I025/I026 with residuals under TOOL-001/GIT-001. See `I012-portable-tools.md`. |
-| I013 | Boundary Control | **Complete** (2026-06-05) | Front-loaded high-risk boundary work: ADR-011 Guardian, ADR-012 exec DSL, ADR-013 provider schema, and #ARCH-S8 R1 centralized logging. See `I013-boundary-control.md`. |
-| I014 | TUI Completion | **Complete** (2026-06-06) | Finish TUI provenance/plugin visibility and copy/export workflows. Two stories: #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export) landed via 2 atomic commits. 652 tests pass workspace-wide (was 615; +37 from talos-tui). See `I014-tui-completion.md`; EXT-001 backlog; ADR-009. |
-| I015 | Provider Schema | **Complete** (2026-06-08) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import (`talos-config::opencode`) with 9 unit tests landed 2026-06-08. `cargo test -p talos-config -p talos-provider -p talos-cli` passes. See `I015-provider-schema.md`; `PROV-001-provider-schema.md`; ADR-013. |
-| I016 | Portable File And Search Tools | **Superseded** by I025 | Native tool outcome delivered through I025/TOOL-003; residual portability/index work remains TOOL-001. |
-| I017 | Embedded Git Tools | **Superseded** by I026 | P0-P2 Git outcome delivered through I026/GIT-001; advanced/fallback residuals remain GIT-001. |
-| I018 | Observability and Prompt Assets | Complete — fulfilled by I047 | Bounded file-log retention and compile-time embedded prompt assets, delivered under ADR-014/015 via I047. See `I018-observability-prompt-assets.md`. |
-| I021 | Evolution MenteDB Realignment | **Complete** (2026-06-06) | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits (#I021-S1..S5): Signal/TurnObservation restructure, `find_marker + capture_window`, Pattern MenteDB fields, hard-reset migration, lesson #19 annotation. 615 tests pass; runtime evidence recorded (model responds normally to `cargo run -p talos-cli -- -p "你好"`). Defense layer (commit `7470ac5`) preserved as belt-and-suspenders. See `I021-evolution-mentedb-realignment.md`; EVOLUTION.md lessons #19 and #20. |
-| I022 | TUI Inline-by-Default | **Complete** (2026-06-08) | Codex-style inline-by-default TUI: viewport at cursor y, finalized turns push to scrollback, fixed 4-line viewport (input+status only), real-time scrollback flush, status bar tips with TTL, diff+force_clear rendering. 127 TUI tests pass; workspace clean. State model refactor deferred to I023. See `I022-tui-inline-default.md`; `docs/proposals/tui-codex-overhaul.md`; ADR-018. |
-| I023 | TUI State Model | **Complete** (2026-06-12) | Event-driven architecture: `talos-conversation` + `talos-tui` separation. Codex-style single-row history insertion with styled scrollback, 3-column prefix padding, multiline user messages with Nord bg color + top/bottom padding, one-row preview with Markdown block classifier, conservative styled Markdown rendering, animated braille spinner, native cursor sync. Review remediation closed: non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback, engine-owned mutation verified. 114 focused tests pass (61 TUI + 53 conversation). See `I023-tui-state-model.md`. |
-| I024 | Conversation Context Continuity | **Complete** (2026-06-13) | P0 context gap closed: agent receives current-session history, JSONL resume is wired, TUI visible resume history hydrates scrollback, implicit resume is workspace-scoped, and layers 1-3 compaction are active. Accepted residuals: LLM compaction layers 4-5/50-turn proof → MEM-003; first-class workspace/session topology → MEM-004. See `I024-conversation-context.md`. |
-| I025 | Tool Pipeline Completion | **Complete** (2026-06-17) | Tool protocol and display pipeline closed: schema validation/dedup, diff/stat, CommonMark fence handling, Mermaid rendering via `mermaid-text`, and ToolNature permission/display metadata. See `I025-tool-pipeline-completion.md`. |
-| I026 | Approval UX + Git Tools + Prompt Optimization | **Complete** (2026-06-18) | All 7 stories implemented: approval ordering and inline result display, read/write Git tools, dynamic prompt templates, Anthropic cache-control emission, tree tool, and active documentation validation. Closure re-verification on 2026-06-18: `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` both pass. Residual: `--all-targets` clippy scope gap registered as ARCH-007. See `I026-approval-ux-doc-validation.md`. |
-| I027 | ARCH-003 Crate Boundary Cleanup | **Complete** (2026-06-18) | Removed dead `talos-mcp -> talos-agent` dependency, renamed `message::ToolResult` → `MessageToolResult` (14 files), and introduced an RPC `Runtime` trait so `talos-rpc` no longer names concrete `Agent` (`AgentRuntime` adapter in `talos-cli`). No behavior change; workspace check/tests/clippy/fmt/governance all clean. See `I027-crate-boundary-cleanup.md`; `docs/backlog/active/ARCH-003-crate-boundary-cleanup.md`. |
-| I028 | Delayed and Scheduled Task Execution | **Superseded before implementation** (2026-07-13) | Historical baseline retained, but its read/auto-allow permission premise is invalid for mutating scheduler operations. I124-I127 own the corrected Execute/Ask sequence. See `I028-delayed-scheduled-tasks.md`; `docs/tasks/2026-07-13-four-month-scheduled-followups-plan.md`. |
-| I029 | Architecture Cleanup Completion | **Complete** (2026-06-18) | Closed ARCH-004/005/006/007: anti-corruption layers, clippy `--all-targets` cleanup, prompt cache stability, and I029 god-module decomposition slice. Post-ARCH-005 residuals are tracked separately as ARCH-008/009/010. See `I029-architecture-cleanup-completion.md`. |
-| I030 | Session Module Decomposition | **Complete** (2026-06-19) | ARCH-008 closed: `talos-session/src/lib.rs` split into error/types/jsonl/topology/manager/tests modules with no behavior change. See `I030-session-module-decomposition.md`. |
-| I031 | Skill And CLI Module Cleanup | **Complete** (2026-06-19) | ARCH-009 skill split and ARCH-010 CLI mode-runner extraction landed; `talos-cli/src/main.rs` is now 241 lines. See `I031-skill-and-cli-module-cleanup.md`. |
-| I032 | Tools Module Cleanup | **Complete** (2026-06-19) | Finished ARCH-010 tools cleanup: `talos-tools/src/file_tools.rs` is now a 108-line shared/re-export module with focused child modules for read, write/edit, delete, and ls. See `I032-tools-module-cleanup.md`. |
-| I033 | Runtime Skill Activation | **Complete** (2026-06-19) | Real `talos` binary regression evidence proves workspace Skill Level 0 metadata reaches the provider request. Level 1/2 execution remains a separate SKILL-002 follow-up. See `I033-runtime-skill-activation.md`. |
-| I034 | MCP Session Integration | **Complete** (2026-06-19) | Configured stdio MCP tools are discovered before the first turn across normal modes, permission/provenance/status are preserved, and failures degrade with bounded cleanup. See `I034-mcp-session-integration.md`. |
-| I035 | Agent Protocol Compatibility Foundation | **Complete** (2026-06-19) | Turn AGENT-001 into a dated protocol/config compatibility plan and read/import-first foundation for shared Agent config such as `~/.agents`. See `I035-agent-protocol-compatibility-foundation.md`. |
-| I036 | Research Consolidation | **Complete** (2026-06-20) | End-of-plan research-only iteration that consolidates REMOTE-001, WEB-001, PLUGIN-001, OKF-001, MEM-005, MODEL-001/002, DIST-001, WEBFETCH-001, and STORE-001 into decisions, ADR candidates, and executable follow-up stories. See `I036-research-consolidation.md`. |
-| I037 | Slash Command Menu | **Complete** (2026-06-20) | TUI-010: `/` opens Codex-style command menu below composer using CMD-001 registry. See `I037-slash-command-menu.md`. |
-| I038 | Model Catalog Foundation | **Complete** (2026-06-20) | MODEL-001: built-in model dataset + models.dev import. Catalog-only (reasoning split to MODEL-003). See `I038-model-catalog-foundation.md`. |
-| I039 | Network Tools & TUI Polish | **Complete** (2026-06-21) | WEBFETCH-001 Phase 0 + TOOL-009 + TUI-011 + TOOL-005. See `I039-network-tools-tui-polish.md`. |
-| I040 | Session Foundation & Tool Refinement | **Complete** (2026-06-22) | SESSION-001-A + http_request content detection + save_url + fetch_url merge. See `I040-session-foundation-tool-refinement.md`. |
-| I041 | Interactive Session Lifecycle & Operation-Scoped Permissions | **Complete** (2026-06-22) | SESSION-001-B + SESSION-001-C + PERM-002. Closed 4 weeks early. See `I041-interactive-session-lifecycle-permission-ux.md`. |
-| I042 | I041 Hotfix — Persistence Continuity, /resume UX, Execute Semantics | **Complete** (2026-06-23) | P1 persistence fix (watch channels), /resume ordinal selection, Execute first-token extraction. See `I042-i041-hotfix-persistence-resume-ux.md`. |
-| I043 | Bottom Panel Generalization, Session Picker, Approval UX | **Complete** (2026-06-23) | BottomPanelState + PanelKind {SlashCommand, SessionPicker, Approval}; /resume picker; R1/R2 tech debt; TUI-008 approval reuses bottom panel with nested-approval queueing; IME guard and menu-close contract refined. Pre-closeout audit run. See `I043-bottom-panel-session-picker-approval-ux.md`. |
-| I044 | Session Integrity And Lifecycle Hardening | **Complete** (2026-06-23) | Six SESSION-002 consistency fixes (O(1) append, concurrent write safety, crash reconciliation, switch ordering, failure cleanup) + `/delete` via picker UX. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. See `I044-session-integrity-lifecycle-hardening.md`. |
-| I045 | Product Readiness — Model Lifecycle, Config, Observability | **Complete (2026-06-24)** | All 4 stories complete: MODEL-004-R (catalog integration), MODEL-005-R (/model picker + credential input + first-run wizard + --init/--available-models/--use-model), CONF-001-S (config CLI), OBS-001 (log rotation). api_key data-loss bug fixed (skip_serializing reverted). Non-navigable group headers in model picker. Closed in ~4 hours, not 1 month. Post-closeout correction (I046): two workspace tests were actually failing at closeout (stale `gpt-4.1` + lost `/resume` fallback). See `I045-product-readiness-model-lifecycle-observability.md`. |
-| I046 | Architecture, Structure, And Governance Repair | **Complete (2026-06-25)** | All 5 stories: S1 (test baseline restored), S2 (provider-aware model identity — `find_model_by_provider`, `(provider, model_id)` semantics), S3 (inline api_key boundary — custom Debug masking, config_get_dotted api_key case, ADR-023), S4 (model_lifecycle.rs extracted from mode_runners.rs), S5 (docs sync — config.reference.toml, AGENTS.md, README, I045 correction). `cargo test/clippy/governance` all pass. See `I046-architecture-structure-governance-repair.md`. |
-| I047 | v0.1.2 Release Readiness And Runtime Polish | **Complete (2026-06-29)** | All slices delivered. v0.1.2 tag pushed, GitHub release published, `v0.2.0` workspace version deployed. See `I047-v012-release-readiness-and-runtime-polish.md`. |
-| I048 | Local Data Lifecycle And Storage Hygiene | **Complete (delivered via I049–I055, 2026-06-29)** | DATA-001 scope fulfilled by I049 (storage CLI), I050–I053 (memory pipeline/quality), and I054–I055 (exploration storage). See `I048-local-data-lifecycle-storage-hygiene.md`. |
-| I049 | Storage Status And Cleanup CLI | **Complete (2026-06-29)** | DATA-001 user-facing CLI slice delivered: storage status, cleanup dry-run/apply, active-session protection, fork visibility, and maintenance commands. All workspace gates + runtime smoke test verified. See `I049-storage-status-and-cleanup-cli.md`. |
-| I050 | Memory Consolidation Pipeline | **Complete (2026-06-29)** | Episodic-to-semantic consolidation pipeline delivered: `EpisodeExtractor` trait + deterministic `RuleBasedExtractor`, `consolidate_episodes()` ADD-only with evidence links, CLI `talos memory consolidate`. All gates + runtime smoke verified. See `I050-memory-consolidation-pipeline.md`. |
-| I051 | Bounded Memory Prompt Injection | **Complete (2026-06-29)** | `format_memory_prompt()` + `SystemPromptBuilder::with_memory_section()` delivered with hidden-output filter, budget truncation, contradiction markers, and disable switch. 8 tests. See `I051-bounded-memory-prompt-injection.md`. |
-| I052 | Procedural Memory And Entity Linking | **Complete (2026-06-29)** | Entity extraction (files/URLs/code), entity-linked retrieval boost, procedural memory, and permission-boundary regression delivered. Schema v2. 8 tests. See `I052-procedural-memory-and-entity-linking.md`. |
-| I053 | Memory Quality And Release Hardening | **Complete (2026-06-29)** | I019 quality gate closed: memory status, retention dry-run, corruption tolerance, I019 acceptance criteria all verified. 7 tests. See `I053-memory-quality-and-release-hardening.md`. |
-| I019 | Layered Memory Foundation | **Complete (2026-06-29)** | All 6 acceptance criteria closed via I050-I053. Four-layer memory, ADD-only consolidation, bounded retrieval, entity linking, procedural memory, contradiction handling. No vector/graph dep. See `I019-layered-memory-foundation.md`. |
-| I054 | Exploration Library Storage Foundation | **Complete (2026-06-29)** | New `talos-exploration` crate with SQLite/FTS5 schema: research_runs, sources, chunks, claims, edges, syntheses. Citation integrity enforced. FTS5 search. 8 tests. See `I054-exploration-library-storage-foundation.md`. |
-| I055 | Exploration Ingestion And Citation Workflow | **Complete (2026-06-29)** | Ingestion pipeline + claim extraction + citation-preserving synthesis + CLI explore ingest/search delivered. 8 tests + runtime verified. See `I055-exploration-ingestion-and-citation-workflow.md`. |
-| I020 | Exploration Library | **Complete (2026-06-29)** | S1-S3 delivered via I054-I055: ExplorationStore schema + FTS5 + citation integrity + ingestion + claim extraction + synthesis. S4 (vector/graph Spike) deferred per ADR-017. See `I020-exploration-library.md`. |
-| I056 | Two-Month Closeout And v0.2.0 Readiness | **Complete (2026-06-29)** | All gates green. I019/I020/DATA-001 acceptance synchronized. README updated. v0.2.0 tag pushed and published after user approval. See `I056-two-month-closeout-and-v020-readiness.md`. |
-| I057 | Acceptance Remediation And Release Gate | **Complete (2026-06-29)** | All 5 stories delivered: S1 storage cleanup permission gate, S2 memory prompt runtime wiring + mock-provider evidence, S3 UTF-8/resource-budget hardening, S4 hidden-output filter expansion, S5 governance sync. All workspace gates pass. v0.2.0 tag pushed after user approval. |
-| I058 | Explicit Runtime Skill Activation | **Complete (2026-06-29)** | `/skills activate <name>` + bounded Level 2 reference loading implemented through typed session context. Workspace gates and real `talos --inline --mock` request-preview proof pass. See `I058-explicit-runtime-skill-activation.md`. |
-| I059 | Architecture Corrosion And Memory Module Decomposition | **Complete (2026-06-27)** | ARCH-012 promoted from a fresh oversized-module audit; `talos-memory/src/lib.rs` split into focused modules while preserving public API. Workspace gates and governance validation pass. See `I059-architecture-corrosion-memory-decomposition.md`. |
-| I060 | Config Module Decomposition | **Complete (2026-06-27)** | ARCH-013 promoted after the follow-up oversized-module audit; `talos-config/src/lib.rs` split into focused modules while preserving public API. Workspace gates and governance validation pass. See `I060-config-module-decomposition.md`. |
-| I061 | CLI Mode Runtime Helper Extraction | **Complete (2026-06-27)** | ARCH-014 extracted reusable runtime helpers from `talos-cli/src/mode_runners.rs`; workspace gates and governance validation pass. See `I061-cli-mode-runtime-helper-extraction.md`. |
-| I062 | TUI Scrollback Helper Decomposition | **Complete (2026-06-27)** | ARCH-015 extracted input and status helpers from `talos-tui/src/scrollback.rs`; workspace gates and governance validation pass. See `I062-tui-scrollback-helper-decomposition.md`. |
-| I063 | TUI Scrollback Markdown Decomposition | **Complete (2026-06-27)** | ARCH-016 extracted Markdown/code/table rendering helpers from `talos-tui/src/scrollback.rs`; workspace gates and governance validation pass. See `I063-tui-scrollback-markdown-decomposition.md`. |
-| I064 | CLI Print Mode Decomposition | **Complete (2026-06-27)** | ARCH-017 extracted print-mode execution from `talos-cli/src/mode_runners.rs` as the first architecture debt burn-down CLI flow slice; workspace gates and governance validation pass. See `I064-cli-print-mode-decomposition.md`. |
-| I065 | TUI App Stream Render Decomposition | **Complete (2026-06-27)** | ARCH-018 extracted stream rendering state from `talos-tui/src/app.rs` into `app_stream.rs`; workspace gates and governance validation pass. See `I065-tui-app-stream-render-decomposition.md`. |
-| I066 | Agent Compaction Decomposition | **Complete (2026-06-27)** | ARCH-019 split `talos-agent/src/compaction.rs` into constants/policy/types/engine/tests while preserving public imports and behavior; workspace gates and governance validation pass. See `I066-agent-compaction-decomposition.md`. |
-| I067 | Agent Prompt Decomposition | **Complete (2026-06-27)** | ARCH-020 split `talos-agent/src/prompt.rs` into assets/types/sections/builder/tests while preserving prompt output, cache markers, and public imports; workspace gates pass. See `I067-agent-prompt-decomposition.md`. |
-| I068 | Agent Session Turn Decomposition | **Complete (2026-06-27)** | ARCH-021 split `talos-agent/src/session.rs` turn forwarding and tests while preserving actor-loop behavior; workspace gates pass. See `I068-agent-session-turn-decomposition.md`. |
-| I069 | CLI Inline Mode Decomposition | **Complete (2026-06-27)** | ARCH-024 split CLI inline mode and inline `/skills` handling into `mode_inline.rs`; `mode_runners.rs` 1778→1500 lines; workspace gates pass. See `I069-cli-inline-mode-decomposition.md`. |
-| I070 | TUI Exit Summary Decomposition | **Complete (2026-06-27)** | ARCH-025 split TUI exit-summary formatting into `app_summary.rs`; `app.rs` 1118→1005 lines; workspace gates pass. See `I070-tui-exit-summary-decomposition.md`. |
-| I071 | Agent Configuration Decomposition | **Complete (2026-06-27)** | ARCH-026 split Agent constructors/configuration setters into `configuration.rs`; duplicate prompt-builder mutation centralized; `lib.rs` 914→655 lines. See `I071-agent-configuration-decomposition.md`. |
-| I072 | Conversation Command Registry Decomposition | **Complete (2026-06-27)** | ARCH-027 split command registry metadata/completion into `command_registry.rs`; `engine.rs` 960→739 lines; workspace gates pass. See `I072-conversation-command-registry-decomposition.md`. |
-| I073 | OpenAI Request Assembly Decomposition | **Complete (2026-06-28)** | ARCH-028 split OpenAI request DTOs/body assembly/redaction into `openai_request.rs`; `openai.rs` 1001→848 lines; workspace gates pass. See `I073-openai-request-assembly-decomposition.md`. |
-| I074 | Exploration Types Decomposition | **Complete (2026-06-28)** | ARCH-029 split exploration domain entities into `types.rs`; `lib.rs` 1070→958 lines; workspace gates pass. See `I074-exploration-types-decomposition.md`. |
-| I075 | Month 1 — Starting Gate and Tooling Hardening | **Complete (2026-07-01)** | Original self-bootstrap plan executed through Month-3 closeout; its Month-4 future work is superseded by the 2026-07-01 replan. See `I075-month1-starting-gate-and-tooling-hardening.md` and `../tasks/2026-07-01-four-month-self-bootstrap-replan.md`. |
-| I076 | Month 1 — Provider, Tooling, And Validation Loop | **Complete (2026-07-01)** | Weeks 1-4 of the 2026-07-01 replan delivered: provider usage, status display, write/edit output, model-switch markers, validation-loop design, and read-only validation plan surface. Full workspace and governance closeout passed. See `I076-month1-provider-tooling-validation.md`. |
-| I077 | Month 2 — Plugin, Exec, And Web Security | **Complete (2026-07-02)** | Weeks 5-8 of the 2026-07-01 replan delivered plugin security review/tool integration, web/dashboard security review/fixes, and direct exec policy/implementation. See `I077-month2-plugin-exec-web-security.md`. |
-| I078 | Month 3 — Session Orchestration, Todo, Memory, And Thinking | **Complete (2026-07-02)** | Weeks 9-12 of the 2026-07-01 replan delivered slash auto-execute, session todo foundations, thinking separation, and self-bootstrap gap evidence. See `I078-month3-session-todo-memory-thinking.md`. |
-| I079 | Month 4 — Release Readiness And Handoff | **Complete (2026-07-02)** | Weeks 13-16 of the 2026-07-01 replan delivered reliability sweep, memory injection decision, publish gate packet, REL-002 readiness report, closeout, handoff, and maintainer feedback fixes. See `I079-month4-release-readiness-handoff.md`. |
-| I080 | Frontline Month 1 — Config And Governance Visibility | **Complete** (2026-07-02) | Config subcommands verified, Ctrl+A/Ctrl+E composer navigation, `/agile status` slash command, dashboard `loopback_only` default-on, ADR-031 amended. F103 deferred. See `I080-frontline-config-governance-visibility.md`. |
-| I081 | Frontline Month 2 — Extension And Distribution Discipline | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I081-frontline-extension-distribution.md`. |
-| I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I082-frontline-ingestion-footprint.md`. |
-| I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I083-frontline-ecosystem-release-posture.md`. |
-| I084 | Experience Reliability — Thinking, Timeout, Retry, And Status | **Complete (2026-07-03)** | UX100-UX106 complete: ADR-034 v3, structured reasoning persistence, Anthropic/OpenAI reasoning paths, timeout detection, retry/backoff, TUI status states. Evidence recorded: 1497 workspace tests, clippy, fmt, governance validation. See `I084-experience-reliability.md`. |
-| I085 | Model Catalog Modernization — talos-models, /model, /connect | **Complete (2026-07-12)** | Stage 1/2 and DB-free packaged-catalog behavior are closed. MC107 real-terminal walkthrough verified `/connect` grouping/filtering, safe credential cancel, and `/model` rendering in a disposable HOME. See `I085-model-catalog-modernization.md`. |
-| I086 | Experience Polish And Retry Visibility | **Superseded before activation (2026-07-12)** | Later I107/I114/I115 work delivered or changed the target; remaining work is replanned under I116-I119. See `I086-experience-polish-and-retry-visibility.md`. |
-| I087 | Site Install Distribution Entrypoints | **Superseded before activation (2026-07-12)** | Revised distribution acceptance is replanned under I118. See `I087-site-install-distribution-entrypoints.md`. |
-| I088 | Extension And Ingestion Risk Bounding | **Superseded before activation (2026-07-12)** | I090/I091 changed the starting state; remaining bounded productization is replanned under I118. See `I088-extension-ingestion-risk-bounding.md`. |
-| I089 | Ecosystem, Self-Bootstrap, And Closeout | **Superseded before activation (2026-07-12)** | I106-I109 produced non-qualifying evidence; the revised sole-primary target is replanned under I119. See `I089-ecosystem-self-bootstrap-closeout.md`. |
-| I090 | High-Risk Ingestion And Search Boundary | **Complete (2026-07-04)** | Month 1 of the direct senior-agent high-risk execution track. Bounded document extraction and ripgrep-backed search stabilization are complete; full workspace and governance closeout passed. No browser/PDF/Office/OCR scope. See `I090-high-risk-ingestion-search-boundary.md` and `../tasks/2026-07-04-architect-owned-four-month-high-risk-execution.md`. |
-| I091 | Plugin, Hook, And Distribution Boundary | **Complete (2026-07-04)** | Month 2 of the direct senior-agent high-risk execution track. `/hooks` diagnostics, hook manifest declaration validation, and optional runtime asset distribution policy are complete; no remote install, marketplace, write-capable plugin tools, or auto-discovery. See `I091-plugin-hook-distribution-boundary.md`. |
-| I092 | Context Compression And Autonomy Gates | **Complete (2026-07-04)** | Month 3 of the direct senior-agent high-risk execution track. Bash-only cache-safe compression proof and deny/ask/allow autonomy matrix closed without runtime autonomy expansion. See `I092-context-compression-autonomy-gates.md`. |
-| I093 | Self-Bootstrap, Runtime, And Release Gate | **Complete (2026-07-04)** | Month 4 of the direct senior-agent high-risk execution track. REL-002 readiness was audited and non-qualification evidence recorded; `v1.0.0` remains No-go. See `I093-self-bootstrap-runtime-release-gate.md` and `../reference/I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md`. |
-| I094 | gix Upgrade And Git Boundary | **Complete (2026-07-04)** | `gix 0.85.0` landed with no feature expansion; host-`git` fallback decisions were audited and recorded; workspace/clippy/governance gates passed. See `I094-gix-upgrade-git-boundary.md` and `../tasks/2026-07-04-high-risk-execution-gix-runtime-governance-plan.md`. |
-| I095 | Runtime Validation Evidence | **Complete (2026-07-04)** | `talos validate run` emits allowlisted validation evidence with command, exit status, output summaries, and permission decision. See `I095-runtime-validation-evidence.md`. |
-| I096 | Governance Mutation Gates | **Complete (2026-07-04)** | `talos governance iteration-record preview/write` provides a narrow owner-doc mutation gate with confirm, post-write validation, and rollback. See `I096-governance-mutation-gates.md`. |
-| I097 | Controlled Self-Bootstrap Rehearsal | **Complete (2026-07-04)** | Closed with non-qualifying REL-002 evidence: Talos executed bounded validation and owner-doc mutation commands, but Codex remained primary. See `I097-controlled-self-bootstrap-rehearsal.md`. |
-| I098 | Permission Preflight And Low-Noise Execution Policy | **Complete (2026-07-06)** | Month 1 of the 2026-07-06 autonomy/permission/runtime hardening plan. `talos permissions preflight` landed as read-only planning output; no broad bash allow or permission-default relaxation. See `I098-permission-preflight-noise-reduction.md`. |
-| I099 | Structured Exec And Bash Fallback Reduction | **Complete (2026-07-06)** | Month 2 of the 2026-07-06 plan. Closed bounded direct-argv `exec` parallel steps, pipe chains, parallel pipe chains, per-step permission facets, and bash fallback matrix without shell parsing. See `I099-structured-exec-and-bash-reduction.md`. |
-| I100 | Project Intelligence And Validation Routing | **Complete (2026-07-06)** | Month 3 of the 2026-07-06 plan. Closed detector descriptor metadata, independent project-type fixture tests, demand-driven adapter guidance evidence, and internal governance mutation validation. See `I100-project-intelligence-validation-routing.md`. |
-| I101 | Model, Git, And Self-Bootstrap Evidence Closeout | **Complete (2026-07-06)** | Month 4 of the 2026-07-06 plan. Closed model-browser walkthrough residuals, standard-provider no-URL connect, custom-provider URL requirement, viewport-windowed model-list rendering, continued `gix` fallback tracking, and honest non-qualifying REL-002 evidence without release overclaim. See `I101-model-git-self-bootstrap-evidence.md` and `../reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md`. |
-| I102 | Provider Runtime Reliability Gate | **Complete (2026-07-08)** | Month 1 of the 2026-07-07 developer operating plan. Closed SSE fixture matrix extension (D101), agent degenerate-tool-call invariant + MaxTokens boundary guard (D102), conversation-loop cancel integration (D103), month-1 closeout (D104), and architecture-review provider error chunk fix. 1791 workspace tests pass. See `I102-provider-runtime-reliability-gate.md`. |
-| I103 | First-Run Model And Diagnostics | **Complete (2026-07-08)** | Month 2 of the 2026-07-07 developer operating plan. D110-D113 verified complete: standard/custom provider connect UX, bounded model browsing, redacted diagnostics. 1791 workspace tests pass. See `I103-first-run-model-diagnostics.md`. |
-| I104 | Long-Session Stability And Permission Evidence | **Complete (2026-07-08)** | Month 3 of the 2026-07-07 developer operating plan. D120-D123 verified complete: permission-noise evidence with deny precedence preserved, validation routing, tool display readability. 1791 workspace tests pass. See `I104-long-session-stability-and-permission-evidence.md`. |
-| I105 | Trial Readiness Closeout | **Complete (2026-07-08)** | Month 4 of the 2026-07-07 developer operating plan. D130-D133 closed: trial docs (README troubleshooting section), smoke checklist (6 direct binary commands plus integration coverage for interactive/failure paths), REL-002 non-qualifying classification, final go/no-go report (GO for controlled local trial, NO-GO for v1.0). 1791 workspace tests pass. See `I105-trial-readiness-closeout.md`. |
-| I106 | Self-Bootstrap Control Plane | **Complete (2026-07-12)** | SBT100-SBT104 complete; external-runtime evidence remains non-qualifying for REL-002. See `I106-self-bootstrap-control-plane.md`. |
-| I107 | Talos-Primary Feature Polish | **Complete (2026-07-12)** | #18 request-dispatch timeout fixed and validated; external-runtime evidence remains non-qualifying. See `I107-talos-primary-feature-polish.md`. |
-| I108 | Architecture-Sensitive Self-Bootstrap | **Complete (2026-07-12)** | ARCH-032 audit complete; external-runtime evidence remains non-qualifying. See `I108-architecture-sensitive-self-bootstrap.md`. |
-| I109 | REL-002 Self-Bootstrap Closeout | **Complete (2026-07-12)** | Evidence audit and NO-GO report complete; REL-002 remains unmet/partial as recorded. See `I109-rel002-self-bootstrap-closeout.md`. |
-| I114 | TUI Runtime Visual Stability | Complete (2026-07-10) | TUI-028 #24 cadence, #25 thinking ripple, #31 compact status rendering, and #39 transient dashboard notification accepted in native Alacritty PTY evidence. See `I114-tui-runtime-visual-stability.md`. |
-| I115 | Runtime Event Semantic Convergence | **Complete (2026-07-11)** | ARCH-033 corrected the semantic gap after ARCH-032: one ordered live queue, authoritative session lifecycle, actor-owned persistence, replay equivalence, and shared runtime-surface semantics. Full workspace and binary E2E validation passed. See `I115-runtime-event-semantic-convergence.md`. |
-| I116 | State Truth And Operator Baseline | **Complete (2026-07-12)** | State trace matrix reconciled 3 drifts (SESSION-004/PERF-001/TOOL-020); operator smoke 13/13; `talos diagnostics status` shipped. See `I116-state-truth-operator-baseline.md`. |
-| I117 | Command Sandbox Evidence | **Complete (2026-07-12)** | Independent security review accepted diagnostic-only evidence for bash and exec single/steps/pipes; evidence never changes permission decisions. See `I117-command-sandbox-evidence.md`. |
-| I118 | Bounded Local Productization | **Complete (2026-07-12)** | LT030-LT034 verified; installer fixture tests (8/8 pass). See `I118-bounded-local-productization.md`. |
-| I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
-| I120 | Dynamic Diagnostics Truth | **Complete** (2026-07-13) | Month 1. serde JSON, dynamic iteration state, malformed→unavailable, and typed ResidualGate pass the maintainer-confirmed repository validation gate. See `I120-dynamic-diagnostics-truth.md`. |
-| I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
-| I122 | Local Extension And Control Diagnostics | **Complete** (2026-07-13) | Month 3. Typed extension snapshot, unified /mcp//plugins//hooks, dashboard /extensions route, 133+23 tests. See `I122-local-extension-control-diagnostics.md`. |
-| I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures (POSIX 9/9 + PowerShell 5/0/1, checksum verified, offline/ARM64 error text asserted), clean-HOME smoke (18/0/2, real session resume), Windows `v0.3.4` install/version trial, and maintainer-confirmed independent replay validation passed. See `I123-installation-and-trial-confidence.md`. |
-| I124 | One-Shot Scheduled Follow-Up | **Complete (2026-07-14)** | All acceptance and security evidence passes: 9 roots use permission wrappers, the real session test positively observes the scheduled turn and its independent Deny, ADR-041 records the accepted minimal API variance, and the full validation ladder is green. See `I124-one-shot-scheduled-followup.md` and `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md`. |
-| I125 | Recurring Scheduled Follow-Ups | **Complete (2026-07-14)** | Additive API compatibility, discriminating Delay semantics, competing-ready Cancel/Shutdown boundaries, fresh permission isolation, 9-root wiring, real configured-provider recurring turns, documentation, and the full validation ladder pass. See `I125-recurring-scheduled-followups.md`. |
-| I126 | Schedule Inspection And Control | **Complete (2026-07-15)** | Read-only no-message 20-row list cap; Execute/Ask cancel with approved no-fire and denied-unchanged real-session proof; multi-tick snapshots; semantic 40/60/80/120 scrollback Buffer coverage; full validation green. See `I126-schedule-inspection-control.md`. |
-| I127 | Scheduler Reliability Closeout | **Complete** (2026-07-15) | Month 4. SF130-SF133 closed: bounded production queue failures, deterministic lifecycle stress, clean-HOME independent replay packet, README limitations, and full validation. See `I127-scheduler-reliability-closeout.md`. |
-| I128 | Embedded Durable Runtime Sessions | **Complete** (2026-07-15) | Host-selected UUID TLOG sessions, opaque external-ID binding, atomic durable turns, filtered transcript/lifecycle APIs, and Runtime auto-recovery with committed-entry events. See `I128-embedded-durable-runtime-sessions.md`. |
-| I129 | WEB-001 Rendered Dashboard Pages | **Complete** (2026-07-15) | P100 Complete. Rendered HTML pages for status/history/governance/config with content negotiation, redaction, and browser evidence. /extensions stays JSON-only. Scope: loopback-only rendered HTML for status/history/governance/masked-config with conservative content negotiation. SESSION-005 is Complete. See `I129-web001-rendered-dashboard-pages.md`. |
-| I130 | TUI-030 Composer Input History | **Complete** (2026-07-16) | In-memory Up/Down composer input history with draft restoration and consecutive-duplicate dedup. Nine state tests and five `handle_input_event` entry-point tests prove navigation, multiline draft restoration, and slash-menu/approval/credential priority guards. No persistence or transcript-format change. See `I130-tui030-composer-input-history.md`. |
-| I131 | TOOL-021 Error Propagation Audit | **Complete** (2026-07-16) | Audit with 15 fixture tests. FINDING-2 was confirmed and subsequently fixed by I135/SESSION-006 on 2026-07-17. See `I131-tool021-error-propagation-audit.md`. |
-| I132 | TASK-001 Persistent Task Runtime — Defer | **Complete** (2026-07-16) | ADR-043 Defer: task runtime NOT implemented. I128 + I124-I127 provide reusable session/turn/scheduler primitives, but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. Defer due to no product need + P130 non-goals. See `I132-task001-persistent-task-defer.md`. |
-| I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
-| I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
-| I135 | Session Error-Path Integrity | **Complete** (corrected 2026-07-17) | Real filesystem failure injection and reconstructed durable-transcript proof accepted with the final locked replay. See `I135-session-error-path-integrity.md`. |
-| I136 | Read-Only Plugin Product Closure | **Complete** (corrected 2026-07-17) | Explicit package loading, permission/provenance execution, typed `/plugins`, and checked-in offline fixture accepted. See `I136-read-only-plugin-product-closure.md`. |
-| I137 | Memory Admission Benchmark | **Complete** (corrected 2026-07-17) | Byte-stable five-policy MEM-009 artifact selects No-Go and rejects sparse indexing for insufficient evidence. See `I137-memory-admission-benchmark.md`. |
-| I138 | Memory Admission Decision Application | **Complete** (corrected 2026-07-17) | No-Go applied: production baseline retained; already-published experimental API held inert for compatibility; independent sensitive filter preserved. See `I138-memory-admission-decision-application.md`. |
-| I139 | Four-Month Reliability Closeout | **Complete** (2026-07-17) | v0.3.8 released. All corrections committed and pushed. Program Complete. REL-002 remains NO-GO. See `I139-four-month-reliability-closeout.md`. |
-| I140 | SEC-001 External-Path Authorization | **Complete** (2026-07-17) | Exact tool/nature/path approval across Runtime/CLI/TUI accepted after Deny/headless/symlink fail-closed security review and full locked replay. See `I140-sec001-external-path-authorization.md`. |
-| I141 | MODEL-007 Variant Picker And TUI-031 Contextual Status Bar | **Complete** (2026-07-18) | Three-stage Provider → Model → Variant picker (ADR-048 amended) with conditional variant stage mirroring `/connect` UX, Recent group persisted at `~/.talos/recent_models.json`, and contextual status bar (`gix`-based branch/dirty, platform label, width-aware tiers). Full locked validation ladder, release preflight, and governance validation all green. See `I141-model-variant-picker-and-status-bar.md`. |
-| I142 | TUI-032 Composer Multiline Wrap | **Complete** (maintainer acceptance 2026-07-20) | Composer/history wrapping, CJK width, cursor/editing, height/scroll, Shift+Enter, Ctrl+J fallback, and bare-Enter submission passed the guided rebuilt-binary acceptance after automated regressions and the full locked validation ladder. Plan at `.sisyphus/plans/tui-032-composer-multiline-wrap.md`. See `I142-composer-multiline-wrap.md`. |
-| I143 | Public Documentation Hub And v0.4.0 Site Sync | **Complete** (maintainer acceptance 2026-07-20) | WEB-006-A/B/C delivered bilingual docs hubs, current release truth, CTA accessibility repair and drift gates; static checks and manual browser QA passed. Pages deployment remains separately observable. See `I143-public-documentation-hub.md`. |
-| I144 | Architecture Sustainability Audit | **Complete** (2026-07-20) | ARCH-034-A audit only: whole-workspace evidence, boundary/duplication/extension verdicts and remediation register; production refactoring is excluded. See `I144-architecture-sustainability-audit.md`. |
-| I145 | Queued Steering Message Display | **Complete** (maintainer terminal acceptance 2026-07-22; `1039430`) | TUI-026 under ADR-049: bounded `UiOutput::SteeringQueueSnapshot` projection, 8-entry/4 KiB FIFO preview, 6-row TUI render budget, lifecycle reconciliation, terminal-growth repaint, and cancellation-preview cleanup. Locked validation and maintainer acceptance for FIFO, `+N more`, drain/clear, and Ctrl+C preview cleanup passed. Completion Commit: `1039430`. See `I145-queued-steering-message-display.md`. |
-| I146 | TUI-033 Parameterless Model And Provider Commands | **Complete** (maintainer slash-prefix retest 2026-07-22; `7f6972a`) | TUI-033: `/model` and `/connect` are strict no-argument menu commands; parameterized TUI input is side-effect-free and redirects to the picker; structured identity propagation. Tab completes a bare command without execution or trailing space; Enter opens its menu. `/mo` now shows only `/model`, rather than description-only matches. Completion Commit: `7f6972a`. See `I146-tui-parameterless-model-connect-commands.md`. |
-| I147 | MODEL-008-A Custom Provider Wizard And Atomic Config | **Complete** (maintainer terminal acceptance 2026-07-22; `1c843b2`) | Five-step wizard (name → protocol → base URL → API key → confirm) with cancel-safe state machine, visible two-choice protocol selection, active-field cursor targeting, ADR-023 key masking, duplicate → explicit update flow, and one atomic config save. Locked validation and maintainer terminal acceptance passed. Completion Commit: `1c843b2`. See `I147-custom-provider-wizard-atomic-config.md`. |
-| I149 | MODEL-009-A Image Input ADR And Security Spike | **Complete** (2026-07-20) | ADR-050 Accepted on all 10 safety-critical points. Security review complete. No production image sending. I150 may proceed. See `I149-image-input-adr-security-spike.md`. |
-| I152 | MODEL-009-D Provider Adapter And TUI/CLI | **Complete** (maintainer walkthrough 2026-07-24; `17e3fef`, `65eb108`) | OpenAI `image_url` + Anthropic base64 wire mapping. R3: capability gate. R5/P1-B: TOCTOU + digest verification. R7: `/attachments` + `/detach` + status count. R8: `--attach` CLI flag. R10: scrollback safe summary. P1-A: shared `image_authorization` routes `/attach` and `--attach` through SEC-001 permission pipeline; canonical-path regression passes. TUI: interactive approval. Print: headless fail-closed. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. See `I152-provider-adapter-tui-cli.md`. |
-| I153 | End-to-End Hardening And Release Candidate | **Complete** (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Full locked validation is green; release candidate checklist documented. Maintainer live Anthropic-compatible provider walkthrough passed 2026-07-24. No tag is authorized by this status change. See `I153-end-to-end-hardening-release-candidate.md`. |
-| I154 | Agent-Mediated Image Read Tool | **Complete** (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | MODEL-009-E adds a separate `read_image` tool for Supported models only. ADR-051 fixes the one-shot provider-continuation contract. P3 complete: `ToolExecutionOutput`/`execute_with_output` trait API, shared image validation, `ReadImageTool` implementation, turn-loop continuation overlay, capability-gated registration, Anthropic coalescing, atomic batch limit, execution-boundary capability gate, path sanitization. 40 new tests pass across 4 crates. Maintainer real-terminal walkthrough passed: Supported model called `read_image`, safe summary in history, one-shot continuation to provider. See `I154-agent-mediated-image-read-tool.md`. |
-| I156 | TUI Narrow-Viewport And Resize Robustness | Complete — maintainer Alacritty walkthrough 2026-07-27 | TUI-035. All automated gates passed; maintainer performed real-terminal Cases A/B/C/D. Completion commits include `6909675` and the accepted Alternate-Screen correction chain through `d4d95ad`. See `I156-tui-narrow-viewport-resize.md`. |
-| I163 | Policy-Controlled Linked Skill Discovery | Complete (2026-07-28) | SKILL-003. Existing completion commits: `04999f1`, `bfb8c22`, `b7e3704`, `a0079dd`, `e11481d`, `12ef1e3`. Windows link behavior and Level-2 reference containment remain explicit residuals. See `I163-policy-controlled-linked-skill-discovery.md`. |
-| I166 | Complete (2026-07-28) | TUI-036. Ctrl+C local clear/close and idle exit; Esc active-turn interruption after modal priority. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; 483 TUI + 2545 workspace tests and maintainer Alacritty acceptance passed. See `I166-interrupt-shortcut-reliability.md`. |
-| I157 | **Complete** (2026-07-30 stale-snapshot concurrency correction) | MODEL-010. Completion commit `5aac6756`; every Talos config writer reloads and mutates current state under one cross-process lock. |
-| I167 | **Complete** (2026-07-29) | TUI-040. Completion implementation `3356aac`; automated validation and maintainer real-terminal review passed. See `I167-approval-option-contrast.md`. |
-| I158 | Tool Registration Composition Consolidation | **Review** (2026-07-31) | Implementation commits `9d2926ed` and `ec4d918f`; exact inventories and full CI pass. Complete remains blocked on scheduler/status exception disposition and final architecture/tool-extension/finding documentation. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | ARCH-031-A. Real optional dependencies + gated modules/re-exports; lightweight read-only default. Blocked until I158 Complete and the post-I158 TUI-037 disposition is recorded. See `I159-talos-tools-feature-boundary.md`. |
-| I160 | Shared CLI And Runtime Internal Composition | Blocked | ARCH-031-B. CLI/runtime share one internal composition implementation with separate public entrypoints. Blocked until I159 Complete. See `I160-shared-cli-runtime-composition.md`. |
-| I161 | Sandbox Fallback And Coding Preset | Blocked | ARCH-031-C. Fail-closed sandbox fallback + explicit coding preset that cannot weaken permission/sandbox. Blocked until I160 Complete and an independent security review is scheduled. See `I161-sandbox-fallback-and-coding-preset.md`. |
-| I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | ARCH-031-D. External SDK fixture + metadata-derived closure → explicit v0.6 GO/NO-GO; no real publish. Blocked until I161 Complete and all workspace tests green. See `I162-v0.6-sdk-publication-readiness.md`. |
+| ID | Codename | State | Activation / Completion Gate |
+|---|---|---|---|
+| I169 | Transactional Batched Steering Turn | Planned — prerequisite satisfied; not active | TUI-044 is Ready. Re-read current facts, confirm no overlap, create a fresh branch from exact current `main`, record explicit activation, keep ADR-056 Proposed, and leave recovery PR #120 immutable. |
+| I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
+| I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
+| I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
+| I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
 
-> Maintainer sequence disposition (2026-07-31): after I158 reaches a formal Complete or Paused
-> disposition, TUI-037 is the next P1 product item to disposition before I159 activation. TUI-037
-> remains Refinement until its OSC 8 and token-required loopback navigation gates are resolved. The
-> disposition must either select a dedicated iteration or explicitly record Blocked/Deferred.
-> I159-I162 retain their published baselines.
+## Completed This Closeout
 
-> Update this table whenever an iteration changes state. "Complete" requires runtime
-> evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
+| ID | Codename | Final State | Completion Evidence |
+|---|---|---|---|
+| I170 | Windows Workspace Validation Unblocker | Complete (2026-08-01) | PR #126 squash-merged at `592254d73a98166df48da0139a02df67e9cd2cd6`; exact implementation Head `8cfe8edb2dbda581244f583fb809591391a54298`; CI run `30705366763`; walkthrough artifact `8820174164`; TOOL-023-A/C Complete; ADR-057 Accepted. |
 
-## Non-Terminal Inventory (2026-07-26 Refresh)
+I170's accepted residuals remain explicit:
 
-This inventory is the required disposition before selecting or activating more work. It does not
-rewrite published iteration baselines.
+- timeout cleanup is guaranteed for the direct shell child, not the complete descendant tree;
+- TOOL-023-B still owns timeout default/configuration;
+- a PowerShell lexer/parser, PowerShell 7 selection and Job Object lifecycle require separate decisions;
+- I170 completion satisfies I169's prerequisite but does not activate or implement I169.
 
-| Iteration | Current State | Disposition Before Next Activation |
+## Recent Non-Terminal / Completed Context
+
+| ID | State | Notes |
 |---|---|---|
-| I011 | Complete (2026-06-30 closure) | S1 delivered; S2 (provider plugin arch) superseded by I015 (PROV-001 Complete). Removed from non-terminal inventory. |
-| I018 | Complete — fulfilled by I047 (reconciled 2026-07-20) | Removed from non-terminal inventory; I047 delivered bounded logs and embedded prompt assets under ADR-014/015. |
-| I019 | Complete (2026-06-29, via I050-I053) | Stale entry corrected 2026-07-15: I019 closed Complete; previously listed as Planned/blocked. |
-| I020 | Complete (2026-06-29, via I054-I055) | Stale entry corrected 2026-07-15: I020 closed Complete; previously listed as Planned/blocked. |
-| I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
-| I124 | Complete (2026-07-14) | Removed from non-terminal inventory after positive scheduled-turn/Deny proof, accepted ADR-041 change control, and a green validation ladder. |
-| I125 | Complete (2026-07-14) | Removed from non-terminal inventory after compatibility, race, permission, real-provider, documentation, and full validation closure. |
-| I126 | Complete (2026-07-15) | Removed from non-terminal inventory after closure of both maintainer review rounds and a green full validation ladder. |
-| I127 | Complete (2026-07-15) | Removed from non-terminal inventory after production full-queue tool-error proof, clean-HOME lifecycle replay, and full validation closure. |
-| I047 | Complete (2026-06-29) | Removed from non-terminal inventory. v0.1.2 and v0.2.0 tags pushed and published. |
-| I048 | Complete (2026-06-29, via I049-I055) | Removed from non-terminal inventory; owner header reconciled 2026-07-16. |
-| I049 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I049 doc, delivered via I049–I055 sequence). |
-| I050 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I050 doc). |
-| I051 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I051 doc). |
-| I052 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I052 doc). |
-| I053 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I053 doc). |
-| I054 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I054 doc). |
-| I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
-| I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
-| I135-I138, I140 | Complete (corrected 2026-07-17) | Removed after corrective evidence, security review, full locked workspace tests, release preflight, governance validation, and diff check passed. |
-| I139 | Complete (inventory reconciled 2026-07-20) | Correction was committed/pushed, replayed from clean `main`, and released as v0.3.8. Removed from non-terminal inventory. |
-| I143 | Complete (maintainer acceptance 2026-07-20) | WEB-006-A/B/C closed after static gates and manual browser QA; Pages deployment remains separately observable. |
-| I144 | Complete (2026-07-20) | ARCH-034-A audit accepted; 20-item finding register filed; production remediation remains Proposed and unselected. Removed from non-terminal inventory. |
-| I145 | Complete (maintainer terminal acceptance 2026-07-22; `1039430`) | TUI-026 queued steering preview. Locked validation and real-terminal FIFO, `+N more`, queue-drain/clear, and Ctrl+C preview-cleanup acceptance passed; removed from the non-terminal inventory. |
-| I146 | Complete (maintainer slash-prefix retest 2026-07-22; `7f6972a`) | TUI-033 parameterless `/model` and `/connect` commands. `/mo` shows only `/model`; Tab completion remains intentionally non-executing and Enter opens the menu. |
-| I147 | Complete (maintainer terminal acceptance 2026-07-22; `1c843b2`) | MODEL-008-A custom provider wizard and atomic config. Implementation, locked validation, and the repaired real-terminal walkthrough passed; removed from the non-terminal inventory. |
-| I148 | Complete (maintainer terminal acceptance 2026-07-22; `f89313c`) | MODEL-008-B discovery/manual-fallback/immediate activation. The custom-provider discovery → selection → immediate activation flow and post-switch text turn passed; Completion Commit: `f89313c`. |
-| I149 | Complete (2026-07-20) | MODEL-009-A image input ADR and security spike. ADR-050 Accepted on all 10 points. Security review complete. No production image sending. I150 may proceed. Removed from non-terminal inventory. |
-| I150 | Complete (maintainer combined terminal acceptance 2026-07-22; `b3cc943`) | MODEL-009-B capability/content/persistence foundation. Supported/Unknown/Unsupported gating, successful attachment, safe history summary, and text-only regression accepted. Completion Commit: `b3cc943`. |
-| I151 | Complete (maintainer terminal acceptance 2026-07-22; `17e3fef`) | MODEL-009-C safe local image ingestion. Valid image attach and invalid non-image rejection were accepted in a real terminal; authorization, validation, decoder/pixel, digest, and adversarial evidence remain recorded. Completion Commit: `17e3fef`. |
-| I152 | Complete (maintainer walkthrough 2026-07-24; `17e3fef`, `65eb108`) | Provider/TUI/CLI image flow security remediation accepted. Live Anthropic-compatible provider walkthrough passed. Removed from non-terminal inventory. |
-| I153 | Complete (maintainer walkthrough 2026-07-24; `6ec5bbc`, `36b7ccc`) | Release-candidate evidence packet complete. Live Anthropic-compatible provider walkthrough passed. Removed from non-terminal inventory. |
-| I154 | Complete (maintainer walkthrough 2026-07-24; `faa5464`, `36b7ccc`) | P3 complete. Maintainer GO after independent verification. Commits `6d4677e`–`faa5464`; 40 new tests pass. Real-terminal walkthrough passed: `read_image` called by Supported model, safe summary in history, one-shot continuation. `image_input` config override added in `36b7ccc`. Removed from non-terminal inventory. |
-| I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
-| I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
-| I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
-| I076 | Complete | Closed 2026-07-01. Removed from non-terminal inventory. |
-| I077 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I078 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I079 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I080 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I081 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
-| I082 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
-| I083 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
-| I084 | Complete | UX100-UX106 complete and release-facing validation evidence recorded. Removed from non-terminal inventory after this release closeout. |
-| I085 | Complete (2026-07-12) | MC107 real-terminal walkthrough passed; removed from non-terminal inventory. |
-| I086 | Superseded before activation | Replaced by the changed post-v0.3.4 objectives in I116-I119. |
-| I102 | Complete | Month-1 developer operating plan closed 2026-07-08. D100-D104 delivered; architecture-review provider error chunk fix landed; 1791 workspace tests pass. I103 is the next to activate. |
-| I103 | Complete | Month-2 developer operating plan closed 2026-07-08. D110-D113 verified (all behavior shipped in I101). I104 is the next to activate. |
-| I104 | Complete | Month-3 developer operating plan closed 2026-07-08. D120-D123 verified (all behavior shipped in PERM-002/003, VALIDATION-001, TUI-015/019/025). I105 is the final iteration. |
-| I105 | Complete | Month-4 developer operating plan closed 2026-07-08. D130-D133 closed. GO for controlled local trial, NO-GO for v1.0 (REL-002 not met). Four-month plan complete. |
-| I106 | Complete (2026-07-12) | Delivery acceptance met; REL-002 evidence remains non-qualifying (external runtime). Removed from non-terminal inventory. |
-| I107 | Complete (2026-07-12) | Corrective delivery acceptance met; REL-002 evidence remains non-qualifying. Removed from non-terminal inventory. |
-| I108 | Complete (2026-07-12) | Architecture audit acceptance met; REL-002 evidence remains non-qualifying. Removed from non-terminal inventory. |
-| I109 | Complete (2026-07-12) | NO-GO closeout acceptance met; REL-002 remains unmet/partial. Removed from non-terminal inventory. |
-| I114 | Complete (2026-07-10) | TUI-028 #24/#25/#31/#39 accepted in native Alacritty; removed from the active selection set. I018-I020, I086-I089, and other planned work remain deferred or blocked as individually recorded; I028 was later superseded by I124-I127. |
-| I087 | Superseded before activation | Revised site-install acceptance moves to I118. |
-| I088 | Superseded before activation | Revised extension/ingestion acceptance moves to I118. |
-| I089 | Superseded before activation | Revised Talos-primary evidence/release decision moves to I119. |
-| I116 | Complete (2026-07-12) | State truth, operator smoke, and diagnostics status delivered. Removed from non-terminal inventory. I117 is the next to activate. |
-| I117 | Complete (2026-07-12) | Evidence wired; sign-off recorded. Removed from non-terminal inventory. |
-| I118 | Complete (2026-07-12) | LT032 fixture tests delivered (8/8 pass). Removed from non-terminal inventory. |
-| I119 | Complete (2026-07-12) | REL-002 re-audit NO-GO; two bounded packets non-qualifying; four-month plan complete. Removed from non-terminal inventory. |
-| I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
-| I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |
-| I093 | Complete | Closed 2026-07-04 with readiness/reporting only, non-qualifying REL-002 evidence, and no v1.0 claim, tag, publish, or release action. |
-| I094 | Complete | Closed 2026-07-04 with `gix 0.85.0`, unchanged feature scope, fallback matrix, and full validation. |
-| I095 | Complete | Closed 2026-07-04 with allowlisted validation evidence and full validation. |
-| I096 | Complete | Closed 2026-07-04 with narrow iteration-record preview/write gate and full validation. |
-| I097 | Complete | Closed 2026-07-04 with non-qualifying REL-002 evidence and explicit primary-executor boundary. |
-| I098 | Complete | Closed 2026-07-06 with read-only permission preflight and full validation. |
-| I100 | Complete | Closed 2026-07-06 with detector metadata, adapter-instruction tests, and internal governance mutation validation. |
-| I101 | Complete | Closed 2026-07-06 with MODEL-006 residuals complete, `gix 0.85.0` tracking updated, and non-qualifying REL-002 evidence recorded. |
-| I035 | Complete | Removed from non-terminal inventory. |
-| I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
-| I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
-| I041 | Active → Complete (2026-06-22) | Activated 2026-06-22; SESSION-001-B + SESSION-001-C + PERM-002 all landed; closed 4 weeks early; T9 TUI smoke boundary documented as residual. |
-| I043 | Active → Complete (2026-06-23) | Closed 2026-06-23. Bottom panel generalization + session picker + R1/R2 + TUI-008 all landed. Pre-closeout audit run. |
-| I044 | Active → Complete (2026-06-23) | Closed 2026-06-23. Six SESSION-002 consistency fixes + deletion all landed. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. |
-| I045 | Complete (2026-06-24) | Removed from non-terminal inventory (Complete record in I045 doc). |
-| I046 | Complete (2026-06-25) | Removed from non-terminal inventory (Complete record in I046 doc). |
+| I168 | Complete (2026-07-30) | Provider terminal outcome integrity; completion commit `86262d02`. |
+| I167 | Complete (2026-07-29) | Approval option contrast; implementation `3356aac`. |
+| I166 | Complete (2026-07-28) | Interrupt shortcut reliability; automated and maintainer Alacritty acceptance passed. |
+| I165 | Complete (2026-07-28) | Growing conversation composer continuity; all human acceptance cases passed. |
+| I164 | Paused (2026-07-28) | Startup-inline target superseded; no Completion Commit. |
+| I163 | Complete (2026-07-28) | Policy-controlled linked skill discovery. |
+| I157 | Complete (2026-07-30 correction) | Provider removal/credential clear stale-snapshot concurrency correction. |
+| I156 | Complete (2026-07-27) | Narrow-viewport and resize robustness; maintainer Alacritty walkthrough passed. |
 
-I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
-Complete/Superseded dispositions without erasing their published objectives.
+## I169 Activation Checklist
 
-### v0.6 Runtime Productization Program (2026-07-26)
+I169 may be selected only after all of the following are true at activation time:
 
-| Iteration | Current State | Disposition Before Next Activation |
-|---|---|---|
-| I156 | Complete — maintainer Alacritty walkthrough 2026-07-27 (`6909675`..`d4d95ad`) | TUI-035. All 4 walkthrough cases passed; all automated gates green. I156 closed. |
-| I163 | Complete (2026-07-28) | SKILL-003. Discovery policy, safe shared-root default, traversal bounds, TOCTOU correction, and isolated tests complete. |
-| I164 | Paused (2026-07-28) — superseded target | TUI-038. Published post-first-submit bottom-layout behavior retained as historical evidence; no Completion Commit. |
-| I165 | Complete (2026-07-28) | TUI-039. Composer follows short Logo/history flow; bottom-fixed on overflow. Implementation commits `8e6ffe9`, `dc52b21`, `97267a`. All 9 human acceptance cases PASS. |
-| I166 | Complete (2026-07-28) | TUI-036. Completion commits `d1a8759e`, `d85514ef`, `264ba8c0`; automated and maintainer Alacritty acceptance passed. |
-| I157 | Complete (2026-07-30 acceptance correction) | MODEL-010 stale-snapshot concurrency correction completed by `5aac6756`; earlier finalization evidence retained as historical. |
-| I167 | Complete (2026-07-29) | TUI-040. Completion implementation `3356aac`; scope was only unselected approval-option contrast. |
-| I158 | Review (2026-07-31) | ARCH-034-R01. Implementation and deterministic profile evidence are merged. Complete remains blocked on scheduler/status contribution exception ownership and final ARCHITECTURE/TOOL-003/F01 documentation. |
-| I159 | Blocked — I158 incomplete / TUI-037 undispositioned | ARCH-031-A. After I158 disposition, TUI-037 must receive a dedicated-iteration or explicit Blocked/Deferred disposition before I159 activation. |
-| I160 | Blocked — I159 incomplete | ARCH-031-B. Blocked until I159 Complete. |
-| I161 | Blocked — I160 incomplete and security reviewer not assigned | ARCH-031-C. Blocked until I160 Complete and an independent security review is scheduled. |
-| I162 | Blocked — I161 incomplete and version/readiness gate not authorized | ARCH-031-D. Blocked until I161 Complete and the version/readiness maintainer gate is authorized. Readiness only; no real publish. |
+- [ ] current `main` SHA and repository state have been re-read;
+- [ ] Issue #119, TUI-044, I169 and ADR-056 are re-read;
+- [ ] no overlapping active steering/session implementation or newer owner exists;
+- [ ] a fresh implementation branch is created from exact current `main`;
+- [ ] I169/TUI-044/Board are changed from Planned/Ready to Active before code mutation;
+- [ ] recovery PR #120 and branch `recovery/pr-68-i169-20260731` remain unchanged;
+- [ ] Windows/macOS exact-head CI and a rebuilt real-TUI acceptance plan remain part of the implementation gate.
 
-## Historical Execution Rounds
+## History
 
-These rounds are retained as historical execution evidence. They are not a current selection,
-planning, or activation owner.
+The prior full iteration registry and non-terminal inventory remain available at:
 
-The current execution sequence is the
-[v0.6 Runtime Productization Program](../tasks/2026-07-26-v0.6-runtime-productization-program.md)
-listed above.
+- [`archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md)
 
-I165 is Complete. TUI-039 is Complete. I164/TUI-038 is Paused.
-I166/TUI-036, I167/TUI-040, I157/MODEL-010, and I168/RUNTIME-003 are Complete.
-I164/TUI-038 remains Paused. I158/ARCH-034-R01 is in Review after implementation and deterministic profile evidence merged;
-I159-I162 remain Blocked, and TUI-037 still requires I158 Complete or Paused.
-I163/SKILL-003 and I156/TUI-035 are Complete. This historical table is not a
-current selection, planning, status, or activation owner.
-
-| Round | When | Work Items | Promotion Rule |
-|-------|------|------------|----------------|
-| R0: Remediation Gate | ✅ Done (2026-06-01) | `R0-remediation-gate.md` | All 7 ARCH stories closed; runtime evidence recorded |
-| R1: Review Closure | ✅ Done (2026-06-03) | `R1-review-closure.md` | I008/I009 Complete; I009 TUI consumer work in #I009-S6 |
-| R2: I010 Architecture Slice | ✅ Done (2026-06-03) | `I010-polished-agent.md` / Slice R2 | AppServerSession seam, TUI approval, inline mode. 532 tests |
-| R3: I010 Product Polish | ✅ Done (2026-06-04) | `I010-polished-agent.md` / Slice R3 | All 5 stories done (S1-S5); 567 tests; move I010 to Review/Complete |
-| R4: I013 Boundary Control | ✅ Done (2026-06-05) | `I013-boundary-control.md` | High-risk permission/provider boundaries have ADRs; logging R1 implemented |
-| R5: I014 TUI Completion | Done / Historical | `I014-tui-completion.md` | TUI provenance, `/plugins`, copy, and export workflows verified |
-| R6: I015 Provider Schema | After I014 or explicit provider priority | `I015-provider-schema.md` | Schema-only provider config foundation lands under ADR-013 |
-| R7: I016 Portable File And Search Tools | When environment-dependency reduction becomes release-critical | `I016-portable-file-search.md` | Native POSIX subset and search tools work on a minimal `PATH` |
-| R8: I017 Embedded Git Tools | After I016 or explicit Git priority | `I017-embedded-git-tools.md` | Git read-only tools target `gix` per ADR-010 |
-| R9: I018 Observability and Prompt Assets | Before memory/exploration prompt expansion | `I018-observability-prompt-assets.md` | Log files are bounded; built-in prompts are standalone embedded assets |
-| R10: I019 Layered Memory Foundation | Before durable research conclusions affect agent behavior | `I019-layered-memory-foundation.md` | Memory writes/retrieval are layered, bounded, and provenance-backed |
-| R11: I020 Exploration Library | After I019 or explicit research priority | `I020-exploration-library.md` | Research artifacts persist locally with sources, claims, synthesis, and storage Spike results |
-| R12: I021 Evolution MenteDB Realignment | ✅ Done (2026-06-06) | `I021-evolution-mentedb-realignment.md` | `talos-evolution` data structure aligned with MenteDB blueprint; 5 atomic commits landed; 615 tests pass; runtime regression confirmed |
-| R13: I022 TUI Inline-by-Default | ✅ Done (2026-06-08) | `I022-tui-inline-default.md` | Codex-style inline-by-default TUI landed; fixed viewport + scrollback flush + status bar tips. State model refactor deferred to I023. |
-| R14: I023 TUI State Model | ✅ Done (2026-06-12) | `I023-tui-state-model.md` | Review remediation closed: broadcast→mpsc non-lossy delivery, agent abort-on-cancel, SIGINT fallback, engine-owned mutation verified; workspace verification clean |
-| R15: I024 Conversation Context | ✅ Done (2026-06-13) | `I024-conversation-context.md`; `../roadmap/TWO-WEEK-HANDOFF-PLAN.md` | Agent receives session history in every turn; JSONL persists episodes; resume context and visible history are restored; residual long-session compaction/topology work is registered |
-| R16: Two-Week Handoff | ✅ Done (2026-06-18) | `../roadmap/TWO-WEEK-HANDOFF-PLAN.md`; `I024-conversation-context.md`; `../backlog/active/TUI-005-logo-splash.md` | TUI-005 in-scope splash delivered and corrected; README repositioned as user guide; I025-I029 closed follow-up tool, prompt, Git, and architecture cleanup slices. |
-| R17: Session Boundary Cleanup | ✅ Done (2026-06-19) | `I030-session-module-decomposition.md`; `../backlog/active/ARCH-008-session-module-decomposition.md` | `talos-session/src/lib.rs` decomposed without behavior change; session tests/clippy pass. |
-| R18: Skill And CLI Cleanup | ✅ Done (2026-06-19) | `I031-skill-and-cli-module-cleanup.md`; `../backlog/active/ARCH-009-skill-module-decomposition.md`; `../backlog/active/ARCH-010-cli-tools-module-cleanup.md` | ARCH-009 and ARCH-010 CLI slice complete; targeted tests/clippy pass. |
-| R19: Tools Cleanup | ✅ Done (2026-06-19) | `I032-tools-module-cleanup.md`; `../backlog/active/ARCH-010-cli-tools-module-cleanup.md` | `file_tools.rs` split before new tool growth; tool tests/clippy and workspace tests pass. |
-| R20: Runtime Skill Activation | Complete | `I033-runtime-skill-activation.md`; `../backlog/active/SKILL-001-runtime-skill-activation.md` | Real binary request-preview regression proves Level 0 discovery/injection; Level 1/2 execution uses SKILL-002 and a new iteration. |
-| R21: MCP Session Integration | Complete | `I034-mcp-session-integration.md`; `../backlog/active/MCP-001-session-mcp-integration.md` | Startup-stable MCP tools are model-visible, permission/provenance/status routed, and covered by real fixture evidence. |
-| R22: Agent Protocol Compatibility | ✅ Done (2026-06-19) | `I035-agent-protocol-compatibility-foundation.md`; `../backlog/active/AGENT-001-standard-agent-protocol-support.md`; `../proposals/standard-agent-protocol-support.md`; `../decisions/022-agent-config-compatibility-boundary.md` | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import landed. |
-| R23: Research Consolidation | ✅ Done (2026-06-20) | `I036-research-consolidation.md`; `../backlog/active/REMOTE-001-remote-session-protocol.md`; `../backlog/active/WEB-001-embedded-web-control-surface.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/OKF-001-native-okf-support.md`; `../backlog/active/MEM-005-context-compaction-policy.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md`; `../backlog/active/MODEL-002-local-micro-model-decision-layer.md`; `../backlog/active/DIST-001-optional-runtime-asset-distribution.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/STORE-001-zvec-storage-evaluation.md` | Research-heavy items are deduplicated into ADR candidates, deferred decisions, or executable follow-up stories; no implementation code changes. |
-| R24: Model Catalog Foundation | ✅ Done (2026-06-20) | `I038-model-catalog-foundation.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md` | Built-in model dataset + models.dev import; catalog-only, reasoning split to MODEL-003. |
-| R25: Network Tools & TUI Polish | ⏳ Active (2026-06-21) | `I039-network-tools-tui-polish.md` | WEBFETCH-001 Phase 0 (http_request) → TOOL-009 (web_search) ∥ TUI-011 (status bar) + TOOL-005 (bash streaming). |
-| R26: DATA/I019/I020 Two-Month Sequence | ✅ Done (2026-06-29) | `../tasks/2026-06-26-data-memory-exploration-two-month-plan.md`; all child iterations I049–I055 Complete; I056 Complete (v0.2.0 tag pushed); I019 Complete (all 6 acceptance closed); I020 Complete (S4 deferred per ADR-017) | All iterations now Complete. Release evidence: v0.1.2 and v0.2.0 tags both pushed and published. |
-| R27: High-Risk Governance Gate | In Progress (2026-06-27) | `../tasks/2026-06-27-personal-oversight-high-risk-roadmap.md`; `I047-v012-release-readiness-and-runtime-polish.md`; `I056-two-month-closeout-and-v020-readiness.md`; `I057-acceptance-remediation-and-release-gate.md`; `../backlog/active/SKILL-002-explicit-runtime-activation.md`; `../backlog/active/PERM-001-guardian-exec-policy.md`; `../backlog/active/MEM-007-active-context-compression.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/MODEL-003-reasoning-thinking-support.md` | Release gates, Skill activation, permission-sensitive work, context compression, web/document ingestion, and protocol/extension ADRs proceed only through governance gates; this does not grant any current executor personal approval authority. |
-| R28: Architect-Owned Four-Month High-Risk Execution | Complete (2026-07-04) | `../tasks/2026-07-04-architect-owned-four-month-high-risk-execution.md`; `I090-high-risk-ingestion-search-boundary.md`; `I091-plugin-hook-distribution-boundary.md`; `I092-context-compression-autonomy-gates.md`; `I093-self-bootstrap-runtime-release-gate.md`; `../reference/I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md` | Closed with REL-002 No-go and no publish/tag/release action. |
-| R29: High-Risk gix/Runtime/Governance Execution Set | Complete (2026-07-04) | `../tasks/2026-07-04-high-risk-execution-gix-runtime-governance-plan.md`; `../reference/I094-I097-HIGH-RISK-GIX-RUNTIME-GOVERNANCE-CLOSEOUT-2026-07-04.md`; `I094-gix-upgrade-git-boundary.md`; `I095-runtime-validation-evidence.md`; `I096-governance-mutation-gates.md`; `I097-controlled-self-bootstrap-rehearsal.md`; `../backlog/active/GIT-001-embedded-git-tools.md`; `../backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`; `../backlog/active/GOV-003-builtin-project-governance.md`; `../backlog/active/REL-002-v1-self-bootstrap-release-gate.md` | I094-I097 complete. `gix 0.85.0`, validation evidence, governance mutation gate, and non-qualifying REL-002 rehearsal are recorded. No publish, tag, release, permission-default change, or v1.0 claim occurred. |
+Individual plans and completion records remain under `docs/iterations/`; this compact index does not
+replace or rewrite them.
