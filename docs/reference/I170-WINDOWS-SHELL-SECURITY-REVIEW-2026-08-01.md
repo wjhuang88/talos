@@ -53,7 +53,7 @@ Required adversarial tests:
 
 The deadline future is created once before the `select!` loop and polled by mutable reference. Output branches only append bounded lines and update pipe-open state; they cannot recreate the timer.
 
-At expiry, Talos kills and waits for the direct child, drains remaining pipes, emits `[timeout]`, and returns an error. The design does not guarantee descendant termination on Windows or Unix when a shell launches detached/grandchild work.
+The one deadline remains active until both the direct child and its stdout/stderr pipes finish. At expiry, Talos kills and waits for the direct child when still running, preserves output already received, emits `[timeout]`, and returns without waiting for pipe EOF. This prevents descendants that inherited the handles from extending the operation timeout while making no descendant-termination claim.
 
 Required adversarial tests:
 

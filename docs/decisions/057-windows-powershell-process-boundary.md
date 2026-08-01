@@ -56,7 +56,7 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 
 - A single Tokio sleep future is created and pinned before stdout/stderr/wait arbitration.
 - Reading output cannot recreate or extend the deadline.
-- At the deadline Talos kills and waits for the direct child, drains bounded remaining pipe output, appends `[timeout]`, and returns a tool error.
+- The same deadline covers direct-child completion and stdout/stderr closure. Talos completes normally only after the direct child and both pipes finish; otherwise it kills/waits the direct child when still running, preserves output already received, appends `[timeout]`, and returns without waiting for descendant-held pipe EOF.
 - This is a direct-child guarantee only. It does not claim termination of every descendant process created by a shell command.
 
 ### Portable presentation and fixtures

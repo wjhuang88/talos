@@ -201,7 +201,16 @@ impl BashTool {
         let mut stdout_open = true;
         let mut stderr_open = true;
 
+        let mut completed_status = None;
         let exit_status = loop {
+            if completed_status.as_ref().is_some_and(Result::is_err)
+                || (completed_status.is_some() && !stdout_open && !stderr_open)
+            {
+                break completed_status
+                    .take()
+                    .expect("completed status checked above");
+            }
+
             tokio::select! {
                 line_result = stdout_reader.next_line(), if stdout_open => {
                     match line_result {
@@ -229,30 +238,17 @@ impl BashTool {
                         }
                     }
                 }
-                status = child.wait() => {
-                    // Drain any remaining output after child exits
-                    while let Ok(Some(line)) = stdout_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
-                    while let Ok(Some(line)) = stderr_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
-                    break status;
+                status = child.wait(), if completed_status.is_none() => {
+                    completed_status = Some(status);
                 }
                 _ = &mut deadline => {
-                    let _ = child.kill().await;
-                    let _ = child.wait().await;
-                    // Drain any remaining output after kill
-                    while let Ok(Some(line)) = stdout_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
+                    if completed_status.is_none() {
+                        let _ = child.kill().await;
+                        let _ = child.wait().await;
                     }
-                    while let Ok(Some(line)) = stderr_reader.next_line().await {
-                        output.push_str(&line);
-                        output.push('\n');
-                    }
+                    // Preserve output already received before the absolute deadline. Descendants
+                    // can inherit stdout/stderr handles and outlive the direct shell child, so
+                    // waiting for EOF here would defeat the operation timeout.
                     output.push_str("[timeout]");
                     return ToolResult::error(output);
                 }
@@ -1182,6 +1178,27 @@ mod tests {
         assert!(
             started.elapsed() < Duration::from_secs(2),
             "continuous output reset the timeout deadline"
+        );
+    }
+
+    #[tokio::test]
+    async fn timeout_does_not_wait_for_descendant_pipe_eof() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(300));
+        #[cfg(windows)]
+        let command = "$child = Start-Process powershell.exe -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 10' -NoNewWindow -PassThru; Start-Sleep -Seconds 10";
+        #[cfg(not(windows))]
+        let command = "sleep 10 &";
+        let started = std::time::Instant::now();
+
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("[timeout]"));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "absolute deadline waited for descendant-held pipe EOF"
         );
     }
 
