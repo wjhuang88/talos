@@ -8,8 +8,10 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::message::AgentEvent;
-use crate::message::Message;
+use crate::message::{AgentEvent, Message};
+use crate::submission::{
+    StructuredSubmission, SubmissionReceiptDisposition, SubmissionSource,
+};
 
 /// Commands sent to the session actor via the bounded SQ.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +27,10 @@ pub enum SessionOp {
     },
     /// Build a provider request preview for diagnostics without calling the provider.
     PreviewRequest { message: String },
+    /// Submit an immutable source-aware batch through the transactional Actor boundary.
+    SubmitStructured { submission: StructuredSubmission },
+    /// Reconcile a sent batch without creating a second execution authority.
+    ReconcileStructured { submission: StructuredSubmission },
     /// Replace the model-visible activated Skill context.
     ///
     /// The CLI/runtime layer is responsible for validating paths and budgets
@@ -47,6 +53,44 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Durable result of structured submission acceptance or reconciliation.
+    SubmissionReceipt {
+        /// Logical Session addressed by the operation.
+        session_id: String,
+        /// Runtime generation that owns the receipt.
+        session_generation: u64,
+        /// Stable batch identity.
+        submission_id: String,
+        /// Exact Engine reservation identity.
+        reservation_id: String,
+        /// Durable receipt identity, empty only for NotAccepted/rejection.
+        receipt_id: String,
+        /// Source used by Actor arbitration.
+        source: SubmissionSource,
+        /// Number of original recoverable items.
+        item_count: usize,
+        /// Aggregate UTF-8 text bytes; content is never included.
+        total_text_bytes: usize,
+        /// Durable, content-free receipt disposition.
+        disposition: SubmissionReceiptDisposition,
+    },
+    /// Generation-aware canonical lifecycle for a structured Actor-owned Turn.
+    StructuredTurnEvent {
+        /// Logical Session identity.
+        session_id: String,
+        /// Runtime generation that owns the Turn.
+        session_generation: u64,
+        /// Actor-owned batch identity.
+        submission_id: String,
+        /// Durable receipt identity.
+        receipt_id: String,
+        /// Stable actor-local Turn identity.
+        turn_id: String,
+        /// Monotonic sequence within this Turn, starting at zero.
+        sequence: u64,
+        /// Ordered lifecycle payload.
+        payload: TurnEventPayload,
+    },
     /// A durable embedded session has atomically committed a completed turn.
     ///
     /// Emitted only after durable storage reports success. Existing unbound
@@ -59,7 +103,7 @@ pub enum SessionEvent {
         /// Stable persisted entry IDs in transcript order.
         entry_ids: Vec<String>,
     },
-    /// Canonical ordered event for one user turn.
+    /// Canonical ordered event for one legacy user turn.
     ///
     /// In-tree runtime consumers must use this envelope instead of inferring
     /// user-turn lifecycle from provider-level [`AgentEvent::TurnStart`] or
@@ -96,7 +140,7 @@ pub enum SessionEvent {
     Error { message: String },
 }
 
-/// Ordered payload carried by [`SessionEvent::TurnEvent`].
+/// Ordered payload carried by canonical Turn events.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
@@ -217,14 +261,33 @@ fn default_model_context_limit() -> u32 {
 
 #[cfg(test)]
 #[allow(warnings)]
-#[allow(warnings)]
-#[allow(warnings)]
-#[allow(warnings)]
 mod tests {
     use super::*;
+    use crate::submission::{
+        PendingSubmissionState, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
+    };
+
+    fn structured_submission() -> StructuredSubmission {
+        StructuredSubmission {
+            batch_id: "batch_1".into(),
+            reservation_id: "reservation_1".into(),
+            transfer_attempt_id: "attempt_1".into(),
+            session_id: "session_1".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            items: vec![SubmissionItem {
+                item_id: "item_1".into(),
+                enqueue_sequence: 1,
+                kind: SubmissionKind::UserTurn,
+                text: "structured".into(),
+                attachments: Vec::new(),
+            }],
+        }
+    }
 
     #[test]
     fn session_op_serde_roundtrip() {
+        let submission = structured_submission();
         let ops = vec![
             SessionOp::Submit {
                 message: "hello".into(),
@@ -232,6 +295,10 @@ mod tests {
             SessionOp::PreviewRequest {
                 message: "diagnostic".into(),
             },
+            SessionOp::SubmitStructured {
+                submission: submission.clone(),
+            },
+            SessionOp::ReconcileStructured { submission },
             SessionOp::Interrupt,
             SessionOp::Shutdown,
         ];
@@ -248,8 +315,25 @@ mod tests {
     #[test]
     fn session_event_serde_roundtrip() {
         let events = vec![
-            SessionEvent::TurnEvent {
+            SessionEvent::SubmissionReceipt {
                 session_id: "session_1".into(),
+                session_generation: 7,
+                submission_id: "batch_1".into(),
+                reservation_id: "reservation_1".into(),
+                receipt_id: "receipt_1".into(),
+                source: SubmissionSource::User,
+                item_count: 1,
+                total_text_bytes: 10,
+                disposition: SubmissionReceiptDisposition::AlreadyAccepted {
+                    state: PendingSubmissionState::AcceptedPending,
+                    turn_id: None,
+                },
+            },
+            SessionEvent::StructuredTurnEvent {
+                session_id: "session_1".into(),
+                session_generation: 7,
+                submission_id: "batch_1".into(),
+                receipt_id: "receipt_1".into(),
                 turn_id: "turn_1".into(),
                 sequence: 0,
                 payload: TurnEventPayload::Started,
@@ -317,6 +401,25 @@ mod tests {
                 serde_json::to_value(&back).unwrap()
             );
         }
+    }
+
+    #[test]
+    fn rejected_receipt_is_content_free() {
+        let event = SessionEvent::SubmissionReceipt {
+            session_id: "session_1".into(),
+            session_generation: 7,
+            submission_id: "batch_1".into(),
+            reservation_id: "reservation_1".into(),
+            receipt_id: String::new(),
+            source: SubmissionSource::User,
+            item_count: 1,
+            total_text_bytes: 10,
+            disposition: SubmissionReceiptDisposition::Rejected {
+                reason: SubmissionRejectionReason::LimitExceeded,
+            },
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(!json.contains("structured"));
     }
 
     #[test]
