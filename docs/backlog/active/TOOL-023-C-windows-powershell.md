@@ -7,6 +7,23 @@
 **Depends on**: TOOL-023-A
 **Selected Iteration**: I170
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
+| Work Slice | TOOL-023-C within I170: one Windows PowerShell process/tool boundary, child environment scrub and portable presentation while preserving Unix behavior and current contribution ownership. |
+| Claimed At | 2026-08-01 |
+| Source Issue | #119 (I170 dependency recovery context) |
+| Governance Claim PR | #122 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #122 merged the I170 claim after exact-head governance, collaboration, remote-owner and CI validation; its recorded I170 slice explicitly includes Windows PowerShell and portability corrections. |
+| Implementation PR | #126 |
+| Last Updated | 2026-08-01 |
+| Handoff / Release Condition | Release only through the I170 claim owner after PR #126 merges and exact Completion Commit plus security/maintainer acceptance are recorded. |
+
 ## Problem
 
 The authoritative shell tool historically invoked `sh -c` and exposed `bash` on every platform. Stock Windows does not provide that process contract, so the registered write-capable shell was unusable and its tests encoded Unix-only assumptions.
