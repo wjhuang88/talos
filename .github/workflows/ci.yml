@@ -53,24 +53,24 @@ jobs:
               """        <h3>Shell escape hatch</h3>
                   <ul>
                     <li><code>bash</code></li>
-                  </ul>""".replace("          ", ""),
+                  </ul>""".replace("                  ", "        ").replace("                    ", "          "),
               """        <h3>Shell escape hatch</h3>
                   <ul>
                     <li><code>bash</code> &mdash; Unix, via <code>sh -c</code>.</li>
                     <li><code>powershell</code> &mdash; Windows, via <code>powershell.exe -NoProfile -NonInteractive</code>.</li>
-                  </ul>""".replace("          ", ""),
+                  </ul>""".replace("                  ", "        ").replace("                    ", "          "),
           )
           replace_once(
               "site/zh/capabilities.html",
               """        <h3>Shell 兜底</h3>
                   <ul>
                     <li><code>bash</code></li>
-                  </ul>""".replace("          ", ""),
+                  </ul>""".replace("                  ", "        ").replace("                    ", "          "),
               """        <h3>Shell 兜底</h3>
                   <ul>
                     <li><code>bash</code> &mdash; Unix，通过 <code>sh -c</code>。</li>
                     <li><code>powershell</code> &mdash; Windows，通过 <code>powershell.exe -NoProfile -NonInteractive</code>。</li>
-                  </ul>""".replace("          ", ""),
+                  </ul>""".replace("                  ", "        ").replace("                    ", "          "),
           )
 
           iterations = Path("docs/iterations/README.md")
