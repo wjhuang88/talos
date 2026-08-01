@@ -14,18 +14,20 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
+| Work Slice | TUI-044/I169 only: transactional structured steering queue transfer, lifecycle correlation, Actor arbitration, complete request budgets and durable replay parity after the merged I170 baseline. |
+| Claimed At | 2026-08-01 |
 | Source Issue | #119 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #123 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Repository owner explicitly instructed implementation to begin after the recovery audit on 2026-08-01; claim merge still requires exact-head CI, both governance validators, remote Issue/Owner reconciliation, merge-time CAS and no blocking review feedback. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish this claim on `main`; begin I169 implementation only after I170's required baseline is merged. |
+| Handoff / Release Condition | Release only by explicit maintainer handoff or after the separate I169 implementation PR is merged and completion evidence is recorded; implementation remains gated on merged I170. |
+
+The claim proposed by PR #123 is ineffective until this exact finalized record is merged into `main`.
 
 This Story replaces only the conflicting historical identifier. Current `TUI-041` remains owned by Issue #69 and must not be overwritten.
 
