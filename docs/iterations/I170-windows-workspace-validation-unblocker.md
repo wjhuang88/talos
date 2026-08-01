@@ -10,20 +10,20 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
+| Work Slice | I170 only: Windows PowerShell process boundary, absolute shell timeout, child environment scrub, portable path/long-list projections, and cross-platform fixture corrections on current main. |
+| Claimed At | 2026-08-01 |
 | Source Issue | #119 (dependency recovery context; I170 remains an independent implementation slice) |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #122 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Repository owner explicitly instructed implementation to begin after the current-main recovery audit on 2026-08-01; claim merge still requires exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish this claim on `main`; then implement only I170 from the resulting merge commit or a later `main`. |
+| Handoff / Release Condition | Release only by an explicit maintainer handoff or after an I170 implementation PR is merged and completion evidence is recorded. |
 
-The claim proposed by this branch is ineffective until the finalized record is merged into `main`.
+The claim proposed by PR #122 is ineffective until this exact finalized record is merged into `main`.
 
 ## Published Baseline
 
@@ -108,10 +108,11 @@ The claim proposed by this branch is ineffective until the finalized record is m
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-01 | Recovery audit | Current `main@c28fe6a6` still hardcodes `sh -c`, resets timeout sleeps inside the output loop, lacks Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
+| 2026-08-01 | Claim proposal | Draft governance PR #122 proposes the bounded I170 work slice. No production implementation may begin until the exact finalized claim is merged into `main`. |
 
 ## Verification Evidence
 
-- Pending claim merge and implementation.
+- Pending exact-head claim CI and governance validation.
 
 ## Completion Evidence
 
