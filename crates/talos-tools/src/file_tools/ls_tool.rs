@@ -173,11 +173,7 @@ fn is_hidden_entry(name: &std::ffi::OsStr) -> bool {
 }
 
 fn format_entry(path: &Path, root: &Path, long: bool) -> String {
-    let display = path
-        .strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string();
+    let display = crate::workspace_relative_display(path, root);
 
     if long {
         return format_entry_long(path, &display);
@@ -244,9 +240,17 @@ fn format_entry_long(path: &Path, display: &str) -> String {
 
 #[cfg(not(unix))]
 fn format_entry_long(path: &Path, display: &str) -> String {
-    let meta = std::fs::symlink_metadata(path).ok();
-    let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-    format!("-         {size:>8}  {display}")
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(_) => return format!("?---------          -  {display}"),
+    };
+    let type_char = if meta.is_dir() { 'd' } else { '-' };
+    let permissions = if meta.permissions().readonly() {
+        "r--------"
+    } else {
+        "rw-------"
+    };
+    format!("{type_char}{permissions}  {:>8}  {display}", meta.len())
 }
 
 #[cfg(unix)]
