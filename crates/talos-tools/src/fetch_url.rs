@@ -423,6 +423,9 @@ mod tests {
             match listener.accept() {
                 Ok((stream, _)) => {
                     stream
+                        .set_nonblocking(false)
+                        .expect("set accepted stream blocking failed");
+                    stream
                         .set_read_timeout(Some(TEST_SERVER_TIMEOUT))
                         .expect("set_read_timeout failed");
                     stream
