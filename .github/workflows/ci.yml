@@ -54,6 +54,50 @@ jobs:
       - name: Release preflight
         run: ./scripts/release_preflight.sh
 
+  windows-rust:
+    name: Windows Rust workspace
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Check workspace
+        run: cargo check --workspace --locked
+
+      - name: Clippy workspace
+        run: cargo clippy --workspace --locked -- -D warnings
+
+      - name: Focused PowerShell process and timeout tests
+        run: |
+          cargo test -p talos-tools --locked platform_command_removes_dangerous_environment_variables -- --nocapture
+          cargo test -p talos-tools --locked continuous_output_does_not_reset_timeout_deadline -- --nocapture
+          cargo test -p talos-tools --locked test_shell_metacharacters_pipe -- --nocapture
+
+      - name: Test workspace
+        run: cargo test --workspace --locked
+
+      - name: Validate project governance
+        shell: pwsh
+        run: ./scripts/validate_project_governance.ps1 .
+
+      - name: Validate collaboration claims
+        shell: bash
+        run: ./scripts/validate_collaboration_claims.sh .
+
+      - name: Rebuilt CLI mock smoke
+        run: cargo run -p talos-cli --locked -- --mock --print --no-init --no-context "windows shell portability smoke"
+
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation
     runs-on: ubuntu-latest
