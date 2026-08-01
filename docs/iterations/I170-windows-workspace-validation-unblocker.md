@@ -39,6 +39,7 @@
 - Historical exact head: `e1da5dd893418a3f6e3737ec900aabe9967b1dda`.
 - Historical branch: `recovery/pr-78-i170-20260731`; it must not be rebased, rewritten, or used for continued development.
 - Governance claim merged at `455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; PR #126 starts from that exact current-main baseline.
+- The implementation branch merged current `main@5520800be081447663cb690ba78fd17d1374e01e` without rebasing or rewriting its existing commits.
 - TUI-044/I169 current owner chain was established by merged governance PR #123 at `ba5a564b4be81366bc3d3e68fd83e7c1d8ce3a4f`; I170 remains an independent prerequisite implementation slice.
 - Recovery classification: behavior remains missing; old CLI registration shape is superseded by the current `talos-tools` contribution and outer composition architecture.
 
@@ -47,7 +48,7 @@
 - Keep Unix/non-Windows `bash`, `sh -c`, ADR-007 pre-exec hardening, permission nature and shell family unchanged.
 - Present `powershell` on Windows and invoke `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`.
 - Remove dangerous inherited environment names in child command configuration on every platform without mutating the parent process.
-- Enforce timeout with one absolute deadline; timeout may not reset when stdout or stderr produces a line.
+- Enforce one absolute deadline across direct-child execution and stdout/stderr completion; output activity and descendant-held pipe handles may not extend it.
 - Integrate the platform shell through the single authoritative `talos-tools` contribution path and preserve outer permission wrapping and presentation filtering.
 - Normalize protocol-visible workspace-relative file/search paths to `/`.
 - Define deterministic Windows long-list type/permission projection without inventing Unix ownership, link count, or executable bits.
@@ -64,7 +65,7 @@
 - Windows exposes exactly one permission-wrapped shell contribution named `powershell`; Unix exposes exactly one named `bash`.
 - Windows executes native PowerShell commands and returns stdout, stderr, exit status and bounded timeout evidence.
 - Unix continues to execute through `sh -c` with the existing hardening contract.
-- One absolute timeout governs spawn/output/wait; output activity cannot extend the deadline.
+- One absolute timeout governs spawn/output/wait and pipe completion; output activity and descendant-held handles cannot extend the deadline.
 - Dangerous environment names are absent from the child and remain unchanged in the Talos parent.
 - Windows recursive `ls`, glob and grep paths use `/`; long listing begins with one type character and nine conservative permission characters.
 - Cross-platform fixtures compile and run without broad skips or reduced assertions.
@@ -77,6 +78,7 @@
 - `cargo clippy --workspace --locked -- -D warnings`
 - `cargo test --workspace --locked`
 - focused `talos-tools`, permission, MCP and CLI shell tests on Unix and Windows
+- direct-child completion plus descendant-held-pipe timeout regression on Unix and Windows
 - `git diff --check`
 - `scripts/validate_project_governance.sh .`
 - `scripts/validate_collaboration_claims.sh .`
@@ -98,6 +100,7 @@
 ### Risks And Rollback
 
 - Risk: platform naming diverges from permission or contribution identity. Gate every inventory and wrapper surface.
+- Risk: direct-child exit does not imply inherited pipes are closed. Keep the absolute deadline active until direct-child completion and both pipes finish; at expiry return without waiting for descendant-held EOF.
 - Risk: direct-child kill does not supervise descendants. Keep that residual explicit; do not claim process-tree termination.
 - Risk: restoring historical registry code creates duplicate contributions. Use only current contribution factories.
 - Rollback: revert the I170 implementation commits and retain the prior Unix-only shell baseline; never rewrite the recovery branch.
@@ -109,13 +112,18 @@
 | 2026-08-01 | Recovery audit | Current main still hardcoded `sh -c`, reset timeout sleeps inside the output loop, lacked Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
 | 2026-08-01 | Claim | Governance PR #122 merged after exact-head release preflight, Windows fixture, collaboration and remote owner validation. |
 | 2026-08-01 | Activation | Created `fix/i170-windows-shell-portability-20260801` from exact `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; no recovery branch was modified. |
-| 2026-08-01 | Implementation slice | Added platform shell identity/process construction, child env scrub, one absolute timeout, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
-| 2026-08-01 | Draft handoff | Opened Draft PR #126. Contribution inventory, remaining hard-coded consumers, fixtures, ADR/security evidence and platform CI remain in progress. |
+| 2026-08-01 | Implementation slice | Added platform shell identity/process construction, child env scrub, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
+| 2026-08-01 | Current-main refresh | Merged `main@5520800be081447663cb690ba78fd17d1374e01e` into the implementation branch as a normal two-parent merge after Issue #124/#125 reconciliation. |
+| 2026-08-01 | Validation finding | macOS release preflight and Windows format/check/Clippy plus focused PowerShell tests passed on an earlier Head; the full Windows workspace test job exposed remaining platform assumptions and is not final evidence. |
+| 2026-08-01 | Security correction | Audit found that waiting for pipe EOF after direct-shell exit can let descendants extend the operation beyond its deadline. The active correction keeps one deadline over both process completion and pipe closure and adds a descendant-held-pipe regression. |
+| 2026-08-01 | Draft handoff | Draft PR #126 remains open and unmergeable by policy until the stronger deadline correction, complete Windows workspace tests, rebuilt platform evidence, security acceptance and exact-head review pass. |
 
 ## Verification Evidence
 
 - Claim-head release preflight, format/check/Clippy/tests, Windows installer fixture and remote Issue/Owner reconciliation passed before activation.
-- Implementation exact-head CI for PR #126 is pending and historical recovery validation is not reused as current evidence.
+- On a non-final PR #126 Head, macOS release preflight passed; Windows format, workspace check, Clippy and focused PowerShell/environment/continuous-output timeout tests passed.
+- The same non-final Windows run failed during full workspace tests. No test is deleted, ignored or weakened; exact failing cases must be repaired and rerun on the final Head.
+- Implementation exact-head CI for PR #126 remains pending, and historical recovery validation is not reused as current evidence.
 
 ## Completion Evidence
 
@@ -125,6 +133,7 @@
 
 - ADR-057 and all historical validation claims remain proposed evidence only until re-established on a fresh exact head.
 - Process-tree supervision remains outside I170 and must not be inferred from direct-child timeout handling.
+- The absolute operation deadline must remain bounded even when an unsupervised descendant inherits the direct shell child's stdout/stderr handles.
 
 ## Retrospective
 
