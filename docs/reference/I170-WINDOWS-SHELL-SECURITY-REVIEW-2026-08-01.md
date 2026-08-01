@@ -19,6 +19,7 @@ Recovery PR #121 and historical head `e1da5dd893418a3f6e3737ec900aabe9967b1dda` 
 | Threat | Boundary | Required control |
 |---|---|---|
 | Model or user invokes arbitrary shell mutation | Permission pipeline | Execute/Shell facets, exact resources for complex/high-risk commands, no registration bypass |
+| PowerShell computes a path outside cwd while receiving a reusable cwd grant | Permission resource classification | Explicit inert-token allowlist on Windows; grouping/call/array/variable/member/provider forms fail closed to exact resources |
 | Windows receives POSIX shell assumptions | Prompt/tool definition | Present only `powershell`; no command translation |
 | Child inherits injection/loader/runtime variables | Process spawn | Child-local removal of the canonical dangerous-name set |
 | Parent environment is changed concurrently | Talos process | Never call parent `set_var`/`remove_var`; use `Command::env_remove` |
@@ -67,13 +68,18 @@ Required adversarial tests:
 
 `BashTool` retains `Execute` / `Shell`. The platform name is used in contribution inventory, permission resource prefixes/descriptions, prompts, MCP listing and output compression. No PowerShell-specific auto-allow parser is introduced; complex/unknown commands remain exact.
 
+Windows reusable parameter templates use an explicit token allowlist rather than an expanding syntax denylist. Only ASCII alphanumeric characters plus `-`, `_`, `.`, `/`, and `=` are eligible before the existing parent/absolute-path checks run. Parentheses, call operators, script blocks, arrays, variables, member/index expressions, quoting, backslashes, wildcard syntax, home expansion and drive/provider tokens therefore receive exact resources. This is intentionally conservative until a reviewed PowerShell lexer/parser exists.
+
 Required checks:
 
 - exactly one shell contribution exists in each profile;
 - Windows inventory is `powershell` plus `exec`, Unix inventory is `bash` plus `exec`;
 - no CLI registry constructs an additional shell tool;
 - denied shell calls remain denied through MCP and product modes;
-- high-risk commands do not acquire reusable permission templates merely because of the platform rename; drive/provider paths and `$`/`~` expansion fall back to exact resources.
+- ordinary reviewed relative path/option tokens can retain cwd-scoped templates;
+- `cat (Join-Path (Get-Item ..).FullName secret.txt)` receives an exact resource;
+- representative call-operator, array, member/index, variable and concatenation forms receive exact resources;
+- drive/provider paths and `$`/`~` expansion remain exact.
 
 ### Portable output and fixtures
 
@@ -85,27 +91,28 @@ Windows long-list metadata deliberately avoids Unix owner/link/executable claims
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| I170-S1 | High | A second Windows shell registration would bypass the authoritative contribution inventory. | Automated evidence complete: one authoritative contribution and platform-sorted product inventories passed on Windows and macOS. |
-| I170-S2 | High | A timeout created inside the output loop can be extended indefinitely. | Automated evidence complete: continuous output and descendant-held-pipe regressions passed under one deadline on Windows and Unix/macOS. |
-| I170-S3 | High | Parent-side environment mutation would race concurrent process execution. | Implementation and command-builder evidence complete: all canonical names are removed child-locally with no parent mutation; independent reviewer confirmation remains required. |
+| I170-S1 | High | A second Windows shell registration would bypass the authoritative contribution inventory. | Automated evidence complete on the prior exact head: one authoritative contribution and platform-sorted product inventories passed on Windows and macOS; final review-fix head must repeat the gate. |
+| I170-S2 | High | A timeout created inside the output loop can be extended indefinitely. | Automated evidence complete on the prior exact head: continuous output and descendant-held-pipe regressions passed under one deadline on Windows and Unix/macOS; final review-fix head must repeat the gate. |
+| I170-S3 | High | Parent-side environment mutation would race concurrent process execution. | Implementation and command-builder evidence complete on the prior exact head: all canonical names are removed child-locally with no parent mutation; final exact-head rerun and independent reviewer confirmation remain required. |
 | I170-S4 | Medium | Direct-child kill does not guarantee descendant termination. | Accepted residual only if PR/docs make no stronger claim; maintainer/security acceptance pending. |
-| I170-S5 | Medium | PowerShell command classification reuses conservative shell heuristics rather than a PowerShell parser. | Automated permission evidence complete: unknown/control, drive/provider and `$`/`~` expansion remain exact resources. |
-| I170-S6 | Medium | Platform output normalization could conceal authorization path changes. | Automated evidence complete: normalization occurs after authorized resolution; document fixtures stay inside explicit workspaces while external paths remain rejected. |
-| I170-S7 | Medium | Windows CI previously validated only installer fixtures. | Automated evidence complete on `1ca536159c34437719e4f776db2e02e4afc8510d` / run `30686493121`: full Windows Rust workspace, governance and rebuilt CLI smoke passed. |
+| I170-S5 | High | PowerShell grouping and computed-path expressions could receive a reusable cwd-scoped template under the prior token denylist. | Review blocker addressed in code by an explicit Windows inert-token allowlist plus computed-expression regressions. Exact-head CI and separate independent re-review are required before acceptance. |
+| I170-S6 | Medium | Platform output normalization could conceal authorization path changes. | Automated evidence complete on the prior exact head: normalization occurs after authorized resolution; document fixtures stay inside explicit workspaces while external paths remain rejected. Final review-fix head must repeat the gate. |
+| I170-S7 | Medium | Windows CI previously validated only installer fixtures. | Prior exact-head CI demonstrated the full Windows Rust workspace, governance and rebuilt CLI smoke. The review fix invalidates that evidence and requires a complete rerun on the final head. |
 
 ## Required Evidence Before Merge
 
 - exact final Head SHA recorded in I170 and PR #126;
 - macOS release preflight passes format/check/Clippy/full tests/governance;
 - Windows job passes format/check/Clippy/full locked workspace tests;
-- focused Windows PowerShell process, env and absolute-timeout tests pass;
+- focused Windows PowerShell process, env, permission allowlist and absolute-timeout tests pass;
 - focused Unix shell/hardening regressions pass;
 - MCP and permission tests prove actual platform identity and denial routing;
 - `git diff --check`, collaboration claim and remote Issue/Owner reconciliation pass;
 - rebuilt Windows direct PowerShell walkthrough records command, stdout/stderr, exit code, working directory and timeout behavior;
 - rebuilt Unix CLI mock smoke passes;
+- an independent reviewer verifies the computed-expression examples receive exact resources on the final Head;
 - no unresolved review thread or unreviewed high-severity finding remains.
 
 ## Merge Recommendation
 
-**Automated gate passed; independent approval pending.** Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121`. PR #126 remains Draft until the Review synchronization Head repeats the gates and an independent process/security plus maintainer review accepts I170-S3/I170-S4 and ADR-057. Historical recovery PR #121 is provenance only.
+**Changes requested; review fix implemented, exact-head validation and independent re-review pending.** The prior automated result and walkthrough artifact apply only to the superseded Head. PR #126 must remain Draft until the final review-fix Head repeats every required CI/artifact gate and an independent process/security reviewer plus maintainer accepts I170-S3, I170-S4, I170-S5 and ADR-057. Historical recovery PR #121 remains provenance only.
