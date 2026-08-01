@@ -1,104 +1,65 @@
-# TOOL-023-A: Fix Bash Timeout Defeated by Continuous Output
+# TOOL-023-A: Fix Shell Timeout Defeated by Continuous Output
 
-**Status**: Ready (2026-07-24)
+**Status**: In Progress — implemented in Draft PR #126; exact-head cross-platform validation pending (2026-08-01)
 **Priority**: P1
 **Parent Epic**: TOOL-023
 **Type**: Technical Story (bug fix)
 **Depends on**: none
+**Selected Iteration**: I170
 
 ## Problem
 
-`crates/talos-tools/src/bash_tool.rs::run_command` runs this shape:
-
-```rust
-let exit_status = loop {
-    tokio::select! {
-        line = stdout_reader.next_line() => { ... }   // resets loop
-        line = stderr_reader.next_line() => { ... }   // resets loop
-        status = child.wait() => { break status; }
-        _ = tokio::time::sleep(timeout_duration) => { kill; return timeout }
-    }
-};
-```
-
-`tokio::time::sleep(timeout_duration)` is created fresh on every loop iteration.
-Whenever a stdout/stderr line arrives, `select!` returns, the loop re-iterates, and
-the timer is dropped and restarted. A subprocess that prints a line more frequently
-than `timeout_duration` (progress logs, `tail -f`, a retry loop, a chatty hung
-network client) **never hits the timeout** and the tool hangs unbounded. This is the
-user-reported "shell calls sometimes hang for an unbounded time".
-
-`exec_tool.rs` (lines ~718–733) shows the correct pattern: pipe readers run in
-detached `tokio::spawn` tasks and the deadline is a single-shot
-`select! { child.wait(), sleep(timeout) }` outside any loop.
+The historical shell loop created `tokio::time::sleep(timeout_duration)` inside each `select!` iteration. Every stdout/stderr line dropped and recreated the timer, so a chatty child could evade the advertised timeout indefinitely.
 
 ## Goal / Value
 
-`bash` enforces its timeout as an absolute wall-clock deadline from spawn,
-independent of how often the child writes output. Restores the safety guarantee the
-tool already claims to provide.
+The platform shell escape hatch enforces one absolute wall-clock deadline from spawn, independent of output frequency, while preserving partial output and direct-child cleanup.
 
 ## Scope
 
-- Restructure `bash_tool.rs::run_command` so the timeout is a single-shot deadline
-  measured from spawn, not reset by output. Prefer the `exec` pattern (detached
-  bounded readers + one `select!`), or wrap the read loop in `tokio::time::timeout`;
-  whichever is chosen must still kill the child and drain already-produced output on
-  expiry, preserving the current `[timeout]` marker and drain-after-kill behavior.
-- Kill semantics: on Unix the existing `child.kill()` targets the direct `sh` child.
-  Document (do not necessarily implement in this story) whether orphaned grandchild
-  processes survive; if process-group kill is needed it is recorded as a residual.
+- Create and pin one deadline before stdout/stderr/wait arbitration.
+- Preserve current timeout range/default, output header, exit code and `[timeout]` projection.
+- Kill and wait for the direct child at expiry, then drain already-produced output.
+- Keep Unix `sh -c` hardening unchanged and share the repaired loop with Windows PowerShell.
+- Record descendant process-tree supervision as an explicit residual rather than overstating direct-child kill.
 
 ## Exclusions
 
-- No timeout default change (that is TOOL-023-B).
-- No Windows shell change (that is TOOL-023-C).
-- No new dependency; use `tokio` primitives already in the workspace.
+- No timeout default/configuration change (TOOL-023-B).
+- No process-group or Windows Job Object implementation.
+- No I169 steering behavior.
 
 ## Decision Links And Constraints
 
-- ADR-009 (external dependencies must not crash the process): the kill+drain path
-  must degrade gracefully, never panic.
+- ADR-007 preserves Unix pre-exec hardening.
+- ADR-057 defines the cross-platform process and direct-child timeout boundary.
+- External process failures return bounded tool errors; they do not crash Talos.
 
-## Uncertainty And Validation Path
+## State / Status Owners
 
-Regression must reproduce the hang deterministically: a fake command that emits a
-line every N ms and never exits, with a timeout < total runtime, must return the
-`[timeout]` error within a bound close to the deadline.
+- Story status and acceptance: this file.
+- Execution/evidence: `docs/iterations/I170-windows-workspace-validation-unblocker.md`.
+- Process decision: `docs/decisions/057-windows-powershell-process-boundary.md`.
+- Implementation: Draft PR #126.
 
-## State/Status Owners
+## Acceptance For Behavior
 
-This story file; parent `TOOL-023`; `docs/BOARD.md` mirror.
+- A child emitting output repeatedly still returns `[timeout]` near the configured absolute duration.
+- Output produced before expiry remains in the result.
+- A child exiting normally preserves complete output and actual exit code.
+- Timeout kills and reaps the direct child before returning.
+- Output activity, pipe closure or stderr activity cannot restart the deadline.
 
-## User-Facing Documentation
+## Acceptance For Technical Work
 
-None (behavior returns to what docs already promise). If the README bash timeout
-wording implies output resets the timer, correct it; otherwise no doc change.
+- [x] One pinned deadline replaces per-iteration sleeps.
+- [x] Fixed regression test emits continuous output and asserts a bounded timeout.
+- [x] Partial-output timeout behavior is tested.
+- [x] Direct-child/process-tree limitation is documented in ADR-057 and the security review.
+- [ ] Exact final Head passes focused Unix and Windows tests.
+- [ ] Exact final Head passes full locked workspace format/check/Clippy/tests on macOS and Windows.
+- [ ] Governance, collaboration, release preflight and review gates pass.
 
-## Required Reads
+## Residual Destination
 
-- `crates/talos-tools/src/bash_tool.rs`
-- `crates/talos-tools/src/exec_tool.rs` (reference timeout implementation)
-
-## Acceptance for behavior
-
-- Given a subprocess that prints a line every 100ms and never exits, and a bash tool
-  timeout of 1s
-  When the model invokes `bash` on that command
-  Then the tool returns a `[timeout]` error within a small bound of 1s (not
-  unbounded), the child is killed, and output produced before the deadline is
-  present in the result.
-
-- Given a subprocess that exits normally in under the timeout while producing output
-  When invoked via `bash`
-  Then the tool returns the full output and the real exit code (no regression to the
-  success path).
-
-## Acceptance for technical work
-
-- [ ] A new test in `bash_tool.rs` reproduces the continuous-output hang and asserts
-      the timeout fires (test would fail/hang against the current code).
-- [ ] `cargo test -p talos-tools --locked` passes.
-- [ ] `cargo clippy --workspace --locked -- -D warnings` clean.
-- [ ] Parent `TOOL-023` and Board status synchronized.
-- [ ] Grandchild-process kill scope recorded as residual if not addressed.
+Descendant process-tree supervision belongs to a separately reviewed process-runtime/TOOL-024 slice. I170 must not claim it through direct-child `kill()`.
