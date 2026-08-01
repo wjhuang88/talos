@@ -85,13 +85,13 @@ Windows long-list metadata deliberately avoids Unix owner/link/executable claims
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| I170-S1 | High | A second Windows shell registration would bypass the authoritative contribution inventory. | Addressed by reusing `bash_tool_contribution`; exact-head inventory tests pending. |
-| I170-S2 | High | A timeout created inside the output loop can be extended indefinitely. | Addressed by one pinned deadline; exact-head Windows/Unix tests pending. |
-| I170-S3 | High | Parent-side environment mutation would race concurrent process execution. | Addressed by child-local `env_remove`; child-observation evidence pending. |
+| I170-S1 | High | A second Windows shell registration would bypass the authoritative contribution inventory. | Automated evidence complete: one authoritative contribution and platform-sorted product inventories passed on Windows and macOS. |
+| I170-S2 | High | A timeout created inside the output loop can be extended indefinitely. | Automated evidence complete: continuous output and descendant-held-pipe regressions passed under one deadline on Windows and Unix/macOS. |
+| I170-S3 | High | Parent-side environment mutation would race concurrent process execution. | Implementation and command-builder evidence complete: all canonical names are removed child-locally with no parent mutation; independent reviewer confirmation remains required. |
 | I170-S4 | Medium | Direct-child kill does not guarantee descendant termination. | Accepted residual only if PR/docs make no stronger claim; maintainer/security acceptance pending. |
-| I170-S5 | Medium | PowerShell command classification reuses conservative shell heuristics rather than a PowerShell parser. | Acceptable only because unknown/control syntax remains exact; permission regression evidence pending. |
-| I170-S6 | Medium | Platform output normalization could conceal authorization path changes. | Addressed by applying normalization after authorized resolution; focused path tests pending. |
-| I170-S7 | Medium | Windows CI previously validated only installer fixtures. | Addressed by adding a full Windows Rust workspace job; exact-head result pending. |
+| I170-S5 | Medium | PowerShell command classification reuses conservative shell heuristics rather than a PowerShell parser. | Automated permission evidence complete: unknown/control, drive/provider and `$`/`~` expansion remain exact resources. |
+| I170-S6 | Medium | Platform output normalization could conceal authorization path changes. | Automated evidence complete: normalization occurs after authorized resolution; document fixtures stay inside explicit workspaces while external paths remain rejected. |
+| I170-S7 | Medium | Windows CI previously validated only installer fixtures. | Automated evidence complete on `1ca536159c34437719e4f776db2e02e4afc8510d` / run `30686493121`: full Windows Rust workspace, governance and rebuilt CLI smoke passed. |
 
 ## Required Evidence Before Merge
 
@@ -108,4 +108,4 @@ Windows long-list metadata deliberately avoids Unix owner/link/executable claims
 
 ## Merge Recommendation
 
-**Not yet approved.** PR #126 must remain Draft until the evidence above is complete. Historical Windows workspace success from recovery PR #121 is not current-head evidence.
+**Automated gate passed; independent approval pending.** Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121`. PR #126 remains Draft until the Review synchronization Head repeats the gates and an independent process/security plus maintainer review accepts I170-S3/I170-S4 and ADR-057. Historical recovery PR #121 is provenance only.

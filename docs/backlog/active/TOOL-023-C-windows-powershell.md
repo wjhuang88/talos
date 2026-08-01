@@ -1,6 +1,6 @@
 # TOOL-023-C: Windows-Native Shell (PowerShell)
 
-**Status**: In Progress — implemented in Draft PR #126; exact-head cross-platform validation and security acceptance pending (2026-08-01)
+**Status**: Review — implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed cross-platform automation in CI run `30686493121`; independent process/security and maintainer acceptance remain pending (2026-08-01)
 **Priority**: P2
 **Parent Epic**: TOOL-023
 **Type**: Product / State Story
@@ -83,8 +83,9 @@ Windows users receive one native, permission-gated `powershell` tool while Unix 
 - [x] README EN/zh-CN platform behavior updated.
 - [x] ADR-057 and current security review recorded as Proposed/Review.
 - [x] A full Windows Rust CI job covers format/check/Clippy/focused tests/full workspace/governance/mock smoke.
-- [ ] Exact final Head passes Windows and macOS/Unix CI.
-- [ ] Rebuilt Windows walkthrough evidence and independent security/maintainer acceptance are recorded.
+- [x] Implementation Head passes Windows and macOS/Unix CI.
+- [x] Native PowerShell process/permission/deadline tests and rebuilt Windows CLI mock smoke are recorded in CI run `30686493121`.
+- [ ] Independent process/security and maintainer acceptance are recorded.
 
 ## Residual Destination
 

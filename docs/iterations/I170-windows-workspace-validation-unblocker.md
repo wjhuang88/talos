@@ -1,6 +1,6 @@
 # Iteration I170: Windows Workspace Validation Unblocker
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-01
 > Planned objective: restore the still-missing Windows-native shell and cross-platform workspace validation behavior preserved by recovery PR #121, without mixing I169 steering semantics or restoring obsolete registration code.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -114,16 +114,19 @@
 | 2026-08-01 | Activation | Created `fix/i170-windows-shell-portability-20260801` from exact `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`; no recovery branch was modified. |
 | 2026-08-01 | Implementation slice | Added platform shell identity/process construction, child env scrub, portable `ls`/grep/glob paths, conservative Windows long-list projection, and Agent support for PowerShell output. |
 | 2026-08-01 | Current-main refresh | Merged `main@5520800be081447663cb690ba78fd17d1374e01e` into the implementation branch as a normal two-parent merge after Issue #124/#125 reconciliation. |
-| 2026-08-01 | Validation finding | macOS release preflight and Windows format/check/Clippy plus focused PowerShell tests passed on an earlier Head; the full Windows workspace test job exposed remaining platform assumptions and is not final evidence. |
+| 2026-08-01 | Validation correction | Earlier Windows full-workspace failures exposed platform-sorted inventory expectations and document fixtures outside their explicit workspace. Expected inventories now sort independently, successful document fixtures execute inside their own workspace, and external-path rejection remains unchanged. |
 | 2026-08-01 | Security correction | Audit found that waiting for pipe EOF after direct-shell exit can let descendants extend the operation beyond its deadline. The active correction keeps one deadline over both process completion and pipe closure and adds a descendant-held-pipe regression. |
-| 2026-08-01 | Draft handoff | Draft PR #126 remains open and unmergeable by policy until the stronger deadline correction, complete Windows workspace tests, rebuilt platform evidence, security acceptance and exact-head review pass. |
+| 2026-08-01 | Automated review gate | Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121`: macOS release preflight; Windows format/check/Clippy, focused PowerShell/permission/deadline tests, complete locked workspace tests, project governance, collaboration claims and rebuilt CLI mock smoke; remote Issue/Owner reconciliation; and the Windows installer fixture. |
+| 2026-08-01 | Review handoff | PR #126 remains Draft until this documentation synchronization Head repeats the same exact-head gates and independent process/security plus maintainer review accepts ADR-057 and the direct-child residual. |
 
 ## Verification Evidence
 
-- Claim-head release preflight, format/check/Clippy/tests, Windows installer fixture and remote Issue/Owner reconciliation passed before activation.
-- On a non-final PR #126 Head, macOS release preflight passed; Windows format, workspace check, Clippy and focused PowerShell/environment/continuous-output timeout tests passed.
-- The same non-final Windows run failed during full workspace tests. No test is deleted, ignored or weakened; exact failing cases must be repaired and rerun on the final Head.
-- Implementation exact-head CI for PR #126 remains pending, and historical recovery validation is not reused as current evidence.
+- Implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed CI run `30686493121` with all four jobs green.
+- macOS evidence: `git diff --check` plus release preflight, including locked workspace format/check/Clippy/tests and governance validators.
+- Windows evidence: format, locked workspace check, Clippy, focused native PowerShell/environment/permission/continuous-output/descendant-held-pipe deadline tests, full locked workspace tests, project governance, collaboration claims, and rebuilt CLI mock smoke.
+- Remote evidence: all 26 open Issues reconciled to owner documents and the Windows installer fixture passed.
+- Earlier failing Windows inventory and document-boundary fixtures were repaired without deleting, ignoring, weakening, or bypassing external-path checks.
+- This Review synchronization commit must repeat the exact-head CI gates before the PR is made ready. Recovery PR #121 evidence is not reused as current proof.
 
 ## Completion Evidence
 

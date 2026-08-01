@@ -1,6 +1,6 @@
 # TOOL-023-A: Fix Shell Timeout Defeated by Continuous Output
 
-**Status**: In Progress — implemented in Draft PR #126; exact-head cross-platform validation pending (2026-08-01)
+**Status**: Review — implementation Head `1ca536159c34437719e4f776db2e02e4afc8510d` passed cross-platform automation in CI run `30686493121`; independent process/security and maintainer review remain pending (2026-08-01)
 **Priority**: P1
 **Parent Epic**: TOOL-023
 **Type**: Technical Story (bug fix)
@@ -36,7 +36,7 @@ The platform shell escape hatch enforces one absolute wall-clock deadline from s
 
 - Create and pin one deadline before stdout/stderr/wait arbitration.
 - Preserve current timeout range/default, output header, exit code and `[timeout]` projection.
-- Kill and wait for the direct child at expiry, then drain already-produced output.
+- At expiry, kill/wait the direct child when still running, preserve output already received, and return without waiting for descendant-held pipe EOF.
 - Keep Unix `sh -c` hardening unchanged and share the repaired loop with Windows PowerShell.
 - Record descendant process-tree supervision as an explicit residual rather than overstating direct-child kill.
 
@@ -73,9 +73,10 @@ The platform shell escape hatch enforces one absolute wall-clock deadline from s
 - [x] Fixed regression test emits continuous output and asserts a bounded timeout.
 - [x] Partial-output timeout behavior is tested.
 - [x] Direct-child/process-tree limitation is documented in ADR-057 and the security review.
-- [ ] Exact final Head passes focused Unix and Windows tests.
-- [ ] Exact final Head passes full locked workspace format/check/Clippy/tests on macOS and Windows.
-- [ ] Governance, collaboration, release preflight and review gates pass.
+- [x] Implementation Head passes focused Unix and Windows tests.
+- [x] Implementation Head passes full locked workspace format/check/Clippy/tests on macOS and Windows.
+- [x] Governance, collaboration, release preflight, remote reconciliation and rebuilt Windows smoke pass.
+- [ ] Independent process/security and maintainer review accepts the direct-child/process-tree residual.
 
 ## Residual Destination
 

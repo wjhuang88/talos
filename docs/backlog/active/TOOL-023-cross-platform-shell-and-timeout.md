@@ -1,6 +1,6 @@
 # TOOL-023: Cross-Platform Shell Execution And Reliable Timeout
 
-**Status**: Partial / Active — TOOL-023-A/C are implemented in Draft PR #126 under I170; TOOL-023-B remains separately unimplemented (2026-08-01)
+**Status**: Partial / Review — TOOL-023-A/C passed automated I170 review gates in Draft PR #126; independent review remains pending and TOOL-023-B remains separately unimplemented (2026-08-01)
 **Priority**: P1 bug fix / P2 platform and configuration follow-ups
 **Source**: User request 2026-07-24
 **Type**: Epic
