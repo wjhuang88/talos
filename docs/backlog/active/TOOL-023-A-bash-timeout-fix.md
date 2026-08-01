@@ -7,6 +7,23 @@
 **Depends on**: none
 **Selected Iteration**: I170
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
+| Work Slice | TOOL-023-A within I170: one absolute shell timeout, partial-output preservation and direct-child cleanup without changing timeout defaults or I169 semantics. |
+| Claimed At | 2026-08-01 |
+| Source Issue | #119 (I170 dependency recovery context) |
+| Governance Claim PR | #122 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #122 merged the I170 claim after exact-head governance, collaboration, remote-owner and CI validation; its recorded I170 slice explicitly includes the absolute shell timeout. |
+| Implementation PR | #126 |
+| Last Updated | 2026-08-01 |
+| Handoff / Release Condition | Release only through the I170 claim owner after PR #126 merges and exact Completion Commit evidence is recorded. |
+
 ## Problem
 
 The historical shell loop created `tokio::time::sleep(timeout_duration)` inside each `select!` iteration. Every stdout/stderr line dropped and recreated the timer, so a chatty child could evade the advertised timeout indefinitely.
