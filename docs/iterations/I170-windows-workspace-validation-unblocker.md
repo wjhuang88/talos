@@ -40,7 +40,8 @@ The claim proposed by PR #122 is ineffective until this exact finalized record i
 - Historical recovery PR: #121, archival only and never mergeable as-is.
 - Historical exact head: `e1da5dd893418a3f6e3737ec900aabe9967b1dda`.
 - Historical branch: `recovery/pr-78-i170-20260731`; it must not be rebased, rewritten, or used for continued development.
-- Fresh development baseline audited on 2026-08-01: `main@c28fe6a6c70b0115e99372927a29ab4107b06b78`.
+- Fresh development baseline rechecked on 2026-08-01: `main@126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`.
+- TUI-044/I169 current owner chain was established by merged governance PR #123 at `ba5a564b4be81366bc3d3e68fd83e7c1d8ce3a4f`; I170 remains an independent prerequisite implementation slice.
 - Recovery classification: behavior remains missing; old CLI registration shape is superseded by the current `talos-tools` contribution and outer composition architecture.
 
 ### Scope
@@ -107,12 +108,14 @@ The claim proposed by PR #122 is ineffective until this exact finalized record i
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-01 | Recovery audit | Current `main@c28fe6a6` still hardcodes `sh -c`, resets timeout sleeps inside the output loop, lacks Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
+| 2026-08-01 | Recovery audit | Current main still hardcodes `sh -c`, resets timeout sleeps inside the output loop, lacks Windows child env scrub and portable path/long-list behavior. Recovery PR #121 remains archival. |
 | 2026-08-01 | Claim proposal | Draft governance PR #122 proposes the bounded I170 work slice. No production implementation may begin until the exact finalized claim is merged into `main`. |
+| 2026-08-01 | Current-main refresh | TUI-044 Claim PR #123 merged. Main then advanced through two externally created noop/add-remove pairs with no net file change; the exact development baseline is re-bound to `126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`. |
 
 ## Verification Evidence
 
-- Pending exact-head claim CI and governance validation.
+- Previous claim-head release preflight, format/check/Clippy/tests and Windows installer fixture passed, but its merge ref predated the TUI-044 Issue matrix.
+- Pending fresh exact-head CI against `main@126d0533fd19b0622d1fa093cd39fb17ffc3a5c2`.
 
 ## Completion Evidence
 
