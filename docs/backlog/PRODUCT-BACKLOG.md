@@ -4,7 +4,7 @@ This file is the compact current-state backlog entrypoint. Story scope, acceptan
 implementation evidence, and residual ownership live in the linked owner documents.
 
 The complete pre-closeout index is preserved unchanged at
-[`archive/2026-Q3/PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md`](archive/2026-Q3/PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md).
+[`PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md`](PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence, not current activation authority.
 
 ## Current Priorities
@@ -78,7 +78,7 @@ Key chains include:
 
 Completed programs, release closeouts, prior active-item detail and the full historical inventory remain available in:
 
-- [`archive/2026-Q3/PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md`](archive/2026-Q3/PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md)
+- [`PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md`](PRODUCT-BACKLOG-pre-I170-closeout-2026-08-01.md)
 - `docs/iterations/`
 - `docs/tasks/`
 - `docs/releases/`
