@@ -38,6 +38,7 @@ mod durable;
 mod error;
 mod jsonl;
 mod manager;
+mod pending_submission;
 mod segment_chain;
 pub mod sqlite;
 mod store;
@@ -56,6 +57,9 @@ pub use durable::{
 pub use error::SessionError;
 pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+};
+pub use pending_submission::{
+    PendingSubmissionError, PendingSubmissionRecord, PendingSubmissionStore,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 pub use store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
