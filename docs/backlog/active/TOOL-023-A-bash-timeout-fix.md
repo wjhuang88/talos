@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Completed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / talos recovery session 2026-08-01 |
 | Work Slice | TOOL-023-A within I170: one absolute shell timeout, partial-output preservation and direct-child cleanup without changing timeout defaults or I169 semantics. |
