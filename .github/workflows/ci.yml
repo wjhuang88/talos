@@ -18,6 +18,128 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  i170-timeout-eof-patch:
+    name: I170 bounded timeout return patch
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/i170-windows-shell-portability-20260801'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply exact timeout EOF correction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bash_tool = Path("crates/talos-tools/src/bash_tool.rs")
+          text = bash_tool.read_text(encoding="utf-8")
+          old = '''                _ = &mut deadline => {
+                    let _ = child.kill().await;
+                    let _ = child.wait().await;
+                    // Drain any remaining output after kill
+                    while let Ok(Some(line)) = stdout_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    while let Ok(Some(line)) = stderr_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    output.push_str("[timeout]");
+                    return ToolResult::error(output);
+                }
+'''
+          new = '''                _ = &mut deadline => {
+                    let _ = child.kill().await;
+                    let _ = child.wait().await;
+                    // Preserve output already received before the absolute deadline. Do not wait
+                    // for pipe EOF here: descendants can inherit the handles and outlive the
+                    // direct shell child, which would defeat the timeout boundary.
+                    output.push_str("[timeout]");
+                    return ToolResult::error(output);
+                }
+'''
+          if old in text:
+              if text.count(old) != 1:
+                  raise SystemExit(f"unexpected timeout branch count: {text.count(old)}")
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("timeout branch old/new form not found")
+
+          marker = '''    #[tokio::test]
+    async fn test_streaming_empty_output() {
+'''
+          test = '''    #[tokio::test]
+    async fn timeout_does_not_wait_for_descendant_pipe_eof() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(300));
+        #[cfg(windows)]
+        let command = "$child = Start-Process powershell.exe -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 10' -NoNewWindow -PassThru; Start-Sleep -Seconds 10";
+        #[cfg(not(windows))]
+        let command = "sleep 10 & wait";
+        let started = std::time::Instant::now();
+
+        let result = tool
+            .execute(serde_json::json!({ "command": command }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("[timeout]"));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "timeout return waited for descendant-held pipe EOF"
+        );
+    }
+
+'''
+          if "async fn timeout_does_not_wait_for_descendant_pipe_eof()" not in text:
+              if text.count(marker) != 1:
+                  raise SystemExit(f"unexpected test insertion marker count: {text.count(marker)}")
+              text = text.replace(marker, test + marker, 1)
+          bash_tool.write_text(text, encoding="utf-8")
+
+          adr = Path("docs/decisions/057-windows-powershell-process-boundary.md")
+          text = adr.read_text(encoding="utf-8")
+          old = "- At the deadline Talos kills and waits for the direct child, drains bounded remaining pipe output, appends `[timeout]`, and returns a tool error."
+          new = "- At the deadline Talos kills and waits for the direct child, preserves output already received, appends `[timeout]`, and returns immediately without waiting for descendant-held pipe EOF."
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("ADR timeout statement old/new form not found")
+          adr.write_text(text, encoding="utf-8")
+
+          review = Path("docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md")
+          text = review.read_text(encoding="utf-8")
+          old = "At expiry, Talos kills and waits for the direct child, drains remaining pipes, emits `[timeout]`, and returns an error. The design does not guarantee descendant termination on Windows or Unix when a shell launches detached/grandchild work."
+          new = "At expiry, Talos kills and waits for the direct child, preserves output already received, emits `[timeout]`, and returns without waiting for pipe EOF. This prevents descendants that inherited stdout/stderr handles from extending the absolute timeout, while still making no descendant-termination claim."
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("security review timeout statement old/new form not found")
+          review.write_text(text, encoding="utf-8")
+          PY
+
+          cargo fmt --all -- --check
+          git diff --check
+
+      - name: Commit bounded timeout correction
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No timeout patch required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/talos-tools/src/bash_tool.rs docs/decisions/057-windows-powershell-process-boundary.md docs/reference/I170-WINDOWS-SHELL-SECURITY-REVIEW-2026-08-01.md
+          git commit -m "fix(tools): return at timeout without waiting for descendant EOF [i170-timeout-eof]"
+          git push origin HEAD:${{ github.head_ref }}
+
   preflight:
     name: Format + Check + Clippy + Test
     runs-on: macos-14
@@ -82,6 +204,7 @@ jobs:
         run: |
           cargo test -p talos-tools --locked platform_command_removes_dangerous_environment_variables -- --nocapture
           cargo test -p talos-tools --locked continuous_output_does_not_reset_timeout_deadline -- --nocapture
+          cargo test -p talos-tools --locked timeout_does_not_wait_for_descendant_pipe_eof -- --nocapture
           cargo test -p talos-tools --locked test_shell_metacharacters_pipe -- --nocapture
 
       - name: Test workspace
