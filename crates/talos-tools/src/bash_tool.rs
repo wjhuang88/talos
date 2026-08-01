@@ -460,9 +460,9 @@ fn is_simple_shell_token(token: &str) -> bool {
         // a denylist. Reusable cwd-scoped templates therefore accept only inert path/option token
         // characters; grouping, call operators, arrays, variables and member expressions become
         // exact resources until a reviewed PowerShell lexer/parser exists.
-        return token
+        token
             .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '='));
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '='))
     }
 
     #[cfg(not(windows))]
