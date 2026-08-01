@@ -450,20 +450,37 @@ fn bash_permission_template(
 }
 
 fn is_simple_shell_token(token: &str) -> bool {
-    !token.is_empty()
-        && !token.contains('*')
-        && !token.contains('?')
-        && !token.contains('[')
-        && !token.contains(']')
-        && !token.contains('{')
-        && !token.contains('}')
-        && !token.contains('\'')
-        && !token.contains('"')
-        && !token.contains('\\')
-        // Shell/provider expansion must never inherit a reusable cwd-scoped grant.
-        && !token.contains('$')
-        && !token.contains(':')
-        && !token.starts_with('~')
+    if token.is_empty() {
+        return false;
+    }
+
+    #[cfg(windows)]
+    {
+        // PowerShell has many expression and invocation forms that are unsafe to approximate with
+        // a denylist. Reusable cwd-scoped templates therefore accept only inert path/option token
+        // characters; grouping, call operators, arrays, variables and member expressions become
+        // exact resources until a reviewed PowerShell lexer/parser exists.
+        return token.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '=')
+        });
+    }
+
+    #[cfg(not(windows))]
+    {
+        !token.contains('*')
+            && !token.contains('?')
+            && !token.contains('[')
+            && !token.contains(']')
+            && !token.contains('{')
+            && !token.contains('}')
+            && !token.contains('\'')
+            && !token.contains('"')
+            && !token.contains('\\')
+            // Shell/provider expansion must never inherit a reusable cwd-scoped grant.
+            && !token.contains('$')
+            && !token.contains(':')
+            && !token.starts_with('~')
+    }
 }
 
 fn read_only_template_key(program: &str, args: &[&str]) -> Option<String> {
@@ -945,6 +962,33 @@ mod tests {
                     .unwrap()
                     .starts_with(&resource_prefix("read_only_inspection", "exact")),
                 "{command} unexpectedly received a reusable template grant"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_shell_template_rejects_computed_powershell_expressions() {
+        let tool = BashTool::new(test_dir());
+        let commands = [
+            "cat (Join-Path (Get-Item ..).FullName secret.txt)",
+            "cat (& { Join-Path (Get-Item ..).FullName secret.txt })",
+            "cat @((Join-Path (Get-Item ..).FullName secret.txt))",
+            "cat (Get-Item ..).FullName",
+            "cat $items[0]",
+            "cat ('..' + '/secret.txt')",
+        ];
+
+        for command in commands {
+            let profile = tool.permission_profile(&serde_json::json!({ "command": command }));
+            let resource = profile[0].resource.as_deref().unwrap();
+            assert!(
+                resource.contains(":exact:"),
+                "{command} unexpectedly received a reusable template grant: {resource}"
+            );
+            assert!(
+                !resource.contains(":template:"),
+                "{command} unexpectedly received a reusable template grant: {resource}"
             );
         }
     }
