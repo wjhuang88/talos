@@ -91,6 +91,7 @@ impl FetchUrlTool {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::limited(redirect_limit))
             .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .no_proxy()
             .build()
             .expect("reqwest Client builder should never fail with default config");
 
@@ -107,6 +108,7 @@ impl FetchUrlTool {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .no_proxy()
             .build()
             .expect("reqwest Client builder should never fail with default config");
 
@@ -353,9 +355,12 @@ impl AgentTool for FetchUrlTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
-    use std::net::TcpListener;
+    use std::io::{ErrorKind, Read, Write};
+    use std::net::{TcpListener, TcpStream};
     use std::thread;
+    use std::time::{Duration as StdDuration, Instant};
+
+    const TEST_SERVER_TIMEOUT: StdDuration = StdDuration::from_secs(5);
 
     #[test]
     fn fetch_url_tool_metadata() {
@@ -408,26 +413,55 @@ mod tests {
         assert!(text.chars().count() < 100);
     }
 
+    fn accept_with_timeout(listener: &TcpListener) -> TcpStream {
+        listener
+            .set_nonblocking(true)
+            .expect("set_nonblocking failed");
+        let deadline = Instant::now() + TEST_SERVER_TIMEOUT;
+
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    stream
+                        .set_read_timeout(Some(TEST_SERVER_TIMEOUT))
+                        .expect("set_read_timeout failed");
+                    stream
+                        .set_write_timeout(Some(TEST_SERVER_TIMEOUT))
+                        .expect("set_write_timeout failed");
+                    return stream;
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                    assert!(
+                        Instant::now() < deadline,
+                        "loopback test server timed out waiting for a connection"
+                    );
+                    thread::sleep(StdDuration::from_millis(10));
+                }
+                Err(error) => panic!("accept failed: {error}"),
+            }
+        }
+    }
+
     fn serve_http(listener: &TcpListener, response: &str) {
-        let (mut stream, _) = listener.accept().expect("accept failed");
+        let mut stream = accept_with_timeout(listener);
         let mut buf = [0u8; 4096];
-        let _ = stream.read(&mut buf).unwrap();
+        stream.read(&mut buf).expect("read failed");
         stream.write_all(response.as_bytes()).expect("write failed");
         stream.flush().expect("flush failed");
     }
 
     fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
-        let (mut stream, _) = listener.accept().expect("accept failed");
+        let mut stream = accept_with_timeout(listener);
         let mut buf = [0u8; 4096];
-        let _ = stream.read(&mut buf).unwrap();
+        stream.read(&mut buf).expect("read failed");
         stream
             .write_all(response1.as_bytes())
             .expect("write failed");
         stream.flush().expect("flush failed");
         drop(stream);
 
-        let (mut stream, _) = listener.accept().expect("accept failed");
-        let _ = stream.read(&mut buf).unwrap();
+        let mut stream = accept_with_timeout(listener);
+        stream.read(&mut buf).expect("read failed");
         stream
             .write_all(response2.as_bytes())
             .expect("write failed");
@@ -445,11 +479,13 @@ mod tests {
              Content-Type: text/html\r\n\
              Content-Length: 0\r\n\r\n"
         );
+        let final_body = "<html><body>Hello World</body></html>";
         let final_response = format!(
             "HTTP/1.1 200 OK\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 27\r\n\r\n\
-             <html><body>Hello World</body></html>"
+             Content-Length: {}\r\n\r\n\
+             {final_body}",
+            final_body.len()
         );
 
         let server = thread::spawn(move || {
@@ -483,11 +519,13 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
         let port = listener.local_addr().unwrap().port();
 
+        let body = "<html><body>Hello World</body></html>";
         let response = format!(
             "HTTP/1.1 200 OK\r\n\
              Content-Type: text/html; charset=utf-8\r\n\
-             Content-Length: 27\r\n\r\n\
-             <html><body>Hello World</body></html>"
+             Content-Length: {}\r\n\r\n\
+             {body}",
+            body.len()
         );
 
         let server = thread::spawn(move || {
