@@ -62,6 +62,7 @@ pub struct PendingSubmissionRecord {
 #[derive(Debug, Clone)]
 pub struct PendingSubmissionStore {
     path: Arc<PathBuf>,
+    session_id: Arc<String>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -78,6 +79,7 @@ impl PendingSubmissionStore {
         let parent = session_file.parent().unwrap_or_else(|| Path::new("."));
         Self {
             path: Arc::new(parent.join(format!("{session_id}.pending.sqlite"))),
+            session_id: Arc::new(session_id.to_owned()),
             lock: Arc::new(Mutex::new(())),
         }
     }
@@ -98,13 +100,9 @@ impl PendingSubmissionStore {
         }
         let encoded = serde_json::to_string(submission)?;
         let fingerprint = fingerprint(encoded.as_bytes());
-        let text_bytes = submission
-            .total_text_bytes()
-            .ok_or(PendingSubmissionError::InvalidTransition)?;
-        let (image_count, image_bytes, _) = submission
-            .image_totals()
-            .ok_or(PendingSubmissionError::InvalidTransition)?;
-        let generation = match i64::try_from(submission.session_generation) {
+        let text_bytes = submission.total_text_bytes();
+        let (image_count, image_bytes) = submission.image_totals();
+        let generation = match i64::try_from(submission.sender_generation) {
             Ok(value) => value,
             Err(_) => return Ok(rejected(SubmissionRejectionReason::InvalidStructure)),
         };
@@ -114,7 +112,7 @@ impl PendingSubmissionStore {
         let transaction = immediate(&mut connection)?;
         ensure_schema(&transaction)?;
 
-        if let Some(row) = lookup(&transaction, &submission.batch_id)? {
+        if let Some(row) = lookup(&transaction, &submission.id)? {
             let disposition = if row.fingerprint == fingerprint && row.json == encoded {
                 SubmissionReceiptDisposition::AlreadyAccepted {
                     state: decode_state(&row.state)?,
@@ -144,9 +142,9 @@ impl PendingSubmissionStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
                        'accepted_pending', NULL)",
             params![
-                submission.batch_id,
-                submission.reservation_id,
-                submission.session_id,
+                submission.id,
+                submission.id,
+                self.session_id.as_str(),
                 generation,
                 receipt_id,
                 fingerprint,
@@ -173,7 +171,7 @@ impl PendingSubmissionStore {
         let _guard = self.guard()?;
         let connection = self.connection()?;
         ensure_schema(&connection)?;
-        Ok(match lookup(&connection, &submission.batch_id)? {
+        Ok(match lookup(&connection, &submission.id)? {
             Some(row) if row.fingerprint == payload_fingerprint && row.json == encoded => (
                 row.receipt_id,
                 SubmissionReceiptDisposition::AlreadyAccepted {
@@ -194,11 +192,11 @@ impl PendingSubmissionStore {
     /// Marks an accepted submission as the active Turn.
     pub fn mark_running(
         &self,
-        batch_id: &str,
+        submission_id: &str,
         turn_id: &str,
     ) -> Result<(), PendingSubmissionError> {
         self.transition(
-            batch_id,
+            submission_id,
             PendingSubmissionState::Running,
             Some(turn_id),
             &[
@@ -226,7 +224,7 @@ impl PendingSubmissionStore {
     /// Marks a started submission terminal without making it resumable.
     pub fn mark_terminal(
         &self,
-        batch_id: &str,
+        submission_id: &str,
         state: PendingSubmissionState,
         turn_id: &str,
     ) -> Result<(), PendingSubmissionError> {
@@ -237,7 +235,7 @@ impl PendingSubmissionStore {
             return Err(PendingSubmissionError::InvalidTransition);
         }
         self.transition(
-            batch_id,
+            submission_id,
             state,
             Some(turn_id),
             &[PendingSubmissionState::Running],
@@ -247,11 +245,11 @@ impl PendingSubmissionStore {
     /// Finalizes custody after the successful transcript commit.
     pub fn mark_committed(
         &self,
-        batch_id: &str,
+        submission_id: &str,
         turn_id: &str,
     ) -> Result<(), PendingSubmissionError> {
         self.transition(
-            batch_id,
+            submission_id,
             PendingSubmissionState::Committed,
             Some(turn_id),
             &[
@@ -278,10 +276,10 @@ impl PendingSubmissionStore {
         rows.map(|row| tuple_to_record(row?)).collect()
     }
 
-    /// Returns one durable batch record.
+    /// Returns one durable submission record.
     pub fn get(
         &self,
-        batch_id: &str,
+        submission_id: &str,
     ) -> Result<Option<PendingSubmissionRecord>, PendingSubmissionError> {
         let _guard = self.guard()?;
         let connection = self.connection()?;
@@ -290,7 +288,7 @@ impl PendingSubmissionStore {
             .query_row(
                 "SELECT receipt_id, fingerprint, submission_json, state, turn_id
                  FROM pending_submissions WHERE batch_id = ?1",
-                params![batch_id],
+                params![submission_id],
                 read_record_tuple,
             )
             .optional()?
@@ -300,7 +298,7 @@ impl PendingSubmissionStore {
 
     fn transition(
         &self,
-        batch_id: &str,
+        submission_id: &str,
         next: PendingSubmissionState,
         turn_id: Option<&str>,
         expected: &[PendingSubmissionState],
@@ -312,7 +310,7 @@ impl PendingSubmissionStore {
         let current = transaction
             .query_row(
                 "SELECT state FROM pending_submissions WHERE batch_id = ?1",
-                params![batch_id],
+                params![submission_id],
                 |row| row.get::<_, String>(0),
             )
             .optional()?
@@ -322,7 +320,7 @@ impl PendingSubmissionStore {
         }
         transaction.execute(
             "UPDATE pending_submissions SET state = ?2, turn_id = ?3 WHERE batch_id = ?1",
-            params![batch_id, encode_state(next), turn_id],
+            params![submission_id, encode_state(next), turn_id],
         )?;
         prune_tombstones(&transaction)?;
         transaction.commit()?;
@@ -360,12 +358,15 @@ fn immediate(connection: &mut Connection) -> Result<Transaction<'_>, rusqlite::E
     connection.transaction_with_behavior(TransactionBehavior::Immediate)
 }
 
-fn lookup(connection: &Connection, batch_id: &str) -> Result<Option<IdentityRow>, rusqlite::Error> {
+fn lookup(
+    connection: &Connection,
+    submission_id: &str,
+) -> Result<Option<IdentityRow>, rusqlite::Error> {
     connection
         .query_row(
             "SELECT receipt_id, fingerprint, submission_json, state, turn_id
              FROM pending_submissions WHERE batch_id = ?1",
-            params![batch_id],
+            params![submission_id],
             |row| {
                 Ok(IdentityRow {
                     receipt_id: row.get(0)?,
