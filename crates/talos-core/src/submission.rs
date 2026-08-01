@@ -82,7 +82,7 @@ impl SubmissionItem {
 /// An immutable compatible queue prefix prepared for one Actor Turn.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StructuredSubmission {
-    /// Stable identity shared by preparation, retries, receipt and reconciliation.
+    /// Stable identity shared by preparation, retries, receipt, and reconciliation.
     pub id: String,
     /// Source used by Actor arbitration.
     pub source: SubmissionSource,
@@ -97,24 +97,23 @@ impl StructuredSubmission {
     /// Returns aggregate UTF-8 text bytes using saturating accounting.
     #[must_use]
     pub fn total_text_bytes(&self) -> usize {
-        self.items
-            .iter()
-            .fold(0usize, |total, item| total.saturating_add(item.text_bytes()))
+        self.items.iter().fold(0usize, |total, item| {
+            total.saturating_add(item.text_bytes())
+        })
     }
 
     /// Returns attachment count and declared bytes using saturating accounting.
     #[must_use]
     pub fn image_totals(&self) -> (usize, u64) {
-        self.items
-            .iter()
-            .flat_map(|item| &item.attachments)
-            .fold((0usize, 0u64), |(count, bytes), part| match part {
-                ContentPart::Image { byte_count, .. } => (
-                    count.saturating_add(1),
-                    bytes.saturating_add(*byte_count),
-                ),
+        self.items.iter().flat_map(|item| &item.attachments).fold(
+            (0usize, 0u64),
+            |(count, bytes), part| match part {
+                ContentPart::Image { byte_count, .. } => {
+                    (count.saturating_add(1), bytes.saturating_add(*byte_count))
+                }
                 ContentPart::Text { .. } => (count, bytes),
-            })
+            },
+        )
     }
 
     /// Returns total attachment metadata bytes or `None` on arithmetic overflow.
@@ -124,9 +123,7 @@ impl StructuredSubmission {
             .iter()
             .flat_map(|item| &item.attachments)
             .try_fold(0usize, |total, part| match part {
-                ContentPart::Image {
-                    path, mime, ..
-                } => total
+                ContentPart::Image { path, mime, .. } => total
                     .checked_add(path.as_os_str().to_string_lossy().len())?
                     .checked_add(mime.len())?
                     .checked_add(std::mem::size_of::<u64>())?
@@ -145,7 +142,7 @@ impl StructuredSubmission {
             .then_some(first)
     }
 
-    /// Validates immutable identity, ordering, compatibility and hard bounds.
+    /// Validates immutable identity, ordering, compatibility, and hard bounds.
     pub fn validate(&self) -> Result<(), SubmissionRejectionReason> {
         if self.id.is_empty()
             || self.items.is_empty()
@@ -186,29 +183,29 @@ impl StructuredSubmission {
         let metadata_bytes = self
             .attachment_metadata_bytes()
             .ok_or(SubmissionRejectionReason::InvalidStructure)?;
-        let oversized_attachment = self
-            .items
-            .iter()
-            .flat_map(|item| &item.attachments)
-            .any(|part| match part {
-                ContentPart::Image {
-                    path,
-                    mime,
-                    byte_count,
-                    ..
-                } => {
-                    let metadata = path
-                        .as_os_str()
-                        .to_string_lossy()
-                        .len()
-                        .saturating_add(mime.len())
-                        .saturating_add(std::mem::size_of::<u64>())
-                        .saturating_add(32);
-                    *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                        || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
-                }
-                ContentPart::Text { .. } => true,
-            });
+        let oversized_attachment =
+            self.items
+                .iter()
+                .flat_map(|item| &item.attachments)
+                .any(|part| match part {
+                    ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                        ..
+                    } => {
+                        let metadata = path
+                            .as_os_str()
+                            .to_string_lossy()
+                            .len()
+                            .saturating_add(mime.len())
+                            .saturating_add(std::mem::size_of::<u64>())
+                            .saturating_add(32);
+                        *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                            || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
+                    }
+                    ContentPart::Text { .. } => true,
+                });
         if image_count > MAX_SUBMISSION_IMAGE_COUNT
             || image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
             || metadata_bytes > MAX_SUBMISSION_TOTAL_ATTACHMENT_METADATA_BYTES
