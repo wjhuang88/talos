@@ -7,7 +7,7 @@ public APIs, or assumptions that require explicit validation.
 
 Each ADR file is authoritative for its own status and decision. The complete pre-closeout index is
 preserved unchanged at
-[`archive/DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md).
+[`DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 
 ## Status Model
 
@@ -89,6 +89,6 @@ architecture-sensitive work.
 
 The original detailed decision descriptions and ordering are retained at:
 
-- [`archive/DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](archive/DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md)
+- [`DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md)
 
 All individual ADR documents remain in this directory and are not replaced by the compact index.
