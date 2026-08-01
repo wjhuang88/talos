@@ -22,8 +22,8 @@
 | Claimed At | 2026-08-02 |
 | Source Issue | #119 |
 | Governance Claim PR | #123 |
-| Authorization Mode | Explicit single-maintainer instruction |
-| Authorization Evidence | Maintainer instructed “正式激活并实施 I169”; preactivation architecture PR #129 passed exact-head platform/governance gates and merged before this fresh branch was created. |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The repository owner explicitly instructed “正式激活并实施 I169”; preactivation architecture PR #129 passed exact-head platform/governance gates and merged before this fresh branch and Draft implementation PR were created. |
 | Implementation PR | #131 |
 | Last Updated | 2026-08-02 |
 | Handoff / Release Condition | Remain Active until the exact PR #131 Head passes the complete Issue #119/ADR-056 matrix and independent review moves the work to Review; no release or completion claim before merge and recorded Completion Commit. |
