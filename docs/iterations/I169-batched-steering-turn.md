@@ -11,12 +11,31 @@
 > Baseline rule: preserve this published objective, dependencies, exclusions, acceptance and validation; changed targets use a new iteration ID.
 > MVP deliverable: a rebuilt Talos TUI proves A/B/C accepted during one active Turn start one later model Turn as three ordered user items, with durable receipt-based transfer, recovery-safe custody and replay parity.
 
-The effective Collaboration Claim is owned by
-`docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`. The maintainer explicitly
-instructed “正式激活并实施 I169” on 2026-08-02. Preactivation architecture PR #129 passed exact-head
-macOS/Windows, governance, collaboration, mock-smoke and remote-reconciliation gates and merged at
-`a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`. I169 was activated on a fresh branch from that exact
-commit and is implemented in Draft PR #131. Recovery PR #120 and its branch remain immutable.
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / I169 implementation session 2026-08-02 |
+| Work Slice | I169 execution only: structured identities and Engine escrow, durable session pending journal and receipt reconciliation, one-Turn Actor arbitration, bridge lifecycle correlation, exact Provider request planning, transcript/replay parity and required acceptance evidence. |
+| Claimed At | 2026-08-02 |
+| Source Issue | #119 |
+| Governance Claim PR | #123 |
+| Authorization Mode | Explicit single-maintainer instruction |
+| Authorization Evidence | Maintainer instructed “正式激活并实施 I169”; preactivation architecture PR #129 passed exact-head platform/governance gates and merged before this fresh branch was created. |
+| Implementation PR | #131 |
+| Last Updated | 2026-08-02 |
+| Handoff / Release Condition | Remain Active until the exact PR #131 Head passes the complete Issue #119/ADR-056 matrix and independent review moves the work to Review; no release or completion claim before merge and recorded Completion Commit. |
+
+The effective Story claim is also recorded in
+`docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`. Recovery PR #120 and its branch
+remain immutable.
+
+The maintainer explicitly instructed “正式激活并实施 I169” on 2026-08-02. Preactivation architecture
+PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-
+reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`. I169 was activated
+on a fresh branch from that exact commit and is implemented in Draft PR #131.
 
 ## Published Baseline
 
@@ -50,11 +69,12 @@ commit and is implemented in Draft PR #131. Recovery PR #120 and its branch rema
 3. Transactional `prepare/reserve/send/durable-accept/reconcile/commit` transfer with immutable,
    non-executable Engine escrow after send until receipt reconciliation.
 4. Versioned session-scoped pending journal separate from successful transcript, with idempotent
-   acceptance, `AlreadyAccepted`, authoritative `NotAccepted`, conflict detection and restart recovery.
-5. Monotonic Session generation on structured operations, receipts and structured Turn events; exact
-   Session/generation/batch/receipt/Turn/sequence validation.
-6. Actor-owned user/scheduler arbitration with at most one active Turn, no ordinary Submit preemption,
-   retained delivery under backpressure and deterministic explicit-user resume.
+   acceptance, `AlreadyAccepted`, authoritative `NotAccepted`, conflict detection and restart
+   recovery.
+5. Monotonic Session generation on structured operations, receipts and structured Turn events;
+   exact Session/generation/batch/receipt/Turn/sequence validation.
+6. Actor-owned user/scheduler arbitration with at most one active Turn, no ordinary Submit
+   preemption, retained delivery under backpressure and deterministic explicit-user resume.
 7. Success auto-advance; Cancel/Error pause unstarted pending work; no automatic replay of an
    already-started terminal Turn.
 8. A/B/C as distinct ordered User/Multimodal messages in Actor input, Provider requests, successful
@@ -90,8 +110,8 @@ commit and is implemented in Draft PR #131. Recovery PR #120 and its branch rema
 
 ### Ownership And Recovery
 
-- Before send, Engine is sole owner and full/closed/reserve-timeout/replaced-sender failures roll back
-  exactly without clearing queue projection.
+- Before send, Engine is sole owner and full/closed/reserve-timeout/replaced-sender failures roll
+  back exactly without clearing queue projection.
 - After send, Engine escrow is non-executable; only journal-backed Actor acceptance grants execution
   authority. One recoverable copy exists until terminal finalization.
 - Ack occurs only after journal commit and must match exact Session, generation, batch, reservation
@@ -159,7 +179,8 @@ Proposed contract merely to match historical PR #120.
   authority, recoverable custody, at most one active Turn and no cross-Session mutation.
 - `cargo fmt --all -- --check`, locked workspace check/Clippy/tests and `git diff --check`.
 - Governance/collaboration validators, release preflight, exact-head Windows and Unix/macOS CI.
-- Rebuilt real-TUI walkthrough, no-Provider smoke and Provider Request Preview / Mock Request evidence.
+- Rebuilt real-TUI walkthrough, no-Provider smoke and Provider Request Preview / Mock Request
+  evidence.
 
 ## Documentation Targets
 
@@ -193,6 +214,8 @@ Proposed contract merely to match historical PR #120.
 | 2026-08-02 | Architecture hardening | PR #129 defined durable receipt, pending journal, lost-Ack, generation, scheduler, terminal, persistence-order and exact-request contracts. |
 | 2026-08-02 | Baseline repair | PR #130 independently stabilized the Windows loopback test fixture found by PR #129 validation. |
 | 2026-08-02 | Formal activation | Maintainer explicitly authorized implementation; no overlap was found; fresh branch created from exact `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; Draft PR #131 opened. |
+| 2026-08-02 | Slice 1 | Added structured submission identities/bounds and a versioned session-scoped pending journal with durable receipts, idempotent reopen, conflict rejection, pause/recovery and terminal tombstones. |
+| 2026-08-02 | Review baseline port | Copied the preserved Review code for Engine/Actor/Bridge/Agent files into the fresh PR branch as a separately identifiable starting snapshot; recovery refs remain unchanged and the snapshot is not completion evidence. |
 
 ## Verification Evidence
 
@@ -202,7 +225,8 @@ Proposed contract merely to match historical PR #120.
 - Fixture PR #130 exact Head `fe87c4265bafd1be67e20e635c176eefe08ac6cc` passed CI
   `30713367293` before merge `57d99596b3882162d0d5b06ace42fb5faed95b3e`.
 - Activation branch and Draft PR #131 are bound to the exact architecture merge baseline.
-- Product implementation and behavior evidence remain pending implementation slices.
+- Product implementation and behavior evidence remain incomplete; current PR #131 Head must become
+  green before any Review claim.
 
 ## Completion Evidence
 
