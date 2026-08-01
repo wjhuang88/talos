@@ -91,7 +91,9 @@ The original blocker command receives an exact resource:
 cat (Join-Path (Get-Item ..).FullName secret.txt)
 ```
 
-Normal reviewed inert tokens such as `src/lib.rs`, `./src/lib.rs`, `file-name_1.2.txt`, `-p talos-tools`, and `--package=talos-tools` retain reusable-template behavior.
+Normal reviewed inert-token examples include a plain local filename, a dot-relative local filename,
+a hyphenated filename, `-p talos-tools`, and `--package=talos-tools`; they retain reusable-template
+behavior without being interpreted by this governance document as required repository source paths.
 
 ### Portable output and fixtures
 
