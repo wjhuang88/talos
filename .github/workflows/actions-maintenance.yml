@@ -1,0 +1,94 @@
+name: Actions Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report obsolete runs without deleting them
+        required: true
+        default: true
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/actions-maintenance.yml
+
+concurrency:
+  group: actions-maintenance
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Remove obsolete one-off workflow runs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete unreferenced runs from retired workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dry_run=false
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            dry_run="${INPUT_DRY_RUN:-true}"
+          fi
+
+          referenced_runs="$(mktemp)"
+          grep -RhoE 'actions/runs/[0-9]+' \
+            docs README.md README.zh-CN.md AGENTS.md .github 2>/dev/null \
+            | sed 's#actions/runs/##' \
+            | sort -u > "${referenced_runs}" || true
+
+          deleted=0
+          preserved_evidence=0
+          skipped_active=0
+
+          while IFS=$'\t' read -r run_id workflow_name workflow_path status created_at; do
+            case "${workflow_path}" in
+              .github/workflows/ci.yml|.github/workflows/release.yml|.github/workflows/pages.yml|.github/workflows/actions-maintenance.yml)
+                continue
+                ;;
+            esac
+
+            if [[ "${run_id}" == "${GITHUB_RUN_ID}" || "${status}" != "completed" ]]; then
+              echo "skip active run ${run_id}: ${workflow_name} (${workflow_path})"
+              skipped_active=$((skipped_active + 1))
+              continue
+            fi
+
+            if grep -qx "${run_id}" "${referenced_runs}"; then
+              echo "preserve referenced evidence run ${run_id}: ${workflow_name} (${workflow_path})"
+              preserved_evidence=$((preserved_evidence + 1))
+              continue
+            fi
+
+            if [[ "${dry_run}" == "true" ]]; then
+              echo "would delete ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
+            else
+              echo "delete ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
+              gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+              deleted=$((deleted + 1))
+            fi
+          done < <(
+            gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+              --jq '.workflow_runs[] | [.id, .name, .path, .status, .created_at] | @tsv'
+          )
+
+          {
+            echo "## Actions maintenance"
+            echo
+            echo "- Dry run: \`${dry_run}\`"
+            echo "- Deleted obsolete runs: \`${deleted}\`"
+            echo "- Preserved referenced evidence runs: \`${preserved_evidence}\`"
+            echo "- Skipped active runs: \`${skipped_active}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
