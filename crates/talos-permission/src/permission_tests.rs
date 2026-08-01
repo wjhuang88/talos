@@ -99,7 +99,7 @@ fn test_default_list_imports_allowed() {
 
 #[test]
 fn test_workspace_auto_allow_file_param() {
-    let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
+    let engine = PermissionEngine::with_workspace_root(std::env::temp_dir());
     let decision = engine.evaluate(
         "find_references",
         &serde_json::json!({"name": "Tool", "file": "src/main.rs"}),
@@ -109,7 +109,7 @@ fn test_workspace_auto_allow_file_param() {
 
 #[test]
 fn test_workspace_auto_allow_path_param() {
-    let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
+    let engine = PermissionEngine::with_workspace_root(std::env::temp_dir());
     let decision = engine.evaluate(
         "find_symbol",
         &serde_json::json!({"name": "Tool", "path": "src/main.rs"}),
