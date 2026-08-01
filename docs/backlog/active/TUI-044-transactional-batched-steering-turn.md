@@ -24,7 +24,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #123 established the owner chain. I170 then completed in PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`, satisfying the published prerequisite. A separate explicit activation is still required before implementation begins. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-02 — preactivation ADR-056 ownership/recovery hardening only; no product code |
+| Last Updated | 2026-08-02 |
 | Handoff / Release Condition | Release only by explicit maintainer handoff or after a separate fresh I169 implementation PR is merged and completion evidence is recorded. |
 
 The claim is effective on `main`, but it is not implementation authorization by itself. Activation
