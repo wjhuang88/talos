@@ -86,7 +86,7 @@ pub struct StructuredSubmission {
     pub batch_id: String,
     /// Identity of the exact Engine prefix frozen for transfer.
     pub reservation_id: String,
-    /// Identity of this bounded send/reconciliation attempt.
+    /// Identity of this bounded send or reconciliation attempt.
     pub transfer_attempt_id: String,
     /// Logical Session that may accept this submission.
     pub session_id: String,
@@ -102,9 +102,9 @@ impl StructuredSubmission {
     /// Returns aggregate UTF-8 text bytes with checked overflow semantics.
     #[must_use]
     pub fn total_text_bytes(&self) -> Option<usize> {
-        self.items.iter().try_fold(0usize, |total, item| {
-            total.checked_add(item.text_bytes())
-        })
+        self.items
+            .iter()
+            .try_fold(0usize, |total, item| total.checked_add(item.text_bytes()))
     }
 
     /// Returns attachment count, declared bytes, and metadata bytes.
@@ -113,8 +113,9 @@ impl StructuredSubmission {
         self.items
             .iter()
             .flat_map(|item| &item.attachments)
-            .try_fold((0usize, 0u64, 0usize), |(count, bytes, metadata), part| {
-                match part {
+            .try_fold(
+                (0usize, 0u64, 0usize),
+                |(count, bytes, metadata), part| match part {
                     ContentPart::Image {
                         path,
                         mime,
@@ -135,8 +136,8 @@ impl StructuredSubmission {
                         ))
                     }
                     ContentPart::Text { .. } => None,
-                }
-            })
+                },
+            )
     }
 
     /// Returns the common dispatch kind for a non-empty homogeneous batch.
@@ -196,29 +197,29 @@ impl StructuredSubmission {
         let Some((image_count, image_bytes, metadata_bytes)) = self.image_totals() else {
             return Err(SubmissionRejectionReason::InvalidStructure);
         };
-        let oversized_attachment = self
-            .items
-            .iter()
-            .flat_map(|item| &item.attachments)
-            .any(|part| match part {
-                ContentPart::Image {
-                    path,
-                    mime,
-                    byte_count,
-                    ..
-                } => {
-                    let metadata = path
-                        .as_os_str()
-                        .to_string_lossy()
-                        .len()
-                        .saturating_add(mime.len())
-                        .saturating_add(std::mem::size_of::<u64>())
-                        .saturating_add(32);
-                    *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                        || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
-                }
-                ContentPart::Text { .. } => true,
-            });
+        let oversized_attachment =
+            self.items
+                .iter()
+                .flat_map(|item| &item.attachments)
+                .any(|part| match part {
+                    ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                        ..
+                    } => {
+                        let metadata = path
+                            .as_os_str()
+                            .to_string_lossy()
+                            .len()
+                            .saturating_add(mime.len())
+                            .saturating_add(std::mem::size_of::<u64>())
+                            .saturating_add(32);
+                        *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                            || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
+                    }
+                    ContentPart::Text { .. } => true,
+                });
         if image_count > MAX_SUBMISSION_IMAGE_COUNT
             || image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
             || metadata_bytes > MAX_SUBMISSION_TOTAL_ATTACHMENT_METADATA_BYTES
