@@ -1362,7 +1362,7 @@ mod tests {
         );
         let mcp_registry = build_mcp_tool_registry();
 
-        let print_tui_inventory = vec![
+        let mut print_tui_inventory = vec![
             SHELL_TOOL_NAME,
             "delete",
             "diff",
@@ -1405,7 +1405,7 @@ mod tests {
             "web_search",
             "write",
         ];
-        let mcp_inventory = vec![
+        let mut mcp_inventory = vec![
             SHELL_TOOL_NAME,
             "delete",
             "diff",
@@ -1439,6 +1439,9 @@ mod tests {
             "web_search",
             "write",
         ];
+
+        print_tui_inventory.sort();
+        mcp_inventory.sort();
 
         assert_eq!(sorted_registry_names(&print_registry), print_tui_inventory);
         assert_eq!(sorted_registry_names(&tui_registry), print_tui_inventory);

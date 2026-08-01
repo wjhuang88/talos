@@ -112,7 +112,7 @@ fn run_trust_command(command: TrustCommand) -> Result<()> {
                     "  Trust effect: repo-contained file writes auto-allow (Deny rules still win)."
                 );
                 println!(
-                    "  Bash/exec: still per-command unless access evidence proves repo-local read (ADR-040)."
+                    "  Shell/exec: still per-command unless access evidence proves repo-local read (ADR-040)."
                 );
             } else {
                 println!("  Trust is not active. Use --trust during session start to grant it.");
