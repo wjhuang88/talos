@@ -3,10 +3,9 @@ use std::path::Path;
 
 #[test]
 fn sealed_provider_plan_owns_budgeted_dispatch_inputs() {
-    let source = fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/request_plan.rs"),
-    )
-    .expect("read request_plan.rs");
+    let source =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/request_plan.rs"))
+            .expect("read request_plan.rs");
 
     for required in [
         "struct ProviderRequestPlan",

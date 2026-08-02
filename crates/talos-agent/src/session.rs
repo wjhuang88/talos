@@ -825,47 +825,43 @@ impl AppServerSession {
             }
         }
 
-        let mut request_tokens = self
-            .agent
-            .estimate_session_request_tokens(&submission.items, self.history.clone())
-            .await;
-        if matches!(request_tokens, Ok(tokens) if tokens > self.model_context_limit) {
-            let fixed_tokens = self
+        let prepared_turn = if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+            None
+        } else {
+            match self
                 .agent
-                .estimate_session_request_tokens(&submission.items, Vec::new())
-                .await;
-            if let Ok(fixed_tokens) = fixed_tokens {
-                let history_budget = self.model_context_limit.saturating_sub(fixed_tokens);
-                let mut projected_compactor = Compactor::new(TokenEstimator::new(), history_budget);
-                let compacted = match projected_compactor
-                    .compact(self.history.clone(), self.agent.provider())
-                    .await
-                {
-                    Ok(history) => history,
-                    Err(_) => {
-                        projected_compactor
-                            .compact_deterministic(self.history.clone())
-                            .0
-                    }
-                };
-                self.history = compacted;
-                request_tokens = self
-                    .agent
-                    .estimate_session_request_tokens(&submission.items, self.history.clone())
-                    .await;
-                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                    let _ = self.try_archive_session(file, dir, &self.history);
+                .prepare_session_turn(
+                    &submission.items,
+                    self.history.clone(),
+                    self.model_context_limit,
+                )
+                .await
+            {
+                Ok(prepared) => Some(prepared),
+                Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
+                    self.reject_submission(
+                        &submission.id,
+                        submission.sender_generation,
+                        SubmissionRejectionReason::ContextBudgetExceeded,
+                    );
+                    return None;
+                }
+                Err(error) => {
+                    let _ = self.eq_tx.send(SessionEvent::Error {
+                        message: format!(
+                            "failed to seal Provider request plan for {}: {error}",
+                            submission.id
+                        ),
+                    });
+                    self.reject_submission(
+                        &submission.id,
+                        submission.sender_generation,
+                        SubmissionRejectionReason::InvalidStructure,
+                    );
+                    return None;
                 }
             }
-        }
-        if !matches!(request_tokens, Ok(tokens) if tokens <= self.model_context_limit) {
-            self.reject_submission(
-                &submission.id,
-                submission.sender_generation,
-                SubmissionRejectionReason::ContextBudgetExceeded,
-            );
-            return None;
-        }
+        };
 
         let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
         let structured = if submission.source == SubmissionSource::Compatibility {
@@ -1035,19 +1031,16 @@ impl AppServerSession {
         let token_clone = token.clone();
         let agent = self.agent.clone();
         let eq_tx = self.eq_tx.clone();
-        let history = self.history.clone();
+        let prepared = prepared_turn.expect("non-preview submission must be prepared");
         let persistence = self.persistence.clone();
         let durable_persistence = self.durable_persistence.clone();
         let session_id = self.session_id.clone();
-        let items = submission.items;
-        let request_context_limit = self.model_context_limit;
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
             let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                 agent,
-                items,
-                history,
+                prepared,
                 event_tx,
                 event_rx,
                 eq_tx,
@@ -1058,7 +1051,6 @@ impl AppServerSession {
                 persistence,
                 durable_persistence,
                 result_tx,
-                request_context_limit,
             }))
             .catch_unwind()
             .await;

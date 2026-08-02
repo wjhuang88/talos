@@ -8,9 +8,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{SessionEvent, SubmissionItem, TurnCompletionStatus, TurnEventPayload};
+use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 
-use crate::Agent;
+use crate::{Agent, PreparedSessionTurn};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -39,8 +39,7 @@ pub(super) enum TurnRecordStatus {
 
 pub(super) struct TurnForwarding {
     pub(super) agent: Arc<Agent>,
-    pub(super) items: Vec<SubmissionItem>,
-    pub(super) history: Vec<Message>,
+    pub(super) prepared: PreparedSessionTurn,
     pub(super) event_tx: mpsc::UnboundedSender<AgentEvent>,
     pub(super) event_rx: mpsc::UnboundedReceiver<AgentEvent>,
     pub(super) eq_tx: mpsc::UnboundedSender<SessionEvent>,
@@ -51,14 +50,12 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
-    pub(super) request_context_limit: u32,
 }
 
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let TurnForwarding {
         agent,
-        items,
-        history,
+        prepared,
         event_tx,
         mut event_rx,
         eq_tx,
@@ -69,7 +66,6 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         persistence,
         durable_persistence,
         result_tx,
-        request_context_limit,
     } = turn;
 
     let eq_tx_clone = eq_tx.clone();
@@ -138,11 +134,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     });
 
-    let mut agent_task = tokio::spawn(async move {
-        agent
-            .run_for_session_turn_items(items, history, event_tx, request_context_limit)
-            .await
-    });
+    let mut agent_task =
+        tokio::spawn(async move { agent.run_prepared_session_turn(prepared, event_tx).await });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,

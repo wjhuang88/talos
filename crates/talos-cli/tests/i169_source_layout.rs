@@ -5,11 +5,7 @@ use std::path::Path;
 fn transactional_bridge_sources_are_normal_rust_modules() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-    for removed in [
-        "build.rs",
-        "src/tui_bridge_impl.rs",
-        "src/tests_impl.rs",
-    ] {
+    for removed in ["build.rs", "src/tui_bridge_impl.rs", "src/tests_impl.rs"] {
         assert!(
             !crate_root.join(removed).exists(),
             "temporary I169 source generator artifact must remain removed: {removed}"
