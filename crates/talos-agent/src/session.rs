@@ -201,7 +201,10 @@ impl AppServerSession {
                         pending_images = pending_images.saturating_sub(submission_size.2);
                         pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
                         if let Err(error) = self.pending_store.pause_unstarted() {
-                            self.emit_custody_error("failed to pause rejected pending work", &error);
+                            self.emit_custody_error(
+                                "failed to pause rejected pending work",
+                                &error,
+                            );
                         }
                         paused = true;
                     }
@@ -445,11 +448,7 @@ impl AppServerSession {
                 MAX_RECENT_SUBMISSION_IDS,
             );
             for item in &submission.items {
-                record_recent_identity(
-                    recent_item_ids,
-                    item.id.clone(),
-                    MAX_RECENT_ITEM_IDS,
-                );
+                record_recent_identity(recent_item_ids, item.id.clone(), MAX_RECENT_ITEM_IDS);
             }
             paused |= record.state == PendingSubmissionState::PausedPending;
             pending.push_back(submission);
@@ -457,10 +456,7 @@ impl AppServerSession {
         paused
     }
 
-    fn release_in_memory_pending_on_shutdown(
-        &self,
-        pending: &mut VecDeque<StructuredSubmission>,
-    ) {
+    fn release_in_memory_pending_on_shutdown(&self, pending: &mut VecDeque<StructuredSubmission>) {
         for submission in pending.drain(..) {
             if submission.source == SubmissionSource::Compatibility {
                 self.reject_submission(
@@ -522,11 +518,7 @@ impl AppServerSession {
         true
     }
 
-    fn emit_custody_error(
-        &self,
-        context: &str,
-        error: &impl std::fmt::Display,
-    ) {
+    fn emit_custody_error(&self, context: &str, error: &impl std::fmt::Display) {
         let _ = self.eq_tx.send(SessionEvent::Error {
             message: format!("{context}: {error}"),
         });
