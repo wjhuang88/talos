@@ -77,9 +77,7 @@ fn submission(
     }
 }
 
-async fn receipt(
-    receiver: &mut mpsc::UnboundedReceiver<SubmissionReceipt>,
-) -> SubmissionReceipt {
+async fn receipt(receiver: &mut mpsc::UnboundedReceiver<SubmissionReceipt>) -> SubmissionReceipt {
     tokio::time::timeout(Duration::from_secs(3), receiver.recv())
         .await
         .expect("tracked receipt timeout")
@@ -112,11 +110,14 @@ async fn wait_for_committed(
 async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-generation-reject").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-generation-reject")
+        .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     let calls = Arc::new(AtomicUsize::new(0));
-    let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
+    let (handle, mut actor) =
+        AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
     actor.set_generation(5);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     assert_eq!(actor.generation(), 5);
@@ -159,11 +160,14 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
 async fn current_user_and_actor_bound_scheduler_use_authoritative_generation() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-generation-accept").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-generation-accept")
+        .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     let calls = Arc::new(AtomicUsize::new(0));
-    let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
+    let (handle, mut actor) =
+        AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
     actor.set_generation(9);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
 
