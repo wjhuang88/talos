@@ -77,14 +77,16 @@ pub struct AppServerSession {
     durable_persistence: Option<DurableTurnPersistence>,
     pending_store: PendingSubmissionStore,
     session_id: String,
+    session_generation: u64,
     turn_prefix: String,
     model_context_limit: u32,
 }
 
 impl AppServerSession {
-    /// Creates a new session actor with the given agent and configuration.
+    /// Creates a new generation-zero session actor with the given agent and configuration.
     ///
-    /// Returns a [`SessionHandle`] and the actor itself for spawning.
+    /// Product composition roots that replace an Actor must call [`Self::set_generation`]
+    /// before spawning it. Returns a [`SessionHandle`] and the actor itself.
     pub fn new(agent: Agent, config: SessionConfig) -> (SessionHandle, Self) {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
@@ -113,11 +115,23 @@ impl AppServerSession {
             durable_persistence: None,
             pending_store,
             session_id,
+            session_generation: 0,
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
             model_context_limit: config.model_context_limit,
         };
 
         (handle, actor)
+    }
+
+    /// Assigns the authoritative generation before this Actor is spawned.
+    pub fn set_generation(&mut self, generation: u64) {
+        self.session_generation = generation;
+    }
+
+    /// Returns the authoritative generation assigned by the composition root.
+    #[must_use]
+    pub fn generation(&self) -> u64 {
+        self.session_generation
     }
 
     pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
@@ -271,6 +285,7 @@ impl AppServerSession {
                             submission_counter = submission_counter.saturating_add(1);
                             let submission = compatibility_submission(
                                 submission_counter,
+                                self.session_generation,
                                 SubmissionKind::UserTurn,
                                 message,
                                 Vec::new(),
@@ -293,6 +308,7 @@ impl AppServerSession {
                             submission_counter = submission_counter.saturating_add(1);
                             let submission = compatibility_submission(
                                 submission_counter,
+                                self.session_generation,
                                 SubmissionKind::UserTurn,
                                 text,
                                 attachments,
@@ -315,6 +331,7 @@ impl AppServerSession {
                             submission_counter = submission_counter.saturating_add(1);
                             let submission = compatibility_submission(
                                 submission_counter,
+                                self.session_generation,
                                 SubmissionKind::PreviewRequest,
                                 message,
                                 Vec::new(),
@@ -465,7 +482,10 @@ impl AppServerSession {
         };
         let paused = !records.is_empty();
         for record in records {
-            let submission = record.submission;
+            let mut submission = record.submission;
+            // Recovery transfers execution authority to this Actor generation.
+            // The durable batch/item/receipt identities remain unchanged.
+            submission.sender_generation = self.session_generation;
             if let Err(reason) = validate_submission(&submission) {
                 let _ = self.eq_tx.send(SessionEvent::Error {
                     message: format!(
@@ -495,9 +515,6 @@ impl AppServerSession {
 
     fn release_in_memory_pending_on_shutdown(&self, pending: &mut VecDeque<StructuredSubmission>) {
         for submission in pending.drain(..) {
-            // Legacy clients only understand that this Actor instance closed.
-            // Durable structured custody is preserved separately in the journal
-            // and is paused immediately after this compatibility projection.
             self.reject_submission(
                 &submission.id,
                 submission.sender_generation,
@@ -562,10 +579,23 @@ impl AppServerSession {
         });
     }
 
+    fn normalize_submission_generation(
+        &self,
+        submission: &mut StructuredSubmission,
+    ) -> Result<(), SubmissionRejectionReason> {
+        if submission.source == SubmissionSource::Scheduler && submission.sender_generation == 0 {
+            submission.sender_generation = self.session_generation;
+        }
+        if submission.sender_generation != self.session_generation {
+            return Err(SubmissionRejectionReason::WrongGeneration);
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn accept_durable_submission(
         &self,
-        submission: StructuredSubmission,
+        mut submission: StructuredSubmission,
         pending: &mut VecDeque<StructuredSubmission>,
         pending_items: &mut usize,
         pending_bytes: &mut usize,
@@ -576,6 +606,10 @@ impl AppServerSession {
         paused: bool,
         receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) -> bool {
+        if let Err(reason) = self.normalize_submission_generation(&mut submission) {
+            self.emit_admission_rejection(&submission, reason, receipt_tx);
+            return false;
+        }
         let (existing_receipt, existing_disposition) =
             match self.pending_store.reconcile(&submission) {
                 Ok(result) => result,
@@ -593,8 +627,6 @@ impl AppServerSession {
                     disposition,
                     receipt_tx,
                 );
-                // Compatibility-only projection for clients that predate durable
-                // receipts. The authoritative result is AlreadyAccepted above.
                 self.reject_submission(
                     &submission.id,
                     submission.sender_generation,
@@ -696,10 +728,15 @@ impl AppServerSession {
         pending: &VecDeque<StructuredSubmission>,
         receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) -> bool {
-        let (receipt_id, disposition) = match self.pending_store.reconcile(submission) {
+        let mut authoritative = submission.clone();
+        if let Err(reason) = self.normalize_submission_generation(&mut authoritative) {
+            self.emit_admission_rejection(&authoritative, reason, receipt_tx);
+            return false;
+        }
+        let (receipt_id, disposition) = match self.pending_store.reconcile(&authoritative) {
             Ok(result) => result,
             Err(error) => {
-                self.emit_durability_rejection(submission, &error, receipt_tx);
+                self.emit_durability_rejection(&authoritative, &error, receipt_tx);
                 return false;
             }
         };
@@ -710,8 +747,10 @@ impl AppServerSession {
                     | PendingSubmissionState::PausedPending,
                 ..
             }
-        ) && pending.iter().any(|queued| queued.id == submission.id);
-        self.emit_submission_receipt(submission, receipt_id, disposition, receipt_tx);
+        ) && pending
+            .iter()
+            .any(|queued| queued.id == authoritative.id);
+        self.emit_submission_receipt(&authoritative, receipt_id, disposition, receipt_tx);
         resume
     }
 
@@ -753,7 +792,7 @@ impl AppServerSession {
     ) {
         let receipt = SubmissionReceipt {
             session_id: self.session_id.clone(),
-            session_generation: submission.sender_generation,
+            session_generation: self.session_generation,
             submission_id: submission.id.clone(),
             reservation_id: submission.id.clone(),
             receipt_id,
@@ -822,8 +861,6 @@ impl AppServerSession {
             );
             return false;
         };
-        // EQ is a projection boundary. Once durable custody has transferred,
-        // a disconnected observer must not prevent Actor arbitration.
         let _ = self.eq_tx.send(SessionEvent::SubmissionQueued {
             session_id: self.session_id.clone(),
             submission_id: submission.id.clone(),
@@ -953,7 +990,7 @@ impl AppServerSession {
             let active = ActiveStructuredTurn {
                 submission_id: submission.id.clone(),
                 receipt_id: record.receipt_id,
-                session_generation: submission.sender_generation,
+                session_generation: self.session_generation,
                 turn_id: turn_id.clone(),
             };
             let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
@@ -1164,6 +1201,7 @@ impl AppServerSession {
 
 fn compatibility_submission(
     sequence: u64,
+    sender_generation: u64,
     kind: SubmissionKind,
     text: String,
     attachments: Vec<talos_core::message::ContentPart>,
@@ -1171,7 +1209,7 @@ fn compatibility_submission(
     StructuredSubmission {
         id: format!("compatibility_{sequence}"),
         source: SubmissionSource::Compatibility,
-        sender_generation: 0,
+        sender_generation,
         items: vec![SubmissionItem {
             id: format!("compatibility_item_{sequence}"),
             enqueue_sequence: sequence,
