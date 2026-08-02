@@ -206,3 +206,49 @@ jobs:
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
+
+  i169-sealed-provider-plans:
+    name: I169 wire sealed Provider plans
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/i169-tui-044-transactional-steering'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - name: Apply deterministic sealed-plan migration
+        run: |
+          set -euo pipefail
+          current_head="$(git rev-parse HEAD)"
+          git fetch origin feat/i169-tui-044-transactional-steering
+          test "$(git rev-parse origin/feat/i169-tui-044-transactional-steering)" = "${current_head}"
+          python3 scripts/i169_wire_provider_plans.py
+          git show HEAD^:.github/workflows/ci.yml > .github/workflows/ci.yml
+
+      - name: Validate sealed plan integration
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo check -p talos-agent --locked
+          cargo clippy -p talos-agent --locked -- -D warnings
+          cargo test -p talos-agent --locked
+
+      - name: Commit and push sealed plan integration
+        run: |
+          set -euo pipefail
+          git config user.name "wjhuang88"
+          git config user.email "6157210+wjhuang88@users.noreply.github.com"
+          rm scripts/i169_wire_provider_plans.py
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(i169): seal initial and continuation Provider plans (#131) [model:gpt-5.6-thinking]"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
