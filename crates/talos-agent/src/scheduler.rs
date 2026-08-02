@@ -337,11 +337,7 @@ impl SchedulerActor {
 
         let handle = tokio::spawn(async move {
             tokio::time::sleep(delay).await;
-            let submission = scheduled_submission(
-                &delivery_identity,
-                1,
-                message_for_fire,
-            );
+            let submission = scheduled_submission(&delivery_identity, 1, message_for_fire);
             deliver_until_accepted(&sq_tx, submission).await;
             let _ = accepted_tx.send(AcceptedFire {
                 task_id: task_id_for_fire,
@@ -482,10 +478,7 @@ fn scheduled_submission(
     }
 }
 
-async fn deliver_until_accepted(
-    sq_tx: &mpsc::Sender<SessionOp>,
-    submission: StructuredSubmission,
-) {
+async fn deliver_until_accepted(sq_tx: &mpsc::Sender<SessionOp>, submission: StructuredSubmission) {
     let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
     let mut submit_required = true;
     let mut attempts = 0_u64;
@@ -554,9 +547,7 @@ async fn next_matching_receipt(
     submission_id: &str,
 ) -> Option<SubmissionReceipt> {
     while let Some(receipt) = receipt_rx.recv().await {
-        if receipt.submission_id == submission_id
-            && receipt.source == SubmissionSource::Scheduler
-        {
+        if receipt.submission_id == submission_id && receipt.source == SubmissionSource::Scheduler {
             return Some(receipt);
         }
     }
@@ -693,14 +684,11 @@ impl AgentTool for DelayTool {
         {
             return scheduler_send_error(error);
         }
-        registration_result(
-            response_rx.await,
-            format!("Delay: {delay_secs} second(s)"),
-        )
+        registration_result(response_rx.await, format!("Delay: {delay_secs} second(s)"))
     }
 
-    fn nature(&self) -> &str {
-        unreachable!()
+    fn nature(&self) -> ToolNature {
+        ToolNature::Execute
     }
 
     fn family(&self) -> ToolFamily {
@@ -903,9 +891,9 @@ impl AgentTool for CancelScheduledTaskTool {
             Ok(CancelResult::Cancelled) => {
                 ToolResult::success(format!("Task {task_id} cancelled."))
             }
-            Ok(CancelResult::NotFound) => ToolResult::success(format!(
-                "Task {task_id} not found or already completed."
-            )),
+            Ok(CancelResult::NotFound) => {
+                ToolResult::success(format!("Task {task_id} not found or already completed."))
+            }
             Err(_) => ToolResult::error("scheduler dropped the request"),
         }
     }
@@ -955,11 +943,7 @@ mod tests {
         }
     }
 
-    async fn register_one_shot(
-        handle: &SchedulerHandle,
-        id: &str,
-        delay: Duration,
-    ) {
+    async fn register_one_shot(handle: &SchedulerHandle, id: &str, delay: Duration) {
         let (response_tx, response_rx) = oneshot::channel();
         handle
             .send(ScheduleCommand::RegisterOneShot {
@@ -978,7 +962,11 @@ mod tests {
 
     fn split_tracked_operation(
         operation: SessionOp,
-    ) -> (bool, StructuredSubmission, mpsc::UnboundedSender<SubmissionReceipt>) {
+    ) -> (
+        bool,
+        StructuredSubmission,
+        mpsc::UnboundedSender<SubmissionReceipt>,
+    ) {
         match operation {
             SessionOp::SubmitStructuredTracked {
                 submission,
@@ -1045,7 +1033,11 @@ mod tests {
             split_tracked_operation(sq_rx.try_recv().unwrap());
         assert!(is_submit);
         assert_eq!(submission.source, SubmissionSource::Scheduler);
-        assert!(submission.items[0].text.starts_with(SCHEDULED_FOLLOWUP_LABEL));
+        assert!(
+            submission.items[0]
+                .text
+                .starts_with(SCHEDULED_FOLLOWUP_LABEL)
+        );
         assert_eq!(list(&handle).await.len(), 1);
 
         accept(
@@ -1065,8 +1057,7 @@ mod tests {
 
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
-        let (_, submitted, _lost_receipt_tx) =
-            split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (_, submitted, _lost_receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
 
         tokio::time::advance(DELIVERY_RECEIPT_TIMEOUT + DELIVERY_RETRY_DELAY).await;
         yield_times(20).await;
@@ -1151,7 +1142,10 @@ mod tests {
         let mut last_receipt_tx = None;
         while let Ok(operation) = sq_rx.try_recv() {
             let (_, retry, receipt_tx) = split_tracked_operation(operation);
-            assert_eq!(retry.id, first.id, "later interval replaced unresolved fire");
+            assert_eq!(
+                retry.id, first.id,
+                "later interval replaced unresolved fire"
+            );
             last_receipt_tx = Some(receipt_tx);
         }
         let receipt_tx = last_receipt_tx.expect("at least one reconciliation retry");
@@ -1189,7 +1183,10 @@ mod tests {
             })
             .await
             .unwrap();
-        assert!(matches!(response_rx.await.unwrap(), CancelResult::Cancelled));
+        assert!(matches!(
+            response_rx.await.unwrap(),
+            CancelResult::Cancelled
+        ));
         tokio::time::advance(Duration::from_secs(10)).await;
         yield_times(20).await;
         assert!(sq_rx.try_recv().is_err());
