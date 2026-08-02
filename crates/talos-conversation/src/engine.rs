@@ -1196,35 +1196,14 @@ impl ConversationEngine {
 
     /// Drains the oldest steering message while preserving FIFO order.
     ///
-    /// This method remains available for downstream callers that need the
-    /// original single-item behavior. Talos's interactive runtime uses
-    /// [`Self::drain_steering_queue_batched`] for TUI-041 / GitHub Issue #50.
+    /// This method remains available only for legacy single-item callers.
+    /// Transactional TUI steering uses structured prepare/commit/rollback.
     pub fn drain_steering_queue(&mut self) -> Option<String> {
         if self.steering_queue.is_empty() {
             None
         } else {
             self.prepared_steering = None;
             Some(self.steering_queue.remove(0).text)
-        }
-    }
-
-    /// Drains the entire steering queue into a single batched message (TUI-041).
-    ///
-    /// When multiple user inputs accumulate in the steering queue during an
-    /// active turn, this method joins them with `\n\n` separators so they are
-    /// processed as one consolidated user turn instead of N sequential turns.
-    /// Returns `None` when the queue is empty.
-    pub fn drain_steering_queue_batched(&mut self) -> Option<String> {
-        if self.steering_queue.is_empty() {
-            None
-        } else {
-            self.prepared_steering = None;
-            let joined = std::mem::take(&mut self.steering_queue)
-                .into_iter()
-                .map(|item| item.text)
-                .collect::<Vec<_>>()
-                .join("\n\n");
-            Some(joined)
         }
     }
 
