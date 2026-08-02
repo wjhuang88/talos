@@ -545,8 +545,7 @@ impl AppServerSession {
             };
         match existing_disposition {
             SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id } => {
-                let disposition =
-                    SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
+                let disposition = SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
                 let delivered =
                     self.emit_submission_receipt(&submission, existing_receipt, disposition);
                 return delivered
@@ -624,8 +623,7 @@ impl AppServerSession {
             SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
                 matches!(
                     state,
-                    PendingSubmissionState::AcceptedPending
-                        | PendingSubmissionState::PausedPending
+                    PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending
                 ) && pending.iter().any(|queued| queued.id == submission.id)
             }
             SubmissionReceiptDisposition::NotAccepted => false,
@@ -677,10 +675,7 @@ impl AppServerSession {
         submission: &StructuredSubmission,
         error: &impl std::fmt::Display,
     ) {
-        self.emit_admission_rejection(
-            submission,
-            SubmissionRejectionReason::DurabilityUnavailable,
-        );
+        self.emit_admission_rejection(submission, SubmissionRejectionReason::DurabilityUnavailable);
         self.emit_custody_error("structured submission durability failed", error);
     }
 
