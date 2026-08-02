@@ -1,5 +1,4 @@
-// Temporary I169 compile probe: the implementation stays in a sibling include
-// while receipt-state compilation is stabilized. This wrapper will be removed
-// before review readiness and the implementation will be restored as a normal
-// rustfmt-managed module.
-include!("tui_bridge_impl.rs");
+// Temporary I169 compile probe: build.rs applies only the exact known compiler
+// fixes to the receipt-state implementation and writes the result to OUT_DIR.
+// This wrapper and build.rs will be removed before review readiness.
+include!(concat!(env!("OUT_DIR"), "/tui_bridge_impl.rs"));
