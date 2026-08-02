@@ -5,7 +5,7 @@
 //! - Drives agent turns via [`Agent::run_streaming`]
 //! - Emits [`SessionEvent`] on the unbounded EQ
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -19,12 +19,9 @@ use tokio_util::sync::CancellationToken;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{
     MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
-    MAX_STEERING_QUEUE_ITEMS, MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS,
-    MAX_SUBMISSION_IMAGE_BYTES, MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES,
-    MAX_SUBMISSION_TOTAL_IMAGE_BYTES, PendingSubmissionState, SessionConfig, SessionEvent,
-    SessionHandle, SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind,
-    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
-    TurnCompletionStatus, TurnEventPayload,
+    MAX_STEERING_QUEUE_ITEMS, PendingSubmissionState, SessionConfig, SessionEvent, SessionHandle,
+    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceiptDisposition,
+    SubmissionRejectionReason, SubmissionSource, TurnCompletionStatus, TurnEventPayload,
 };
 use talos_session::PendingSubmissionStore;
 
@@ -351,7 +348,10 @@ impl AppServerSession {
                             }
                         }
                         SessionOp::ReconcileStructured { submission } => {
-                            self.reconcile_submission(&submission);
+                            let resumes = submission.source != SubmissionSource::Scheduler;
+                            if self.reconcile_submission(&submission, &pending) && resumes {
+                                paused = false;
+                            }
                         }
                         SessionOp::Interrupt => {
                             if let Some(token) = &cancel_token {
@@ -424,17 +424,16 @@ impl AppServerSession {
                 return true;
             }
         };
-        let mut paused = false;
+        let paused = !records.is_empty();
         for record in records {
             let submission = record.submission;
-            if validate_submission(&submission).is_err() {
+            if let Err(reason) = validate_submission(&submission) {
                 let _ = self.eq_tx.send(SessionEvent::Error {
                     message: format!(
-                        "pending submission {} failed validation during recovery",
+                        "pending submission {} failed validation during recovery: {reason:?}",
                         submission.id
                     ),
                 });
-                paused = true;
                 continue;
             }
             let (images, image_bytes) = submission.image_totals();
@@ -450,7 +449,6 @@ impl AppServerSession {
             for item in &submission.items {
                 record_recent_identity(recent_item_ids, item.id.clone(), MAX_RECENT_ITEM_IDS);
             }
-            paused |= record.state == PendingSubmissionState::PausedPending;
             pending.push_back(submission);
         }
         paused
@@ -537,24 +535,80 @@ impl AppServerSession {
         recent_item_ids: &mut VecDeque<String>,
         paused: bool,
     ) -> bool {
+        let (existing_receipt, existing_disposition) =
+            match self.pending_store.reconcile(&submission) {
+                Ok(result) => result,
+                Err(error) => {
+                    self.emit_durability_rejection(&submission, &error);
+                    return false;
+                }
+            };
+        match existing_disposition {
+            SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id } => {
+                let disposition =
+                    SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
+                let delivered =
+                    self.emit_submission_receipt(&submission, existing_receipt, disposition);
+                return delivered
+                    && matches!(
+                        state,
+                        PendingSubmissionState::AcceptedPending
+                            | PendingSubmissionState::PausedPending
+                    )
+                    && pending.iter().any(|queued| queued.id == submission.id);
+            }
+            SubmissionReceiptDisposition::Rejected { reason } => {
+                self.emit_submission_receipt(
+                    &submission,
+                    existing_receipt,
+                    SubmissionReceiptDisposition::Rejected { reason },
+                );
+                self.reject_submission(&submission.id, submission.sender_generation, reason);
+                return false;
+            }
+            SubmissionReceiptDisposition::NotAccepted => {}
+            SubmissionReceiptDisposition::AcceptedPending => {
+                self.emit_custody_error(
+                    "structured reconciliation returned an invalid first-accept state",
+                    &submission.id,
+                );
+                return false;
+            }
+        }
+
+        if let Err(reason) = validate_submission(&submission) {
+            self.emit_admission_rejection(&submission, reason);
+            return false;
+        }
+        if submission
+            .items
+            .iter()
+            .any(|item| recent_item_ids.contains(&item.id))
+        {
+            self.emit_admission_rejection(&submission, SubmissionRejectionReason::Duplicate);
+            return false;
+        }
+        if !queue_has_capacity(
+            &submission,
+            *pending_items,
+            *pending_bytes,
+            *pending_images,
+            *pending_image_bytes,
+        ) {
+            self.emit_admission_rejection(&submission, SubmissionRejectionReason::LimitExceeded);
+            return false;
+        }
+
         let (receipt_id, disposition) = match self.pending_store.accept(&submission) {
             Ok(result) => result,
             Err(error) => {
-                let disposition = SubmissionReceiptDisposition::Rejected {
-                    reason: SubmissionRejectionReason::DurabilityUnavailable,
-                };
-                self.emit_submission_receipt(&submission, String::new(), disposition);
-                self.reject_submission(
-                    &submission.id,
-                    submission.sender_generation,
-                    SubmissionRejectionReason::DurabilityUnavailable,
-                );
-                self.emit_custody_error("structured submission durability failed", &error);
+                self.emit_durability_rejection(&submission, &error);
                 return false;
             }
         };
-
-        self.emit_submission_receipt(&submission, receipt_id, disposition.clone());
+        if !self.emit_submission_receipt(&submission, receipt_id, disposition.clone()) {
+            return false;
+        }
         match disposition {
             SubmissionReceiptDisposition::AcceptedPending => self.accept_submission(
                 submission,
@@ -567,7 +621,13 @@ impl AppServerSession {
                 recent_item_ids,
                 paused,
             ),
-            SubmissionReceiptDisposition::AlreadyAccepted { .. } => false,
+            SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
+                matches!(
+                    state,
+                    PendingSubmissionState::AcceptedPending
+                        | PendingSubmissionState::PausedPending
+                ) && pending.iter().any(|queued| queued.id == submission.id)
+            }
             SubmissionReceiptDisposition::NotAccepted => false,
             SubmissionReceiptDisposition::Rejected { reason } => {
                 self.reject_submission(&submission.id, submission.sender_generation, reason);
@@ -576,19 +636,52 @@ impl AppServerSession {
         }
     }
 
-    fn reconcile_submission(&self, submission: &StructuredSubmission) {
+    fn reconcile_submission(
+        &self,
+        submission: &StructuredSubmission,
+        pending: &VecDeque<StructuredSubmission>,
+    ) -> bool {
         let (receipt_id, disposition) = match self.pending_store.reconcile(submission) {
             Ok(result) => result,
             Err(error) => {
-                let disposition = SubmissionReceiptDisposition::Rejected {
-                    reason: SubmissionRejectionReason::DurabilityUnavailable,
-                };
-                self.emit_submission_receipt(submission, String::new(), disposition);
-                self.emit_custody_error("structured submission reconciliation failed", &error);
-                return;
+                self.emit_durability_rejection(submission, &error);
+                return false;
             }
         };
-        self.emit_submission_receipt(submission, receipt_id, disposition);
+        let resume = matches!(
+            disposition,
+            SubmissionReceiptDisposition::AlreadyAccepted {
+                state: PendingSubmissionState::AcceptedPending
+                    | PendingSubmissionState::PausedPending,
+                ..
+            }
+        ) && pending.iter().any(|queued| queued.id == submission.id);
+        self.emit_submission_receipt(submission, receipt_id, disposition) && resume
+    }
+
+    fn emit_admission_rejection(
+        &self,
+        submission: &StructuredSubmission,
+        reason: SubmissionRejectionReason,
+    ) {
+        self.emit_submission_receipt(
+            submission,
+            String::new(),
+            SubmissionReceiptDisposition::Rejected { reason },
+        );
+        self.reject_submission(&submission.id, submission.sender_generation, reason);
+    }
+
+    fn emit_durability_rejection(
+        &self,
+        submission: &StructuredSubmission,
+        error: &impl std::fmt::Display,
+    ) {
+        self.emit_admission_rejection(
+            submission,
+            SubmissionRejectionReason::DurabilityUnavailable,
+        );
+        self.emit_custody_error("structured submission durability failed", error);
     }
 
     fn emit_submission_receipt(
@@ -596,18 +689,20 @@ impl AppServerSession {
         submission: &StructuredSubmission,
         receipt_id: String,
         disposition: SubmissionReceiptDisposition,
-    ) {
-        let _ = self.eq_tx.send(SessionEvent::SubmissionReceipt {
-            session_id: self.session_id.clone(),
-            session_generation: submission.sender_generation,
-            submission_id: submission.id.clone(),
-            reservation_id: submission.id.clone(),
-            receipt_id,
-            source: submission.source,
-            item_count: submission.items.len(),
-            total_text_bytes: submission.total_text_bytes(),
-            disposition,
-        });
+    ) -> bool {
+        self.eq_tx
+            .send(SessionEvent::SubmissionReceipt {
+                session_id: self.session_id.clone(),
+                session_generation: submission.sender_generation,
+                submission_id: submission.id.clone(),
+                reservation_id: submission.id.clone(),
+                receipt_id,
+                source: submission.source,
+                item_count: submission.items.len(),
+                total_text_bytes: submission.total_text_bytes(),
+                disposition,
+            })
+            .is_ok()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -640,7 +735,13 @@ impl AppServerSession {
             );
             return false;
         }
-        let Some(next_items) = pending_items.checked_add(submission.items.len()) else {
+        let Some((next_items, next_bytes, next_images, next_image_bytes)) = queue_totals_after(
+            &submission,
+            *pending_items,
+            *pending_bytes,
+            *pending_images,
+            *pending_image_bytes,
+        ) else {
             self.reject_submission(
                 &submission.id,
                 submission.sender_generation,
@@ -648,51 +749,20 @@ impl AppServerSession {
             );
             return false;
         };
-        let Some(next_bytes) = pending_bytes.checked_add(submission.total_text_bytes()) else {
-            self.reject_submission(
-                &submission.id,
-                submission.sender_generation,
-                SubmissionRejectionReason::LimitExceeded,
-            );
-            return false;
-        };
-        let (submission_images, submission_image_bytes) = submission.image_totals();
-        let Some(next_images) = pending_images.checked_add(submission_images) else {
-            self.reject_submission(
-                &submission.id,
-                submission.sender_generation,
-                SubmissionRejectionReason::LimitExceeded,
-            );
-            return false;
-        };
-        let Some(next_image_bytes) = pending_image_bytes.checked_add(submission_image_bytes) else {
-            self.reject_submission(
-                &submission.id,
-                submission.sender_generation,
-                SubmissionRejectionReason::LimitExceeded,
-            );
-            return false;
-        };
-        if next_items > MAX_STEERING_QUEUE_ITEMS
-            || next_bytes > MAX_STEERING_QUEUE_BYTES
-            || next_images > MAX_STEERING_QUEUE_IMAGES
-            || next_image_bytes > MAX_STEERING_QUEUE_IMAGE_BYTES
+        if self
+            .eq_tx
+            .send(SessionEvent::SubmissionQueued {
+                session_id: self.session_id.clone(),
+                submission_id: submission.id.clone(),
+                sender_generation: submission.sender_generation,
+                source: submission.source,
+                item_count: submission.items.len(),
+                total_text_bytes: submission.total_text_bytes(),
+            })
+            .is_err()
         {
-            self.reject_submission(
-                &submission.id,
-                submission.sender_generation,
-                SubmissionRejectionReason::LimitExceeded,
-            );
             return false;
         }
-        let _ = self.eq_tx.send(SessionEvent::SubmissionQueued {
-            session_id: self.session_id.clone(),
-            submission_id: submission.id.clone(),
-            sender_generation: submission.sender_generation,
-            source: submission.source,
-            item_count: submission.items.len(),
-            total_text_bytes: submission.total_text_bytes(),
-        });
 
         record_recent_identity(
             recent_submission_ids,
@@ -1059,46 +1129,41 @@ fn record_recent_identity(identities: &mut VecDeque<String>, id: String, capacit
 }
 
 fn validate_submission(submission: &StructuredSubmission) -> Result<(), SubmissionRejectionReason> {
-    if submission.id.is_empty()
-        || submission.items.is_empty()
-        || submission.items.len() > MAX_SUBMISSION_BATCH_ITEMS
-        || submission.common_kind().is_none()
-        || (submission.common_kind() == Some(SubmissionKind::PreviewRequest)
-            && (submission.items.len() != 1 || !submission.items[0].attachments.is_empty()))
-    {
-        return Err(SubmissionRejectionReason::InvalidStructure);
-    }
-    if submission.total_text_bytes() > MAX_SUBMISSION_BATCH_BYTES
-        || submission
-            .items
-            .iter()
-            .any(|item| item.id.is_empty() || item.text.len() > MAX_SUBMISSION_ITEM_BYTES)
-    {
-        return Err(SubmissionRejectionReason::LimitExceeded);
-    }
-    let mut image_count = 0_usize;
-    let mut total_image_bytes = 0_u64;
-    for item in &submission.items {
-        for attachment in &item.attachments {
-            if let talos_core::message::ContentPart::Image { byte_count, .. } = attachment {
-                image_count = image_count.saturating_add(1);
-                total_image_bytes = total_image_bytes.saturating_add(*byte_count);
-                if image_count > MAX_SUBMISSION_IMAGE_COUNT
-                    || *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                    || total_image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
-                {
-                    return Err(SubmissionRejectionReason::LimitExceeded);
-                }
-            }
-        }
-    }
-    let mut item_ids = HashSet::with_capacity(submission.items.len());
-    if submission
-        .items
-        .iter()
-        .any(|item| !item_ids.insert(item.id.as_str()))
-    {
-        return Err(SubmissionRejectionReason::Duplicate);
-    }
-    Ok(())
+    submission.validate()
+}
+
+fn queue_has_capacity(
+    submission: &StructuredSubmission,
+    pending_items: usize,
+    pending_bytes: usize,
+    pending_images: usize,
+    pending_image_bytes: u64,
+) -> bool {
+    queue_totals_after(
+        submission,
+        pending_items,
+        pending_bytes,
+        pending_images,
+        pending_image_bytes,
+    )
+    .is_some()
+}
+
+fn queue_totals_after(
+    submission: &StructuredSubmission,
+    pending_items: usize,
+    pending_bytes: usize,
+    pending_images: usize,
+    pending_image_bytes: u64,
+) -> Option<(usize, usize, usize, u64)> {
+    let next_items = pending_items.checked_add(submission.items.len())?;
+    let next_bytes = pending_bytes.checked_add(submission.total_text_bytes())?;
+    let (submission_images, submission_image_bytes) = submission.image_totals();
+    let next_images = pending_images.checked_add(submission_images)?;
+    let next_image_bytes = pending_image_bytes.checked_add(submission_image_bytes)?;
+    (next_items <= MAX_STEERING_QUEUE_ITEMS
+        && next_bytes <= MAX_STEERING_QUEUE_BYTES
+        && next_images <= MAX_STEERING_QUEUE_IMAGES
+        && next_image_bytes <= MAX_STEERING_QUEUE_IMAGE_BYTES)
+        .then_some((next_items, next_bytes, next_images, next_image_bytes))
 }
