@@ -480,13 +480,15 @@ mod tests {
             "HTTP/1.1 302 Found\r\n\
              Location: http://127.0.0.1:{port}/final\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 0\r\n\r\n"
+             Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
         );
         let final_body = "<html><body>Hello World</body></html>";
         let final_response = format!(
             "HTTP/1.1 200 OK\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: {}\r\n\r\n\
+             Content-Length: {}\r\n\
+             Connection: close\r\n\r\n\
              {final_body}",
             final_body.len()
         );
