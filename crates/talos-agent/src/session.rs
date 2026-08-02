@@ -20,8 +20,9 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{
     MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
     MAX_STEERING_QUEUE_ITEMS, PendingSubmissionState, SessionConfig, SessionEvent, SessionHandle,
-    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceiptDisposition,
-    SubmissionRejectionReason, SubmissionSource, TurnCompletionStatus, TurnEventPayload,
+    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceipt,
+    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
+    TurnCompletionStatus, TurnEventPayload,
 };
 #[cfg(test)]
 use talos_core::session::{MAX_SUBMISSION_BATCH_ITEMS, MAX_SUBMISSION_IMAGE_COUNT};
@@ -344,6 +345,28 @@ impl AppServerSession {
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
                                 paused,
+                                None,
+                            ) && resumes
+                            {
+                                paused = false;
+                            }
+                        }
+                        SessionOp::SubmitStructuredTracked {
+                            submission,
+                            receipt_tx,
+                        } => {
+                            let resumes = submission.source != SubmissionSource::Scheduler;
+                            if self.accept_durable_submission(
+                                submission,
+                                &mut pending,
+                                &mut pending_items,
+                                &mut pending_bytes,
+                                &mut pending_images,
+                                &mut pending_image_bytes,
+                                &mut recent_submission_ids,
+                                &mut recent_item_ids,
+                                paused,
+                                receipt_tx.as_ref(),
                             ) && resumes
                             {
                                 paused = false;
@@ -351,7 +374,21 @@ impl AppServerSession {
                         }
                         SessionOp::ReconcileStructured { submission } => {
                             let resumes = submission.source != SubmissionSource::Scheduler;
-                            if self.reconcile_submission(&submission, &pending) && resumes {
+                            if self.reconcile_submission(&submission, &pending, None) && resumes {
+                                paused = false;
+                            }
+                        }
+                        SessionOp::ReconcileStructuredTracked {
+                            submission,
+                            receipt_tx,
+                        } => {
+                            let resumes = submission.source != SubmissionSource::Scheduler;
+                            if self.reconcile_submission(
+                                &submission,
+                                &pending,
+                                receipt_tx.as_ref(),
+                            ) && resumes
+                            {
                                 paused = false;
                             }
                         }
@@ -537,20 +574,25 @@ impl AppServerSession {
         recent_submission_ids: &mut VecDeque<String>,
         recent_item_ids: &mut VecDeque<String>,
         paused: bool,
+        receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) -> bool {
         let (existing_receipt, existing_disposition) =
             match self.pending_store.reconcile(&submission) {
                 Ok(result) => result,
                 Err(error) => {
-                    self.emit_durability_rejection(&submission, &error);
+                    self.emit_durability_rejection(&submission, &error, receipt_tx);
                     return false;
                 }
             };
         match existing_disposition {
             SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id } => {
                 let disposition = SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
-                let delivered =
-                    self.emit_submission_receipt(&submission, existing_receipt, disposition);
+                self.emit_submission_receipt(
+                    &submission,
+                    existing_receipt,
+                    disposition,
+                    receipt_tx,
+                );
                 // Compatibility-only projection for clients that predate durable
                 // receipts. The authoritative result is AlreadyAccepted above.
                 self.reject_submission(
@@ -558,19 +600,18 @@ impl AppServerSession {
                     submission.sender_generation,
                     SubmissionRejectionReason::Duplicate,
                 );
-                return delivered
-                    && matches!(
-                        state,
-                        PendingSubmissionState::AcceptedPending
-                            | PendingSubmissionState::PausedPending
-                    )
-                    && pending.iter().any(|queued| queued.id == submission.id);
+                return matches!(
+                    state,
+                    PendingSubmissionState::AcceptedPending
+                        | PendingSubmissionState::PausedPending
+                ) && pending.iter().any(|queued| queued.id == submission.id);
             }
             SubmissionReceiptDisposition::Rejected { reason } => {
                 self.emit_submission_receipt(
                     &submission,
                     existing_receipt,
                     SubmissionReceiptDisposition::Rejected { reason },
+                    receipt_tx,
                 );
                 self.reject_submission(&submission.id, submission.sender_generation, reason);
                 return false;
@@ -586,7 +627,7 @@ impl AppServerSession {
         }
 
         if let Err(reason) = validate_submission(&submission) {
-            self.emit_admission_rejection(&submission, reason);
+            self.emit_admission_rejection(&submission, reason, receipt_tx);
             return false;
         }
         if submission
@@ -594,7 +635,11 @@ impl AppServerSession {
             .iter()
             .any(|item| recent_item_ids.contains(&item.id))
         {
-            self.emit_admission_rejection(&submission, SubmissionRejectionReason::Duplicate);
+            self.emit_admission_rejection(
+                &submission,
+                SubmissionRejectionReason::Duplicate,
+                receipt_tx,
+            );
             return false;
         }
         if !queue_has_capacity(
@@ -604,20 +649,27 @@ impl AppServerSession {
             *pending_images,
             *pending_image_bytes,
         ) {
-            self.emit_admission_rejection(&submission, SubmissionRejectionReason::LimitExceeded);
+            self.emit_admission_rejection(
+                &submission,
+                SubmissionRejectionReason::LimitExceeded,
+                receipt_tx,
+            );
             return false;
         }
 
         let (receipt_id, disposition) = match self.pending_store.accept(&submission) {
             Ok(result) => result,
             Err(error) => {
-                self.emit_durability_rejection(&submission, &error);
+                self.emit_durability_rejection(&submission, &error, receipt_tx);
                 return false;
             }
         };
-        if !self.emit_submission_receipt(&submission, receipt_id, disposition.clone()) {
-            return false;
-        }
+        self.emit_submission_receipt(
+            &submission,
+            receipt_id,
+            disposition.clone(),
+            receipt_tx,
+        );
         match disposition {
             SubmissionReceiptDisposition::AcceptedPending => self.accept_submission(
                 submission,
@@ -648,11 +700,12 @@ impl AppServerSession {
         &self,
         submission: &StructuredSubmission,
         pending: &VecDeque<StructuredSubmission>,
+        receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) -> bool {
         let (receipt_id, disposition) = match self.pending_store.reconcile(submission) {
             Ok(result) => result,
             Err(error) => {
-                self.emit_durability_rejection(submission, &error);
+                self.emit_durability_rejection(submission, &error, receipt_tx);
                 return false;
             }
         };
@@ -664,18 +717,21 @@ impl AppServerSession {
                 ..
             }
         ) && pending.iter().any(|queued| queued.id == submission.id);
-        self.emit_submission_receipt(submission, receipt_id, disposition) && resume
+        self.emit_submission_receipt(submission, receipt_id, disposition, receipt_tx);
+        resume
     }
 
     fn emit_admission_rejection(
         &self,
         submission: &StructuredSubmission,
         reason: SubmissionRejectionReason,
+        receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) {
         self.emit_submission_receipt(
             submission,
             String::new(),
             SubmissionReceiptDisposition::Rejected { reason },
+            receipt_tx,
         );
         self.reject_submission(&submission.id, submission.sender_generation, reason);
     }
@@ -684,8 +740,13 @@ impl AppServerSession {
         &self,
         submission: &StructuredSubmission,
         error: &impl std::fmt::Display,
+        receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) {
-        self.emit_admission_rejection(submission, SubmissionRejectionReason::DurabilityUnavailable);
+        self.emit_admission_rejection(
+            submission,
+            SubmissionRejectionReason::DurabilityUnavailable,
+            receipt_tx,
+        );
         self.emit_custody_error("structured submission durability failed", error);
     }
 
@@ -694,20 +755,33 @@ impl AppServerSession {
         submission: &StructuredSubmission,
         receipt_id: String,
         disposition: SubmissionReceiptDisposition,
-    ) -> bool {
-        self.eq_tx
-            .send(SessionEvent::SubmissionReceipt {
-                session_id: self.session_id.clone(),
-                session_generation: submission.sender_generation,
-                submission_id: submission.id.clone(),
-                reservation_id: submission.id.clone(),
-                receipt_id,
-                source: submission.source,
-                item_count: submission.items.len(),
-                total_text_bytes: submission.total_text_bytes(),
-                disposition,
-            })
-            .is_ok()
+        receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
+    ) {
+        let receipt = SubmissionReceipt {
+            session_id: self.session_id.clone(),
+            session_generation: submission.sender_generation,
+            submission_id: submission.id.clone(),
+            reservation_id: submission.id.clone(),
+            receipt_id,
+            source: submission.source,
+            item_count: submission.items.len(),
+            total_text_bytes: submission.total_text_bytes(),
+            disposition,
+        };
+        let _ = self.eq_tx.send(SessionEvent::SubmissionReceipt {
+            session_id: receipt.session_id.clone(),
+            session_generation: receipt.session_generation,
+            submission_id: receipt.submission_id.clone(),
+            reservation_id: receipt.reservation_id.clone(),
+            receipt_id: receipt.receipt_id.clone(),
+            source: receipt.source,
+            item_count: receipt.item_count,
+            total_text_bytes: receipt.total_text_bytes,
+            disposition: receipt.disposition.clone(),
+        });
+        if let Some(receipt_tx) = receipt_tx {
+            let _ = receipt_tx.send(receipt);
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -754,20 +828,16 @@ impl AppServerSession {
             );
             return false;
         };
-        if self
-            .eq_tx
-            .send(SessionEvent::SubmissionQueued {
-                session_id: self.session_id.clone(),
-                submission_id: submission.id.clone(),
-                sender_generation: submission.sender_generation,
-                source: submission.source,
-                item_count: submission.items.len(),
-                total_text_bytes: submission.total_text_bytes(),
-            })
-            .is_err()
-        {
-            return false;
-        }
+        // EQ is a projection boundary. Once durable custody has transferred,
+        // a disconnected observer must not prevent Actor arbitration.
+        let _ = self.eq_tx.send(SessionEvent::SubmissionQueued {
+            session_id: self.session_id.clone(),
+            submission_id: submission.id.clone(),
+            sender_generation: submission.sender_generation,
+            source: submission.source,
+            item_count: submission.items.len(),
+            total_text_bytes: submission.total_text_bytes(),
+        });
 
         record_recent_identity(
             recent_submission_ids,
