@@ -152,10 +152,7 @@ async fn initial_provider_dispatch_consumes_the_exact_sealed_plan_once() {
         serde_json::to_value(&captured[0].messages).unwrap(),
         serde_json::to_value(&expected_messages).unwrap()
     );
-    assert_eq!(
-        serde_json::to_value(&captured[0].tools).unwrap(),
-        serde_json::to_value(&expected_tools).unwrap()
-    );
+    assert_eq!(captured[0].tools, expected_tools);
 }
 
 #[tokio::test]
