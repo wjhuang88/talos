@@ -183,29 +183,29 @@ impl StructuredSubmission {
         let metadata_bytes = self
             .attachment_metadata_bytes()
             .ok_or(SubmissionRejectionReason::InvalidStructure)?;
-        let oversized_attachment = self
-            .items
-            .iter()
-            .flat_map(|item| &item.attachments)
-            .any(|part| match part {
-                ContentPart::Image {
-                    path,
-                    mime,
-                    byte_count,
-                    ..
-                } => {
-                    let metadata = path
-                        .as_os_str()
-                        .to_string_lossy()
-                        .len()
-                        .saturating_add(mime.len())
-                        .saturating_add(std::mem::size_of::<u64>())
-                        .saturating_add(32);
-                    *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                        || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
-                }
-                ContentPart::Text { .. } => true,
-            });
+        let oversized_attachment =
+            self.items
+                .iter()
+                .flat_map(|item| &item.attachments)
+                .any(|part| match part {
+                    ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                        ..
+                    } => {
+                        let metadata = path
+                            .as_os_str()
+                            .to_string_lossy()
+                            .len()
+                            .saturating_add(mime.len())
+                            .saturating_add(std::mem::size_of::<u64>())
+                            .saturating_add(32);
+                        *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                            || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
+                    }
+                    ContentPart::Text { .. } => true,
+                });
         if image_count > MAX_SUBMISSION_IMAGE_COUNT
             || image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
             || metadata_bytes > MAX_SUBMISSION_TOTAL_ATTACHMENT_METADATA_BYTES
@@ -289,10 +289,7 @@ impl SubmissionReceiptDisposition {
     /// Returns true once the Actor has durably accepted this exact identity.
     #[must_use]
     pub fn has_durable_custody(&self) -> bool {
-        matches!(
-            self,
-            Self::AcceptedPending | Self::AlreadyAccepted { .. }
-        )
+        matches!(self, Self::AcceptedPending | Self::AlreadyAccepted { .. })
     }
 }
 
