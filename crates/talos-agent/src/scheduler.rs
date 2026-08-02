@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use talos_core::session::{
@@ -22,6 +22,7 @@ use talos_core::session::{
 use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 /// Minimum allowed one-shot delay.
@@ -943,6 +944,17 @@ mod tests {
         }
     }
 
+    async fn advance_delivery_retry() {
+        // `advance` only moves timers that already exist. Give the delivery
+        // future time to arm its receipt timeout, move that timeout, then let
+        // it arm the separate retry sleep before moving the clock again.
+        yield_times(10).await;
+        tokio::time::advance(DELIVERY_RECEIPT_TIMEOUT).await;
+        yield_times(10).await;
+        tokio::time::advance(DELIVERY_RETRY_DELAY).await;
+        yield_times(20).await;
+    }
+
     async fn register_one_shot(handle: &SchedulerHandle, id: &str, delay: Duration) {
         let (response_tx, response_rx) = oneshot::channel();
         handle
@@ -1059,8 +1071,7 @@ mod tests {
         yield_times(10).await;
         let (_, submitted, _lost_receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
 
-        tokio::time::advance(DELIVERY_RECEIPT_TIMEOUT + DELIVERY_RETRY_DELAY).await;
-        yield_times(20).await;
+        advance_delivery_retry().await;
         let (is_submit, reconciled, receipt_tx) =
             split_tracked_operation(sq_rx.try_recv().unwrap());
         assert!(!is_submit);
@@ -1109,8 +1120,9 @@ mod tests {
             },
         );
 
-        tokio::time::advance(DELIVERY_RETRY_DELAY).await;
         yield_times(10).await;
+        tokio::time::advance(DELIVERY_RETRY_DELAY).await;
+        yield_times(20).await;
         let (is_submit, retry, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
         assert!(is_submit);
         assert_eq!(retry, first);
@@ -1137,24 +1149,19 @@ mod tests {
         yield_times(10).await;
         let (_, first, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
 
-        tokio::time::advance(Duration::from_secs(12)).await;
-        yield_times(30).await;
-        let mut last_receipt_tx = None;
-        while let Ok(operation) = sq_rx.try_recv() {
-            let (_, retry, receipt_tx) = split_tracked_operation(operation);
-            assert_eq!(
-                retry.id, first.id,
-                "later interval replaced unresolved fire"
-            );
-            last_receipt_tx = Some(receipt_tx);
-        }
-        let receipt_tx = last_receipt_tx.expect("at least one reconciliation retry");
+        advance_delivery_retry().await;
+        let (is_submit, retry, receipt_tx) =
+            split_tracked_operation(sq_rx.try_recv().unwrap());
+        assert!(!is_submit);
+        assert_eq!(retry.id, first.id, "later interval replaced unresolved fire");
+        assert!(sq_rx.try_recv().is_err());
+
         accept(
-            &first,
+            &retry,
             &receipt_tx,
             SubmissionReceiptDisposition::AcceptedPending,
         );
-        yield_times(10).await;
+        yield_times(20).await;
 
         tokio::time::advance(Duration::from_secs(4)).await;
         yield_times(10).await;
