@@ -7,9 +7,7 @@ use talos_core::message::{AgentEvent, Message, StopReason, Usage};
 use talos_core::provider::{LanguageModel, ProviderResult, ToolDefinition};
 use talos_core::session::{SubmissionItem, SubmissionKind};
 use talos_core::tool::ToolRegistry;
-use talos_plugin::{
-    HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult,
-};
+use talos_plugin::{HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult};
 use tokio::sync::mpsc;
 
 use super::*;
