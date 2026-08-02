@@ -1150,10 +1150,12 @@ mod tests {
         let (_, first, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
 
         advance_delivery_retry().await;
-        let (is_submit, retry, receipt_tx) =
-            split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (is_submit, retry, receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
         assert!(!is_submit);
-        assert_eq!(retry.id, first.id, "later interval replaced unresolved fire");
+        assert_eq!(
+            retry.id, first.id,
+            "later interval replaced unresolved fire"
+        );
         assert!(sq_rx.try_recv().is_err());
 
         accept(
