@@ -602,8 +602,7 @@ impl AppServerSession {
                 );
                 return matches!(
                     state,
-                    PendingSubmissionState::AcceptedPending
-                        | PendingSubmissionState::PausedPending
+                    PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending
                 ) && pending.iter().any(|queued| queued.id == submission.id);
             }
             SubmissionReceiptDisposition::Rejected { reason } => {
@@ -664,12 +663,7 @@ impl AppServerSession {
                 return false;
             }
         };
-        self.emit_submission_receipt(
-            &submission,
-            receipt_id,
-            disposition.clone(),
-            receipt_tx,
-        );
+        self.emit_submission_receipt(&submission, receipt_id, disposition.clone(), receipt_tx);
         match disposition {
             SubmissionReceiptDisposition::AcceptedPending => self.accept_submission(
                 submission,
