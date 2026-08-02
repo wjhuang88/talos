@@ -21,8 +21,6 @@ pub struct CommitResult {
     pub old_session: Session,
     /// The handle for the newly active session actor.
     pub new_handle: SessionHandle,
-    /// Authoritative generation assigned to the newly active Actor.
-    pub session_generation: u64,
 }
 
 /// A prepared but not-yet-active session replacement.
@@ -103,7 +101,6 @@ impl SessionTransition {
         Ok(CommitResult {
             old_session,
             new_handle: prepared.handle,
-            session_generation: next_generation,
         })
     }
 
