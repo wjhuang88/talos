@@ -22,9 +22,10 @@ use talos_core::session::{
     MAX_STEERING_QUEUE_ITEMS, MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS,
     MAX_SUBMISSION_IMAGE_BYTES, MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES,
     MAX_SUBMISSION_TOTAL_IMAGE_BYTES, SessionConfig, SessionEvent, SessionHandle, SessionOp,
-    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
-    SubmissionSource, TurnCompletionStatus, TurnEventPayload,
+    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceiptDisposition,
+    SubmissionRejectionReason, SubmissionSource, TurnCompletionStatus, TurnEventPayload,
 };
+use talos_session::PendingSubmissionStore;
 
 use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
@@ -59,6 +60,7 @@ pub struct AppServerSession {
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
     durable_persistence: Option<DurableTurnPersistence>,
+    pending_store: PendingSubmissionStore,
     session_id: String,
     turn_prefix: String,
     model_context_limit: u32,
@@ -76,10 +78,17 @@ impl AppServerSession {
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
         let handle = SessionHandle { sq_tx, eq_rx };
-
         let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
-
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
+        let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
+        let pending_session_file = config
+            .workspace_root
+            .join(".talos")
+            .join("runtime")
+            .join(format!("{session_id}.tlog"));
+        let pending_store =
+            PendingSubmissionStore::for_session_file(&pending_session_file, &session_id);
+
         let actor = Self {
             agent: Arc::new(agent),
             sq_rx,
@@ -90,7 +99,8 @@ impl AppServerSession {
             session_dir: None,
             persistence: None,
             durable_persistence: None,
-            session_id: format!("runtime_{}_{}", std::process::id(), instance_id),
+            pending_store,
+            session_id,
             // Keep durable turn IDs unique across Runtime reconstruction. A host that
             // needs retry idempotency supplies the stable ID to `DurableSession`.
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
@@ -111,6 +121,7 @@ impl AppServerSession {
         session: talos_session::Session,
         metadata: talos_session::SessionMetadata,
     ) {
+        self.pending_store = PendingSubmissionStore::for_session(&session);
         self.session_id = session.id.to_string();
         self.persistence = Some(TurnPersistence { session, metadata });
     }
@@ -121,7 +132,10 @@ impl AppServerSession {
         session: talos_session::DurableSession,
         policy: talos_session::PersistencePolicy,
     ) {
-        self.session_id = session.id().to_string();
+        let session_id = session.id().to_string();
+        self.pending_store =
+            PendingSubmissionStore::for_session_file(session.file_path(), &session_id);
+        self.session_id = session_id;
         self.durable_persistence = Some(DurableTurnPersistence { session, policy });
     }
 
@@ -225,121 +239,155 @@ impl AppServerSession {
                         pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         continue;
                     };
-            match op {
-                SessionOp::Submit { message } => {
-                    submission_counter = submission_counter.saturating_add(1);
-                    let submission = compatibility_submission(submission_counter, SubmissionKind::UserTurn, message, Vec::new());
-                    if self.accept_submission(
-                        submission,
-                        &mut pending,
-                        &mut pending_items,
-                        &mut pending_bytes,
-                        &mut pending_images,
-                        &mut pending_image_bytes,
-                        &mut recent_submission_ids,
-                        &mut recent_item_ids,
-                        paused,
-                    ) { paused = false; }
-                }
-                SessionOp::SubmitMultimodal { text, attachments } => {
-                    submission_counter = submission_counter.saturating_add(1);
-                    let submission = compatibility_submission(submission_counter, SubmissionKind::UserTurn, text, attachments);
-                    if self.accept_submission(
-                        submission,
-                        &mut pending,
-                        &mut pending_items,
-                        &mut pending_bytes,
-                        &mut pending_images,
-                        &mut pending_image_bytes,
-                        &mut recent_submission_ids,
-                        &mut recent_item_ids,
-                        paused,
-                    ) { paused = false; }
-                }
-                SessionOp::PreviewRequest { message } => {
-                    submission_counter = submission_counter.saturating_add(1);
-                    let submission = compatibility_submission(submission_counter, SubmissionKind::PreviewRequest, message, Vec::new());
-                    if self.accept_submission(
-                        submission,
-                        &mut pending,
-                        &mut pending_items,
-                        &mut pending_bytes,
-                        &mut pending_images,
-                        &mut pending_image_bytes,
-                        &mut recent_submission_ids,
-                        &mut recent_item_ids,
-                        paused,
-                    ) { paused = false; }
-                }
-                SessionOp::SubmitStructured { submission } => {
-                    let resumes = submission.source != SubmissionSource::Scheduler;
-                    if self.accept_submission(
-                        submission,
-                        &mut pending,
-                        &mut pending_items,
-                        &mut pending_bytes,
-                        &mut pending_images,
-                        &mut pending_image_bytes,
-                        &mut recent_submission_ids,
-                        &mut recent_item_ids,
-                        paused,
-                    ) && resumes { paused = false; }
-                }
-                SessionOp::Interrupt => {
-                    if let Some(token) = &cancel_token {
-                        token.cancel();
-                    } else if let Some(submission) = pending.pop_front() {
-                        pending_items = pending_items.saturating_sub(submission.items.len());
-                        pending_bytes = pending_bytes.saturating_sub(submission.total_text_bytes());
-                        let (images, image_bytes) = submission.image_totals();
-                        pending_images = pending_images.saturating_sub(images);
-                        pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
-                        self.reject_submission(
-                            &submission.id,
-                            submission.sender_generation,
-                            SubmissionRejectionReason::Cancelled,
-                        );
-                    }
-                    paused = true;
-                }
-                SessionOp::SetSkillContext { name, content } => {
-                    if current_turn.is_some() || !pending.is_empty() {
-                        let _ = self.eq_tx.send(SessionEvent::Error {
-                            message: "cannot change active skill while a turn is active".into(),
-                        });
-                        continue;
-                    }
-                    let context = match (name, content) {
-                        (Some(name), Some(content)) => {
-                            Some(ActivatedSkillContext { name, content })
+                    match op {
+                        SessionOp::Submit { message } => {
+                            submission_counter = submission_counter.saturating_add(1);
+                            let submission = compatibility_submission(
+                                submission_counter,
+                                SubmissionKind::UserTurn,
+                                message,
+                                Vec::new(),
+                            );
+                            if self.accept_submission(
+                                submission,
+                                &mut pending,
+                                &mut pending_items,
+                                &mut pending_bytes,
+                                &mut pending_images,
+                                &mut pending_image_bytes,
+                                &mut recent_submission_ids,
+                                &mut recent_item_ids,
+                                paused,
+                            ) {
+                                paused = false;
+                            }
                         }
-                        _ => None,
-                    };
-                    if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
-                        agent_mut.set_activated_skill_context(context);
-                    } else {
-                        let _ = self.eq_tx.send(SessionEvent::Error {
-                            message: "cannot change active skill while agent is busy".into(),
-                        });
+                        SessionOp::SubmitMultimodal { text, attachments } => {
+                            submission_counter = submission_counter.saturating_add(1);
+                            let submission = compatibility_submission(
+                                submission_counter,
+                                SubmissionKind::UserTurn,
+                                text,
+                                attachments,
+                            );
+                            if self.accept_submission(
+                                submission,
+                                &mut pending,
+                                &mut pending_items,
+                                &mut pending_bytes,
+                                &mut pending_images,
+                                &mut pending_image_bytes,
+                                &mut recent_submission_ids,
+                                &mut recent_item_ids,
+                                paused,
+                            ) {
+                                paused = false;
+                            }
+                        }
+                        SessionOp::PreviewRequest { message } => {
+                            submission_counter = submission_counter.saturating_add(1);
+                            let submission = compatibility_submission(
+                                submission_counter,
+                                SubmissionKind::PreviewRequest,
+                                message,
+                                Vec::new(),
+                            );
+                            if self.accept_submission(
+                                submission,
+                                &mut pending,
+                                &mut pending_items,
+                                &mut pending_bytes,
+                                &mut pending_images,
+                                &mut pending_image_bytes,
+                                &mut recent_submission_ids,
+                                &mut recent_item_ids,
+                                paused,
+                            ) {
+                                paused = false;
+                            }
+                        }
+                        SessionOp::SubmitStructured { submission } => {
+                            let resumes = submission.source != SubmissionSource::Scheduler;
+                            if self.accept_durable_submission(
+                                submission,
+                                &mut pending,
+                                &mut pending_items,
+                                &mut pending_bytes,
+                                &mut pending_images,
+                                &mut pending_image_bytes,
+                                &mut recent_submission_ids,
+                                &mut recent_item_ids,
+                                paused,
+                            ) && resumes
+                            {
+                                paused = false;
+                            }
+                        }
+                        SessionOp::ReconcileStructured { submission } => {
+                            self.reconcile_submission(&submission);
+                        }
+                        SessionOp::Interrupt => {
+                            if let Some(token) = &cancel_token {
+                                token.cancel();
+                            } else if let Some(submission) = pending.pop_front() {
+                                pending_items = pending_items.saturating_sub(submission.items.len());
+                                pending_bytes =
+                                    pending_bytes.saturating_sub(submission.total_text_bytes());
+                                let (images, image_bytes) = submission.image_totals();
+                                pending_images = pending_images.saturating_sub(images);
+                                pending_image_bytes =
+                                    pending_image_bytes.saturating_sub(image_bytes);
+                                self.reject_submission(
+                                    &submission.id,
+                                    submission.sender_generation,
+                                    SubmissionRejectionReason::Cancelled,
+                                );
+                            }
+                            paused = true;
+                        }
+                        SessionOp::SetSkillContext { name, content } => {
+                            if current_turn.is_some() || !pending.is_empty() {
+                                let _ = self.eq_tx.send(SessionEvent::Error {
+                                    message: "cannot change active skill while a turn is active"
+                                        .into(),
+                                });
+                                continue;
+                            }
+                            let context = match (name, content) {
+                                (Some(name), Some(content)) => {
+                                    Some(ActivatedSkillContext { name, content })
+                                }
+                                _ => None,
+                            };
+                            if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
+                                agent_mut.set_activated_skill_context(context);
+                            } else {
+                                let _ = self.eq_tx.send(SessionEvent::Error {
+                                    message: "cannot change active skill while agent is busy"
+                                        .into(),
+                                });
+                            }
+                        }
+                        SessionOp::Shutdown => {
+                            shutting_down = true;
+                            if let Some(token) = &cancel_token {
+                                token.cancel();
+                            }
+                            for submission in pending.drain(..) {
+                                self.reject_submission(
+                                    &submission.id,
+                                    submission.sender_generation,
+                                    SubmissionRejectionReason::SessionClosed,
+                                );
+                            }
+                            pending_items = current_submission_size.map_or(0, |size| size.0);
+                            pending_bytes = current_submission_size.map_or(0, |size| size.1);
+                            pending_images = current_submission_size.map_or(0, |size| size.2);
+                            pending_image_bytes =
+                                current_submission_size.map_or(0, |size| size.3);
+                            paused = false;
+                        }
                     }
-                }
-                SessionOp::Shutdown => {
-                    shutting_down = true;
-                    if let Some(token) = &cancel_token { token.cancel(); }
-                    for submission in pending.drain(..) {
-                        self.reject_submission(
-                            &submission.id,
-                            submission.sender_generation,
-                            SubmissionRejectionReason::SessionClosed,
-                        );
-                    }
-                    pending_items = current_submission_size.map_or(0, |size| size.0);
-                    pending_bytes = current_submission_size.map_or(0, |size| size.1);
-                    pending_images = current_submission_size.map_or(0, |size| size.2);
-                    pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
-                    paused = false;
-                }
-            }
                 }
             }
         }
@@ -349,6 +397,105 @@ impl AppServerSession {
         for msg in record.new_messages {
             self.history.push(msg);
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn accept_durable_submission(
+        &self,
+        submission: StructuredSubmission,
+        pending: &mut VecDeque<StructuredSubmission>,
+        pending_items: &mut usize,
+        pending_bytes: &mut usize,
+        pending_images: &mut usize,
+        pending_image_bytes: &mut u64,
+        recent_submission_ids: &mut VecDeque<String>,
+        recent_item_ids: &mut VecDeque<String>,
+        paused: bool,
+    ) -> bool {
+        let (receipt_id, disposition) = match self.pending_store.accept(&submission) {
+            Ok(result) => result,
+            Err(error) => {
+                let disposition = SubmissionReceiptDisposition::Rejected {
+                    reason: SubmissionRejectionReason::DurabilityUnavailable,
+                };
+                self.emit_submission_receipt(&submission, String::new(), disposition);
+                self.reject_submission(
+                    &submission.id,
+                    submission.sender_generation,
+                    SubmissionRejectionReason::DurabilityUnavailable,
+                );
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!("structured submission durability failed: {error}"),
+                });
+                return false;
+            }
+        };
+
+        self.emit_submission_receipt(&submission, receipt_id, disposition.clone());
+        match disposition {
+            SubmissionReceiptDisposition::AcceptedPending => self.accept_submission(
+                submission,
+                pending,
+                pending_items,
+                pending_bytes,
+                pending_images,
+                pending_image_bytes,
+                recent_submission_ids,
+                recent_item_ids,
+                paused,
+            ),
+            SubmissionReceiptDisposition::AlreadyAccepted { .. } => {
+                // Preserve the pre-I169 compatibility projection while modern
+                // bridges use the durable receipt as the authoritative result.
+                self.reject_submission(
+                    &submission.id,
+                    submission.sender_generation,
+                    SubmissionRejectionReason::Duplicate,
+                );
+                false
+            }
+            SubmissionReceiptDisposition::NotAccepted => false,
+            SubmissionReceiptDisposition::Rejected { reason } => {
+                self.reject_submission(&submission.id, submission.sender_generation, reason);
+                false
+            }
+        }
+    }
+
+    fn reconcile_submission(&self, submission: &StructuredSubmission) {
+        let (receipt_id, disposition) = match self.pending_store.reconcile(submission) {
+            Ok(result) => result,
+            Err(error) => {
+                let disposition = SubmissionReceiptDisposition::Rejected {
+                    reason: SubmissionRejectionReason::DurabilityUnavailable,
+                };
+                self.emit_submission_receipt(submission, String::new(), disposition);
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!("structured submission reconciliation failed: {error}"),
+                });
+                return;
+            }
+        };
+        self.emit_submission_receipt(submission, receipt_id, disposition);
+    }
+
+    fn emit_submission_receipt(
+        &self,
+        submission: &StructuredSubmission,
+        receipt_id: String,
+        disposition: SubmissionReceiptDisposition,
+    ) {
+        let _ = self.eq_tx.send(SessionEvent::SubmissionReceipt {
+            session_id: self.session_id.clone(),
+            session_generation: submission.sender_generation,
+            submission_id: submission.id.clone(),
+            reservation_id: submission.id.clone(),
+            receipt_id,
+            source: submission.source,
+            item_count: submission.items.len(),
+            total_text_bytes: submission.total_text_bytes(),
+            disposition,
+        });
     }
 
     #[allow(clippy::too_many_arguments)]
