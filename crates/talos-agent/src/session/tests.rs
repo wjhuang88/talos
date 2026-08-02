@@ -530,7 +530,7 @@ async fn duplicate_submission_and_item_identity_execute_at_most_once() {
 }
 
 #[tokio::test]
-async fn closed_eq_never_transfers_submission_ownership_to_actor_queue() {
+async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
@@ -545,24 +545,47 @@ async fn closed_eq_never_transfers_submission_ownership_to_actor_queue() {
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let actor_task = tokio::spawn(async move { actor.run().await });
+    let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
 
     sq_tx
-        .send(SessionOp::SubmitStructured {
+        .send(SessionOp::SubmitStructuredTracked {
             submission: structured_submission(
                 "lost_ack_batch",
                 "lost_ack_item",
                 12,
-                "must not run",
+                "must run once",
                 SubmissionSource::User,
             ),
+            receipt_tx: Some(receipt_tx),
         })
         .await
         .unwrap();
-    tokio::task::yield_now().await;
+
+    let receipt = tokio::time::timeout(Duration::from_secs(2), receipt_rx.recv())
+        .await
+        .expect("tracked durable receipt timeout")
+        .expect("tracked durable receipt channel");
+    assert!(receipt.disposition.has_durable_custody());
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if captured.lock().unwrap().len() == 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("Actor should execute accepted work without an EQ observer");
+
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
 
-    assert!(captured.lock().unwrap().is_empty());
+    let requests = captured.lock().unwrap();
+    assert_eq!(requests.len(), 1, "Actor custody must execute exactly once");
+    assert!(requests[0].iter().any(
+        |message| matches!(message, Message::User { content } if content == "must run once")
+    ));
 }
 
 #[tokio::test]
