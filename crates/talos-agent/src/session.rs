@@ -457,13 +457,14 @@ impl AppServerSession {
 
     fn release_in_memory_pending_on_shutdown(&self, pending: &mut VecDeque<StructuredSubmission>) {
         for submission in pending.drain(..) {
-            if submission.source == SubmissionSource::Compatibility {
-                self.reject_submission(
-                    &submission.id,
-                    submission.sender_generation,
-                    SubmissionRejectionReason::SessionClosed,
-                );
-            }
+            // Legacy clients only understand that this Actor instance closed.
+            // Durable structured custody is preserved separately in the journal
+            // and is paused immediately after this compatibility projection.
+            self.reject_submission(
+                &submission.id,
+                submission.sender_generation,
+                SubmissionRejectionReason::SessionClosed,
+            );
         }
     }
 
@@ -549,6 +550,13 @@ impl AppServerSession {
                 let disposition = SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
                 let delivered =
                     self.emit_submission_receipt(&submission, existing_receipt, disposition);
+                // Compatibility-only projection for clients that predate durable
+                // receipts. The authoritative result is AlreadyAccepted above.
+                self.reject_submission(
+                    &submission.id,
+                    submission.sender_generation,
+                    SubmissionRejectionReason::Duplicate,
+                );
                 return delivered
                     && matches!(
                         state,
