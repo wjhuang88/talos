@@ -2,7 +2,7 @@
 
 **Original repository baseline**: `main@455bfbd5c5316862675aa68c62f1b62bff2e5cc7`
 **Post-I170 reconciliation baseline**: `main@592254d73a98166df48da0139a02df67e9cd2cd6`
-**Remote scope**: all 26 open GitHub Issues observed on 2026-08-01
+**Remote scope**: all 27 open GitHub Issues observed through 2026-08-02
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
@@ -11,8 +11,9 @@
 - No open Issue is closed by this reconciliation: none has a Complete owner that also matches the remaining remote scope.
 - Deferred, Refinement, Ready, Partial, and Blocked remain open states; “registered” does not mean “scheduled”.
 - Recovered Issue #119 is assigned to TUI-044 because current main already assigns TUI-041 to Issue #69.
-- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite, but TUI-044/I169 implementation is not started and Issue #119 remains open.
-- New Intake Issues #124 and #125 are registered as unclaimed Refinement owners MODEL-011 and TUI-045; this reconciliation does not authorize implementation.
+- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite, but TUI-044/I169 remains open in Draft PR #131.
+- New Intake Issues #124 and #125 are registered as unclaimed Refinement owners MODEL-011 and TUI-045.
+- Issue #132 is assigned to existing PROVIDER-003 because that Story already owns dynamic provider credentials; this synchronization does not authorize provider-auth implementation in I169.
 - REL-001 and DATA-001 historical owner drift is corrected to Complete; they are not currently open GitHub Issues.
 
 ## Open Issue Matrix
@@ -42,9 +43,10 @@
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Ready | Bounded fix; iteration/claim still required. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
-| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Ready — prerequisite satisfied | Keep open: claim is established and I170 completed, but activation, fresh current-main implementation, ADR-056 review, exact-head CI and a separate implementation PR remain required. |
+| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Active | Draft PR #131 implements I169; keep open until complete acceptance, ADR-056 review, exact-head CI and merge evidence. |
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Intake registered; probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Intake registered; layout ownership and real-terminal acceptance remain unclaimed. |
+| [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement | Existing dynamic-credential owner broadened; ADR, threat model and bounded provider-specific slices required before implementation. |
 
 ## Status Corrections
 
@@ -54,8 +56,9 @@
 - `TOOL-024`: linked explicitly to Issue #59 and to RUNTIME-005/PERM-006 lifecycle and permission prerequisites.
 - `TUI-044`: added for recovered Issue #119; historical TUI-041 steering ownership is not restored because TUI-041 currently belongs to Issue #69.
 - `I170`: completed in merged PR #126; this clears only TUI-044's prerequisite and does not complete or close Issue #119.
-- `MODEL-011` and `TUI-045`: registered from new Intake Issues #124/#125 as unclaimed Refinement owners only.
+- `MODEL-011` and `TUI-045`: registered from Intake Issues #124/#125 as unclaimed Refinement owners only.
+- `PROVIDER-003`: linked to Issue #132 and broadened from the Copilot driving example to the architecture owner for dynamic provider authentication; remains Refinement and unselected.
 
 ## Closure Rule
 
-An Issue may be closed only after its owner is Complete with implementation/acceptance evidence and the remote Issue has no separately owned residual. This audit intentionally leaves all 26 observed Issues open.
+An Issue may be closed only after its owner is Complete with implementation/acceptance evidence and the remote Issue has no separately owned residual. This audit intentionally leaves all 27 observed Issues open.
