@@ -21,9 +21,10 @@ use talos_core::session::{
     MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
     MAX_STEERING_QUEUE_ITEMS, MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS,
     MAX_SUBMISSION_IMAGE_BYTES, MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES,
-    MAX_SUBMISSION_TOTAL_IMAGE_BYTES, SessionConfig, SessionEvent, SessionHandle, SessionOp,
-    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceiptDisposition,
-    SubmissionRejectionReason, SubmissionSource, TurnCompletionStatus, TurnEventPayload,
+    MAX_SUBMISSION_TOTAL_IMAGE_BYTES, PendingSubmissionState, SessionConfig, SessionEvent,
+    SessionHandle, SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind,
+    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
+    TurnCompletionStatus, TurnEventPayload,
 };
 use talos_session::PendingSubmissionStore;
 
@@ -45,6 +46,20 @@ use turn::{
 static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 const MAX_RECENT_SUBMISSION_IDS: usize = 1024;
 const MAX_RECENT_ITEM_IDS: usize = 4096;
+
+#[derive(Debug, Clone)]
+struct ActiveStructuredTurn {
+    submission_id: String,
+    receipt_id: String,
+    session_generation: u64,
+    turn_id: String,
+}
+
+struct StartedTurn {
+    handle: JoinHandle<Option<TurnRecord>>,
+    token: CancellationToken,
+    structured: Option<ActiveStructuredTurn>,
+}
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
@@ -69,10 +84,7 @@ pub struct AppServerSession {
 impl AppServerSession {
     /// Creates a new session actor with the given agent and configuration.
     ///
-    /// Returns a [`SessionHandle`] (for the UI to send commands and receive events)
-    /// and the actor itself (to be spawned on a tokio task via [`AppServerSession::run`]).
-    ///
-    /// The SQ channel has a bounded capacity of 512; the EQ is unbounded.
+    /// Returns a [`SessionHandle`] and the actor itself for spawning.
     pub fn new(agent: Agent, config: SessionConfig) -> (SessionHandle, Self) {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
@@ -101,8 +113,6 @@ impl AppServerSession {
             durable_persistence: None,
             pending_store,
             session_id,
-            // Keep durable turn IDs unique across Runtime reconstruction. A host that
-            // needs retry idempotency supplies the stable ID to `DurableSession`.
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
             model_context_limit: config.model_context_limit,
         };
@@ -115,7 +125,7 @@ impl AppServerSession {
         self.session_dir = Some(dir);
     }
 
-    /// Assigns the durable session that owns all successful turn-message writes.
+    /// Assigns the durable session that owns successful turn-message writes.
     pub fn set_persistence(
         &mut self,
         session: talos_session::Session,
@@ -126,7 +136,7 @@ impl AppServerSession {
         self.persistence = Some(TurnPersistence { session, metadata });
     }
 
-    /// Assigns an atomic durable session used only by the embedded runtime.
+    /// Assigns an atomic durable session used by the embedded runtime.
     pub fn set_durable_persistence(
         &mut self,
         session: talos_session::DurableSession,
@@ -139,16 +149,7 @@ impl AppServerSession {
         self.durable_persistence = Some(DurableTurnPersistence { session, policy });
     }
 
-    /// Runs the session actor loop until shutdown or SQ disconnect.
-    ///
-    /// For each [`SessionOp::Submit`], spawns a turn task that:
-    /// 1. Emits [`TurnEventPayload::Started`]
-    /// 2. Calls `agent.run_streaming()` with an internal mpsc channel
-    /// 3. Forwards `AgentEvent`s as ordered [`TurnEventPayload::Progress`] on the EQ
-    /// 4. Emits [`TurnEventPayload::Completed`] on finish
-    ///
-    /// [`SessionOp::Interrupt`] cancels the current turn.
-    /// [`SessionOp::Shutdown`] exits the loop.
+    /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
         let mut turn_counter: u64 = 0;
         let mut submission_counter: u64 = 0;
@@ -161,8 +162,17 @@ impl AppServerSession {
         let mut recent_item_ids = VecDeque::<String>::new();
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
         let mut current_submission_size: Option<(usize, usize, usize, u64)> = None;
+        let mut current_structured: Option<ActiveStructuredTurn> = None;
         let mut cancel_token: Option<CancellationToken> = None;
-        let mut paused = false;
+        let mut paused = self.restore_pending_submissions(
+            &mut pending,
+            &mut pending_items,
+            &mut pending_bytes,
+            &mut pending_images,
+            &mut pending_image_bytes,
+            &mut recent_submission_ids,
+            &mut recent_item_ids,
+        );
         let mut shutting_down = false;
 
         loop {
@@ -179,16 +189,20 @@ impl AppServerSession {
                 );
                 turn_counter = turn_counter.saturating_add(1);
                 match self.start_submission(submission, turn_counter).await {
-                    Some((handle, token)) => {
-                        current_turn = Some(handle);
+                    Some(started) => {
+                        current_turn = Some(started.handle);
                         current_submission_size = Some(submission_size);
-                        cancel_token = Some(token);
+                        current_structured = started.structured;
+                        cancel_token = Some(started.token);
                     }
                     None => {
                         pending_items = pending_items.saturating_sub(submission_size.0);
                         pending_bytes = pending_bytes.saturating_sub(submission_size.1);
                         pending_images = pending_images.saturating_sub(submission_size.2);
                         pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
+                        if let Err(error) = self.pending_store.pause_unstarted() {
+                            self.emit_custody_error("failed to pause rejected pending work", &error);
+                        }
                         paused = true;
                     }
                 }
@@ -213,26 +227,36 @@ impl AppServerSession {
                         pending_images = pending_images.saturating_sub(images);
                         pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
                     }
+                    let structured = current_structured.take();
                     match completed.and_then(Result::ok).flatten() {
                         Some(record) => {
                             let status = record.status;
+                            let completion = record.completion.clone();
                             self.commit_turn_record(record);
-                            paused = status != TurnRecordStatus::Success;
+                            let custody_ok = structured.as_ref().is_none_or(|active| {
+                                self.finish_structured_turn(active, &completion)
+                            });
+                            paused = status != TurnRecordStatus::Success || !custody_ok;
                         }
-                        None => paused = true,
+                        None => {
+                            if let Some(active) = structured.as_ref() {
+                                let completion = TurnCompletionStatus::Error {
+                                    message: "turn task ended without a completion record".into(),
+                                };
+                                let _ = self.finish_structured_turn(active, &completion);
+                            }
+                            paused = true;
+                        }
                     }
                 }
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
                         shutting_down = true;
-                        if let Some(token) = cancel_token.take() { token.cancel(); }
-                        for submission in pending.drain(..) {
-                            self.reject_submission(
-                                &submission.id,
-                                submission.sender_generation,
-                                SubmissionRejectionReason::SessionClosed,
-                            );
+                        if let Some(token) = cancel_token.take() {
+                            token.cancel();
                         }
+                        self.release_in_memory_pending_on_shutdown(&mut pending);
+                        let _ = self.pending_store.pause_unstarted();
                         pending_items = current_submission_size.map_or(0, |size| size.0);
                         pending_bytes = current_submission_size.map_or(0, |size| size.1);
                         pending_images = current_submission_size.map_or(0, |size| size.2);
@@ -329,21 +353,12 @@ impl AppServerSession {
                         SessionOp::Interrupt => {
                             if let Some(token) = &cancel_token {
                                 token.cancel();
-                            } else if let Some(submission) = pending.pop_front() {
-                                pending_items = pending_items.saturating_sub(submission.items.len());
-                                pending_bytes =
-                                    pending_bytes.saturating_sub(submission.total_text_bytes());
-                                let (images, image_bytes) = submission.image_totals();
-                                pending_images = pending_images.saturating_sub(images);
-                                pending_image_bytes =
-                                    pending_image_bytes.saturating_sub(image_bytes);
-                                self.reject_submission(
-                                    &submission.id,
-                                    submission.sender_generation,
-                                    SubmissionRejectionReason::Cancelled,
-                                );
+                            } else if !pending.is_empty() {
+                                if let Err(error) = self.pending_store.pause_unstarted() {
+                                    self.emit_custody_error("failed to pause pending work", &error);
+                                }
+                                paused = true;
                             }
-                            paused = true;
                         }
                         SessionOp::SetSkillContext { name, content } => {
                             if current_turn.is_some() || !pending.is_empty() {
@@ -373,22 +388,86 @@ impl AppServerSession {
                             if let Some(token) = &cancel_token {
                                 token.cancel();
                             }
-                            for submission in pending.drain(..) {
-                                self.reject_submission(
-                                    &submission.id,
-                                    submission.sender_generation,
-                                    SubmissionRejectionReason::SessionClosed,
-                                );
+                            self.release_in_memory_pending_on_shutdown(&mut pending);
+                            if let Err(error) = self.pending_store.pause_unstarted() {
+                                self.emit_custody_error("failed to persist shutdown pause", &error);
                             }
                             pending_items = current_submission_size.map_or(0, |size| size.0);
                             pending_bytes = current_submission_size.map_or(0, |size| size.1);
                             pending_images = current_submission_size.map_or(0, |size| size.2);
-                            pending_image_bytes =
-                                current_submission_size.map_or(0, |size| size.3);
-                            paused = false;
+                            pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         }
                     }
                 }
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn restore_pending_submissions(
+        &self,
+        pending: &mut VecDeque<StructuredSubmission>,
+        pending_items: &mut usize,
+        pending_bytes: &mut usize,
+        pending_images: &mut usize,
+        pending_image_bytes: &mut u64,
+        recent_submission_ids: &mut VecDeque<String>,
+        recent_item_ids: &mut VecDeque<String>,
+    ) -> bool {
+        let records = match self.pending_store.recover_unstarted() {
+            Ok(records) => records,
+            Err(error) => {
+                self.emit_custody_error("failed to recover pending submissions", &error);
+                return true;
+            }
+        };
+        let mut paused = false;
+        for record in records {
+            let submission = record.submission;
+            if validate_submission(&submission).is_err() {
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!(
+                        "pending submission {} failed validation during recovery",
+                        submission.id
+                    ),
+                });
+                paused = true;
+                continue;
+            }
+            let (images, image_bytes) = submission.image_totals();
+            *pending_items = pending_items.saturating_add(submission.items.len());
+            *pending_bytes = pending_bytes.saturating_add(submission.total_text_bytes());
+            *pending_images = pending_images.saturating_add(images);
+            *pending_image_bytes = pending_image_bytes.saturating_add(image_bytes);
+            record_recent_identity(
+                recent_submission_ids,
+                submission.id.clone(),
+                MAX_RECENT_SUBMISSION_IDS,
+            );
+            for item in &submission.items {
+                record_recent_identity(
+                    recent_item_ids,
+                    item.id.clone(),
+                    MAX_RECENT_ITEM_IDS,
+                );
+            }
+            paused |= record.state == PendingSubmissionState::PausedPending;
+            pending.push_back(submission);
+        }
+        paused
+    }
+
+    fn release_in_memory_pending_on_shutdown(
+        &self,
+        pending: &mut VecDeque<StructuredSubmission>,
+    ) {
+        for submission in pending.drain(..) {
+            if submission.source == SubmissionSource::Compatibility {
+                self.reject_submission(
+                    &submission.id,
+                    submission.sender_generation,
+                    SubmissionRejectionReason::SessionClosed,
+                );
             }
         }
     }
@@ -397,6 +476,60 @@ impl AppServerSession {
         for msg in record.new_messages {
             self.history.push(msg);
         }
+    }
+
+    fn finish_structured_turn(
+        &self,
+        active: &ActiveStructuredTurn,
+        completion: &TurnCompletionStatus,
+    ) -> bool {
+        let transition = match completion {
+            TurnCompletionStatus::Success { .. } => self
+                .pending_store
+                .mark_committed(&active.submission_id, &active.turn_id),
+            TurnCompletionStatus::Cancelled => self.pending_store.mark_terminal(
+                &active.submission_id,
+                PendingSubmissionState::TerminalCancelled,
+                &active.turn_id,
+            ),
+            TurnCompletionStatus::Error { .. } => self.pending_store.mark_terminal(
+                &active.submission_id,
+                PendingSubmissionState::TerminalError,
+                &active.turn_id,
+            ),
+        };
+        if let Err(error) = transition {
+            self.emit_custody_error("failed to finalize structured turn custody", &error);
+            return false;
+        }
+        if !matches!(completion, TurnCompletionStatus::Success { .. })
+            && let Err(error) = self.pending_store.pause_unstarted()
+        {
+            self.emit_custody_error("failed to pause unstarted work after terminal turn", &error);
+            return false;
+        }
+        let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
+            session_id: self.session_id.clone(),
+            session_generation: active.session_generation,
+            submission_id: active.submission_id.clone(),
+            receipt_id: active.receipt_id.clone(),
+            turn_id: active.turn_id.clone(),
+            sequence: 1,
+            payload: TurnEventPayload::Completed {
+                status: completion.clone(),
+            },
+        });
+        true
+    }
+
+    fn emit_custody_error(
+        &self,
+        context: &str,
+        error: &impl std::fmt::Display,
+    ) {
+        let _ = self.eq_tx.send(SessionEvent::Error {
+            message: format!("{context}: {error}"),
+        });
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -424,9 +557,7 @@ impl AppServerSession {
                     submission.sender_generation,
                     SubmissionRejectionReason::DurabilityUnavailable,
                 );
-                let _ = self.eq_tx.send(SessionEvent::Error {
-                    message: format!("structured submission durability failed: {error}"),
-                });
+                self.emit_custody_error("structured submission durability failed", &error);
                 return false;
             }
         };
@@ -444,16 +575,7 @@ impl AppServerSession {
                 recent_item_ids,
                 paused,
             ),
-            SubmissionReceiptDisposition::AlreadyAccepted { .. } => {
-                // Preserve the pre-I169 compatibility projection while modern
-                // bridges use the durable receipt as the authoritative result.
-                self.reject_submission(
-                    &submission.id,
-                    submission.sender_generation,
-                    SubmissionRejectionReason::Duplicate,
-                );
-                false
-            }
+            SubmissionReceiptDisposition::AlreadyAccepted { .. } => false,
             SubmissionReceiptDisposition::NotAccepted => false,
             SubmissionReceiptDisposition::Rejected { reason } => {
                 self.reject_submission(&submission.id, submission.sender_generation, reason);
@@ -470,9 +592,7 @@ impl AppServerSession {
                     reason: SubmissionRejectionReason::DurabilityUnavailable,
                 };
                 self.emit_submission_receipt(submission, String::new(), disposition);
-                let _ = self.eq_tx.send(SessionEvent::Error {
-                    message: format!("structured submission reconciliation failed: {error}"),
-                });
+                self.emit_custody_error("structured submission reconciliation failed", &error);
                 return;
             }
         };
@@ -573,20 +693,14 @@ impl AppServerSession {
             );
             return false;
         }
-        if self
-            .eq_tx
-            .send(SessionEvent::SubmissionQueued {
-                session_id: self.session_id.clone(),
-                submission_id: submission.id.clone(),
-                sender_generation: submission.sender_generation,
-                source: submission.source,
-                item_count: submission.items.len(),
-                total_text_bytes: submission.total_text_bytes(),
-            })
-            .is_err()
-        {
-            return false;
-        }
+        let _ = self.eq_tx.send(SessionEvent::SubmissionQueued {
+            session_id: self.session_id.clone(),
+            submission_id: submission.id.clone(),
+            sender_generation: submission.sender_generation,
+            source: submission.source,
+            item_count: submission.items.len(),
+            total_text_bytes: submission.total_text_bytes(),
+        });
 
         record_recent_identity(
             recent_submission_ids,
@@ -626,7 +740,7 @@ impl AppServerSession {
         &mut self,
         submission: StructuredSubmission,
         turn_counter: u64,
-    ) -> Option<(JoinHandle<Option<TurnRecord>>, CancellationToken)> {
+    ) -> Option<StartedTurn> {
         if self.compactor.should_compact(&self.history) {
             let compacted = self.compactor.apply_budget(self.history.clone());
             let compacted = self.compactor.apply_trim(compacted);
@@ -687,30 +801,58 @@ impl AppServerSession {
         }
 
         let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
-        if self
-            .eq_tx
-            .send(SessionEvent::SubmissionStarted {
-                session_id: self.session_id.clone(),
+        let structured = if submission.source == SubmissionSource::Compatibility {
+            None
+        } else {
+            let record = match self.pending_store.get(&submission.id) {
+                Ok(Some(record)) => record,
+                Ok(None) => {
+                    self.reject_submission(
+                        &submission.id,
+                        submission.sender_generation,
+                        SubmissionRejectionReason::DurabilityUnavailable,
+                    );
+                    return None;
+                }
+                Err(error) => {
+                    self.emit_custody_error("failed to load accepted submission", &error);
+                    return None;
+                }
+            };
+            if let Err(error) = self.pending_store.mark_running(&submission.id, &turn_id) {
+                self.emit_custody_error("failed to mark structured submission running", &error);
+                return None;
+            }
+            let active = ActiveStructuredTurn {
                 submission_id: submission.id.clone(),
-                sender_generation: submission.sender_generation,
+                receipt_id: record.receipt_id,
+                session_generation: submission.sender_generation,
                 turn_id: turn_id.clone(),
-            })
-            .is_err()
-        {
-            return None;
-        }
-        if self
-            .eq_tx
-            .send(SessionEvent::TurnEvent {
+            };
+            let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
                 session_id: self.session_id.clone(),
-                turn_id: turn_id.clone(),
+                session_generation: active.session_generation,
+                submission_id: active.submission_id.clone(),
+                receipt_id: active.receipt_id.clone(),
+                turn_id: active.turn_id.clone(),
                 sequence: 0,
                 payload: TurnEventPayload::Started,
-            })
-            .is_err()
-        {
-            return None;
-        }
+            });
+            Some(active)
+        };
+
+        let _ = self.eq_tx.send(SessionEvent::SubmissionStarted {
+            session_id: self.session_id.clone(),
+            submission_id: submission.id.clone(),
+            sender_generation: submission.sender_generation,
+            turn_id: turn_id.clone(),
+        });
+        let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+            session_id: self.session_id.clone(),
+            turn_id: turn_id.clone(),
+            sequence: 0,
+            payload: TurnEventPayload::Started,
+        });
 
         if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
             let agent = self.agent.clone();
@@ -723,22 +865,24 @@ impl AppServerSession {
             let handle = tokio::spawn(async move {
                 let result = tokio::select! {
                     () = preview_token.cancelled() => {
+                        let completion = TurnCompletionStatus::Cancelled;
                         let _ = eq_tx.send(SessionEvent::TurnEvent {
                             session_id,
                             turn_id,
                             sequence: 1,
                             payload: TurnEventPayload::Completed {
-                                status: TurnCompletionStatus::Cancelled,
+                                status: completion.clone(),
                             },
                         });
                         return Some(TurnRecord {
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Cancelled,
+                            completion,
                         });
                     }
                     result = agent.preview_request(message, history) => result,
                 };
-                let (status, record_status) = match result {
+                let (completion, record_status) = match result {
                     Ok(Some(preview)) => {
                         let _ = eq_tx.send(SessionEvent::TurnEvent {
                             session_id: session_id.clone(),
@@ -798,14 +942,21 @@ impl AppServerSession {
                     } else {
                         1
                     },
-                    payload: TurnEventPayload::Completed { status },
+                    payload: TurnEventPayload::Completed {
+                        status: completion.clone(),
+                    },
                 });
                 Some(TurnRecord {
                     new_messages: Vec::new(),
                     status: record_status,
+                    completion,
                 })
             });
-            return Some((handle, token));
+            return Some(StartedTurn {
+                handle,
+                token,
+                structured,
+            });
         }
 
         if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
@@ -846,7 +997,11 @@ impl AppServerSession {
             .await;
             result_rx.await.ok()
         });
-        Some((handle, token))
+        Some(StartedTurn {
+            handle,
+            token,
+            structured,
+        })
     }
 
     fn try_archive_session(
