@@ -9,8 +9,8 @@ use talos_core::message::{AgentEvent, Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
 use talos_core::session::{
     PendingSubmissionState, RuntimePolicy, SessionConfig, SessionEvent, SessionOp,
-    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceiptDisposition,
-    SubmissionSource, TurnEventPayload,
+    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionReceipt,
+    SubmissionReceiptDisposition, SubmissionSource, TurnEventPayload,
 };
 use talos_core::tool::ToolRegistry;
 use talos_session::{PendingSubmissionStore, PersistencePolicy, SessionManager};
@@ -120,8 +120,17 @@ async fn wait_for_structured_start(
     }
 }
 
+async fn wait_for_tracked_receipt(
+    receipt_rx: &mut mpsc::UnboundedReceiver<SubmissionReceipt>,
+) -> SubmissionReceipt {
+    tokio::time::timeout(Duration::from_secs(3), receipt_rx.recv())
+        .await
+        .expect("timed out waiting for tracked durable receipt")
+        .expect("tracked durable receipt channel closed")
+}
+
 #[tokio::test]
-async fn lost_ack_keeps_durable_pending_without_execution() {
+async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager.create_or_open_session("i169-lost-ack").unwrap();
@@ -137,28 +146,81 @@ async fn lost_ack_keeps_durable_pending_without_execution() {
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let actor_task = tokio::spawn(async move { actor.run().await });
+    let immutable = submission("lost_ack_batch", "lost_ack_item", 7, "retain me");
 
+    // The EQ projection is intentionally absent. Durable Actor custody must
+    // still execute the accepted submission and commit it exactly once.
     sq_tx
         .send(SessionOp::SubmitStructured {
-            submission: submission("lost_ack_batch", "lost_ack_item", 7, "retain me"),
+            submission: immutable.clone(),
         })
         .await
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(150)).await;
 
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let committed = store
+                .get("lost_ack_batch")
+                .unwrap()
+                .is_some_and(|record| record.state == PendingSubmissionState::Committed);
+            if committed && calls.load(Ordering::SeqCst) == 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("accepted lost-Ack submission should commit once");
+
+    // Reconciliation asks the same authority about the exact immutable
+    // identity. It must not enqueue or execute a second Turn.
+    let (reconcile_tx, mut reconcile_rx) = mpsc::unbounded_channel();
+    sq_tx
+        .send(SessionOp::ReconcileStructuredTracked {
+            submission: immutable.clone(),
+            receipt_tx: Some(reconcile_tx),
+        })
+        .await
+        .unwrap();
+    let reconciled = wait_for_tracked_receipt(&mut reconcile_rx).await;
+    assert_eq!(reconciled.submission_id, "lost_ack_batch");
+    assert!(matches!(
+        reconciled.disposition,
+        SubmissionReceiptDisposition::AlreadyAccepted {
+            state: PendingSubmissionState::Committed,
+            turn_id: Some(_),
+        }
+    ));
+
+    // Even an accidental resend of the exact payload resolves to the existing
+    // durable identity rather than creating another execution authority.
+    let (resend_tx, mut resend_rx) = mpsc::unbounded_channel();
+    sq_tx
+        .send(SessionOp::SubmitStructuredTracked {
+            submission: immutable,
+            receipt_tx: Some(resend_tx),
+        })
+        .await
+        .unwrap();
+    let resent = wait_for_tracked_receipt(&mut resend_rx).await;
+    assert!(matches!(
+        resent.disposition,
+        SubmissionReceiptDisposition::AlreadyAccepted {
+            state: PendingSubmissionState::Committed,
+            turn_id: Some(_),
+        }
+    ));
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         store.get("lost_ack_batch").unwrap().unwrap().state,
-        PendingSubmissionState::AcceptedPending
+        PendingSubmissionState::Committed
     );
 
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-    assert_eq!(
-        store.get("lost_ack_batch").unwrap().unwrap().state,
-        PendingSubmissionState::PausedPending
-    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
