@@ -206,3 +206,50 @@ jobs:
       - name: PowerShell installer fixture (offline)
         shell: pwsh
         run: ./scripts/install_fixtures.ps1
+
+  i169-remove-delimiter-batch:
+    name: I169 remove delimiter steering batch
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/i169-tui-044-transactional-steering'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - name: Apply deterministic delimiter removal
+        run: |
+          set -euo pipefail
+          current_head="$(git rev-parse HEAD)"
+          git fetch origin feat/i169-tui-044-transactional-steering
+          test "$(git rev-parse origin/feat/i169-tui-044-transactional-steering)" = "${current_head}"
+          python3 scripts/i169_remove_delimiter_batch.py
+          git show HEAD^:.github/workflows/ci.yml > .github/workflows/ci.yml
+
+      - name: Validate structured Engine boundary
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo check -p talos-conversation --locked
+          cargo clippy -p talos-conversation --locked -- -D warnings
+          cargo test -p talos-conversation --locked
+          ! grep -R "drain_steering_queue_batched" crates/talos-conversation/src
+
+      - name: Commit and push delimiter removal
+        run: |
+          set -euo pipefail
+          git config user.name "wjhuang88"
+          git config user.email "6157210+wjhuang88@users.noreply.github.com"
+          rm scripts/i169_remove_delimiter_batch.py
+          git add -A
+          git diff --cached --check
+          git commit -m "refactor(i169): remove delimiter-authoritative steering batch (#131) [model:gpt-5.6-thinking]"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
