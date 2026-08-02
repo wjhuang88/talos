@@ -169,7 +169,7 @@ def main() -> None:
         self.run_prepared_inner(prepared, event_tx).await
     }
 
-    pub(super) async fn run_prepared_inner(
+    async fn run_prepared_inner(
         &self,
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
