@@ -282,9 +282,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             // aborts failed turns: no commit_turn call happens here.
             let mut error_message = e.to_string();
             if diagnostic_failure.is_some() {
-                error_message.push_str(
-                    "\n[warning: failed to persist provider terminal diagnostic]",
-                );
+                error_message
+                    .push_str("\n[warning: failed to persist provider terminal diagnostic]");
             }
             if !partial_messages.is_empty()
                 && let Some(persistence) = &persistence
