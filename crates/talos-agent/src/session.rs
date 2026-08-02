@@ -483,8 +483,6 @@ impl AppServerSession {
         let paused = !records.is_empty();
         for record in records {
             let mut submission = record.submission;
-            // Recovery transfers execution authority to this Actor generation.
-            // The durable batch/item/receipt identities remain unchanged.
             submission.sender_generation = self.session_generation;
             if let Err(reason) = validate_submission(&submission) {
                 let _ = self.eq_tx.send(SessionEvent::Error {
@@ -747,9 +745,7 @@ impl AppServerSession {
                     | PendingSubmissionState::PausedPending,
                 ..
             }
-        ) && pending
-            .iter()
-            .any(|queued| queued.id == authoritative.id);
+        ) && pending.iter().any(|queued| queued.id == authoritative.id);
         self.emit_submission_receipt(&authoritative, receipt_id, disposition, receipt_tx);
         resume
     }
