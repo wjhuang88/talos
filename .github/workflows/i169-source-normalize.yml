@@ -41,13 +41,14 @@ jobs:
           rm crates/talos-cli/src/tui_bridge_impl.rs
           rm crates/talos-cli/src/tests_impl.rs
 
-      - name: Remove delimiter-authoritative compatibility API
+      - name: Remove delimiter-authoritative compatibility API and tests
         shell: python
         run: |
+          import re
           from pathlib import Path
 
-          path = Path("crates/talos-conversation/src/engine.rs")
-          source = path.read_text()
+          engine_path = Path("crates/talos-conversation/src/engine.rs")
+          engine = engine_path.read_text()
           old_doc = '''    /// Drains the oldest steering message while preserving FIFO order.
     ///
     /// This method remains available for downstream callers that need the
@@ -80,24 +81,73 @@ jobs:
         }
     }
 '''
-          if source.count(old_doc) != 1:
+          if engine.count(old_doc) != 1:
               raise SystemExit("expected exactly one legacy drain doc block")
-          if source.count(old_batch) != 1:
+          if engine.count(old_batch) != 1:
               raise SystemExit("expected exactly one delimiter batch method")
-          source = source.replace(old_doc, new_doc, 1).replace(old_batch, "", 1)
-          path.write_text(source)
+          engine = engine.replace(old_doc, new_doc, 1).replace(old_batch, "", 1)
+          if "drain_steering_queue_batched" in engine:
+              raise SystemExit("delimiter batch API remains in engine source")
+          engine_path.write_text(engine)
+
+          tests_path = Path("crates/talos-conversation/src/engine_tests.rs")
+          tests = tests_path.read_text()
+          tests = tests.replace(
+              "// drain_steering_queue / drain_steering_queue_batched",
+              "// drain_steering_queue / structured steering transaction",
+              1,
+          )
+          tests = tests.replace(
+              '''    assert_eq!(
+        engine.drain_steering_queue_batched(),
+        Some("queued".to_string())
+    );''',
+              '''    assert_eq!(engine.drain_steering_queue(), Some("queued".to_string()));''',
+              1,
+          )
+
+          for name in (
+              "drain_steering_queue_batched_joins_all_with_separator",
+              "drain_steering_queue_batched_single_message",
+              "drain_steering_queue_batched_none_when_empty",
+          ):
+              pattern = rf"\n#\[test\]\nfn {name}\(\) \{{.*?\n\}}\n"
+              tests, count = re.subn(pattern, "\n", tests, count=1, flags=re.DOTALL)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one obsolete test {name}")
+
+          old_snapshot = '''    let drained = engine.drain_steering_queue_batched();
+    assert_eq!(drained, Some("first\\n\\nsecond".to_string()));
+
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 0);
+    assert!(snap.entries.is_empty());'''
+          new_snapshot = '''    let drained = engine.drain_steering_queue();
+    assert_eq!(drained, Some("first".to_string()));
+
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 1);
+    assert_eq!(snap.entries.len(), 1);
+    assert_eq!(snap.entries[0].text, "second");'''
+          if tests.count(old_snapshot) != 1:
+              raise SystemExit("expected exactly one legacy snapshot drain assertion")
+          tests = tests.replace(old_snapshot, new_snapshot, 1)
+          if "drain_steering_queue_batched" in tests:
+              raise SystemExit("delimiter batch references remain in Engine tests")
+          tests_path.write_text(tests)
 
       - name: Remove one-shot workflow
         shell: bash
         run: rm .github/workflows/i169-source-normalize.yml
 
-      - name: Format and check normalized sources
+      - name: Format and verify normalized sources
         shell: bash
         run: |
           set -euo pipefail
           cargo fmt --all
           cargo fmt --all -- --check
           cargo check -p talos-conversation -p talos-cli --locked
+          cargo test -p talos-conversation --locked
 
       - name: Commit normalized source tree
         shell: bash
