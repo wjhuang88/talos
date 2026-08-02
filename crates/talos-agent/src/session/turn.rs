@@ -27,6 +27,7 @@ pub(super) struct DurableTurnPersistence {
 pub(super) struct TurnRecord {
     pub(super) new_messages: Vec<Message>,
     pub(super) status: TurnRecordStatus,
+    pub(super) completion: TurnCompletionStatus,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -148,18 +149,20 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             let _ = forwarder.await;
+            let completion = TurnCompletionStatus::Cancelled;
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,
                 turn_id,
                 sequence,
                 payload: TurnEventPayload::Completed {
-                    status: TurnCompletionStatus::Cancelled,
+                    status: completion.clone(),
                 },
             });
             let _ = result_tx.send(TurnRecord {
                 new_messages: Vec::new(),
                 status: TurnRecordStatus::Cancelled,
+                completion,
             });
             return;
         }
@@ -174,16 +177,22 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     match agent_result {
         Ok((Ok(final_text), new_messages)) => {
             if diagnostic_failure.is_some() {
+                let completion = TurnCompletionStatus::Error {
+                    message: "failed to persist provider terminal diagnostic".into(),
+                };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                     session_id,
                     turn_id,
                     sequence,
                     payload: TurnEventPayload::Completed {
-                        status: TurnCompletionStatus::Error {
-                            message: "failed to persist provider terminal diagnostic".into(),
-                        },
+                        status: completion.clone(),
                     },
+                });
+                let _ = result_tx.send(TurnRecord {
+                    new_messages: Vec::new(),
+                    status: TurnRecordStatus::Error,
+                    completion,
                 });
                 return;
             }
@@ -192,14 +201,20 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 && let Err(message) =
                     persist_turn_messages(persistence, &new_messages, &raw_tool_outputs)
             {
+                let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                     session_id,
                     turn_id,
                     sequence,
                     payload: TurnEventPayload::Completed {
-                        status: TurnCompletionStatus::Error { message },
+                        status: completion.clone(),
                     },
+                });
+                let _ = result_tx.send(TurnRecord {
+                    new_messages: Vec::new(),
+                    status: TurnRecordStatus::Error,
+                    completion,
                 });
                 return;
             }
@@ -210,16 +225,22 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 {
                     Ok(commit) => commit.entry_ids,
                     Err(error) => {
+                        let completion = TurnCompletionStatus::Error {
+                            message: format!("failed to persist completed turn: {error}"),
+                        };
                         let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                         let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                             session_id,
                             turn_id,
                             sequence,
                             payload: TurnEventPayload::Completed {
-                                status: TurnCompletionStatus::Error {
-                                    message: format!("failed to persist completed turn: {error}"),
-                                },
+                                status: completion.clone(),
                             },
+                        });
+                        let _ = result_tx.send(TurnRecord {
+                            new_messages: Vec::new(),
+                            status: TurnRecordStatus::Error,
+                            completion,
                         });
                         return;
                     }
@@ -234,21 +255,23 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     entry_ids: persisted_entry_ids,
                 });
             }
+            let completion = TurnCompletionStatus::Success {
+                final_text,
+                new_messages: cloned_messages,
+            };
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,
                 turn_id,
                 sequence,
                 payload: TurnEventPayload::Completed {
-                    status: TurnCompletionStatus::Success {
-                        final_text: final_text.clone(),
-                        new_messages: cloned_messages,
-                    },
+                    status: completion.clone(),
                 },
             });
             let _ = result_tx.send(TurnRecord {
                 new_messages,
                 status: TurnRecordStatus::Success,
+                completion,
             });
         }
         Ok((Err(e), partial_messages)) => {
@@ -260,8 +283,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             let mut error_message = e.to_string();
             if diagnostic_failure.is_some() {
                 error_message.push_str(
-                    "
-[warning: failed to persist provider terminal diagnostic]",
+                    "\n[warning: failed to persist provider terminal diagnostic]",
                 );
             }
             if !partial_messages.is_empty()
@@ -270,47 +292,48 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 match persist_turn_messages(persistence, &partial_messages, &raw_tool_outputs) {
                     Ok(()) => {}
                     Err(persist_err) => {
-                        // Do not silently swallow persistence failure.
-                        // Append it to the error message so the host can
-                        // observe that tool results were not saved.
                         error_message = format!(
                             "{error_message}\n[warning: failed to persist partial turn messages: {persist_err}]"
                         );
                     }
                 }
             }
+            let completion = TurnCompletionStatus::Error {
+                message: error_message,
+            };
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,
                 turn_id,
                 sequence,
                 payload: TurnEventPayload::Completed {
-                    status: TurnCompletionStatus::Error {
-                        message: error_message,
-                    },
+                    status: completion.clone(),
                 },
             });
             let _ = result_tx.send(TurnRecord {
                 new_messages: partial_messages,
                 status: TurnRecordStatus::Error,
+                completion,
             });
         }
         Err(_join_error) => {
             error!("agent panicked during turn");
+            let completion = TurnCompletionStatus::Error {
+                message: "agent panicked".into(),
+            };
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,
                 turn_id,
                 sequence,
                 payload: TurnEventPayload::Completed {
-                    status: TurnCompletionStatus::Error {
-                        message: "agent panicked".into(),
-                    },
+                    status: completion.clone(),
                 },
             });
             let _ = result_tx.send(TurnRecord {
                 new_messages: Vec::new(),
                 status: TurnRecordStatus::Error,
+                completion,
             });
         }
     }
