@@ -183,29 +183,29 @@ impl StructuredSubmission {
         let metadata_bytes = self
             .attachment_metadata_bytes()
             .ok_or(SubmissionRejectionReason::InvalidStructure)?;
-        let oversized_attachment =
-            self.items
-                .iter()
-                .flat_map(|item| &item.attachments)
-                .any(|part| match part {
-                    ContentPart::Image {
-                        path,
-                        mime,
-                        byte_count,
-                        ..
-                    } => {
-                        let metadata = path
-                            .as_os_str()
-                            .to_string_lossy()
-                            .len()
-                            .saturating_add(mime.len())
-                            .saturating_add(std::mem::size_of::<u64>())
-                            .saturating_add(32);
-                        *byte_count > MAX_SUBMISSION_IMAGE_BYTES
-                            || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
-                    }
-                    ContentPart::Text { .. } => true,
-                });
+        let oversized_attachment = self
+            .items
+            .iter()
+            .flat_map(|item| &item.attachments)
+            .any(|part| match part {
+                ContentPart::Image {
+                    path,
+                    mime,
+                    byte_count,
+                    ..
+                } => {
+                    let metadata = path
+                        .as_os_str()
+                        .to_string_lossy()
+                        .len()
+                        .saturating_add(mime.len())
+                        .saturating_add(std::mem::size_of::<u64>())
+                        .saturating_add(32);
+                    *byte_count > MAX_SUBMISSION_IMAGE_BYTES
+                        || metadata > MAX_SUBMISSION_ATTACHMENT_METADATA_BYTES
+                }
+                ContentPart::Text { .. } => true,
+            });
         if image_count > MAX_SUBMISSION_IMAGE_COUNT
             || image_bytes > MAX_SUBMISSION_TOTAL_IMAGE_BYTES
             || metadata_bytes > MAX_SUBMISSION_TOTAL_ATTACHMENT_METADATA_BYTES
@@ -285,6 +285,40 @@ pub enum SubmissionReceiptDisposition {
     },
 }
 
+impl SubmissionReceiptDisposition {
+    /// Returns true once the Actor has durably accepted this exact identity.
+    #[must_use]
+    pub fn has_durable_custody(&self) -> bool {
+        matches!(
+            self,
+            Self::AcceptedPending | Self::AlreadyAccepted { .. }
+        )
+    }
+}
+
+/// Canonical durable result delivered to a tracked structured submitter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubmissionReceipt {
+    /// Logical Session that produced the receipt.
+    pub session_id: String,
+    /// Runtime generation echoed from the submitted batch.
+    pub session_generation: u64,
+    /// Stable batch identity.
+    pub submission_id: String,
+    /// Exact frozen-prefix identity. Currently identical to `submission_id`.
+    pub reservation_id: String,
+    /// Durable receipt identity, empty only for rejection or `NotAccepted`.
+    pub receipt_id: String,
+    /// Source used by Actor arbitration.
+    pub source: SubmissionSource,
+    /// Number of original recoverable items.
+    pub item_count: usize,
+    /// Aggregate original UTF-8 text bytes.
+    pub total_text_bytes: usize,
+    /// Durable, content-free disposition.
+    pub disposition: SubmissionReceiptDisposition,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,6 +382,25 @@ mod tests {
         assert_eq!(
             value.validate(),
             Err(SubmissionRejectionReason::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn durable_custody_excludes_rejection_and_not_accepted() {
+        assert!(SubmissionReceiptDisposition::AcceptedPending.has_durable_custody());
+        assert!(
+            SubmissionReceiptDisposition::AlreadyAccepted {
+                state: PendingSubmissionState::Committed,
+                turn_id: Some("turn-1".into()),
+            }
+            .has_durable_custody()
+        );
+        assert!(!SubmissionReceiptDisposition::NotAccepted.has_durable_custody());
+        assert!(
+            !SubmissionReceiptDisposition::Rejected {
+                reason: SubmissionRejectionReason::LimitExceeded,
+            }
+            .has_durable_custody()
         );
     }
 }
