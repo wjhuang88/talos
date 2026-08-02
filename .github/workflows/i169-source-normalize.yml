@@ -1,0 +1,111 @@
+name: I169 source normalization
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+    paths:
+      - .github/workflows/i169-source-normalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - name: Materialize reviewed generated sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated="$PWD/.i169-generated"
+          mkdir -p "$generated"
+          rustc crates/talos-cli/build.rs -o /tmp/i169-source-generator
+          (
+            cd crates/talos-cli
+            OUT_DIR="$generated" /tmp/i169-source-generator
+          )
+          cp "$generated/tui_bridge_impl.rs" crates/talos-cli/src/tui_bridge.rs
+          cp "$generated/tests_impl.rs" crates/talos-cli/src/tests.rs
+          rm -rf "$generated"
+          rm crates/talos-cli/build.rs
+          rm crates/talos-cli/src/tui_bridge_impl.rs
+          rm crates/talos-cli/src/tests_impl.rs
+
+      - name: Remove delimiter-authoritative compatibility API
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("crates/talos-conversation/src/engine.rs")
+          source = path.read_text()
+          old_doc = '''    /// Drains the oldest steering message while preserving FIFO order.
+    ///
+    /// This method remains available for downstream callers that need the
+    /// original single-item behavior. Talos's interactive runtime uses
+    /// [`Self::drain_steering_queue_batched`] for TUI-041 / GitHub Issue #50.
+'''
+          new_doc = '''    /// Drains the oldest steering message while preserving FIFO order.
+    ///
+    /// This method remains available only for legacy single-item callers.
+    /// Transactional TUI steering uses structured prepare/commit/rollback.
+'''
+          old_batch = '''
+    /// Drains the entire steering queue into a single batched message (TUI-041).
+    ///
+    /// When multiple user inputs accumulate in the steering queue during an
+    /// active turn, this method joins them with `\\n\\n` separators so they are
+    /// processed as one consolidated user turn instead of N sequential turns.
+    /// Returns `None` when the queue is empty.
+    pub fn drain_steering_queue_batched(&mut self) -> Option<String> {
+        if self.steering_queue.is_empty() {
+            None
+        } else {
+            self.prepared_steering = None;
+            let joined = std::mem::take(&mut self.steering_queue)
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>()
+                .join("\\n\\n");
+            Some(joined)
+        }
+    }
+'''
+          if source.count(old_doc) != 1:
+              raise SystemExit("expected exactly one legacy drain doc block")
+          if source.count(old_batch) != 1:
+              raise SystemExit("expected exactly one delimiter batch method")
+          source = source.replace(old_doc, new_doc, 1).replace(old_batch, "", 1)
+          path.write_text(source)
+
+      - name: Remove one-shot workflow
+        shell: bash
+        run: rm .github/workflows/i169-source-normalize.yml
+
+      - name: Format and check normalized sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo check -p talos-conversation -p talos-cli --locked
+
+      - name: Commit normalized source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "wjhuang88"
+          git config user.email "6157210+wjhuang88@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "refactor(i169): materialize transactional bridge sources (#131) [model:gpt-5.6-thinking]"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
