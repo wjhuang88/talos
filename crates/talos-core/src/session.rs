@@ -15,7 +15,7 @@ pub use crate::submission::{
     MAX_SUBMISSION_BATCH_BYTES, MAX_SUBMISSION_BATCH_ITEMS, MAX_SUBMISSION_IMAGE_BYTES,
     MAX_SUBMISSION_IMAGE_COUNT, MAX_SUBMISSION_ITEM_BYTES, MAX_SUBMISSION_TOTAL_IMAGE_BYTES,
     PendingSubmissionState, StructuredSubmission, SubmissionItem, SubmissionKind,
-    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
+    SubmissionReceipt, SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
 };
 
 /// Commands sent to the session actor via the bounded SQ.
@@ -33,8 +33,24 @@ pub enum SessionOp {
     PreviewRequest { message: String },
     /// Submit an immutable source-aware batch through the Actor boundary.
     SubmitStructured { submission: StructuredSubmission },
+    /// Submit a batch and receive the same canonical durable receipt projected on EQ.
+    ///
+    /// The sender is runtime-local and deliberately excluded from serialization.
+    SubmitStructuredTracked {
+        submission: StructuredSubmission,
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
+    },
     /// Reconcile a sent batch without creating a second execution authority.
     ReconcileStructured { submission: StructuredSubmission },
+    /// Reconcile a batch and receive the canonical durable result directly.
+    ///
+    /// The sender is runtime-local and deliberately excluded from serialization.
+    ReconcileStructuredTracked {
+        submission: StructuredSubmission,
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
+    },
     /// Replace the model-visible activated Skill context.
     SetSkillContext {
         /// Active Skill name, or `None` to clear activation.
@@ -303,7 +319,17 @@ mod tests {
             SessionOp::SubmitStructured {
                 submission: submission.clone(),
             },
-            SessionOp::ReconcileStructured { submission },
+            SessionOp::SubmitStructuredTracked {
+                submission: submission.clone(),
+                receipt_tx: None,
+            },
+            SessionOp::ReconcileStructured {
+                submission: submission.clone(),
+            },
+            SessionOp::ReconcileStructuredTracked {
+                submission,
+                receipt_tx: None,
+            },
             SessionOp::Interrupt,
             SessionOp::Shutdown,
         ];
