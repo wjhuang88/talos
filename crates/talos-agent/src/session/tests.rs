@@ -583,9 +583,11 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 
     let requests = captured.lock().unwrap();
     assert_eq!(requests.len(), 1, "Actor custody must execute exactly once");
-    assert!(requests[0].iter().any(
-        |message| matches!(message, Message::User { content } if content == "must run once")
-    ));
+    assert!(
+        requests[0].iter().any(
+            |message| matches!(message, Message::User { content } if content == "must run once")
+        )
+    );
 }
 
 #[tokio::test]
