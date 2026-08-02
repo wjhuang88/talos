@@ -41,7 +41,6 @@ fn main() {
         "rejected submission unused fields",
     );
 
-    let output =
-        PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("tui_bridge_impl.rs");
+    let output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("tui_bridge_impl.rs");
     fs::write(output, source).expect("write generated I169 bridge implementation");
 }
