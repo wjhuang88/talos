@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use talos_agent::session::AppServerSession;
 use talos_agent::Agent;
+use talos_agent::session::AppServerSession;
 use talos_core::message::{AgentEvent, Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
 use talos_core::session::{
@@ -165,7 +165,9 @@ async fn lost_ack_keeps_durable_pending_without_execution() {
 async fn shutdown_pauses_unstarted_durable_submissions() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-shutdown-pause").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-shutdown-pause")
+        .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     let calls = Arc::new(AtomicUsize::new(0));
