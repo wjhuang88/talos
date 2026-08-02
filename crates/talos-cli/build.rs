@@ -235,6 +235,56 @@ mod tests {"#,
         }"#,
         "plain structured submission assertion",
     );
+    replace_once(
+        &mut tests_source,
+        r#"    async fn conversation_loop_cancel_emits_terminal_cancelled_status() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let agent_tx = TestTurnSender::new(agent_tx);
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);"#,
+        r#"    async fn conversation_loop_cancel_emits_terminal_cancelled_status() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let agent_tx = TestTurnSender::new(agent_tx);
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);"#,
+        "cancel test interrupt receiver",
+    );
+    replace_once(
+        &mut tests_source,
+        r#"        user_tx.send(UserInput::Cancel).unwrap();
+
+        let mut saw_cancelled_status = false;"#,
+        r#"        user_tx.send(UserInput::Cancel).unwrap();
+
+        let operation = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            interrupt_rx.recv(),
+        )
+        .await
+        .expect("cancel reaches Actor command queue")
+        .expect("Actor command queue remains open");
+        assert!(matches!(operation, talos_core::session::SessionOp::Interrupt));
+        agent_tx
+            .tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".to_string(),
+                turn_id: "turn_test".to_string(),
+                sequence: agent_tx
+                    .sequence
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Cancelled,
+                },
+            })
+            .expect("Actor cancellation completion reaches bridge");
+
+        let mut saw_cancelled_status = false;"#,
+        "cancel test actor terminal event",
+    );
     fs::write(output_dir.join("tests_impl.rs"), tests_source)
         .expect("write generated I169 CLI tests");
 }
