@@ -60,11 +60,7 @@ impl LanguageModel for RecordingDelayModel {
     }
 }
 
-fn make_agent(
-    calls: Arc<AtomicUsize>,
-    inputs: Arc<Mutex<Vec<String>>>,
-    delay: Duration,
-) -> Agent {
+fn make_agent(calls: Arc<AtomicUsize>, inputs: Arc<Mutex<Vec<String>>>, delay: Duration) -> Agent {
     #[allow(deprecated)]
     Agent::new(
         Arc::new(RecordingDelayModel {
@@ -176,7 +172,9 @@ async fn wait_for_state(
 async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-stress-identity").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-stress-identity")
+        .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
 
@@ -224,14 +222,20 @@ async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
         sender.await.unwrap();
     }
 
-    assert_eq!(wait_for_completions(&mut eq_rx, 1).await, vec![work.id.clone()]);
+    assert_eq!(
+        wait_for_completions(&mut eq_rx, 1).await,
+        vec![work.id.clone()]
+    );
     wait_for_state(&store, &work.id, PendingSubmissionState::Committed).await;
     tokio::time::sleep(Duration::from_millis(150)).await;
 
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
-        inputs.lock().expect("recorded input lock poisoned").as_slice(),
-        ["execute exactly once"]
+        inputs
+            .lock()
+            .expect("recorded input lock poisoned")
+            .as_slice(),
+        ["execute exactly once".to_string()]
     );
 
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
