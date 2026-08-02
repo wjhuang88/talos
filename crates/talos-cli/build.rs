@@ -15,6 +15,7 @@ fn main() {
 
     let mut source = fs::read_to_string("src/tui_bridge_impl.rs")
         .expect("read I169 bridge implementation source");
+    source = source.replace("\r\n", "\n");
 
     replace_once(
         &mut source,
