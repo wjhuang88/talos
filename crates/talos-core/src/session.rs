@@ -42,11 +42,13 @@ pub enum SessionOp {
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
     },
     /// Reconcile a sent batch without creating a second execution authority.
-    ReconcileStructured { submission: StructuredSubmission },
+    SubmitStructuredReconcile { submission: StructuredSubmission },
     /// Reconcile a batch and receive the canonical durable result directly.
     ///
-    /// The sender is runtime-local and deliberately excluded from serialization.
-    ReconcileStructuredTracked {
+    /// Reconciliation is observational: it never grants execution authority or
+    /// resumes paused work, even when the immutable submission belongs to an
+    /// older Actor generation.
+    SubmitStructuredReconcileTracked {
         submission: StructuredSubmission,
         #[serde(skip)]
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
@@ -58,8 +60,17 @@ pub enum SessionOp {
         /// Bounded Skill body/reference content, or `None` to clear activation.
         content: Option<String>,
     },
-    /// Interrupt the current turn.
+    /// Interrupt the current turn through the legacy compatibility path.
+    ///
+    /// New interactive paths must use [`SessionOp::InterruptTurn`].
     Interrupt,
+    /// Interrupt exactly one Actor generation and one active structured Turn.
+    InterruptTurn {
+        /// Authoritative Actor generation captured with the command sender.
+        session_generation: u64,
+        /// Exact active Turn identity observed from `StructuredTurnEvent::Started`.
+        turn_id: String,
+    },
     /// Shut down the session actor.
     Shutdown,
 }
@@ -95,7 +106,7 @@ pub enum SessionEvent {
         /// Canonical Turn identity.
         turn_id: String,
     },
-    /// Compatibility rejection before a structured Turn starts.
+    /// Rejection before durable Actor custody transfers.
     SubmissionRejected {
         /// Session that rejected the submission.
         session_id: String,
@@ -106,15 +117,28 @@ pub enum SessionEvent {
         /// Bounded content-free reason.
         reason: SubmissionRejectionReason,
     },
+    /// A durably accepted submission could not start and remains paused/recoverable.
+    SubmissionPaused {
+        /// Session that retains custody.
+        session_id: String,
+        /// Authoritative Actor generation emitting the pause.
+        session_generation: u64,
+        /// Stable submission identity.
+        submission_id: String,
+        /// Durable receipt identity.
+        receipt_id: String,
+        /// Content-free pre-start failure reason.
+        reason: SubmissionRejectionReason,
+    },
     /// Durable result of structured submission acceptance or reconciliation.
     SubmissionReceipt {
         /// Logical Session addressed by the operation.
         session_id: String,
-        /// Runtime generation that owns the receipt.
+        /// Runtime generation that owns the receipt projection.
         session_generation: u64,
         /// Stable batch identity.
         submission_id: String,
-        /// Exact frozen-prefix identity. Currently identical to submission_id.
+        /// Exact frozen-prefix reservation identity.
         reservation_id: String,
         /// Durable receipt identity, empty only for NotAccepted/rejection.
         receipt_id: String,
@@ -122,7 +146,7 @@ pub enum SessionEvent {
         source: SubmissionSource,
         /// Number of original recoverable items.
         item_count: usize,
-        /// Aggregate UTF-8 text bytes.
+        /// Aggregate original UTF-8 text bytes.
         total_text_bytes: usize,
         /// Durable content-free disposition.
         disposition: SubmissionReceiptDisposition,
@@ -323,14 +347,18 @@ mod tests {
                 submission: submission.clone(),
                 receipt_tx: None,
             },
-            SessionOp::ReconcileStructured {
+            SessionOp::SubmitStructuredReconcile {
                 submission: submission.clone(),
             },
-            SessionOp::ReconcileStructuredTracked {
+            SessionOp::SubmitStructuredReconcileTracked {
                 submission,
                 receipt_tx: None,
             },
             SessionOp::Interrupt,
+            SessionOp::InterruptTurn {
+                session_generation: 7,
+                turn_id: "turn_7".into(),
+            },
             SessionOp::Shutdown,
         ];
         for op in &ops {
@@ -366,11 +394,18 @@ mod tests {
                 sender_generation: 7,
                 reason: SubmissionRejectionReason::LimitExceeded,
             },
+            SessionEvent::SubmissionPaused {
+                session_id: "session_1".into(),
+                session_generation: 7,
+                submission_id: "batch_1".into(),
+                receipt_id: "receipt_1".into(),
+                reason: SubmissionRejectionReason::ContextBudgetExceeded,
+            },
             SessionEvent::SubmissionReceipt {
                 session_id: "session_1".into(),
                 session_generation: 7,
                 submission_id: "batch_1".into(),
-                reservation_id: "batch_1".into(),
+                reservation_id: "reservation_batch_1".into(),
                 receipt_id: "receipt_1".into(),
                 source: SubmissionSource::User,
                 item_count: 1,
