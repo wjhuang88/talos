@@ -403,7 +403,7 @@ impl PendingSubmissionStore {
             .filter_map(|entry| decode_turn_transcript_outcome(&entry.content))
             .filter(|record| record.turn_id == turn_id)
             .map(|record| record.outcome)
-            .last())
+            .next_back())
     }
 
     fn transition(
