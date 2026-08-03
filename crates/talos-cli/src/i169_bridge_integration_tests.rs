@@ -327,7 +327,6 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
             submission_id: submission.id.clone(),
             reservation_id: format!("reservation:{}", submission.id),
             receipt_id: receipt_id.clone(),
-            source: SubmissionSource::User,
             item_count: 1,
             total_text_bytes: submission.total_text_bytes(),
             disposition: SubmissionReceiptDisposition::AcceptedPending,

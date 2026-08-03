@@ -24,7 +24,6 @@ fn accept_structured_submission(
             submission_id: submission.id.clone(),
             reservation_id: format!("reservation:{}", submission.id),
             receipt_id: receipt_id.to_string(),
-            source: submission.source.clone(),
             item_count: submission.items.len(),
             total_text_bytes: submission.total_text_bytes(),
             disposition: talos_core::session::SubmissionReceiptDisposition::AcceptedPending,
