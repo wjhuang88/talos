@@ -26,9 +26,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Verify exact protected parent
+      - name: Verify protected trigger ancestry
         shell: bash
-        run: test "$(git rev-parse HEAD^)" = "a599777fadaeaa0e99981dac4315baf345f5687c"
+        run: |
+          test "$(git rev-parse HEAD^^)" = "1bbc42bb483edc08514b0871a6726505b5be2cd8"
+          test -f .github/i169-remediation-trigger
 
       - name: Execute corrected staged remediation
         shell: bash
@@ -70,11 +72,13 @@ jobs:
           mode_path.write_text(mode_text.replace(rpc_old, rpc_new))
           PYRUN
 
-      - name: Restore persistent CI and remove temporary workflows
+      - name: Restore persistent CI and remove all temporary assets
         shell: bash
         run: |
-          git checkout HEAD^^ -- .github/workflows/ci.yml
-          rm .github/workflows/i169-generation-handoff-remediation.yml .github/workflows/i169-generation-handoff-launcher.yml
+          git checkout HEAD^^^^ -- .github/workflows/ci.yml
+          rm .github/workflows/i169-generation-handoff-remediation.yml
+          rm .github/workflows/i169-generation-handoff-launcher.yml
+          rm .github/i169-remediation-trigger
           cargo fmt --all
           git diff --check
           test -n "$(git status --short)"
