@@ -11,9 +11,7 @@ use talos_conversation::{
 };
 use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::{
-    PendingSubmissionState, RuntimePolicy, SessionConfig, SessionOp,
-};
+use talos_core::session::{PendingSubmissionState, RuntimePolicy, SessionConfig, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_session::{PendingSubmissionStore, PersistencePolicy, SessionManager};
 use tokio::sync::mpsc;
@@ -73,8 +71,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
         context_limit: Some(64),
         ..Default::default()
     });
-    let (session_tx, _session_rx) =
-        mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
     let skills_dir = tempfile::tempdir().unwrap();
     let runtime_skills = Arc::new(tokio::sync::Mutex::new(
         crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
