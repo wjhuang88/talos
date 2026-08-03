@@ -16,9 +16,9 @@
 //!
 //! # Branching Model
 //!
-//! Each session supports multiple branches. A branch is a linear sequence of entries
-//! rooted at a specific entry. The `fork` method creates a new branch from any existing
-//! entry, enabling tree-structured conversation histories.
+//! Each session supports multiple branches, each identified by a unique ID.
+//! The `fork` method creates a new branch from any existing entry, enabling tree-structured
+//! conversations.
 //!
 //! # Crash Safety
 //!
@@ -49,6 +49,7 @@ mod tool_contributions;
 mod topology;
 mod transcript;
 pub use tool_compression::{ToolOutputCompression, compress_tool_output};
+mod turn_outcome;
 mod types;
 
 pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};
@@ -74,6 +75,7 @@ pub use todo::{
 };
 pub use tool_contributions::todo_tool_contributions_for_sessions_dir;
 pub use transcript::{TranscriptEntry, export_json, export_markdown, read_transcript};
+pub use turn_outcome::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
 #[cfg(test)]
