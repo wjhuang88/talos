@@ -16,9 +16,9 @@
 //!
 //! # Branching Model
 //!
-//! Each session supports multiple branches, each identified by a unique ID.
-//! The `fork` method creates a new branch from any existing entry, enabling tree-structured
-//! conversations.
+//! Each session supports multiple branches. A branch is a linear sequence of entries
+//! rooted at a specific entry. The `fork` method creates a new branch from any existing
+//! entry, enabling tree-structured conversations.
 //!
 //! # Crash Safety
 //!
