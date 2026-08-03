@@ -7,10 +7,54 @@
 //! This is SESSION-001-A: the infrastructure that SESSION-001-B (new/resume)
 //! and SESSION-001-C (fork) consume.
 
+use std::sync::{Mutex, OnceLock};
+
 use talos_agent::session::AppServerSession;
 use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::Session;
 use tokio::sync::mpsc;
+
+type SenderGenerationRegistry = Vec<(mpsc::WeakSender<SessionOp>, u64)>;
+
+fn sender_generation_registry() -> &'static Mutex<SenderGenerationRegistry> {
+    static REGISTRY: OnceLock<Mutex<SenderGenerationRegistry>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn register_generation_bound_sender(sender: &mpsc::Sender<SessionOp>, generation: u64) {
+    let mut registry = sender_generation_registry()
+        .lock()
+        .expect("session sender generation registry poisoned");
+    registry.retain(|(weak, _)| {
+        weak.upgrade()
+            .is_some_and(|existing| !existing.same_channel(sender))
+    });
+    registry.push((sender.downgrade(), generation));
+}
+
+/// Returns the composition-root generation bound to one exact command Sender.
+///
+/// The registry stores weak Sender references, so observing a route never keeps
+/// a retired Actor command channel alive. Production senders are registered
+/// before they are published through the lifecycle watch boundary.
+pub(crate) fn authoritative_generation_for_sender(
+    sender: &mpsc::Sender<SessionOp>,
+) -> Option<u64> {
+    let mut registry = sender_generation_registry()
+        .lock()
+        .expect("session sender generation registry poisoned");
+    let mut generation = None;
+    registry.retain(|(weak, registered_generation)| {
+        let Some(existing) = weak.upgrade() else {
+            return false;
+        };
+        if existing.same_channel(sender) {
+            generation = Some(*registered_generation);
+        }
+        true
+    });
+    generation
+}
 
 /// One exact Session Actor command route.
 ///
@@ -39,6 +83,7 @@ impl SessionCommandTarget {
     #[must_use]
     fn bind_sender(&self) -> mpsc::Sender<SessionOp> {
         let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
+        register_generation_bound_sender(&proxy_tx, self.generation);
         let target = self.clone();
         tokio::spawn(async move {
             while let Some(operation) = proxy_rx.recv().await {
@@ -104,6 +149,7 @@ pub struct SessionTransition {
 impl SessionTransition {
     /// Creates the transition owner for the initial generation-zero Actor.
     pub fn new(sq_tx: mpsc::Sender<SessionOp>, session: Session) -> Self {
+        register_generation_bound_sender(&sq_tx, 0);
         Self {
             active_target: SessionCommandTarget::new(sq_tx, 0),
             active_session: session,
@@ -156,5 +202,28 @@ impl SessionTransition {
 
     pub fn rollback(&mut self) {
         self.prepared = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn coalesced_watch_updates_resolve_latest_authoritative_generation() {
+        let (sender_zero, _rx_zero) = mpsc::channel(1);
+        let (sender_one, _rx_one) = mpsc::channel(1);
+        let (sender_two, _rx_two) = mpsc::channel(1);
+        register_generation_bound_sender(&sender_zero, 0);
+        register_generation_bound_sender(&sender_one, 1);
+        register_generation_bound_sender(&sender_two, 2);
+
+        let (watch_tx, mut watch_rx) = tokio::sync::watch::channel(sender_zero);
+        watch_tx.send(sender_one).unwrap();
+        watch_tx.send(sender_two).unwrap();
+
+        watch_rx.changed().await.unwrap();
+        let current = watch_rx.borrow().clone();
+        assert_eq!(authoritative_generation_for_sender(&current), Some(2));
     }
 }
