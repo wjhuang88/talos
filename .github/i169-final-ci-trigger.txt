@@ -1,1 +1,0 @@
-Temporary exact-head CI trigger; removed by the next commit.
