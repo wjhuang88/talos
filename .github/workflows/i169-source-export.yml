@@ -1,0 +1,30 @@
+name: I169 Source Export
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Package exact-head source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --output="${RUNNER_TEMP}/talos-source.tar.gz" HEAD
+          sha256sum "${RUNNER_TEMP}/talos-source.tar.gz"
+      - name: Upload exact-head source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: talos-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/talos-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
