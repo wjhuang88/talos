@@ -1,0 +1,183 @@
+diff --git a/crates/talos-cli/src/mode_runners.rs b/crates/talos-cli/src/mode_runners.rs
+index f860c73..b6b38dc 100644
+--- a/crates/talos-cli/src/mode_runners.rs
++++ b/crates/talos-cli/src/mode_runners.rs
+@@ -147,6 +147,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
+     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+     let _sched_join = sched_pending.spawn(
+         handle.sq_tx.clone(),
++        actor.generation(),
+         tokio_util::sync::CancellationToken::new(),
+     );
+     tokio::spawn(async move { actor.run().await });
+@@ -338,13 +339,18 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
+         model_context_limit,
+     };
+     let (handle, mut actor) = AppServerSession::new(agent, session_config);
++    actor
++        .set_persistence(
++            session.clone(),
++            session_metadata_for_model(&config.model, &config.provider),
++        )
++        .context("failed to restore durable Session generation")?;
++    let generation = actor.generation();
++    let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+     let _sched_join = sched_pending.spawn(
+         handle.sq_tx.clone(),
+-        tokio_util::sync::CancellationToken::new(),
+-    );
+-    actor.set_persistence(
+-        session.clone(),
+-        session_metadata_for_model(&config.model, &config.provider),
++        generation,
++        scheduler_cancel.clone(),
+     );
+     let sq_tx_signal = handle.sq_tx.clone();
+     tokio::spawn(async move { actor.run().await });
+@@ -352,6 +358,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
+     let transition = Arc::new(Mutex::new(SessionTransition::new(
+         handle.sq_tx.clone(),
+         session.clone(),
++        generation,
++        scheduler_cancel,
+     )));
+     tokio::spawn(async move {
+         loop {
+diff --git a/crates/talos-cli/src/mode_runners_tests.rs b/crates/talos-cli/src/mode_runners_tests.rs
+index 45de161..e9ad711 100644
+--- a/crates/talos-cli/src/mode_runners_tests.rs
++++ b/crates/talos-cli/src/mode_runners_tests.rs
+@@ -1217,6 +1217,8 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
+         let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
+             sq_tx,
+             session.clone(),
++            0,
++            tokio_util::sync::CancellationToken::new(),
+         )));
+         let mcp_config = talos_config::McpConfig::default();
+ 
+@@ -1313,6 +1315,8 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
+         let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
+             sq_tx,
+             session.clone(),
++            0,
++            tokio_util::sync::CancellationToken::new(),
+         )));
+         let mcp_config = talos_config::McpConfig::default();
+ 
+diff --git a/crates/talos-cli/src/model_lifecycle.rs b/crates/talos-cli/src/model_lifecycle.rs
+index 7af1aef..1837bf6 100644
+--- a/crates/talos-cli/src/model_lifecycle.rs
++++ b/crates/talos-cli/src/model_lifecycle.rs
+@@ -398,19 +398,23 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>)
+     }
+ 
+     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+-    let _sched_join = sched_pending.spawn(
+-        handle.sq_tx.clone(),
+-        tokio_util::sync::CancellationToken::new(),
+-    );
+-    actor.set_persistence(
++    if let Err(e) = actor.set_persistence(
+         current_session.clone(),
+         crate::mode_runtime::session_metadata_for_model(
+             &runtime_model_config.model,
+             &runtime_model_config.provider,
+         ),
+-    );
++    ) {
++        let text = format!("[Error] Failed to restore durable Session generation: {e}\n");
++        send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
++        return false;
++    }
+     let session_for_prepare = current_session.clone();
+-    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
++    if let Err(e) = transition
++        .lock()
++        .await
++        .prepare(handle, session_for_prepare, sched_pending)
++    {
+         let text = format!("[Error] Failed to prepare model switch: {e}\n");
+         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+         return false;
+diff --git a/crates/talos-core/src/session.rs b/crates/talos-core/src/session.rs
+index 847796f..1cda654 100644
+--- a/crates/talos-core/src/session.rs
++++ b/crates/talos-core/src/session.rs
+@@ -71,6 +71,13 @@ pub enum SessionOp {
+         session_generation: u64,
+         turn_id: String,
+     },
++    /// Explicitly terminalizes one durably accepted submission that paused
++    /// before Provider start. The immutable generation and submission identity
++    /// prevent a delayed command from resolving different custody.
++    CancelPausedSubmission {
++        session_generation: u64,
++        submission_id: String,
++    },
+     Shutdown,
+ }
+ 
+@@ -302,6 +309,10 @@ mod tests {
+                 session_generation: 7,
+                 turn_id: "turn_7".into(),
+             },
++            SessionOp::CancelPausedSubmission {
++                session_generation: 7,
++                submission_id: "batch_1".into(),
++            },
+             SessionOp::Shutdown,
+         ];
+         for op in &ops {
+diff --git a/crates/talos-session/src/pending_submission/tests.rs b/crates/talos-session/src/pending_submission/tests.rs
+index 3b14a6b..081e787 100644
+--- a/crates/talos-session/src/pending_submission/tests.rs
++++ b/crates/talos-session/src/pending_submission/tests.rs
+@@ -172,3 +172,47 @@ fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
+         }
+     );
+ }
++
++#[test]
++fn runtime_generation_survives_store_reopen_and_advances_atomically() {
++    let dir = tempfile::tempdir().unwrap();
++    let session_file = dir.path().join("session.tlog");
++    let store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
++    assert_eq!(store.runtime_generation().unwrap(), 0);
++    assert_eq!(store.advance_runtime_generation().unwrap(), 1);
++    drop(store);
++
++    let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
++    assert_eq!(reopened.runtime_generation().unwrap(), 1);
++    assert_eq!(reopened.advance_runtime_generation().unwrap(), 2);
++    assert_eq!(reopened.runtime_generation().unwrap(), 2);
++}
++
++#[test]
++fn explicit_prestart_cancel_terminalizes_custody_and_preserves_identity() {
++    let dir = tempfile::tempdir().unwrap();
++    let store =
++        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
++    let payload = submission();
++    let (receipt, accepted) = store.accept(&payload).unwrap();
++    assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
++    store.mark_paused(&payload.id).unwrap();
++    store
++        .cancel_unstarted(&payload.id, "prestart-cancel:batch-1")
++        .unwrap();
++
++    let record = store.get(&payload.id).unwrap().unwrap();
++    assert_eq!(record.state, PendingSubmissionState::TerminalCancelled);
++    assert_eq!(record.turn_id.as_deref(), Some("prestart-cancel:batch-1"));
++    assert!(store.recover_unstarted().unwrap().is_empty());
++
++    let (replay_receipt, replay) = store.accept(&payload).unwrap();
++    assert_eq!(replay_receipt, receipt);
++    assert_eq!(
++        replay,
++        SubmissionReceiptDisposition::AlreadyAccepted {
++            state: PendingSubmissionState::TerminalCancelled,
++            turn_id: Some("prestart-cancel:batch-1".into()),
++        }
++    );
++}

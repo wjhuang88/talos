@@ -1,13 +1,13 @@
-name: I169 Source Export
+name: I169 Remediation Apply
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-source:
+  apply-remediation:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -15,19 +15,36 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Package exact-head source snapshot
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Apply, format, and validate reviewed remediation
         shell: bash
         run: |
           set -euo pipefail
-          git archive \
-            --format=tar.gz \
-            --output="${RUNNER_TEMP}/talos-source.tar.gz" \
-            HEAD
-          sha256sum "${RUNNER_TEMP}/talos-source.tar.gz"
-      - name: Upload exact-head source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: talos-source-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/talos-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
+          for patch in .github/i169-patches/*.patch; do
+            git apply --check "$patch"
+            git apply "$patch"
+          done
+          rm -rf .github/i169-patches
+          rm -f .github/i169-remediation.part{1,2,3,4}
+          rm -f .github/workflows/i169-source-export.yml
+          cargo fmt --all
+          git diff --check
+          cargo check --workspace --locked
+          cargo test -p talos-session runtime_generation_survives_store_reopen_and_advances_atomically --locked
+          cargo test -p talos-session explicit_prestart_cancel_terminalizes_custody_and_preserves_identity --locked
+          cargo test -p talos-agent scheduled_fire_uses_the_bound_actor_generation --locked
+          cargo test -p talos-agent --test i169_terminal_outcome_recovery --locked
+          cargo test -p talos-cli cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptance --locked
+      - name: Commit validated remediation
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(i169): address independent review blockers"
+          git push origin "HEAD:${HEAD_REF}"

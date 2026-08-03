@@ -1,0 +1,105 @@
+diff --git a/crates/talos-cli/src/tui_bridge.rs b/crates/talos-cli/src/tui_bridge.rs
+index 4d90137..a058d7d 100644
+--- a/crates/talos-cli/src/tui_bridge.rs
++++ b/crates/talos-cli/src/tui_bridge.rs
+@@ -46,6 +46,13 @@ struct DeferredAcceptedSubmission {
+     cancel_requested: bool,
+ }
+ 
++#[derive(Debug)]
++struct PausedAcceptedSubmission {
++    session_id: String,
++    session_generation: u64,
++    submission_id: String,
++}
++
+ impl DeferredAcceptedSubmission {
+     fn into_turn_state(self) -> BridgeTurnState {
+         BridgeTurnState::AcceptedByActor {
+@@ -111,12 +118,14 @@ enum BridgeTurnState {
+         turn_id: String,
+         next_sequence: u64,
+     },
+-    PausedAfterFailure,
++    PausedAfterFailure {
++        paused: Option<PausedAcceptedSubmission>,
++    },
+ }
+ 
+ impl BridgeTurnState {
+     fn accepts_queued_input(&self) -> bool {
+-        !matches!(self, Self::Idle | Self::PausedAfterFailure)
++        !matches!(self, Self::Idle | Self::PausedAfterFailure { .. })
+     }
+ 
+     fn blocks_session_mutation(&self) -> bool {
+@@ -601,10 +610,26 @@ async fn handle_session_event(
+             session_id,
+             submission_id,
+             sender_generation: rejected_generation,
+-            ..
++            reason,
+         } => {
+             let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
+             match state {
++                BridgeTurnState::PausedAfterFailure {
++                    paused: Some(paused),
++                } if paused.session_id == session_id
++                    && paused.session_generation == rejected_generation
++                    && paused.submission_id == submission_id
++                    && reason == talos_core::session::SubmissionRejectionReason::Cancelled =>
++                {
++                    *turn_state = deferred_accepted.take().map_or(
++                        BridgeTurnState::Idle,
++                        DeferredAcceptedSubmission::into_turn_state,
++                    );
++                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
++                        source: MessageSource::System,
++                        text: "[System] Paused submission cancelled before Provider start; later durable work may continue.\n".into(),
++                    }));
++                }
+                 BridgeTurnState::Submitting {
+                     submission,
+                     session_id: expected_session,
+@@ -620,7 +645,7 @@ async fn handle_session_event(
+                         .is_none_or(|expected| expected == &session_id) =>
+                 {
+                     engine.rollback_prepared_steering(&submission_id);
+-                    *turn_state = BridgeTurnState::PausedAfterFailure;
++                    *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+                     emit_bridge_error(
+                         ui_tx,
+                         "session rejected the queued submission; input was retained",
+@@ -630,6 +655,17 @@ async fn handle_session_event(
+                     *turn_state = other;
+                 }
+             }
++            if matches!(turn_state, BridgeTurnState::Idle) {
++                dispatch_prepared_submission(
++                    engine,
++                    turn_state,
++                    sq_tx_watch,
++                    known_sender,
++                    sender_generation,
++                    ui_tx,
++                )
++                .await;
++            }
+         }
+         SessionEvent::SubmissionPaused {
+             session_id,
+@@ -652,7 +688,13 @@ async fn handle_session_event(
+                     && expected_receipt == receipt_id =>
+                 {
+                     deferred_accepted.take();
+-                    *turn_state = BridgeTurnState::PausedAfterFailure;
++                    *turn_state = BridgeTurnState::PausedAfterFailure {
++                        paused: Some(PausedAcceptedSubmission {
++                            session_id,
++                            session_generation,
++                            submission_id: submission_id.clone(),
++                        }),
++                    };
+                     emit_bridge_error(
+                         ui_tx,
+                         &format!(
