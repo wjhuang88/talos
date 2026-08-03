@@ -1217,6 +1217,8 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
             sq_tx,
             session.clone(),
+            0,
+            tokio_util::sync::CancellationToken::new(),
         )));
         let mcp_config = talos_config::McpConfig::default();
 
@@ -1313,6 +1315,8 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
         let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
             sq_tx,
             session.clone(),
+            0,
+            tokio_util::sync::CancellationToken::new(),
         )));
         let mcp_config = talos_config::McpConfig::default();
 

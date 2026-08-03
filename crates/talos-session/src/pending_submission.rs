@@ -47,6 +47,12 @@ pub enum PendingSubmissionError {
     /// A lifecycle update violates the state machine.
     #[error("invalid pending submission state transition")]
     InvalidTransition,
+    /// A persisted runtime generation cannot be represented safely.
+    #[error("invalid persisted runtime generation: {0}")]
+    InvalidRuntimeGeneration(i64),
+    /// The durable runtime generation reached its maximum value.
+    #[error("runtime generation exhausted")]
+    RuntimeGenerationExhausted,
 }
 
 /// Exact durable record returned for Actor recovery.
@@ -96,6 +102,45 @@ impl PendingSubmissionStore {
     #[must_use]
     pub fn path(&self) -> &Path {
         self.path.as_ref()
+    }
+
+    /// Returns the durable runtime generation for this Session.
+    ///
+    /// The value is Session-scoped and survives process restart. New Sessions
+    /// start at generation zero; Actor replacement for the same Session must
+    /// advance it through [`Self::advance_runtime_generation`].
+    pub fn runtime_generation(&self) -> Result<u64, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let connection = self.connection()?;
+        ensure_schema(&connection)?;
+        let value = connection.query_row(
+            "SELECT value FROM pending_journal_meta WHERE key = 'runtime_generation'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        u64::try_from(value).map_err(|_| PendingSubmissionError::InvalidRuntimeGeneration(value))
+    }
+
+    /// Atomically advances and returns the durable runtime generation.
+    pub fn advance_runtime_generation(&self) -> Result<u64, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let mut connection = self.connection()?;
+        let transaction = immediate(&mut connection)?;
+        ensure_schema(&transaction)?;
+        let current = transaction.query_row(
+            "SELECT value FROM pending_journal_meta WHERE key = 'runtime_generation'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        let next = current
+            .checked_add(1)
+            .ok_or(PendingSubmissionError::RuntimeGenerationExhausted)?;
+        transaction.execute(
+            "UPDATE pending_journal_meta SET value = ?1 WHERE key = 'runtime_generation'",
+            params![next],
+        )?;
+        transaction.commit()?;
+        u64::try_from(next).map_err(|_| PendingSubmissionError::InvalidRuntimeGeneration(next))
     }
 
     /// Durably accepts an exact submission or returns its prior receipt.
@@ -224,6 +269,28 @@ impl PendingSubmissionStore {
             &[
                 PendingSubmissionState::AcceptedPending,
                 PendingSubmissionState::PausedPending,
+            ],
+        )
+    }
+
+    /// Explicitly cancels a durably accepted submission before Provider start.
+    ///
+    /// This is the terminal resolution path for deterministic pre-start
+    /// failures such as context-budget rejection. It preserves permanent
+    /// idempotency evidence while releasing FIFO custody for later work.
+    pub fn cancel_unstarted(
+        &self,
+        submission_id: &str,
+        cancellation_id: &str,
+    ) -> Result<(), PendingSubmissionError> {
+        self.transition(
+            submission_id,
+            PendingSubmissionState::TerminalCancelled,
+            Some(cancellation_id),
+            &[
+                PendingSubmissionState::AcceptedPending,
+                PendingSubmissionState::PausedPending,
+                PendingSubmissionState::TerminalCancelled,
             ],
         )
     }
@@ -602,7 +669,9 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
              turn_id TEXT
          );
          INSERT OR IGNORE INTO pending_journal_meta (key, value)
-         VALUES ('schema_version', 1);",
+         VALUES ('schema_version', 1);
+         INSERT OR IGNORE INTO pending_journal_meta (key, value)
+         VALUES ('runtime_generation', 0);",
     )?;
     let version = connection.query_row(
         "SELECT value FROM pending_journal_meta WHERE key = 'schema_version'",

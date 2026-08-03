@@ -9,10 +9,12 @@
 
 use std::sync::{Mutex, OnceLock};
 
+use talos_agent::PendingSchedulerActor;
 use talos_agent::session::AppServerSession;
 use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::Session;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 type SenderGenerationRegistry = Vec<(mpsc::WeakSender<SessionOp>, u64)>;
 
@@ -112,6 +114,7 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredReconcileTracked { .. }
             | SessionOp::SetSkillContext { .. }
             | SessionOp::InterruptTurn { .. }
+            | SessionOp::CancelPausedSubmission { .. }
             | SessionOp::Interrupt
             | SessionOp::Shutdown => {}
         }
@@ -135,21 +138,29 @@ pub struct CommitResult {
 struct PreparedSession {
     handle: SessionHandle,
     session: Session,
+    scheduler: PendingSchedulerActor,
 }
 
 pub struct SessionTransition {
     active_target: SessionCommandTarget,
     active_session: Session,
+    active_scheduler_cancel: CancellationToken,
     prepared: Option<PreparedSession>,
 }
 
 impl SessionTransition {
-    /// Creates the transition owner for the initial generation-zero Actor.
-    pub fn new(sq_tx: mpsc::Sender<SessionOp>, session: Session) -> Self {
-        register_generation_bound_sender(&sq_tx, 0);
+    /// Creates the transition owner for the active durable Session generation.
+    pub fn new(
+        sq_tx: mpsc::Sender<SessionOp>,
+        session: Session,
+        generation: u64,
+        scheduler_cancel: CancellationToken,
+    ) -> Self {
+        register_generation_bound_sender(&sq_tx, generation);
         Self {
-            active_target: SessionCommandTarget::new(sq_tx, 0),
+            active_target: SessionCommandTarget::new(sq_tx, generation),
             active_session: session,
+            active_scheduler_cancel: scheduler_cancel,
             prepared: None,
         }
     }
@@ -160,35 +171,58 @@ impl SessionTransition {
         self.active_target.generation
     }
 
-    pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
+    pub fn prepare(
+        &mut self,
+        handle: SessionHandle,
+        session: Session,
+        scheduler: PendingSchedulerActor,
+    ) -> Result<(), String> {
         if self.prepared.is_some() {
             return Err(
                 "a session transition is already prepared — commit or rollback first".to_string(),
             );
         }
-        self.prepared = Some(PreparedSession { handle, session });
+        self.prepared = Some(PreparedSession {
+            handle,
+            session,
+            scheduler,
+        });
         Ok(())
     }
 
-    /// Commits one Actor replacement and assigns its authoritative generation
-    /// before the task is spawned or the generation-bound sender is published.
+    /// Commits one Actor replacement after the target Session generation is
+    /// durably known. Same-Session runtime replacement advances the durable
+    /// generation; switching to another Session restores that Session's epoch.
     pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
-        let next_generation = self
-            .active_generation()
-            .checked_add(1)
-            .ok_or_else(|| "session generation exhausted".to_string())?;
         let mut prepared = self
             .prepared
             .take()
             .ok_or_else(|| "no prepared transition to commit".to_string())?;
-
+        let same_session = prepared.session.id == self.active_session.id;
+        let next_generation = if same_session {
+            actor
+                .advance_generation()
+                .map_err(|error| format!("failed to advance Session generation: {error}"))?
+        } else {
+            actor.generation()
+        };
         actor.set_generation(next_generation);
+
+        let scheduler_cancel = CancellationToken::new();
+        let _scheduler_join = prepared.scheduler.spawn(
+            prepared.handle.sq_tx.clone(),
+            next_generation,
+            scheduler_cancel.clone(),
+        );
         tokio::spawn(async move { actor.run().await });
+
+        self.active_scheduler_cancel.cancel();
         let _ = self.active_target.try_send(SessionOp::Shutdown);
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
         prepared.handle.sq_tx = new_target.bind_sender();
         self.active_target = new_target;
+        self.active_scheduler_cancel = scheduler_cancel;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
 
         Ok(CommitResult {

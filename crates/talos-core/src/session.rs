@@ -71,6 +71,13 @@ pub enum SessionOp {
         session_generation: u64,
         turn_id: String,
     },
+    /// Explicitly terminalizes one durably accepted submission that paused
+    /// before Provider start. The immutable generation and submission identity
+    /// prevent a delayed command from resolving different custody.
+    CancelPausedSubmission {
+        session_generation: u64,
+        submission_id: String,
+    },
     Shutdown,
 }
 
@@ -301,6 +308,10 @@ mod tests {
             SessionOp::InterruptTurn {
                 session_generation: 7,
                 turn_id: "turn_7".into(),
+            },
+            SessionOp::CancelPausedSubmission {
+                session_generation: 7,
+                submission_id: "batch_1".into(),
             },
             SessionOp::Shutdown,
         ];

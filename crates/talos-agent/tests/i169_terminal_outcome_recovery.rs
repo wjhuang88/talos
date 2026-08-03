@@ -14,7 +14,7 @@ use talos_core::session::{
 };
 use talos_core::tool::ToolRegistry;
 use talos_session::{
-    PendingSubmissionStore, PersistencePolicy, SessionManager, TurnTranscriptOutcome,
+    PendingSubmissionStore, SessionManager, SessionMetadata, TurnTranscriptOutcome,
     TurnTranscriptOutcomeRecord,
 };
 use tokio::sync::mpsc;
@@ -75,6 +75,12 @@ async fn assert_terminal_recovery(
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    assert_eq!(
+        store
+            .advance_runtime_generation()
+            .expect("advance durable runtime generation"),
+        1
+    );
     let frozen = submission(submission_id);
     store.accept(&frozen).expect("durable acceptance");
     store
@@ -87,8 +93,10 @@ async fn assert_terminal_recovery(
 
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), config(temp.path()));
-    actor.set_generation(1);
-    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    actor
+        .set_persistence(durable.session().clone(), SessionMetadata::default())
+        .expect("install production Session persistence");
+    assert_eq!(actor.generation(), 1);
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let task = tokio::spawn(async move { actor.run().await });

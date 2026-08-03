@@ -459,23 +459,24 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
 }
 
 #[tokio::test]
-async fn repeated_retained_prestart_pause_releases_newer_bridge_acceptance() {
+async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptance() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
-        .create_or_open_session("i169-retained-repeat-pause")
+        .create_or_open_session("i169-retained-prestart-cancel")
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    let retained = retained_submission("retained-repeat-u1", 1, "U1");
+    let oversized = "U1 ".repeat(8_192);
+    let retained = retained_submission("retained-prestart-u1", 1, &oversized);
     store.accept(&retained).unwrap();
     store.mark_paused(&retained.id).unwrap();
 
-    let provider_calls = Arc::new(AtomicUsize::new(0));
+    let order = Arc::new(Mutex::new(Vec::new()));
     #[allow(deprecated)]
     let agent = Agent::new(
-        Arc::new(CountingModel {
-            calls: provider_calls.clone(),
+        Arc::new(RecordingModel {
+            order: order.clone(),
         }),
         ToolRegistry::new(),
     );
@@ -483,7 +484,7 @@ async fn repeated_retained_prestart_pause_releases_newer_bridge_acceptance() {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: temp.path().to_path_buf(),
         initial_history: Vec::new(),
-        model_context_limit: 1,
+        model_context_limit: 128,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
@@ -493,7 +494,7 @@ async fn repeated_retained_prestart_pause_releases_newer_bridge_acceptance() {
     let (user_tx, user_rx) = mpsc::unbounded_channel();
     let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
     let (_watch_tx, watch_rx) = tokio::sync::watch::channel(handle.sq_tx);
-    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(1));
+    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(128));
     let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
     let bridge_task = tokio::spawn(run_conversation_loop(
         ConversationEngine::new("i169-model".into(), "test-provider".into()),
@@ -509,36 +510,38 @@ async fn repeated_retained_prestart_pause_releases_newer_bridge_acceptance() {
         },
     ));
 
-    for resume_text in ["R", "NEXT"] {
-        user_tx
-            .send(UserInput::Message(resume_text.into()))
-            .unwrap();
-        tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                match ui_rx.recv().await {
-                    Some(UiOutput::Content(ContentOutput::Block {
-                        source: MessageSource::Error,
-                        text,
-                    })) if text.contains(
-                        "older retained submission retained-repeat-u1 paused before the newly accepted submission",
-                    ) => break,
-                    Some(_) => {}
-                    None => panic!("Bridge closed before retained pre-start pause evidence"),
-                }
+    user_tx.send(UserInput::Message("R".into())).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match ui_rx.recv().await {
+                Some(UiOutput::Content(ContentOutput::Block {
+                    source: MessageSource::Error,
+                    text,
+                })) if text.contains(
+                    "older retained submission retained-prestart-u1 paused before the newly accepted submission",
+                ) => break,
+                Some(_) => {}
+                None => panic!("Bridge closed before retained pre-start pause evidence"),
             }
-        })
-        .await
-        .expect("retained pre-start pause must release the newer Bridge acceptance");
-        assert_eq!(
-            store.get(&retained.id).unwrap().unwrap().state,
-            PendingSubmissionState::PausedPending
-        );
-        assert_eq!(provider_calls.load(Ordering::SeqCst), 0);
-    }
+        }
+    })
+    .await
+    .expect("retained pre-start pause must be visible");
+    assert_eq!(
+        store.get(&retained.id).unwrap().unwrap().state,
+        PendingSubmissionState::PausedPending
+    );
+    assert!(order.lock().unwrap().is_empty());
+
+    user_tx.send(UserInput::Cancel).unwrap();
+    wait_for_order(&order, &["R"]).await;
+    assert_eq!(
+        store.get(&retained.id).unwrap().unwrap().state,
+        PendingSubmissionState::TerminalCancelled
+    );
 
     user_tx.send(UserInput::Exit).unwrap();
     bridge_task.await.unwrap();
     actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
-    assert_eq!(provider_calls.load(Ordering::SeqCst), 0);
 }

@@ -154,13 +154,16 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor
+        .set_persistence(
+            session.clone(),
+            session_metadata_for_model(&config.model, &config.provider),
+        )
+        .context("failed to restore durable Session generation")?;
     let _sched_join = sched_pending.spawn(
         handle.sq_tx.clone(),
+        actor.generation(),
         tokio_util::sync::CancellationToken::new(),
-    );
-    actor.set_persistence(
-        session.clone(),
-        session_metadata_for_model(&config.model, &config.provider),
     );
     tokio::spawn(async move { actor.run().await });
 

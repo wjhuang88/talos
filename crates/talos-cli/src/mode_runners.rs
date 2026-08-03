@@ -147,6 +147,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     let _sched_join = sched_pending.spawn(
         handle.sq_tx.clone(),
+        actor.generation(),
         tokio_util::sync::CancellationToken::new(),
     );
     tokio::spawn(async move { actor.run().await });
@@ -338,20 +339,24 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
-    actor.set_persistence(
-        session.clone(),
-        session_metadata_for_model(&config.model, &config.provider),
-    );
+    actor
+        .set_persistence(
+            session.clone(),
+            session_metadata_for_model(&config.model, &config.provider),
+        )
+        .context("failed to restore durable Session generation")?;
+    let generation = actor.generation();
+    let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+    let _sched_join =
+        sched_pending.spawn(handle.sq_tx.clone(), generation, scheduler_cancel.clone());
     let sq_tx_signal = handle.sq_tx.clone();
     tokio::spawn(async move { actor.run().await });
 
     let transition = Arc::new(Mutex::new(SessionTransition::new(
         handle.sq_tx.clone(),
         session.clone(),
+        generation,
+        scheduler_cancel,
     )));
     tokio::spawn(async move {
         loop {

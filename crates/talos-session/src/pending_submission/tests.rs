@@ -172,3 +172,47 @@ fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
         }
     );
 }
+
+#[test]
+fn runtime_generation_survives_store_reopen_and_advances_atomically() {
+    let dir = tempfile::tempdir().unwrap();
+    let session_file = dir.path().join("session.tlog");
+    let store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    assert_eq!(store.runtime_generation().unwrap(), 0);
+    assert_eq!(store.advance_runtime_generation().unwrap(), 1);
+    drop(store);
+
+    let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    assert_eq!(reopened.runtime_generation().unwrap(), 1);
+    assert_eq!(reopened.advance_runtime_generation().unwrap(), 2);
+    assert_eq!(reopened.runtime_generation().unwrap(), 2);
+}
+
+#[test]
+fn explicit_prestart_cancel_terminalizes_custody_and_preserves_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+    let payload = submission();
+    let (receipt, accepted) = store.accept(&payload).unwrap();
+    assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
+    store.mark_paused(&payload.id).unwrap();
+    store
+        .cancel_unstarted(&payload.id, "prestart-cancel:batch-1")
+        .unwrap();
+
+    let record = store.get(&payload.id).unwrap().unwrap();
+    assert_eq!(record.state, PendingSubmissionState::TerminalCancelled);
+    assert_eq!(record.turn_id.as_deref(), Some("prestart-cancel:batch-1"));
+    assert!(store.recover_unstarted().unwrap().is_empty());
+
+    let (replay_receipt, replay) = store.accept(&payload).unwrap();
+    assert_eq!(replay_receipt, receipt);
+    assert_eq!(
+        replay,
+        SubmissionReceiptDisposition::AlreadyAccepted {
+            state: PendingSubmissionState::TerminalCancelled,
+            turn_id: Some("prestart-cancel:batch-1".into()),
+        }
+    );
+}
