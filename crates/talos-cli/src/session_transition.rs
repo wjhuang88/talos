@@ -12,7 +12,7 @@ use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::Session;
 use tokio::sync::mpsc;
 
-/// Atomically published command route for one exact Session Actor generation.
+/// One exact Session Actor command route.
 ///
 /// A target owns both the Actor SQ and the authoritative generation. Consumers
 /// receive a normal bounded sender created by [`Self::bind_sender`]; that proxy
@@ -20,24 +20,24 @@ use tokio::sync::mpsc;
 /// target before forwarding it. An old proxy therefore remains bound to the
 /// old Actor and can never be adopted by a later lifecycle (ADR-056).
 #[derive(Clone)]
-pub(crate) struct SessionCommandTarget {
-    pub(crate) sq_tx: mpsc::Sender<SessionOp>,
-    pub(crate) generation: u64,
+struct SessionCommandTarget {
+    sq_tx: mpsc::Sender<SessionOp>,
+    generation: u64,
 }
 
 impl SessionCommandTarget {
     #[must_use]
-    pub(crate) fn new(sq_tx: mpsc::Sender<SessionOp>, generation: u64) -> Self {
+    fn new(sq_tx: mpsc::Sender<SessionOp>, generation: u64) -> Self {
         Self { sq_tx, generation }
     }
 
     /// Creates a bounded command proxy permanently bound to this Actor target.
     ///
-    /// Reconciliation intentionally retains the original immutable generation:
-    /// it is observational and may query an older accepted identity. New
-    /// submissions and targeted interrupts are always sealed to this target.
+    /// Reconciliation retains the original immutable generation because it is
+    /// observational and may query an older accepted identity. New submissions
+    /// and targeted interrupts are always sealed to this target.
     #[must_use]
-    pub(crate) fn bind_sender(&self) -> mpsc::Sender<SessionOp> {
+    fn bind_sender(&self) -> mpsc::Sender<SessionOp> {
         let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
         let target = self.clone();
         tokio::spawn(async move {
@@ -77,7 +77,7 @@ impl SessionCommandTarget {
         operation
     }
 
-    pub(crate) fn try_send(
+    fn try_send(
         &self,
         operation: SessionOp,
     ) -> Result<(), mpsc::error::TrySendError<SessionOp>> {
@@ -89,10 +89,9 @@ impl SessionCommandTarget {
 pub struct CommitResult {
     /// The session that was active before the transition.
     pub old_session: Session,
-    /// The handle for the newly active session actor.
+    /// The handle for the newly active session actor. Its SQ sender is the
+    /// generation-binding proxy, not the raw Actor sender.
     pub new_handle: SessionHandle,
-    /// Sender and authoritative generation for the newly active Actor.
-    pub new_target: SessionCommandTarget,
 }
 
 struct PreparedSession {
@@ -116,12 +115,6 @@ impl SessionTransition {
         }
     }
 
-    /// Returns an atomic snapshot of the currently active Actor route.
-    #[must_use]
-    pub(crate) fn active_target(&self) -> SessionCommandTarget {
-        self.active_target.clone()
-    }
-
     /// Returns the authoritative generation of the currently active Actor.
     #[must_use]
     pub fn active_generation(&self) -> u64 {
@@ -139,13 +132,13 @@ impl SessionTransition {
     }
 
     /// Commits one Actor replacement and assigns its authoritative generation
-    /// before the task is spawned or the command proxy is published.
+    /// before the task is spawned or the generation-bound sender is published.
     pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
         let next_generation = self
             .active_generation()
             .checked_add(1)
             .ok_or_else(|| "session generation exhausted".to_string())?;
-        let prepared = self
+        let mut prepared = self
             .prepared
             .take()
             .ok_or_else(|| "no prepared transition to commit".to_string())?;
@@ -155,13 +148,13 @@ impl SessionTransition {
         let _ = self.active_target.try_send(SessionOp::Shutdown);
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
-        self.active_target = new_target.clone();
+        prepared.handle.sq_tx = new_target.bind_sender();
+        self.active_target = new_target;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
 
         Ok(CommitResult {
             old_session,
             new_handle: prepared.handle,
-            new_target,
         })
     }
 
