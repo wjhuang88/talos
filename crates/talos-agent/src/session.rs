@@ -204,7 +204,10 @@ impl AppServerSession {
                     image_bytes,
                 );
                 turn_counter = turn_counter.saturating_add(1);
-                match self.start_submission(submission.clone(), turn_counter).await {
+                match self
+                    .start_submission(submission.clone(), turn_counter)
+                    .await
+                {
                     Some(started) => {
                         current_turn = Some(started.handle);
                         current_submission_size = Some(submission_size);

@@ -281,9 +281,7 @@ impl PendingSubmissionStore {
     }
 
     /// Returns Running records for transcript-backed crash reconciliation.
-    pub fn recover_running(
-        &self,
-    ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
+    pub fn recover_running(&self) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
         self.recover_states(&["running"])
     }
 

@@ -22,20 +22,28 @@ pub use crate::submission::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionOp {
-    Submit { message: String },
+    Submit {
+        message: String,
+    },
     SubmitMultimodal {
         text: String,
         attachments: Vec<crate::message::ContentPart>,
     },
-    PreviewRequest { message: String },
-    SubmitStructured { submission: StructuredSubmission },
+    PreviewRequest {
+        message: String,
+    },
+    SubmitStructured {
+        submission: StructuredSubmission,
+    },
     SubmitStructuredTracked {
         submission: StructuredSubmission,
         #[serde(skip)]
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
     },
     /// Stable public compatibility operation.
-    ReconcileStructured { submission: StructuredSubmission },
+    ReconcileStructured {
+        submission: StructuredSubmission,
+    },
     /// Stable public compatibility operation with a direct receipt channel.
     ReconcileStructuredTracked {
         submission: StructuredSubmission,
@@ -43,7 +51,9 @@ pub enum SessionOp {
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
     },
     /// Transitional additive alias routed to the same observational reconcile path.
-    SubmitStructuredReconcile { submission: StructuredSubmission },
+    SubmitStructuredReconcile {
+        submission: StructuredSubmission,
+    },
     /// Transitional additive alias routed to the same observational reconcile path.
     SubmitStructuredReconcileTracked {
         submission: StructuredSubmission,
