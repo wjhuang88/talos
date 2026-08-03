@@ -18,11 +18,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar --exclude=.git --exclude=target -czf talos-source.tar.gz .
+          tar --exclude=.git --exclude=target -czf /tmp/talos-source.tar.gz .
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
           name: i169-source-${{ github.event.pull_request.head.sha || github.sha }}
-          path: talos-source.tar.gz
+          path: /tmp/talos-source.tar.gz
           if-no-files-found: error
           retention-days: 1
