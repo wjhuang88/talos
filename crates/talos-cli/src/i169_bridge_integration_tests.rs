@@ -94,7 +94,11 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
         .send(UserInput::Message("preserve this exact user input".into()))
         .unwrap();
 
-    let mut last_snapshot = SteeringQueueSnapshot::default();
+    let mut last_snapshot = SteeringQueueSnapshot {
+        entries: Vec::new(),
+        total_count: 0,
+        omitted_count: 0,
+    };
     let pause_message = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match ui_rx.recv().await {
