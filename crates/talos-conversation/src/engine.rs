@@ -1,5 +1,8 @@
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
-use std::time::Instant;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use talos_core::message::{AgentEvent, ContentPart, MessageToolResult, StopReason, Usage};
 use talos_core::session::{
@@ -19,6 +22,27 @@ use crate::types::{
     TodoCommandAction, TodoCommandRequest, TodoExportFormat, ToolCallDisplay, ToolCallInfo,
     ToolResultDisplay, TurnPhase, UiOutput,
 };
+
+static NEXT_STEERING_NAMESPACE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+fn next_steering_identity_namespace() -> String {
+    let instance_sequence = NEXT_STEERING_NAMESPACE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let timestamp_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_nanos());
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u32(std::process::id());
+    hasher.write_u64(instance_sequence);
+    hasher.write_u128(timestamp_nanos);
+    let nonce = hasher.finish();
+    format!(
+        "{:x}-{:x}-{:x}-{:x}",
+        std::process::id(),
+        timestamp_nanos,
+        instance_sequence,
+        nonce
+    )
+}
 
 fn is_timeout_error(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
@@ -166,6 +190,7 @@ pub struct ConversationEngine {
     pub(crate) current_turn_text: String,
     pub(crate) steering_queue: Vec<SubmissionItem>,
     prepared_steering: Option<(String, Vec<String>)>,
+    steering_identity_namespace: String,
     next_steering_sequence: u64,
     pub(crate) followup_queue: Vec<String>,
     pub(crate) usage: Usage,
@@ -209,6 +234,7 @@ impl ConversationEngine {
             current_turn_text: String::new(),
             steering_queue: Vec::new(),
             prepared_steering: None,
+            steering_identity_namespace: next_steering_identity_namespace(),
             next_steering_sequence: 0,
             followup_queue: Vec::new(),
             usage: Usage::default(),
@@ -411,7 +437,10 @@ impl ConversationEngine {
         let enqueue_sequence = self.next_steering_sequence;
         self.next_steering_sequence = self.next_steering_sequence.saturating_add(1);
         self.steering_queue.push(SubmissionItem {
-            id: format!("steering_{enqueue_sequence}"),
+            id: format!(
+                "steering:{}:item:{enqueue_sequence}",
+                self.steering_identity_namespace
+            ),
             enqueue_sequence,
             kind,
             text,
@@ -823,7 +852,7 @@ impl ConversationEngine {
                         }
                     }
                     text.push_str(
-                        "[System] These will be sent with your next message. Use /detach <index|all> to remove.\n"
+                        "[System] These will be sent with your next message. Use /detach <index|all> to remove.\n",
                     );
                     outputs.push(content_block(MessageSource::System, text));
                 }
@@ -1244,7 +1273,10 @@ impl ConversationEngine {
         }
         let batch_sequence = self.next_steering_sequence;
         self.next_steering_sequence = self.next_steering_sequence.saturating_add(1);
-        let id = format!("steering_batch_{batch_sequence}");
+        let id = format!(
+            "steering:{}:batch:{batch_sequence}",
+            self.steering_identity_namespace
+        );
         self.prepared_steering = Some((
             id.clone(),
             items.iter().map(|item| item.id.clone()).collect(),
