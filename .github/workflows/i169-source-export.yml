@@ -31,6 +31,12 @@ jobs:
           rm -f .github/workflows/i169-source-export.yml
           cargo fmt --all
           git diff --check
+          echo '=== patched AppServerSession methods ==='
+          sed -n '120,180p' crates/talos-agent/src/session.rs
+          echo '=== talos-agent package source ==='
+          cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; d=json.load(sys.stdin); print([p["manifest_path"] for p in d["packages"] if p["name"]=="talos-agent"])'
+          cargo check -p talos-agent --locked
+          cargo check -p talos-cli --locked
           cargo check --workspace --locked
           cargo test -p talos-session runtime_generation_survives_store_reopen_and_advances_atomically --locked
           cargo test -p talos-session explicit_prestart_cancel_terminalizes_custody_and_preserves_identity --locked
