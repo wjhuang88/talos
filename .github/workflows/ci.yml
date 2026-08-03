@@ -1,11 +1,9 @@
 name: CI
 
 on:
-  pull_request:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
 
 permissions:
   contents: write
@@ -16,7 +14,6 @@ env:
 jobs:
   i169-remediation:
     name: Apply corrected I169 generation handoff remediation
-    if: github.head_ref == 'feat/i169-tui-044-transactional-steering'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -24,13 +21,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: feat/i169-tui-044-transactional-steering
 
-      - name: Verify protected trigger ancestry
+      - name: Verify exact protected parent
         shell: bash
-        run: |
-          test "$(git rev-parse HEAD^^)" = "1bbc42bb483edc08514b0871a6726505b5be2cd8"
-          test -f .github/i169-remediation-trigger
+        run: test "$(git rev-parse HEAD^)" = "bbce801ed160801610b4cfc8344e6fadf6ab3c80"
 
       - name: Execute corrected staged remediation
         shell: bash
@@ -75,7 +70,7 @@ jobs:
       - name: Restore persistent CI and remove all temporary assets
         shell: bash
         run: |
-          git checkout HEAD^^^^ -- .github/workflows/ci.yml
+          git checkout HEAD^^^^^ -- .github/workflows/ci.yml
           rm .github/workflows/i169-generation-handoff-remediation.yml
           rm .github/workflows/i169-generation-handoff-launcher.yml
           rm .github/i169-remediation-trigger
