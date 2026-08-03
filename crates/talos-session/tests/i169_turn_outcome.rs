@@ -1,7 +1,5 @@
 use talos_core::message::Message;
-use talos_session::{
-    SessionManager, TurnTranscriptOutcome, TurnTranscriptOutcomeRecord,
-};
+use talos_session::{SessionManager, TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 
 #[test]
 fn transcript_outcome_markers_are_hidden_and_only_success_binds_turn_identity() {
@@ -47,10 +45,7 @@ fn transcript_outcome_markers_are_hidden_and_only_success_binds_turn_identity() 
             .read_turn_transcript_outcomes()
             .expect("read outcome evidence"),
         vec![
-            TurnTranscriptOutcomeRecord::new(
-                "turn-success",
-                TurnTranscriptOutcome::Success,
-            ),
+            TurnTranscriptOutcomeRecord::new("turn-success", TurnTranscriptOutcome::Success),
             TurnTranscriptOutcomeRecord::new("turn-error", TurnTranscriptOutcome::Error),
             TurnTranscriptOutcomeRecord::new(
                 "turn-cancelled",
