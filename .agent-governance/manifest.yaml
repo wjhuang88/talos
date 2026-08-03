@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-03"
-status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent review returned CHANGES REQUIRED; remediation must prove durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation, fixed-seed stress, full exact-head platform CI and rebuilt real-TUI acceptance before Review. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
+status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation and fixed-seed stress; none of those claims is accepted until the new exact Head passes the full platform CI and rebuilt real-TUI evidence and receives fresh independent review. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Complete the independently requested I169 remediation only on feat/i169-tui-044-transactional-steering in Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde"
+    - "Validate the landed independent-review remediation on the new exact Head of Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde"
     - "Keep ADR-056 Proposed until durable receipt, lost-Ack, pre-start resolution, scheduler/terminal, exact-request, restart and replay evidence passes independent review"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"
     - "Require locked workspace gates, exact-head Windows/macOS CI, Provider mock/request-preview evidence and rebuilt real-TUI acceptance before I169 Review"
