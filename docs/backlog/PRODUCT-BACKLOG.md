@@ -20,7 +20,6 @@ That snapshot is historical evidence, not current activation authority.
 | 1 | Runtime session and protocol foundations | SESSION-009 and RUNTIME-005 remain Refinement; ACP-001 remains Blocked until session attachment, controller ownership and shutdown/finalization boundaries are accepted. | `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/ACP-001-agent-client-protocol-server.md` |
 | 1 | Memory scope architecture | MEM-011 remains Refinement. Accept schema/migration and legacy-fixture decisions before implementation. | `docs/backlog/active/MEM-011-extensible-memory-scopes.md`; Issue #116 |
 | 1 | Provider/runtime reliability follow-ups | Preserve explicit terminal outcomes, usage accounting and bounded request/stream behavior before dependent status/cost UX. | `docs/backlog/active/PROVIDER-001-openai-streaming-usage.md`; `docs/backlog/active/PROVIDER-002-response-reliability-timeout-retry.md`; `docs/backlog/active/PROVIDER-004-text-tool-call-id-collision.md` |
-| 2 | Dynamic provider authentication | PROVIDER-003 / Issue #132 is Refinement only. Accept an ADR and threat model before selecting any OAuth, SigV4, command-token, bearer-refresh, storage or request-replay implementation slice. This governance intake is unrelated to I169 product code. | `docs/backlog/active/PROVIDER-003-dynamic-provider-credentials.md`; ADR-013; ADR-023; ADR-057; Issue #132 |
 | 2 | TOOL-023 residual configuration work | TOOL-023-A/C are Complete through I170. TOOL-023-B alone owns the 300-second default/configuration proposal and is not implemented by I170. | `docs/backlog/active/TOOL-023-cross-platform-shell-and-timeout.md`; `docs/backlog/active/TOOL-023-B-configurable-timeout-default.md` |
 | 3 | Deferred product architecture | Desktop, multi-agent, health monitoring, persistent tasks and A2A remain Deferred/Refinement until explicitly reprioritized and ADR-gated. | DESKTOP-001; AGENT-003; RUNTIME-004; TASK-001; A2A-001 |
 
@@ -73,7 +72,6 @@ Key chains include:
 - I158 disposition → TUI-037 disposition → I159 → I160 → I161 → I162;
 - RUNTIME-005 and PERM-006-C before background-job completion claims;
 - ADR/migration acceptance before MEM-011;
-- PROVIDER-003 ADR/threat model before any Issue #132 implementation slice;
 - architecture decisions before DESKTOP-001, AGENT-003, RUNTIME-004, TASK-001 or A2A-001 implementation.
 
 ## Completed Programs And History
@@ -104,5 +102,3 @@ owner is Complete/Cancelled and no separately owned residual remains.
 
 Issue #119 remains open and Active in Draft PR #131. Completion still requires the complete I169
 acceptance matrix, ADR-056 review, exact-head CI, rebuilt real-TUI evidence and a merge-ready PR.
-Issue #132 remains open in PROVIDER-003 Refinement; the I169 branch changes only governance records
-needed to keep the remote Issue set synchronized and does not authorize provider-auth implementation.
