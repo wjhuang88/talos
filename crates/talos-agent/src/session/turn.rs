@@ -143,13 +143,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             let _ = forwarder.await;
-            if let Some(persistence) = &persistence
-                && let Err(message) = persist_turn_outcome(
-                    persistence,
-                    &turn_id,
-                    TurnTranscriptOutcome::Cancelled,
-                )
-            {
+            if let Err(message) = persist_terminal_outcome(
+                persistence.as_ref(),
+                durable_persistence.as_ref(),
+                &turn_id,
+                TurnTranscriptOutcome::Cancelled,
+            ) {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -195,9 +194,18 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     match agent_result {
         Ok((Ok(final_text), new_messages)) => {
             if diagnostic_failure.is_some() {
-                let completion = TurnCompletionStatus::Error {
-                    message: "failed to persist provider terminal diagnostic".into(),
-                };
+                let mut message = "failed to persist provider terminal diagnostic".to_string();
+                if let Err(outcome_error) = persist_terminal_outcome(
+                    persistence.as_ref(),
+                    durable_persistence.as_ref(),
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                ) {
+                    message.push_str(&format!(
+                        "\n[warning: terminal outcome persistence also failed: {outcome_error}]"
+                    ));
+                }
+                let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                     session_id,
@@ -216,7 +224,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let cloned_messages = new_messages.clone();
             if let Some(persistence) = &persistence
-                && let Err(message) = persist_turn_messages(
+                && let Err(mut message) = persist_turn_messages(
                     persistence,
                     &turn_id,
                     &new_messages,
@@ -224,6 +232,16 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     false,
                 )
             {
+                if let Err(outcome_error) = persist_terminal_outcome(
+                    Some(persistence),
+                    durable_persistence.as_ref(),
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                ) {
+                    message.push_str(&format!(
+                        "\n[warning: terminal outcome persistence also failed: {outcome_error}]"
+                    ));
+                }
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -242,8 +260,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 return;
             }
             if let Some(persistence) = &persistence
-                && let Err(message) =
-                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Success)
+                && let Err(message) = persist_terminal_outcome(
+                    Some(persistence),
+                    None,
+                    &turn_id,
+                    TurnTranscriptOutcome::Success,
+                )
             {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
@@ -269,9 +291,18 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 {
                     Ok(commit) => commit.entry_ids,
                     Err(error) => {
-                        let completion = TurnCompletionStatus::Error {
-                            message: format!("failed to persist completed turn: {error}"),
-                        };
+                        let mut message = format!("failed to persist completed turn: {error}");
+                        if let Err(outcome_error) = persist_terminal_outcome(
+                            None,
+                            Some(persistence),
+                            &turn_id,
+                            TurnTranscriptOutcome::Error,
+                        ) {
+                            message.push_str(&format!(
+                                "\n[warning: terminal outcome persistence also failed: {outcome_error}]"
+                            ));
+                        }
+                        let completion = TurnCompletionStatus::Error { message };
                         let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                         let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                             session_id,
@@ -345,9 +376,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 }
             }
             if transcript_persisted
-                && let Some(persistence) = &persistence
-                && let Err(persist_err) =
-                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Error)
+                && let Err(persist_err) = persist_terminal_outcome(
+                    persistence.as_ref(),
+                    durable_persistence.as_ref(),
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                )
             {
                 error_message = format!(
                     "{error_message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
@@ -374,10 +408,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         Err(_join_error) => {
             error!("agent panicked during turn");
             let mut message = "agent panicked".to_string();
-            if let Some(persistence) = &persistence
-                && let Err(persist_err) =
-                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Error)
-            {
+            if let Err(persist_err) = persist_terminal_outcome(
+                persistence.as_ref(),
+                durable_persistence.as_ref(),
+                &turn_id,
+                TurnTranscriptOutcome::Error,
+            ) {
                 message = format!(
                     "{message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
                 );
@@ -426,13 +462,20 @@ fn persist_turn_messages(
     Ok(())
 }
 
-fn persist_turn_outcome(
-    persistence: &TurnPersistence,
+fn persist_terminal_outcome(
+    persistence: Option<&TurnPersistence>,
+    durable_persistence: Option<&DurableTurnPersistence>,
     turn_id: &str,
     outcome: TurnTranscriptOutcome,
 ) -> Result<(), String> {
-    persistence
-        .session
+    let session = if let Some(durable) = durable_persistence {
+        durable.session.session()
+    } else if let Some(persistence) = persistence {
+        &persistence.session
+    } else {
+        return Ok(());
+    };
+    session
         .append_turn_transcript_outcome(&TurnTranscriptOutcomeRecord::new(turn_id, outcome))
         .map_err(|error| format!("failed to persist terminal transcript outcome: {error}"))
 }
