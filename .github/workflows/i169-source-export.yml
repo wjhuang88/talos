@@ -18,14 +18,74 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
-      - name: Apply, format, and validate reviewed remediation
+      - name: Recover, apply, format, and validate reviewed remediation
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/i169-remediation.part{1,2,3,4} \
-            | base64 --decode \
-            | gzip --decompress > /tmp/i169.patch
-          git apply --check /tmp/i169.patch
+
+          candidate_root="/tmp/i169-candidates"
+          rm -rf "${candidate_root}"
+          mkdir -p "${candidate_root}"
+
+          for part in 1 2 3 4; do
+            path=".github/i169-remediation.part${part}"
+            dir="${candidate_root}/part${part}"
+            mkdir -p "${dir}"
+            declare -A seen=()
+            index=0
+            while read -r commit; do
+              [[ -n "${commit}" ]] || continue
+              if ! git cat-file -e "${commit}:${path}" 2>/dev/null; then
+                continue
+              fi
+              candidate="${dir}/${index}"
+              git show "${commit}:${path}" > "${candidate}"
+              digest="$(sha256sum "${candidate}" | cut -d' ' -f1)"
+              if [[ -n "${seen[${digest}]:-}" ]]; then
+                rm -f "${candidate}"
+                continue
+              fi
+              seen[${digest}]=1
+              index=$((index + 1))
+            done < <(git log --all --format=%H -- "${path}")
+            if [[ "${index}" -eq 0 ]]; then
+              echo "No historical candidates found for ${path}" >&2
+              exit 1
+            fi
+            echo "${path}: ${index} unique candidate(s)"
+            unset seen
+          done
+
+          found=0
+          for p1 in "${candidate_root}/part1/"*; do
+            for p2 in "${candidate_root}/part2/"*; do
+              for p3 in "${candidate_root}/part3/"*; do
+                for p4 in "${candidate_root}/part4/"*; do
+                  cat "${p1}" "${p2}" "${p3}" "${p4}" > /tmp/i169.base64
+                  if ! base64 --decode /tmp/i169.base64 > /tmp/i169.patch.gz 2>/dev/null; then
+                    continue
+                  fi
+                  if ! gzip --test /tmp/i169.patch.gz 2>/dev/null; then
+                    continue
+                  fi
+                  gzip --decompress --stdout /tmp/i169.patch.gz > /tmp/i169.patch
+                  if ! git apply --check /tmp/i169.patch 2>/dev/null; then
+                    continue
+                  fi
+                  echo "Recovered coherent payload:"
+                  sha256sum "${p1}" "${p2}" "${p3}" "${p4}" /tmp/i169.patch
+                  found=1
+                  break 4
+                done
+              done
+            done
+          done
+
+          if [[ "${found}" -ne 1 ]]; then
+            echo "No coherent historical payload combination passed gzip and git-apply validation" >&2
+            exit 1
+          fi
+
           git apply /tmp/i169.patch
           rm -f .github/i169-remediation.part{1,2,3,4}
           rm -f .github/workflows/i169-source-export.yml
