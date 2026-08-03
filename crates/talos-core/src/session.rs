@@ -131,18 +131,24 @@ pub enum SessionEvent {
         sequence: u64,
         payload: TurnEventPayload,
     },
-    AgentEvent { event: AgentEvent },
+    AgentEvent {
+        event: AgentEvent,
+    },
     ApprovalRequired {
         tool_name: String,
         arguments: String,
         call_id: String,
     },
-    TurnStarted { turn_id: String },
+    TurnStarted {
+        turn_id: String,
+    },
     TurnCompleted {
         turn_id: String,
         status: TurnCompletionStatus,
     },
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,7 +170,9 @@ pub enum TurnCompletionStatus {
         new_messages: Vec<crate::message::Message>,
     },
     Cancelled,
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 pub struct SessionHandle {
