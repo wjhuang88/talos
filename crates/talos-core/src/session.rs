@@ -22,51 +22,48 @@ pub use crate::submission::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionOp {
-    /// Submit a user message for the agent to process.
     Submit { message: String },
-    /// Submit a user message with image attachments (MODEL-009-D/I152).
     SubmitMultimodal {
         text: String,
         attachments: Vec<crate::message::ContentPart>,
     },
-    /// Build a provider request preview without calling the provider.
     PreviewRequest { message: String },
-    /// Submit an immutable source-aware batch through the Actor boundary.
     SubmitStructured { submission: StructuredSubmission },
-    /// Submit a batch and receive the same canonical durable receipt projected on EQ.
     SubmitStructuredTracked {
         submission: StructuredSubmission,
         #[serde(skip)]
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
     },
-    /// Reconcile a sent batch without creating a second execution authority.
+    /// Stable public compatibility operation.
     ReconcileStructured { submission: StructuredSubmission },
-    /// Reconcile a batch and receive the canonical durable result directly.
-    ///
-    /// Reconciliation is observational: it never grants execution authority or
-    /// resumes paused work, including for an older Actor generation.
+    /// Stable public compatibility operation with a direct receipt channel.
     ReconcileStructuredTracked {
         submission: StructuredSubmission,
         #[serde(skip)]
         receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
     },
-    /// Replace the model-visible activated Skill context.
+    /// Transitional additive alias routed to the same observational reconcile path.
+    SubmitStructuredReconcile { submission: StructuredSubmission },
+    /// Transitional additive alias routed to the same observational reconcile path.
+    SubmitStructuredReconcileTracked {
+        submission: StructuredSubmission,
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<SubmissionReceipt>>,
+    },
     SetSkillContext {
         name: Option<String>,
         content: Option<String>,
     },
-    /// Interrupt the current turn through the legacy compatibility path.
+    /// Legacy unqualified compatibility interrupt.
     Interrupt,
-    /// Interrupt exactly one Actor generation and one active structured Turn.
+    /// Generation- and Turn-targeted interrupt for new interactive paths.
     InterruptTurn {
         session_generation: u64,
         turn_id: String,
     },
-    /// Shut down the session actor.
     Shutdown,
 }
 
-/// Events emitted by the session actor on the unbounded EQ.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
@@ -85,14 +82,12 @@ pub enum SessionEvent {
         sender_generation: u64,
         turn_id: String,
     },
-    /// Rejection before durable Actor custody transfers.
     SubmissionRejected {
         session_id: String,
         submission_id: String,
         sender_generation: u64,
         reason: SubmissionRejectionReason,
     },
-    /// A durably accepted submission could not start and remains recoverable.
     SubmissionPaused {
         session_id: String,
         session_generation: u64,
@@ -272,6 +267,13 @@ mod tests {
                 submission: submission.clone(),
             },
             SessionOp::ReconcileStructuredTracked {
+                submission: submission.clone(),
+                receipt_tx: None,
+            },
+            SessionOp::SubmitStructuredReconcile {
+                submission: submission.clone(),
+            },
+            SessionOp::SubmitStructuredReconcileTracked {
                 submission,
                 receipt_tx: None,
             },
