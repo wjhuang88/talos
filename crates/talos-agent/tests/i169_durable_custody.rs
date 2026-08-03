@@ -142,6 +142,7 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
         delay: Duration::from_millis(10),
     });
     let (handle, mut actor) = AppServerSession::new(agent, session_config(temp.path()));
+    actor.set_generation(7);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
@@ -238,6 +239,7 @@ async fn shutdown_pauses_unstarted_durable_submissions() {
         delay: Duration::from_secs(10),
     });
     let (handle, mut actor) = AppServerSession::new(agent, session_config(temp.path()));
+    actor.set_generation(1);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
@@ -253,14 +255,14 @@ async fn shutdown_pauses_unstarted_durable_submissions() {
 
     sq_tx
         .send(SessionOp::SubmitStructured {
-            submission: submission("pending_batch_1", "pending_item_1", 2, "later one"),
+            submission: submission("pending_batch_1", "pending_item_1", 1, "later one"),
         })
         .await
         .unwrap();
     wait_for_receipt(&mut eq_rx, "pending_batch_1").await;
     sq_tx
         .send(SessionOp::SubmitStructured {
-            submission: submission("pending_batch_2", "pending_item_2", 3, "later two"),
+            submission: submission("pending_batch_2", "pending_item_2", 1, "later two"),
         })
         .await
         .unwrap();
