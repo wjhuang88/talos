@@ -48,10 +48,7 @@ impl LanguageModel for GatedModel {
 
 fn make_agent(calls: Arc<AtomicUsize>, release: Arc<Notify>) -> Agent {
     #[allow(deprecated)]
-    Agent::new(
-        Arc::new(GatedModel { calls, release }),
-        ToolRegistry::new(),
-    )
+    Agent::new(Arc::new(GatedModel { calls, release }), ToolRegistry::new())
 }
 
 fn session_config(workspace_root: &Path) -> SessionConfig {
@@ -86,9 +83,7 @@ fn backup_path(path: &Path) -> PathBuf {
     path.with_file_name(format!("{file_name}.fault-backup"))
 }
 
-async fn wait_for_structured_start(
-    eq_rx: &mut mpsc::UnboundedReceiver<SessionEvent>,
-) -> String {
+async fn wait_for_structured_start(eq_rx: &mut mpsc::UnboundedReceiver<SessionEvent>) -> String {
     loop {
         let event = tokio::time::timeout(Duration::from_secs(5), eq_rx.recv())
             .await
