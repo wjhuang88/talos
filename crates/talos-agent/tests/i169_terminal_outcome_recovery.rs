@@ -86,8 +86,7 @@ async fn assert_terminal_recovery(
         .expect("terminal outcome marker");
 
     let calls = Arc::new(AtomicUsize::new(0));
-    let (handle, mut actor) =
-        AppServerSession::new(make_agent(calls.clone()), config(temp.path()));
+    let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), config(temp.path()));
     actor.set_generation(1);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let sq_tx = handle.sq_tx;
