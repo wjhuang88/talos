@@ -417,6 +417,7 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(7);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -488,6 +489,7 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(11);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -546,6 +548,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(12);
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -595,7 +598,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 }
 
 #[tokio::test]
-async fn context_budget_rejects_before_submission_started() {
+async fn context_budget_pauses_before_submission_started() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
@@ -607,6 +610,7 @@ async fn context_budget_rejects_before_submission_started() {
         model_context_limit: 64,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(13);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -628,17 +632,17 @@ async fn context_budget_rejects_before_submission_started() {
     loop {
         let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
             .await
-            .expect("budget rejection timeout")
+            .expect("budget pause timeout")
             .expect("session event channel");
-        let rejected = matches!(
+        let paused = matches!(
             event,
-            SessionEvent::SubmissionRejected {
+            SessionEvent::SubmissionPaused {
                 reason: SubmissionRejectionReason::ContextBudgetExceeded,
                 ..
             }
         );
         events.push(event);
-        if rejected {
+        if paused {
             break;
         }
     }
@@ -649,6 +653,11 @@ async fn context_budget_rejects_before_submission_started() {
         !events
             .iter()
             .any(|event| matches!(event, SessionEvent::SubmissionStarted { .. }))
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, SessionEvent::SubmissionRejected { .. }))
     );
     assert!(captured.lock().unwrap().is_empty());
 }
@@ -666,6 +675,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(21);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -744,6 +754,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(31);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -1126,7 +1137,6 @@ async fn test_multi_turn_with_history() {
 
     let actor_task = tokio::spawn(async move { actor.run().await });
 
-    // Submit 3 turns
     sq_tx
         .send(SessionOp::Submit {
             message: "turn 1".into(),
@@ -1165,13 +1175,10 @@ async fn test_multi_turn_with_history() {
         .count();
     assert!(success_count >= 1, "Should have at least 1 Success");
 
-    // Verify the 3rd turn received history from turns 1 and 2
     let captured = captured_messages.lock().unwrap();
     assert!(captured.len() >= 3, "Should have captured at least 3 calls");
 
-    // 3rd call should have messages from turns 1 and 2
     let third_call_messages = &captured[2];
-    // Should have: User(turn 1), Assistant(first response), User(turn 2), Assistant(second response), User(turn 3 with system prompt)
     let user_messages: Vec<_> = third_call_messages
         .iter()
         .filter(|m| matches!(m, Message::User { .. }))
@@ -1479,8 +1486,6 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
     );
 }
 
-// ── TOOL-021 fixture: provider error after tool execution drops tool results ──
-
 struct EchoTool;
 
 #[async_trait::async_trait]
@@ -1511,7 +1516,6 @@ impl talos_core::tool::AgentTool for EchoTool {
     }
 }
 
-/// Model that sends a tool call, then on second call sends an error.
 struct ToolCallThenErrorModel {
     call_count: Arc<std::sync::atomic::AtomicU8>,
     trailing_fragment: bool,
@@ -1541,7 +1545,6 @@ impl LanguageModel for ToolCallThenErrorModel {
         tokio::spawn(async move {
             let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if n == 0 {
-                // First call: produce a tool call
                 let _ = tx
                     .send(AgentEvent::ToolCall {
                         call: talos_core::message::ToolCall {
@@ -1582,8 +1585,6 @@ impl LanguageModel for ToolCallThenErrorModel {
     }
 }
 
-/// Proves SESSION-006 / I135 FIX: when a provider error occurs after tool execution,
-/// the session NOW persists the completed tool exchange for resume.
 #[tokio::test]
 async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fragment() {
     use talos_session::{SessionManager, SessionMetadata};
@@ -1627,10 +1628,8 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         .await
         .unwrap();
 
-    // Wait for turn completion
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Verify the turn completed with an error
     let has_error_completion = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1641,8 +1640,6 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         has_error_completion,
         "turn should complete with error status"
     );
-    // SESSION-006 / I135 FIX: The tool result IS NOW persisted because the
-    // error branch in turn.rs calls persist_turn_messages with partial_messages.
     let persisted = session.read_messages().unwrap();
     let has_tool_result = persisted
         .iter()
@@ -1680,19 +1677,14 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
     assert_eq!(diagnostics[1].response_ordinal, 2);
 }
 
-/// Proves ADR-042 is preserved with REAL durable persistence: when both
-/// interactive and durable persistence are configured, a provider error
-/// still results in NO durable commit (no EntriesCommitted) while the
-/// interactive session retains the completed tool exchange.
 #[tokio::test]
 async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
-    use talos_session::{DurableSession, PersistencePolicy, SessionManager, SessionMetadata};
+    use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("adr042-real", "").unwrap();
 
-    // Create a real durable session
     let durable = manager
         .create_or_open_session("adr042-real-durable")
         .expect("durable session");
@@ -1710,7 +1702,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    // Set BOTH interactive and durable persistence
     actor.set_persistence(
         session.clone(),
         SessionMetadata {
@@ -1734,7 +1725,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Turn must error
     let has_error = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1743,7 +1733,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     });
     assert!(has_error, "turn should error");
 
-    // ADR-042: NO EntriesCommitted on error path — durable failed turns abort
     let has_entries_committed = events
         .iter()
         .any(|e| matches!(e, SessionEvent::EntriesCommitted { .. }));
@@ -1752,7 +1741,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
         "ADR-042: no EntriesCommitted on error path — durable failed turns abort"
     );
 
-    // Interactive persistence DOES have the tool result (SESSION-006 fix)
     let persisted = session.read_messages().unwrap();
     let has_tool_result = persisted
         .iter()
@@ -1761,13 +1749,8 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
         has_tool_result,
         "interactive session persists tool result on error (SESSION-006 fix)"
     );
-    // The actor owns the DurableSession. We verify ADR-042 via the
-    // EntriesCommitted event absence (checked above), which is the
-    // authoritative signal that commit_turn was never called.
 }
 
-/// Proves persistence failure is observable: when persist_turn_messages
-/// fails, the error message includes the persistence failure warning.
 #[tokio::test]
 async fn fixture_persistence_failure_is_observable_in_error() {
     use talos_session::{SessionManager, SessionMetadata};
@@ -1776,8 +1759,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("persist-fail", "").unwrap();
 
-    // Deterministically block the concrete session path on every platform:
-    // replace its parent directory with a regular file after creation.
     let session_parent = session
         .file_path
         .parent()
@@ -1821,7 +1802,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // The turn should complete with error (provider error from the model)
     let error_message = events.iter().find_map(|e| match completed_status(e) {
         Some(TurnCompletionStatus::Error { message }) => Some(message.clone()),
         _ => None,
@@ -1838,8 +1818,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     );
 }
 
-/// Proves ADR-042 durable transcript is empty after failed turn:
-/// reopens the durable session and verifies no committed entries.
 #[tokio::test]
 async fn fixture_durable_transcript_empty_after_failed_turn() {
     use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
@@ -1848,7 +1826,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("durable-empty", "").unwrap();
 
-    // Create durable session and keep the directory for later reopening
     let durable_external_id = "durable-empty-check";
     let durable = manager
         .create_or_open_session(durable_external_id)
@@ -1889,7 +1866,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Verify turn errored
     let has_error = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1898,8 +1874,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
     });
     assert!(has_error, "turn should error");
 
-    // Reopen the durable session and verify transcript is empty
-    // (ADR-042: failed turns abort, leaving no committed entries)
     let reopened = manager
         .get_session_by_external_id(durable_external_id)
         .expect("durable lookup");
