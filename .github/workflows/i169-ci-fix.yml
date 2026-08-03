@@ -1,0 +1,78 @@
+name: I169 Exact-Head CI Correction
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  correct-ci-regression:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTC_WRAPPER: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Remove duplicate receipt source fields
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bridge = Path("crates/talos-cli/src/i169_bridge_integration_tests.rs")
+          text = bridge.read_text()
+          old = """            receipt_id: receipt_id.clone(),
+                      source: SubmissionSource::User,
+                      item_count: 1,
+          """
+          new = """            receipt_id: receipt_id.clone(),
+                      item_count: 1,
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one duplicate bridge field block, found {text.count(old)}")
+          bridge.write_text(text.replace(old, new, 1))
+
+          tests = Path("crates/talos-cli/src/tests.rs")
+          text = tests.read_text()
+          old = """            session_generation: submission.sender_generation,
+                      source: submission.source,
+                      submission_id: submission.id.clone(),
+          """
+          new = """            session_generation: submission.sender_generation,
+                      submission_id: submission.id.clone(),
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one duplicate test field block, found {text.count(old)}")
+          tests.write_text(text.replace(old, new, 1))
+          PY
+          rm -f .github/workflows/i169-ci-fix.yml
+          cargo fmt --all
+          git diff --check
+      - name: Compile Talos CLI tests without cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset RUSTC_WRAPPER
+          rm -rf target
+          cargo test -p talos-cli --no-run --locked
+          cargo clippy -p talos-cli --tests --locked -- -D warnings
+      - name: Commit exact-head correction
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(i169): remove duplicate receipt source fields"
+          git push origin "HEAD:${HEAD_REF}"
