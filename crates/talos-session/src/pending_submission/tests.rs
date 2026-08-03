@@ -115,3 +115,65 @@ fn unstarted_work_can_pause_and_recover_in_fifo_order() {
             .all(|record| record.state == PendingSubmissionState::PausedPending)
     );
 }
+
+#[test]
+fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+
+    let mut oldest = submission();
+    oldest.id = "oldest-batch".into();
+    oldest.items[0].id = "oldest-item".into();
+    let (oldest_receipt, accepted) = store.accept(&oldest).unwrap();
+    assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
+    store.mark_running(&oldest.id, "turn-oldest").unwrap();
+    store
+        .mark_committed(&oldest.id, "turn-oldest")
+        .unwrap();
+
+    for index in 0..MAX_TOMBSTONES {
+        let mut payload = submission();
+        payload.id = format!("later-batch-{index}");
+        payload.items[0].id = format!("later-item-{index}");
+        payload.items[0].enqueue_sequence = index as u64 + 2;
+        let (_, disposition) = store.accept(&payload).unwrap();
+        assert_eq!(
+            disposition,
+            SubmissionReceiptDisposition::AcceptedPending
+        );
+        let turn_id = format!("later-turn-{index}");
+        store.mark_running(&payload.id, &turn_id).unwrap();
+        store.mark_committed(&payload.id, &turn_id).unwrap();
+    }
+
+    assert!(
+        store.get(&oldest.id).unwrap().is_none(),
+        "the oldest large terminal payload must be pruned after the bound is exceeded"
+    );
+
+    let (replay_receipt, replay) = store.accept(&oldest).unwrap();
+    assert_eq!(replay_receipt, oldest_receipt);
+    assert_eq!(
+        replay,
+        SubmissionReceiptDisposition::AlreadyAccepted {
+            state: PendingSubmissionState::Committed,
+            turn_id: Some("turn-oldest".into()),
+        }
+    );
+    assert!(
+        store.get(&oldest.id).unwrap().is_none(),
+        "an idempotent replay must not recreate a pruned payload row"
+    );
+
+    let mut conflict = oldest.clone();
+    conflict.items[0].text = "conflicting delayed retry".into();
+    let (conflict_receipt, conflict_result) = store.accept(&conflict).unwrap();
+    assert_eq!(conflict_receipt, oldest_receipt);
+    assert_eq!(
+        conflict_result,
+        SubmissionReceiptDisposition::Rejected {
+            reason: SubmissionRejectionReason::IdentityConflict,
+        }
+    );
+}
