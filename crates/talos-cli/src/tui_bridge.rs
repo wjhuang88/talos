@@ -484,6 +484,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_session_event(
     event: SessionEvent,
     engine: &mut ConversationEngine,
