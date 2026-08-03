@@ -14,9 +14,11 @@ use tokio::sync::mpsc;
 
 /// Atomically published command route for one exact Session Actor generation.
 ///
-/// A sender and its generation must travel together. Publishing only a new
-/// sender and letting consumers infer an epoch locally permits delayed commands
-/// from an old lifecycle to target a newer Actor (ADR-056).
+/// A target owns both the Actor SQ and the authoritative generation. Consumers
+/// receive a normal bounded sender created by [`Self::bind_sender`]; that proxy
+/// seals every new structured submission and targeted interrupt to this exact
+/// target before forwarding it. An old proxy therefore remains bound to the
+/// old Actor and can never be adopted by a later lifecycle (ADR-056).
 #[derive(Clone)]
 pub(crate) struct SessionCommandTarget {
     pub(crate) sq_tx: mpsc::Sender<SessionOp>,
@@ -29,9 +31,50 @@ impl SessionCommandTarget {
         Self { sq_tx, generation }
     }
 
+    /// Creates a bounded command proxy permanently bound to this Actor target.
+    ///
+    /// Reconciliation intentionally retains the original immutable generation:
+    /// it is observational and may query an older accepted identity. New
+    /// submissions and targeted interrupts are always sealed to this target.
     #[must_use]
-    pub(crate) fn same_actor(&self, other: &Self) -> bool {
-        self.generation == other.generation && self.sq_tx.same_channel(&other.sq_tx)
+    pub(crate) fn bind_sender(&self) -> mpsc::Sender<SessionOp> {
+        let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
+        let target = self.clone();
+        tokio::spawn(async move {
+            while let Some(operation) = proxy_rx.recv().await {
+                let operation = target.bind_operation(operation);
+                if target.sq_tx.send(operation).await.is_err() {
+                    break;
+                }
+            }
+        });
+        proxy_tx
+    }
+
+    fn bind_operation(&self, mut operation: SessionOp) -> SessionOp {
+        match &mut operation {
+            SessionOp::SubmitStructured { submission }
+            | SessionOp::SubmitStructuredTracked { submission, .. } => {
+                submission.sender_generation = self.generation;
+            }
+            SessionOp::InterruptTurn {
+                session_generation,
+                ..
+            } => {
+                *session_generation = self.generation;
+            }
+            SessionOp::Submit { .. }
+            | SessionOp::SubmitMultimodal { .. }
+            | SessionOp::PreviewRequest { .. }
+            | SessionOp::ReconcileStructured { .. }
+            | SessionOp::ReconcileStructuredTracked { .. }
+            | SessionOp::SubmitStructuredReconcile { .. }
+            | SessionOp::SubmitStructuredReconcileTracked { .. }
+            | SessionOp::SetSkillContext { .. }
+            | SessionOp::Interrupt
+            | SessionOp::Shutdown => {}
+        }
+        operation
     }
 
     pub(crate) fn try_send(
@@ -43,10 +86,6 @@ impl SessionCommandTarget {
 }
 
 /// Result of a successful [`SessionTransition::commit`].
-///
-/// Contains the old session (for cleanup or fork source access), the new
-/// [`SessionHandle`], and the exact command target that must be published to
-/// Bridge and lifecycle callers as one atomic value.
 pub struct CommitResult {
     /// The session that was active before the transition.
     pub old_session: Session,
@@ -56,7 +95,6 @@ pub struct CommitResult {
     pub new_target: SessionCommandTarget,
 }
 
-/// A prepared but not-yet-active session replacement.
 struct PreparedSession {
     handle: SessionHandle,
     session: Session,
@@ -90,8 +128,6 @@ impl SessionTransition {
         self.active_target.generation
     }
 
-    /// Prepare a session transition. Stores the handle and session; the actor
-    /// is passed to [`commit`](Self::commit) to avoid storing a `!Send` type.
     pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
         if self.prepared.is_some() {
             return Err(
@@ -102,11 +138,8 @@ impl SessionTransition {
         Ok(())
     }
 
-    /// Commit the prepared transition, spawning the new actor and swapping sessions.
-    ///
-    /// The composition root assigns the next generation before the Actor starts
-    /// and publishes the sender and generation together. Actor admission remains
-    /// the authoritative generation check (ADR-056).
+    /// Commits one Actor replacement and assigns its authoritative generation
+    /// before the task is spawned or the command proxy is published.
     pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
         let next_generation = self
             .active_generation()
