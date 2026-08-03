@@ -21,7 +21,7 @@ fn accept_structured_submission(
             session_id: "session_test".to_string(),
             session_generation: submission.sender_generation,
             submission_id: submission.id.clone(),
-            reservation_id: submission.id.clone(),
+            reservation_id: format!("reservation:{}", submission.id),
             receipt_id: receipt_id.to_string(),
             source: submission.source.clone(),
             item_count: submission.items.len(),
@@ -844,7 +844,16 @@ mod tests {
         std::fs::create_dir_all(&skill_dir).unwrap();
         std::fs::write(
             skill_dir.join("SKILL.md"),
-            "---\nname: review\ndescription: Review code\ntriggers:\n  - review\n---\n\n# Review\nCheck safety.\n",
+            "---\
+name: review\
+description: Review code\
+triggers:\
+  - review\
+---\
+\
+# Review\
+Check safety.\
+",
         )
         .unwrap();
 
@@ -2314,8 +2323,6 @@ mod steering_snapshot_tests {
             },
         ));
 
-        // /attach with a path that WOULD exist — the rejection must happen
-        // before any filesystem probe, so we never create the file.
         user_tx
             .send(UserInput::Message(
                 "/attach /tmp/this-file-must-not-be-read.png".to_string(),
