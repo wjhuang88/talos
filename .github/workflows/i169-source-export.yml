@@ -1,0 +1,28 @@
+name: I169 Source Export
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Package source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude=target -czf talos-source.tar.gz .
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: i169-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: talos-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
