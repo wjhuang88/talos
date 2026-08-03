@@ -3,8 +3,8 @@ use crate::diagnostic::{
     is_terminal_diagnostic_content,
 };
 use crate::turn_outcome::{
-    TurnTranscriptOutcome, TurnTranscriptOutcomeRecord, decode_turn_transcript_outcome,
-    encode_turn_transcript_outcome, is_turn_transcript_outcome_content,
+    TurnTranscriptOutcomeRecord, decode_turn_transcript_outcome, encode_turn_transcript_outcome,
+    is_turn_transcript_outcome_content,
 };
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
@@ -76,8 +76,7 @@ impl Session {
             "system",
             &content,
             SessionMetadata {
-                turn_id: matches!(outcome.outcome, TurnTranscriptOutcome::Success)
-                    .then(|| outcome.turn_id.clone()),
+                turn_id: Some(outcome.turn_id.clone()),
                 ..SessionMetadata::default()
             },
         )?;
