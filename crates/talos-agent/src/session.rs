@@ -1262,7 +1262,10 @@ impl AppServerSession {
 }
 
 #[cfg(test)]
-fn bind_unit_test_sender(target: mpsc::Sender<SessionOp>, generation: u64) -> mpsc::Sender<SessionOp> {
+fn bind_unit_test_sender(
+    target: mpsc::Sender<SessionOp>,
+    generation: u64,
+) -> mpsc::Sender<SessionOp> {
     let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
     tokio::spawn(async move {
         while let Some(mut operation) = proxy_rx.recv().await {
@@ -1272,8 +1275,7 @@ fn bind_unit_test_sender(target: mpsc::Sender<SessionOp>, generation: u64) -> mp
                     submission.sender_generation = generation;
                 }
                 SessionOp::InterruptTurn {
-                    session_generation,
-                    ..
+                    session_generation, ..
                 } => {
                     *session_generation = generation;
                 }
