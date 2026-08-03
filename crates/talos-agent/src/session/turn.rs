@@ -242,11 +242,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 return;
             }
             if let Some(persistence) = &persistence
-                && let Err(message) = persist_turn_outcome(
-                    persistence,
-                    &turn_id,
-                    TurnTranscriptOutcome::Success,
-                )
+                && let Err(message) =
+                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Success)
             {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
@@ -349,11 +346,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             if transcript_persisted
                 && let Some(persistence) = &persistence
-                && let Err(persist_err) = persist_turn_outcome(
-                    persistence,
-                    &turn_id,
-                    TurnTranscriptOutcome::Error,
-                )
+                && let Err(persist_err) =
+                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Error)
             {
                 error_message = format!(
                     "{error_message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
@@ -381,11 +375,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             error!("agent panicked during turn");
             let mut message = "agent panicked".to_string();
             if let Some(persistence) = &persistence
-                && let Err(persist_err) = persist_turn_outcome(
-                    persistence,
-                    &turn_id,
-                    TurnTranscriptOutcome::Error,
-                )
+                && let Err(persist_err) =
+                    persist_turn_outcome(persistence, &turn_id, TurnTranscriptOutcome::Error)
             {
                 message = format!(
                     "{message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
