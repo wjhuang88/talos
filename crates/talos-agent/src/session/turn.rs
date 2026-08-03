@@ -9,6 +9,7 @@ use tracing::error;
 
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
+use talos_session::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 
 use crate::{Agent, PreparedSessionTurn};
 
@@ -142,6 +143,30 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             let _ = forwarder.await;
+            if let Some(persistence) = &persistence
+                && let Err(message) = persist_turn_outcome(
+                    persistence,
+                    &turn_id,
+                    TurnTranscriptOutcome::Cancelled,
+                )
+            {
+                let completion = TurnCompletionStatus::Error { message };
+                let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+                let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                    session_id,
+                    turn_id,
+                    sequence,
+                    payload: TurnEventPayload::Completed {
+                        status: completion.clone(),
+                    },
+                });
+                let _ = result_tx.send(TurnRecord {
+                    new_messages: Vec::new(),
+                    status: TurnRecordStatus::Error,
+                    completion,
+                });
+                return;
+            }
             let completion = TurnCompletionStatus::Cancelled;
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -193,6 +218,30 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             if let Some(persistence) = &persistence
                 && let Err(message) =
                     persist_turn_messages(persistence, &turn_id, &new_messages, &raw_tool_outputs)
+            {
+                let completion = TurnCompletionStatus::Error { message };
+                let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+                let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                    session_id,
+                    turn_id,
+                    sequence,
+                    payload: TurnEventPayload::Completed {
+                        status: completion.clone(),
+                    },
+                });
+                let _ = result_tx.send(TurnRecord {
+                    new_messages: Vec::new(),
+                    status: TurnRecordStatus::Error,
+                    completion,
+                });
+                return;
+            }
+            if let Some(persistence) = &persistence
+                && let Err(message) = persist_turn_outcome(
+                    persistence,
+                    &turn_id,
+                    TurnTranscriptOutcome::Success,
+                )
             {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
@@ -273,6 +322,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 error_message
                     .push_str("\n[warning: failed to persist provider terminal diagnostic]");
             }
+            let mut transcript_persisted = true;
             if !partial_messages.is_empty()
                 && let Some(persistence) = &persistence
             {
@@ -284,11 +334,24 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 ) {
                     Ok(()) => {}
                     Err(persist_err) => {
+                        transcript_persisted = false;
                         error_message = format!(
                             "{error_message}\n[warning: failed to persist partial turn messages: {persist_err}]"
                         );
                     }
                 }
+            }
+            if transcript_persisted
+                && let Some(persistence) = &persistence
+                && let Err(persist_err) = persist_turn_outcome(
+                    persistence,
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                )
+            {
+                error_message = format!(
+                    "{error_message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
+                );
             }
             let completion = TurnCompletionStatus::Error {
                 message: error_message,
@@ -310,9 +373,19 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
         Err(_join_error) => {
             error!("agent panicked during turn");
-            let completion = TurnCompletionStatus::Error {
-                message: "agent panicked".into(),
-            };
+            let mut message = "agent panicked".to_string();
+            if let Some(persistence) = &persistence
+                && let Err(persist_err) = persist_turn_outcome(
+                    persistence,
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                )
+            {
+                message = format!(
+                    "{message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
+                );
+            }
+            let completion = TurnCompletionStatus::Error { message };
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,
@@ -353,4 +426,15 @@ fn persist_turn_messages(
             .map_err(|error| format!("failed to persist completed turn: {error}"))?;
     }
     Ok(())
+}
+
+fn persist_turn_outcome(
+    persistence: &TurnPersistence,
+    turn_id: &str,
+    outcome: TurnTranscriptOutcome,
+) -> Result<(), String> {
+    persistence
+        .session
+        .append_turn_transcript_outcome(&TurnTranscriptOutcomeRecord::new(turn_id, outcome))
+        .map_err(|error| format!("failed to persist terminal transcript outcome: {error}"))
 }
