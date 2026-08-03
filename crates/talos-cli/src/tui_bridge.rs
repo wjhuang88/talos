@@ -883,7 +883,10 @@ fn handle_structured_submission_started(
         ..
     } = turn_state
     else {
-        emit_bridge_error(ui_tx, "ignored uncorrelated structured submission projection");
+        emit_bridge_error(
+            ui_tx,
+            "ignored uncorrelated structured submission projection",
+        );
         return;
     };
 
@@ -895,7 +898,10 @@ fn handle_structured_submission_started(
     let matches_expected = expected_submission == &submission.id && expected_receipt == &receipt_id;
     if matches_expected {
         if expected_payload != &submission {
-            emit_bridge_error(ui_tx, "ignored conflicting structured submission projection");
+            emit_bridge_error(
+                ui_tx,
+                "ignored conflicting structured submission projection",
+            );
             return;
         }
         if !*projected {
@@ -905,8 +911,8 @@ fn handle_structured_submission_started(
         return;
     }
 
-    let retained_predecessor = expected_submission != &submission.id
-        && expected_receipt != &receipt_id;
+    let retained_predecessor =
+        expected_submission != &submission.id && expected_receipt != &receipt_id;
     if !retained_predecessor {
         emit_bridge_error(ui_tx, "ignored mismatched structured submission projection");
         return;
