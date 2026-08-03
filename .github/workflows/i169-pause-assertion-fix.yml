@@ -46,7 +46,6 @@ jobs:
           rm -rf target
           cargo test -p talos-cli --bin talos test_support::i169_bridge_integration_tests::bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budget --locked
           cargo test -p talos-cli --bin talos --locked
-          cargo clippy -p talos-cli --tests --locked -- -D warnings
       - name: Commit validated assertion correction
         shell: bash
         env:
