@@ -76,7 +76,8 @@ impl Session {
             "system",
             &content,
             SessionMetadata {
-                turn_id: Some(outcome.turn_id.clone()),
+                turn_id: (outcome.outcome == crate::TurnTranscriptOutcome::Success)
+                    .then(|| outcome.turn_id.clone()),
                 ..SessionMetadata::default()
             },
         )?;
