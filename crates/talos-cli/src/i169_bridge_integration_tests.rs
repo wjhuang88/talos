@@ -39,8 +39,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
         .create_or_open_session("i169-bridge-budget")
         .expect("durable session");
     let session_id = durable.id().to_string();
-    let pending_store =
-        PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    let pending_store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
 
     let provider_calls = Arc::new(AtomicUsize::new(0));
     #[allow(deprecated)]
