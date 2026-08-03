@@ -128,9 +128,7 @@ fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
     let (oldest_receipt, accepted) = store.accept(&oldest).unwrap();
     assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
     store.mark_running(&oldest.id, "turn-oldest").unwrap();
-    store
-        .mark_committed(&oldest.id, "turn-oldest")
-        .unwrap();
+    store.mark_committed(&oldest.id, "turn-oldest").unwrap();
 
     for index in 0..MAX_TOMBSTONES {
         let mut payload = submission();
@@ -138,10 +136,7 @@ fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
         payload.items[0].id = format!("later-item-{index}");
         payload.items[0].enqueue_sequence = index as u64 + 2;
         let (_, disposition) = store.accept(&payload).unwrap();
-        assert_eq!(
-            disposition,
-            SubmissionReceiptDisposition::AcceptedPending
-        );
+        assert_eq!(disposition, SubmissionReceiptDisposition::AcceptedPending);
         let turn_id = format!("later-turn-{index}");
         store.mark_running(&payload.id, &turn_id).unwrap();
         store.mark_committed(&payload.id, &turn_id).unwrap();
