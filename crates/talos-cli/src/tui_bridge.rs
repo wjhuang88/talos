@@ -41,6 +41,8 @@ struct DeferredAcceptedSubmission {
     session_generation: u64,
     submission_id: String,
     receipt_id: String,
+    submission: StructuredSubmission,
+    projected: bool,
     cancel_requested: bool,
 }
 
@@ -51,6 +53,8 @@ impl DeferredAcceptedSubmission {
             session_generation: self.session_generation,
             submission_id: self.submission_id,
             receipt_id: self.receipt_id,
+            submission: self.submission,
+            projected: self.projected,
             cancel_requested: self.cancel_requested,
         }
     }
@@ -73,6 +77,8 @@ enum BridgeTurnState {
         session_generation: u64,
         submission_id: String,
         receipt_id: String,
+        submission: StructuredSubmission,
+        projected: bool,
         cancel_requested: bool,
     },
     StructuredRunning {
@@ -516,6 +522,24 @@ async fn handle_session_event(
                 disposition,
             );
         }
+        SessionEvent::StructuredSubmissionStarted {
+            session_id,
+            session_generation,
+            submission,
+            receipt_id,
+            turn_id,
+        } => {
+            handle_structured_submission_started(
+                engine,
+                turn_state,
+                ui_tx,
+                session_id,
+                session_generation,
+                submission,
+                receipt_id,
+                turn_id,
+            );
+        }
         SessionEvent::StructuredTurnEvent {
             session_id,
             session_generation,
@@ -660,8 +684,9 @@ async fn handle_session_event(
             }
         }
         SessionEvent::SubmissionQueued { .. } | SessionEvent::SubmissionStarted { .. } => {
-            // Compatibility projections only. Durable SubmissionReceipt and
-            // StructuredTurnEvent own transfer and lifecycle authority.
+            // Compatibility projections only. Durable SubmissionReceipt,
+            // StructuredSubmissionStarted and StructuredTurnEvent own transfer,
+            // visible ordering and lifecycle authority.
         }
         SessionEvent::Error { message } => {
             emit_bridge_error(ui_tx, &message);
@@ -757,6 +782,8 @@ fn handle_submission_receipt(
                 session_generation,
                 submission_id,
                 receipt_id,
+                submission,
+                projected: false,
                 cancel_requested,
             };
         }
@@ -806,16 +833,85 @@ fn commit_actor_custody(
         );
         return false;
     }
-    for item in &submission.items {
-        for output in engine.start_user_message(&item.text) {
-            let _ = ui_tx.send(output);
-        }
-    }
     let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
         engine.steering_queue_snapshot(),
     ));
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     true
+}
+
+fn emit_submission_projection(
+    engine: &mut ConversationEngine,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    submission: &StructuredSubmission,
+) {
+    for item in &submission.items {
+        for output in engine.start_user_message(&item.text) {
+            let _ = ui_tx.send(output);
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_structured_submission_started(
+    engine: &mut ConversationEngine,
+    turn_state: &mut BridgeTurnState,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    session_id: String,
+    session_generation: u64,
+    submission: StructuredSubmission,
+    receipt_id: String,
+    turn_id: String,
+) {
+    if submission.sender_generation != session_generation
+        || submission.source != SubmissionSource::User
+        || submission.validate().is_err()
+        || receipt_id.is_empty()
+        || turn_id.is_empty()
+    {
+        emit_bridge_error(ui_tx, "ignored invalid structured submission projection");
+        return;
+    }
+
+    let BridgeTurnState::AcceptedByActor {
+        session_id: expected_session,
+        session_generation: expected_generation,
+        submission_id: expected_submission,
+        receipt_id: expected_receipt,
+        submission: expected_payload,
+        projected,
+        ..
+    } = turn_state
+    else {
+        emit_bridge_error(ui_tx, "ignored uncorrelated structured submission projection");
+        return;
+    };
+
+    if expected_session != &session_id || *expected_generation != session_generation {
+        emit_bridge_error(ui_tx, "ignored stale structured submission projection");
+        return;
+    }
+
+    let matches_expected = expected_submission == &submission.id && expected_receipt == &receipt_id;
+    if matches_expected {
+        if expected_payload != &submission {
+            emit_bridge_error(ui_tx, "ignored conflicting structured submission projection");
+            return;
+        }
+        if !*projected {
+            emit_submission_projection(engine, ui_tx, &submission);
+            *projected = true;
+        }
+        return;
+    }
+
+    let retained_predecessor = expected_submission != &submission.id
+        && expected_receipt != &receipt_id;
+    if !retained_predecessor {
+        emit_bridge_error(ui_tx, "ignored mismatched structured submission projection");
+        return;
+    }
+    emit_submission_projection(engine, ui_tx, &submission);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -841,6 +937,8 @@ fn handle_structured_turn_event(
                 session_generation: expected_generation,
                 submission_id: expected_submission,
                 receipt_id: expected_receipt,
+                submission,
+                projected,
                 cancel_requested,
             } if expected_session == session_id
                 && expected_generation == session_generation
@@ -848,6 +946,9 @@ fn handle_structured_turn_event(
                 && expected_receipt == receipt_id
                 && sequence == 0 =>
             {
+                if !projected {
+                    emit_submission_projection(engine, ui_tx, &submission);
+                }
                 for output in engine.handle_turn_started() {
                     let _ = ui_tx.send(output);
                 }
@@ -893,6 +994,8 @@ fn handle_structured_turn_event(
                 session_generation: expected_generation,
                 submission_id: expected_submission,
                 receipt_id: expected_receipt,
+                submission: expected_payload,
+                projected,
                 cancel_requested,
             } if expected_session == session_id
                 && expected_generation == session_generation
@@ -906,6 +1009,8 @@ fn handle_structured_turn_event(
                         session_generation: expected_generation,
                         submission_id: expected_submission,
                         receipt_id: expected_receipt,
+                        submission: expected_payload,
+                        projected,
                         cancel_requested,
                     };
                     emit_bridge_error(
@@ -919,6 +1024,8 @@ fn handle_structured_turn_event(
                     session_generation: expected_generation,
                     submission_id: expected_submission,
                     receipt_id: expected_receipt,
+                    submission: expected_payload,
+                    projected,
                     cancel_requested,
                 });
                 for output in engine.handle_turn_started() {
