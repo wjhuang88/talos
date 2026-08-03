@@ -216,8 +216,13 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let cloned_messages = new_messages.clone();
             if let Some(persistence) = &persistence
-                && let Err(message) =
-                    persist_turn_messages(persistence, &turn_id, &new_messages, &raw_tool_outputs)
+                && let Err(message) = persist_turn_messages(
+                    persistence,
+                    &turn_id,
+                    &new_messages,
+                    &raw_tool_outputs,
+                    true,
+                )
             {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
@@ -331,6 +336,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     &turn_id,
                     &partial_messages,
                     &raw_tool_outputs,
+                    false,
                 ) {
                     Ok(()) => {}
                     Err(persist_err) => {
@@ -409,10 +415,11 @@ fn persist_turn_messages(
     turn_id: &str,
     messages: &[Message],
     raw_tool_outputs: &Arc<Mutex<HashMap<String, String>>>,
+    bind_turn_id: bool,
 ) -> Result<(), String> {
     for message in messages {
         let mut metadata = persistence.metadata.clone();
-        metadata.turn_id = Some(turn_id.to_owned());
+        metadata.turn_id = bind_turn_id.then(|| turn_id.to_owned());
         if let Message::Tool { result } = message
             && let Ok(outputs) = raw_tool_outputs.lock()
             && let Some(raw) = outputs.get(&result.tool_use_id)
