@@ -113,7 +113,7 @@ impl PendingSubmissionStore {
         ensure_schema(&transaction)?;
 
         if let Some(row) = lookup(&transaction, &submission.id)? {
-            let disposition = if row.fingerprint == fingerprint && row.json == encoded {
+            let disposition = if identity_matches(&row, &fingerprint, &encoded) {
                 SubmissionReceiptDisposition::AlreadyAccepted {
                     state: decode_state(&row.state)?,
                     turn_id: row.turn_id,
@@ -134,6 +134,7 @@ impl PendingSubmissionStore {
         }
 
         let receipt_id = Uuid::new_v4().to_string();
+        let reservation_id = format!("reservation:{}", submission.id);
         transaction.execute(
             "INSERT INTO pending_submissions (
                 batch_id, reservation_id, session_id, session_generation,
@@ -143,7 +144,7 @@ impl PendingSubmissionStore {
                        'accepted_pending', NULL)",
             params![
                 submission.id,
-                submission.id,
+                reservation_id,
                 self.session_id.as_str(),
                 generation,
                 receipt_id,
@@ -172,7 +173,7 @@ impl PendingSubmissionStore {
         let connection = self.connection()?;
         ensure_schema(&connection)?;
         Ok(match lookup(&connection, &submission.id)? {
-            Some(row) if row.fingerprint == payload_fingerprint && row.json == encoded => (
+            Some(row) if identity_matches(&row, &payload_fingerprint, &encoded) => (
                 row.receipt_id,
                 SubmissionReceiptDisposition::AlreadyAccepted {
                     state: decode_state(&row.state)?,
@@ -199,6 +200,19 @@ impl PendingSubmissionStore {
             submission_id,
             PendingSubmissionState::Running,
             Some(turn_id),
+            &[
+                PendingSubmissionState::AcceptedPending,
+                PendingSubmissionState::PausedPending,
+            ],
+        )
+    }
+
+    /// Pauses one durably accepted submission before it starts.
+    pub fn mark_paused(&self, submission_id: &str) -> Result<(), PendingSubmissionError> {
+        self.transition(
+            submission_id,
+            PendingSubmissionState::PausedPending,
+            None,
             &[
                 PendingSubmissionState::AcceptedPending,
                 PendingSubmissionState::PausedPending,
@@ -263,20 +277,40 @@ impl PendingSubmissionStore {
     pub fn recover_unstarted(
         &self,
     ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
+        self.recover_states(&["accepted_pending", "paused_pending"])
+    }
+
+    /// Returns Running records for transcript-backed crash reconciliation.
+    pub fn recover_running(
+        &self,
+    ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
+        self.recover_states(&["running"])
+    }
+
+    fn recover_states(
+        &self,
+        states: &[&str],
+    ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
         let _guard = self.guard()?;
         let connection = self.connection()?;
         ensure_schema(&connection)?;
-        let mut statement = connection.prepare(
+        let state_filter = states
+            .iter()
+            .map(|state| format!("'{state}'"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
             "SELECT receipt_id, fingerprint, submission_json, state, turn_id
              FROM pending_submissions
-             WHERE state IN ('accepted_pending', 'paused_pending')
-             ORDER BY rowid ASC",
-        )?;
+             WHERE state IN ({state_filter})
+             ORDER BY rowid ASC"
+        );
+        let mut statement = connection.prepare(&sql)?;
         let rows = statement.query_map([], read_record_tuple)?;
         rows.map(|row| tuple_to_record(row?)).collect()
     }
 
-    /// Returns one durable submission record.
+    /// Returns one durable submission record that still retains its payload.
     pub fn get(
         &self,
         submission_id: &str,
@@ -349,7 +383,7 @@ type RecordTuple = (String, String, String, String, Option<String>);
 struct IdentityRow {
     receipt_id: String,
     fingerprint: String,
-    json: String,
+    json: Option<String>,
     state: String,
     turn_id: Option<String>,
 }
@@ -358,11 +392,15 @@ fn immediate(connection: &mut Connection) -> Result<Transaction<'_>, rusqlite::E
     connection.transaction_with_behavior(TransactionBehavior::Immediate)
 }
 
+fn identity_matches(row: &IdentityRow, fingerprint: &str, encoded: &str) -> bool {
+    row.fingerprint == fingerprint && row.json.as_deref().is_none_or(|json| json == encoded)
+}
+
 fn lookup(
     connection: &Connection,
     submission_id: &str,
 ) -> Result<Option<IdentityRow>, rusqlite::Error> {
-    connection
+    let active = connection
         .query_row(
             "SELECT receipt_id, fingerprint, submission_json, state, turn_id
              FROM pending_submissions WHERE batch_id = ?1",
@@ -371,9 +409,28 @@ fn lookup(
                 Ok(IdentityRow {
                     receipt_id: row.get(0)?,
                     fingerprint: row.get(1)?,
-                    json: row.get(2)?,
+                    json: Some(row.get(2)?),
                     state: row.get(3)?,
                     turn_id: row.get(4)?,
+                })
+            },
+        )
+        .optional()?;
+    if active.is_some() {
+        return Ok(active);
+    }
+    connection
+        .query_row(
+            "SELECT receipt_id, fingerprint, state, turn_id
+             FROM submission_idempotency WHERE batch_id = ?1",
+            params![submission_id],
+            |row| {
+                Ok(IdentityRow {
+                    receipt_id: row.get(0)?,
+                    fingerprint: row.get(1)?,
+                    json: None,
+                    state: row.get(2)?,
+                    turn_id: row.get(3)?,
                 })
             },
         )
@@ -461,6 +518,13 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
              state TEXT NOT NULL,
              turn_id TEXT
          );
+         CREATE TABLE IF NOT EXISTS submission_idempotency (
+             batch_id TEXT PRIMARY KEY,
+             receipt_id TEXT NOT NULL,
+             fingerprint TEXT NOT NULL,
+             state TEXT NOT NULL,
+             turn_id TEXT
+         );
          INSERT OR IGNORE INTO pending_journal_meta (key, value)
          VALUES ('schema_version', 1);",
     )?;
@@ -477,6 +541,25 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
 }
 
 fn prune_tombstones(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
+    // Preserve the permanent idempotency identity and terminal summary before
+    // pruning the large serialized payload. Delayed retries can therefore
+    // never become a fresh Provider execution merely because payload storage
+    // was compacted.
+    transaction.execute(
+        "INSERT INTO submission_idempotency (
+             batch_id, receipt_id, fingerprint, state, turn_id
+         )
+         SELECT batch_id, receipt_id, fingerprint, state, turn_id
+         FROM pending_submissions
+         WHERE state IN ('committed', 'terminal_cancelled', 'terminal_error')
+         ON CONFLICT(batch_id) DO UPDATE SET
+             receipt_id = excluded.receipt_id,
+             fingerprint = excluded.fingerprint,
+             state = excluded.state,
+             turn_id = excluded.turn_id",
+        [],
+    )?;
+
     let count: i64 = transaction.query_row(
         "SELECT COUNT(*) FROM pending_submissions
          WHERE state IN ('committed', 'terminal_cancelled', 'terminal_error')",
