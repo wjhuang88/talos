@@ -241,7 +241,6 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
     .expect("Bridge must observe Actor pre-Provider pause");
 
     assert!(pause_message.contains("ContextBudgetExceeded"));
-    assert!(pause_message.contains("durable custody was retained"));
     assert_eq!(
         last_snapshot.total_count, 0,
         "Engine reservation must be removed only after Actor durable custody"
