@@ -791,12 +791,7 @@ fn handle_structured_turn_event(
                     let _ = ui_tx.send(output);
                 }
                 if cancel_requested {
-                    if send_targeted_interrupt(
-                        sq_tx_watch,
-                        session_generation,
-                        &turn_id,
-                        ui_tx,
-                    ) {
+                    if send_targeted_interrupt(sq_tx_watch, session_generation, &turn_id, ui_tx) {
                         *turn_state = BridgeTurnState::StructuredCancelling {
                             session_id,
                             session_generation,
@@ -1359,12 +1354,7 @@ fn request_cancel(
             next_legacy_sequence,
             progress_mode,
         } => {
-            if !send_targeted_interrupt(
-                sq_tx_watch,
-                *session_generation,
-                turn_id,
-                ui_tx,
-            ) {
+            if !send_targeted_interrupt(sq_tx_watch, *session_generation, turn_id, ui_tx) {
                 return;
             }
             *turn_state = BridgeTurnState::StructuredCancelling {
@@ -1408,8 +1398,7 @@ fn send_targeted_interrupt(
         .try_send(SessionOp::InterruptTurn {
             session_generation,
             turn_id: turn_id.to_owned(),
-        })
-    {
+        }) {
         Ok(()) => true,
         Err(_) => {
             emit_bridge_error(
