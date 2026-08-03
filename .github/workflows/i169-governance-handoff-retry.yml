@@ -1,0 +1,46 @@
+name: I169 Review Handoff Governance Sync Retry
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  synchronize-governance:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Execute the reviewed synchronization script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/i169-governance-handoff.yml').read_text().splitlines()
+          start = source.index("          python3 - <<'PY'") + 1
+          end = source.index("          PY", start)
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in source[start:end]) + "\n"
+          Path('/tmp/i169_governance_sync.py').write_text(script)
+          PY
+          python3 /tmp/i169_governance_sync.py
+          rm -f .github/workflows/i169-governance-handoff.yml
+          rm -f .github/workflows/i169-governance-handoff-retry.yml
+          git diff --check
+          bash scripts/validate_project_governance.sh .
+      - name: Commit synchronized governance handoff
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "docs(i169): synchronize independent review handoff"
+          git push origin "HEAD:${HEAD_REF}"
