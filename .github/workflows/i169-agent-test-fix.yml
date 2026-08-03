@@ -1,0 +1,53 @@
+name: I169 Agent Test Fix Apply
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Remove invalid set_persistence unwraps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("crates/talos-agent/src/session/tests.rs")
+          text = path.read_text()
+          pattern = re.compile(
+              r"(actor\n\s+\.set_persistence\(.*?\n\s+\))\n\s+\.unwrap\(\);",
+              re.DOTALL,
+          )
+          text, count = pattern.subn(r"\1;", text)
+          if count != 5:
+              raise SystemExit(f"expected 5 invalid set_persistence unwraps, found {count}")
+          path.write_text(text)
+          PY
+          rm -f .github/workflows/i169-agent-test-fix.yml
+          cargo fmt --all
+          git diff --check
+      - name: Commit agent test correction
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(i169): correct persistence test setup [model:GPT-5.6]"
+          git push origin "HEAD:${HEAD_REF}"
