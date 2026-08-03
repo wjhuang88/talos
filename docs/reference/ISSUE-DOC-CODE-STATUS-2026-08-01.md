@@ -11,9 +11,9 @@
 - No open Issue is closed by this reconciliation: none has a Complete owner that also matches the remaining remote scope.
 - Deferred, Refinement, Ready, Partial, and Blocked remain open states; “registered” does not mean “scheduled”.
 - Recovered Issue #119 is assigned to TUI-044 because current main already assigns TUI-041 to Issue #69.
-- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite, but TUI-044/I169 remains open in PR #131.
-- Intake Issues #124, #125 and #134 are registered as unclaimed Refinement owners MODEL-011, TUI-045 and TUI-046.
-- Issue #132 is mapped to existing PROVIDER-003 only to satisfy remote owner reconciliation; its governance expansion remains owned by Draft PR #133 and does not authorize provider-auth implementation in I169.
+- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite; TUI-044/I169 is Active in Draft PR #131 and Issue #119 remains open.
+- Intake Issues #124, #125 and #134 are registered as unclaimed Refinement owners MODEL-011, TUI-045 and TUI-046; this reconciliation does not authorize implementation.
+- Issue #132 is assigned to PROVIDER-003 as an architecture/decomposition Epic. Its bounded child identities are recorded, but no child is claimed, selected, or authorized.
 - REL-001 and DATA-001 historical owner drift is corrected to Complete; they are not currently open GitHub Issues.
 
 ## Open Issue Matrix
@@ -46,7 +46,7 @@
 | [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Active | PR #131 implements I169; keep open until complete acceptance, ADR-056 review, exact-head CI and merge evidence. |
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Intake registered; probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Intake registered; layout ownership and real-terminal acceptance remain unclaimed. |
-| [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement | Mandatory owner sync only; Draft PR #133 owns the provider-auth governance expansion. |
+| [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement Epic | Architecture/decomposition owner only; PROVIDER-003-A ADR/threat model and a separately claimed bounded child are required before implementation. |
 | [#134](https://github.com/wjhuang88/talos/issues/134) | native text selection and copy | [TUI-046](../backlog/active/TUI-046-native-text-selection-copy.md) | Refinement | Intake registered; mouse-capture policy, ADR-054 impact and real-terminal matrix remain unclaimed. |
 
 ## Status Corrections
@@ -58,7 +58,7 @@
 - `TUI-044`: added for recovered Issue #119; historical TUI-041 steering ownership is not restored because TUI-041 currently belongs to Issue #69.
 - `I170`: completed in merged PR #126; this clears only TUI-044's prerequisite and does not complete or close Issue #119.
 - `MODEL-011`, `TUI-045` and `TUI-046`: registered from Intake Issues #124/#125/#134 as unclaimed Refinement owners only.
-- `PROVIDER-003`: Issue #132 mapping is retained only for mandatory remote reconciliation; Draft PR #133 remains the governance owner for any provider-auth scope expansion.
+- `PROVIDER-003`: linked to Issue #132 and reclassified as the dynamic-authentication architecture/decomposition Epic. PROVIDER-003-A through G define separate future claim, review, rollback and completion boundaries; none is selected.
 
 ## Closure Rule
 
