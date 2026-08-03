@@ -14,6 +14,11 @@ use talos_core::submission::{
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::turn_outcome::decode_turn_transcript_outcome;
+use crate::{
+    CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTranscriptOutcome,
+};
+
 const SCHEMA_VERSION: i64 = 1;
 const MAX_TOMBSTONES: usize = MAX_PENDING_SUBMISSIONS * 2;
 
@@ -29,6 +34,9 @@ pub enum PendingSubmissionError {
     /// Journal directory creation failed.
     #[error("pending submission journal I/O failed: {0}")]
     Io(#[from] std::io::Error),
+    /// Transcript inspection failed while reconciling a Running record.
+    #[error("pending submission transcript inspection failed: {0}")]
+    Transcript(#[from] crate::SessionError),
     /// The in-process journal lock was poisoned.
     #[error("pending submission journal lock poisoned")]
     LockPoisoned,
@@ -62,6 +70,7 @@ pub struct PendingSubmissionRecord {
 #[derive(Debug, Clone)]
 pub struct PendingSubmissionStore {
     path: Arc<PathBuf>,
+    session_file: Arc<PathBuf>,
     session_id: Arc<String>,
     lock: Arc<Mutex<()>>,
 }
@@ -79,6 +88,7 @@ impl PendingSubmissionStore {
         let parent = session_file.parent().unwrap_or_else(|| Path::new("."));
         Self {
             path: Arc::new(parent.join(format!("{session_id}.pending.sqlite"))),
+            session_file: Arc::new(session_file.to_path_buf()),
             session_id: Arc::new(session_id.to_owned()),
             lock: Arc::new(Mutex::new(())),
         }
@@ -252,25 +262,53 @@ impl PendingSubmissionStore {
             submission_id,
             state,
             Some(turn_id),
-            &[PendingSubmissionState::Running],
+            &[PendingSubmissionState::Running, state],
         )
     }
 
-    /// Finalizes custody after the successful transcript commit.
+    /// Finalizes custody from the authoritative terminal transcript outcome.
+    ///
+    /// Success becomes Committed. Error and Cancelled markers are mapped to
+    /// their matching terminal states even when the caller is the legacy
+    /// startup path named `mark_committed`. A real transcript file with no
+    /// marker is ambiguous and remains Running.
     pub fn mark_committed(
         &self,
         submission_id: &str,
         turn_id: &str,
     ) -> Result<(), PendingSubmissionError> {
-        self.transition(
-            submission_id,
-            PendingSubmissionState::Committed,
-            Some(turn_id),
-            &[
-                PendingSubmissionState::Running,
+        let outcome = self.transcript_outcome_for_turn(turn_id)?;
+        match outcome {
+            Some(TurnTranscriptOutcome::Success) => self.transition(
+                submission_id,
                 PendingSubmissionState::Committed,
-            ],
-        )
+                Some(turn_id),
+                &[
+                    PendingSubmissionState::Running,
+                    PendingSubmissionState::Committed,
+                ],
+            ),
+            Some(TurnTranscriptOutcome::Cancelled) => self.mark_terminal(
+                submission_id,
+                PendingSubmissionState::TerminalCancelled,
+                turn_id,
+            ),
+            Some(TurnTranscriptOutcome::Error) => self.mark_terminal(
+                submission_id,
+                PendingSubmissionState::TerminalError,
+                turn_id,
+            ),
+            None if !self.session_file.exists() => self.transition(
+                submission_id,
+                PendingSubmissionState::Committed,
+                Some(turn_id),
+                &[
+                    PendingSubmissionState::Running,
+                    PendingSubmissionState::Committed,
+                ],
+            ),
+            None => Err(PendingSubmissionError::InvalidTransition),
+        }
     }
 
     /// Returns unstarted work in durable FIFO order.
@@ -326,6 +364,31 @@ impl PendingSubmissionStore {
             .optional()?
             .map(tuple_to_record)
             .transpose()
+    }
+
+    fn transcript_outcome_for_turn(
+        &self,
+        turn_id: &str,
+    ) -> Result<Option<TurnTranscriptOutcome>, PendingSubmissionError> {
+        if !self.session_file.exists() {
+            return Ok(None);
+        }
+        let entries = if self
+            .session_file
+            .extension()
+            .and_then(|value| value.to_str())
+            == Some("jsonl")
+        {
+            JsonlSessionStore.read_entries(self.session_file.as_ref())?
+        } else {
+            CompactTextSessionStore.read_entries(self.session_file.as_ref())?
+        };
+        Ok(entries
+            .into_iter()
+            .filter_map(|entry| decode_turn_transcript_outcome(&entry.content))
+            .filter(|record| record.turn_id == turn_id)
+            .map(|record| record.outcome)
+            .last())
     }
 
     fn transition(
