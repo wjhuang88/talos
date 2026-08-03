@@ -165,6 +165,8 @@ impl AppServerSession {
 
     /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
+        self.reconcile_running_submissions();
+
         let mut turn_counter: u64 = 0;
         let mut submission_counter: u64 = 0;
         let mut pending = VecDeque::<StructuredSubmission>::new();
@@ -202,7 +204,7 @@ impl AppServerSession {
                     image_bytes,
                 );
                 turn_counter = turn_counter.saturating_add(1);
-                match self.start_submission(submission, turn_counter).await {
+                match self.start_submission(submission.clone(), turn_counter).await {
                     Some(started) => {
                         current_turn = Some(started.handle);
                         current_submission_size = Some(submission_size);
@@ -210,16 +212,10 @@ impl AppServerSession {
                         cancel_token = Some(started.token);
                     }
                     None => {
-                        pending_items = pending_items.saturating_sub(submission_size.0);
-                        pending_bytes = pending_bytes.saturating_sub(submission_size.1);
-                        pending_images = pending_images.saturating_sub(submission_size.2);
-                        pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
-                        if let Err(error) = self.pending_store.pause_unstarted() {
-                            self.emit_custody_error(
-                                "failed to pause rejected pending work",
-                                &error,
-                            );
-                        }
+                        // Custody has already transferred for structured work.
+                        // Retain the exact immutable submission in memory and in
+                        // the journal, and require an explicit later resume.
+                        pending.push_front(submission);
                         paused = true;
                     }
                 }
@@ -299,7 +295,6 @@ impl AppServerSession {
                                 &mut pending_image_bytes,
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
-                                paused,
                             ) {
                                 paused = false;
                             }
@@ -322,7 +317,6 @@ impl AppServerSession {
                                 &mut pending_image_bytes,
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
-                                paused,
                             ) {
                                 paused = false;
                             }
@@ -345,7 +339,6 @@ impl AppServerSession {
                                 &mut pending_image_bytes,
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
-                                paused,
                             ) {
                                 paused = false;
                             }
@@ -361,7 +354,6 @@ impl AppServerSession {
                                 &mut pending_image_bytes,
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
-                                paused,
                                 None,
                             ) && resumes
                             {
@@ -382,34 +374,29 @@ impl AppServerSession {
                                 &mut pending_image_bytes,
                                 &mut recent_submission_ids,
                                 &mut recent_item_ids,
-                                paused,
                                 receipt_tx.as_ref(),
                             ) && resumes
                             {
                                 paused = false;
                             }
                         }
-                        SessionOp::ReconcileStructured { submission } => {
-                            let resumes = submission.source != SubmissionSource::Scheduler;
-                            if self.reconcile_submission(&submission, &pending, None) && resumes {
-                                paused = false;
-                            }
+                        SessionOp::ReconcileStructured { submission }
+                        | SessionOp::SubmitStructuredReconcile { submission } => {
+                            self.reconcile_submission(&submission, None);
                         }
                         SessionOp::ReconcileStructuredTracked {
                             submission,
                             receipt_tx,
+                        }
+                        | SessionOp::SubmitStructuredReconcileTracked {
+                            submission,
+                            receipt_tx,
                         } => {
-                            let resumes = submission.source != SubmissionSource::Scheduler;
-                            if self.reconcile_submission(
-                                &submission,
-                                &pending,
-                                receipt_tx.as_ref(),
-                            ) && resumes
-                            {
-                                paused = false;
-                            }
+                            self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
+                            // Explicit legacy compatibility path. New TUI paths
+                            // use generation/Turn-targeted cancellation below.
                             if let Some(token) = &cancel_token {
                                 token.cancel();
                             } else if !pending.is_empty() {
@@ -417,6 +404,18 @@ impl AppServerSession {
                                     self.emit_custody_error("failed to pause pending work", &error);
                                 }
                                 paused = true;
+                            }
+                        }
+                        SessionOp::InterruptTurn {
+                            session_generation,
+                            turn_id,
+                        } => {
+                            let matches = session_generation == self.session_generation
+                                && current_structured
+                                    .as_ref()
+                                    .is_some_and(|active| active.turn_id == turn_id);
+                            if matches && let Some(token) = &cancel_token {
+                                token.cancel();
                             }
                         }
                         SessionOp::SetSkillContext { name, content } => {
@@ -462,6 +461,77 @@ impl AppServerSession {
         }
     }
 
+    /// Finalizes journal rows left Running by a crash after transcript commit.
+    ///
+    /// A transcript-backed turn is committed idempotently without Provider
+    /// re-execution. Ambiguous Running rows remain frozen and visible.
+    fn reconcile_running_submissions(&self) {
+        let records = match self.pending_store.recover_running() {
+            Ok(records) => records,
+            Err(error) => {
+                self.emit_custody_error("failed to inspect running submissions", &error);
+                return;
+            }
+        };
+        for record in records {
+            let Some(turn_id) = record.turn_id.as_deref() else {
+                self.emit_custody_error(
+                    "running submission has no Turn identity",
+                    &record.submission.id,
+                );
+                continue;
+            };
+            match self.transcript_entry_ids_for_turn(turn_id) {
+                Ok(entry_ids) if !entry_ids.is_empty() => {
+                    if let Err(error) = self
+                        .pending_store
+                        .mark_committed(&record.submission.id, turn_id)
+                    {
+                        self.emit_custody_error(
+                            "failed to finalize transcript-backed running submission",
+                            &error,
+                        );
+                    }
+                }
+                Ok(_) => {
+                    let _ = self.eq_tx.send(SessionEvent::Error {
+                        message: format!(
+                            "submission {} remains frozen in Running state because transcript outcome for Turn {turn_id} is ambiguous",
+                            record.submission.id
+                        ),
+                    });
+                }
+                Err(error) => self.emit_custody_error(
+                    "failed to reconcile Running submission with transcript",
+                    &error,
+                ),
+            }
+        }
+    }
+
+    fn transcript_entry_ids_for_turn(&self, turn_id: &str) -> Result<Vec<String>, String> {
+        if let Some(persistence) = &self.durable_persistence {
+            return persistence
+                .session
+                .committed_turn_entry_ids(turn_id)
+                .map_err(|error| error.to_string());
+        }
+        if let Some(persistence) = &self.persistence {
+            return persistence
+                .session
+                .read_entries()
+                .map(|entries| {
+                    entries
+                        .into_iter()
+                        .filter(|entry| entry.metadata.turn_id.as_deref() == Some(turn_id))
+                        .map(|entry| entry.id)
+                        .collect()
+                })
+                .map_err(|error| error.to_string());
+        }
+        Ok(Vec::new())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn restore_pending_submissions(
         &self,
@@ -482,8 +552,7 @@ impl AppServerSession {
         };
         let paused = !records.is_empty();
         for record in records {
-            let mut submission = record.submission;
-            submission.sender_generation = self.session_generation;
+            let submission = record.submission;
             if let Err(reason) = validate_submission(&submission) {
                 let _ = self.eq_tx.send(SessionEvent::Error {
                     message: format!(
@@ -506,7 +575,7 @@ impl AppServerSession {
             for item in &submission.items {
                 record_recent_identity(recent_item_ids, item.id.clone(), MAX_RECENT_ITEM_IDS);
             }
-            pending.push_back(submission);
+            enqueue_by_source(pending, submission);
         }
         paused
     }
@@ -577,13 +646,10 @@ impl AppServerSession {
         });
     }
 
-    fn normalize_submission_generation(
+    fn validate_current_generation(
         &self,
-        submission: &mut StructuredSubmission,
+        submission: &StructuredSubmission,
     ) -> Result<(), SubmissionRejectionReason> {
-        if submission.source == SubmissionSource::Scheduler && submission.sender_generation == 0 {
-            submission.sender_generation = self.session_generation;
-        }
         if submission.sender_generation != self.session_generation {
             return Err(SubmissionRejectionReason::WrongGeneration);
         }
@@ -593,7 +659,7 @@ impl AppServerSession {
     #[allow(clippy::too_many_arguments)]
     fn accept_durable_submission(
         &self,
-        mut submission: StructuredSubmission,
+        submission: StructuredSubmission,
         pending: &mut VecDeque<StructuredSubmission>,
         pending_items: &mut usize,
         pending_bytes: &mut usize,
@@ -601,10 +667,9 @@ impl AppServerSession {
         pending_image_bytes: &mut u64,
         recent_submission_ids: &mut VecDeque<String>,
         recent_item_ids: &mut VecDeque<String>,
-        paused: bool,
         receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) -> bool {
-        if let Err(reason) = self.normalize_submission_generation(&mut submission) {
+        if let Err(reason) = self.validate_current_generation(&submission) {
             self.emit_admission_rejection(&submission, reason, receipt_tx);
             return false;
         }
@@ -618,22 +683,13 @@ impl AppServerSession {
             };
         match existing_disposition {
             SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id } => {
-                let disposition = SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id };
                 self.emit_submission_receipt(
                     &submission,
                     existing_receipt,
-                    disposition,
+                    SubmissionReceiptDisposition::AlreadyAccepted { state, turn_id },
                     receipt_tx,
                 );
-                self.reject_submission(
-                    &submission.id,
-                    submission.sender_generation,
-                    SubmissionRejectionReason::Duplicate,
-                );
-                return matches!(
-                    state,
-                    PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending
-                ) && pending.iter().any(|queued| queued.id == submission.id);
+                return false;
             }
             SubmissionReceiptDisposition::Rejected { reason } => {
                 self.emit_submission_receipt(
@@ -704,15 +760,9 @@ impl AppServerSession {
                 pending_image_bytes,
                 recent_submission_ids,
                 recent_item_ids,
-                paused,
             ),
-            SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
-                matches!(
-                    state,
-                    PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending
-                ) && pending.iter().any(|queued| queued.id == submission.id)
-            }
-            SubmissionReceiptDisposition::NotAccepted => false,
+            SubmissionReceiptDisposition::AlreadyAccepted { .. }
+            | SubmissionReceiptDisposition::NotAccepted => false,
             SubmissionReceiptDisposition::Rejected { reason } => {
                 self.reject_submission(&submission.id, submission.sender_generation, reason);
                 false
@@ -720,34 +770,21 @@ impl AppServerSession {
         }
     }
 
+    /// Reconciliation is observation only. It deliberately accepts an immutable
+    /// older-generation payload for lookup, but never resumes or creates work.
     fn reconcile_submission(
         &self,
         submission: &StructuredSubmission,
-        pending: &VecDeque<StructuredSubmission>,
         receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
-    ) -> bool {
-        let mut authoritative = submission.clone();
-        if let Err(reason) = self.normalize_submission_generation(&mut authoritative) {
-            self.emit_admission_rejection(&authoritative, reason, receipt_tx);
-            return false;
-        }
-        let (receipt_id, disposition) = match self.pending_store.reconcile(&authoritative) {
+    ) {
+        let (receipt_id, disposition) = match self.pending_store.reconcile(submission) {
             Ok(result) => result,
             Err(error) => {
-                self.emit_durability_rejection(&authoritative, &error, receipt_tx);
-                return false;
+                self.emit_durability_rejection(submission, &error, receipt_tx);
+                return;
             }
         };
-        let resume = matches!(
-            disposition,
-            SubmissionReceiptDisposition::AlreadyAccepted {
-                state: PendingSubmissionState::AcceptedPending
-                    | PendingSubmissionState::PausedPending,
-                ..
-            }
-        ) && pending.iter().any(|queued| queued.id == authoritative.id);
-        self.emit_submission_receipt(&authoritative, receipt_id, disposition, receipt_tx);
-        resume
+        self.emit_submission_receipt(submission, receipt_id, disposition, receipt_tx);
     }
 
     fn emit_admission_rejection(
@@ -786,11 +823,12 @@ impl AppServerSession {
         disposition: SubmissionReceiptDisposition,
         receipt_tx: Option<&mpsc::UnboundedSender<SubmissionReceipt>>,
     ) {
+        let reservation_id = format!("reservation:{}", submission.id);
         let receipt = SubmissionReceipt {
             session_id: self.session_id.clone(),
             session_generation: self.session_generation,
             submission_id: submission.id.clone(),
-            reservation_id: submission.id.clone(),
+            reservation_id,
             receipt_id,
             source: submission.source,
             item_count: submission.items.len(),
@@ -824,7 +862,6 @@ impl AppServerSession {
         pending_image_bytes: &mut u64,
         recent_submission_ids: &mut VecDeque<String>,
         recent_item_ids: &mut VecDeque<String>,
-        paused: bool,
     ) -> bool {
         if let Err(reason) = validate_submission(&submission) {
             self.reject_submission(&submission.id, submission.sender_generation, reason);
@@ -878,11 +915,7 @@ impl AppServerSession {
         *pending_bytes = next_bytes;
         *pending_images = next_images;
         *pending_image_bytes = next_image_bytes;
-        if paused && submission.source != SubmissionSource::Scheduler {
-            pending.push_front(submission);
-        } else {
-            pending.push_back(submission);
-        }
+        enqueue_by_source(pending, submission);
         true
     }
 
@@ -896,6 +929,36 @@ impl AppServerSession {
             session_id: self.session_id.clone(),
             submission_id: submission_id.to_owned(),
             sender_generation,
+            reason,
+        });
+    }
+
+    fn pause_before_start(
+        &self,
+        submission: &StructuredSubmission,
+        reason: SubmissionRejectionReason,
+    ) {
+        if submission.source == SubmissionSource::Compatibility {
+            self.reject_submission(&submission.id, submission.sender_generation, reason);
+            return;
+        }
+        if let Err(error) = self.pending_store.mark_paused(&submission.id) {
+            self.emit_custody_error("failed to pause accepted pre-start submission", &error);
+            return;
+        }
+        let receipt_id = match self.pending_store.get(&submission.id) {
+            Ok(Some(record)) => record.receipt_id,
+            Ok(None) => String::new(),
+            Err(error) => {
+                self.emit_custody_error("failed to reload paused pre-start submission", &error);
+                String::new()
+            }
+        };
+        let _ = self.eq_tx.send(SessionEvent::SubmissionPaused {
+            session_id: self.session_id.clone(),
+            session_generation: self.session_generation,
+            submission_id: submission.id.clone(),
+            receipt_id,
             reason,
         });
     }
@@ -936,9 +999,8 @@ impl AppServerSession {
             {
                 Ok(prepared) => Some(prepared),
                 Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
-                    self.reject_submission(
-                        &submission.id,
-                        submission.sender_generation,
+                    self.pause_before_start(
+                        &submission,
                         SubmissionRejectionReason::ContextBudgetExceeded,
                     );
                     return None;
@@ -950,9 +1012,8 @@ impl AppServerSession {
                             submission.id
                         ),
                     });
-                    self.reject_submission(
-                        &submission.id,
-                        submission.sender_generation,
+                    self.pause_before_start(
+                        &submission,
                         SubmissionRejectionReason::InvalidStructure,
                     );
                     return None;
@@ -967,10 +1028,9 @@ impl AppServerSession {
             let record = match self.pending_store.get(&submission.id) {
                 Ok(Some(record)) => record,
                 Ok(None) => {
-                    self.reject_submission(
+                    self.emit_custody_error(
+                        "accepted structured submission is missing from journal",
                         &submission.id,
-                        submission.sender_generation,
-                        SubmissionRejectionReason::DurabilityUnavailable,
                     );
                     return None;
                 }
@@ -1214,6 +1274,21 @@ fn compatibility_submission(
             attachments,
         }],
     }
+}
+
+fn enqueue_by_source(
+    pending: &mut VecDeque<StructuredSubmission>,
+    submission: StructuredSubmission,
+) {
+    if submission.source == SubmissionSource::Scheduler {
+        pending.push_back(submission);
+        return;
+    }
+    let scheduler_boundary = pending
+        .iter()
+        .position(|queued| queued.source == SubmissionSource::Scheduler)
+        .unwrap_or(pending.len());
+    pending.insert(scheduler_boundary, submission);
 }
 
 fn record_recent_identity(identities: &mut VecDeque<String>, id: String, capacity: usize) {
