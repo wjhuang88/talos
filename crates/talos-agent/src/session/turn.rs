@@ -191,12 +191,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let cloned_messages = new_messages.clone();
             if let Some(persistence) = &persistence
-                && let Err(message) = persist_turn_messages(
-                    persistence,
-                    &turn_id,
-                    &new_messages,
-                    &raw_tool_outputs,
-                )
+                && let Err(message) =
+                    persist_turn_messages(persistence, &turn_id, &new_messages, &raw_tool_outputs)
             {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
@@ -272,11 +268,6 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
         }
         Ok((Err(e), partial_messages)) => {
-            // SESSION-006 / I135: persist valid completed tool exchanges even
-            // when the agent turn fails. The partial_messages contain only
-            // normalized, complete exchanges — never half-streamed fragments
-            // or fabricated tool results. Durable Runtime (ADR-042) still
-            // aborts failed turns: no commit_turn call happens here.
             let mut error_message = e.to_string();
             if diagnostic_failure.is_some() {
                 error_message
