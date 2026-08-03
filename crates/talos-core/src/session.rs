@@ -92,6 +92,16 @@ pub enum SessionEvent {
         sender_generation: u64,
         turn_id: String,
     },
+    /// Authoritative model-visible projection emitted immediately before a
+    /// structured Turn starts. The Actor, not the receipt observer, defines
+    /// the visible ordering when retained work precedes a new resume item.
+    StructuredSubmissionStarted {
+        session_id: String,
+        session_generation: u64,
+        submission: StructuredSubmission,
+        receipt_id: String,
+        turn_id: String,
+    },
     SubmissionRejected {
         session_id: String,
         submission_id: String,
@@ -306,6 +316,7 @@ mod tests {
 
     #[test]
     fn session_event_serde_roundtrip() {
+        let submission = structured_submission();
         let events = vec![
             SessionEvent::SubmissionQueued {
                 session_id: "session_1".into(),
@@ -335,6 +346,13 @@ mod tests {
                     state: PendingSubmissionState::AcceptedPending,
                     turn_id: None,
                 },
+            },
+            SessionEvent::StructuredSubmissionStarted {
+                session_id: "session_1".into(),
+                session_generation: 7,
+                submission: submission.clone(),
+                receipt_id: "receipt_1".into(),
+                turn_id: "turn_1".into(),
             },
             SessionEvent::StructuredTurnEvent {
                 session_id: "session_1".into(),
