@@ -476,7 +476,7 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
 }
 
 #[tokio::test]
-async fn duplicate_submission_and_item_identity_execute_at_most_once() {
+async fn duplicate_submission_reconciles_and_executes_at_most_once() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
@@ -520,12 +520,16 @@ async fn duplicate_submission_and_item_identity_execute_at_most_once() {
     assert_eq!(captured.lock().unwrap().len(), 1);
     assert!(events.iter().any(|event| matches!(
         event,
-        SessionEvent::SubmissionRejected {
+        SessionEvent::SubmissionReceipt {
             submission_id,
-            sender_generation: 11,
-            reason: SubmissionRejectionReason::Duplicate,
+            disposition: SubmissionReceiptDisposition::AlreadyAccepted { .. },
             ..
         } if submission_id == "duplicate_batch"
+    )));
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionRejected { submission_id, .. }
+            if submission_id == "duplicate_batch"
     )));
 }
 
