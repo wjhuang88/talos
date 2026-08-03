@@ -21,7 +21,10 @@ fn sender_generation_registry() -> &'static Mutex<SenderGenerationRegistry> {
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn register_generation_bound_sender(sender: &mpsc::Sender<SessionOp>, generation: u64) {
+pub(crate) fn register_generation_bound_sender(
+    sender: &mpsc::Sender<SessionOp>,
+    generation: u64,
+) {
     let mut registry = sender_generation_registry()
         .lock()
         .expect("session sender generation registry poisoned");
