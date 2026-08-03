@@ -20,9 +20,9 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #134 |
-| Governance Claim PR | PR #133 |
-| Authorization Mode | Governance registration only |
-| Authorization Evidence | Maintainer Issue intake; no implementation authorization |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-03 |
 | Handoff / Release Condition | Refine the selection/mouse-capture contract, select an iteration and establish a claim before implementation. |
