@@ -91,19 +91,7 @@ impl AppServerSession {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
-        #[cfg(test)]
-        let handle_sq_tx = if tokio::runtime::Handle::try_current().is_ok() {
-            bind_unit_test_sender(sq_tx.clone(), 0)
-        } else {
-            sq_tx.clone()
-        };
-        #[cfg(not(test))]
-        let handle_sq_tx = sq_tx;
-
-        let handle = SessionHandle {
-            sq_tx: handle_sq_tx,
-            eq_rx,
-        };
+        let handle = SessionHandle { sq_tx, eq_rx };
         let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
@@ -556,9 +544,18 @@ impl AppServerSession {
                 return true;
             }
         };
-        let paused = !records.is_empty();
+        let mut paused = false;
         for record in records {
             let submission = record.submission;
+            if submission.sender_generation != self.session_generation {
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!(
+                        "pending submission {} belongs to Session generation {} and remains frozen; current generation is {}",
+                        submission.id, submission.sender_generation, self.session_generation
+                    ),
+                });
+                continue;
+            }
             if let Err(reason) = validate_submission(&submission) {
                 let _ = self.eq_tx.send(SessionEvent::Error {
                     message: format!(
@@ -568,6 +565,7 @@ impl AppServerSession {
                 });
                 continue;
             }
+            paused = true;
             let (images, image_bytes) = submission.image_totals();
             *pending_items = pending_items.saturating_add(submission.items.len());
             *pending_bytes = pending_bytes.saturating_add(submission.total_text_bytes());
@@ -830,7 +828,7 @@ impl AppServerSession {
         let reservation_id = format!("reservation:{}", submission.id);
         let receipt = SubmissionReceipt {
             session_id: self.session_id.clone(),
-            session_generation: self.session_generation,
+            session_generation: submission.sender_generation,
             submission_id: submission.id.clone(),
             reservation_id,
             receipt_id,
@@ -965,8 +963,6 @@ impl AppServerSession {
             receipt_id,
             reason,
         });
-        #[cfg(test)]
-        self.reject_submission(&submission.id, submission.sender_generation, reason);
     }
 
     async fn start_submission(
@@ -1259,34 +1255,6 @@ impl AppServerSession {
 
         Ok(())
     }
-}
-
-#[cfg(test)]
-fn bind_unit_test_sender(
-    target: mpsc::Sender<SessionOp>,
-    generation: u64,
-) -> mpsc::Sender<SessionOp> {
-    let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
-    tokio::spawn(async move {
-        while let Some(mut operation) = proxy_rx.recv().await {
-            match &mut operation {
-                SessionOp::SubmitStructured { submission }
-                | SessionOp::SubmitStructuredTracked { submission, .. } => {
-                    submission.sender_generation = generation;
-                }
-                SessionOp::InterruptTurn {
-                    session_generation, ..
-                } => {
-                    *session_generation = generation;
-                }
-                _ => {}
-            }
-            if target.send(operation).await.is_err() {
-                break;
-            }
-        }
-    });
-    proxy_tx
 }
 
 fn compatibility_submission(
