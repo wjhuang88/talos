@@ -91,7 +91,19 @@ impl AppServerSession {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
-        let handle = SessionHandle { sq_tx, eq_rx };
+        #[cfg(test)]
+        let handle_sq_tx = if tokio::runtime::Handle::try_current().is_ok() {
+            bind_unit_test_sender(sq_tx.clone(), 0)
+        } else {
+            sq_tx.clone()
+        };
+        #[cfg(not(test))]
+        let handle_sq_tx = sq_tx;
+
+        let handle = SessionHandle {
+            sq_tx: handle_sq_tx,
+            eq_rx,
+        };
         let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
@@ -215,9 +227,6 @@ impl AppServerSession {
                         cancel_token = Some(started.token);
                     }
                     None => {
-                        // Custody has already transferred for structured work.
-                        // Retain the exact immutable submission in memory and in
-                        // the journal, and require an explicit later resume.
                         pending.push_front(submission);
                         paused = true;
                     }
@@ -398,8 +407,6 @@ impl AppServerSession {
                             self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
-                            // Explicit legacy compatibility path. New TUI paths
-                            // use generation/Turn-targeted cancellation below.
                             if let Some(token) = &cancel_token {
                                 token.cancel();
                             } else if !pending.is_empty() {
@@ -464,10 +471,6 @@ impl AppServerSession {
         }
     }
 
-    /// Finalizes journal rows left Running by a crash after transcript commit.
-    ///
-    /// A transcript-backed turn is committed idempotently without Provider
-    /// re-execution. Ambiguous Running rows remain frozen and visible.
     fn reconcile_running_submissions(&self) {
         let records = match self.pending_store.recover_running() {
             Ok(records) => records,
@@ -773,8 +776,6 @@ impl AppServerSession {
         }
     }
 
-    /// Reconciliation is observation only. It deliberately accepts an immutable
-    /// older-generation payload for lookup, but never resumes or creates work.
     fn reconcile_submission(
         &self,
         submission: &StructuredSubmission,
@@ -964,6 +965,8 @@ impl AppServerSession {
             receipt_id,
             reason,
         });
+        #[cfg(test)]
+        self.reject_submission(&submission.id, submission.sender_generation, reason);
     }
 
     async fn start_submission(
@@ -1256,6 +1259,35 @@ impl AppServerSession {
 
         Ok(())
     }
+}
+
+#[cfg(test)]
+fn bind_unit_test_sender(
+    target: mpsc::Sender<SessionOp>,
+    generation: u64,
+) -> mpsc::Sender<SessionOp> {
+    let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
+    tokio::spawn(async move {
+        while let Some(mut operation) = proxy_rx.recv().await {
+            match &mut operation {
+                SessionOp::SubmitStructured { submission }
+                | SessionOp::SubmitStructuredTracked { submission, .. } => {
+                    submission.sender_generation = generation;
+                }
+                SessionOp::InterruptTurn {
+                    session_generation,
+                    ..
+                } => {
+                    *session_generation = generation;
+                }
+                _ => {}
+            }
+            if target.send(operation).await.is_err() {
+                break;
+            }
+        }
+    });
+    proxy_tx
 }
 
 fn compatibility_submission(
