@@ -1,12 +1,12 @@
 use talos_conversation::ConversationEngine;
 use talos_core::session::SubmissionKind;
 
-fn prepare(engine: &mut ConversationEngine, text: &str) -> talos_core::session::StructuredSubmission {
-    let (accepted, _) = engine.enqueue_structured_steering(
-        text.to_owned(),
-        SubmissionKind::UserTurn,
-        Vec::new(),
-    );
+fn prepare(
+    engine: &mut ConversationEngine,
+    text: &str,
+) -> talos_core::session::StructuredSubmission {
+    let (accepted, _) =
+        engine.enqueue_structured_steering(text.to_owned(), SubmissionKind::UserTurn, Vec::new());
     assert!(accepted);
     engine
         .prepare_steering_submission()
@@ -29,7 +29,10 @@ fn engine_rebuild_does_not_reuse_item_or_batch_identity() {
 
     assert_ne!(first_submission.id, second_submission.id);
     assert_ne!(first_submission.items[0].id, second_submission.items[0].id);
-    assert_eq!(first_submission.items[0].text, second_submission.items[0].text);
+    assert_eq!(
+        first_submission.items[0].text,
+        second_submission.items[0].text
+    );
 }
 
 #[test]
