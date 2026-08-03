@@ -654,9 +654,10 @@ mod tests {
         loop_handle.await.unwrap();
     }
 
-    // FS03 / RUNTIME-002: prove the visible diagnostic signals (error Tip + Error stream) are
-    // forwarded by the conversation loop on terminal failure, and that the normal success path
-    // (EndTurn) remains unchanged after the MaxTokens clearing fix.
+    // FS03 / RUNTIME-002 FS01 surface #3: prove the conversation loop forwards a terminal
+    // `UiOutput::Status { is_processing: false }` after provider/tool errors,
+    // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
+    // (`AgentEvent` -> `run_conversation_loop` -> `UiOutput`) rather than the engine in isolation.
 
     #[tokio::test]
     async fn conversation_loop_emits_visible_error_signals_on_terminal_failure() {
@@ -844,16 +845,7 @@ mod tests {
         std::fs::create_dir_all(&skill_dir).unwrap();
         std::fs::write(
             skill_dir.join("SKILL.md"),
-            "---\
-name: review\
-description: Review code\
-triggers:\
-  - review\
----\
-\
-# Review\
-Check safety.\
-",
+            "---\nname: review\ndescription: Review code\ntriggers:\n  - review\n---\n\n# Review\nCheck safety.\n",
         )
         .unwrap();
 
@@ -2323,6 +2315,8 @@ mod steering_snapshot_tests {
             },
         ));
 
+        // /attach with a path that WOULD exist — the rejection must happen
+        // before any filesystem probe, so we never create the file.
         user_tx
             .send(UserInput::Message(
                 "/attach /tmp/this-file-must-not-be-read.png".to_string(),
@@ -2432,8 +2426,8 @@ mod steering_snapshot_tests {
         loop_handle.abort();
 
         let error_text = received
-            .expect("must receive an error block within timeout")
-            .expect("error channel must not close");
+            .expect("must receive a system or error block within timeout")
+            .expect("ui channel must not close");
         assert!(
             error_text.contains("does not support image input"),
             "error must mention capability rejection, got: {error_text}"
