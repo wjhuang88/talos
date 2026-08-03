@@ -1,0 +1,41 @@
+name: I169 Test Fixture Fix Apply
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Apply and validate test fixture fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/i169-test-fixture-fix.patch
+          git apply .github/i169-test-fixture-fix.patch
+          rm -f .github/i169-test-fixture-fix.patch
+          rm -f .github/workflows/i169-test-fixture-fix.yml
+          cargo fmt --all
+          git diff --check
+      - name: Commit test fixture fix
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(i169): deduplicate structured receipt fixtures [model:GPT-5.6]"
+          git push origin "HEAD:${HEAD_REF}"
