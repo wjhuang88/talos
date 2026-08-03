@@ -569,6 +569,39 @@ async fn handle_session_event(
                 }
             }
         }
+        SessionEvent::SubmissionPaused {
+            session_id,
+            session_generation,
+            submission_id,
+            receipt_id,
+            reason,
+        } => {
+            let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
+            match state {
+                BridgeTurnState::AcceptedByActor {
+                    session_id: expected_session,
+                    session_generation: expected_generation,
+                    submission_id: expected_submission,
+                    receipt_id: expected_receipt,
+                    ..
+                } if expected_session == session_id
+                    && expected_generation == session_generation
+                    && expected_submission == submission_id
+                    && expected_receipt == receipt_id =>
+                {
+                    *turn_state = BridgeTurnState::PausedAfterFailure;
+                    emit_bridge_error(
+                        ui_tx,
+                        &format!(
+                            "accepted submission was paused before Provider start ({reason:?}); durable custody was retained"
+                        ),
+                    );
+                }
+                other => {
+                    *turn_state = other;
+                }
+            }
+        }
         SessionEvent::SubmissionQueued { .. } | SessionEvent::SubmissionStarted { .. } => {
             // Compatibility projections only. Durable SubmissionReceipt and
             // StructuredTurnEvent own transfer and lifecycle authority.
@@ -584,7 +617,7 @@ async fn handle_session_event(
 fn handle_submission_receipt(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
-    sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
+    _sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     session_id: String,
     session_generation: u64,
@@ -611,7 +644,7 @@ fn handle_submission_receipt(
     };
 
     let metadata_matches = submission.id == submission_id
-        && submission.id == reservation_id
+        && reservation_id == format!("reservation:{}", submission.id)
         && submission.sender_generation == session_generation
         && sender_generation == session_generation
         && source == submission.source
@@ -666,9 +699,6 @@ fn handle_submission_receipt(
                 receipt_id,
                 cancel_requested,
             };
-            if cancel_requested {
-                send_interrupt(sq_tx_watch, ui_tx);
-            }
         }
         SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
             if !commit_actor_custody(engine, ui_tx, &submission) {
@@ -761,17 +791,34 @@ fn handle_structured_turn_event(
                     let _ = ui_tx.send(output);
                 }
                 if cancel_requested {
-                    send_interrupt(sq_tx_watch, ui_tx);
-                    *turn_state = BridgeTurnState::StructuredCancelling {
-                        session_id,
+                    if send_targeted_interrupt(
+                        sq_tx_watch,
                         session_generation,
-                        submission_id,
-                        receipt_id,
-                        turn_id,
-                        next_structured_sequence: 1,
-                        next_legacy_sequence: 1,
-                        progress_mode: ProgressMode::Unknown,
-                    };
+                        &turn_id,
+                        ui_tx,
+                    ) {
+                        *turn_state = BridgeTurnState::StructuredCancelling {
+                            session_id,
+                            session_generation,
+                            submission_id,
+                            receipt_id,
+                            turn_id,
+                            next_structured_sequence: 1,
+                            next_legacy_sequence: 1,
+                            progress_mode: ProgressMode::Unknown,
+                        };
+                    } else {
+                        *turn_state = BridgeTurnState::StructuredRunning {
+                            session_id,
+                            session_generation,
+                            submission_id,
+                            receipt_id,
+                            turn_id,
+                            next_structured_sequence: 1,
+                            next_legacy_sequence: 1,
+                            progress_mode: ProgressMode::Unknown,
+                        };
+                    }
                 } else {
                     *turn_state = BridgeTurnState::StructuredRunning {
                         session_id,
@@ -1291,9 +1338,6 @@ fn request_cancel(
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
-    if !send_interrupt(sq_tx_watch, ui_tx) {
-        return;
-    }
     match turn_state {
         BridgeTurnState::Submitting {
             cancel_requested, ..
@@ -1301,6 +1345,8 @@ fn request_cancel(
         | BridgeTurnState::AcceptedByActor {
             cancel_requested, ..
         } => {
+            // No Turn identity exists yet. Remember intent and send the exact
+            // targeted interrupt only after a matching Structured Started event.
             *cancel_requested = true;
         }
         BridgeTurnState::StructuredRunning {
@@ -1313,6 +1359,14 @@ fn request_cancel(
             next_legacy_sequence,
             progress_mode,
         } => {
+            if !send_targeted_interrupt(
+                sq_tx_watch,
+                *session_generation,
+                turn_id,
+                ui_tx,
+            ) {
+                return;
+            }
             *turn_state = BridgeTurnState::StructuredCancelling {
                 session_id: session_id.clone(),
                 session_generation: *session_generation,
@@ -1329,6 +1383,9 @@ fn request_cancel(
             turn_id,
             next_sequence,
         } => {
+            if !send_legacy_interrupt(sq_tx_watch, ui_tx) {
+                return;
+            }
             *turn_state = BridgeTurnState::LegacyCancelling {
                 session_id: session_id.clone(),
                 turn_id: turn_id.clone(),
@@ -1339,7 +1396,32 @@ fn request_cancel(
     }
 }
 
-fn send_interrupt(
+fn send_targeted_interrupt(
+    sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
+    session_generation: u64,
+    turn_id: &str,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+) -> bool {
+    match sq_tx_watch
+        .borrow()
+        .clone()
+        .try_send(SessionOp::InterruptTurn {
+            session_generation,
+            turn_id: turn_id.to_owned(),
+        })
+    {
+        Ok(()) => true,
+        Err(_) => {
+            emit_bridge_error(
+                ui_tx,
+                "session command channel is busy; targeted cancel was not accepted",
+            );
+            false
+        }
+    }
+}
+
+fn send_legacy_interrupt(
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) -> bool {
