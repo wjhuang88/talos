@@ -157,7 +157,7 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
 }
 
 #[tokio::test]
-async fn current_user_and_actor_bound_scheduler_use_authoritative_generation() {
+async fn user_and_scheduler_require_the_exact_authoritative_generation() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
@@ -193,13 +193,39 @@ async fn current_user_and_actor_bound_scheduler_use_authoritative_generation() {
     assert!(user_receipt.disposition.has_durable_custody());
     wait_for_committed(&store, "current_generation_batch", &calls, 1).await;
 
+    for (id, generation) in [("scheduler_zero", 0), ("scheduler_old", 8)] {
+        let (stale_tx, mut stale_rx) = mpsc::unbounded_channel();
+        sq_tx
+            .send(SessionOp::SubmitStructuredTracked {
+                submission: submission(
+                    id,
+                    &format!("{id}_item"),
+                    generation,
+                    SubmissionSource::Scheduler,
+                ),
+                receipt_tx: Some(stale_tx),
+            })
+            .await
+            .unwrap();
+        let stale = receipt(&mut stale_rx).await;
+        assert_eq!(stale.session_generation, 9);
+        assert!(matches!(
+            stale.disposition,
+            SubmissionReceiptDisposition::Rejected {
+                reason: SubmissionRejectionReason::WrongGeneration,
+            }
+        ));
+        assert!(store.get(id).unwrap().is_none());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
     let (scheduler_tx, mut scheduler_rx) = mpsc::unbounded_channel();
     sq_tx
         .send(SessionOp::SubmitStructuredTracked {
             submission: submission(
                 "scheduler_generation_batch",
                 "scheduler_generation_item",
-                0,
+                9,
                 SubmissionSource::Scheduler,
             ),
             receipt_tx: Some(scheduler_tx),
