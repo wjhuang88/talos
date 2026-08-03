@@ -1416,16 +1416,14 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor
-        .set_persistence(
-            session.clone(),
-            SessionMetadata {
-                provider: Some("mock".into()),
-                model: Some("mock-model".into()),
-                ..SessionMetadata::default()
-            },
-        )
-        .unwrap();
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("mock-model".into()),
+            ..SessionMetadata::default()
+        },
+    );
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -1610,16 +1608,14 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor
-        .set_persistence(
-            session.clone(),
-            SessionMetadata {
-                provider: Some("mock".into()),
-                model: Some("test".into()),
-                ..SessionMetadata::default()
-            },
-        )
-        .unwrap();
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
 
     let sq_tx = handle.sq_tx;
     let eq_rx = handle.eq_rx;
@@ -1706,16 +1702,14 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    actor
-        .set_persistence(
-            session.clone(),
-            SessionMetadata {
-                provider: Some("mock".into()),
-                model: Some("test".into()),
-                ..SessionMetadata::default()
-            },
-        )
-        .unwrap();
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
     actor.set_durable_persistence(durable, PersistencePolicy::default());
 
     let sq_tx = handle.sq_tx;
@@ -1786,16 +1780,14 @@ async fn fixture_persistence_failure_is_observable_in_error() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor
-        .set_persistence(
-            session.clone(),
-            SessionMetadata {
-                provider: Some("mock".into()),
-                model: Some("test".into()),
-                ..SessionMetadata::default()
-            },
-        )
-        .unwrap();
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
 
     let sq_tx = handle.sq_tx;
     let eq_rx = handle.eq_rx;
@@ -1851,16 +1843,14 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor
-        .set_persistence(
-            session.clone(),
-            SessionMetadata {
-                provider: Some("mock".into()),
-                model: Some("test".into()),
-                ..SessionMetadata::default()
-            },
-        )
-        .unwrap();
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
     actor.set_durable_persistence(durable, PersistencePolicy::default());
 
     let sq_tx = handle.sq_tx;
