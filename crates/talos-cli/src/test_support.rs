@@ -10,5 +10,7 @@
 //! module's tests that also mutate `HOME` under their own private lock.
 //! All `HOME`-mutating tests in this crate must lock this shared mutex.
 
-#[cfg(test)]
+#[path = "i169_bridge_integration_tests.rs"]
+mod i169_bridge_integration_tests;
+
 pub(crate) static HOME_ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
