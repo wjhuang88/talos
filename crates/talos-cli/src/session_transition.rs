@@ -21,10 +21,7 @@ fn sender_generation_registry() -> &'static Mutex<SenderGenerationRegistry> {
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-pub(crate) fn register_generation_bound_sender(
-    sender: &mpsc::Sender<SessionOp>,
-    generation: u64,
-) {
+pub(crate) fn register_generation_bound_sender(sender: &mpsc::Sender<SessionOp>, generation: u64) {
     let mut registry = sender_generation_registry()
         .lock()
         .expect("session sender generation registry poisoned");
@@ -40,9 +37,7 @@ pub(crate) fn register_generation_bound_sender(
 /// The registry stores weak Sender references, so observing a route never keeps
 /// a retired Actor command channel alive. Production senders are registered
 /// before they are published through the lifecycle watch boundary.
-pub(crate) fn authoritative_generation_for_sender(
-    sender: &mpsc::Sender<SessionOp>,
-) -> Option<u64> {
+pub(crate) fn authoritative_generation_for_sender(sender: &mpsc::Sender<SessionOp>) -> Option<u64> {
     let mut registry = sender_generation_registry()
         .lock()
         .expect("session sender generation registry poisoned");
