@@ -18,7 +18,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
-      - name: Apply, format, and validate reviewed remediation
+      - name: Apply and diagnose reviewed remediation
         shell: bash
         run: |
           set -euo pipefail
@@ -33,10 +33,12 @@ jobs:
           git diff --check
           echo '=== patched AppServerSession methods ==='
           sed -n '120,180p' crates/talos-agent/src/session.rs
-          echo '=== talos-agent package source ==='
-          cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; d=json.load(sys.stdin); print([p["manifest_path"] for p in d["packages"] if p["name"]=="talos-agent"])'
-          cargo check -p talos-agent --locked
-          cargo check -p talos-cli --locked
+          echo '=== talos-agent dependency graph ==='
+          cargo tree -p talos-cli -e features | grep -A4 -B4 talos-agent || true
+          cargo metadata --format-version 1 | python3 -c 'import json,sys; d=json.load(sys.stdin); ps={p["id"]:p for p in d["packages"]}; cli=next(p for p in d["packages"] if p["name"]=="talos-cli"); node=next(n for n in d["resolve"]["nodes"] if n["id"]==cli["id"]); print([(dep["name"], dep["pkg"], ps[dep["pkg"]]["manifest_path"]) for dep in node["deps"] if dep["name"]=="talos_agent"])'
+          echo '=== force clean dependency build ==='
+          cargo clean -p talos-agent
+          cargo check -vv -p talos-cli --locked
           cargo check --workspace --locked
           cargo test -p talos-session runtime_generation_survives_store_reopen_and_advances_atomically --locked
           cargo test -p talos-session explicit_prestart_cancel_terminalizes_custody_and_preserves_identity --locked
