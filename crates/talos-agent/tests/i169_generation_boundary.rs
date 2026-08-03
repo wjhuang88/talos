@@ -141,7 +141,10 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
         .unwrap();
 
     let rejected = receipt(&mut receipt_rx).await;
-    assert_eq!(rejected.session_generation, 5);
+    assert_eq!(
+        rejected.session_generation, 4,
+        "a rejection receipt must echo the addressed stale generation"
+    );
     assert!(matches!(
         rejected.disposition,
         SubmissionReceiptDisposition::Rejected {
@@ -208,7 +211,10 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
             .await
             .unwrap();
         let stale = receipt(&mut stale_rx).await;
-        assert_eq!(stale.session_generation, 9);
+        assert_eq!(
+            stale.session_generation, generation,
+            "a rejection receipt must remain correlated to its addressed generation"
+        );
         assert!(matches!(
             stale.disposition,
             SubmissionReceiptDisposition::Rejected {
