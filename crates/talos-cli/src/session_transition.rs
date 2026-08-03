@@ -63,9 +63,11 @@ pub(crate) fn authoritative_generation_for_sender(
 ///
 /// A target owns both the Actor SQ and the authoritative generation. Consumers
 /// receive a normal bounded sender created by [`Self::bind_sender`]; that proxy
-/// seals every new structured submission and targeted interrupt to this exact
-/// target before forwarding it. An old proxy therefore remains bound to the
-/// old Actor and can never be adopted by a later lifecycle (ADR-056).
+/// seals each new structured submission to this exact target before forwarding
+/// it. Targeted interrupts retain the caller's generation so the Actor can
+/// reject delayed commands instead of having the proxy rewrite their intent.
+/// An old proxy remains bound to the old Actor and can never be adopted by a
+/// later lifecycle (ADR-056).
 #[derive(Clone)]
 struct SessionCommandTarget {
     sq_tx: mpsc::Sender<SessionOp>,
@@ -82,7 +84,8 @@ impl SessionCommandTarget {
     ///
     /// Reconciliation retains the original immutable generation because it is
     /// observational and may query an older accepted identity. New submissions
-    /// and targeted interrupts are always sealed to this target.
+    /// are sealed to this target; targeted interrupts remain immutable and are
+    /// validated by the Actor against both generation and Turn ID.
     #[must_use]
     fn bind_sender(&self) -> mpsc::Sender<SessionOp> {
         let (proxy_tx, mut proxy_rx) = mpsc::channel(512);
@@ -105,11 +108,6 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredTracked { submission, .. } => {
                 submission.sender_generation = self.generation;
             }
-            SessionOp::InterruptTurn {
-                session_generation, ..
-            } => {
-                *session_generation = self.generation;
-            }
             SessionOp::Submit { .. }
             | SessionOp::SubmitMultimodal { .. }
             | SessionOp::PreviewRequest { .. }
@@ -118,6 +116,7 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredReconcile { .. }
             | SessionOp::SubmitStructuredReconcileTracked { .. }
             | SessionOp::SetSkillContext { .. }
+            | SessionOp::InterruptTurn { .. }
             | SessionOp::Interrupt
             | SessionOp::Shutdown => {}
         }
@@ -228,5 +227,22 @@ mod tests {
         watch_rx.changed().await.unwrap();
         let current = watch_rx.borrow().clone();
         assert_eq!(authoritative_generation_for_sender(&current), Some(2));
+    }
+
+    #[test]
+    fn targeted_interrupt_generation_is_not_rewritten_by_proxy_binding() {
+        let (sender, _receiver) = mpsc::channel(1);
+        let target = SessionCommandTarget::new(sender, 2);
+        let operation = target.bind_operation(SessionOp::InterruptTurn {
+            session_generation: 1,
+            turn_id: "old-turn".into(),
+        });
+        assert!(matches!(
+            operation,
+            SessionOp::InterruptTurn {
+                session_generation: 1,
+                turn_id,
+            } if turn_id == "old-turn"
+        ));
     }
 }
