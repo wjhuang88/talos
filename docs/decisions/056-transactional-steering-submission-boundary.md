@@ -3,10 +3,10 @@
 ## Status
 
 Proposed for TUI-044/I169. Preactivation architecture hardening was recorded on 2026-08-02 from
-`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`. I169 is now Active in Draft PR #131 under
-maintainer implementation authorization and remains in remediation and repeat independent review.
+`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`. I169 is Active in PR #131 and has reached a
+fresh independent-review handoff after remediation under maintainer implementation authorization.
 This lifecycle update does not accept ADR-056, complete I169/TUI-044, close Issue #119 or authorize
-PR #131 to become Ready or merge.
+merge; Ready-for-review is only a handoff state and is not approval.
 
 The I170 prerequisite completed through PR #126. This decision recovers the reviewed constraints
 preserved by archival Draft PR #120, but neither the historical implementation nor this Proposed

@@ -11,7 +11,7 @@
 - No open Issue is closed by this reconciliation: none has a Complete owner that also matches the remaining remote scope.
 - Deferred, Refinement, Ready, Partial, and Blocked remain open states; “registered” does not mean “scheduled”.
 - Recovered Issue #119 is assigned to TUI-044 because current main already assigns TUI-041 to Issue #69.
-- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite; TUI-044/I169 is Active in Draft PR #131 and Issue #119 remains open.
+- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite; TUI-044/I169 is Active in PR #131 review handoff and Issue #119 remains open.
 - Intake Issues #124, #125 and #134 are registered as unclaimed Refinement owners MODEL-011, TUI-045 and TUI-046; this reconciliation does not authorize implementation.
 - Issue #132 is assigned to PROVIDER-003 as an architecture/decomposition Epic. Its bounded child identities are recorded, but no child is claimed, selected, or authorized.
 - REL-001 and DATA-001 historical owner drift is corrected to Complete; they are not currently open GitHub Issues.

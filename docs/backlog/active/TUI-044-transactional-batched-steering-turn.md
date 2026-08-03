@@ -5,7 +5,7 @@
 | Story ID | TUI-044 |
 | Type | TUI / Runtime State Story |
 | Priority | P1 |
-| Status | Active — Draft PR #131 |
+| Status | Active — PR #131 review handoff |
 | Source | [GitHub Issue #119](https://github.com/wjhuang88/talos/issues/119) |
 | Selected Iteration | I169 |
 | Depends On | TUI-026/I145; ADR-005; ADR-006; ADR-039; ADR-042; ADR-049; Proposed ADR-056; completed I170 baseline |
@@ -28,7 +28,7 @@
 | Authorization Evidence | The repository owner explicitly instructed “正式激活并实施 I169” on 2026-08-02. PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae` before this fresh implementation branch and PR were created. |
 | Implementation Baseline | `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae` |
 | Implementation Branch | `feat/i169-tui-044-transactional-steering` |
-| Last Updated | 2026-08-02 |
+| Last Updated | 2026-08-04 |
 | Handoff / Release Condition | No release claim until PR #131 is merged, ADR-056 is reviewed, exact-head validation and rebuilt real-TUI acceptance pass, and completion evidence is recorded. |
 
 Recovery PR #120 and `recovery/pr-68-i169-20260731` remain immutable historical evidence and are not
@@ -146,7 +146,7 @@ attachment clearing, delimiter batch APIs and separately rebuilt estimates are r
 - Story scope/acceptance: this file.
 - Execution/evidence: `docs/iterations/I169-batched-steering-turn.md`.
 - Decision: `docs/decisions/056-transactional-steering-submission-boundary.md`.
-- Remote synchronization: Issue #119 and Draft PR #131.
+- Remote synchronization: Issue #119 and PR #131 review handoff.
 - Historical evidence only: Draft PR #120.
 - Derived view: `docs/BOARD.md`.
 

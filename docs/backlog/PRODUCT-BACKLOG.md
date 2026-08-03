@@ -15,7 +15,7 @@ That snapshot is historical evidence, not current activation authority.
 | 0 | Internal validation service | Validation must become an internal callable, language-neutral service; governance must not depend on shell scripts and project adapters must be detected before guidance is injected. | `docs/backlog/active/VALIDATION-001-internal-validation-service.md`; `docs/backlog/active/GOV-003-builtin-project-governance.md`; `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md` |
 | 0 | Permission pipeline convergence | PERM-006 remains Refinement. Select and review A→E children sequentially; no child may broaden PERM-004/PERM-005 policy implicitly. | `docs/backlog/active/PERM-006-permission-pipeline-convergence.md`; PERM-006-A/B/C/D/E |
 | 0 | Memory admission safety | MEM-010 is Ready but unselected. A bounded correction iteration must prove only user-authored episodes enter new global memory. | `docs/backlog/active/MEM-010-user-origin-memory-admission.md`; Issue #114 |
-| 1 | TUI-044 transactional batched steering | **Active in Draft PR #131.** Implement only on `feat/i169-tui-044-transactional-steering` synchronized with current `main`. ADR-056 remains Proposed; recovery PR #120 remains immutable. | `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`; `docs/iterations/I169-batched-steering-turn.md`; `docs/decisions/056-transactional-steering-submission-boundary.md`; Issue #119; PR #131 |
+| 1 | TUI-044 transactional batched steering | **Active in PR #131 review handoff.** Implement only on `feat/i169-tui-044-transactional-steering` synchronized with current `main`. ADR-056 remains Proposed; recovery PR #120 remains immutable. | `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`; `docs/iterations/I169-batched-steering-turn.md`; `docs/decisions/056-transactional-steering-submission-boundary.md`; Issue #119; PR #131 |
 | 1 | TUI regression intake | TUI-043 is Ready; TUI-041, TUI-042, TUI-045 and TUI-046 remain Refinement and require bounded layout/state-transition or terminal-interaction evidence before selection. | `docs/backlog/active/TUI-041-thinking-preview-wrap-and-height.md`; `docs/backlog/active/TUI-042-noop-history-scroll-stability.md`; `docs/backlog/active/TUI-043-tool-placeholder-suppression.md`; `docs/backlog/active/TUI-045-permission-prompt-layout-anchor.md`; `docs/backlog/active/TUI-046-native-text-selection-copy.md` |
 | 1 | Runtime session and protocol foundations | SESSION-009 and RUNTIME-005 remain Refinement; ACP-001 remains Blocked until session attachment, controller ownership and shutdown/finalization boundaries are accepted. | `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/ACP-001-agent-client-protocol-server.md` |
 | 1 | Memory scope architecture | MEM-011 remains Refinement. Accept schema/migration and legacy-fixture decisions before implementation. | `docs/backlog/active/MEM-011-extensible-memory-scopes.md`; Issue #116 |
@@ -46,7 +46,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
-| TUI-044 / I169 | Active — Draft PR #131 | Remain Active until structured transaction/journal/lifecycle/request/replay implementation, exact-head CI, rebuilt real-TUI evidence and independent ADR-056 review reach Review. |
+| TUI-044 / I169 | Active — PR #131 review handoff | Remain Active until structured transaction/journal/lifecycle/request/replay implementation, exact-head CI, rebuilt real-TUI evidence and independent ADR-056 review reach Review. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |
@@ -103,8 +103,8 @@ When an Issue-backed owner transitions to Active, Review, Complete, Blocked or C
 the remote Issue with the causing PR/commit and one-line disposition. Close an Issue only when its
 owner is Complete/Cancelled and no separately owned residual remains.
 
-Issue #119 remains open and Active in Draft PR #131. Completion still requires the complete I169
-acceptance matrix, ADR-056 review, exact-head CI, rebuilt real-TUI evidence and a merge-ready PR.
+Issue #119 remains open and Active in PR #131 review handoff. Completion still requires fresh
+independent acceptance, maintainer merge authorization, merge evidence and recorded lifecycle closeout.
 Issue #132 remains open under the PROVIDER-003 Refinement Epic; no child implementation is authorized
 until PROVIDER-003-A and a separately claimed child owner establish the required boundary.
 Issue #134 remains open under TUI-046 Refinement; terminal interaction policy, ADR-054 impact,

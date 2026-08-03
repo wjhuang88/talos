@@ -1,6 +1,6 @@
 # Iteration I169: Transactional Batched Steering Turn
 
-> Document status: Active — Draft PR #131
+> Document status: Active — PR #131 review handoff
 > Published plan date: 2026-08-01
 > Preactivation hardening date: 2026-08-02
 > Activation date: 2026-08-02
@@ -25,7 +25,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The repository owner explicitly instructed “正式激活并实施 I169”; preactivation architecture PR #129 passed exact-head platform/governance gates and merged before this fresh branch and Draft implementation PR were created. |
 | Implementation PR | #131 |
-| Last Updated | 2026-08-02 |
+| Last Updated | 2026-08-04 |
 | Handoff / Release Condition | Remain Active until the exact PR #131 Head passes the complete Issue #119/ADR-056 matrix and independent review moves the work to Review; no release or completion claim before merge and recorded Completion Commit. |
 
 The effective Story claim is also recorded in
@@ -35,7 +35,7 @@ remain immutable.
 The maintainer explicitly instructed “正式激活并实施 I169” on 2026-08-02. Preactivation architecture
 PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-
 reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`. I169 was activated
-on a fresh branch from that exact commit and is implemented in Draft PR #131.
+on a fresh branch from that exact commit and is implemented in PR #131 at review handoff.
 
 ## Published Baseline
 
@@ -191,7 +191,7 @@ Proposed contract merely to match historical PR #120.
 - ADR-039/042/049 only where the accepted implementation actually extends their boundary.
 - Board, Product Backlog, iteration index and governance manifest.
 - README/user documentation only after behavior exists.
-- Issue #119 and Draft PR #131 synchronization.
+- Issue #119 and PR #131 review-handoff synchronization.
 
 ## Risks And Rollback
 
@@ -219,6 +219,7 @@ Proposed contract merely to match historical PR #120.
 | 2026-08-02 | Formal activation | Maintainer explicitly authorized implementation; no overlap was found; fresh branch created from exact `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; Draft PR #131 opened. |
 | 2026-08-02 | Slice 1 | Added structured submission identities/bounds and a versioned session-scoped pending journal with durable receipts, idempotent reopen, conflict rejection, pause/recovery and terminal tombstones. |
 | 2026-08-02 | Review baseline port | Copied the preserved Review code for Engine/Actor/Bridge/Agent files into the fresh PR branch as a separately identifiable starting snapshot; recovery refs remain unchanged and the snapshot is not completion evidence. |
+| 2026-08-04 | Review handoff | Remediation code and regression evidence passed CI #967 at `8cd00fe311fcb349488f3fea69e03f406fc2631e`; governance lifecycle is synchronized for a fresh exact-head CI and independent review. ADR-056 remains Proposed and no merge/completion is authorized. |
 | 2026-08-03 | Independent-review remediation | PR #131 returned to Draft. Remediation defines explicit pre-start cancellation, ordinary-Session terminal-outcome recovery, generation-bound scheduler delivery, durable runtime-generation reconstruction, UUID Engine identities and fixed-seed interleaving evidence. Exact-head CI and repeat independent acceptance remain pending. |
 
 ## Verification Evidence
@@ -228,9 +229,10 @@ Proposed contract merely to match historical PR #120.
   `30713776456` before merge `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`.
 - Fixture PR #130 exact Head `fe87c4265bafd1be67e20e635c176eefe08ac6cc` passed CI
   `30713367293` before merge `57d99596b3882162d0d5b06ace42fb5faed95b3e`.
-- Activation branch and Draft PR #131 are bound to the exact architecture merge baseline.
-- Product implementation and behavior evidence remain incomplete; current PR #131 Head must become
-  green before any Review claim.
+- Activation branch and PR #131 remain bound to the exact architecture merge baseline.
+- Independent-review remediation and regression evidence are implemented. The implementation tree at
+  `8cd00fe311fcb349488f3fea69e03f406fc2631e` passed CI #967; this lifecycle synchronization requires
+  a new exact-head CI before fresh independent review.
 
 ## Completion Evidence
 

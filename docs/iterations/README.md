@@ -30,7 +30,7 @@ That snapshot is historical evidence and not current activation authority.
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I169 | Transactional Batched Steering Turn | Active — Draft PR #131 (2026-08-02) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require complete transaction/journal/lifecycle/request/replay evidence, exact-head CI and rebuilt real-TUI acceptance before Review. |
+| I169 | Transactional Batched Steering Turn | Active — PR #131 review handoff (2026-08-04) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require complete transaction/journal/lifecycle/request/replay evidence, exact-head CI and rebuilt real-TUI acceptance before Review. |
 | I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
