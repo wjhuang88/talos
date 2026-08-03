@@ -1,8 +1,8 @@
 diff --git a/crates/talos-cli/src/tui_bridge.rs b/crates/talos-cli/src/tui_bridge.rs
-index 4d90137..a058d7d 100644
+index 2542397..a058d7d 100644
 --- a/crates/talos-cli/src/tui_bridge.rs
 +++ b/crates/talos-cli/src/tui_bridge.rs
-@@ -665,13 +707,29 @@ async fn handle_session_event(
+@@ -707,13 +707,29 @@ async fn handle_session_event(
                      session_generation: expected_generation,
                      submission_id: expected_submission,
                      receipt_id: expected_receipt,
@@ -35,7 +35,7 @@ index 4d90137..a058d7d 100644
                      emit_bridge_error(
                          ui_tx,
                          &format!(
-@@ -775,7 +833,7 @@ fn handle_submission_receipt(
+@@ -817,7 +833,7 @@ fn handle_submission_receipt(
                  return;
              }
              if !commit_actor_custody(engine, ui_tx, &submission) {
@@ -44,7 +44,7 @@ index 4d90137..a058d7d 100644
                  return;
              }
              *turn_state = BridgeTurnState::AcceptedByActor {
-@@ -790,10 +848,10 @@ fn handle_submission_receipt(
+@@ -832,10 +848,10 @@ fn handle_submission_receipt(
          }
          SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
              if !commit_actor_custody(engine, ui_tx, &submission) {
@@ -57,7 +57,7 @@ index 4d90137..a058d7d 100644
              emit_bridge_error(
                  ui_tx,
                  &format!(
-@@ -803,7 +861,7 @@ fn handle_submission_receipt(
+@@ -845,7 +861,7 @@ fn handle_submission_receipt(
          }
          SubmissionReceiptDisposition::NotAccepted => {
              engine.rollback_prepared_steering(&submission_id);
@@ -66,7 +66,7 @@ index 4d90137..a058d7d 100644
              emit_bridge_error(
                  ui_tx,
                  "the session authoritatively reported that the queued submission was not accepted; input was retained",
-@@ -811,7 +869,7 @@ fn handle_submission_receipt(
+@@ -853,7 +869,7 @@ fn handle_submission_receipt(
          }
          SubmissionReceiptDisposition::Rejected { reason } => {
              engine.rollback_prepared_steering(&submission_id);
@@ -75,7 +75,7 @@ index 4d90137..a058d7d 100644
              emit_bridge_error(
                  ui_tx,
                  &format!(
-@@ -865,7 +923,10 @@ fn handle_structured_submission_started(
+@@ -907,7 +923,10 @@ fn handle_structured_submission_started(
      turn_id: String,
  ) {
      if submission.sender_generation != session_generation
@@ -87,7 +87,7 @@ index 4d90137..a058d7d 100644
          || submission.validate().is_err()
          || receipt_id.is_empty()
          || turn_id.is_empty()
-@@ -874,6 +935,22 @@ fn handle_structured_submission_started(
+@@ -916,6 +935,22 @@ fn handle_structured_submission_started(
          return;
      }
  
@@ -110,7 +110,7 @@ index 4d90137..a058d7d 100644
      let BridgeTurnState::AcceptedByActor {
          session_id: expected_session,
          session_generation: expected_generation,
-@@ -1188,7 +1265,7 @@ fn handle_structured_turn_event(
+@@ -1230,7 +1265,7 @@ fn handle_structured_turn_event(
                  )
              } else {
                  deferred_accepted.take();
@@ -119,7 +119,7 @@ index 4d90137..a058d7d 100644
              };
              let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                  engine.steering_queue_snapshot(),
-@@ -1329,7 +1406,7 @@ fn handle_legacy_turn_event(
+@@ -1371,7 +1406,7 @@ fn handle_legacy_turn_event(
                      *turn_state = if success {
                          BridgeTurnState::Idle
                      } else {
@@ -128,7 +128,7 @@ index 4d90137..a058d7d 100644
                      };
                      let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                          engine.steering_queue_snapshot(),
-@@ -1573,6 +1650,24 @@ fn request_cancel(
+@@ -1615,6 +1650,24 @@ fn request_cancel(
              // targeted interrupt only after a matching Structured Started event.
              *cancel_requested = true;
          }
@@ -153,7 +153,7 @@ index 4d90137..a058d7d 100644
          BridgeTurnState::StructuredRunning {
              session_id,
              session_generation,
-@@ -1707,7 +1802,7 @@ async fn dispatch_prepared_submission(
+@@ -1749,7 +1802,7 @@ async fn dispatch_prepared_submission(
      };
      if !sent {
          engine.rollback_prepared_steering(&submission_id);
