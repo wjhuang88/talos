@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use talos_agent::session::AppServerSession;
 use talos_agent::Agent;
+use talos_agent::session::AppServerSession;
 use talos_conversation::{
     ContentOutput, ConversationEngine, MessageSource, ModelInfo, SteeringQueueSnapshot, UiOutput,
     UserInput,
@@ -21,7 +21,7 @@ use talos_session::{PendingSubmissionStore, PersistencePolicy, SessionManager};
 use tokio::sync::mpsc;
 
 use crate::session_transition::register_generation_bound_sender;
-use crate::tui_bridge::{run_conversation_loop, ConversationLoopIo, SessionLifecycleRequest};
+use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
 
 struct CountingModel {
     calls: Arc<AtomicUsize>,
@@ -113,7 +113,10 @@ async fn wait_for_order(order: &Arc<Mutex<Vec<String>>>, expected: &[&str]) {
             if actual.len() >= expected.len() {
                 assert_eq!(
                     &actual[..expected.len()],
-                    &expected.iter().map(|value| (*value).to_string()).collect::<Vec<_>>()
+                    &expected
+                        .iter()
+                        .map(|value| (*value).to_string())
+                        .collect::<Vec<_>>()
                 );
                 break;
             }
@@ -263,7 +266,9 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
         },
     ));
 
-    user_tx.send(UserInput::Message("generation two".into())).unwrap();
+    user_tx
+        .send(UserInput::Message("generation two".into()))
+        .unwrap();
     let operation = tokio::time::timeout(Duration::from_secs(5), receiver_two.recv())
         .await
         .expect("G2 dispatch timeout")
