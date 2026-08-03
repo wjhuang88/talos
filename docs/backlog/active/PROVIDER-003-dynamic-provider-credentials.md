@@ -1,28 +1,52 @@
 # PROVIDER-003: Dynamic Provider Authentication And Credentials
 
-Type: Product/API Story
-Parent Epic: None (coordinates with MC-001 / I085)
-Status: Refinement
-Source Issue: #132
+| Field | Value |
+|---|---|
+| Story ID | PROVIDER-003 |
+| Type | Architecture / Provider Authentication Epic |
+| Priority | P2 |
+| Status | Refinement — child Stories are defined but unclaimed and unscheduled |
+| Source | [GitHub Issue #132](https://github.com/wjhuang88/talos/issues/132) |
+| Selected Iteration | None |
+| Depends On | ADR-013; ADR-023; ADR-057 / TOOL-023; I085 provider setup; sealed provider-request boundary |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | #132 |
+| Governance Claim PR | PR #133 |
+| Authorization Mode | Governance registration and decomposition only |
+| Authorization Evidence | Maintainer requested Issue intake; no implementation authorization |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-03 |
+| Handoff / Release Condition | Materialize and independently select one bounded child Story before product-code work. |
 
 ## Identity / Goal / Value
 
 Talos provider authentication is currently coupled to static `api_key` / `api_key_env` values.
-That excludes providers whose request authority is obtained or refreshed dynamically, including:
+That excludes providers whose request authority is obtained, refreshed, or calculated dynamically,
+including:
 
 - GitHub Copilot OAuth device flow followed by provider-token exchange;
 - AWS Bedrock request signing with SigV4;
-- GCP/Vertex bearer tokens obtained from Application Default Credentials or a bounded command;
+- GCP/Vertex bearer tokens obtained from Application Default Credentials;
 - corporate gateways using short-lived or externally acquired tokens;
 - bearer-token sessions that must refresh before expiry or after an authentication failure.
 
-Issue #132 is the remote intake for this broader capability. This owner document is the single
-planning authority for that Issue; the proposal in the Issue is input, not an accepted schema or
-implementation contract.
+Issue #132 is the remote intake for this broader program. PROVIDER-003 is the architecture and
+decomposition Epic, not one testable implementation Story. The proposal in the Issue is input,
+not an accepted schema, trait design, provider contract, or implementation authorization.
 
-Goal: Talos can obtain the current authorization material required by a configured provider,
-apply it at the provider request boundary, refresh it safely, and never expose secrets through
-configuration, logs, diagnostics, Debug output, transcript data, or UI projections.
+Goal: define and deliver bounded authentication capabilities so Talos can obtain the current
+authorization material required by a configured provider, apply it at the final provider-request
+boundary, refresh it safely, and never expose secrets through configuration, logs, diagnostics,
+Debug output, transcript data, or UI projections.
 
 The initial researched example remains GitHub Copilot. The models.dev catalog lists a
 `github-copilot` provider with 25 models (verified 2026-07-03 against the live api.json), so this is
@@ -54,46 +78,47 @@ that decision.
 
 - AWS SigV4 signs the complete request, so it cannot be modeled as a static header value detached
   from method, URI, headers, payload hash, region, service, credentials, and signing time.
-- GCP bearer tokens may come from Application Default Credentials or an external command, but the
-  acquisition mechanism, timeout, cache lifetime, stderr handling, and process permissions must
-  be explicit and bounded.
+- GCP bearer tokens may come from Application Default Credentials, with explicit acquisition,
+  timeout, cache-lifetime, cancellation, and error-redaction behavior.
 - A generic command-token mechanism is code execution and credential handling, not merely config
   parsing. It requires the normal permission, timeout, environment-scrubbing, and secret-redaction
   boundaries.
 - Refresh-on-401 must be bounded and idempotent; it must not create an unbounded retry loop or
   replay a non-replayable request body without a sealed request policy.
 
-## Scope
+## Bounded Child Story Decomposition
 
-This Story owns the architecture and staged delivery plan for dynamic provider authentication:
+These identities reserve separate review, claim, rollback, iteration, and completion boundaries.
+They are not implementation authorization. Before a child becomes Ready or Active, create its own
+owner document with acceptance tests, collaboration claim, exact dependencies, and selected
+iteration.
 
-1. **Authentication contract and configuration schema**
-   - distinguish static API keys, bearer-token acquisition, OAuth device flow, and request-signing
-     mechanisms without embedding provider-specific behavior in generic config parsing;
-   - preserve backward compatibility for existing static-key providers;
-   - define capability discovery and fail-closed behavior for unsupported combinations.
-2. **Credential resolver lifecycle**
-   - current credential acquisition, expiry, refresh, invalidation, and bounded 401 recovery;
-   - single-flight refresh so concurrent requests do not stampede or overwrite newer credentials;
-   - explicit cancellation, timeout, and shutdown behavior.
-3. **Provider request-boundary integration**
-   - attach bearer/header authorization only after request construction is sealed;
-   - allow signing mechanisms such as SigV4 to cover the complete final request;
-   - keep authentication state out of transcript and model-visible content.
-4. **Credential storage and redaction**
-   - define which refresh material is durable, where it is stored, and which material must remain
-     process-local;
-   - mask every secret-bearing display and diagnostic path under ADR-023 discipline;
-   - prevent secrets from `Debug`, errors, tracing fields, snapshots, fixtures, and sample config.
-5. **Interactive and headless acquisition surfaces**
-   - coordinate `/connect`, `talos auth`, and provider setup rather than creating competing flows;
-   - distinguish interactive device flow from headless environment/credential-chain resolution.
-6. **Provider-specific implementation slices**
-   - Copilot OAuth/token exchange;
-   - AWS Bedrock SigV4;
-   - GCP/Vertex token resolution;
-   - bounded external command token acquisition;
-   - generic bearer refresh only where the ADR proves a stable cross-provider contract.
+| Child Story | Bounded outcome | Depends On | Explicit non-goal |
+|---|---|---|---|
+| PROVIDER-003-A | Authentication capability ADR, threat model, compatibility rules, and accepted decomposition. | ADR-013; ADR-023; provider request architecture research | No provider product code or credential persistence. |
+| PROVIDER-003-B | Credential resolver lifecycle: acquisition result, expiry, single-flight refresh, invalidation, shutdown, storage boundary, and redaction. | PROVIDER-003-A | No provider-specific OAuth, ADC, SigV4, or command execution. |
+| PROVIDER-003-C | Final-request authorization contract and bounded authentication-failure replay policy, including non-replayable bodies. | PROVIDER-003-A; sealed request-plan/request boundary; PROVIDER-003-B for bearer refresh | No provider-specific acquisition flow. |
+| PROVIDER-003-D | GitHub Copilot device flow, OAuth-token exchange, interactive setup, and provider-specific headers. | PROVIDER-003-A/B/C; I085 setup UX; approved OAuth client-id policy | No AWS, GCP, or generic command-token behavior. |
+| PROVIDER-003-E | AWS Bedrock credential-chain resolution and SigV4 signing of the exact final request. | PROVIDER-003-A/C; accepted signing/time/clock-skew rules | No bearer-token or OAuth abstraction claim. |
+| PROVIDER-003-F | GCP/Vertex Application Default Credentials and bounded bearer-token resolution. | PROVIDER-003-A/B/C | No arbitrary external command execution. |
+| PROVIDER-003-G | Bounded external command-token acquisition with permission, timeout, environment, stderr, cancellation, and redaction policy. | PROVIDER-003-A/B/C; TOOL-023; ADR-057; permission review | No implicit shell, unbounded process, or generic provider signing. |
+
+Dependency order is not a mandate to implement every child. PROVIDER-003-A must be accepted first.
+After that, select only one independently reviewable child at a time; provider-specific children
+must not silently broaden the shared contracts owned by A/B/C.
+
+## Epic Scope
+
+This Epic owns only program-level architecture and decomposition:
+
+1. authentication capability taxonomy and backward-compatible configuration boundary;
+2. shared credential lifecycle, storage, refresh, cancellation, and redaction questions;
+3. final-request mutation/signing and bounded replay questions;
+4. interactive versus headless acquisition boundaries;
+5. child ownership, dependency order, and residual placement;
+6. conformance requirements across provider-specific implementations.
+
+Implementation behavior belongs to the selected child Story, not directly to PROVIDER-003.
 
 ## Exclusions At Refinement Stage
 
@@ -104,22 +129,25 @@ This Story owns the architecture and staged delivery plan for dynamic provider a
 - No unbounded command execution, token-refresh loop, or retry-on-401 loop.
 - No claim that one generic header callback is sufficient for request-signing providers.
 - No implementation inside I169 / PR #131; this synchronization is governance-only.
+- No child may be claimed, activated, or marked complete through this Epic document alone.
 
 ## Dependencies
 
-- A new ADR is required before implementation. ADR-013 limits current provider openness to the
-  schema/config boundary, and ADR-023 covers the existing inline static-key boundary.
-- I085 `/connect` provider setup is the natural UX carrier; this Story must not fork a competing
-  setup experience.
-- TOOL-023 / ADR-057 constraints apply to any external command-token process.
+- PROVIDER-003-A requires a new ADR before any implementation. ADR-013 limits current provider
+  openness to the schema/config boundary, and ADR-023 covers the existing inline static-key
+  boundary.
+- I085 `/connect` provider setup is the natural UX carrier; provider-specific children must not
+  fork a competing setup experience.
+- TOOL-023 / ADR-057 constraints apply to external command-token acquisition.
 - Permission and secret-handling reviews are mandatory before enabling command execution or
   durable refresh material.
-- Provider request sealing and retry semantics must be understood before 401-triggered replay.
+- Provider request sealing and retry semantics must be accepted before 401-triggered replay or
+  SigV4 integration.
 
 ## Decision Links And Constraints
 
-- ADR-013 (provider config schema boundary): new executable auth mechanisms require a separate
-  accepted decision.
+- ADR-013 (provider config schema boundary): executable authentication mechanisms require a
+  separate accepted decision.
 - ADR-023 (inline API-key boundary): masking and storage behavior remain mandatory, but dynamic
   refresh material may need a stricter successor decision.
 - ADR-057 / TOOL-023: external command acquisition inherits bounded process, environment, and
@@ -129,7 +157,7 @@ This Story owns the architecture and staged delivery plan for dynamic provider a
 
 ## Uncertainty And Validation Path
 
-Before selecting an implementation iteration:
+Before selecting an implementation child:
 
 - verify each provider flow against primary documentation and a controlled live or protocol-level
   fixture;
@@ -139,20 +167,21 @@ Before selecting an implementation iteration:
 - decide durable storage boundaries and migration behavior;
 - perform threat modeling for token theft, command injection, environment leakage, clock skew,
   stale refresh overwrites, and diagnostic disclosure;
-- split provider-specific implementation into independently reviewable iterations.
+- materialize the selected child owner document and choose a bounded iteration.
 
 ## State / Status Owners
 
+- Epic scope, decomposition, and status: this file.
 - Backlog row: `docs/backlog/PRODUCT-BACKLOG.md`.
 - Remote intake: GitHub Issue #132.
-- This file owns Story scope and state.
+- Child implementation status: the future child owner document, never this Epic by implication.
 
 ## User-Facing Documentation
 
-When implementation is selected:
+When a child implementation is selected:
 
-- README provider configuration documents supported authentication mechanisms without exposing
-  credentials;
+- README provider configuration documents only supported authentication mechanisms and never
+  exposes credentials;
 - `docs/reference/config.reference.toml` documents only accepted schema;
 - setup/auth commands document interactive versus headless behavior and recovery paths.
 
@@ -166,20 +195,20 @@ When implementation is selected:
 - `crates/talos-config/src/types.rs`
 - `crates/talos-config/src/credentials.rs`
 - provider request construction and retry paths in `talos-provider` / `talos-agent`
-- primary GitHub, AWS, and GCP authentication documentation during ADR research
+- primary GitHub, AWS, and GCP authentication documentation during ADR and child research
 
-## Acceptance For Architecture And Governance
+## Acceptance For Epic Governance
 
-- [ ] Accepted ADR defines capability boundaries, schema compatibility, storage, refresh,
-      cancellation, retries, redaction, and provider-specific signing requirements.
-- [ ] Threat model covers token disclosure, command execution, stale refresh races, clock skew,
-      retry loops, request replay, and shutdown.
-- [ ] Issue #132 is decomposed into bounded implementation slices with explicit dependencies.
-- [ ] No implementation begins until one slice has an iteration, exact base, owner, validation
-      matrix, and maintainer activation.
+- [ ] PROVIDER-003-A owner document and ADR/threat-model review are accepted before product code.
+- [ ] Every selected child has its own owner, collaboration claim, iteration, exact base, validation
+      matrix, and residual destination.
+- [ ] Shared capability changes occur only in A/B/C and are not smuggled through a provider-specific
+      child.
+- [ ] Issue #132 remains open while any selected child or separately owned residual remains.
 
-## Acceptance For Future Behavior
+## Acceptance For Epic Completion
 
+- Selected children are Complete with provider-specific and cross-provider conformance evidence.
 - Existing static-key providers remain backward compatible.
 - Dynamic credentials are acquired and refreshed without exposing secret material.
 - Concurrent requests share bounded refresh ownership and cannot replace newer credentials with a
@@ -187,5 +216,10 @@ When implementation is selected:
 - Authentication failures produce bounded, redacted diagnostics and do not cause unbounded replay.
 - SigV4 or equivalent signing covers the exact request that is sent.
 - Interactive and headless flows fail closed when required acquisition capability is unavailable.
-- Workspace tests cover cache/refresh races, masking, cancellation, shutdown, malformed responses,
-  provider rejection, clock boundaries, and retry exhaustion.
+- Unselected provider mechanisms remain Refinement rather than being implied complete.
+
+## Residual Destination
+
+Partial implementation remains owned by the corresponding child Story. New provider mechanisms,
+credential stores, OS keychain support, browser automation, or broader request-replay semantics
+require separate owners or an explicit update to the decomposition before implementation.
