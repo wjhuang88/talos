@@ -221,7 +221,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     &turn_id,
                     &new_messages,
                     &raw_tool_outputs,
-                    true,
+                    false,
                 )
             {
                 let completion = TurnCompletionStatus::Error { message };
