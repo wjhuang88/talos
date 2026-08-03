@@ -8,16 +8,14 @@ use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, 
 use sha2::{Digest, Sha256};
 use talos_core::submission::{
     MAX_PENDING_SUBMISSION_BYTES, MAX_PENDING_SUBMISSIONS, MAX_STEERING_QUEUE_IMAGE_BYTES,
-    MAX_STEERING_QUEUE_IMAGES, PendingSubmissionState, StructuredSubmission,
+    MAX_STEERING_QUEUE_IMAGES, PendingSubmissionState, StructuredSubmission, SubmissionKind,
     SubmissionReceiptDisposition, SubmissionRejectionReason,
 };
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::turn_outcome::decode_turn_transcript_outcome;
-use crate::{
-    CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTranscriptOutcome,
-};
+use crate::{CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTranscriptOutcome};
 
 const SCHEMA_VERSION: i64 = 1;
 const MAX_TOMBSTONES: usize = MAX_PENDING_SUBMISSIONS * 2;
@@ -271,12 +269,29 @@ impl PendingSubmissionStore {
     /// Success becomes Committed. Error and Cancelled markers are mapped to
     /// their matching terminal states even when the caller is the legacy
     /// startup path named `mark_committed`. A real transcript file with no
-    /// marker is ambiguous and remains Running.
+    /// marker is ambiguous and remains Running. Preview requests are the only
+    /// transcript-free successful structured kind and are validated from the
+    /// immutable journal payload before taking that compatibility path.
     pub fn mark_committed(
         &self,
         submission_id: &str,
         turn_id: &str,
     ) -> Result<(), PendingSubmissionError> {
+        let preview = self.get(submission_id)?.is_some_and(|record| {
+            record.submission.common_kind() == Some(SubmissionKind::PreviewRequest)
+        });
+        if preview {
+            return self.transition(
+                submission_id,
+                PendingSubmissionState::Committed,
+                Some(turn_id),
+                &[
+                    PendingSubmissionState::Running,
+                    PendingSubmissionState::Committed,
+                ],
+            );
+        }
+
         let outcome = self.transcript_outcome_for_turn(turn_id)?;
         match outcome {
             Some(TurnTranscriptOutcome::Success) => self.transition(
