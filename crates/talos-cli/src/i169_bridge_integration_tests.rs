@@ -127,6 +127,44 @@ async fn wait_for_order(order: &Arc<Mutex<Vec<String>>>, expected: &[&str]) {
     .expect("Provider order timeout");
 }
 
+async fn wait_for_visible_user_order(
+    ui_rx: &mut mpsc::UnboundedReceiver<UiOutput>,
+    expected: &[&str],
+) -> Vec<String> {
+    let mut visible = Vec::new();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while visible.len() < expected.len() {
+            match ui_rx.recv().await {
+                Some(UiOutput::Content(ContentOutput::Block {
+                    source: MessageSource::User,
+                    text,
+                })) => {
+                    let expected_next = expected[visible.len()];
+                    assert!(
+                        text.contains(expected_next),
+                        "visible user projection was out of order: expected {expected_next:?}, got {text:?}"
+                    );
+                    visible.push(expected_next.to_string());
+                }
+                Some(UiOutput::Content(ContentOutput::Block {
+                    source: MessageSource::Error,
+                    text,
+                })) if text.contains("ignored stale structured turn start")
+                    || text.contains("ignored stale or out-of-order structured completion")
+                    || text.contains("ignored uncorrelated structured submission projection") =>
+                {
+                    panic!("retained lifecycle was discarded: {text}");
+                }
+                Some(_) => {}
+                None => panic!("Bridge UI channel closed before visible FIFO projection"),
+            }
+        }
+    })
+    .await
+    .expect("visible user order timeout");
+    visible
+}
+
 #[tokio::test]
 async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budget() {
     let temp = tempfile::tempdir().unwrap();
@@ -411,24 +449,8 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
 
     user_tx.send(UserInput::Message("NEXT".into())).unwrap();
     wait_for_order(&order, &["U1", "U2", "R", "NEXT"]).await;
-
-    let mut stale_error = None;
-    while let Ok(output) = ui_rx.try_recv() {
-        if let UiOutput::Content(ContentOutput::Block {
-            source: MessageSource::Error,
-            text,
-        }) = output
-            && (text.contains("ignored stale structured turn start")
-                || text.contains("ignored stale or out-of-order structured completion"))
-        {
-            stale_error = Some(text);
-            break;
-        }
-    }
-    assert!(
-        stale_error.is_none(),
-        "retained lifecycle must be adopted instead of discarded: {stale_error:?}"
-    );
+    let visible = wait_for_visible_user_order(&mut ui_rx, &["U1", "U2", "R", "NEXT"]).await;
+    assert_eq!(visible, vec!["U1", "U2", "R", "NEXT"]);
 
     user_tx.send(UserInput::Exit).unwrap();
     bridge_task.await.unwrap();
