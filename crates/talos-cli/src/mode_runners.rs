@@ -343,7 +343,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),
     );
-    let transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())?;
+    let transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
+        .map_err(anyhow::Error::msg)?;
     let session_generation = transition_owner.active_generation();
     actor.set_generation(session_generation);
     let _sched_join = sched_pending.spawn(
