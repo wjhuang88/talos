@@ -3,6 +3,7 @@
 Type: Product/API Story
 Parent Epic: None (coordinates with MC-001 / I085)
 Status: Refinement
+Source Issue: #132
 
 ## Identity / Goal / Value
 
