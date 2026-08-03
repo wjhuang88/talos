@@ -58,8 +58,7 @@ impl SessionCommandTarget {
                 submission.sender_generation = self.generation;
             }
             SessionOp::InterruptTurn {
-                session_generation,
-                ..
+                session_generation, ..
             } => {
                 *session_generation = self.generation;
             }
@@ -77,10 +76,7 @@ impl SessionCommandTarget {
         operation
     }
 
-    fn try_send(
-        &self,
-        operation: SessionOp,
-    ) -> Result<(), mpsc::error::TrySendError<SessionOp>> {
+    fn try_send(&self, operation: SessionOp) -> Result<(), mpsc::error::TrySendError<SessionOp>> {
         self.sq_tx.try_send(operation)
     }
 }
