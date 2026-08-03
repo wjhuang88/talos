@@ -25,12 +25,13 @@ jobs:
 
       - name: Verify exact protected parent
         shell: bash
-        run: test "$(git rev-parse HEAD^)" = "bbce801ed160801610b4cfc8344e6fadf6ab3c80"
+        run: test "$(git rev-parse HEAD^)" = "692717843b714ea7cb31ac10b6bfc9c162799656"
 
-      - name: Execute corrected staged remediation
+      - name: Execute corrected staged remediation with exact failure capture
         shell: bash
         run: |
-          python3 - <<'PYRUN'
+          set +e
+          python3 - <<'PYRUN' > /tmp/i169-remediation.log 2>&1
           from pathlib import Path
           import textwrap
 
@@ -66,14 +67,28 @@ jobs:
               raise SystemExit(f'unexpected RPC constructor count after patch: {mode_text.count(rpc_old)}')
           mode_path.write_text(mode_text.replace(rpc_old, rpc_new))
           PYRUN
+          status=$?
+          set -e
+          cat /tmp/i169-remediation.log
+          if [[ ${status} -ne 0 ]]; then
+            git reset --hard HEAD
+            cp /tmp/i169-remediation.log .github/i169-remediation-failure.log
+            git config user.name "talos-remediation-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git add .github/i169-remediation-failure.log
+            git commit -m "chore(i169): record remediation failure"
+            git push origin HEAD:feat/i169-tui-044-transactional-steering
+            exit ${status}
+          fi
 
       - name: Restore persistent CI and remove all temporary assets
         shell: bash
         run: |
-          git checkout HEAD^^^^^ -- .github/workflows/ci.yml
+          git show f8b165eba311ec1de26e01d1940a942e0a48d57c:.github/workflows/ci.yml > .github/workflows/ci.yml
           rm .github/workflows/i169-generation-handoff-remediation.yml
           rm .github/workflows/i169-generation-handoff-launcher.yml
           rm .github/i169-remediation-trigger
+          rm -f .github/i169-remediation-failure.log
           cargo fmt --all
           git diff --check
           test -n "$(git status --short)"
