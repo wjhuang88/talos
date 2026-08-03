@@ -157,6 +157,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
         AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
+    actor.set_generation(1);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
@@ -192,7 +193,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
 }
 
 #[tokio::test]
-async fn paused_submission_recovers_only_after_reconcile_and_commits_once() {
+async fn paused_reconcile_is_observational_until_explicit_user_resume() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
@@ -209,6 +210,7 @@ async fn paused_submission_recovers_only_after_reconcile_and_commits_once() {
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
         AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
+    actor.set_generation(2);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
@@ -236,28 +238,67 @@ async fn paused_submission_recovers_only_after_reconcile_and_commits_once() {
         }
     );
 
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "observational reconciliation must not resume paused work"
+    );
+    assert_eq!(
+        store.get(&work.id).unwrap().unwrap().state,
+        PendingSubmissionState::PausedPending
+    );
+
+    let resume = submission(
+        "resume_batch",
+        "resume_item",
+        2,
+        "explicitly resume retained work",
+    );
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: resume.clone(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        wait_for_receipt(&mut eq_rx, &resume.id).await,
+        SubmissionReceiptDisposition::AcceptedPending
+    );
+
     wait_for_success(&mut eq_rx, &work.id).await;
+    wait_for_success(&mut eq_rx, &resume.id).await;
     wait_for_state(&store, &work.id, PendingSubmissionState::Committed).await;
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    wait_for_state(&store, &resume.id, PendingSubmissionState::Committed).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 
     let reopened = manager
         .create_or_open_session("i169-paused-recovery")
         .unwrap();
     let messages = reopened.read_messages().unwrap();
-    assert!(
-        messages.iter().any(|message| {
-            matches!(message, Message::User { content } if content == "recover me once")
-        }),
-        "successful recovered turn must be present in the durable transcript"
+    let user_messages = messages
+        .iter()
+        .filter_map(|message| match message {
+            Message::User { content } => Some(content.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        user_messages,
+        vec!["recover me once", "explicitly resume retained work"],
+        "older retained user work must run before the explicit resuming item"
     );
-    assert!(
-        messages.iter().any(|message| {
-            matches!(message, Message::Assistant { content, .. } if content == "done")
-        }),
-        "successful recovered assistant output must be present in the durable transcript"
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| {
+                matches!(message, Message::Assistant { content, .. } if content == "done")
+            })
+            .count(),
+        2
     );
 
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
