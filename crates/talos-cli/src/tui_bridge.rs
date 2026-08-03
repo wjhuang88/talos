@@ -1068,9 +1068,10 @@ fn handle_structured_turn_event(
             }
             let success = matches!(status, TurnCompletionStatus::Success { .. });
             *turn_state = if success {
-                deferred_accepted
-                    .take()
-                    .map_or(BridgeTurnState::Idle, DeferredAcceptedSubmission::into_turn_state)
+                deferred_accepted.take().map_or(
+                    BridgeTurnState::Idle,
+                    DeferredAcceptedSubmission::into_turn_state,
+                )
             } else {
                 deferred_accepted.take();
                 BridgeTurnState::PausedAfterFailure
