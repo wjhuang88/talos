@@ -1051,6 +1051,13 @@ impl AppServerSession {
                 session_generation: self.session_generation,
                 turn_id: turn_id.clone(),
             };
+            let _ = self.eq_tx.send(SessionEvent::StructuredSubmissionStarted {
+                session_id: self.session_id.clone(),
+                session_generation: active.session_generation,
+                submission: submission.clone(),
+                receipt_id: active.receipt_id.clone(),
+                turn_id: active.turn_id.clone(),
+            });
             let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
                 session_id: self.session_id.clone(),
                 session_generation: active.session_generation,
