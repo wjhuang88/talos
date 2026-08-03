@@ -1,8 +1,7 @@
-use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
+
+use uuid::Uuid;
 
 use talos_core::message::{AgentEvent, ContentPart, MessageToolResult, StopReason, Usage};
 use talos_core::session::{
@@ -23,25 +22,8 @@ use crate::types::{
     ToolResultDisplay, TurnPhase, UiOutput,
 };
 
-static NEXT_STEERING_NAMESPACE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
-
 fn next_steering_identity_namespace() -> String {
-    let instance_sequence = NEXT_STEERING_NAMESPACE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let timestamp_nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_nanos());
-    let mut hasher = RandomState::new().build_hasher();
-    hasher.write_u32(std::process::id());
-    hasher.write_u64(instance_sequence);
-    hasher.write_u128(timestamp_nanos);
-    let nonce = hasher.finish();
-    format!(
-        "{:x}-{:x}-{:x}-{:x}",
-        std::process::id(),
-        timestamp_nanos,
-        instance_sequence,
-        nonce
-    )
+    Uuid::new_v4().to_string()
 }
 
 fn is_timeout_error(message: &str) -> bool {

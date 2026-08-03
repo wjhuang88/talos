@@ -179,40 +179,45 @@ fn runtime_generation_survives_store_reopen_and_advances_atomically() {
     let session_file = dir.path().join("session.tlog");
     let store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
     assert_eq!(store.runtime_generation().unwrap(), 0);
-    assert_eq!(store.advance_runtime_generation().unwrap(), 1);
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
     drop(store);
 
     let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
     assert_eq!(reopened.runtime_generation().unwrap(), 1);
-    assert_eq!(reopened.advance_runtime_generation().unwrap(), 2);
-    assert_eq!(reopened.runtime_generation().unwrap(), 2);
+    assert!(matches!(
+        reopened.advance_runtime_generation(0),
+        Err(PendingSubmissionError::GenerationConflict {
+            expected: 0,
+            actual: 1,
+        })
+    ));
+    assert_eq!(reopened.advance_runtime_generation(1).unwrap(), 2);
 }
 
 #[test]
-fn explicit_prestart_cancel_terminalizes_custody_and_preserves_identity() {
+fn prestart_cancel_terminalizes_identity_without_provider_turn() {
     let dir = tempfile::tempdir().unwrap();
     let store =
         PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
     let payload = submission();
-    let (receipt, accepted) = store.accept(&payload).unwrap();
+    let (receipt_id, accepted) = store.accept(&payload).unwrap();
     assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
     store.mark_paused(&payload.id).unwrap();
-    store
-        .cancel_unstarted(&payload.id, "prestart-cancel:batch-1")
-        .unwrap();
+    store.cancel_unstarted(&payload.id).unwrap();
 
     let record = store.get(&payload.id).unwrap().unwrap();
+    assert_eq!(record.receipt_id, receipt_id);
     assert_eq!(record.state, PendingSubmissionState::TerminalCancelled);
-    assert_eq!(record.turn_id.as_deref(), Some("prestart-cancel:batch-1"));
+    assert_eq!(record.turn_id, None);
     assert!(store.recover_unstarted().unwrap().is_empty());
 
-    let (replay_receipt, replay) = store.accept(&payload).unwrap();
-    assert_eq!(replay_receipt, receipt);
+    let (same_receipt, replay) = store.accept(&payload).unwrap();
+    assert_eq!(same_receipt, receipt_id);
     assert_eq!(
         replay,
         SubmissionReceiptDisposition::AlreadyAccepted {
             state: PendingSubmissionState::TerminalCancelled,
-            turn_id: Some("prestart-cancel:batch-1".into()),
+            turn_id: None,
         }
     );
 }

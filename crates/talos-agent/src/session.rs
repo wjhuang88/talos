@@ -52,6 +52,7 @@ struct ActiveStructuredTurn {
     submission_id: String,
     receipt_id: String,
     session_generation: u64,
+    source: SubmissionSource,
     turn_id: String,
 }
 
@@ -144,20 +145,10 @@ impl AppServerSession {
         &mut self,
         session: talos_session::Session,
         metadata: talos_session::SessionMetadata,
-    ) -> Result<(), PendingSubmissionError> {
+    ) {
         self.pending_store = PendingSubmissionStore::for_session(&session);
         self.session_id = session.id.to_string();
-        self.session_generation = self.pending_store.runtime_generation()?;
         self.persistence = Some(TurnPersistence { session, metadata });
-        Ok(())
-    }
-
-    /// Atomically advances the durable generation for an Actor replacement
-    /// that continues the same Session.
-    pub fn advance_generation(&mut self) -> Result<u64, PendingSubmissionError> {
-        let generation = self.pending_store.advance_runtime_generation()?;
-        self.session_generation = generation;
-        Ok(generation)
     }
 
     /// Assigns an atomic durable session used by the embedded runtime.
@@ -430,80 +421,17 @@ impl AppServerSession {
                             session_generation,
                             submission_id,
                         } => {
-                            if session_generation != self.session_generation {
-                                self.reject_submission(
+                            if current_turn.is_none()
+                                && session_generation == self.session_generation
+                                && self.cancel_paused_submission(
                                     &submission_id,
-                                    session_generation,
-                                    SubmissionRejectionReason::WrongGeneration,
-                                );
-                                continue;
-                            }
-                            let Some(index) = pending
-                                .iter()
-                                .position(|submission| submission.id == submission_id)
-                            else {
-                                let _ = self.eq_tx.send(SessionEvent::Error {
-                                    message: format!(
-                                        "paused submission {submission_id} is not pending in the active Actor"
-                                    ),
-                                });
-                                continue;
-                            };
-                            let record = match self.pending_store.get(&submission_id) {
-                                Ok(Some(record)) => record,
-                                Ok(None) => {
-                                    self.emit_custody_error(
-                                        "paused submission is missing from durable custody",
-                                        &submission_id,
-                                    );
-                                    continue;
-                                }
-                                Err(error) => {
-                                    self.emit_custody_error(
-                                        "failed to read paused submission from durable custody",
-                                        &error,
-                                    );
-                                    continue;
-                                }
-                            };
-                            if !matches!(
-                                record.state,
-                                PendingSubmissionState::AcceptedPending
-                                    | PendingSubmissionState::PausedPending
-                            ) {
-                                self.emit_custody_error(
-                                    "paused submission cannot be cancelled from its current state",
-                                    &submission_id,
-                                );
-                                continue;
-                            }
-                            let cancellation_id = format!("prestart_cancel:{submission_id}");
-                            if let Err(error) = self.pending_store.cancel_unstarted(
-                                &submission_id,
-                                &cancellation_id,
-                            ) {
-                                self.emit_custody_error(
-                                    "failed to terminalize paused submission",
-                                    &error,
-                                );
-                                continue;
-                            }
-                            let submission = pending
-                                .remove(index)
-                                .expect("pending submission index must remain valid");
-                            let (images, image_bytes) = submission.image_totals();
-                            pending_items = pending_items.saturating_sub(submission.items.len());
-                            pending_bytes =
-                                pending_bytes.saturating_sub(submission.total_text_bytes());
-                            pending_images = pending_images.saturating_sub(images);
-                            pending_image_bytes =
-                                pending_image_bytes.saturating_sub(image_bytes);
-                            self.reject_submission(
-                                &submission.id,
-                                submission.sender_generation,
-                                SubmissionRejectionReason::Cancelled,
-                            );
-                            if current_turn.is_none() {
+                                    &mut pending,
+                                    &mut pending_items,
+                                    &mut pending_bytes,
+                                    &mut pending_images,
+                                    &mut pending_image_bytes,
+                                )
+                            {
                                 paused = false;
                             }
                         }
@@ -694,6 +622,7 @@ impl AppServerSession {
         let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
             session_id: self.session_id.clone(),
             session_generation: active.session_generation,
+            source: active.source,
             submission_id: active.submission_id.clone(),
             receipt_id: active.receipt_id.clone(),
             turn_id: active.turn_id.clone(),
@@ -996,6 +925,52 @@ impl AppServerSession {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn cancel_paused_submission(
+        &self,
+        submission_id: &str,
+        pending: &mut VecDeque<StructuredSubmission>,
+        pending_items: &mut usize,
+        pending_bytes: &mut usize,
+        pending_images: &mut usize,
+        pending_image_bytes: &mut u64,
+    ) -> bool {
+        let Some(front) = pending.front() else {
+            return false;
+        };
+        if front.id != submission_id || front.sender_generation != self.session_generation {
+            return false;
+        }
+        let record = match self.pending_store.get(submission_id) {
+            Ok(Some(record)) if record.state == PendingSubmissionState::PausedPending => record,
+            Ok(_) => return false,
+            Err(error) => {
+                self.emit_custody_error("failed to inspect paused submission", &error);
+                return false;
+            }
+        };
+        if let Err(error) = self.pending_store.cancel_unstarted(submission_id) {
+            self.emit_custody_error("failed to terminalize paused submission", &error);
+            return false;
+        }
+        let Some(submission) = pending.pop_front() else {
+            return false;
+        };
+        let (images, image_bytes) = submission.image_totals();
+        *pending_items = pending_items.saturating_sub(submission.items.len());
+        *pending_bytes = pending_bytes.saturating_sub(submission.total_text_bytes());
+        *pending_images = pending_images.saturating_sub(images);
+        *pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
+        let _ = self.eq_tx.send(SessionEvent::SubmissionResolved {
+            session_id: self.session_id.clone(),
+            session_generation: self.session_generation,
+            submission_id: submission_id.to_owned(),
+            receipt_id: record.receipt_id,
+            state: PendingSubmissionState::TerminalCancelled,
+        });
+        true
+    }
+
     fn pause_before_start(
         &self,
         submission: &StructuredSubmission,
@@ -1110,6 +1085,7 @@ impl AppServerSession {
                 submission_id: submission.id.clone(),
                 receipt_id: record.receipt_id,
                 session_generation: self.session_generation,
+                source: submission.source,
                 turn_id: turn_id.clone(),
             };
             let _ = self.eq_tx.send(SessionEvent::StructuredSubmissionStarted {
@@ -1122,6 +1098,7 @@ impl AppServerSession {
             let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
                 session_id: self.session_id.clone(),
                 session_generation: active.session_generation,
+                source: active.source,
                 submission_id: active.submission_id.clone(),
                 receipt_id: active.receipt_id.clone(),
                 turn_id: active.turn_id.clone(),

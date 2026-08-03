@@ -323,6 +323,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
         .send(SessionEvent::SubmissionReceipt {
             session_id: "session-generation-two".into(),
             session_generation: 2,
+            source: SubmissionSource::User,
             submission_id: submission.id.clone(),
             reservation_id: format!("reservation:{}", submission.id),
             receipt_id: receipt_id.clone(),
@@ -336,6 +337,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
         .send(SessionEvent::StructuredTurnEvent {
             session_id: "session-generation-two".into(),
             session_generation: 2,
+            source: SubmissionSource::User,
             submission_id: submission.id.clone(),
             receipt_id: receipt_id.clone(),
             turn_id: "turn-generation-two".into(),
@@ -347,6 +349,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
         .send(SessionEvent::StructuredTurnEvent {
             session_id: "session-generation-two".into(),
             session_generation: 2,
+            source: SubmissionSource::User,
             submission_id: submission.id,
             receipt_id,
             turn_id: "turn-generation-two".into(),
@@ -463,12 +466,12 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
-        .create_or_open_session("i169-retained-prestart-cancel")
+        .create_or_open_session("i169-retained-cancel-pause")
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    let oversized = "U1 ".repeat(8_192);
-    let retained = retained_submission("retained-prestart-u1", 1, &oversized);
+    let oversized = "U".repeat(60_000);
+    let retained = retained_submission("retained-cancel-u1", 1, &oversized);
     store.accept(&retained).unwrap();
     store.mark_paused(&retained.id).unwrap();
 
@@ -484,7 +487,7 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: temp.path().to_path_buf(),
         initial_history: Vec::new(),
-        model_context_limit: 128,
+        model_context_limit: 8_192,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
@@ -494,7 +497,7 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
     let (user_tx, user_rx) = mpsc::unbounded_channel();
     let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
     let (_watch_tx, watch_rx) = tokio::sync::watch::channel(handle.sq_tx);
-    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(128));
+    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(8_192));
     let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
     let bridge_task = tokio::spawn(run_conversation_loop(
         ConversationEngine::new("i169-model".into(), "test-provider".into()),
@@ -517,16 +520,19 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
                 Some(UiOutput::Content(ContentOutput::Block {
                     source: MessageSource::Error,
                     text,
-                })) if text.contains(
-                    "older retained submission retained-prestart-u1 paused before the newly accepted submission",
-                ) => break,
+                })) if text
+                    .contains("older retained submission retained-cancel-u1 paused before")
+                    && text.contains("press cancel") =>
+                {
+                    break;
+                }
                 Some(_) => {}
                 None => panic!("Bridge closed before retained pre-start pause evidence"),
             }
         }
     })
     .await
-    .expect("retained pre-start pause must be visible");
+    .expect("retained pre-start pause must expose a resolution action");
     assert_eq!(
         store.get(&retained.id).unwrap().unwrap().state,
         PendingSubmissionState::PausedPending
@@ -539,6 +545,11 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
         store.get(&retained.id).unwrap().unwrap().state,
         PendingSubmissionState::TerminalCancelled
     );
+
+    user_tx.send(UserInput::Message("NEXT".into())).unwrap();
+    wait_for_order(&order, &["R", "NEXT"]).await;
+    let visible = wait_for_visible_user_order(&mut ui_rx, &["R", "NEXT"]).await;
+    assert_eq!(visible, vec!["R", "NEXT"]);
 
     user_tx.send(UserInput::Exit).unwrap();
     bridge_task.await.unwrap();

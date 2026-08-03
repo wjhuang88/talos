@@ -71,12 +71,14 @@ on a fresh branch from that exact commit and is implemented in Draft PR #131.
 4. Versioned session-scoped pending journal separate from successful transcript, with idempotent
    acceptance, `AlreadyAccepted`, authoritative `NotAccepted`, conflict detection and restart
    recovery.
-5. Monotonic Session generation on structured operations, receipts and structured Turn events;
-   exact Session/generation/batch/receipt/Turn/sequence validation.
+5. Durable Session generation on structured operations, receipts and structured Turn events; live
+   replacement advances it atomically, process reconstruction rehydrates it unchanged, and exact
+   Session/generation/batch/receipt/Turn/sequence validation applies end to end.
 6. Actor-owned user/scheduler arbitration with at most one active Turn, no ordinary Submit
    preemption, retained delivery under backpressure and deterministic explicit-user resume.
-7. Success auto-advance; Cancel/Error pause unstarted pending work; no automatic replay of an
-   already-started terminal Turn.
+7. Success auto-advance; Cancel/Error pause unstarted pending work; deterministic pre-start failure
+   has an explicit exact-generation cancel/terminalize action; no automatic replay of an already-
+   started terminal Turn.
 8. A/B/C as distinct ordered User/Multimodal messages in Actor input, Provider requests, successful
    transcript and resumed history.
 9. Successful transcript commit before pending-journal finalization, with Turn-ID crash recovery and
@@ -127,8 +129,9 @@ on a fresh branch from that exact commit and is implemented in Draft PR #131.
   state.
 - Ordinary Submit never preempts. Interrupt targets only the matching active Turn and does not remove
   pending work when idle.
-- Cancel/Error pause Engine queued and unstarted Actor pending work; explicit user input resumes
-  deterministic retained-user-before-scheduler ordering without duplicate execution.
+- Cancel/Error pause Engine queued and unstarted Actor pending work. Admissible retained work resumes
+  in retained-user-before-scheduler order; deterministic pre-start failure can be terminalized by an
+  exact-generation command without Provider execution so it cannot pin the FIFO forever.
 - Scheduler cannot bypass Actor arbitration, preempt user work, resume a paused Actor by itself or
   silently lose an undelivered fire.
 
@@ -216,6 +219,7 @@ Proposed contract merely to match historical PR #120.
 | 2026-08-02 | Formal activation | Maintainer explicitly authorized implementation; no overlap was found; fresh branch created from exact `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; Draft PR #131 opened. |
 | 2026-08-02 | Slice 1 | Added structured submission identities/bounds and a versioned session-scoped pending journal with durable receipts, idempotent reopen, conflict rejection, pause/recovery and terminal tombstones. |
 | 2026-08-02 | Review baseline port | Copied the preserved Review code for Engine/Actor/Bridge/Agent files into the fresh PR branch as a separately identifiable starting snapshot; recovery refs remain unchanged and the snapshot is not completion evidence. |
+| 2026-08-03 | Independent-review remediation | PR #131 returned to Draft. Remediation defines explicit pre-start cancellation, ordinary-Session terminal-outcome recovery, generation-bound scheduler delivery, durable runtime-generation reconstruction, UUID Engine identities and fixed-seed interleaving evidence. Exact-head CI and repeat independent acceptance remain pending. |
 
 ## Verification Evidence
 

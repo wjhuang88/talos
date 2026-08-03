@@ -398,23 +398,15 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    if let Err(e) = actor.set_persistence(
+    actor.set_persistence(
         current_session.clone(),
         crate::mode_runtime::session_metadata_for_model(
             &runtime_model_config.model,
             &runtime_model_config.provider,
         ),
-    ) {
-        let text = format!("[Error] Failed to restore durable Session generation: {e}\n");
-        send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
-        return false;
-    }
+    );
     let session_for_prepare = current_session.clone();
-    if let Err(e) = transition
-        .lock()
-        .await
-        .prepare(handle, session_for_prepare, sched_pending)
-    {
+    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
         let text = format!("[Error] Failed to prepare model switch: {e}\n");
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
         return false;
@@ -423,6 +415,11 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     let mut transition_guard = transition.lock().await;
     match transition_guard.commit(actor) {
         Ok(result) => {
+            let _sched_join = sched_pending.spawn(
+                result.new_handle.sq_tx.clone(),
+                result.generation,
+                tokio_util::sync::CancellationToken::new(),
+            );
             let _ = session_watch_tx.send(current_session.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx

@@ -166,3 +166,101 @@ async fn generation_two_can_observe_but_never_execute_generation_one_custody() {
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
 }
+
+#[tokio::test]
+async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() {
+    let temp = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp.path().join("sessions"));
+    let durable = manager
+        .create_or_open_session("i169-generation-restart")
+        .unwrap();
+    let session_id = durable.id().to_string();
+    let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+
+    let retained = submission("generation-one-retained", 1, "resume after restart");
+    assert_eq!(
+        store.accept(&retained).unwrap().1,
+        SubmissionReceiptDisposition::AcceptedPending
+    );
+    assert_eq!(store.pause_unstarted().unwrap(), 1);
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CountingModel {
+            calls: calls.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp.path().to_path_buf(),
+        initial_history: Vec::new(),
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let recovered_generation = store.runtime_generation().unwrap();
+    assert_eq!(recovered_generation, 1);
+    actor.set_generation(recovered_generation);
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    let resume = submission("generation-one-resume", 1, "explicit resume authority");
+    let (resume_receipt_tx, mut resume_receipt_rx) = mpsc::unbounded_channel();
+    sq_tx
+        .send(SessionOp::SubmitStructuredTracked {
+            submission: resume.clone(),
+            receipt_tx: Some(resume_receipt_tx),
+        })
+        .await
+        .unwrap();
+    let receipt = tracked_receipt(&mut resume_receipt_rx).await;
+    assert!(receipt.disposition.has_durable_custody());
+    assert_eq!(receipt.session_generation, 1);
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let retained_committed = store
+                .get(&retained.id)
+                .unwrap()
+                .is_some_and(|record| record.state == PendingSubmissionState::Committed);
+            let resume_committed = store
+                .get(&resume.id)
+                .unwrap()
+                .is_some_and(|record| record.state == PendingSubmissionState::Committed);
+            if retained_committed && resume_committed && calls.load(Ordering::SeqCst) == 2 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("reconstructed generation must resume retained custody exactly once");
+
+    let stale = submission("generation-zero-stale-after-restart", 0, "must reject");
+    let (stale_receipt_tx, mut stale_receipt_rx) = mpsc::unbounded_channel();
+    sq_tx
+        .send(SessionOp::SubmitStructuredTracked {
+            submission: stale.clone(),
+            receipt_tx: Some(stale_receipt_tx),
+        })
+        .await
+        .unwrap();
+    let stale_receipt = tracked_receipt(&mut stale_receipt_rx).await;
+    assert!(matches!(
+        stale_receipt.disposition,
+        SubmissionReceiptDisposition::Rejected { .. }
+    ));
+    assert!(store.get(&stale.id).unwrap().is_none());
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+
+    while eq_rx.try_recv().is_ok() {}
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+}

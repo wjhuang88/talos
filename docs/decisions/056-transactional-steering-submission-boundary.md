@@ -60,7 +60,7 @@ this recovered decision.
 The implementation may use different Rust names, but it must preserve these logical identities:
 
 - `SessionId`: stable logical Session identity.
-- `SessionGeneration`: monotonic actor/runtime generation for one logical Session.
+- `SessionGeneration`: durable runtime epoch for one logical Session. Live replacement advances it atomically; process reconstruction of the same authority rehydrates it unchanged.
 - `QueueItemId`: stable identity of one accepted input item.
 - `BatchId`: stable identity of one compatible queue-prefix snapshot.
 - `ReservationId`: identity of the exact Engine prefix frozen for transfer.
@@ -196,7 +196,7 @@ Minimum journal states are equivalent to:
 AcceptedPending
 Running(turn_id)
 PausedPending
-TerminalCancelled(turn_id)
+TerminalCancelled(turn_id?)
 TerminalError(turn_id)
 Committed(turn_id)
 ```
@@ -274,8 +274,11 @@ a separately approved UX.
 ### 7. Session generation
 
 `SessionGeneration` is assigned by the Session composition root, not inferred only from channel
-object identity. It starts at a defined value for a newly created Session and monotonically
-increments whenever the Actor/runtime instance for the same logical Session is replaced or rebuilt.
+object identity. It starts at a defined value for a newly created Session and is stored durably with
+the Session pending-journal metadata. A live replacement of the Actor/runtime for the same logical
+Session atomically advances the durable generation. A process reconstruction after memory loss
+rehydrates the stored generation unchanged so already accepted envelopes remain addressable; it does
+not invent generation zero or silently rewrite those envelopes.
 
 Every structured Session operation, receipt and canonical Turn event carries:
 
@@ -323,7 +326,9 @@ Pending ordering is deterministic:
 ### 9. Scheduler delivery and SQ-full semantics
 
 Scheduler work uses the same structured submission and Actor receipt boundary. Source identity is
-not encoded only in visible text.
+not encoded only in visible text. Every scheduler owner is spawned from one authoritative
+`{sender, SessionId, SessionGeneration}` target after that generation has been assigned; a raw sender
+or hard-coded generation zero is not a valid delivery route.
 
 A generated scheduler fire receives a stable fire/submission identity. Until the Actor journal
 accepts it, the scheduler remains responsible for that exact fire.
@@ -353,7 +358,12 @@ On matching `Cancelled` or `Error`:
 - Actor-owned submissions that have not started remain durable and become `PausedPending`;
 - scheduler and user pending work retain identities and FIFO/source ordering;
 - automatic advancement stops;
-- an explicit user submission may authorize resume under the arbitration policy above.
+- an explicit user submission may authorize resume under the arbitration policy above when the
+  retained request is admissible;
+- a deterministic pre-Provider failure such as `ContextBudgetExceeded` requires an explicit,
+  generation-bound pre-start resolution. The user may terminalize that exact paused identity as
+  `TerminalCancelled` without Provider execution, after which later accepted work may advance. New
+  input alone must not repeatedly retry an impossible FIFO head forever.
 
 The current failed/cancelled Turn is not silently retried. Any explicit retry UX for that already
 started batch is outside I169 unless separately approved. Partial-turn persistence continues to obey
@@ -506,8 +516,12 @@ AwaitingReceipt
   -> PausedAmbiguous when old Session generation cannot be reconciled
 
 ActorAcceptedPending
-  -> PausedPending after another Turn Cancel/Error
+  -> PausedPending after another Turn Cancel/Error or deterministic pre-start failure
   -> ActorRunning only when arbitration permits
+
+PausedPending
+  -> TerminalCancelled on an explicit exact-generation pre-start cancel
+  -> ActorRunning only through the documented resume policy
 ```
 
 At no point may both Engine and Actor have execution authority. The Engine escrow after send is a

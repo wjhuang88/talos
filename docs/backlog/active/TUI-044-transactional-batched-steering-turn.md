@@ -70,7 +70,8 @@ persistence semantics or retryability.
   receipt/Turn identity and exact monotonic sequence.
 - The Session Actor is sole execution authority after durable acceptance, keeps at most one active
   Turn and arbitrates user/scheduler work without ordinary Submit preemption.
-- Matching Success may auto-advance. Cancel/Error pause unstarted pending work; an already-started
+- Matching Success may auto-advance. Cancel/Error pause unstarted pending work; deterministic
+  pre-start failure exposes an exact generation-bound cancel/terminalize action; an already-started
   terminal Turn is not automatically replayed.
 - A/B/C remain distinct ordered `Message::User` or `Message::Multimodal` values in Actor input,
   Provider requests, successful transcript and resumed history.

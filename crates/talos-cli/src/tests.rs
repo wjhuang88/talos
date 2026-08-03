@@ -20,6 +20,7 @@ fn accept_structured_submission(
         .send(talos_core::session::SessionEvent::SubmissionReceipt {
             session_id: "session_test".to_string(),
             session_generation: submission.sender_generation,
+            source: submission.source,
             submission_id: submission.id.clone(),
             reservation_id: format!("reservation:{}", submission.id),
             receipt_id: receipt_id.to_string(),
@@ -41,6 +42,7 @@ fn complete_structured_submission(
         .send(talos_core::session::SessionEvent::StructuredTurnEvent {
             session_id: "session_test".to_string(),
             session_generation: submission.sender_generation,
+            source: submission.source,
             submission_id: submission.id.clone(),
             receipt_id: receipt_id.to_string(),
             turn_id: turn_id.clone(),
@@ -52,6 +54,7 @@ fn complete_structured_submission(
         .send(talos_core::session::SessionEvent::StructuredTurnEvent {
             session_id: "session_test".to_string(),
             session_generation: submission.sender_generation,
+            source: submission.source,
             submission_id: submission.id.clone(),
             receipt_id: receipt_id.to_string(),
             turn_id,

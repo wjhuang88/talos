@@ -75,12 +75,6 @@ async fn assert_terminal_recovery(
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(
-        store
-            .advance_runtime_generation()
-            .expect("advance durable runtime generation"),
-        1
-    );
     let frozen = submission(submission_id);
     store.accept(&frozen).expect("durable acceptance");
     store
@@ -93,10 +87,8 @@ async fn assert_terminal_recovery(
 
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), config(temp.path()));
-    actor
-        .set_persistence(durable.session().clone(), SessionMetadata::default())
-        .expect("install production Session persistence");
-    assert_eq!(actor.generation(), 1);
+    actor.set_generation(1);
+    actor.set_persistence(durable.session().clone(), SessionMetadata::default());
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let task = tokio::spawn(async move { actor.run().await });
@@ -148,4 +140,79 @@ async fn running_cancelled_outcome_recovers_as_terminal_cancelled_without_replay
         PendingSubmissionState::TerminalCancelled,
     )
     .await;
+}
+
+#[tokio::test]
+async fn running_success_outcome_recovers_as_committed_without_replay() {
+    assert_terminal_recovery(
+        "i169-running-success-outcome",
+        "running-success-submission",
+        "running-success-turn",
+        TurnTranscriptOutcome::Success,
+        PendingSubmissionState::Committed,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn ordinary_transcript_entry_without_terminal_outcome_remains_frozen_running() {
+    let temp = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp.path().join("sessions"));
+    let durable = manager
+        .create_or_open_session("i169-running-ambiguous-outcome")
+        .expect("durable session");
+    let session_id = durable.id().to_string();
+    let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    let frozen = submission("running-ambiguous-submission");
+    let turn_id = "running-ambiguous-turn";
+    store.accept(&frozen).expect("durable acceptance");
+    store
+        .mark_running(&frozen.id, turn_id)
+        .expect("mark running");
+    durable
+        .session()
+        .append_with_metadata(
+            &Message::Assistant {
+                content: "partial provider output".into(),
+                tool_calls: Vec::new(),
+                reasoning: None,
+            },
+            SessionMetadata {
+                turn_id: Some(turn_id.into()),
+                ..SessionMetadata::default()
+            },
+        )
+        .expect("partial transcript entry");
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (handle, mut actor) = AppServerSession::new(make_agent(calls.clone()), config(temp.path()));
+    actor.set_generation(1);
+    actor.set_persistence(durable.session().clone(), SessionMetadata::default());
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let task = tokio::spawn(async move { actor.run().await });
+
+    let event = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = eq_rx.recv().await.expect("session event channel");
+            if let talos_core::session::SessionEvent::Error { message } = event
+                && message.contains("remains frozen in Running state")
+            {
+                break message;
+            }
+        }
+    })
+    .await
+    .expect("ambiguous recovery diagnostic timeout");
+    assert!(event.contains(turn_id));
+    let record = store
+        .get(&frozen.id)
+        .expect("read pending journal")
+        .expect("running record remains addressable");
+    assert_eq!(record.state, PendingSubmissionState::Running);
+    assert_eq!(record.turn_id.as_deref(), Some(turn_id));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    task.await.unwrap();
 }

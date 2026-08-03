@@ -18,6 +18,7 @@ use crate::turn_outcome::decode_turn_transcript_outcome;
 use crate::{CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTranscriptOutcome};
 
 const SCHEMA_VERSION: i64 = 1;
+const RUNTIME_GENERATION_KEY: &str = "runtime_generation";
 const MAX_TOMBSTONES: usize = MAX_PENDING_SUBMISSIONS * 2;
 
 /// Failure while reading or mutating pending-submission custody.
@@ -47,12 +48,17 @@ pub enum PendingSubmissionError {
     /// A lifecycle update violates the state machine.
     #[error("invalid pending submission state transition")]
     InvalidTransition,
-    /// A persisted runtime generation cannot be represented safely.
-    #[error("invalid persisted runtime generation: {0}")]
-    InvalidRuntimeGeneration(i64),
-    /// The durable runtime generation reached its maximum value.
+    /// The durable runtime generation changed outside the expected lifecycle owner.
+    #[error("runtime generation conflict: expected {expected}, found {actual}")]
+    GenerationConflict {
+        /// Generation held by the caller.
+        expected: u64,
+        /// Generation stored durably for the Session.
+        actual: u64,
+    },
+    /// The durable runtime generation cannot advance further.
     #[error("runtime generation exhausted")]
-    RuntimeGenerationExhausted,
+    GenerationExhausted,
 }
 
 /// Exact durable record returned for Actor recovery.
@@ -104,43 +110,44 @@ impl PendingSubmissionStore {
         self.path.as_ref()
     }
 
-    /// Returns the durable runtime generation for this Session.
+    /// Loads the durable runtime generation for this logical Session.
     ///
-    /// The value is Session-scoped and survives process restart. New Sessions
-    /// start at generation zero; Actor replacement for the same Session must
-    /// advance it through [`Self::advance_runtime_generation`].
+    /// Legacy Sessions without the metadata key are initialized at generation
+    /// zero. Process reconstruction rehydrates this exact value so accepted
+    /// envelopes remain addressable after memory loss.
     pub fn runtime_generation(&self) -> Result<u64, PendingSubmissionError> {
-        let _guard = self.guard()?;
-        let connection = self.connection()?;
-        ensure_schema(&connection)?;
-        let value = connection.query_row(
-            "SELECT value FROM pending_journal_meta WHERE key = 'runtime_generation'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?;
-        u64::try_from(value).map_err(|_| PendingSubmissionError::InvalidRuntimeGeneration(value))
-    }
-
-    /// Atomically advances and returns the durable runtime generation.
-    pub fn advance_runtime_generation(&self) -> Result<u64, PendingSubmissionError> {
         let _guard = self.guard()?;
         let mut connection = self.connection()?;
         let transaction = immediate(&mut connection)?;
         ensure_schema(&transaction)?;
-        let current = transaction.query_row(
-            "SELECT value FROM pending_journal_meta WHERE key = 'runtime_generation'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?;
+        let generation = load_or_initialize_runtime_generation(&transaction)?;
+        transaction.commit()?;
+        Ok(generation)
+    }
+
+    /// Atomically advances the durable generation for a live replacement of
+    /// the same logical Session.
+    pub fn advance_runtime_generation(&self, expected: u64) -> Result<u64, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let mut connection = self.connection()?;
+        let transaction = immediate(&mut connection)?;
+        ensure_schema(&transaction)?;
+        let current = load_or_initialize_runtime_generation(&transaction)?;
+        if current != expected {
+            return Err(PendingSubmissionError::GenerationConflict {
+                expected,
+                actual: current,
+            });
+        }
         let next = current
             .checked_add(1)
-            .ok_or(PendingSubmissionError::RuntimeGenerationExhausted)?;
+            .ok_or(PendingSubmissionError::GenerationExhausted)?;
         transaction.execute(
-            "UPDATE pending_journal_meta SET value = ?1 WHERE key = 'runtime_generation'",
-            params![next],
+            "UPDATE pending_journal_meta SET value = ?2 WHERE key = ?1",
+            params![RUNTIME_GENERATION_KEY, to_i64(next)],
         )?;
         transaction.commit()?;
-        u64::try_from(next).map_err(|_| PendingSubmissionError::InvalidRuntimeGeneration(next))
+        Ok(next)
     }
 
     /// Durably accepts an exact submission or returns its prior receipt.
@@ -273,28 +280,6 @@ impl PendingSubmissionStore {
         )
     }
 
-    /// Explicitly cancels a durably accepted submission before Provider start.
-    ///
-    /// This is the terminal resolution path for deterministic pre-start
-    /// failures such as context-budget rejection. It preserves permanent
-    /// idempotency evidence while releasing FIFO custody for later work.
-    pub fn cancel_unstarted(
-        &self,
-        submission_id: &str,
-        cancellation_id: &str,
-    ) -> Result<(), PendingSubmissionError> {
-        self.transition(
-            submission_id,
-            PendingSubmissionState::TerminalCancelled,
-            Some(cancellation_id),
-            &[
-                PendingSubmissionState::AcceptedPending,
-                PendingSubmissionState::PausedPending,
-                PendingSubmissionState::TerminalCancelled,
-            ],
-        )
-    }
-
     /// Pauses all accepted submissions that have not started.
     pub fn pause_unstarted(&self) -> Result<usize, PendingSubmissionError> {
         let _guard = self.guard()?;
@@ -308,6 +293,24 @@ impl PendingSubmissionStore {
         )?;
         transaction.commit()?;
         Ok(changed)
+    }
+
+    /// Explicitly terminalizes one accepted submission before Provider start.
+    ///
+    /// This is the recovery action for deterministic pre-start failures. The
+    /// original identity remains in the permanent idempotency ledger and can
+    /// never execute as fresh work later.
+    pub fn cancel_unstarted(&self, submission_id: &str) -> Result<(), PendingSubmissionError> {
+        self.transition(
+            submission_id,
+            PendingSubmissionState::TerminalCancelled,
+            None,
+            &[
+                PendingSubmissionState::AcceptedPending,
+                PendingSubmissionState::PausedPending,
+                PendingSubmissionState::TerminalCancelled,
+            ],
+        )
     }
 
     /// Marks a started submission terminal without making it resumable.
@@ -669,9 +672,7 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
              turn_id TEXT
          );
          INSERT OR IGNORE INTO pending_journal_meta (key, value)
-         VALUES ('schema_version', 1);
-         INSERT OR IGNORE INTO pending_journal_meta (key, value)
-         VALUES ('runtime_generation', 0);",
+         VALUES ('schema_version', 1);",
     )?;
     let version = connection.query_row(
         "SELECT value FROM pending_journal_meta WHERE key = 'schema_version'",
@@ -683,6 +684,21 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
     } else {
         Err(PendingSubmissionError::UnsupportedSchema(version))
     }
+}
+
+fn load_or_initialize_runtime_generation(
+    connection: &Connection,
+) -> Result<u64, PendingSubmissionError> {
+    connection.execute(
+        "INSERT OR IGNORE INTO pending_journal_meta (key, value) VALUES (?1, 0)",
+        params![RUNTIME_GENERATION_KEY],
+    )?;
+    let value = connection.query_row(
+        "SELECT value FROM pending_journal_meta WHERE key = ?1",
+        params![RUNTIME_GENERATION_KEY],
+        |row| row.get::<_, i64>(0),
+    )?;
+    u64::try_from(value).map_err(|_| PendingSubmissionError::UnsupportedSchema(value))
 }
 
 fn prune_tombstones(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {

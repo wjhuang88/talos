@@ -295,3 +295,95 @@ async fn distinct_submissions_reach_provider_in_fifo_order_under_burst_load() {
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
 }
+
+#[tokio::test]
+async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
+    const COUNT: usize = 12;
+    const STEPS: usize = 128;
+    const SEED: u64 = 0x5eed_0169_c057_0d1e;
+
+    let temp = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp.path().join("sessions"));
+    let durable = manager
+        .create_or_open_session("i169-fixed-seed-interleaving")
+        .unwrap();
+    let session_id = durable.id().to_string();
+    let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let inputs = Arc::new(Mutex::new(Vec::new()));
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(calls.clone(), inputs.clone(), Duration::from_millis(2)),
+        session_config(temp.path()),
+    );
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    let works = (0..COUNT)
+        .map(|index| submission(index + 100, format!("seeded-{index}")))
+        .collect::<Vec<_>>();
+    let mut first_submit_seen = vec![false; COUNT];
+    let mut expected_order = Vec::with_capacity(COUNT);
+    let mut state = SEED;
+
+    for step in 0..STEPS {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let index = ((state >> 32) as usize) % COUNT;
+        let force_submit = !first_submit_seen[index] || (state & 0b11) == 0;
+        let work = works[index].clone();
+        let operation = if force_submit {
+            if !first_submit_seen[index] {
+                first_submit_seen[index] = true;
+                expected_order.push(index);
+            }
+            SessionOp::SubmitStructured { submission: work }
+        } else {
+            SessionOp::ReconcileStructured { submission: work }
+        };
+        sq_tx.send(operation).await.unwrap();
+        if step % 7 == 0 {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    for index in 0..COUNT {
+        if !first_submit_seen[index] {
+            first_submit_seen[index] = true;
+            expected_order.push(index);
+            sq_tx
+                .send(SessionOp::SubmitStructured {
+                    submission: works[index].clone(),
+                })
+                .await
+                .unwrap();
+        }
+    }
+
+    let completed = wait_for_completions(&mut eq_rx, COUNT).await;
+    let expected_ids = expected_order
+        .iter()
+        .map(|index| works[*index].id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(completed, expected_ids, "fixed seed: {SEED:#x}");
+    assert_eq!(calls.load(Ordering::SeqCst), COUNT, "fixed seed: {SEED:#x}");
+
+    let expected_inputs = expected_order
+        .iter()
+        .map(|index| format!("seeded-{index}"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        *inputs.lock().expect("recorded input lock poisoned"),
+        expected_inputs,
+        "fixed seed: {SEED:#x}"
+    );
+    for work in &works {
+        wait_for_state(&store, &work.id, PendingSubmissionState::Committed).await;
+    }
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+}

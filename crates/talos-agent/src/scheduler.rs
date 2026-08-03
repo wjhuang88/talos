@@ -1044,6 +1044,29 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn scheduled_fire_uses_the_bound_actor_generation() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(8);
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, 7, CancellationToken::new());
+        register_one_shot(&handle, "generation-bound", Duration::from_secs(1)).await;
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+        let (is_submit, submission, receipt_tx) =
+            split_tracked_operation(sq_rx.try_recv().unwrap());
+        assert!(is_submit);
+        assert_eq!(submission.source, SubmissionSource::Scheduler);
+        assert_eq!(submission.sender_generation, 7);
+
+        accept(
+            &submission,
+            &receipt_tx,
+            SubmissionReceiptDisposition::AcceptedPending,
+        );
+        yield_times(10).await;
+        assert!(list(&handle).await.is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn one_shot_transfers_only_after_durable_receipt() {
         let (sq_tx, mut sq_rx) = mpsc::channel(8);
         let (handle, _join) = spawn_scheduler_actor(sq_tx, 0, CancellationToken::new());
@@ -1069,23 +1092,6 @@ mod tests {
         );
         yield_times(10).await;
         assert!(list(&handle).await.is_empty());
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn scheduled_fire_uses_the_bound_actor_generation() {
-        let (sq_tx, mut sq_rx) = mpsc::channel(8);
-        let (handle, _join) = spawn_scheduler_actor(sq_tx, 7, CancellationToken::new());
-        register_one_shot(&handle, "generation-seven", Duration::from_secs(1)).await;
-
-        tokio::time::advance(Duration::from_secs(2)).await;
-        yield_times(10).await;
-        let (_, submission, receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
-        assert_eq!(submission.sender_generation, 7);
-        accept(
-            &submission,
-            &receipt_tx,
-            SubmissionReceiptDisposition::AcceptedPending,
-        );
     }
 
     #[tokio::test(start_paused = true)]

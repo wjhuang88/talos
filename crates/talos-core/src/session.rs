@@ -72,8 +72,8 @@ pub enum SessionOp {
         turn_id: String,
     },
     /// Explicitly terminalizes one durably accepted submission that paused
-    /// before Provider start. The immutable generation and submission identity
-    /// prevent a delayed command from resolving different custody.
+    /// before Provider execution. The immutable submission is never replayed
+    /// or rewritten; only the exact current generation may resolve it.
     CancelPausedSubmission {
         session_generation: u64,
         submission_id: String,
@@ -122,6 +122,15 @@ pub enum SessionEvent {
         receipt_id: String,
         reason: SubmissionRejectionReason,
     },
+    /// A pre-start durable submission was explicitly resolved without
+    /// Provider execution.
+    SubmissionResolved {
+        session_id: String,
+        session_generation: u64,
+        submission_id: String,
+        receipt_id: String,
+        state: PendingSubmissionState,
+    },
     SubmissionReceipt {
         session_id: String,
         session_generation: u64,
@@ -136,6 +145,7 @@ pub enum SessionEvent {
     StructuredTurnEvent {
         session_id: String,
         session_generation: u64,
+        source: SubmissionSource,
         submission_id: String,
         receipt_id: String,
         turn_id: String,
@@ -344,6 +354,13 @@ mod tests {
                 receipt_id: "receipt_1".into(),
                 reason: SubmissionRejectionReason::ContextBudgetExceeded,
             },
+            SessionEvent::SubmissionResolved {
+                session_id: "session_1".into(),
+                session_generation: 7,
+                submission_id: "batch_1".into(),
+                receipt_id: "receipt_1".into(),
+                state: PendingSubmissionState::TerminalCancelled,
+            },
             SessionEvent::SubmissionReceipt {
                 session_id: "session_1".into(),
                 session_generation: 7,
@@ -368,6 +385,7 @@ mod tests {
             SessionEvent::StructuredTurnEvent {
                 session_id: "session_1".into(),
                 session_generation: 7,
+                source: SubmissionSource::User,
                 submission_id: "batch_1".into(),
                 receipt_id: "receipt_1".into(),
                 turn_id: "turn_1".into(),

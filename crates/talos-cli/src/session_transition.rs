@@ -9,12 +9,10 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use talos_agent::PendingSchedulerActor;
 use talos_agent::session::AppServerSession;
 use talos_core::session::{SessionHandle, SessionOp};
-use talos_session::Session;
+use talos_session::{PendingSubmissionStore, Session};
 use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
 
 type SenderGenerationRegistry = Vec<(mpsc::WeakSender<SessionOp>, u64)>;
 
@@ -133,36 +131,35 @@ pub struct CommitResult {
     /// The handle for the newly active session actor. Its SQ sender is the
     /// generation-binding proxy, not the raw Actor sender.
     pub new_handle: SessionHandle,
+    /// Durable authoritative generation assigned to the replacement Actor.
+    pub generation: u64,
 }
 
 struct PreparedSession {
     handle: SessionHandle,
     session: Session,
-    scheduler: PendingSchedulerActor,
 }
 
 pub struct SessionTransition {
     active_target: SessionCommandTarget,
     active_session: Session,
-    active_scheduler_cancel: CancellationToken,
     prepared: Option<PreparedSession>,
 }
 
 impl SessionTransition {
-    /// Creates the transition owner for the active durable Session generation.
-    pub fn new(
-        sq_tx: mpsc::Sender<SessionOp>,
-        session: Session,
-        generation: u64,
-        scheduler_cancel: CancellationToken,
-    ) -> Self {
+    /// Creates the transition owner by rehydrating the durable generation for
+    /// the active logical Session. A process restart therefore preserves the
+    /// authority that owns accepted pending work.
+    pub fn new(sq_tx: mpsc::Sender<SessionOp>, session: Session) -> Result<Self, String> {
+        let generation = PendingSubmissionStore::for_session(&session)
+            .runtime_generation()
+            .map_err(|error| format!("failed to load Session runtime generation: {error}"))?;
         register_generation_bound_sender(&sq_tx, generation);
-        Self {
+        Ok(Self {
             active_target: SessionCommandTarget::new(sq_tx, generation),
             active_session: session,
-            active_scheduler_cancel: scheduler_cancel,
             prepared: None,
-        }
+        })
     }
 
     /// Returns the authoritative generation of the currently active Actor.
@@ -171,63 +168,52 @@ impl SessionTransition {
         self.active_target.generation
     }
 
-    pub fn prepare(
-        &mut self,
-        handle: SessionHandle,
-        session: Session,
-        scheduler: PendingSchedulerActor,
-    ) -> Result<(), String> {
+    pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
         if self.prepared.is_some() {
             return Err(
                 "a session transition is already prepared — commit or rollback first".to_string(),
             );
         }
-        self.prepared = Some(PreparedSession {
-            handle,
-            session,
-            scheduler,
-        });
+        self.prepared = Some(PreparedSession { handle, session });
         Ok(())
     }
 
-    /// Commits one Actor replacement after the target Session generation is
-    /// durably known. Same-Session runtime replacement advances the durable
-    /// generation; switching to another Session restores that Session's epoch.
+    /// Commits one Actor replacement and assigns its authoritative generation
+    /// before the task is spawned or the generation-bound sender is published.
     pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
+        let prepared = self
+            .prepared
+            .as_ref()
+            .ok_or_else(|| "no prepared transition to commit".to_string())?;
+        let same_logical_session = prepared.session.id == self.active_session.id;
+        let pending_store = PendingSubmissionStore::for_session(&prepared.session);
+        let next_generation = if same_logical_session {
+            pending_store
+                .advance_runtime_generation(self.active_generation())
+                .map_err(|error| format!("failed to advance Session runtime generation: {error}"))?
+        } else {
+            pending_store.runtime_generation().map_err(|error| {
+                format!("failed to load target Session runtime generation: {error}")
+            })?
+        };
         let mut prepared = self
             .prepared
             .take()
-            .ok_or_else(|| "no prepared transition to commit".to_string())?;
-        let same_session = prepared.session.id == self.active_session.id;
-        let next_generation = if same_session {
-            actor
-                .advance_generation()
-                .map_err(|error| format!("failed to advance Session generation: {error}"))?
-        } else {
-            actor.generation()
-        };
+            .ok_or_else(|| "prepared transition disappeared during commit".to_string())?;
+
         actor.set_generation(next_generation);
-
-        let scheduler_cancel = CancellationToken::new();
-        let _scheduler_join = prepared.scheduler.spawn(
-            prepared.handle.sq_tx.clone(),
-            next_generation,
-            scheduler_cancel.clone(),
-        );
         tokio::spawn(async move { actor.run().await });
-
-        self.active_scheduler_cancel.cancel();
         let _ = self.active_target.try_send(SessionOp::Shutdown);
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
         prepared.handle.sq_tx = new_target.bind_sender();
         self.active_target = new_target;
-        self.active_scheduler_cancel = scheduler_cancel;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
 
         Ok(CommitResult {
             old_session,
             new_handle: prepared.handle,
+            generation: next_generation,
         })
     }
 
@@ -256,6 +242,21 @@ mod tests {
         watch_rx.changed().await.unwrap();
         let current = watch_rx.borrow().clone();
         assert_eq!(authoritative_generation_for_sender(&current), Some(2));
+    }
+
+    #[test]
+    fn transition_rehydrates_the_durable_session_generation() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("i169-transition-generation")
+            .unwrap();
+        let store = PendingSubmissionStore::for_session(durable.session());
+        assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+        let (sender, _receiver) = mpsc::channel(1);
+
+        let transition = SessionTransition::new(sender, durable.session().clone()).unwrap();
+        assert_eq!(transition.active_generation(), 1);
     }
 
     #[test]

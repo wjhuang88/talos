@@ -8,7 +8,8 @@ use talos_agent::prompt::ContextFile;
 use talos_config::Config;
 use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_session::{
-    SessionManager, SessionMetadata, TodoItem, TodoPriority, TodoQuery, TodoRepository, TodoStatus,
+    PendingSubmissionStore, SessionManager, SessionMetadata, TodoItem, TodoPriority, TodoQuery,
+    TodoRepository, TodoStatus,
 };
 use uuid::Uuid;
 
@@ -26,6 +27,12 @@ pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub(crate) fn runtime_generation_for_session(session: &talos_session::Session) -> Result<u64> {
+    PendingSubmissionStore::for_session(session)
+        .runtime_generation()
+        .map_err(|error| anyhow!("failed to load Session runtime generation: {error}"))
 }
 
 pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {

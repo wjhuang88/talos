@@ -46,13 +46,6 @@ struct DeferredAcceptedSubmission {
     cancel_requested: bool,
 }
 
-#[derive(Debug)]
-struct PausedAcceptedSubmission {
-    session_id: String,
-    session_generation: u64,
-    submission_id: String,
-}
-
 impl DeferredAcceptedSubmission {
     fn into_turn_state(self) -> BridgeTurnState {
         BridgeTurnState::AcceptedByActor {
@@ -118,14 +111,26 @@ enum BridgeTurnState {
         turn_id: String,
         next_sequence: u64,
     },
-    PausedAfterFailure {
-        paused: Option<PausedAcceptedSubmission>,
+    /// Exact durable submission that failed before Provider start. New user
+    /// input remains Engine-owned until this identity is explicitly resolved.
+    PreStartPaused {
+        session_id: String,
+        session_generation: u64,
+        submission_id: String,
+        receipt_id: String,
     },
+    PreStartCancelling {
+        session_id: String,
+        session_generation: u64,
+        submission_id: String,
+        receipt_id: String,
+    },
+    PausedAfterFailure,
 }
 
 impl BridgeTurnState {
     fn accepts_queued_input(&self) -> bool {
-        !matches!(self, Self::Idle | Self::PausedAfterFailure { .. })
+        !matches!(self, Self::Idle | Self::PausedAfterFailure)
     }
 
     fn blocks_session_mutation(&self) -> bool {
@@ -553,6 +558,7 @@ async fn handle_session_event(
         SessionEvent::StructuredTurnEvent {
             session_id,
             session_generation,
+            source,
             submission_id,
             receipt_id,
             turn_id,
@@ -567,6 +573,7 @@ async fn handle_session_event(
                 ui_tx,
                 session_id,
                 session_generation,
+                source,
                 submission_id,
                 receipt_id,
                 turn_id,
@@ -610,26 +617,10 @@ async fn handle_session_event(
             session_id,
             submission_id,
             sender_generation: rejected_generation,
-            reason,
+            ..
         } => {
             let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
             match state {
-                BridgeTurnState::PausedAfterFailure {
-                    paused: Some(paused),
-                } if paused.session_id == session_id
-                    && paused.session_generation == rejected_generation
-                    && paused.submission_id == submission_id
-                    && reason == talos_core::session::SubmissionRejectionReason::Cancelled =>
-                {
-                    *turn_state = deferred_accepted.take().map_or(
-                        BridgeTurnState::Idle,
-                        DeferredAcceptedSubmission::into_turn_state,
-                    );
-                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
-                        source: MessageSource::System,
-                        text: "[System] Paused submission cancelled before Provider start; later durable work may continue.\n".into(),
-                    }));
-                }
                 BridgeTurnState::Submitting {
                     submission,
                     session_id: expected_session,
@@ -645,7 +636,7 @@ async fn handle_session_event(
                         .is_none_or(|expected| expected == &session_id) =>
                 {
                     engine.rollback_prepared_steering(&submission_id);
-                    *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+                    *turn_state = BridgeTurnState::PausedAfterFailure;
                     emit_bridge_error(
                         ui_tx,
                         "session rejected the queued submission; input was retained",
@@ -654,17 +645,6 @@ async fn handle_session_event(
                 other => {
                     *turn_state = other;
                 }
-            }
-            if matches!(turn_state, BridgeTurnState::Idle) {
-                dispatch_prepared_submission(
-                    engine,
-                    turn_state,
-                    sq_tx_watch,
-                    known_sender,
-                    sender_generation,
-                    ui_tx,
-                )
-                .await;
             }
         }
         SessionEvent::SubmissionPaused {
@@ -687,18 +667,16 @@ async fn handle_session_event(
                     && expected_submission == submission_id
                     && expected_receipt == receipt_id =>
                 {
-                    deferred_accepted.take();
-                    *turn_state = BridgeTurnState::PausedAfterFailure {
-                        paused: Some(PausedAcceptedSubmission {
-                            session_id,
-                            session_generation,
-                            submission_id: submission_id.clone(),
-                        }),
+                    *turn_state = BridgeTurnState::PreStartPaused {
+                        session_id,
+                        session_generation,
+                        submission_id,
+                        receipt_id,
                     };
                     emit_bridge_error(
                         ui_tx,
                         &format!(
-                            "accepted submission was paused before Provider start ({reason:?}); durable custody was retained"
+                            "accepted submission paused before Provider start ({reason:?}); press cancel to terminalize it without execution"
                         ),
                     );
                 }
@@ -707,33 +685,34 @@ async fn handle_session_event(
                     session_generation: expected_generation,
                     submission_id: expected_submission,
                     receipt_id: expected_receipt,
-                    submission: expected_payload,
+                    submission,
                     projected,
                     cancel_requested,
                 } if expected_session == session_id
                     && expected_generation == session_generation
                     && (expected_submission != submission_id || expected_receipt != receipt_id) =>
                 {
-                    *deferred_accepted = Some(DeferredAcceptedSubmission {
-                        session_id: expected_session,
-                        session_generation: expected_generation,
-                        submission_id: expected_submission.clone(),
-                        receipt_id: expected_receipt,
-                        submission: expected_payload,
-                        projected,
-                        cancel_requested,
-                    });
-                    *turn_state = BridgeTurnState::PausedAfterFailure {
-                        paused: Some(PausedAcceptedSubmission {
-                            session_id,
-                            session_generation,
-                            submission_id,
-                        }),
+                    if deferred_accepted.is_none() {
+                        *deferred_accepted = Some(DeferredAcceptedSubmission {
+                            session_id: expected_session,
+                            session_generation: expected_generation,
+                            submission_id: expected_submission.clone(),
+                            receipt_id: expected_receipt,
+                            submission,
+                            projected,
+                            cancel_requested,
+                        });
+                    }
+                    *turn_state = BridgeTurnState::PreStartPaused {
+                        session_id,
+                        session_generation,
+                        submission_id: submission_id.clone(),
+                        receipt_id,
                     };
                     emit_bridge_error(
                         ui_tx,
                         &format!(
-                            "older retained submission {submission_id} paused before the newly accepted submission {expected_submission} could start ({reason:?}); durable custody was retained"
+                            "older retained submission {submission_id} paused before {expected_submission}; press cancel to terminalize the paused identity and continue"
                         ),
                     );
                 }
@@ -741,6 +720,65 @@ async fn handle_session_event(
                     *turn_state = other;
                 }
             }
+        }
+        SessionEvent::SubmissionResolved {
+            session_id,
+            session_generation,
+            submission_id,
+            receipt_id,
+            state: PendingSubmissionState::TerminalCancelled,
+        } => {
+            let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
+            let matches = matches!(
+                &state,
+                BridgeTurnState::PreStartPaused {
+                    session_id: expected_session,
+                    session_generation: expected_generation,
+                    submission_id: expected_submission,
+                    receipt_id: expected_receipt,
+                } | BridgeTurnState::PreStartCancelling {
+                    session_id: expected_session,
+                    session_generation: expected_generation,
+                    submission_id: expected_submission,
+                    receipt_id: expected_receipt,
+                } if expected_session == &session_id
+                    && *expected_generation == session_generation
+                    && expected_submission == &submission_id
+                    && expected_receipt == &receipt_id
+            );
+            if !matches {
+                *turn_state = state;
+                emit_bridge_error(ui_tx, "ignored stale paused-submission resolution");
+                return;
+            }
+            *turn_state = deferred_accepted.take().map_or(
+                BridgeTurnState::Idle,
+                DeferredAcceptedSubmission::into_turn_state,
+            );
+            send_bridge_stream(
+                ui_tx,
+                MessageSource::System,
+                format!(
+                    "[System] Cancelled paused submission {submission_id} before Provider execution.\n"
+                ),
+            );
+            if matches!(turn_state, BridgeTurnState::Idle) {
+                dispatch_prepared_submission(
+                    engine,
+                    turn_state,
+                    sq_tx_watch,
+                    known_sender,
+                    sender_generation,
+                    ui_tx,
+                )
+                .await;
+            }
+        }
+        SessionEvent::SubmissionResolved { .. } => {
+            emit_bridge_error(
+                ui_tx,
+                "ignored unsupported paused-submission terminal state",
+            );
         }
         SessionEvent::SubmissionQueued { .. } | SessionEvent::SubmissionStarted { .. } => {
             // Compatibility projections only. Durable SubmissionReceipt,
@@ -833,7 +871,7 @@ fn handle_submission_receipt(
                 return;
             }
             if !commit_actor_custody(engine, ui_tx, &submission) {
-                *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+                *turn_state = BridgeTurnState::PausedAfterFailure;
                 return;
             }
             *turn_state = BridgeTurnState::AcceptedByActor {
@@ -848,10 +886,10 @@ fn handle_submission_receipt(
         }
         SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
             if !commit_actor_custody(engine, ui_tx, &submission) {
-                *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+                *turn_state = BridgeTurnState::PausedAfterFailure;
                 return;
             }
-            *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+            *turn_state = BridgeTurnState::PausedAfterFailure;
             emit_bridge_error(
                 ui_tx,
                 &format!(
@@ -861,7 +899,7 @@ fn handle_submission_receipt(
         }
         SubmissionReceiptDisposition::NotAccepted => {
             engine.rollback_prepared_steering(&submission_id);
-            *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+            *turn_state = BridgeTurnState::PausedAfterFailure;
             emit_bridge_error(
                 ui_tx,
                 "the session authoritatively reported that the queued submission was not accepted; input was retained",
@@ -869,7 +907,7 @@ fn handle_submission_receipt(
         }
         SubmissionReceiptDisposition::Rejected { reason } => {
             engine.rollback_prepared_steering(&submission_id);
-            *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+            *turn_state = BridgeTurnState::PausedAfterFailure;
             emit_bridge_error(
                 ui_tx,
                 &format!(
@@ -923,10 +961,7 @@ fn handle_structured_submission_started(
     turn_id: String,
 ) {
     if submission.sender_generation != session_generation
-        || !matches!(
-            submission.source,
-            SubmissionSource::User | SubmissionSource::Scheduler
-        )
+        || submission.source == SubmissionSource::Compatibility
         || submission.validate().is_err()
         || receipt_id.is_empty()
         || turn_id.is_empty()
@@ -939,15 +974,6 @@ fn handle_structured_submission_started(
         && matches!(turn_state, BridgeTurnState::Idle)
     {
         emit_submission_projection(engine, ui_tx, &submission);
-        *turn_state = BridgeTurnState::AcceptedByActor {
-            session_id,
-            session_generation,
-            submission_id: submission.id.clone(),
-            receipt_id,
-            submission,
-            projected: true,
-            cancel_requested: false,
-        };
         return;
     }
 
@@ -1007,6 +1033,7 @@ fn handle_structured_turn_event(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     session_id: String,
     session_generation: u64,
+    source: SubmissionSource,
     submission_id: String,
     receipt_id: String,
     turn_id: String,
@@ -1016,6 +1043,27 @@ fn handle_structured_turn_event(
     let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
     match payload {
         TurnEventPayload::Started => match state {
+            BridgeTurnState::Idle
+                if source == SubmissionSource::Scheduler
+                    && sequence == 0
+                    && !submission_id.is_empty()
+                    && !receipt_id.is_empty()
+                    && !turn_id.is_empty() =>
+            {
+                for output in engine.handle_turn_started() {
+                    let _ = ui_tx.send(output);
+                }
+                *turn_state = BridgeTurnState::StructuredRunning {
+                    session_id,
+                    session_generation,
+                    submission_id,
+                    receipt_id,
+                    turn_id,
+                    next_structured_sequence: 1,
+                    next_legacy_sequence: 1,
+                    progress_mode: ProgressMode::Unknown,
+                };
+            }
             BridgeTurnState::AcceptedByActor {
                 session_id: expected_session,
                 session_generation: expected_generation,
@@ -1024,7 +1072,8 @@ fn handle_structured_turn_event(
                 submission,
                 projected,
                 cancel_requested,
-            } if expected_session == session_id
+            } if source == SubmissionSource::User
+                && expected_session == session_id
                 && expected_generation == session_generation
                 && expected_submission == submission_id
                 && expected_receipt == receipt_id
@@ -1081,7 +1130,8 @@ fn handle_structured_turn_event(
                 submission: expected_payload,
                 projected,
                 cancel_requested,
-            } if expected_session == session_id
+            } if source != SubmissionSource::Compatibility
+                && expected_session == session_id
                 && expected_generation == session_generation
                 && sequence == 0
                 && !receipt_id.is_empty()
@@ -1265,7 +1315,7 @@ fn handle_structured_turn_event(
                 )
             } else {
                 deferred_accepted.take();
-                BridgeTurnState::PausedAfterFailure { paused: None }
+                BridgeTurnState::PausedAfterFailure
             };
             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                 engine.steering_queue_snapshot(),
@@ -1406,7 +1456,7 @@ fn handle_legacy_turn_event(
                     *turn_state = if success {
                         BridgeTurnState::Idle
                     } else {
-                        BridgeTurnState::PausedAfterFailure { paused: None }
+                        BridgeTurnState::PausedAfterFailure
                     };
                     let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                         engine.steering_queue_snapshot(),
@@ -1650,23 +1700,26 @@ fn request_cancel(
             // targeted interrupt only after a matching Structured Started event.
             *cancel_requested = true;
         }
-        BridgeTurnState::PausedAfterFailure {
-            paused: Some(paused),
+        BridgeTurnState::PreStartPaused {
+            session_id,
+            session_generation,
+            submission_id,
+            receipt_id,
         } => {
-            if sq_tx_watch
-                .borrow()
-                .clone()
-                .try_send(SessionOp::CancelPausedSubmission {
-                    session_generation: paused.session_generation,
-                    submission_id: paused.submission_id.clone(),
-                })
-                .is_err()
-            {
-                emit_bridge_error(
-                    ui_tx,
-                    "session command channel is busy; paused submission cancel was not accepted",
-                );
+            if !send_paused_submission_cancel(
+                sq_tx_watch,
+                *session_generation,
+                submission_id,
+                ui_tx,
+            ) {
+                return;
             }
+            *turn_state = BridgeTurnState::PreStartCancelling {
+                session_id: session_id.clone(),
+                session_generation: *session_generation,
+                submission_id: submission_id.clone(),
+                receipt_id: receipt_id.clone(),
+            };
         }
         BridgeTurnState::StructuredRunning {
             session_id,
@@ -1707,6 +1760,30 @@ fn request_cancel(
             };
         }
         _ => {}
+    }
+}
+
+fn send_paused_submission_cancel(
+    sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
+    session_generation: u64,
+    submission_id: &str,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+) -> bool {
+    match sq_tx_watch
+        .borrow()
+        .clone()
+        .try_send(SessionOp::CancelPausedSubmission {
+            session_generation,
+            submission_id: submission_id.to_owned(),
+        }) {
+        Ok(()) => true,
+        Err(_) => {
+            emit_bridge_error(
+                ui_tx,
+                "session command channel is busy; paused submission was not resolved",
+            );
+            false
+        }
     }
 }
 
@@ -1802,7 +1879,7 @@ async fn dispatch_prepared_submission(
     };
     if !sent {
         engine.rollback_prepared_steering(&submission_id);
-        *turn_state = BridgeTurnState::PausedAfterFailure { paused: None };
+        *turn_state = BridgeTurnState::PausedAfterFailure;
         emit_bridge_error(
             ui_tx,
             "session command channel unavailable; queued input was retained",
