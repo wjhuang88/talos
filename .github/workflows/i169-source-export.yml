@@ -35,8 +35,8 @@ jobs:
           gzip --test /tmp/i169.patch.gz
           gzip --decompress --stdout /tmp/i169.patch.gz > /tmp/i169.patch
           echo '5f4b7030e1037af5ec3444246e0e3b972b74165437c6c8981eeebb470183c085  /tmp/i169.patch' | sha256sum --check
-          git apply --check /tmp/i169.patch
-          git apply /tmp/i169.patch
+          git apply --check --exclude=.github/workflows/i169-source-export.yml /tmp/i169.patch
+          git apply --exclude=.github/workflows/i169-source-export.yml /tmp/i169.patch
           rm -f .github/i169-increment.part{00,01,02,03}
           rm -f .github/workflows/i169-source-export.yml
           cargo fmt --all
