@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(crate) const TURN_TRANSCRIPT_OUTCOME_PREFIX: &str =
-    "__TALOS_TURN_TRANSCRIPT_OUTCOME__:";
+pub(crate) const TURN_TRANSCRIPT_OUTCOME_PREFIX: &str = "__TALOS_TURN_TRANSCRIPT_OUTCOME__:";
 
 /// Durable proof of the terminal transcript outcome for one runtime Turn.
 ///
@@ -41,9 +40,7 @@ pub(crate) fn encode_turn_transcript_outcome(
         .map(|encoded| format!("{TURN_TRANSCRIPT_OUTCOME_PREFIX}{encoded}"))
 }
 
-pub(crate) fn decode_turn_transcript_outcome(
-    content: &str,
-) -> Option<TurnTranscriptOutcomeRecord> {
+pub(crate) fn decode_turn_transcript_outcome(content: &str) -> Option<TurnTranscriptOutcomeRecord> {
     content
         .strip_prefix(TURN_TRANSCRIPT_OUTCOME_PREFIX)
         .and_then(|encoded| serde_json::from_str(encoded).ok())
