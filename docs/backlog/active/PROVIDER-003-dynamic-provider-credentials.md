@@ -20,9 +20,9 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #132 |
-| Governance Claim PR | PR #133 |
-| Authorization Mode | Governance registration and decomposition only |
-| Authorization Evidence | Maintainer requested Issue intake; no implementation authorization |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-03 |
 | Handoff / Release Condition | Materialize and independently select one bounded child Story before product-code work. |
