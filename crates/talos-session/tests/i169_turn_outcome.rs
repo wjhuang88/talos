@@ -47,10 +47,7 @@ fn transcript_outcome_markers_are_hidden_and_only_success_binds_turn_identity() 
         vec![
             TurnTranscriptOutcomeRecord::new("turn-success", TurnTranscriptOutcome::Success),
             TurnTranscriptOutcomeRecord::new("turn-error", TurnTranscriptOutcome::Error),
-            TurnTranscriptOutcomeRecord::new(
-                "turn-cancelled",
-                TurnTranscriptOutcome::Cancelled,
-            ),
+            TurnTranscriptOutcomeRecord::new("turn-cancelled", TurnTranscriptOutcome::Cancelled,),
         ]
     );
 
