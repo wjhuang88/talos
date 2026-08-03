@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
 
 use crate::mode_runtime::request_preview_payload;
+use crate::session_transition::authoritative_generation_for_sender;
 use crate::skill_runtime::RuntimeSkills;
 use talos_conversation::MessageSource;
 use talos_conversation::{
@@ -35,12 +36,34 @@ enum ProgressMode {
 }
 
 #[derive(Debug)]
+struct DeferredAcceptedSubmission {
+    session_id: String,
+    session_generation: u64,
+    submission_id: String,
+    receipt_id: String,
+    cancel_requested: bool,
+}
+
+impl DeferredAcceptedSubmission {
+    fn into_turn_state(self) -> BridgeTurnState {
+        BridgeTurnState::AcceptedByActor {
+            session_id: self.session_id,
+            session_generation: self.session_generation,
+            submission_id: self.submission_id,
+            receipt_id: self.receipt_id,
+            cancel_requested: self.cancel_requested,
+        }
+    }
+}
+
+#[derive(Debug)]
 enum BridgeTurnState {
     Idle,
     Submitting {
         submission: StructuredSubmission,
         session_id: Option<String>,
         sender_generation: u64,
+        command_sender: tokio::sync::mpsc::Sender<SessionOp>,
         cancel_requested: bool,
         last_reconcile: Instant,
         reconcile_attempts: u32,
@@ -133,8 +156,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     engine.set_model_info(&model_info_watch.borrow().clone());
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     let mut turn_state = BridgeTurnState::Idle;
-    let mut sender_generation = 0_u64;
+    let mut deferred_accepted = None;
     let mut known_sender = sq_tx_watch.borrow().clone();
+    let mut sender_generation = authoritative_generation_for_sender(&known_sender).unwrap_or(0);
     let mut pending_attachment_generation =
         (!engine.pending_image_attachments.is_empty()).then_some(sender_generation);
     let mut receipt_tick = tokio::time::interval(RECEIPT_RECONCILE_TICK);
@@ -146,14 +170,23 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 if changed.is_ok() {
                     let current_sender = sq_tx_watch.borrow().clone();
                     if !known_sender.same_channel(&current_sender) {
-                        sender_generation = sender_generation.saturating_add(1);
-                        known_sender = current_sender;
-                        if !engine.pending_image_attachments.is_empty() {
-                            pending_attachment_generation = Some(sender_generation);
-                            send_bridge_stream(
+                        if let Some(current_generation) =
+                            authoritative_generation_for_sender(&current_sender)
+                        {
+                            sender_generation = current_generation;
+                            known_sender = current_sender;
+                            if !engine.pending_image_attachments.is_empty() {
+                                pending_attachment_generation = Some(sender_generation);
+                                send_bridge_stream(
+                                    &ui_tx,
+                                    MessageSource::System,
+                                    "[System] Pending attachments were retained across the session runtime replacement.\n".into(),
+                                );
+                            }
+                        } else {
+                            emit_bridge_error(
                                 &ui_tx,
-                                MessageSource::System,
-                                "[System] Pending attachments were retained across the session runtime replacement.\n".into(),
+                                "session lifecycle published a command Sender without an authoritative generation",
                             );
                         }
                     }
@@ -167,7 +200,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 }
             }
             _ = receipt_tick.tick() => {
-                retry_submission_receipt(&mut turn_state, &sq_tx_watch, &ui_tx);
+                retry_submission_receipt(&mut turn_state, &ui_tx);
             }
             event = agent_rx.recv() => {
                 match event {
@@ -176,6 +209,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             event,
                             &mut engine,
                             &mut turn_state,
+                            &mut deferred_accepted,
                             &sq_tx_watch,
                             &mut known_sender,
                             &mut sender_generation,
@@ -448,6 +482,7 @@ async fn handle_session_event(
     event: SessionEvent,
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
+    deferred_accepted: &mut Option<DeferredAcceptedSubmission>,
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     known_sender: &mut tokio::sync::mpsc::Sender<SessionOp>,
     sender_generation: &mut u64,
@@ -493,6 +528,7 @@ async fn handle_session_event(
             handle_structured_turn_event(
                 engine,
                 turn_state,
+                deferred_accepted,
                 sq_tx_watch,
                 ui_tx,
                 session_id,
@@ -548,6 +584,7 @@ async fn handle_session_event(
                     submission,
                     session_id: expected_session,
                     sender_generation: expected_generation,
+                    command_sender: _,
                     cancel_requested: _,
                     last_reconcile: _,
                     reconcile_attempts: _,
@@ -589,11 +626,31 @@ async fn handle_session_event(
                     && expected_submission == submission_id
                     && expected_receipt == receipt_id =>
                 {
+                    deferred_accepted.take();
                     *turn_state = BridgeTurnState::PausedAfterFailure;
                     emit_bridge_error(
                         ui_tx,
                         &format!(
                             "accepted submission was paused before Provider start ({reason:?}); durable custody was retained"
+                        ),
+                    );
+                }
+                BridgeTurnState::AcceptedByActor {
+                    session_id: expected_session,
+                    session_generation: expected_generation,
+                    submission_id: expected_submission,
+                    receipt_id: expected_receipt,
+                    ..
+                } if expected_session == session_id
+                    && expected_generation == session_generation
+                    && (expected_submission != submission_id || expected_receipt != receipt_id) =>
+                {
+                    deferred_accepted.take();
+                    *turn_state = BridgeTurnState::PausedAfterFailure;
+                    emit_bridge_error(
+                        ui_tx,
+                        &format!(
+                            "older retained submission {submission_id} paused before the newly accepted submission {expected_submission} could start ({reason:?}); durable custody was retained"
                         ),
                     );
                 }
@@ -634,6 +691,7 @@ fn handle_submission_receipt(
         submission,
         session_id: expected_session,
         sender_generation,
+        command_sender,
         cancel_requested,
         last_reconcile,
         reconcile_attempts,
@@ -659,6 +717,7 @@ fn handle_submission_receipt(
             submission,
             session_id: expected_session,
             sender_generation,
+            command_sender,
             cancel_requested,
             last_reconcile,
             reconcile_attempts,
@@ -678,6 +737,7 @@ fn handle_submission_receipt(
                     submission,
                     session_id: Some(session_id),
                     sender_generation,
+                    command_sender,
                     cancel_requested,
                     last_reconcile,
                     reconcile_attempts,
@@ -762,6 +822,7 @@ fn commit_actor_custody(
 fn handle_structured_turn_event(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
+    deferred_accepted: &mut Option<DeferredAcceptedSubmission>,
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     session_id: String,
@@ -826,6 +887,53 @@ fn handle_structured_turn_event(
                         progress_mode: ProgressMode::Unknown,
                     };
                 }
+            }
+            BridgeTurnState::AcceptedByActor {
+                session_id: expected_session,
+                session_generation: expected_generation,
+                submission_id: expected_submission,
+                receipt_id: expected_receipt,
+                cancel_requested,
+            } if expected_session == session_id
+                && expected_generation == session_generation
+                && sequence == 0
+                && !receipt_id.is_empty()
+                && (expected_submission != submission_id || expected_receipt != receipt_id) =>
+            {
+                if deferred_accepted.is_some() {
+                    *turn_state = BridgeTurnState::AcceptedByActor {
+                        session_id: expected_session,
+                        session_generation: expected_generation,
+                        submission_id: expected_submission,
+                        receipt_id: expected_receipt,
+                        cancel_requested,
+                    };
+                    emit_bridge_error(
+                        ui_tx,
+                        "cannot adopt more than one retained submission lifecycle at a time",
+                    );
+                    return;
+                }
+                *deferred_accepted = Some(DeferredAcceptedSubmission {
+                    session_id: expected_session,
+                    session_generation: expected_generation,
+                    submission_id: expected_submission,
+                    receipt_id: expected_receipt,
+                    cancel_requested,
+                });
+                for output in engine.handle_turn_started() {
+                    let _ = ui_tx.send(output);
+                }
+                *turn_state = BridgeTurnState::StructuredRunning {
+                    session_id,
+                    session_generation,
+                    submission_id,
+                    receipt_id,
+                    turn_id,
+                    next_structured_sequence: 1,
+                    next_legacy_sequence: 1,
+                    progress_mode: ProgressMode::Unknown,
+                };
             }
             other => {
                 *turn_state = other;
@@ -960,8 +1068,11 @@ fn handle_structured_turn_event(
             }
             let success = matches!(status, TurnCompletionStatus::Success { .. });
             *turn_state = if success {
-                BridgeTurnState::Idle
+                deferred_accepted
+                    .take()
+                    .map_or(BridgeTurnState::Idle, DeferredAcceptedSubmission::into_turn_state)
             } else {
+                deferred_accepted.take();
                 BridgeTurnState::PausedAfterFailure
             };
             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
@@ -1291,39 +1402,42 @@ fn handle_structured_legacy_projection(
 
 fn retry_submission_receipt(
     turn_state: &mut BridgeTurnState,
-    sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
-    let (submission, attempts) = match turn_state {
+    let (submission, command_sender, attempts) = match turn_state {
         BridgeTurnState::Submitting {
             submission,
+            command_sender,
             last_reconcile,
             reconcile_attempts,
             ..
         } if last_reconcile.elapsed() >= RECEIPT_RECONCILE_AFTER => {
             *last_reconcile = Instant::now();
             *reconcile_attempts = reconcile_attempts.saturating_add(1);
-            (Some(submission.clone()), *reconcile_attempts)
+            (
+                Some(submission.clone()),
+                Some(command_sender.clone()),
+                *reconcile_attempts,
+            )
         }
-        _ => (None, 0),
+        _ => (None, None, 0),
     };
-    let Some(submission) = submission else {
+    let (Some(submission), Some(command_sender)) = (submission, command_sender) else {
         return;
     };
-    let sender = sq_tx_watch.borrow().clone();
-    if sender
+    if command_sender
         .try_send(SessionOp::ReconcileStructured { submission })
         .is_err()
         && attempts == RECEIPT_WARNING_ATTEMPT
     {
         emit_bridge_error(
             ui_tx,
-            "submission receipt reconciliation is waiting for command-channel capacity; Engine escrow remains frozen",
+            "submission receipt reconciliation is waiting for its original generation-bound command route; Engine escrow remains frozen",
         );
     } else if attempts == RECEIPT_WARNING_ATTEMPT {
         emit_bridge_error(
             ui_tx,
-            "submission receipt was delayed; reconciliation is continuing with the same immutable identity",
+            "submission receipt was delayed; reconciliation is continuing on the original command route with the same immutable identity",
         );
     }
 }
@@ -1436,8 +1550,15 @@ async fn dispatch_prepared_submission(
 ) {
     let current_sender = sq_tx_watch.borrow().clone();
     if !known_sender.same_channel(&current_sender) {
-        *sender_generation = (*sender_generation).saturating_add(1);
-        *known_sender = current_sender;
+        let Some(current_generation) = authoritative_generation_for_sender(&current_sender) else {
+            emit_bridge_error(
+                ui_tx,
+                "cannot submit through a command Sender without an authoritative generation",
+            );
+            return;
+        };
+        *sender_generation = current_generation;
+        *known_sender = current_sender.clone();
     }
     let Some(mut submission) = engine.prepare_steering_submission() else {
         return;
@@ -1448,15 +1569,22 @@ async fn dispatch_prepared_submission(
         submission: submission.clone(),
         session_id: None,
         sender_generation: *sender_generation,
+        command_sender: current_sender.clone(),
         cancel_requested: false,
         last_reconcile: Instant::now(),
         reconcile_attempts: 0,
     };
-    let sender = sq_tx_watch.borrow().clone();
-    let reserve =
-        tokio::time::timeout(Duration::from_secs(1), sender.clone().reserve_owned()).await;
+    let reserve = tokio::time::timeout(
+        Duration::from_secs(1),
+        current_sender.clone().reserve_owned(),
+    )
+    .await;
     let sent = match reserve {
-        Ok(Ok(permit)) if sender.same_channel(&sq_tx_watch.borrow()) => {
+        Ok(Ok(permit))
+            if current_sender.same_channel(&sq_tx_watch.borrow())
+                && authoritative_generation_for_sender(&current_sender)
+                    .is_none_or(|generation| generation == *sender_generation) =>
+        {
             permit.send(SessionOp::SubmitStructured { submission });
             true
         }
