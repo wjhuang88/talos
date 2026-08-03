@@ -8,7 +8,6 @@ permissions:
 
 jobs:
   apply-fix:
-    # Triggered only after the workflow exists in the previous PR Head.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -25,22 +24,34 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path("crates/talos-agent/src/session/tests.rs")
-          text = path.read_text()
-          pattern = re.compile(
-              r"(actor\n\s+\.set_persistence\(.*?\n\s+\))\n\s+\.unwrap\(\);",
-              re.DOTALL,
-          )
-          text, count = pattern.subn(r"\1;", text)
+          lines = path.read_text().splitlines(keepends=True)
+          output = []
+          count = 0
+          for index, line in enumerate(lines):
+              recent = lines[max(0, index - 20):index]
+              if line.strip() == ".unwrap();" and any(
+                  ".set_persistence(" in previous for previous in recent
+              ):
+                  if not output or output[-1].strip() != ")":
+                      raise SystemExit("set_persistence unwrap is not preceded by a closing call")
+                  newline = "\r\n" if output[-1].endswith("\r\n") else "\n"
+                  output[-1] = output[-1].rstrip("\r\n") + ";" + newline
+                  count += 1
+                  continue
+              output.append(line)
           if count != 5:
               raise SystemExit(f"expected 5 invalid set_persistence unwraps, found {count}")
-          path.write_text(text)
+          path.write_text("".join(output))
           PY
           rm -f .github/workflows/i169-agent-test-fix.yml
+          rm -f .github/workflows/i169-test-api-fix.yml
           cargo fmt --all
           git diff --check
+      - name: Compile affected test target
+        shell: bash
+        run: cargo test -p talos-agent --lib --no-run --locked
       - name: Commit agent test correction
         shell: bash
         env:
