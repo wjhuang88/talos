@@ -1,0 +1,152 @@
+name: I169 Review Handoff Governance Sync
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  synchronize-governance:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Synchronize I169 review-handoff lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1) -> None:
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found != count:
+                  raise SystemExit(f"{path}: expected {count} occurrence(s), found {found}: {old!r}")
+              p.write_text(text.replace(old, new, count))
+
+          replace(
+              ".agent-governance/manifest.yaml",
+              'status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation and fixed-seed stress. CI #947 reached the full implementation and exposed one compile-only anyhow error adapter, now corrected; all substantive claims still require a new complete exact-head platform CI, rebuilt real-TUI evidence and fresh independent review. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."',
+              'status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in PR #131 review handoff against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation, scheduler Bridge correlation, opaque Engine identity and fixed-seed stress. The implementation tree at 8cd00fe311fcb349488f3fea69e03f406fc2631e passed complete platform CI #967; this lifecycle synchronization still requires a new exact-head CI and fresh independent review. Ready-for-review is only a handoff state, not approval or merge authorization. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."',
+          )
+          replace(
+              ".agent-governance/manifest.yaml",
+              '    - "Validate the compile-corrected independent-review remediation on the new exact Head of Draft PR #131 against current main a03e25436a25f84f117a90362686fc8205e52dde"',
+              '    - "Validate the lifecycle-synchronized PR #131 exact Head against current main a03e25436a25f84f117a90362686fc8205e52dde and request fresh independent review; Ready status is a handoff, not approval or merge authorization"',
+          )
+
+          replace(
+              "docs/BOARD.md",
+              "| I169 Transactional Batched Steering Turn | Active — Draft PR #131; activated 2026-08-02 |",
+              "| I169 Transactional Batched Steering Turn | Active — PR #131 review handoff; activated 2026-08-02 |",
+          )
+          replace(
+              "docs/BOARD.md",
+              "Issue #119 is now Active in Draft PR #131;",
+              "Issue #119 is Active in PR #131 review handoff;",
+          )
+
+          replace(
+              "docs/backlog/PRODUCT-BACKLOG.md",
+              "**Active in Draft PR #131.**",
+              "**Active in PR #131 review handoff.**",
+          )
+          replace(
+              "docs/backlog/PRODUCT-BACKLOG.md",
+              "| TUI-044 / I169 | Active — Draft PR #131 |",
+              "| TUI-044 / I169 | Active — PR #131 review handoff |",
+          )
+          replace(
+              "docs/backlog/PRODUCT-BACKLOG.md",
+              "Issue #119 remains open and Active in Draft PR #131. Completion still requires the complete I169\nacceptance matrix, ADR-056 review, exact-head CI, rebuilt real-TUI evidence and a merge-ready PR.",
+              "Issue #119 remains open and Active in PR #131 review handoff. Completion still requires fresh\nindependent acceptance, maintainer merge authorization, merge evidence and recorded lifecycle closeout.",
+          )
+
+          replace(
+              "docs/backlog/active/TUI-044-transactional-batched-steering-turn.md",
+              "| Status | Active — Draft PR #131 |",
+              "| Status | Active — PR #131 review handoff |",
+          )
+          replace(
+              "docs/backlog/active/TUI-044-transactional-batched-steering-turn.md",
+              "| Last Updated | 2026-08-02 |",
+              "| Last Updated | 2026-08-04 |",
+          )
+          replace(
+              "docs/backlog/active/TUI-044-transactional-batched-steering-turn.md",
+              "- Remote synchronization: Issue #119 and Draft PR #131.",
+              "- Remote synchronization: Issue #119 and PR #131 review handoff.",
+          )
+
+          replace(
+              "docs/decisions/056-transactional-steering-submission-boundary.md",
+              "`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`. I169 is now Active in Draft PR #131 under\nmaintainer implementation authorization and remains in remediation and repeat independent review.\nThis lifecycle update does not accept ADR-056, complete I169/TUI-044, close Issue #119 or authorize\nPR #131 to become Ready or merge.",
+              "`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`. I169 is Active in PR #131 and has reached a\nfresh independent-review handoff after remediation under maintainer implementation authorization.\nThis lifecycle update does not accept ADR-056, complete I169/TUI-044, close Issue #119 or authorize\nmerge; Ready-for-review is only a handoff state and is not approval.",
+          )
+
+          replace(
+              "docs/iterations/I169-batched-steering-turn.md",
+              "> Document status: Active — Draft PR #131",
+              "> Document status: Active — PR #131 review handoff",
+          )
+          replace(
+              "docs/iterations/I169-batched-steering-turn.md",
+              "| Last Updated | 2026-08-02 |",
+              "| Last Updated | 2026-08-04 |",
+          )
+          replace(
+              "docs/iterations/I169-batched-steering-turn.md",
+              "on a fresh branch from that exact commit and is implemented in Draft PR #131.",
+              "on a fresh branch from that exact commit and is implemented in PR #131 at review handoff.",
+          )
+          replace(
+              "docs/iterations/I169-batched-steering-turn.md",
+              "- Issue #119 and Draft PR #131 synchronization.",
+              "- Issue #119 and PR #131 review-handoff synchronization.",
+          )
+          replace(
+              "docs/iterations/I169-batched-steering-turn.md",
+              "- Activation branch and Draft PR #131 are bound to the exact architecture merge baseline.\n- Product implementation and behavior evidence remain incomplete; current PR #131 Head must become\n  green before any Review claim.",
+              "- Activation branch and PR #131 remain bound to the exact architecture merge baseline.\n- Independent-review remediation and regression evidence are implemented. The implementation tree at\n  `8cd00fe311fcb349488f3fea69e03f406fc2631e` passed CI #967; this lifecycle synchronization requires\n  a new exact-head CI before fresh independent review.",
+          )
+          marker = "| 2026-08-03 | Independent-review remediation |"
+          p = Path("docs/iterations/I169-batched-steering-turn.md")
+          text = p.read_text()
+          if text.count(marker) != 1:
+              raise SystemExit(f"I169 remediation row count mismatch: {text.count(marker)}")
+          row = "| 2026-08-04 | Review handoff | Remediation code and regression evidence passed CI #967 at `8cd00fe311fcb349488f3fea69e03f406fc2631e`; governance lifecycle is synchronized for a fresh exact-head CI and independent review. ADR-056 remains Proposed and no merge/completion is authorized. |\n"
+          insert_at = text.index(marker)
+          line_start = text.rfind("\n", 0, insert_at) + 1
+          p.write_text(text[:line_start] + row + text[line_start:])
+
+          replace(
+              "docs/iterations/README.md",
+              "| I169 | Transactional Batched Steering Turn | Active — Draft PR #131 (2026-08-02) |",
+              "| I169 | Transactional Batched Steering Turn | Active — PR #131 review handoff (2026-08-04) |",
+          )
+          replace(
+              "docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md",
+              "TUI-044/I169 is Active in Draft PR #131 and Issue #119 remains open.",
+              "TUI-044/I169 is Active in PR #131 review handoff and Issue #119 remains open.",
+          )
+          PY
+          rm -f .github/workflows/i169-governance-handoff.yml
+          git diff --check
+          bash scripts/validate_project_governance.sh
+      - name: Commit synchronized governance handoff
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "docs(i169): synchronize independent review handoff"
+          git push origin "HEAD:${HEAD_REF}"
