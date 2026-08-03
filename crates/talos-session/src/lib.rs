@@ -35,6 +35,7 @@ pub mod compaction_engine;
 mod compression;
 mod diagnostic;
 mod durable;
+mod durable_recovery;
 mod error;
 mod jsonl;
 mod manager;
