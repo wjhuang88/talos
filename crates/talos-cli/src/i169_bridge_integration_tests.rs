@@ -457,3 +457,88 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
     actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
     actor_task.await.unwrap();
 }
+
+#[tokio::test]
+async fn repeated_retained_prestart_pause_releases_newer_bridge_acceptance() {
+    let temp = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp.path().join("sessions"));
+    let durable = manager
+        .create_or_open_session("i169-retained-repeat-pause")
+        .expect("durable session");
+    let session_id = durable.id().to_string();
+    let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    let retained = retained_submission("retained-repeat-u1", 1, "U1");
+    store.accept(&retained).unwrap();
+    store.mark_paused(&retained.id).unwrap();
+
+    let provider_calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CountingModel {
+            calls: provider_calls.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp.path().to_path_buf(),
+        initial_history: Vec::new(),
+        model_context_limit: 1,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    let actor_sq_tx = handle.sq_tx.clone();
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    let (user_tx, user_rx) = mpsc::unbounded_channel();
+    let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+    let (_watch_tx, watch_rx) = tokio::sync::watch::channel(handle.sq_tx);
+    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(1));
+    let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let bridge_task = tokio::spawn(run_conversation_loop(
+        ConversationEngine::new("i169-model".into(), "test-provider".into()),
+        ConversationLoopIo {
+            agent_rx: handle.eq_rx,
+            user_rx,
+            ui_tx,
+            sq_tx_watch: watch_rx,
+            model_info_watch: model_rx,
+            session_tx,
+            runtime_skills: runtime_skills(),
+            permission_engine: None,
+        },
+    ));
+
+    for resume_text in ["R", "NEXT"] {
+        user_tx
+            .send(UserInput::Message(resume_text.into()))
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                match ui_rx.recv().await {
+                    Some(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text,
+                    })) if text.contains(
+                        "older retained submission retained-repeat-u1 paused before the newly accepted submission",
+                    ) => break,
+                    Some(_) => {}
+                    None => panic!("Bridge closed before retained pre-start pause evidence"),
+                }
+            }
+        })
+        .await
+        .expect("retained pre-start pause must release the newer Bridge acceptance");
+        assert_eq!(
+            store.get(&retained.id).unwrap().unwrap().state,
+            PendingSubmissionState::PausedPending
+        );
+        assert_eq!(provider_calls.load(Ordering::SeqCst), 0);
+    }
+
+    user_tx.send(UserInput::Exit).unwrap();
+    bridge_task.await.unwrap();
+    actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    assert_eq!(provider_calls.load(Ordering::SeqCst), 0);
+}
