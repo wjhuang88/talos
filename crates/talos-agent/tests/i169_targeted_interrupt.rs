@@ -84,7 +84,7 @@ async fn assert_no_structured_cancellation(
                     !matches!(
                         event,
                         SessionEvent::StructuredTurnEvent {
-                            ref turn_id: completed_turn,
+                            turn_id: ref completed_turn,
                             payload: TurnEventPayload::Completed {
                                 status: TurnCompletionStatus::Cancelled,
                             },
@@ -205,7 +205,7 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
             if matches!(
                 event,
                 SessionEvent::StructuredTurnEvent {
-                    ref turn_id: completed_turn,
+                    turn_id: ref completed_turn,
                     payload: TurnEventPayload::Completed {
                         status: TurnCompletionStatus::Cancelled,
                     },
