@@ -21,9 +21,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Verify exact protected parent
+      - name: Verify exact protected trigger chain
         shell: bash
-        run: test "$(git rev-parse HEAD^)" = "5b34192b01c09e856671b4db61629551e834e60d"
+        run: |
+          test "$(git rev-parse HEAD^^)" = "c18185a67d2ed46935ee8f841adf52a265ac8679"
+          test -f .github/i169-artifact-trigger
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -75,6 +77,7 @@ jobs:
           rm .github/workflows/i169-generation-handoff-remediation.yml
           rm .github/workflows/i169-generation-handoff-launcher.yml
           rm .github/i169-remediation-trigger
+          rm .github/i169-artifact-trigger
           rm -f .github/i169-remediation-failure.log
           cargo fmt --all
           git diff --check
