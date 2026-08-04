@@ -406,13 +406,13 @@ mod tests {
     use std::path::Path;
 
     fn make_store() -> ExplorationStore {
-        ExplorationStore::open_memory().unwrap()
+        ExplorationStore::open_memory().expect("test operation should succeed")
     }
 
     fn source_count(db_path: &Path) -> i64 {
-        let conn = Connection::open(db_path).unwrap();
+        let conn = Connection::open(db_path).expect("test operation should succeed");
         conn.query_row("SELECT COUNT(*) FROM sources", [], |row| row.get(0))
-            .unwrap()
+            .expect("test operation should succeed")
     }
 
     // --- ingest_text tests ---
@@ -420,33 +420,42 @@ mod tests {
     #[test]
     fn ingest_text_creates_source_and_chunks() {
         let mut store = make_store();
-        let run = store.create_run("test query", Some("test plan")).unwrap();
+        let run = store
+            .create_run("test query", Some("test plan"))
+            .expect("test operation should succeed");
 
         let text = "Rust is a systems programming language.\n\nIt provides memory safety without garbage collection.\n\nThe ownership model is unique among mainstream languages.";
         let config = ChunkingConfig::default();
 
-        let report = ingest_text(&mut store, &run.id, "Rust Overview", text, &config).unwrap();
+        let report = ingest_text(&mut store, &run.id, "Rust Overview", text, &config)
+            .expect("test operation should succeed");
 
         assert!(!report.source_id.is_empty());
         assert!(report.chunks_created > 0);
         assert_eq!(report.chunk_ids.len(), report.chunks_created);
 
         // Verify source exists.
-        let source = store.get_source(&report.source_id).unwrap();
+        let source = store
+            .get_source(&report.source_id)
+            .expect("test operation should succeed");
         assert!(source.is_some());
-        let source = source.unwrap();
+        let source = source.expect("test operation should succeed");
         assert_eq!(source.title, "Rust Overview");
         assert!(source.url.is_none());
 
         // Verify FTS search finds content.
-        let results = store.search_chunks("memory safety", 10).unwrap();
+        let results = store
+            .search_chunks("memory safety", 10)
+            .expect("test operation should succeed");
         assert!(!results.is_empty(), "FTS should find ingested content");
     }
 
     #[test]
     fn ingest_text_chunk_overlap() {
         let mut store = make_store();
-        let run = store.create_run("overlap test", None).unwrap();
+        let run = store
+            .create_run("overlap test", None)
+            .expect("test operation should succeed");
 
         // Create text that will be split into multiple chunks with small max.
         let text = "AAAAAAAAAA BBBBBBBBBB CCCCCCCCCC DDDDDDDDDD EEEEEEEEEE FFFFFFFFFF GGGGGGGGGG HHHHHHHHHH IIIIIIIIII JJJJJJJJJJ";
@@ -456,7 +465,8 @@ mod tests {
             ..Default::default()
         };
 
-        let report = ingest_text(&mut store, &run.id, "Overlap Test", text, &config).unwrap();
+        let report = ingest_text(&mut store, &run.id, "Overlap Test", text, &config)
+            .expect("test operation should succeed");
 
         assert!(
             report.chunks_created > 1,
@@ -466,7 +476,9 @@ mod tests {
 
         // Verify overlap: adjacent chunks should share content.
         // We can check by searching for content that spans chunk boundaries.
-        let results = store.search_chunks("BBBBBBBBBB", 10).unwrap();
+        let results = store
+            .search_chunks("BBBBBBBBBB", 10)
+            .expect("test operation should succeed");
         assert!(!results.is_empty(), "Should find BBBBBBBBBB in chunks");
     }
 
@@ -475,7 +487,9 @@ mod tests {
     #[test]
     fn ingest_fetched_records_provenance() {
         let mut store = make_store();
-        let run = store.create_run("fetched test", None).unwrap();
+        let run = store
+            .create_run("fetched test", None)
+            .expect("test operation should succeed");
 
         let fetched_at = Utc::now();
         let content = FetchedContent {
@@ -486,11 +500,14 @@ mod tests {
         };
 
         let config = ChunkingConfig::default();
-        let report = ingest_fetched(&mut store, &run.id, &content, &config).unwrap();
+        let report = ingest_fetched(&mut store, &run.id, &content, &config)
+            .expect("test operation should succeed");
 
-        let source = store.get_source(&report.source_id).unwrap();
+        let source = store
+            .get_source(&report.source_id)
+            .expect("test operation should succeed");
         assert!(source.is_some());
-        let source = source.unwrap();
+        let source = source.expect("test operation should succeed");
         assert_eq!(source.url, Some("https://example.com/article".to_string()));
         assert_eq!(source.title, "Example Article");
         // fetched_at should match (within the same second due to serialization).
@@ -504,7 +521,9 @@ mod tests {
     #[test]
     fn ingest_fetched_exceeds_file_budget_returns_error() {
         let mut store = make_store();
-        let run = store.create_run("fetched budget test", None).unwrap();
+        let run = store
+            .create_run("fetched budget test", None)
+            .expect("test operation should succeed");
         let content = FetchedContent {
             url: "https://example.com/large".to_string(),
             title: "Large Article".to_string(),
@@ -524,7 +543,9 @@ mod tests {
     #[test]
     fn ingest_fetched_exceeds_chunk_cap_returns_error() {
         let mut store = make_store();
-        let run = store.create_run("fetched cap test", None).unwrap();
+        let run = store
+            .create_run("fetched cap test", None)
+            .expect("test operation should succeed");
         let content = FetchedContent {
             url: "https://example.com/chunky".to_string(),
             title: "Chunky Article".to_string(),
@@ -606,7 +627,9 @@ mod tests {
     #[test]
     fn create_synthesis_with_valid_citations() {
         let mut store = make_store();
-        let run = store.create_run("synthesis test", None).unwrap();
+        let run = store
+            .create_run("synthesis test", None)
+            .expect("test operation should succeed");
 
         // Ingest two sources.
         let report1 = ingest_text(
@@ -616,7 +639,7 @@ mod tests {
             "Rust is fast and safe.",
             &ChunkingConfig::default(),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
         let report2 = ingest_text(
             &mut store,
@@ -625,7 +648,7 @@ mod tests {
             "Rust has great tooling.",
             &ChunkingConfig::default(),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
         let synthesis = create_synthesis(
             &store,
@@ -635,7 +658,7 @@ mod tests {
             &["Based on limited sources".to_string()],
             &["What about ecosystem maturity?".to_string()],
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
         assert!(!synthesis.id.is_empty());
         assert_eq!(synthesis.conclusion, "Rust is a well-designed language");
@@ -647,7 +670,9 @@ mod tests {
     #[test]
     fn create_synthesis_rejects_missing_citations() {
         let store = make_store();
-        let run = store.create_run("bad citation test", None).unwrap();
+        let run = store
+            .create_run("bad citation test", None)
+            .expect("test operation should succeed");
 
         let err = create_synthesis(
             &store,
@@ -657,7 +682,7 @@ mod tests {
             &[],
             &[],
         )
-        .unwrap_err();
+        .expect_err("test operation should fail as expected");
 
         assert!(
             matches!(err, ExplorationError::CitationValidation(_)),
@@ -672,7 +697,7 @@ mod tests {
         let mut store = make_store();
         let run = store
             .create_run("offline pipeline test", Some("Full offline pipeline"))
-            .unwrap();
+            .expect("test operation should succeed");
 
         // Step 1: Ingest local text.
         let text = "Python is a popular programming language. It was created by Guido van Rossum in 1991. Python supports multiple paradigms. The language has a large standard library.";
@@ -683,7 +708,7 @@ mod tests {
             text,
             &ChunkingConfig::default(),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
         assert!(report.chunks_created > 0);
 
@@ -695,7 +720,9 @@ mod tests {
         );
 
         // Step 3: Search for content.
-        let results = store.search_chunks("Python programming", 10).unwrap();
+        let results = store
+            .search_chunks("Python programming", 10)
+            .expect("test operation should succeed");
         assert!(
             !results.is_empty(),
             "FTS should find ingested content offline"
@@ -710,7 +737,7 @@ mod tests {
             &["Limited to one source".to_string()],
             &["How does Python compare to Rust?".to_string()],
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
         assert!(!synthesis.id.is_empty());
         assert_eq!(synthesis.cited_source_ids.len(), 1);
@@ -720,10 +747,12 @@ mod tests {
 
     #[test]
     fn ingest_text_exceeds_file_budget_returns_error() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
-        let mut store = ExplorationStore::open(&db_path).unwrap();
-        let run = store.create_run("budget-test", None).unwrap();
+        let mut store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+        let run = store
+            .create_run("budget-test", None)
+            .expect("test operation should succeed");
 
         let config = ChunkingConfig {
             max_file_bytes: 100,
@@ -737,10 +766,12 @@ mod tests {
 
     #[test]
     fn ingest_text_within_budget_succeeds() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
-        let mut store = ExplorationStore::open(&db_path).unwrap();
-        let run = store.create_run("budget-test", None).unwrap();
+        let mut store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+        let run = store
+            .create_run("budget-test", None)
+            .expect("test operation should succeed");
 
         let config = ChunkingConfig {
             max_file_bytes: 10_000,
@@ -748,16 +779,19 @@ mod tests {
         };
         let text = "Hello world. This is a test.\n\nSecond paragraph here.";
 
-        let report = ingest_text(&mut store, &run.id, "normal", text, &config).unwrap();
+        let report = ingest_text(&mut store, &run.id, "normal", text, &config)
+            .expect("test operation should succeed");
         assert!(report.chunks_created > 0);
     }
 
     #[test]
     fn ingest_text_exceeds_chunk_cap_returns_error() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
-        let mut store = ExplorationStore::open(&db_path).unwrap();
-        let run = store.create_run("cap-test", None).unwrap();
+        let mut store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+        let run = store
+            .create_run("cap-test", None)
+            .expect("test operation should succeed");
 
         let config = ChunkingConfig {
             max_chunk_chars: 5,
@@ -775,10 +809,12 @@ mod tests {
 
     #[test]
     fn ingest_text_chunk_cap_failure_leaves_no_source() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
-        let mut store = ExplorationStore::open(&db_path).unwrap();
-        let run = store.create_run("atomic-cap-test", None).unwrap();
+        let mut store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+        let run = store
+            .create_run("atomic-cap-test", None)
+            .expect("test operation should succeed");
 
         let config = ChunkingConfig {
             max_chunk_chars: 5,

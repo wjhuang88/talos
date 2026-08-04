@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn consolidation_creates_semantic_memory_with_evidence() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
         let episodes = make_episodes();
         let extractor = RuleBasedExtractor::new();
         let config = ConsolidationConfig {
@@ -605,7 +605,8 @@ mod tests {
             max_candidates_per_session: 20,
         };
 
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
 
         assert!(
             report.inserted > 0,
@@ -617,7 +618,9 @@ mod tests {
         );
 
         // Verify retrieval works.
-        let results = store.retrieve("Rust", 10).unwrap();
+        let results = store
+            .retrieve("Rust", 10)
+            .expect("test operation should succeed");
         assert!(!results.is_empty(), "Should find Rust-related memory");
 
         // Verify evidence source_ref contains session_id and entry_id.
@@ -634,7 +637,7 @@ mod tests {
 
     #[test]
     fn exact_duplicate_dedup_by_content_hash() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
         let episodes = make_episodes();
         let extractor = RuleBasedExtractor::new();
         let config = ConsolidationConfig {
@@ -643,12 +646,14 @@ mod tests {
         };
 
         // First run.
-        let report1 = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report1 = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
         let first_inserted = report1.inserted;
         assert!(first_inserted > 0);
 
         // Second run on same episodes.
-        let report2 = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report2 = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
 
         assert_eq!(
             report2.inserted, 0,
@@ -662,7 +667,7 @@ mod tests {
 
     #[test]
     fn conflicting_same_key_preserved_not_overwritten() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
         // Two episodes with same key prefix (first 40 chars match) but different content.
         let episodes = vec![
@@ -688,18 +693,23 @@ mod tests {
             max_candidates_per_session: 20,
         };
 
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
 
         assert_eq!(
             report.inserted, 2,
             "Both conflicting items should be inserted"
         );
-        assert_eq!(store.count().unwrap(), 2, "Store should contain both items");
+        assert_eq!(
+            store.count().expect("test operation should succeed"),
+            2,
+            "Store should contain both items"
+        );
     }
 
     #[test]
     fn malformed_and_empty_sessions_degrade_gracefully() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
         let episodes = vec![
             // Empty content.
@@ -731,7 +741,8 @@ mod tests {
         };
 
         // Should not panic.
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
 
         // System and tool are skipped by extractor; empty and short are also skipped.
         // So candidates_extracted should be 0.
@@ -746,7 +757,7 @@ mod tests {
 
     #[test]
     fn disabled_config_no_writes() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
         let episodes = make_episodes();
         let extractor = RuleBasedExtractor::new();
         let config = ConsolidationConfig {
@@ -754,14 +765,19 @@ mod tests {
             max_candidates_per_session: 20,
         };
 
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
 
         assert_eq!(report.candidates_extracted, 0);
         assert_eq!(report.inserted, 0);
         assert_eq!(report.duplicates_skipped, 0);
         assert_eq!(report.evidence_links_created, 0);
         assert!(report.errors.is_empty());
-        assert_eq!(store.count().unwrap(), 0, "Store should be empty");
+        assert_eq!(
+            store.count().expect("test operation should succeed"),
+            0,
+            "Store should be empty"
+        );
     }
 
     #[test]
@@ -896,7 +912,7 @@ mod tests {
 
     #[test]
     fn disabled_mode_admits_nothing() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
         let episodes = vec![SessionEpisode {
             session_id: "s1".into(),
             entry_id: "e1".into(),
@@ -907,7 +923,8 @@ mod tests {
         }];
         let extractor = RuleBasedExtractor::new();
         let config = ConsolidationConfig::default(); // enabled = false
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
         assert_eq!(
             report.inserted, 0,
             "disabled consolidation should write nothing"
@@ -916,7 +933,7 @@ mod tests {
 
     #[test]
     fn credential_shaped_content_not_in_store() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let mut store = MemoryStore::open_memory().expect("test operation should succeed");
         let episodes = vec![SessionEpisode {
             session_id: "s1".into(),
             entry_id: "e1".into(),
@@ -930,7 +947,8 @@ mod tests {
             enabled: true,
             max_candidates_per_session: 20,
         };
-        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config)
+            .expect("test operation should succeed");
         assert_eq!(
             report.candidates_extracted, 0,
             "sensitive content should not be extracted"
@@ -939,7 +957,9 @@ mod tests {
             report.inserted, 0,
             "sensitive content must not be written to store"
         );
-        let results = store.retrieve("api_key", 10).unwrap();
+        let results = store
+            .retrieve("api_key", 10)
+            .expect("test operation should succeed");
         assert!(results.is_empty(), "no sensitive content in store");
     }
 }

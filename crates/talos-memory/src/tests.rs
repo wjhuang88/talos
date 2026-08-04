@@ -21,7 +21,7 @@ fn make_item(id: &str, key: &str, content: &str) -> MemoryItem {
 
 #[test]
 fn test_schema_migration_creates_tables() {
-    let store = MemoryStore::open_memory().unwrap();
+    let store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let table_count: i64 = store
         .conn
@@ -31,7 +31,7 @@ fn test_schema_migration_creates_tables() {
             [],
             |row| row.get(0),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(table_count, 3, "All three tables should exist");
 
@@ -42,37 +42,37 @@ fn test_schema_migration_creates_tables() {
             [],
             |row| row.get(0),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(fts_count, 1, "FTS5 virtual table should exist");
 }
 
 #[test]
 fn test_insert_and_retrieve() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     let content = "Rust is a systems programming language focused on safety".to_string();
     let item = make_item("mem-1", "rust", &content);
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let results = store
         .retrieve("Rust systems programming safety", 10)
-        .unwrap();
+        .expect("test operation should succeed");
     assert!(!results.is_empty(), "Should find the inserted item");
     assert_eq!(results[0].item.content, content);
 }
 
 #[test]
 fn test_add_only_preserves_conflicts() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item1 = make_item("mem-1", "language", "Python is dynamically typed");
     let item2 = make_item("mem-2", "language", "Python is statically typed");
 
-    store.insert(item1).unwrap();
-    store.insert(item2).unwrap();
+    store.insert(item1).expect("test operation should succeed");
+    store.insert(item2).expect("test operation should succeed");
 
     assert_eq!(
-        store.count().unwrap(),
+        store.count().expect("test operation should succeed"),
         2,
         "Both conflicting items should exist"
     );
@@ -80,23 +80,32 @@ fn test_add_only_preserves_conflicts() {
 
 #[test]
 fn test_exact_dedup_prevents_duplicates() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item("mem-1", "fact", "The sky is blue");
-    assert!(store.insert(item).unwrap(), "First insert should succeed");
+    assert!(
+        store.insert(item).expect("test operation should succeed"),
+        "First insert should succeed"
+    );
 
     let item_dup = make_item("mem-2", "fact", "The sky is blue");
     assert!(
-        !store.insert(item_dup).unwrap(),
+        !store
+            .insert(item_dup)
+            .expect("test operation should succeed"),
         "Duplicate should be ignored"
     );
 
-    assert_eq!(store.count().unwrap(), 1, "Only one row should exist");
+    assert_eq!(
+        store.count().expect("test operation should succeed"),
+        1,
+        "Only one row should exist"
+    );
 }
 
 #[test]
 fn test_bounded_retrieval_respects_limit() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     for i in 0..5 {
         let item = make_item(
@@ -104,10 +113,12 @@ fn test_bounded_retrieval_respects_limit() {
             "topic",
             &format!("Item number {i} about testing retrieval limits"),
         );
-        store.insert(item).unwrap();
+        store.insert(item).expect("test operation should succeed");
     }
 
-    let results = store.retrieve("testing retrieval", 3).unwrap();
+    let results = store
+        .retrieve("testing retrieval", 3)
+        .expect("test operation should succeed");
     assert!(
         results.len() <= 3,
         "Should respect limit of 3, got {}",
@@ -117,14 +128,14 @@ fn test_bounded_retrieval_respects_limit() {
 
 #[test]
 fn test_retrieval_includes_evidence() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item(
         "mem-1",
         "evidence-test",
         "Evidence links are important for provenance",
     );
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let link = EvidenceLink {
         id: "ev-1".to_string(),
@@ -133,9 +144,13 @@ fn test_retrieval_includes_evidence() {
         source_ref: "session-abc".to_string(),
         created_at: Utc::now(),
     };
-    store.insert_evidence(link).unwrap();
+    store
+        .insert_evidence(link)
+        .expect("test operation should succeed");
 
-    let results = store.retrieve("evidence provenance", 10).unwrap();
+    let results = store
+        .retrieve("evidence provenance", 10)
+        .expect("test operation should succeed");
     assert!(!results.is_empty());
     assert!(
         !results[0].evidence.is_empty(),
@@ -146,21 +161,21 @@ fn test_retrieval_includes_evidence() {
 
 #[test]
 fn test_retrieval_scoring_is_deterministic() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item(
         "mem-1",
         "deterministic",
         "Deterministic scoring test content for verification",
     );
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let results1 = store
         .retrieve("deterministic scoring verification", 10)
-        .unwrap();
+        .expect("test operation should succeed");
     let results2 = store
         .retrieve("deterministic scoring verification", 10)
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(results1.len(), results2.len());
     if !results1.is_empty() {
@@ -175,15 +190,19 @@ fn test_retrieval_scoring_is_deterministic() {
 
 #[test]
 fn test_retrieve_empty_query_returns_nothing() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item("mem-1", "test", "Some content here");
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
-    let results = store.retrieve("", 10).unwrap();
+    let results = store
+        .retrieve("", 10)
+        .expect("test operation should succeed");
     assert!(results.is_empty(), "Empty query should return no results");
 
-    let results = store.retrieve("   ", 10).unwrap();
+    let results = store
+        .retrieve("   ", 10)
+        .expect("test operation should succeed");
     assert!(
         results.is_empty(),
         "Whitespace-only query should return no results"
@@ -192,25 +211,27 @@ fn test_retrieve_empty_query_returns_nothing() {
 
 #[test]
 fn test_get_by_id() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item("mem-1", "lookup", "Lookup by ID test content");
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
-    let found = store.get("mem-1").unwrap();
+    let found = store.get("mem-1").expect("test operation should succeed");
     assert!(found.is_some());
-    let found = found.unwrap();
+    let found = found.expect("test operation should succeed");
     assert_eq!(found.id, "mem-1");
     assert_eq!(found.content, "Lookup by ID test content");
     assert_eq!(found.kind, MemoryKind::Semantic);
 
-    let not_found = store.get("nonexistent").unwrap();
+    let not_found = store
+        .get("nonexistent")
+        .expect("test operation should succeed");
     assert!(not_found.is_none());
 }
 
 #[test]
 fn test_procedural_kind_roundtrip() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let now = Utc::now();
     let item = MemoryItem {
@@ -224,18 +245,21 @@ fn test_procedural_kind_roundtrip() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
-    let found = store.get("proc-1").unwrap().unwrap();
+    let found = store
+        .get("proc-1")
+        .expect("test operation should succeed")
+        .expect("test operation should succeed");
     assert_eq!(found.kind, MemoryKind::Procedural);
 }
 
 #[test]
 fn test_evidence_link_persists() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item("mem-1", "test", "Test content");
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let link = EvidenceLink {
         id: "ev-1".to_string(),
@@ -244,9 +268,13 @@ fn test_evidence_link_persists() {
         source_ref: "read:src/main.rs".to_string(),
         created_at: Utc::now(),
     };
-    store.insert_evidence(link).unwrap();
+    store
+        .insert_evidence(link)
+        .expect("test operation should succeed");
 
-    let results = store.retrieve("Test content", 10).unwrap();
+    let results = store
+        .retrieve("Test content", 10)
+        .expect("test operation should succeed");
     assert!(!results.is_empty());
     assert_eq!(results[0].evidence.len(), 1);
     assert_eq!(results[0].evidence[0].source_type, "tool_call");
@@ -254,7 +282,7 @@ fn test_evidence_link_persists() {
 
 #[test]
 fn test_evidence_requires_existing_memory() {
-    let store = MemoryStore::open_memory().unwrap();
+    let store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let link = EvidenceLink {
         id: "ev-orphan".to_string(),
@@ -275,44 +303,52 @@ fn test_evidence_requires_existing_memory() {
 
 #[test]
 fn test_memory_maintenance_operations_run() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     store
         .insert(make_item(
             "mem-1",
             "maintenance",
             "maintenance test content",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
 
-    store.checkpoint_truncate().unwrap();
-    store.vacuum().unwrap();
-    assert_eq!(store.count().unwrap(), 1);
+    store
+        .checkpoint_truncate()
+        .expect("test operation should succeed");
+    store.vacuum().expect("test operation should succeed");
+    assert_eq!(store.count().expect("test operation should succeed"), 1);
 }
 
 #[test]
 fn test_count_reflects_inserts() {
-    let mut store = MemoryStore::open_memory().unwrap();
-    assert_eq!(store.count().unwrap(), 0);
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
+    assert_eq!(store.count().expect("test operation should succeed"), 0);
 
-    store.insert(make_item("m1", "k", "c1")).unwrap();
-    assert_eq!(store.count().unwrap(), 1);
+    store
+        .insert(make_item("m1", "k", "c1"))
+        .expect("test operation should succeed");
+    assert_eq!(store.count().expect("test operation should succeed"), 1);
 
-    store.insert(make_item("m2", "k", "c2")).unwrap();
-    assert_eq!(store.count().unwrap(), 2);
+    store
+        .insert(make_item("m2", "k", "c2"))
+        .expect("test operation should succeed");
+    assert_eq!(store.count().expect("test operation should succeed"), 2);
 
     // Exact dup should not increase count.
-    store.insert(make_item("m3", "k", "c1")).unwrap();
-    assert_eq!(store.count().unwrap(), 2);
+    store
+        .insert(make_item("m3", "k", "c1"))
+        .expect("test operation should succeed");
+    assert_eq!(store.count().expect("test operation should succeed"), 2);
 }
 
 // --- format_memory_prompt tests ---
 
 #[test]
 fn format_memory_prompt_disabled_returns_none() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     store
         .insert(make_item("mem-1", "test", "some content"))
-        .unwrap();
+        .expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: false,
@@ -323,7 +359,7 @@ fn format_memory_prompt_disabled_returns_none() {
 
 #[test]
 fn format_memory_prompt_no_results_returns_none() {
-    let store = MemoryStore::open_memory().unwrap();
+    let store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: true,
@@ -334,7 +370,7 @@ fn format_memory_prompt_no_results_returns_none() {
 
 #[test]
 fn format_memory_prompt_produces_bounded_section() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     store
         .insert(make_item(
@@ -342,21 +378,21 @@ fn format_memory_prompt_produces_bounded_section() {
             "rust",
             "Rust is a systems language focused on safety",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
     store
         .insert(make_item(
             "mem-2",
             "rust",
             "Rust has zero-cost abstractions and no garbage collector",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
     store
         .insert(make_item(
             "mem-3",
             "testing",
             "Testing is important for software quality",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
 
     // Add evidence for provenance.
     store
@@ -367,7 +403,7 @@ fn format_memory_prompt_produces_bounded_section() {
             source_ref: "session-abc:entry-1:0".to_string(),
             created_at: Utc::now(),
         })
-        .unwrap();
+        .expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: true,
@@ -377,7 +413,7 @@ fn format_memory_prompt_produces_bounded_section() {
     let result = format_memory_prompt(&store, "Rust safety", &config);
 
     assert!(result.is_some(), "Should produce output");
-    let text = result.unwrap();
+    let text = result.expect("test operation should succeed");
     assert!(text.contains("## Relevant Memory"), "Should contain header");
     assert!(text.contains("confidence="), "Should contain confidence");
     assert!(text.contains("source:"), "Should contain source reference");
@@ -386,12 +422,12 @@ fn format_memory_prompt_produces_bounded_section() {
 
 #[test]
 fn format_memory_prompt_truncates_on_budget() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let long_content = "This is a very long memory item that contains a lot of text to test the truncation behavior of the format_memory_prompt function when the character budget is exceeded by the accumulated output length of multiple memory items combined together in the final formatted string".repeat(3);
     store
         .insert(make_item("mem-1", "long", &long_content))
-        .unwrap();
+        .expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: true,
@@ -401,7 +437,7 @@ fn format_memory_prompt_truncates_on_budget() {
     let result = format_memory_prompt(&store, "long memory", &config);
 
     assert!(result.is_some(), "Should produce some output");
-    let text = result.unwrap();
+    let text = result.expect("test operation should succeed");
     assert!(
         text.contains("truncated"),
         "Should contain truncation notice, got: {text}"
@@ -411,7 +447,7 @@ fn format_memory_prompt_truncates_on_budget() {
 
 #[test]
 fn format_memory_prompt_filters_hidden_output() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     // Insert a clean memory item.
     store
@@ -420,7 +456,7 @@ fn format_memory_prompt_filters_hidden_output() {
             "clean",
             "Rust is a safe systems language",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
 
     // Insert items that look like hidden tool output.
     store
@@ -429,21 +465,21 @@ fn format_memory_prompt_filters_hidden_output() {
             "tool-like",
             "<tool_result>file read successfully</tool_result>",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
     store
         .insert(make_item(
             "mem-3",
             "tool-like-2",
             "Tool output: the file contains 42 lines",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
     store
         .insert(make_item(
             "mem-4",
             "tool-like-3",
             "is_error: true, message: something failed",
         ))
-        .unwrap();
+        .expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: true,
@@ -472,7 +508,7 @@ fn format_memory_prompt_filters_hidden_output() {
 
 #[test]
 fn format_memory_prompt_marks_contradictions() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let now = Utc::now();
     let item = MemoryItem {
@@ -486,7 +522,7 @@ fn format_memory_prompt_marks_contradictions() {
         last_accessed: None,
         contradiction_ref: Some("ref-123".to_string()),
     };
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let config = MemoryPromptConfig {
         enabled: true,
@@ -496,7 +532,7 @@ fn format_memory_prompt_marks_contradictions() {
     let result = format_memory_prompt(&store, "Python typed", &config);
 
     assert!(result.is_some(), "Should produce output");
-    let text = result.unwrap();
+    let text = result.expect("test operation should succeed");
     assert!(
         text.contains("CONTRADICTION"),
         "Should mark contradiction, got: {text}"
@@ -587,7 +623,7 @@ fn extract_entities_malformed_input_no_panic() {
 
 #[test]
 fn entity_overlap_boosts_retrieval() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     // Memory with file paths that match the query.
     let item1 = make_item(
@@ -595,7 +631,7 @@ fn entity_overlap_boosts_retrieval() {
         "entity-test",
         "Update src/main.rs to fix the bug in Cargo.toml",
     );
-    store.insert(item1).unwrap();
+    store.insert(item1).expect("test operation should succeed");
 
     // Memory with unrelated content.
     let item2 = make_item(
@@ -603,9 +639,11 @@ fn entity_overlap_boosts_retrieval() {
         "entity-test",
         "The weather is nice today and the sky is blue",
     );
-    store.insert(item2).unwrap();
+    store.insert(item2).expect("test operation should succeed");
 
-    let results = store.retrieve("src/main.rs Cargo.toml", 10).unwrap();
+    let results = store
+        .retrieve("src/main.rs Cargo.toml", 10)
+        .expect("test operation should succeed");
     assert!(!results.is_empty(), "Should find results");
 
     // The entity-matching item should rank higher or at least appear.
@@ -622,7 +660,7 @@ fn entity_overlap_boosts_retrieval() {
 
 #[test]
 fn procedural_memory_storage_and_retrieval() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let now = Utc::now();
     let item = MemoryItem {
@@ -636,19 +674,24 @@ fn procedural_memory_storage_and_retrieval() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
-    let results = store.retrieve("cargo fmt commit", 10).unwrap();
+    let results = store
+        .retrieve("cargo fmt commit", 10)
+        .expect("test operation should succeed");
     assert!(!results.is_empty(), "Should retrieve procedural memory");
 
     let found = results.iter().find(|r| r.item.id == "proc-test-1");
     assert!(found.is_some(), "Should find the procedural item");
-    assert_eq!(found.unwrap().item.kind, MemoryKind::Procedural);
+    assert_eq!(
+        found.expect("test operation should succeed").item.kind,
+        MemoryKind::Procedural
+    );
 }
 
 #[test]
 fn procedural_memory_has_no_permission_authority() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = MemoryItem {
         id: "proc-perm-test".to_string(),
@@ -661,9 +704,11 @@ fn procedural_memory_has_no_permission_authority() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    assert!(store.insert(item).unwrap());
+    assert!(store.insert(item).expect("test operation should succeed"));
 
-    let results = store.retrieve("cargo fmt", 10).unwrap();
+    let results = store
+        .retrieve("cargo fmt", 10)
+        .expect("test operation should succeed");
     assert!(!results.is_empty());
 
     // Memory retrieval returns data only — no permission grant.
@@ -672,14 +717,14 @@ fn procedural_memory_has_no_permission_authority() {
 
 #[test]
 fn entity_linking_on_insert() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     let item = make_item(
         "mem-link-test",
         "entity-linking",
         "Update src/lib.rs and check Cargo.toml for dependencies",
     );
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     // Verify entities were linked in the database.
     let entity_count: i64 = store
@@ -689,7 +734,7 @@ fn entity_linking_on_insert() {
             params!["mem-link-test"],
             |row| row.get(0),
         )
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert!(
         entity_count > 0,
@@ -700,7 +745,7 @@ fn entity_linking_on_insert() {
     let total_entities: i64 = store
         .conn
         .query_row("SELECT COUNT(*) FROM entities", [], |row| row.get(0))
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert!(
         total_entities > 0,
@@ -710,9 +755,10 @@ fn entity_linking_on_insert() {
 
 #[test]
 fn corrupt_db_degrades_gracefully() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("test operation should succeed");
     let corrupt_path = dir.path().join("corrupt.db");
-    std::fs::write(&corrupt_path, b"this is not a valid sqlite database file").unwrap();
+    std::fs::write(&corrupt_path, b"this is not a valid sqlite database file")
+        .expect("test operation should succeed");
 
     let result = MemoryStore::open(&corrupt_path);
     assert!(
@@ -735,7 +781,7 @@ fn corrupt_db_degrades_gracefully() {
 
 #[test]
 fn missing_db_path_handled() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("test operation should succeed");
     let nested_path = dir.path().join("nonexistent").join("sub").join("memory.db");
 
     let result = MemoryStore::open(&nested_path);
@@ -747,7 +793,7 @@ fn missing_db_path_handled() {
 
 #[test]
 fn memory_status_reports_counts() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
 
     for i in 0..3 {
         let item = make_item(
@@ -755,7 +801,7 @@ fn memory_status_reports_counts() {
             "status-test",
             &format!("Update src/lib.rs for semantic fact {i}"),
         );
-        store.insert(item).unwrap();
+        store.insert(item).expect("test operation should succeed");
     }
 
     let now = Utc::now();
@@ -771,7 +817,7 @@ fn memory_status_reports_counts() {
             last_accessed: None,
             contradiction_ref: None,
         };
-        store.insert(item).unwrap();
+        store.insert(item).expect("test operation should succeed");
     }
 
     for i in 0..3 {
@@ -783,10 +829,12 @@ fn memory_status_reports_counts() {
                 source_ref: format!("session-{i}"),
                 created_at: Utc::now(),
             })
-            .unwrap();
+            .expect("test operation should succeed");
     }
 
-    let status = store.memory_status().unwrap();
+    let status = store
+        .memory_status()
+        .expect("test operation should succeed");
     assert_eq!(status.total_items, 5);
     assert_eq!(status.semantic_count, 3);
     assert_eq!(status.procedural_count, 2);
@@ -798,7 +846,7 @@ fn memory_status_reports_counts() {
 
 #[test]
 fn retention_dry_run_no_deletion() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     let now = Utc::now();
 
     let low_conf = MemoryItem {
@@ -812,7 +860,9 @@ fn retention_dry_run_no_deletion() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(low_conf).unwrap();
+    store
+        .insert(low_conf)
+        .expect("test operation should succeed");
 
     let high_conf = MemoryItem {
         id: "high-conf".to_string(),
@@ -825,24 +875,28 @@ fn retention_dry_run_no_deletion() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(high_conf).unwrap();
+    store
+        .insert(high_conf)
+        .expect("test operation should succeed");
 
     let policy = RetentionPolicy {
         min_confidence: Some(0.5),
         ..Default::default()
     };
 
-    let candidates = store.retention_candidates(&policy).unwrap();
+    let candidates = store
+        .retention_candidates(&policy)
+        .expect("test operation should succeed");
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].id, "low-conf");
 
-    let count_before = store.count().unwrap();
+    let count_before = store.count().expect("test operation should succeed");
     assert_eq!(count_before, 2);
 }
 
 #[test]
 fn retention_key_preview_truncated() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     let now = Utc::now();
 
     let long_key =
@@ -859,14 +913,16 @@ fn retention_key_preview_truncated() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(item).unwrap();
+    store.insert(item).expect("test operation should succeed");
 
     let policy = RetentionPolicy {
         min_confidence: Some(0.5),
         ..Default::default()
     };
 
-    let candidates = store.retention_candidates(&policy).unwrap();
+    let candidates = store
+        .retention_candidates(&policy)
+        .expect("test operation should succeed");
     assert_eq!(candidates.len(), 1);
     assert!(
         candidates[0].key_preview.len() <= 30,
@@ -879,7 +935,7 @@ fn retention_key_preview_truncated() {
 
 #[test]
 fn retention_unreinforced_only() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     let now = Utc::now();
 
     let with_evidence = MemoryItem {
@@ -893,7 +949,9 @@ fn retention_unreinforced_only() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(with_evidence).unwrap();
+    store
+        .insert(with_evidence)
+        .expect("test operation should succeed");
     store
         .insert_evidence(EvidenceLink {
             id: "ev-1".to_string(),
@@ -902,7 +960,7 @@ fn retention_unreinforced_only() {
             source_ref: "session-1".to_string(),
             created_at: now,
         })
-        .unwrap();
+        .expect("test operation should succeed");
 
     let without_evidence = MemoryItem {
         id: "without-ev".to_string(),
@@ -915,21 +973,25 @@ fn retention_unreinforced_only() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(without_evidence).unwrap();
+    store
+        .insert(without_evidence)
+        .expect("test operation should succeed");
 
     let policy = RetentionPolicy {
         unreinforced_only: true,
         ..Default::default()
     };
 
-    let candidates = store.retention_candidates(&policy).unwrap();
+    let candidates = store
+        .retention_candidates(&policy)
+        .expect("test operation should succeed");
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].id, "without-ev");
 }
 
 #[test]
 fn end_to_end_memory_pipeline() {
-    let mut store = MemoryStore::open_memory().unwrap();
+    let mut store = MemoryStore::open_memory().expect("test operation should succeed");
     let now = Utc::now();
 
     let semantic = MemoryItem {
@@ -943,7 +1005,9 @@ fn end_to_end_memory_pipeline() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(semantic).unwrap();
+    store
+        .insert(semantic)
+        .expect("test operation should succeed");
 
     store
         .insert_evidence(EvidenceLink {
@@ -953,7 +1017,7 @@ fn end_to_end_memory_pipeline() {
             source_ref: "session-e2e:turn-0".to_string(),
             created_at: now,
         })
-        .unwrap();
+        .expect("test operation should succeed");
 
     let procedural = MemoryItem {
         id: "e2e-proc".to_string(),
@@ -966,15 +1030,21 @@ fn end_to_end_memory_pipeline() {
         last_accessed: None,
         contradiction_ref: None,
     };
-    store.insert(procedural).unwrap();
+    store
+        .insert(procedural)
+        .expect("test operation should succeed");
 
-    let sem_results = store.retrieve("Rust memory safety", 5).unwrap();
+    let sem_results = store
+        .retrieve("Rust memory safety", 5)
+        .expect("test operation should succeed");
     assert!(
         sem_results.iter().any(|r| r.item.id == "e2e-sem"),
         "Should retrieve semantic memory"
     );
 
-    let proc_results = store.retrieve("cargo test", 5).unwrap();
+    let proc_results = store
+        .retrieve("cargo test", 5)
+        .expect("test operation should succeed");
     assert!(
         proc_results.iter().any(|r| r.item.id == "e2e-proc"),
         "Should retrieve procedural memory"
@@ -987,13 +1057,15 @@ fn end_to_end_memory_pipeline() {
     };
     let prompt = format_memory_prompt(&store, "Rust memory safety", &config);
     assert!(prompt.is_some(), "Should produce formatted prompt");
-    let prompt_text = prompt.unwrap();
+    let prompt_text = prompt.expect("test operation should succeed");
     assert!(
         prompt_text.contains("memory safety"),
         "Prompt should contain memory content"
     );
 
-    let status = store.memory_status().unwrap();
+    let status = store
+        .memory_status()
+        .expect("test operation should succeed");
     assert_eq!(status.total_items, 2);
     assert_eq!(status.semantic_count, 1);
     assert_eq!(status.procedural_count, 1);
