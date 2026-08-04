@@ -671,4 +671,3 @@ failure cannot silently restore different request semantics.
 
 This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
 Proposed, and Issue #119 remains Open.
-
