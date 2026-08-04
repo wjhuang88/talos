@@ -25,24 +25,6 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - name: Verify corrected patch transport
-        shell: bash
-        run: |
-          set -euo pipefail
-          wc -c .github/i169-followup2.patch.gz.b64.part*
-          sha256sum .github/i169-followup2.patch.gz.b64.part*
-          test "$(cat .github/i169-followup2.patch.gz.b64.part* | wc -c)" -eq 10348
-          test "$(cat .github/i169-followup2.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "3fa50751220e22a2784a0a956aa8d033840869bc133728f246ee53bb1f1edec7"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part00 | cut -d' ' -f1)" = "2a726e5be56f71c525d81ba4553a96f19e710d229b4368fbba00b0686c7fa0d7"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part01 | cut -d' ' -f1)" = "80de1949822734447f624c04f436c4e45728711e2428d17e59a07e04a770ed5a"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part02 | cut -d' ' -f1)" = "f78e0b77d78f73d50f2d49635abfab087d94a652d29bde4834ccdf82cbdd8863"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part03 | cut -d' ' -f1)" = "00b8d43688da1a16fbe8aa4fadff06af2e47d8d825e86c99c0f2032a281e2077"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part04 | cut -d' ' -f1)" = "f7294301e16aac6b1783c64cfba1d99950a0fc08b74a6e7644f084e972ff920f"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05a | cut -d' ' -f1)" = "5dfe695b54307f2277f898fcd02a040f9aec229c34c4562b148d8de533a8707a"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05b | cut -d' ' -f1)" = "048d9f2f640c339cb16742e803098316caf5c3d68cef18a31854632c92bdd306"
-          test "$(wc -c < .github/i169-followup2-testfix.patch.gz.b64)" -eq 796
-          test "$(sha256sum .github/i169-followup2-testfix.patch.gz.b64 | cut -d' ' -f1)" = "b090a02733e967a5acdc418e5767655d3edefed3f79c95317740eb8675ee0495"
-
       - name: Apply and format corrected follow-up
         shell: bash
         run: |
@@ -50,184 +32,25 @@ jobs:
           cat .github/i169-followup2.patch.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/i169-followup2.patch
           test "$(sha256sum /tmp/i169-followup2.patch | cut -d' ' -f1)" = "39e833b09a8074351f4e9ead8696f6db39d50b2cc307bac21b56cbfb83a206ac"
           git apply --index /tmp/i169-followup2.patch
+
           base64 --decode .github/i169-followup2-testfix.patch.gz.b64 | gzip --decompress > /tmp/i169-followup2-testfix.patch
           test "$(sha256sum /tmp/i169-followup2-testfix.patch | cut -d' ' -f1)" = "1f34e7b342f3513dfb344bbfd68e47fa025893ac7ce5c4f5daa79ed3ea0a6924"
           git apply --index /tmp/i169-followup2-testfix.patch
-          python3 - <<'PY'
-          from pathlib import Path
 
-          def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
-              file = Path(path)
-              text = file.read_text()
-              actual = text.count(old)
-              if actual != expected:
-                  raise SystemExit(
-                      f"{path}: expected {expected} exact replacement(s), found {actual}"
-                  )
-              file.write_text(text.replace(old, new))
+          printf '%s' 'H4sIAAAAAAAC/+1YbW/bNhD+nl9BZEAhz7ITWUjSqhiQrGmxDQtQpGm/DINAU5TDRSY1vtQOiv73HUXJlhj5bei2Dqg+yBJ5dzzePfec6IzlORqNZkwjfEIk1lSdaFwINSIFO1GSnCiqFBM8vcc8K6hUY6nQdG/Ro9FodIDlo+FweIj1y0s0Or8IL9AQ7pNTBO9zkSFQ1gp9OkLNVVCNAvVnqpfpAmtyDw8hStsDcjlAP6DqOUkIrMFpEUi8cEKDl56tqWTZjIJWasoMnHUGn4w6q/NSkSQxfCoMz2iWNuZ9q/dCPCiQnxpWZKl9SyWdMaXlY6CloSA/asvPSZkSwXM2A6UqWPVrktyQ8lX9mNEcm0Lb1YZtbVyWUnzERRNQsHElwU9OF8GdYVf19E9u1o2vLdjLMNj2mBSC02AQducyJscl1vfBYKxFap/Sqck7YgPfI2m4ZnOaVvuvHAI/bt3gj27sUDeqkB7umr0avM0xxzMqNyzgR9Gb/kDriPp6OS4U9cZsjtvxAXh0ATI3Gq0S3pPflbATqsrjeRRGUB8vTsMo3lgf9nqmJeaKadhz6M1UEfYH3RrhGpLVaB3wUX/Afek1gr1QPPOw4C/eJGdVzf58t9a92b7q3bqAXPqee+jw1I9FfHn9+s3V+1/vji3IoIQZn9n9d8TeiTkNjkVJOWYdOT9QDhmr18H6cYwXmGmLlGwnlUPqYdMGuEeqtMLAFjLvFd5G5/0KWwi9X8FiNppEcfgcDavfSWRhi9UjJyjnqIxytozrcktXaQBbRaoMITCQKggiTNZpdjkOBm3Ar7GeigU40M3LGGuNIe2YaPax8tFiMRDAyjAkZPqHYDxEitzTzEDRpwRzQov2iJUYeFYNX0hcPqH9tS9tCtbigYkksdsGOjeaLutxz/PB/6krLIR8UCUm9GvtDXs7+LV2iKoOJFWQW5t+ByIbJHcXRgddVCqdNQLXBsoUNpQkuRRzqC2igjNwy5XkZFI1kmgSx3Ur+cI1ubsRbWxGmxvSxqbUl+0+3Y0tao82tU+r2t2u2i1rg/r2ZrVHw6qalsZyRvWoytu2trVuXbXGbLG1e/V0sAq92zqaA108eWE/7qM4Pq8/7/fCXI5ZYSRNuYBSqFLTRdrhrOv1bbfa3cqEE6qyGDa00NDBYMX77f1+Y+1vrL2JtfswHWz5WHelEl84fo7Pzg7h51218s8eDXYw8H98QPjixwIOUFvCgZ7yPWjWUWxbxUKSwWb/pbNCkRYsp+SRFHTHQaErueuU4EnvOCJ40hbsF9F5GJ2iYfXbf6o1iiJlSssv379sDdmvHQu1JHkL95qu7IzjXEga10lyZX9aal1CflunwbFyj5iEj6nK9ST5dGN/X+EST1kBFURViG4pVoJD8l7nuZA6RB+wZJjra5p/3mBNCwHG7uB+W/8j9ESwAYddmjxA24B742ndbNbCNU7Bv1/AlaJuaO/gbEPDpr295rDM6u1nnovVSyX4+Un01lbXxfq37N/U5dNZr2aAdoiMYZDP93Bfcep3v8F+4dQWXAObzQa/H/0FsH8oduMUAAA=' | base64 --decode | gzip --decompress > /tmp/i169-followup2-testwiring.patch
+          test "$(sha256sum /tmp/i169-followup2-testwiring.patch | cut -d' ' -f1)" = "80063619f570976929ade9a1c4f57b0c0e762c8c43a1cddbb1564d835c1e7747"
+          set +e
+          git apply --reject /tmp/i169-followup2-testwiring.patch
+          apply_status=$?
+          set -e
+          test "$apply_status" -eq 1
+          mapfile -t rejects < <(find crates -name '*.rej' -type f)
+          test "${#rejects[@]}" -eq 1
+          test "${rejects[0]}" = "crates/talos-cli/src/mode_runners_tests.rs.rej"
+          grep -q 'nonexistent-provider' "${rejects[0]}"
+          printf '%s' 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwYXRoID0gUGF0aCgiY3JhdGVzL3RhbG9zLWNsaS9zcmMvbW9kZV9ydW5uZXJzX3Rlc3RzLnJzIikKdGV4dCA9IHBhdGgucmVhZF90ZXh0KCkKb2xkID0gIiIiICAgICAgICBsZXQgbW9kZWxfcmVzdWx0ID0gaGFuZGxlX3Nlc3Npb25fbW9kZWwoCiAgICAgICAgICAgICZ0cmFuc2l0aW9uLAogICAgICAgICAgICAmdWlfdHgsCiAgICAgICAgICAgICZjb25maWcsCiAgICAgICAgICAgICZob29rcywKICAgICAgICAgICAgd29ya3NwYWNlLnBhdGgoKSwKICAgICAgICAgICAgJm1jcF9jb25maWcsCiAgICAgICAgICAgICZzZXNzaW9uX3dhdGNoX3R4LAogICAgICAgICAgICAmc3FfdHhfd2F0Y2hfdHgsCiAgICAgICAgICAgICZicmlkZ2VfdHgsCiAgICAgICAgICAgICZzZXNzaW9uX3dhdGNoX3J4LAogICAgICAgICAgICAmc2Vzc2lvbl9tYW5hZ2VyLAogICAgICAgICAgICAibm9uZXhpc3RlbnQtbW9kZWwiLnRvX3N0cmluZygpLAogICAgICAgICAgICBTb21lKCJub25leGlzdGVudC1wcm92aWRlciIudG9fc3RyaW5nKCkpLAogICAgICAgICAgICB0cnVlLAogICAgICAgICkKIiIiCm5ldyA9ICIiIiAgICAgICAgbGV0IG1vZGVsX3Jlc3VsdCA9IGhhbmRsZV9zZXNzaW9uX21vZGVsKAogICAgICAgICAgICAmdHJhbnNpdGlvbiwKICAgICAgICAgICAgJnVpX3R4LAogICAgICAgICAgICAmY29uZmlnLAogICAgICAgICAgICAmcnVudGltZV9idWlsZGVyLAogICAgICAgICAgICAmc2Vzc2lvbl93YXRjaF90eCwKICAgICAgICAgICAgJnNxX3R4X3dhdGNoX3R4LAogICAgICAgICAgICAmYnJpZGdlX3R4LAogICAgICAgICAgICAmc2Vzc2lvbl93YXRjaF9yeCwKICAgICAgICAgICAgIm5vbmV4aXN0ZW50LW1vZGVsIi50b19zdHJpbmcoKSwKICAgICAgICAgICAgU29tZSgibm9uZXhpc3RlbnQtcHJvdmlkZXIiLnRvX3N0cmluZygpKSwKICAgICAgICApCiIiIgppZiB0ZXh0LmNvdW50KG9sZCkgIT0gMToKICAgIHJhaXNlIFN5c3RlbUV4aXQoZiJleHBlY3RlZCBvbmUgcmVqZWN0ZWQgZmFpbHVyZS1wYXRoIGNhbGwsIGZvdW5kIHt0ZXh0LmNvdW50KG9sZCl9IikKcGF0aC53cml0ZV90ZXh0KHRleHQucmVwbGFjZShvbGQsIG5ldykpCg==' | base64 --decode | python3
+          rm "${rejects[0]}"
 
-          replace_exact(
-              "crates/talos-cli/src/session_handlers.rs",
-              """        let hooks = build_hook_registry(true);
-        let mcp_config = talos_config::McpConfig::default();
-""",
-              """        let hooks = build_hook_registry(true);
-        let approval_handler = Arc::new(TuiApprovalHandler::new(
-            ui_tx.clone(),
-            dir.path().to_path_buf(),
-        ));
-        let runtime_builder = TuiRuntimeBuilder::new(
-            ui_tx.clone(),
-            hooks,
-            dir.path().to_path_buf(),
-            session_manager.clone(),
-            approval_handler,
-            Vec::new(),
-            false,
-            true,
-        );
-""",
-          )
-          replace_exact(
-              "crates/talos-cli/src/session_handlers.rs",
-              """        let result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &hooks,
-            dir.path(),
-            &mcp_config,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_rx_update_tx,
-            &session_watch_rx,
-            &session_manager,
-            "o3@DEFAULT".to_string(),
-            Some("openai".to_string()),
-            true,
-        )
-""",
-              """        let result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &runtime_builder,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_rx_update_tx,
-            &session_watch_rx,
-            "o3@DEFAULT".to_string(),
-            Some("openai".to_string()),
-        )
-""",
-          )
-
-          replace_exact(
-              "crates/talos-cli/src/mode_runners_tests.rs",
-              """        let mcp_config = talos_config::McpConfig::default();
-""",
-              """        let approval_handler = Arc::new(TuiApprovalHandler::new(
-            ui_tx.clone(),
-            workspace.path().to_path_buf(),
-        ));
-        let runtime_builder = TuiRuntimeBuilder::new(
-            ui_tx.clone(),
-            hooks.clone(),
-            workspace.path().to_path_buf(),
-            session_manager.clone(),
-            approval_handler,
-            Vec::new(),
-            false,
-            true,
-        );
-""",
-              expected=2,
-          )
-          replace_exact(
-              "crates/talos-cli/src/mode_runners_tests.rs",
-              """            handle_session_model(
-                &transition,
-                &ui_tx,
-                &config,
-                &hooks,
-                workspace.path(),
-                &mcp_config,
-                &session_watch_tx,
-                &sq_tx_watch_tx,
-                &bridge_tx,
-                &session_watch_rx,
-                &session_manager,
-                "target-model".to_string(),
-                Some("target-gw".to_string()),
-                true,
-            ),
-""",
-              """            handle_session_model(
-                &transition,
-                &ui_tx,
-                &config,
-                &runtime_builder,
-                &session_watch_tx,
-                &sq_tx_watch_tx,
-                &bridge_tx,
-                &session_watch_rx,
-                "target-model".to_string(),
-                Some("target-gw".to_string()),
-            ),
-""",
-          )
-          replace_exact(
-              "crates/talos-cli/src/mode_runners_tests.rs",
-              """        let model_result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &hooks,
-            workspace.path(),
-            &mcp_config,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_tx,
-            &session_watch_rx,
-            &session_manager,
-            "nonexistent-model".to_string(),
-            Some("nonexistent-provider".to_string()),
-            true,
-        )
-""",
-              """        let model_result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &runtime_builder,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_tx,
-            &session_watch_rx,
-            "nonexistent-model".to_string(),
-            Some("nonexistent-provider".to_string()),
-        )
-""",
-          )
-
-          replace_exact(
-              "crates/talos-cli/src/model_lifecycle.rs",
-              """    use talos_config::ProviderConfig;
-""",
-              """    use talos_agent::Agent;
-    use talos_config::ProviderConfig;
-""",
-          )
-          replace_exact(
-              "crates/talos-cli/src/model_lifecycle.rs",
-              """    use talos_session::{JsonlSessionStore, SessionEntry, SessionInfo, SessionStore};
-""",
-              """    use talos_session::{
-        JsonlSessionStore, SessionEntry, SessionInfo, SessionManager, SessionStore,
-    };
-""",
-          )
-          PY
           cargo fmt --all
           git add -A
           cargo fmt --all -- --check
