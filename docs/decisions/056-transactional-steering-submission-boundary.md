@@ -671,3 +671,15 @@ failure cannot silently restore different request semantics.
 
 This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
 Proposed, and Issue #119 remains Open.
+
+## Runtime projection clarification (2026-08-04)
+
+A durable provider/model/variant identity is not sufficient unless every runtime reconstruction
+deterministically materializes the same effective Provider request options. The implementation under
+review therefore uses one shared materialization boundary before Provider construction across live
+switch, startup, resume, new/fork and headless roots. Persisted identity remains declarative; derived
+reasoning/options are reconstructed from the selected catalog variant on every build. Equivalent
+baseline spellings are normalized before no-op decisions and cannot create a new activation.
+
+This clarification records the implementation contract while ADR-056 remains Proposed. It does not
+complete I169/TUI-044, close Issue #119, approve PR #131 or authorize merge.

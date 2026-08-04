@@ -54,6 +54,67 @@ mod tests {
             "boundary helper emits only two outputs"
         );
     }
+
+    #[tokio::test]
+    async fn normalized_default_model_selection_is_a_true_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        let session_manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+        let session = session_manager.create_session("project", "").unwrap();
+        let (raw_sq_tx, _raw_sq_rx) = mpsc::channel(4);
+        let transition = Arc::new(Mutex::new(
+            SessionTransition::new(raw_sq_tx.clone(), session.clone()).unwrap(),
+        ));
+        let generation_before = transition.lock().await.active_generation();
+
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+        let (session_watch_tx, session_watch_rx) = watch::channel(session.clone());
+        let (sq_tx_watch_tx, _sq_tx_watch_rx) = watch::channel(raw_sq_tx);
+        let (bridge_rx_update_tx, _bridge_rx_update_rx) = mpsc::unbounded_channel();
+        let hooks = build_hook_registry(true);
+        let mcp_config = talos_config::McpConfig::default();
+
+        let mut config = Config::default();
+        config
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut config, None);
+
+        let result = handle_session_model(
+            &transition,
+            &ui_tx,
+            &config,
+            &hooks,
+            dir.path(),
+            &mcp_config,
+            &session_watch_tx,
+            &sq_tx_watch_tx,
+            &bridge_rx_update_tx,
+            &session_watch_rx,
+            &session_manager,
+            "o3@DEFAULT".to_string(),
+            Some("openai".to_string()),
+            true,
+        )
+        .await;
+
+        assert!(result.is_none());
+        assert_eq!(
+            transition.lock().await.active_generation(),
+            generation_before,
+            "equivalent baseline selection must not fence or replace the Actor"
+        );
+        assert!(
+            session.read_entries().unwrap().iter().all(|entry| {
+                crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
+                    .is_none()
+            }),
+            "equivalent baseline selection must not append an activation record"
+        );
+        assert!(
+            ui_rx.try_recv().is_err(),
+            "a true no-op must not publish status or error output"
+        );
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -482,6 +543,18 @@ pub(crate) fn build_connect_picker_data(config: &Config) -> talos_conversation::
     }
 }
 
+fn same_model_activation_identity(current: &Config, requested: &Config) -> bool {
+    crate::mode_runtime::SessionModelIdentity::new(
+        &current.provider,
+        &current.model,
+        current.variant.as_deref(),
+    ) == crate::mode_runtime::SessionModelIdentity::new(
+        &requested.provider,
+        &requested.model,
+        requested.variant.as_deref(),
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_model(
     transition: &Arc<Mutex<SessionTransition>>,
@@ -540,10 +613,7 @@ pub(crate) async fn handle_session_model(
 
     let provider_name = model_config.provider.clone();
 
-    if config.model == parsed_model_id
-        && config.provider == provider_name
-        && config.variant == variant
-    {
+    if same_model_activation_identity(config, &model_config) {
         return None;
     }
 

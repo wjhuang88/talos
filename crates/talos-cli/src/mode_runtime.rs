@@ -534,6 +534,19 @@ mod tests {
             .unwrap();
     }
 
+    fn provider_reasoning_effort(config: &Config) -> Option<String> {
+        let provider = crate::provider_setup::build_provider(config, "sk-test-session", false);
+        let preview = provider
+            .request_preview(&[talos_core::message::Message::User {
+                content: "session reconstruction probe".to_string(),
+            }])
+            .expect("real provider request preview");
+        preview
+            .pointer("/body/reasoning_effort")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    }
+
     #[test]
     fn session_activation_restores_exact_variant_and_reasoning_options() {
         let session = activation_test_session("restore-variant");
@@ -552,20 +565,7 @@ mod tests {
         assert_eq!(config.model, "o3");
         assert_eq!(config.variant.as_deref(), Some("high-reasoning"));
 
-        let catalog = config.all_models();
-        let metadata =
-            talos_config::model::find_model_by_provider(&catalog, &config.provider, &config.model)
-                .expect("openai/o3 catalog metadata");
-        let resolution = crate::model_lifecycle::resolve_variant(
-            config.variant.as_deref(),
-            &metadata.variants,
-            &metadata.capabilities,
-        );
-        assert_eq!(
-            resolution.reasoning_effort,
-            Some(talos_core::model::ReasoningEffort::High)
-        );
-        assert_eq!(resolution.diagnostic, None);
+        assert_eq!(provider_reasoning_effort(&config).as_deref(), Some("high"));
     }
 
     #[test]
@@ -586,6 +586,7 @@ mod tests {
         assert_eq!(config.provider, "openai");
         assert_eq!(config.model, "gpt-4o");
         assert_eq!(config.variant, None);
+        assert_eq!(provider_reasoning_effort(&config), None);
     }
 
     #[test]
@@ -602,16 +603,9 @@ mod tests {
         apply_session_model_to_config(&mut config, &session);
         assert_eq!(config.variant.as_deref(), Some("deleted-variant"));
 
-        let catalog = config.all_models();
-        let metadata =
-            talos_config::model::find_model_by_provider(&catalog, &config.provider, &config.model)
-                .expect("openai/o3 catalog metadata");
-        let resolution = crate::model_lifecycle::resolve_variant(
-            config.variant.as_deref(),
-            &metadata.variants,
-            &metadata.capabilities,
-        );
+        let (_, resolution) = crate::model_lifecycle::materialize_runtime_model_config(&config);
         assert_eq!(resolution.reasoning_effort, None);
         assert!(resolution.diagnostic.is_some());
+        assert_eq!(provider_reasoning_effort(&config), None);
     }
 }

@@ -87,3 +87,55 @@ fn model_switch_activation_durability_precedes_replacement_publication() {
     assert!(!helper.contains("transition_guard.commit("));
     assert!(!helper.contains("sq_tx_watch_tx.send("));
 }
+
+#[test]
+fn provider_construction_cannot_bypass_variant_materialization() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let provider_setup = fs::read_to_string(crate_root.join("src/provider_setup.rs"))
+        .expect("read provider setup source")
+        .replace("\r\n", "\n");
+    let materialize = provider_setup
+        .find("materialize_runtime_model_config(config)")
+        .expect("shared runtime materialization call");
+    let mock_branch = provider_setup
+        .find("if mock {")
+        .expect("provider mock branch");
+    assert!(materialize < mock_branch);
+
+    let lifecycle = fs::read_to_string(crate_root.join("src/model_lifecycle.rs"))
+        .expect("read model lifecycle source");
+    assert!(lifecycle.contains("pub(crate) fn materialize_runtime_model_config("));
+
+    let handlers = fs::read_to_string(crate_root.join("src/session_handlers.rs"))
+        .expect("read session handlers source");
+    assert!(handlers.contains("same_model_activation_identity(config, &model_config)"));
+    assert!(!handlers.contains("config.variant == variant"));
+
+    fn visit(directory: &Path, provider_setup: &Path) {
+        for entry in fs::read_dir(directory).expect("read source directory") {
+            let path = entry.expect("source entry").path();
+            if path.is_dir() {
+                visit(&path, provider_setup);
+                continue;
+            }
+            if path.extension().and_then(|value| value.to_str()) != Some("rs")
+                || path == provider_setup
+            {
+                continue;
+            }
+            let source = fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+            assert!(
+                !source.contains("OpenAIProvider::new(")
+                    && !source.contains("AnthropicProvider::new("),
+                "Provider construction must remain centralized through build_provider: {}",
+                path.display()
+            );
+        }
+    }
+
+    visit(
+        &crate_root.join("src"),
+        &crate_root.join("src/provider_setup.rs"),
+    );
+}

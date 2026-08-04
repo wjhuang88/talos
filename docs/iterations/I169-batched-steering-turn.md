@@ -301,3 +301,15 @@ failure cannot silently restore different request semantics.
 
 This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
 Proposed, and Issue #119 remains Open.
+
+## 2026-08-04 runtime variant projection remediation
+
+The latest remediation removes the split between durable variant identity and effective Provider
+request options. `build_provider` now materializes the normalized active variant through the same
+shared projection used by live model replacement, covering initial TUI construction, resume,
+new/fork and other CLI roots. Real request previews assert High reasoning restoration and bounded
+unknown/default fallback. The `/model` no-op guard compares normalized activation identities, so an
+equivalent baseline selection performs no fence, replacement or durable activation append.
+
+This evidence is a fresh review handoff only. I169/TUI-044 remain Active, ADR-056 remains Proposed,
+and Issue #119 remains Open pending exact-head CI and independent review.

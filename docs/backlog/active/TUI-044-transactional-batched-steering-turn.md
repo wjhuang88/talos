@@ -202,3 +202,15 @@ failure cannot silently restore different request semantics.
 
 This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
 Proposed, and Issue #119 remains Open.
+
+## 2026-08-04 runtime variant projection remediation
+
+The current review cycle centralizes provider/model/variant runtime materialization before every
+Provider construction. Durable Session identity remains declarative, while one shared boundary
+resolves the normalized variant and projects its effective request options for live switching,
+startup, resume, new/fork and headless construction paths. Equivalent baseline spellings such as
+`None`, empty and `default` are true no-ops and cannot advance generation or append an activation.
+
+Production request-preview tests verify the actual OpenAI request `reasoning_effort`, rather than
+only the persisted label or resolver result. This remains implementation evidence under review;
+TUI-044 and I169 remain Active, ADR-056 remains Proposed, and Issue #119 remains Open.

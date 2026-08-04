@@ -189,6 +189,52 @@ pub(crate) fn resolve_variant(
     }
 }
 
+/// Materializes the declarative provider/model/variant identity into the exact
+/// effective runtime configuration consumed by Provider construction.
+///
+/// Persisted configuration keeps the stable variant identity separate from
+/// derived request options. Every runtime reconstruction must call this helper
+/// so live switching, startup, resume, new/fork and headless modes cannot
+/// disagree about the first Provider request.
+pub(crate) fn materialize_runtime_model_config(config: &Config) -> (Config, VariantResolution) {
+    let mut runtime_config = config.clone();
+    let all_models = config.all_models();
+    let metadata =
+        talos_config::model::find_model_by_provider(&all_models, &config.provider, &config.model);
+    let resolution = metadata.map_or_else(
+        || {
+            resolve_variant(
+                config.variant.as_deref(),
+                &[],
+                &ModelCapabilities::default(),
+            )
+        },
+        |model| {
+            resolve_variant(
+                config.variant.as_deref(),
+                &model.variants,
+                &model.capabilities,
+            )
+        },
+    );
+
+    if let Some(reasoning_effort) = resolution.reasoning_effort.clone() {
+        let provider = runtime_config
+            .providers
+            .entry(runtime_config.provider.clone())
+            .or_default();
+        let reasoning = provider
+            .models
+            .entry(runtime_config.model.clone())
+            .or_default()
+            .reasoning
+            .get_or_insert_with(ReasoningOptions::default);
+        reasoning.effort = Some(reasoning_effort);
+    }
+
+    (runtime_config, resolution)
+}
+
 /// Applies a variant change to a Config in-memory.
 ///
 /// Returns `true` when the value actually changed (so the caller can persist).
@@ -304,37 +350,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         mock,
     } = params;
 
-    let mut runtime_model_config = model_config.clone();
-    let all_models = model_config.all_models();
-    let metadata = talos_config::model::find_model_by_provider(
-        &all_models,
-        &model_config.provider,
-        &model_config.model,
-    );
-    let resolution = metadata.map_or_else(
-        || resolve_variant(variant.as_deref(), &[], &ModelCapabilities::default()),
-        |model| resolve_variant(variant.as_deref(), &model.variants, &model.capabilities),
-    );
-    if let Some(diagnostic) = resolution.diagnostic.as_deref() {
-        tracing::warn!(
-            provider = %model_config.provider,
-            model = %model_config.model,
-            "{diagnostic}"
-        );
-    }
-    if let Some(reasoning_effort) = resolution.reasoning_effort {
-        let provider = runtime_model_config
-            .providers
-            .entry(runtime_model_config.provider.clone())
-            .or_default();
-        let reasoning = provider
-            .models
-            .entry(runtime_model_config.model.clone())
-            .or_default()
-            .reasoning
-            .get_or_insert_with(ReasoningOptions::default);
-        reasoning.effort = Some(reasoning_effort);
-    }
+    let (runtime_model_config, _) = materialize_runtime_model_config(model_config);
 
     let model_context_limit = runtime_model_config.resolve_model_limits().0;
 
