@@ -38,7 +38,7 @@ jobs:
           from pathlib import Path
           workflow = Path('.github/workflows/i169-source-export.yml').read_text()
           matches = re.findall(
-              r"printf '%s' '([A-Za-z0-9+/=]+)' \| base64 --decode \| gzip --decompress > /tmp/i169-followup2-testwiring.patch",
+              r"printf '%s' '([A-Za-z0-9+/=]+)' \\| base64 --decode \\| gzip --decompress > /tmp/i169-followup2-testwiring.patch",
               workflow,
           )
           if len(matches) != 1:
@@ -94,28 +94,60 @@ jobs:
           '''
           layout = layout[:success_start] + success_replacement + layout[success_end:]
 
+          helper_end = layout.index('\n/// Test-only compatibility harness', function_start)
+          helper_guard = layout[function_start:helper_end]
+          old_fence = '.find(".quiesce_same_session(session)")\n        .expect("old runtime retirement");'
+          new_fence = '.find(".quiesce_same_session_for_activation(session, &activation)")\n        .expect("atomic activation stage and old-runtime retirement");'
+          if helper_guard.count(old_fence) != 1:
+              raise SystemExit(f'expected one old fence guard, found {helper_guard.count(old_fence)}')
+          helper_guard = helper_guard.replace(old_fence, new_fence)
+          if helper_guard.count('    assert!(fence < activation);') != 1:
+              raise SystemExit('expected one obsolete fence ordering assertion')
+          helper_guard = helper_guard.replace(
+              '    assert!(fence < activation);\n    assert!(activation < tail_check);',
+              '    assert!(activation < fence);\n    assert!(fence < tail_check);',
+          )
+          layout = layout[:function_start] + helper_guard + layout[helper_end:]
+
           guard_start = layout.index('fn tui_runtime_construction_is_centralized_in_the_shared_builder()')
-          forbidden_at = layout.index('        for forbidden in [', guard_start)
-          production_decl = '''        let production_source = source
-              .split("\\n#[cfg(test)]")
-              .next()
-              .expect("production source prefix");
-          '''
-          if 'let production_source = source' in layout[guard_start:forbidden_at]:
-              raise SystemExit('production-source guard unexpectedly already present')
-          layout = layout[:forbidden_at] + production_decl + layout[forbidden_at:]
-          guard_end = layout.index('\n}\n\n#[test]\nfn every_production_provider_root', guard_start)
-          guard = layout[guard_start:guard_end]
-          replacements = {
-              '!source.contains(forbidden)': '!production_source.contains(forbidden)',
-              'ad-hoc TUI runtime construction escaped the shared builder': 'ad-hoc production TUI runtime construction escaped the shared builder',
-              'assert!(source.contains("TuiRuntimeBuilder"));': 'assert!(production_source.contains("TuiRuntimeBuilder"));',
-          }
-          for old, new in replacements.items():
-              if guard.count(old) != 1:
-                  raise SystemExit(f'guard expected one {old!r}, found {guard.count(old)}')
-              guard = guard.replace(old, new)
-          layout_path.write_text(layout[:guard_start] + guard + layout[guard_end:])
+          guard_end = layout.index('\n}\n\n#[test]\nfn every_production_provider_root', guard_start) + 2
+          replacement_guard = '''fn tui_runtime_construction_is_centralized_in_the_shared_builder() {
+              let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+              let builder = fs::read_to_string(crate_root.join("src/tui_runtime_builder.rs"))
+                  .expect("read TUI runtime builder source");
+              assert!(builder.contains("AppServerSession::new("));
+              assert!(builder.contains("McpSessionRuntime::start("));
+              assert!(builder.contains("set_request_budget_spec("));
+
+              for (root, required_builder_boundary) in [
+                  (
+                      "src/model_lifecycle.rs",
+                      "runtime_builder: &'a TuiRuntimeBuilder",
+                  ),
+                  (
+                      "src/session_handlers.rs",
+                      "runtime_builder: &TuiRuntimeBuilder",
+                  ),
+              ] {
+                  let source = fs::read_to_string(crate_root.join(root))
+                      .unwrap_or_else(|error| panic!("read {root}: {error}"));
+                  for forbidden in [
+                      "AppServerSession::new(",
+                      "McpSessionRuntime::start(",
+                      "build_tui_tool_registry(",
+                  ] {
+                      assert!(
+                          !source.contains(forbidden),
+                          "ad-hoc production TUI runtime construction escaped the shared builder in {root}: {forbidden}"
+                      );
+                  }
+                  assert!(
+                      source.contains(required_builder_boundary),
+                      "production runtime transition must accept the shared TuiRuntimeBuilder in {root}"
+                  );
+              }
+          }'''
+          layout_path.write_text(layout[:guard_start] + replacement_guard + layout[guard_end:])
           PY
 
           cargo fmt --all
@@ -126,18 +158,27 @@ jobs:
       - name: Workspace compile
         run: cargo check --workspace --locked
 
-      - name: Focused remediation tests
-        shell: bash
+      - name: Agent request-budget regression tests
         run: |
-          set -euo pipefail
           cargo test -p talos-agent configured_output_limit_above_4096_is_reserved_before_dispatch --locked
           cargo test -p talos-agent declared_image_size_is_conservatively_budgeted_before_dispatch --locked
           cargo test -p talos-agent multiple_declared_images_saturate_budget_instead_of_overflowing --locked
+
+      - name: Session runtime-identity regression tests
+        run: |
           cargo test -p talos-session --test i169_runtime_identity --locked
           cargo test -p talos-session runtime_activation_stage_is_generation_atomic_and_restart_recoverable --locked
+
+      - name: CLI publication and compaction regression tests
+        run: |
           cargo test -p talos-cli publication_failure_stops_replacement_without_success --locked
           cargo test -p talos-cli session_owned_activation_survives_repeated_production_compaction --locked
-          cargo test -p talos-cli --test i169_source_layout --locked
+
+      - name: Source-layout boundary tests
+        run: cargo test -p talos-cli --test i169_source_layout --locked
+
+      - name: Full talos-cli test suite
+        run: cargo test -p talos-cli --locked
 
       - name: Strict Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -146,11 +187,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm -f .github/i169-followup.patch.gz.b64.part* \
-            .github/i169-followup2.patch.gz.b64.part* \
-            .github/i169-followup2-testfix.patch.gz.b64 \
-            .github/workflows/i169-source-export.yml \
-            .github/workflows/i169-source-verify2.yml
+          find .github -maxdepth 1 -type f -name 'i169-followup*.patch.gz.b64*' -print0 | xargs -0 -r git rm -f --
+          git rm -f .github/workflows/i169-source-export.yml .github/workflows/i169-source-verify2.yml
           git diff --cached --check
           git config user.name talos-governance-bot
           git config user.email actions@users.noreply.github.com
