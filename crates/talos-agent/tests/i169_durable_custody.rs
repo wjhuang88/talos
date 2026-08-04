@@ -75,6 +75,14 @@ fn submission(id: &str, item_id: &str, generation: u64, text: &str) -> Structure
     }
 }
 
+fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
+    let mut current = store.runtime_generation().unwrap();
+    while current < target {
+        current = store.advance_runtime_generation(current).unwrap();
+    }
+    assert_eq!(current, target);
+}
+
 async fn wait_for_receipt(
     eq_rx: &mut mpsc::UnboundedReceiver<SessionEvent>,
     wanted_submission_id: &str,
@@ -136,6 +144,7 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
     let durable = manager.create_or_open_session("i169-lost-ack").unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_runtime_generation(&store, 7);
     let calls = Arc::new(AtomicUsize::new(0));
     let agent = make_agent(CountingModel {
         calls: calls.clone(),
@@ -233,6 +242,7 @@ async fn shutdown_pauses_unstarted_durable_submissions() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_runtime_generation(&store, 1);
     let calls = Arc::new(AtomicUsize::new(0));
     let agent = make_agent(CountingModel {
         calls: calls.clone(),
