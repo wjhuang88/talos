@@ -8,19 +8,21 @@ fn unique_home(label: &str) -> PathBuf {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("test operation should succeed")
             .as_nanos()
     ));
-    fs::create_dir_all(dir.join(".talos")).unwrap();
+    fs::create_dir_all(dir.join(".talos")).expect("test operation should succeed");
     dir
 }
 
 fn write_config(home: &std::path::Path, toml_content: &str) {
-    fs::write(home.join(".talos/config.toml"), toml_content).unwrap();
+    fs::write(home.join(".talos/config.toml"), toml_content)
+        .expect("test operation should succeed");
 }
 
 fn write_credentials(home: &std::path::Path, toml_content: &str) {
-    fs::write(home.join(".talos/credentials.toml"), toml_content).unwrap();
+    fs::write(home.join(".talos/credentials.toml"), toml_content)
+        .expect("test operation should succeed");
 }
 
 fn run_cmd(home: &std::path::Path, args: &[&str]) -> (bool, String, String) {
@@ -51,8 +53,13 @@ fn assert_no_secret(stdout: &str, stderr: &str, markers: &[&str]) {
 
 fn assert_no_temp_residual(home: &std::path::Path) {
     let entries: Vec<String> = fs::read_dir(home.join(".talos"))
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .expect("test operation should succeed")
+        .map(|e| {
+            e.expect("test operation should succeed")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
     assert!(
         !entries.iter().any(|n| n.contains(".tmp")),
@@ -132,12 +139,15 @@ api_key = "{SECRET_B}"
     assert!(stdout.contains("removed"));
     assert_no_secret(&stdout, &stderr, &[SECRET_A]);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
-    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
+    let reloaded: talos_config::Config =
+        toml::from_str(&config_raw).expect("test operation should succeed");
     assert!(!reloaded.providers.contains_key("custom-a"));
     assert!(reloaded.providers.contains_key("custom-b"));
 
-    let creds_raw = fs::read_to_string(home.join(".talos/credentials.toml")).unwrap();
+    let creds_raw = fs::read_to_string(home.join(".talos/credentials.toml"))
+        .expect("test operation should succeed");
     assert!(!creds_raw.contains("custom-a"));
     assert!(creds_raw.contains("custom-b"));
     assert_no_temp_residual(&home);
@@ -170,8 +180,10 @@ api_key = "{SECRET_ANT}"
     assert!(!stdout.contains("destroyed"));
     assert_no_secret(&stdout, &stderr, &[SECRET_ANT]);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
-    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
+    let reloaded: talos_config::Config =
+        toml::from_str(&config_raw).expect("test operation should succeed");
     assert!(!reloaded.providers.contains_key("anthropic"));
     assert_no_temp_residual(&home);
     cleanup(&home);
@@ -204,7 +216,8 @@ api_key_env = "GW_API_KEY"
     assert!(stdout.contains("cleared"));
     assert_no_secret(&stdout, &stderr, &[SECRET_A]);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
     assert!(config_raw.contains("base_url"));
     assert!(config_raw.contains("api_key_env"));
     assert!(!config_raw.contains(SECRET_A));
@@ -270,7 +283,7 @@ fn credentials_only_custom_provider_removed() {
     if creds_path.exists() {
         assert!(
             !fs::read_to_string(&creds_path)
-                .unwrap()
+                .expect("test operation should succeed")
                 .contains("old-custom")
         );
     }
@@ -295,7 +308,7 @@ fn credentials_only_builtin_provider_removed() {
     if creds_path.exists() {
         assert!(
             !fs::read_to_string(&creds_path)
-                .unwrap()
+                .expect("test operation should succeed")
                 .contains("anthropic")
         );
     }
@@ -326,8 +339,10 @@ api_key = "{SECRET_A}"
     assert_no_secret(&stdout, &stderr, &[SECRET_A]);
     assert_no_temp_residual(&home);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
-    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
+    let reloaded: talos_config::Config =
+        toml::from_str(&config_raw).expect("test operation should succeed");
     assert!(!reloaded.providers.contains_key("active-gw"));
     assert!(reloaded.api_key().is_err());
 
@@ -370,8 +385,10 @@ api_key = "{SECRET_ANT}"
     assert!(success);
     assert_no_secret(&stdout, &stderr, &[SECRET_ANT]);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
-    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
+    let reloaded: talos_config::Config =
+        toml::from_str(&config_raw).expect("test operation should succeed");
     assert!(!reloaded.providers.contains_key("anthropic"));
     assert!(reloaded.api_key().is_err());
 
@@ -482,8 +499,10 @@ api_key = "{SECRET_B}"
 
     run_cmd(&home, &["config", "unset", "providers.target", "--confirm"]);
 
-    let config_raw = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
-    let reloaded: talos_config::Config = toml::from_str(&config_raw).unwrap();
+    let config_raw =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
+    let reloaded: talos_config::Config =
+        toml::from_str(&config_raw).expect("test operation should succeed");
     assert!(!reloaded.providers.contains_key("target"));
     assert!(reloaded.providers.contains_key("keeper"));
     assert!(
@@ -513,13 +532,14 @@ api_key = "{SECRET_A}"
     let config_before = read_bytes(&home.join(".talos/config.toml"));
     let talos_dir = home.join(".talos");
     let txn_dir = talos_dir.join(".provider-unset-transaction");
-    fs::create_dir_all(&txn_dir).unwrap();
+    fs::create_dir_all(&txn_dir).expect("test operation should succeed");
     fs::write(
         txn_dir.join("manifest"),
         "version = 1\nphase = \"Prepared\"\ntransaction_id = \"test-1\"\nconfig_existed_before = true\nconfig_exists_after = true\ncredentials_existed_before = false\ncredentials_exist_after = false\n",
     )
-    .unwrap();
-    fs::write(txn_dir.join("config.before"), &config_before).unwrap();
+    .expect("test operation should succeed");
+    fs::write(txn_dir.join("config.before"), &config_before)
+        .expect("test operation should succeed");
 
     let (list_ok, list_stdout, list_err) = run_cmd(&home, &["config", "list"]);
     assert!(list_ok, "config list must succeed after recovery");
@@ -543,21 +563,23 @@ api_key = "key-x"
 "#,
     );
     let new_config = "provider = \"x\"\nmodel = \"y\"\n";
-    fs::write(&home.join(".talos/config.toml"), new_config).unwrap();
+    fs::write(home.join(".talos/config.toml"), new_config).expect("test operation should succeed");
 
     let txn_dir = home.join(".talos/.provider-unset-transaction");
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.after"), new_config.as_bytes()).unwrap();
+    fs::create_dir_all(&txn_dir).expect("test operation should succeed");
+    fs::write(txn_dir.join("config.after"), new_config.as_bytes())
+        .expect("test operation should succeed");
     fs::write(
         txn_dir.join("manifest"),
         "version = 1\nphase = \"Committed\"\ntransaction_id = \"test-2\"\nconfig_existed_before = true\nconfig_exists_after = true\ncredentials_existed_before = false\ncredentials_exist_after = false\n",
     )
-    .unwrap();
+    .expect("test operation should succeed");
 
     let (list_ok, _stdout, _err) = run_cmd(&home, &["config", "list"]);
     assert!(list_ok);
 
-    let after = fs::read_to_string(home.join(".talos/config.toml")).unwrap();
+    let after =
+        fs::read_to_string(home.join(".talos/config.toml")).expect("test operation should succeed");
     assert_eq!(after, new_config);
     assert!(!txn_dir.exists());
     cleanup(&home);
