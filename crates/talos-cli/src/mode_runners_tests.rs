@@ -1208,34 +1208,52 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .create_session("p1fix3-success", "test-ws")
             .unwrap();
         let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
-        let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
+        let (sq_tx, mut sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
         let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
         let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
             talos_session::Session,
             mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
         )>();
-        let transition = Arc::new(tokio::sync::Mutex::new(
-            SessionTransition::new(sq_tx, session.clone()).unwrap(),
-        ));
+        let old_actor_join = tokio::spawn(async move {
+            while let Some(operation) = sq_rx.recv().await {
+                if matches!(operation, talos_core::session::SessionOp::Shutdown) {
+                    break;
+                }
+            }
+        });
+        let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+        let scheduler_token = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            scheduler_token.cancelled().await;
+        });
+        let mut transition_owner = SessionTransition::new(sq_tx, session.clone()).unwrap();
+        transition_owner
+            .attach_active_runtime(old_actor_join, scheduler_cancel, scheduler_join)
+            .unwrap();
+        let transition = Arc::new(tokio::sync::Mutex::new(transition_owner));
         let mcp_config = talos_config::McpConfig::default();
 
-        let model_result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &hooks,
-            workspace.path(),
-            &mcp_config,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_tx,
-            &session_watch_rx,
-            &session_manager,
-            "target-model".to_string(),
-            Some("target-gw".to_string()),
-            true,
+        let model_result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            handle_session_model(
+                &transition,
+                &ui_tx,
+                &config,
+                &hooks,
+                workspace.path(),
+                &mcp_config,
+                &session_watch_tx,
+                &sq_tx_watch_tx,
+                &bridge_tx,
+                &session_watch_rx,
+                &session_manager,
+                "target-model".to_string(),
+                Some("target-gw".to_string()),
+                true,
+            ),
         )
-        .await;
+        .await
+        .expect("production-equivalent model switch must not hang");
 
         let new_config = model_result.expect("model switch to mock must succeed");
         let bridge_update_ok = bridge_rx.try_recv().is_ok();
