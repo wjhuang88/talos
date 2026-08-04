@@ -30,6 +30,16 @@ jobs:
         with:
           components: rustfmt
 
+      - name: Verify staged patch transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          wc -c .github/i169-code.patch.gz.b64.part*
+          sha256sum .github/i169-code.patch.gz.b64.part*
+          cat .github/i169-code.patch.gz.b64.part* | sha256sum
+          test "$(cat .github/i169-code.patch.gz.b64.part* | wc -c)" -eq 28072
+          test "$(cat .github/i169-code.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "0d86fa3c6bd20abc0b8f1b740646e9cb2ba84e0a828ff206c401e2b8f6caa4cc"
+
       - name: Reconstruct and apply remediation
         shell: bash
         run: |
