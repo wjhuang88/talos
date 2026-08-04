@@ -23,15 +23,15 @@ fn transactional_bridge_sources_are_normal_rust_modules() {
 }
 
 #[test]
-fn model_switch_marker_durability_precedes_replacement_publication() {
+fn model_switch_activation_durability_precedes_replacement_publication() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let source = fs::read_to_string(crate_root.join("src/model_lifecycle.rs"))
         .expect("read model lifecycle source")
         .replace("\r\n", "\n");
 
     let barrier = source
-        .find("persist_switch_marker_and_read_final_history(")
-        .expect("durable model-switch activation barrier");
+        .find("establish_model_activation_and_read_final_history(")
+        .expect("durable model activation barrier");
     let prepare = source
         .find("transition_guard.prepare(")
         .expect("replacement prepare boundary");
@@ -49,14 +49,15 @@ fn model_switch_marker_durability_precedes_replacement_publication() {
     assert!(prepare < commit);
     assert!(commit < publish);
     assert!(publish < success);
-    assert!(!source.contains("failed to persist model switch marker"));
+    assert!(source.contains("previous_variant"));
+    assert!(source.contains("SessionModelIdentity::new("));
     assert!(source.contains("No replacement route was published"));
 
     let helper_start = source
-        .find("async fn persist_switch_marker_and_read_final_history(")
+        .find("async fn persist_model_activation_and_read_final_history(")
         .expect("activation barrier helper definition");
     let helper_end = source[helper_start..]
-        .find("\nfn model_switch_markers_match(")
+        .find("\n/// Test-only compatibility harness")
         .map(|offset| helper_start + offset)
         .expect("activation barrier helper end");
     let helper = &source[helper_start..helper_end];
@@ -64,19 +65,24 @@ fn model_switch_marker_durability_precedes_replacement_publication() {
     let fence = helper
         .find(".quiesce_same_session(session)")
         .expect("old runtime retirement");
+    let activation = helper
+        .find("SessionModelActivation::new(")
+        .expect("exact generation + variant-aware activation identity");
     let tail_check = helper
-        .find(".read_entries()")
-        .expect("durable marker tail check");
+        .find("model_activation_tail(session)")
+        .expect("machine-readable activation tail check");
     let marker_commit = helper
-        .find(".append_with_metadata(switch_marker, marker_metadata)")
-        .expect("durable marker commit");
+        .find(".append_with_metadata(&marker, marker_metadata)")
+        .expect("durable activation commit");
     let replay = helper
-        .find(".read_messages()")
-        .expect("canonical replay after marker commit");
+        .find("verified_activation_history(session, &activation, &marker)")
+        .expect("canonical replay after activation commit");
 
-    assert!(fence < tail_check);
+    assert!(fence < activation);
+    assert!(activation < tail_check);
     assert!(tail_check < marker_commit);
     assert!(marker_commit < replay);
+    assert!(!helper.contains("left_content == right_content"));
     assert!(!helper.contains("transition_guard.prepare("));
     assert!(!helper.contains("transition_guard.commit("));
     assert!(!helper.contains("sq_tx_watch_tx.send("));

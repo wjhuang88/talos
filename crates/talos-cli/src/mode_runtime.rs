@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
@@ -18,6 +20,115 @@ use crate::Cli;
 const REQUEST_PREVIEW_COMMAND: &str = "/mock-request";
 const TODO_PROMPT_MAX_ITEMS: usize = 12;
 const TODO_PROMPT_MAX_CHARS: usize = 2400;
+const SESSION_MODEL_ACTIVATION_PREFIX: &str = "talos:model-activation:v1:";
+
+/// Exact model runtime identity owned by a durable Session.
+///
+/// `None`, an empty string, and the legacy `default` spelling all normalize to
+/// the same baseline variant so live activation and restart reconstruction
+/// cannot disagree about the effective Provider request options.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SessionModelIdentity {
+    pub provider: String,
+    pub model: String,
+    pub variant: Option<String>,
+}
+
+impl SessionModelIdentity {
+    #[must_use]
+    pub(crate) fn new(provider: &str, model: &str, variant: Option<&str>) -> Self {
+        Self {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            variant: crate::model_lifecycle::normalize_variant_id(variant).map(str::to_string),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn display_name(&self) -> String {
+        match self.variant.as_deref() {
+            Some(variant) => format!("{}/{}@{variant}", self.provider, self.model),
+            None => format!("{}/{}", self.provider, self.model),
+        }
+    }
+}
+
+/// Machine-readable, append-only activation record.
+///
+/// The generation and exact previous/target identities form the immutable
+/// logical-operation identity. `activation_id` is a deterministic digest of
+/// that tuple, so a retry of the same interrupted activation is stable while a
+/// new transition — including a variant-only transition — is distinct.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SessionModelActivation {
+    pub version: u8,
+    pub activation_id: String,
+    pub generation: u64,
+    pub previous: SessionModelIdentity,
+    pub target: SessionModelIdentity,
+}
+
+impl SessionModelActivation {
+    #[must_use]
+    pub(crate) fn new(
+        generation: u64,
+        previous: SessionModelIdentity,
+        target: SessionModelIdentity,
+    ) -> Self {
+        let canonical = serde_json::to_vec(&(generation, &previous, &target))
+            .expect("model activation identity contains only serializable values");
+        let digest = Sha256::digest(canonical);
+        let suffix: String = digest
+            .iter()
+            .take(16)
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        Self {
+            version: 1,
+            activation_id: format!("model-activation-g{generation}-{suffix}"),
+            generation,
+            previous,
+            target,
+        }
+    }
+}
+
+pub(crate) fn session_model_activation_metadata(
+    activation: &SessionModelActivation,
+) -> Result<SessionMetadata, serde_json::Error> {
+    let mut metadata =
+        session_metadata_for_model(&activation.target.model, &activation.target.provider);
+    metadata.raw_content = Some(format!(
+        "{SESSION_MODEL_ACTIVATION_PREFIX}{}",
+        serde_json::to_string(activation)?
+    ));
+    Ok(metadata)
+}
+
+pub(crate) fn session_model_activation_from_metadata(
+    metadata: &SessionMetadata,
+) -> Option<SessionModelActivation> {
+    let payload = metadata
+        .raw_content
+        .as_deref()?
+        .strip_prefix(SESSION_MODEL_ACTIVATION_PREFIX)?;
+    let activation: SessionModelActivation = serde_json::from_str(payload).ok()?;
+    if activation.version != 1 {
+        return None;
+    }
+    let expected = SessionModelActivation::new(
+        activation.generation,
+        activation.previous.clone(),
+        activation.target.clone(),
+    );
+    if activation.activation_id != expected.activation_id
+        || metadata.provider.as_deref() != Some(activation.target.provider.as_str())
+        || metadata.model.as_deref() != Some(activation.target.model.as_str())
+    {
+        return None;
+    }
+    Some(activation)
+}
 
 pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
     let trimmed = input.trim_start();
@@ -49,24 +160,44 @@ pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> Session
     }
 }
 
-fn latest_session_model_info(session: &talos_session::Session) -> Option<(String, String)> {
-    session
-        .read_entries()
-        .ok()?
-        .into_iter()
-        .rev()
-        .find_map(
-            |entry| match (entry.metadata.model, entry.metadata.provider) {
-                (Some(model), Some(provider)) => Some((model, provider)),
-                (Some(model), None) => Some((model, String::new())),
+enum LatestSessionModelInfo {
+    Activation(SessionModelIdentity),
+    Legacy { model: String, provider: String },
+}
+
+fn latest_session_model_info(session: &talos_session::Session) -> Option<LatestSessionModelInfo> {
+    let mut legacy = None;
+    for entry in session.read_entries().ok()?.into_iter().rev() {
+        if entry.role == "system"
+            && let Some(activation) = session_model_activation_from_metadata(&entry.metadata)
+        {
+            return Some(LatestSessionModelInfo::Activation(activation.target));
+        }
+        if legacy.is_none() {
+            legacy = match (entry.metadata.model, entry.metadata.provider) {
+                (Some(model), Some(provider)) => {
+                    Some(LatestSessionModelInfo::Legacy { model, provider })
+                }
+                (Some(model), None) => Some(LatestSessionModelInfo::Legacy {
+                    model,
+                    provider: String::new(),
+                }),
                 _ => None,
-            },
-        )
+            };
+        }
+    }
+    legacy
 }
 
 pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
-    let Some((model, provider)) = latest_session_model_info(session) else {
+    let Some(model_info) = latest_session_model_info(session) else {
         return;
+    };
+    let (model, provider, exact_variant) = match model_info {
+        LatestSessionModelInfo::Activation(identity) => {
+            (identity.model, identity.provider, Some(identity.variant))
+        }
+        LatestSessionModelInfo::Legacy { model, provider } => (model, provider, None),
     };
     let model_ref = if provider.is_empty() || model.starts_with(&format!("{provider}/")) {
         model
@@ -79,6 +210,10 @@ pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos
             model = %model_ref,
             "failed to restore session model metadata: {e}"
         );
+        return;
+    }
+    if let Some(variant) = exact_variant {
+        crate::model_lifecycle::apply_variant_change(config, variant.as_deref());
     }
 }
 
@@ -377,5 +512,106 @@ mod tests {
         let prompt = format_session_todo_prompt(&repo, session.id).unwrap();
         assert!(prompt.contains("2 more active item(s) omitted"));
         assert_eq!(prompt.matches("- [").count(), TODO_PROMPT_MAX_ITEMS);
+    }
+
+    fn activation_test_session(name: &str) -> talos_session::Session {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.keep();
+        let path = root.join(format!("{name}.jsonl"));
+        std::fs::write(&path, b"").unwrap();
+        talos_session::Session::new(Uuid::new_v4(), "test".into(), String::new(), path)
+    }
+
+    fn append_activation(session: &talos_session::Session, activation: &SessionModelActivation) {
+        session
+            .append_with_metadata(
+                &talos_core::message::Message::System {
+                    content: format!("[System] activation {}", activation.activation_id),
+                    cache_markers: Vec::new(),
+                },
+                session_model_activation_metadata(activation).unwrap(),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn session_activation_restores_exact_variant_and_reasoning_options() {
+        let session = activation_test_session("restore-variant");
+        let activation = SessionModelActivation::new(
+            7,
+            SessionModelIdentity::new("openai", "o3", Some("low-reasoning")),
+            SessionModelIdentity::new("openai", "o3", Some("high-reasoning")),
+        );
+        append_activation(&session, &activation);
+
+        let mut config = Config::default();
+        config.variant = Some("low-reasoning".into());
+        apply_session_model_to_config(&mut config, &session);
+
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.model, "o3");
+        assert_eq!(config.variant.as_deref(), Some("high-reasoning"));
+
+        let catalog = config.all_models();
+        let metadata =
+            talos_config::model::find_model_by_provider(&catalog, &config.provider, &config.model)
+                .expect("openai/o3 catalog metadata");
+        let resolution = crate::model_lifecycle::resolve_variant(
+            config.variant.as_deref(),
+            &metadata.variants,
+            &metadata.capabilities,
+        );
+        assert_eq!(
+            resolution.reasoning_effort,
+            Some(talos_core::model::ReasoningEffort::High)
+        );
+        assert_eq!(resolution.diagnostic, None);
+    }
+
+    #[test]
+    fn session_activation_normalizes_default_and_clears_stale_variant() {
+        let session = activation_test_session("clear-variant");
+        let activation = SessionModelActivation::new(
+            8,
+            SessionModelIdentity::new("openai", "o3", Some("high-reasoning")),
+            SessionModelIdentity::new("openai", "gpt-4o", Some("default")),
+        );
+        assert_eq!(activation.target.variant, None);
+        append_activation(&session, &activation);
+
+        let mut config = Config::default();
+        config.variant = Some("high-reasoning".into());
+        apply_session_model_to_config(&mut config, &session);
+
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.model, "gpt-4o");
+        assert_eq!(config.variant, None);
+    }
+
+    #[test]
+    fn unknown_persisted_variant_restores_identity_but_uses_safe_fallback() {
+        let session = activation_test_session("unknown-variant");
+        let activation = SessionModelActivation::new(
+            9,
+            SessionModelIdentity::new("openai", "o3", None),
+            SessionModelIdentity::new("openai", "o3", Some("deleted-variant")),
+        );
+        append_activation(&session, &activation);
+
+        let mut config = Config::default();
+        apply_session_model_to_config(&mut config, &session);
+        assert_eq!(config.variant.as_deref(), Some("deleted-variant"));
+
+        let catalog = config.all_models();
+        let metadata =
+            talos_config::model::find_model_by_provider(&catalog, &config.provider, &config.model)
+                .expect("openai/o3 catalog metadata");
+        let resolution = crate::model_lifecycle::resolve_variant(
+            config.variant.as_deref(),
+            &metadata.variants,
+            &metadata.capabilities,
+        );
+        assert_eq!(resolution.reasoning_effort, None);
+        assert!(resolution.diagnostic.is_some());
     }
 }

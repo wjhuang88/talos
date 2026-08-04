@@ -654,3 +654,21 @@ The latest implementation evidence tightens same-Session generation replacement 
 - Race and reconstruction evidence covers concurrent admission versus fencing, full Actor queues, old-Scheduler cancellation, Actor receiver closure, durable generation 1+ reopen, stale-command rejection, journal state, receipt generation, and Provider call counts.
 
 This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.
+
+## 2026-08-04 exact activation identity remediation
+
+The current review cycle requires same-Session model activation durability to carry the complete
+ADR-048 identity: provider, model, and normalized variant. PR #131 now records a machine-readable
+activation object containing the durable target generation, deterministic activation ID, exact
+previous identity, and exact target identity. `None`, empty, and `default` variants normalize to the
+same baseline identity.
+
+Visible marker text is not the idempotency key. Only an exact activation object may be reused after
+an interrupted commit/publication cut point; a new intentional switch, including a variant-only
+switch on the same provider/model, creates a distinct activation. Session startup restores the
+variant from this Session-owned record before Provider construction, so a later global config write
+failure cannot silently restore different request semantics.
+
+This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
+Proposed, and Issue #119 remains Open.
+

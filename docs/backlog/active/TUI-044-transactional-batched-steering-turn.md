@@ -185,3 +185,21 @@ no replacement route and leaves the fenced Session stopped with an explicit reco
 
 This remains an **Active** remediation handoff. It does not accept ADR-056, complete TUI-044/I169,
 close Issue #119, approve PR #131, or authorize merge.
+
+## 2026-08-04 exact activation identity remediation
+
+The current review cycle requires same-Session model activation durability to carry the complete
+ADR-048 identity: provider, model, and normalized variant. PR #131 now records a machine-readable
+activation object containing the durable target generation, deterministic activation ID, exact
+previous identity, and exact target identity. `None`, empty, and `default` variants normalize to the
+same baseline identity.
+
+Visible marker text is not the idempotency key. Only an exact activation object may be reused after
+an interrupted commit/publication cut point; a new intentional switch, including a variant-only
+switch on the same provider/model, creates a distinct activation. Session startup restores the
+variant from this Session-owned record before Provider construction, so a later global config write
+failure cannot silently restore different request semantics.
+
+This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
+Proposed, and Issue #119 remains Open.
+

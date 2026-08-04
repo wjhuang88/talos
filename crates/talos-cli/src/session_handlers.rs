@@ -528,6 +528,7 @@ pub(crate) async fn handle_session_model(
 
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
+    let previous_variant = config.variant.clone();
     let mut model_config = config.clone();
     if let Err(e) = model_config.set_active_model(&resolve_id) {
         let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
@@ -582,6 +583,7 @@ pub(crate) async fn handle_session_model(
         api_key,
         previous_model,
         previous_provider,
+        previous_variant,
         model_id: parsed_model_id.clone(),
         variant: model_config.variant.clone(),
         provider_for_status: provider_name.clone(),
@@ -628,6 +630,7 @@ pub(crate) async fn handle_session_model_with_credential(
 ) -> Option<Config> {
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
+    let previous_variant = config.variant.clone();
     let credential_provider = cred.provider.clone();
     let credential_api_key = cred.api_key.clone();
     let mut model_config = match ConfigStore::default_store().update_config(|current| {
@@ -692,6 +695,7 @@ pub(crate) async fn handle_session_model_with_credential(
         api_key,
         previous_model,
         previous_provider,
+        previous_variant,
         model_id: parsed_model_id.clone(),
         variant: model_config.variant.clone(),
         provider_for_status,
