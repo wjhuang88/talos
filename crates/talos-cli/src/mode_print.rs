@@ -148,6 +148,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
     let _sched_join = sched_pending.spawn(
         handle.sq_tx.clone(),
+        actor.generation(),
         tokio_util::sync::CancellationToken::new(),
     );
     tokio::spawn(async move { actor.run().await });

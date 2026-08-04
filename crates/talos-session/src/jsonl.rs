@@ -2,6 +2,10 @@ use crate::diagnostic::{
     ProviderTerminalDiagnostic, decode_terminal_diagnostic, encode_terminal_diagnostic,
     is_terminal_diagnostic_content,
 };
+use crate::turn_outcome::{
+    TurnTranscriptOutcomeRecord, decode_turn_transcript_outcome, encode_turn_transcript_outcome,
+    is_turn_transcript_outcome_content,
+};
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
 use std::collections::HashSet;
@@ -39,7 +43,6 @@ impl Session {
             "system",
             &content,
             SessionMetadata {
-                turn_id: Some(diagnostic.turn_id.clone()),
                 provider: diagnostic.provider.clone(),
                 model: diagnostic.model.clone(),
                 ..SessionMetadata::default()
@@ -55,6 +58,39 @@ impl Session {
             .read_entries()?
             .iter()
             .filter_map(|entry| decode_terminal_diagnostic(&entry.content))
+            .collect())
+    }
+
+    /// Appends the authoritative terminal transcript outcome for one Turn.
+    ///
+    /// Callers must write this marker only after every transcript message for
+    /// the outcome has been durably appended. Recovery never infers Success
+    /// from ordinary or partial message entries alone.
+    pub fn append_turn_transcript_outcome(
+        &self,
+        outcome: &TurnTranscriptOutcomeRecord,
+    ) -> Result<(), SessionError> {
+        let content = encode_turn_transcript_outcome(outcome)
+            .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+        let entry = self.build_entry(
+            "system",
+            &content,
+            SessionMetadata {
+                turn_id: (outcome.outcome == crate::TurnTranscriptOutcome::Success)
+                    .then(|| outcome.turn_id.clone()),
+                ..SessionMetadata::default()
+            },
+        )?;
+        self.append_entry_locked(&entry)
+    }
+
+    pub fn read_turn_transcript_outcomes(
+        &self,
+    ) -> Result<Vec<TurnTranscriptOutcomeRecord>, SessionError> {
+        Ok(self
+            .read_entries()?
+            .iter()
+            .filter_map(|entry| decode_turn_transcript_outcome(&entry.content))
             .collect())
     }
 
@@ -141,7 +177,9 @@ impl Session {
                     .into()
                 }
                 "system" => {
-                    if is_terminal_diagnostic_content(&entry.content) {
+                    if is_terminal_diagnostic_content(&entry.content)
+                        || is_turn_transcript_outcome_content(&entry.content)
+                    {
                         None
                     } else if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
                         Some(Message::System {

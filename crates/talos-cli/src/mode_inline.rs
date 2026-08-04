@@ -154,13 +154,16 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),
+    );
+    let session_generation = crate::mode_runtime::runtime_generation_for_session(&session)?;
+    actor.set_generation(session_generation);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        session_generation,
+        tokio_util::sync::CancellationToken::new(),
     );
     tokio::spawn(async move { actor.run().await });
 

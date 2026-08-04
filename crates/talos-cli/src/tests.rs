@@ -1,3 +1,73 @@
+async fn receive_structured_submission(
+    receiver: &mut tokio::sync::mpsc::Receiver<talos_core::session::SessionOp>,
+) -> talos_core::session::StructuredSubmission {
+    let operation = tokio::time::timeout(std::time::Duration::from_secs(2), receiver.recv())
+        .await
+        .expect("structured submission dispatched within timeout")
+        .expect("structured submission command channel remains open");
+    match operation {
+        talos_core::session::SessionOp::SubmitStructured { submission } => submission,
+        other => panic!("expected SubmitStructured, got {other:?}"),
+    }
+}
+
+fn accept_structured_submission(
+    sender: &tokio::sync::mpsc::UnboundedSender<talos_core::session::SessionEvent>,
+    submission: &talos_core::session::StructuredSubmission,
+    receipt_id: &str,
+) {
+    sender
+        .send(talos_core::session::SessionEvent::SubmissionReceipt {
+            session_id: "session_test".to_string(),
+            session_generation: submission.sender_generation,
+            source: submission.source,
+            submission_id: submission.id.clone(),
+            reservation_id: format!("reservation:{}", submission.id),
+            receipt_id: receipt_id.to_string(),
+            item_count: submission.items.len(),
+            total_text_bytes: submission.total_text_bytes(),
+            disposition: talos_core::session::SubmissionReceiptDisposition::AcceptedPending,
+        })
+        .expect("durable receipt reaches bridge");
+}
+
+fn complete_structured_submission(
+    sender: &tokio::sync::mpsc::UnboundedSender<talos_core::session::SessionEvent>,
+    submission: &talos_core::session::StructuredSubmission,
+    receipt_id: &str,
+) {
+    let turn_id = format!("turn_{}", submission.id);
+    sender
+        .send(talos_core::session::SessionEvent::StructuredTurnEvent {
+            session_id: "session_test".to_string(),
+            session_generation: submission.sender_generation,
+            source: submission.source,
+            submission_id: submission.id.clone(),
+            receipt_id: receipt_id.to_string(),
+            turn_id: turn_id.clone(),
+            sequence: 0,
+            payload: talos_core::session::TurnEventPayload::Started,
+        })
+        .expect("structured turn start reaches bridge");
+    sender
+        .send(talos_core::session::SessionEvent::StructuredTurnEvent {
+            session_id: "session_test".to_string(),
+            session_generation: submission.sender_generation,
+            source: submission.source,
+            submission_id: submission.id.clone(),
+            receipt_id: receipt_id.to_string(),
+            turn_id,
+            sequence: 1,
+            payload: talos_core::session::TurnEventPayload::Completed {
+                status: talos_core::session::TurnCompletionStatus::Success {
+                    final_text: String::new(),
+                    new_messages: Vec::new(),
+                },
+            },
+        })
+        .expect("structured turn completion reaches bridge");
+}
+
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
@@ -220,6 +290,12 @@ mod tests {
             })
             .unwrap();
 
+        let submission = receive_structured_submission(&mut interrupt_rx).await;
+        assert_eq!(submission.items.len(), 1);
+        assert_eq!(submission.items[0].text, "queued follow-up");
+        accept_structured_submission(&agent_tx.tx, &submission, "receipt_follow_up");
+        complete_structured_submission(&agent_tx.tx, &submission, "receipt_follow_up");
+
         let mut saw_queued_user_stream = false;
         let mut saw_queue_drained_status = false;
         for _ in 0..20 {
@@ -245,11 +321,6 @@ mod tests {
 
         assert!(saw_queued_user_stream);
         assert!(saw_queue_drained_status);
-        assert!(matches!(
-            interrupt_rx.try_recv(),
-            Ok(talos_core::session::SessionOp::Submit { message }) if message == "queued follow-up"
-        ));
-
         drop(agent_tx);
         drop(user_tx);
         loop_handle.await.unwrap();
@@ -400,17 +471,9 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(
-            tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
-                .await
-                .unwrap()
-                .and_then(|op| match op {
-                    talos_core::session::SessionOp::Submit { message } => Some(message),
-                    _ => None,
-                })
-                .as_deref(),
-            Some("after tool")
-        );
+        let submission = receive_structured_submission(&mut sq_rx).await;
+        assert_eq!(submission.items.len(), 1);
+        assert_eq!(submission.items[0].text, "after tool");
         loop_handle.abort();
     }
 
@@ -593,9 +656,10 @@ mod tests {
         loop_handle.await.unwrap();
     }
 
-    // FS03 / RUNTIME-002: prove the visible diagnostic signals (error Tip + Error stream) are
-    // forwarded by the conversation loop on terminal failure, and that the normal success path
-    // (EndTurn) remains unchanged after the MaxTokens clearing fix.
+    // FS03 / RUNTIME-002 FS01 surface #3: prove the conversation loop forwards a terminal
+    // `UiOutput::Status { is_processing: false }` after provider/tool errors,
+    // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
+    // (`AgentEvent` -> `run_conversation_loop` -> `UiOutput`) rather than the engine in isolation.
 
     #[tokio::test]
     async fn conversation_loop_emits_visible_error_signals_on_terminal_failure() {
@@ -695,7 +759,7 @@ mod tests {
         let agent_tx = TestTurnSender::new(agent_tx);
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
             model_name: "test-model".to_string(),
@@ -729,6 +793,29 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         user_tx.send(UserInput::Cancel).unwrap();
+
+        let operation =
+            tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
+                .await
+                .expect("cancel reaches Actor command queue")
+                .expect("Actor command queue remains open");
+        assert!(matches!(
+            operation,
+            talos_core::session::SessionOp::Interrupt
+        ));
+        agent_tx
+            .tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".to_string(),
+                turn_id: "turn_test".to_string(),
+                sequence: agent_tx
+                    .sequence
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Cancelled,
+                },
+            })
+            .expect("Actor cancellation completion reaches bridge");
 
         let mut saw_cancelled_status = false;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -2102,20 +2189,18 @@ mod steering_snapshot_tests {
             "must receive a SessionOp within timeout"
         );
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::SubmitMultimodal { text, attachments } => {
-                assert_eq!(text, "describe this image");
-                assert_eq!(attachments.len(), 1);
-                match &attachments[0] {
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.items.len(), 1);
+                assert_eq!(submission.items[0].text, "describe this image");
+                assert_eq!(submission.items[0].attachments.len(), 1);
+                match &submission.items[0].attachments[0] {
                     ContentPart::Image { mime, .. } => {
                         assert_eq!(mime, "image/png");
                     }
                     _ => panic!("expected ContentPart::Image"),
                 }
             }
-            other => panic!(
-                "expected SubmitMultimodal, got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected SubmitStructured, got {other:?}"),
         }
     }
 
@@ -2170,10 +2255,12 @@ mod steering_snapshot_tests {
 
         assert!(received_op.is_ok());
         match received_op.unwrap().unwrap() {
-            talos_core::session::SessionOp::Submit { message } => {
-                assert_eq!(message, "plain text message");
+            talos_core::session::SessionOp::SubmitStructured { submission } => {
+                assert_eq!(submission.items.len(), 1);
+                assert_eq!(submission.items[0].text, "plain text message");
+                assert!(submission.items[0].attachments.is_empty());
             }
-            other => panic!("expected Submit, got {:?}", other),
+            other => panic!("expected SubmitStructured, got {other:?}"),
         }
     }
 
@@ -2341,8 +2428,8 @@ mod steering_snapshot_tests {
         loop_handle.abort();
 
         let error_text = received
-            .expect("must receive an error block within timeout")
-            .expect("error channel must not close");
+            .expect("must receive a system or error block within timeout")
+            .expect("ui channel must not close");
         assert!(
             error_text.contains("does not support image input"),
             "error must mention capability rejection, got: {error_text}"
