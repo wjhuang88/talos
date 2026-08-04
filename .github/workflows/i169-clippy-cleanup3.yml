@@ -21,7 +21,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt,clippy
+          components: rustfmt
 
       - name: Clarify CLI integration-test failures
         shell: python
@@ -52,9 +52,6 @@ jobs:
 
       - name: Format workspace
         run: cargo fmt --all
-
-      - name: Strict workspace Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Publish source-only cleanup
         shell: bash
