@@ -23,7 +23,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt,clippy
 
       - name: Verify corrected patch transport
         shell: bash
@@ -53,6 +53,9 @@ jobs:
           base64 --decode .github/i169-followup2-testfix.patch.gz.b64 | gzip --decompress > /tmp/i169-followup2-testfix.patch
           test "$(sha256sum /tmp/i169-followup2-testfix.patch | cut -d' ' -f1)" = "1f34e7b342f3513dfb344bbfd68e47fa025893ac7ce5c4f5daa79ed3ea0a6924"
           git apply --index /tmp/i169-followup2-testfix.patch
+          printf '%s' 'H4sIAAAAAAAC/+1YbW/bNhD+nl9BZEAhz7ITWUjSqhiQrGmxDQtQpGm/DINAU5TDRSY1vtQOiv73HUXJlhj5bei2Dqg+yBJ5dzzePfec6IzlORqNZkwjfEIk1lSdaFwINSIFO1GSnCiqFBM8vcc8K6hUY6nQdG/Ro9FodIDlo+FweIj1y0s0Or8IL9AQ7pNTBO9zkSFQ1gp9OkLNVVCNAvVnqpfpAmtyDw8hStsDcjlAP6DqOUkIrMFpEUi8cEKDl56tqWTZjIJWasoMnHUGn4w6q/NSkSQxfCoMz2iWNuZ9q/dCPCiQnxpWZKl9SyWdMaXlY6CloSA/asvPSZkSwXM2A6UqWPVrktyQ8lX9mNEcm0Lb1YZtbVyWUnzERRNQsHElwU9OF8GdYVf19E9u1o2vLdjLMNj2mBSC02AQducyJscl1vfBYKxFap/Sqck7YgPfI2m4ZnOaVvuvHAI/bt3gj27sUDeqkB7umr0avM0xxzMqNyzgR9Gb/kDriPp6OS4U9cZsjtvxAXh0ATI3Gq0S3pPflbATqsrjeRRGUB8vTsMo3lgf9nqmJeaKadhz6M1UEfYH3RrhGpLVaB3wUX/Afek1gr1QPPOw4C/eJGdVzf58t9a92b7q3bqAXPqee+jw1I9FfHn9+s3V+1/vji3IoIQZn9n9d8TeiTkNjkVJOWYdOT9QDhmr18H6cYwXmGmLlGwnlUPqYdMGuEeqtMLAFjLvFd5G5/0KWwi9X8FiNppEcfgcDavfSWRhi9UjJyjnqIxytozrcktXaQBbRaoMITCQKggiTNZpdjkOBm3Ar7GeigU40M3LGGuNIe2YaPax8tFiMRDAyjAkZPqHYDxEitzTzEDRpwRzQov2iJUYeFYNX0hcPqH9tS9tCtbigYkksdsGOjeaLutxz/PB/6krLIR8UCUm9GvtDXs7+LV2iKoOJFWQW5t+ByIbJHcXRgddVCqdNQLXBsoUNpQkuRRzqC2igjNwy5XkZFI1kmgSx3Ur+cI1ubsRbWxGmxvSxqbUl+0+3Y0tao82tU+r2t2u2i1rg/r2ZrVHw6qalsZyRvWoytu2trVuXbXGbLG1e/V0sAq92zqaA108eWE/7qM4Pq8/7/fCXI5ZYSRNuYBSqFLTRdrhrOv1bbfa3cqEE6qyGDa00NDBYMX77f1+Y+1vrL2JtfswHWz5WHelEl84fo7Pzg7h51218s8eDXYw8H98QPjixwIOUFvCgZ7yPWjWUWxbxUKSwWb/pbNCkRYsp+SRFHTHQaErueuU4EnvOCJ40hbsF9F5GJ2iYfXbf6o1iiJlSssv379sDdmvHQu1JHkL95qu7IzjXEga10lyZX9aal1CflunwbFyj5iEj6nK9ST5dGN/X+EST1kBFURViG4pVoJD8l7nuZA6RB+wZJjra5p/3mBNCwHG7uB+W/8j9ESwAYddmjxA24B742ndbNbCNU7Bv1/AlaJuaO/gbEPDpr295rDM6u1nnovVSyX4+Un01lbXxfq37N/U5dNZr2aAdoiMYZDP93Bfcep3v8F+4dQWXAObzQa/H/0FsH8oduMUAAA=' | base64 --decode | gzip --decompress > /tmp/i169-followup2-testwiring.patch
+          test "$(sha256sum /tmp/i169-followup2-testwiring.patch | cut -d' ' -f1)" = "80063619f570976929ade9a1c4f57b0c0e762c8c43a1cddbb1564d835c1e7747"
+          git apply --index /tmp/i169-followup2-testwiring.patch
           cargo fmt --all
           git add -A
           cargo fmt --all -- --check
@@ -74,6 +77,10 @@ jobs:
           cargo test -p talos-cli publication_failure_stops_replacement_without_success --locked
           cargo test -p talos-cli session_owned_activation_survives_repeated_production_compaction --locked
           cargo test -p talos-cli --test i169_source_layout --locked
+
+      - name: Strict Clippy
+        shell: bash
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Commit verified code and remove temporary facilities
         shell: bash
