@@ -75,6 +75,7 @@ async fn assert_terminal_recovery(
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
     let frozen = submission(submission_id);
     store.accept(&frozen).expect("durable acceptance");
     store
@@ -163,6 +164,7 @@ async fn ordinary_transcript_entry_without_terminal_outcome_remains_frozen_runni
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
     let frozen = submission("running-ambiguous-submission");
     let turn_id = "running-ambiguous-turn";
     store.accept(&frozen).expect("durable acceptance");
