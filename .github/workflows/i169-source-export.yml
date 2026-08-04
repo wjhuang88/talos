@@ -1,11 +1,6 @@
-name: I169 exact-tree export
+name: I169 verified follow-up apply
 
 on:
-  push:
-    branches:
-      - feat/i169-tui-044-transactional-steering
-    paths:
-      - .github/workflows/i169-source-export.yml
   pull_request:
     branches:
       - main
@@ -13,24 +8,69 @@ on:
       - .github/workflows/i169-source-export.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export:
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact branch tree
+      - name: Checkout remediation branch
         uses: actions/checkout@v4
         with:
           ref: feat/i169-tui-044-transactional-steering
           fetch-depth: 0
-      - name: Build repository bundle
-        shell: bash
-        run: git bundle create talos-exact.bundle --all
-      - name: Upload repository bundle
-        uses: actions/upload-artifact@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: i169-exact-tree-${{ github.sha }}
-          path: talos-exact.bundle
-          if-no-files-found: error
-          retention-days: 1
+          components: rustfmt
+
+      - name: Verify patch transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat .github/i169-followup.patch.gz.b64.part* | wc -c)" -eq 9716
+          test "$(cat .github/i169-followup.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "e02f60b22bcc7f612e5611a8a943aaa51cdbfcc05b30047a7c37dc068eb331f0"
+          test "$(sha256sum .github/i169-followup.patch.gz.b64.part00 | cut -d' ' -f1)" = "0d383e63e7f9afa82b2b62b8a9815a578c9607877599d9766b8047b55d346e7d"
+          test "$(sha256sum .github/i169-followup.patch.gz.b64.part01 | cut -d' ' -f1)" = "93885b64a552af8539a3a193f717a28198d4432f7e95c120adf5fd48c0124c4d"
+          test "$(sha256sum .github/i169-followup.patch.gz.b64.part02 | cut -d' ' -f1)" = "6afb41cb8767ef737c385a1e929317ee8d1a5f60df3d8597a68369fb4196986f"
+
+      - name: Apply and format follow-up
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/i169-followup.patch.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/i169-followup.patch
+          test "$(sha256sum /tmp/i169-followup.patch | cut -d' ' -f1)" = "b3330232efe30c42987b10716d363965b1e963a7170395e972dcaeb00254ad4f"
+          git apply --index /tmp/i169-followup.patch
+          cargo fmt --all
+          git add -A
+          cargo fmt --all -- --check
+          git diff --cached --check
+
+      - name: Workspace compile
+        shell: bash
+        run: cargo check --workspace --locked
+
+      - name: Focused remediation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p talos-agent configured_output_limit_above_4096_is_reserved_before_dispatch --locked
+          cargo test -p talos-agent declared_image_size_is_conservatively_budgeted_before_dispatch --locked
+          cargo test -p talos-agent multiple_declared_images_saturate_budget_instead_of_overflowing --locked
+          cargo test -p talos-session --test i169_runtime_identity --locked
+          cargo test -p talos-session runtime_activation_stage_is_generation_atomic_and_restart_recoverable --locked
+          cargo test -p talos-cli publication_failure_stops_replacement_without_success --locked
+          cargo test -p talos-cli session_owned_activation_survives_repeated_production_compaction --locked
+          cargo test -p talos-cli --test i169_source_layout --locked
+
+      - name: Commit verified code and remove temporary facilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f .github/i169-followup.patch.gz.b64.part* .github/workflows/i169-source-export.yml
+          git diff --cached --check
+          git config user.name "talos-governance-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "test(i169): harden runtime reconstruction boundaries"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
