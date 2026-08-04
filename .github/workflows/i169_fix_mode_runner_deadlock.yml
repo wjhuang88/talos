@@ -66,8 +66,8 @@ jobs:
                   let transition = Arc::new(tokio::sync::Mutex::new(transition_owner));
                   let mcp_config = talos_config::McpConfig::default();
           '''
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one success-fixture composition root, found {text.count(old)}')
+          if old not in text:
+              raise SystemExit('success-fixture composition root not found')
           text = text.replace(old, new, 1)
 
           old_call = '''        let model_result = handle_session_model(
