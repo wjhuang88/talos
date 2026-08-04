@@ -19,9 +19,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Verify exact protected parent
+      - name: Verify protected trigger ancestry
         shell: bash
-        run: test "$(git rev-parse HEAD^)" = "7cb52c8652c7c6593c1075cd0b3e8d61523cd4c0"
+        run: |
+          git merge-base --is-ancestor 7cb52c8652c7c6593c1075cd0b3e8d61523cd4c0 HEAD
+          test -f .github/i169-awaited-handoff-trigger
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -386,24 +388,57 @@ struct PreparedSession {
         Ok(result) => {
 ''',
           )
+
+          session_tests = "crates/talos-agent/src/session/tests.rs"
+          replace_exact(
+              session_tests,
+              "    actor.set_generation(",
+              "    set_authoritative_generation(&mut actor, ",
+              expected=6,
+          )
+          replace_exact(
+              session_tests,
+              '''#[test]
+fn structured_submission_rejects_unbounded_image_metadata() {
+''',
+              '''fn set_authoritative_generation(actor: &mut AppServerSession, generation: u64) {
+    let store = actor.pending_store.clone();
+    let current = store.runtime_generation().unwrap();
+    for expected in current..generation {
+        assert_eq!(
+            store.advance_runtime_generation(expected).unwrap(),
+            expected + 1
+        );
+    }
+    actor.set_generation(generation);
+}
+
+#[test]
+fn structured_submission_rejects_unbounded_image_metadata() {
+''',
+          )
           PY
 
       - name: Restore persistent CI and validate focused paths
         shell: bash
         run: |
           git show 7cb52c8652c7c6593c1075cd0b3e8d61523cd4c0:.github/workflows/ci.yml > .github/workflows/ci.yml
+          rm .github/i169-awaited-handoff-trigger
           cargo fmt --all
           git diff --check
           cargo check -p talos-cli --locked
           cargo test -p talos-session pending_submission --locked
           cargo test -p talos-cli session_transition --locked
+          cargo test -p talos-agent --lib --locked
           cargo test -p talos-agent --test i169_generation_boundary --test i169_old_generation_reconcile --locked
 
       - name: Commit with expected-head protection
         shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           git fetch origin feat/i169-tui-044-transactional-steering
-          test "$(git rev-parse origin/feat/i169-tui-044-transactional-steering)" = "${GITHUB_SHA}"
+          test "$(git rev-parse origin/feat/i169-tui-044-transactional-steering)" = "${EXPECTED_HEAD}"
           git config user.name "talos-remediation-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
