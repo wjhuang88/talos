@@ -269,4 +269,3 @@ This evidence is a review handoff only. It does not mark the Story, Iteration, A
 - It then advances durable generation, revokes old routes, joins the old Scheduler and Actor, reads canonical final transcript history, appends the switch marker, and constructs/publishes the replacement Actor.
 - Focused race evidence queues a final old-generation transcript commit during retirement and proves replacement history observes it before the switch marker.
 - Provider-discovery connection bounding remains test-only; production timeout behavior is outside I169 and unchanged.
-
