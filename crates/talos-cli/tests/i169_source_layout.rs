@@ -26,7 +26,8 @@ fn transactional_bridge_sources_are_normal_rust_modules() {
 fn model_switch_marker_durability_precedes_replacement_publication() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let source = fs::read_to_string(crate_root.join("src/model_lifecycle.rs"))
-        .expect("read model lifecycle source");
+        .expect("read model lifecycle source")
+        .replace("\r\n", "\n");
 
     let barrier = source
         .find("persist_switch_marker_and_read_final_history(")
