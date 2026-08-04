@@ -72,6 +72,14 @@ fn submission(id: &str, item_id: &str, generation: u64, text: &str) -> Structure
     }
 }
 
+fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
+    let mut current = store.runtime_generation().unwrap();
+    while current < target {
+        current = store.advance_runtime_generation(current).unwrap();
+    }
+    assert_eq!(current, target);
+}
+
 async fn wait_for_receipt(
     eq_rx: &mut mpsc::UnboundedReceiver<SessionEvent>,
     wanted_submission_id: &str,
@@ -148,6 +156,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_runtime_generation(&store, 1);
     let work = submission("orphan_batch", "orphan_item", 1, "do not replay");
 
     let (_, accepted) = store.accept(&work).unwrap();
@@ -201,6 +210,7 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_runtime_generation(&store, 2);
     let work = submission("paused_batch", "paused_item", 2, "recover me once");
 
     let (_, accepted) = store.accept(&work).unwrap();
