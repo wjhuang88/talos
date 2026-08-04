@@ -6,6 +6,11 @@ on:
       - feat/i169-tui-044-transactional-steering
     paths:
       - .github/workflows/i169-source-export.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/i169-source-export.yml
 
 permissions:
   contents: write
