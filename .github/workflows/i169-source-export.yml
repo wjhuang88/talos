@@ -29,6 +29,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          wc -c .github/i169-followup.patch.gz.b64.part*
+          sha256sum .github/i169-followup.patch.gz.b64.part*
+          cat .github/i169-followup.patch.gz.b64.part* | wc -c
+          cat .github/i169-followup.patch.gz.b64.part* | sha256sum
           test "$(cat .github/i169-followup.patch.gz.b64.part* | wc -c)" -eq 9716
           test "$(cat .github/i169-followup.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "e02f60b22bcc7f612e5611a8a943aaa51cdbfcc05b30047a7c37dc068eb331f0"
           test "$(sha256sum .github/i169-followup.patch.gz.b64.part00 | cut -d' ' -f1)" = "0d383e63e7f9afa82b2b62b8a9815a578c9607877599d9766b8047b55d346e7d"
