@@ -49,4 +49,34 @@ fn model_switch_marker_durability_precedes_replacement_publication() {
     assert!(commit < publish);
     assert!(publish < success);
     assert!(!source.contains("failed to persist model switch marker"));
+    assert!(source.contains("No replacement route was published"));
+
+    let helper_start = source
+        .find("async fn persist_switch_marker_and_read_final_history(")
+        .expect("activation barrier helper definition");
+    let helper_end = source[helper_start..]
+        .find("\nfn model_switch_markers_match(")
+        .map(|offset| helper_start + offset)
+        .expect("activation barrier helper end");
+    let helper = &source[helper_start..helper_end];
+
+    let fence = helper
+        .find(".quiesce_same_session(session)")
+        .expect("old runtime retirement");
+    let tail_check = helper
+        .find(".read_entries()")
+        .expect("durable marker tail check");
+    let marker_commit = helper
+        .find(".append_with_metadata(switch_marker, marker_metadata)")
+        .expect("durable marker commit");
+    let replay = helper
+        .find(".read_messages()")
+        .expect("canonical replay after marker commit");
+
+    assert!(fence < tail_check);
+    assert!(tail_check < marker_commit);
+    assert!(marker_commit < replay);
+    assert!(!helper.contains("transition_guard.prepare("));
+    assert!(!helper.contains("transition_guard.commit("));
+    assert!(!helper.contains("sq_tx_watch_tx.send("));
 }
