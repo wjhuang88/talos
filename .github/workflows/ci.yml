@@ -34,6 +34,24 @@ jobs:
           reviewed_head="4e6404e60a5d8716581829bda761e7e77836d203"
           test "$(git merge-base "${reviewed_head}" HEAD)" = "${reviewed_head}"
           git show "${reviewed_head}:.github/workflows/ci.yml" > /tmp/i169-original-ci.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/i169_variant_activation_patch.py')
+          text = path.read_text()
+          old = '''    count = text.count(old)
+              if count != 1:
+          '''
+          new = '''    count = text.count(old)
+              if label == "normal model pass previous variant":
+                  if count != 2:
+                      raise SystemExit(f"{label}: expected exactly two matches, found {count}")
+                  return text.replace(old, new, 1)
+              if count != 1:
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('patch helper guard not found exactly once')
+          path.write_text(text.replace(old, new, 1))
+          PY
           python3 .github/i169_variant_activation_patch.py
           rm .github/i169_variant_activation_patch.py
           cp /tmp/i169-original-ci.yml .github/workflows/ci.yml
