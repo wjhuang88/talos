@@ -13,7 +13,7 @@ use talos_core::message::Message;
 use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
-use talos_session::{Session, SessionError, SessionManager};
+use talos_session::{Session, SessionError, SessionManager, SessionMetadata};
 use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
@@ -337,6 +337,10 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         &model_config.provider,
         &model_config.model,
     );
+    let marker_metadata = crate::mode_runtime::session_metadata_for_model(
+        &runtime_model_config.model,
+        &runtime_model_config.provider,
+    );
 
     let provider = crate::provider_setup::build_provider(&runtime_model_config, &api_key, mock);
     let approval_handler = Arc::new(TuiApprovalHandler::new(
@@ -389,29 +393,32 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 
     let mut transition_guard = transition.lock().await;
-    let mut history = match read_final_history_after_quiescence(
+    let history = match persist_switch_marker_and_read_final_history(
         &mut transition_guard,
         &current_session,
+        &switch_marker,
+        marker_metadata,
     )
     .await
     {
         Ok(history) => history,
         Err(FinalHistoryError::Fence(error)) => {
             let text = format!(
-                "[Error] Failed to fence model switch: {error}. Previous model remains active.\n"
+                "[Error] Failed to fence model switch: {error}. Previous model remains active.
+"
             );
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
             return false;
         }
-        Err(FinalHistoryError::Read(error)) => {
+        Err(FinalHistoryError::Persist(error)) => {
             let text = format!(
-                "[Error] Model switch fenced the old runtime but failed to read final Session history: {error}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
+                "[Error] Model switch fenced the old runtime but failed to durably commit the switch marker and final Session history: {error}. No replacement route was published. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.
+"
             );
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
             return false;
         }
     };
-    history.push(switch_marker.clone());
     let session_config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
@@ -453,13 +460,6 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 talos_conversation::MessageSource::System,
                 success_message,
             );
-            let marker_metadata = crate::mode_runtime::session_metadata_for_model(
-                &runtime_model_config.model,
-                &runtime_model_config.provider,
-            );
-            if let Err(e) = current_session.append_with_metadata(&switch_marker, marker_metadata) {
-                eprintln!("Warning: failed to persist model switch marker: {e}");
-            }
             let (ctx_limit, _) = runtime_model_config.resolve_model_limits();
             let all_models = runtime_model_config.all_models();
             let meta = talos_config::model::find_model_by_provider(
@@ -506,18 +506,74 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
 #[derive(Debug)]
 enum FinalHistoryError {
     Fence(String),
-    Read(SessionError),
+    Persist(SessionError),
 }
 
-async fn read_final_history_after_quiescence(
+/// Retires the old same-Session runtime, durably establishes the model-switch
+/// marker, and returns the exact persisted history used to construct the
+/// replacement Actor. No replacement command or event route is reachable
+/// while this activation barrier is running.
+async fn persist_switch_marker_and_read_final_history(
     transition: &mut SessionTransition,
     session: &Session,
+    switch_marker: &Message,
+    marker_metadata: SessionMetadata,
 ) -> Result<Vec<Message>, FinalHistoryError> {
     transition
         .quiesce_same_session(session)
         .await
         .map_err(FinalHistoryError::Fence)?;
-    session.read_messages().map_err(FinalHistoryError::Read)
+
+    let Message::System {
+        content: marker_content,
+        ..
+    } = switch_marker
+    else {
+        return Err(FinalHistoryError::Persist(SessionError::ParseError(
+            "model-switch marker must be a system message".to_string(),
+        )));
+    };
+    let encoded_marker = format!("__SYSTEM__:{marker_content}");
+    let marker_is_durable_tail = session
+        .read_entries()
+        .map_err(FinalHistoryError::Persist)?
+        .last()
+        .is_some_and(|entry| entry.role == "system" && entry.content == encoded_marker);
+
+    if !marker_is_durable_tail {
+        session
+            .append_with_metadata(switch_marker, marker_metadata)
+            .map_err(FinalHistoryError::Persist)?;
+    }
+
+    let history = session
+        .read_messages()
+        .map_err(FinalHistoryError::Persist)?;
+    if !history
+        .last()
+        .is_some_and(|message| model_switch_markers_match(message, switch_marker))
+    {
+        return Err(FinalHistoryError::Persist(SessionError::ParseError(
+            "durable model-switch marker is not the final replacement history entry".to_string(),
+        )));
+    }
+    Ok(history)
+}
+
+fn model_switch_markers_match(left: &Message, right: &Message) -> bool {
+    matches!(
+        (left, right),
+        (
+            Message::System {
+                content: left_content,
+                ..
+            },
+            Message::System {
+                content: right_content,
+                ..
+            }
+        ) if left_content == right_content
+    )
 }
 
 fn model_switch_marker(
@@ -547,11 +603,58 @@ fn send_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use talos_config::ProviderConfig;
     use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
     use talos_core::tool::ToolRegistry;
     use talos_provider::mock::MockProvider;
+    use talos_session::{JsonlSessionStore, SessionEntry, SessionInfo, SessionStore};
     use uuid::Uuid;
+
+    #[derive(Debug)]
+    struct FailingAppendStore;
+
+    impl SessionStore for FailingAppendStore {
+        fn read_entries(&self, file_path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
+            SessionStore::read_entries(&JsonlSessionStore, file_path)
+        }
+
+        fn append_entry(
+            &self,
+            _file_path: &Path,
+            _entry: &SessionEntry,
+        ) -> Result<(), SessionError> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "injected model-switch marker failure",
+            )
+            .into())
+        }
+
+        fn replace_entries_atomically(
+            &self,
+            file_path: &Path,
+            entries: &[SessionEntry],
+        ) -> Result<(), SessionError> {
+            SessionStore::replace_entries_atomically(&JsonlSessionStore, file_path, entries)
+        }
+
+        fn read_last_entry_id(&self, file_path: &Path) -> Option<String> {
+            SessionStore::read_last_entry_id(&JsonlSessionStore, file_path)
+        }
+
+        fn scan_file(&self, file_path: &Path) -> Result<SessionInfo, SessionError> {
+            SessionStore::scan_file(&JsonlSessionStore, file_path)
+        }
+
+        fn read_bytes(&self, file_path: &Path) -> Result<Vec<u8>, SessionError> {
+            SessionStore::read_bytes(&JsonlSessionStore, file_path)
+        }
+
+        fn file_extension(&self) -> &'static str {
+            "jsonl"
+        }
+    }
 
     #[test]
     fn ready_models_have_correct_provider_and_context_limit() {
@@ -628,15 +731,19 @@ mod tests {
             .unwrap();
 
         command_tx.send(SessionOp::Interrupt).await.unwrap();
-        let mut history = read_final_history_after_quiescence(&mut transition, &session)
-            .await
-            .unwrap();
-        history.push(model_switch_marker(
-            "old-provider",
-            "old-model",
-            "new-provider",
-            "new-model",
-        ));
+        let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
+        let history = persist_switch_marker_and_read_final_history(
+            &mut transition,
+            &session,
+            &marker,
+            SessionMetadata {
+                provider: Some("new-provider".into()),
+                model: Some("new-model".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
 
         let user_contents: Vec<_> = history
             .iter()
@@ -650,6 +757,121 @@ mod tests {
             vec!["history-before-switch", "committed-during-handoff"]
         );
         assert!(matches!(history.last(), Some(Message::System { .. })));
+    }
+
+    #[tokio::test]
+    async fn model_switch_marker_write_failure_stops_before_publication() {
+        let temp = tempfile::tempdir().unwrap();
+        let file_path = temp.path().join("session.jsonl");
+        std::fs::write(&file_path, b"").unwrap();
+        let session = Session::with_store(
+            Uuid::new_v4(),
+            "test".into(),
+            String::new(),
+            file_path,
+            Arc::new(FailingAppendStore),
+        );
+        let (raw_tx, raw_rx) = mpsc::channel(1);
+        drop(raw_rx);
+        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
+
+        let error = persist_switch_marker_and_read_final_history(
+            &mut transition,
+            &session,
+            &marker,
+            SessionMetadata {
+                provider: Some("new-provider".into()),
+                model: Some("new-model".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            FinalHistoryError::Persist(SessionError::IoError(_))
+        ));
+        assert_eq!(
+            talos_session::PendingSubmissionStore::for_session(&session)
+                .runtime_generation()
+                .unwrap(),
+            1
+        );
+        assert!(session.read_entries().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn model_switch_marker_retry_after_restart_is_idempotent_and_replay_equivalent() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(temp.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("i169-model-marker-retry")
+            .unwrap();
+        let session = durable.session().clone();
+        session
+            .append(&Message::User {
+                content: "history-before-switch".into(),
+            })
+            .unwrap();
+        let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
+        let metadata = SessionMetadata {
+            provider: Some("new-provider".into()),
+            model: Some("new-model".into()),
+            ..Default::default()
+        };
+
+        let (first_tx, first_rx) = mpsc::channel(1);
+        drop(first_rx);
+        let mut first_transition = SessionTransition::new(first_tx, session.clone()).unwrap();
+        let first_history = persist_switch_marker_and_read_final_history(
+            &mut first_transition,
+            &session,
+            &marker,
+            metadata.clone(),
+        )
+        .await
+        .unwrap();
+        drop(first_transition);
+
+        let (restart_tx, restart_rx) = mpsc::channel(1);
+        drop(restart_rx);
+        let mut restarted_transition = SessionTransition::new(restart_tx, session.clone()).unwrap();
+        let retried_history = persist_switch_marker_and_read_final_history(
+            &mut restarted_transition,
+            &session,
+            &marker,
+            metadata,
+        )
+        .await
+        .unwrap();
+
+        let Message::System { content, .. } = &marker else {
+            unreachable!();
+        };
+        let encoded_marker = format!("__SYSTEM__:{content}");
+        assert_eq!(
+            session
+                .read_entries()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.role == "system" && entry.content == encoded_marker)
+                .count(),
+            1
+        );
+        assert_eq!(format!("{first_history:?}"), format!("{retried_history:?}"));
+
+        let reopened = Session::new(
+            session.id,
+            session.project.clone(),
+            session.workspace_root.clone(),
+            session.file_path.clone(),
+        );
+        assert_eq!(
+            format!("{retried_history:?}"),
+            format!("{:?}", reopened.read_messages().unwrap())
+        );
     }
 
     #[test]

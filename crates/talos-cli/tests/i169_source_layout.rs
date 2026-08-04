@@ -21,3 +21,32 @@ fn transactional_bridge_sources_are_normal_rust_modules() {
         );
     }
 }
+
+#[test]
+fn model_switch_marker_durability_precedes_replacement_publication() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = fs::read_to_string(crate_root.join("src/model_lifecycle.rs"))
+        .expect("read model lifecycle source");
+
+    let barrier = source
+        .find("persist_switch_marker_and_read_final_history(")
+        .expect("durable model-switch activation barrier");
+    let prepare = source
+        .find("transition_guard.prepare(")
+        .expect("replacement prepare boundary");
+    let commit = source
+        .find("transition_guard.commit(")
+        .expect("replacement commit boundary");
+    let publish = source
+        .find("sq_tx_watch_tx.send(")
+        .expect("replacement SQ publication");
+    let success = source
+        .find("MessageSource::System,\n                success_message")
+        .expect("model-switch success publication");
+
+    assert!(barrier < prepare);
+    assert!(prepare < commit);
+    assert!(commit < publish);
+    assert!(publish < success);
+    assert!(!source.contains("failed to persist model switch marker"));
+}

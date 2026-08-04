@@ -170,3 +170,18 @@ The latest implementation evidence tightens same-Session generation replacement 
 - Provider-discovery stabilization is test-only; production discovery retains its pre-I169 30-second request policy and no production timeout exception is claimed by I169.
 
 This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.
+
+## Model-switch marker publication remediation (2026-08-04)
+
+The current review cycle adds a durable activation barrier for same-Session model/provider
+replacement. After generation fencing and acknowledged old-runtime retirement, the switch marker is
+committed to the canonical Session log before replacement Actor construction, command/event watch
+publication, success output, or any generation-G+1 user/Scheduler Turn can execute.
+
+The marker commit is tail-idempotent for the quiescent Session. A crash after marker persistence but
+before route publication can retry without creating a second marker, and the replacement Actor is built
+from a fresh read of the same persisted log used by restart/resume. Marker write/read failure publishes
+no replacement route and leaves the fenced Session stopped with an explicit recoverable error.
+
+This remains an **Active** remediation handoff. It does not accept ADR-056, complete TUI-044/I169,
+close Issue #119, approve PR #131, or authorize merge.

@@ -18,6 +18,13 @@ arbitration, terminal handling, pending-work recovery, structured persistence an
 semantics. ADR-049's engine-owned read-only queue projection before acknowledgement remains in
 force.
 
+The active PR #131 remediation also treats same-Session model/provider replacement as a durable
+activation barrier: the old generation is fenced and retired, the model-switch marker is committed
+exactly once at the quiescent log tail, and only then may the replacement Actor and its command/event
+routes become reachable. A marker persistence failure is a hard publication failure, not a warning;
+restart/retry must preserve one marker and the same model-visible ordering. This language records the
+implementation under review while ADR-056 remains Proposed.
+
 ## Context
 
 Issue #119 requires compatible steering inputs accepted while one model turn is active to be

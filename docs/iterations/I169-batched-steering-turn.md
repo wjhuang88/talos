@@ -269,3 +269,18 @@ This evidence is a review handoff only. It does not mark the Story, Iteration, A
 - It then advances durable generation, revokes old routes, joins the old Scheduler and Actor, reads canonical final transcript history, appends the switch marker, and constructs/publishes the replacement Actor.
 - Focused race evidence queues a final old-generation transcript commit during retirement and proves replacement history observes it before the switch marker.
 - Provider-discovery connection bounding remains test-only; production timeout behavior is outside I169 and unchanged.
+
+## Model-switch marker publication remediation (2026-08-04)
+
+The current review cycle adds a durable activation barrier for same-Session model/provider
+replacement. After generation fencing and acknowledged old-runtime retirement, the switch marker is
+committed to the canonical Session log before replacement Actor construction, command/event watch
+publication, success output, or any generation-G+1 user/Scheduler Turn can execute.
+
+The marker commit is tail-idempotent for the quiescent Session. A crash after marker persistence but
+before route publication can retry without creating a second marker, and the replacement Actor is built
+from a fresh read of the same persisted log used by restart/resume. Marker write/read failure publishes
+no replacement route and leaves the fenced Session stopped with an explicit recoverable error.
+
+This remains an **Active** remediation handoff. It does not accept ADR-056, complete TUI-044/I169,
+close Issue #119, approve PR #131, or authorize merge.
