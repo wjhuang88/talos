@@ -1,4 +1,4 @@
-name: I169 apply remediation
+name: I169 exact-tree export
 
 on:
   push:
@@ -13,63 +13,24 @@ on:
       - .github/workflows/i169-source-export.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  export:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout remediation branch
+      - name: Checkout exact branch tree
         uses: actions/checkout@v4
         with:
           ref: feat/i169-tui-044-transactional-steering
           fetch-depth: 0
-
-      - name: Install Rust formatter
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Verify staged patch transport
+      - name: Build repository bundle
         shell: bash
-        run: |
-          set -euo pipefail
-          wc -c .github/i169-code.patch.gz.b64.part*
-          sha256sum .github/i169-code.patch.gz.b64.part*
-          cat .github/i169-code.patch.gz.b64.part* | sha256sum
-          test "$(cat .github/i169-code.patch.gz.b64.part* | wc -c)" -eq 28072
-          test "$(cat .github/i169-code.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "0d86fa3c6bd20abc0b8f1b740646e9cb2ba84e0a828ff206c401e2b8f6caa4cc"
-          test "$(sha256sum .github/i169-code.patch.gz.b64.part03a | cut -d' ' -f1)" = "2a72bcf022fa4e4fa17035a4d25c24cc84deb4bfacf5c4a439c249f5badc5c8f"
-          test "$(sha256sum .github/i169-code.patch.gz.b64.part03b | cut -d' ' -f1)" = "5709e420f0a5dbf2424058a001ce6296b537b7e892ccf78d7c40e49a5f67f613"
-
-      - name: Reconstruct and apply remediation
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat .github/i169-code.patch.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/i169-code.patch
-          git apply --index /tmp/i169-code.patch
-          cargo fmt --all
-          git add -A
-          git rm -f .github/i169-code.patch.gz.b64.part* .github/workflows/i169-source-export.yml
-          git diff --cached --check
-
-      - name: Commit and publish exact remediation tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "talos-governance-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git commit -m "fix(tui): make runtime reconstruction session-owned"
-          git push origin HEAD:feat/i169-tui-044-transactional-steering
-
-      - name: Export remediated repository bundle
-        shell: bash
-        run: git bundle create talos-remediated.bundle --all
-
-      - name: Upload remediated repository bundle
+        run: git bundle create talos-exact.bundle --all
+      - name: Upload repository bundle
         uses: actions/upload-artifact@v4
         with:
-          name: i169-remediated-bundle-${{ github.sha }}
-          path: talos-remediated.bundle
+          name: i169-exact-tree-${{ github.sha }}
+          path: talos-exact.bundle
           if-no-files-found: error
           retention-days: 1
