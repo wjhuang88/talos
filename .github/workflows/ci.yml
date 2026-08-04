@@ -83,7 +83,7 @@ jobs:
           set -euo pipefail
           cargo check -p talos-cli --locked
           cargo clippy -p talos-cli --locked -- -D warnings
-          ./scripts/validate_collaboration_claims.sh .
+          bash scripts/validate_collaboration_claims.sh .
           git diff --check 4e6404e60a5d8716581829bda761e7e77836d203...HEAD
           test ! -e .github/i169_variant_activation_patch.py
           test "$(git hash-object .github/workflows/ci.yml)" = "13c553cad99f9165dda24ab0259b36c5b3a7220c"
