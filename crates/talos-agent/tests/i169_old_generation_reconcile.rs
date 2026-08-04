@@ -67,8 +67,8 @@ async fn tracked_receipt(
         .expect("tracked receipt channel closed")
 }
 
-#[tokio::test]
-async fn generation_two_can_observe_but_never_execute_generation_one_custody() {
+#[test]
+fn generation_advance_refuses_to_orphan_generation_one_custody() {
     let temp = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
@@ -76,95 +76,33 @@ async fn generation_two_can_observe_but_never_execute_generation_one_custody() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    let old = submission("generation-one", 1, "must remain frozen");
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+
+    let retained = submission("generation-one", 1, "must retain custody");
     assert_eq!(
-        store.accept(&old).unwrap().1,
+        store.accept(&retained).unwrap().1,
         SubmissionReceiptDisposition::AcceptedPending
     );
     assert_eq!(store.pause_unstarted().unwrap(), 1);
-
-    let calls = Arc::new(AtomicUsize::new(0));
-    #[allow(deprecated)]
-    let agent = Agent::new(
-        Arc::new(CountingModel {
-            calls: calls.clone(),
-        }),
-        ToolRegistry::new(),
-    );
-    let config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: temp.path().to_path_buf(),
-        initial_history: Vec::new(),
-        model_context_limit: 128_000,
-    };
-    let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(2);
-    actor.set_durable_persistence(durable, PersistencePolicy::default());
-    let sq_tx = handle.sq_tx;
-    drop(handle.eq_rx);
-    let actor_task = tokio::spawn(async move { actor.run().await });
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-
-    let (old_receipt_tx, mut old_receipt_rx) = mpsc::unbounded_channel();
-    sq_tx
-        .send(SessionOp::ReconcileStructuredTracked {
-            submission: old.clone(),
-            receipt_tx: Some(old_receipt_tx),
+    assert!(matches!(
+        store.advance_runtime_generation(1),
+        Err(talos_session::PendingSubmissionError::GenerationBusy {
+            generation: 1,
+            pending: 1,
         })
-        .await
-        .unwrap();
-    let receipt = tracked_receipt(&mut old_receipt_rx).await;
-    assert_eq!(receipt.session_generation, 1);
+    ));
+    assert_eq!(store.runtime_generation().unwrap(), 1);
+
+    store.cancel_unstarted(&retained.id).unwrap();
+    assert_eq!(store.advance_runtime_generation(1).unwrap(), 2);
+    let stale = submission("late-generation-one", 1, "must reject after fence");
     assert_eq!(
-        receipt.disposition,
-        SubmissionReceiptDisposition::AlreadyAccepted {
-            state: PendingSubmissionState::PausedPending,
-            turn_id: None,
+        store.accept(&stale).unwrap().1,
+        SubmissionReceiptDisposition::Rejected {
+            reason: talos_core::session::SubmissionRejectionReason::WrongGeneration,
         }
     );
-
-    let current = submission("generation-two", 2, "may execute");
-    let (current_receipt_tx, mut current_receipt_rx) = mpsc::unbounded_channel();
-    sq_tx
-        .send(SessionOp::SubmitStructuredTracked {
-            submission: current.clone(),
-            receipt_tx: Some(current_receipt_tx),
-        })
-        .await
-        .unwrap();
-    let receipt = tracked_receipt(&mut current_receipt_rx).await;
-    assert_eq!(receipt.session_generation, 2);
-    assert_eq!(
-        receipt.disposition,
-        SubmissionReceiptDisposition::AcceptedPending
-    );
-
-    tokio::time::timeout(Duration::from_secs(3), async {
-        loop {
-            if calls.load(Ordering::SeqCst) == 1
-                && store
-                    .get(&current.id)
-                    .unwrap()
-                    .is_some_and(|record| record.state == PendingSubmissionState::Committed)
-            {
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("current generation work must commit");
-
-    assert_eq!(
-        store.get(&old.id).unwrap().unwrap().state,
-        PendingSubmissionState::PausedPending
-    );
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
-
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    assert!(store.get(&stale.id).unwrap().is_none());
 }
 
 #[tokio::test]
