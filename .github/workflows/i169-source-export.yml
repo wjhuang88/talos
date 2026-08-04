@@ -38,7 +38,8 @@ jobs:
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part02 | cut -d' ' -f1)" = "f78e0b77d78f73d50f2d49635abfab087d94a652d29bde4834ccdf82cbdd8863"
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part03 | cut -d' ' -f1)" = "00b8d43688da1a16fbe8aa4fadff06af2e47d8d825e86c99c0f2032a281e2077"
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part04 | cut -d' ' -f1)" = "f7294301e16aac6b1783c64cfba1d99950a0fc08b74a6e7644f084e972ff920f"
-          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05 | cut -d' ' -f1)" = "7724b32ce4149ffc88128611dc892f03bdbf53a9785eedbfff91d8ef5550a0ef"
+          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05a | cut -d' ' -f1)" = "5dfe695b54307f2277f898fcd02a040f9aec229c34c4562b148d8de533a8707a"
+          test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05b | cut -d' ' -f1)" = "048d9f2f640c339cb16742e803098316caf5c3d68cef18a31854632c92bdd306"
 
       - name: Apply and format corrected follow-up
         shell: bash
