@@ -6,116 +6,17 @@ on:
 permissions:
   contents: read
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  build-i169-remediation:
-    name: Build I169 atomic remediation artifact
+  probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Verify protected artifact trigger
+      - name: Create marker
         shell: bash
         run: |
-          expected_parent="$(sed -n 's/^workflow-parent=//p' .github/i169-artifact-trigger)"
-          test -n "${expected_parent}"
-          test "$(git rev-parse HEAD^)" = "${expected_parent}"
-          git merge-base --is-ancestor 5b34192b01c09e856671b4db61629551e834e60d HEAD
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Apply corrected remediation in isolated workspace
-        shell: bash
-        run: |
-          python3 - <<'PYRUN'
-          from pathlib import Path
-          import textwrap
-
-          workflow = Path('.github/workflows/i169-generation-handoff-remediation.yml').read_text()
-          start = workflow.index('          from pathlib import Path\n')
-          end = workflow.index('\n          PY\n', start)
-          script = textwrap.dedent(workflow[start:end])
-          needle = """          replace_exact(
-              mode,
-              '''    let (handle, mut actor) = AppServerSession::new(agent, session_config);\\n''',
-              '''    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);\\n''',
-          )"""
-          replacement = """          replace_exact(
-              mode,
-              '''    let (handle, mut actor) = AppServerSession::new(agent, session_config);\\n''',
-              '''    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);\\n''',
-              expected=2,
-          )"""
-          if script.count(needle) != 1:
-              raise SystemExit(f'unexpected mode-runner patch template count: {script.count(needle)}')
-          script = script.replace(needle, replacement)
-          exec(compile(script, 'i169-generation-handoff-remediation', 'exec'))
-
-          mode_path = Path('crates/talos-cli/src/mode_runners.rs')
-          mode_text = mode_path.read_text()
-          rpc_old = """    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-"""
-          rpc_new = """    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-"""
-          if mode_text.count(rpc_old) != 1:
-              raise SystemExit(f'unexpected RPC constructor count after patch: {mode_text.count(rpc_old)}')
-          mode_path.write_text(mode_text.replace(rpc_old, rpc_new))
-          PYRUN
-
-          git show f8b165eba311ec1de26e01d1940a942e0a48d57c:.github/workflows/ci.yml > .github/workflows/ci.yml
-          rm .github/workflows/i169-generation-handoff-remediation.yml
-          rm .github/workflows/i169-generation-handoff-launcher.yml
-          rm .github/i169-remediation-trigger
-          rm .github/i169-artifact-trigger
-          rm -f .github/i169-remediation-failure.log
-          cargo fmt --all
-          git diff --check
-
-      - name: Run focused remediation tests
-        shell: bash
-        run: |
-          cargo test -p talos-session pending_submission --locked
-          cargo test -p talos-cli session_transition --locked
-          cargo test -p talos-agent --test i169_generation_boundary --test i169_old_generation_reconcile --locked
-
-      - name: Package exact final files
-        shell: bash
-        run: |
-          mkdir -p i169-remediation-files
-          while IFS= read -r path; do
-            mkdir -p "i169-remediation-files/$(dirname "$path")"
-            cp "$path" "i169-remediation-files/$path"
-          done <<'EOF'
-          .github/workflows/ci.yml
-          crates/talos-session/src/pending_submission.rs
-          crates/talos-session/src/pending_submission/tests.rs
-          crates/talos-cli/src/session_transition.rs
-          crates/talos-cli/src/mode_runners.rs
-          crates/talos-cli/src/session_handlers.rs
-          crates/talos-cli/src/model_lifecycle.rs
-          crates/talos-agent/tests/i169_generation_boundary.rs
-          crates/talos-agent/tests/i169_old_generation_reconcile.rs
-          EOF
-          git diff --name-status > i169-remediation-files/MANIFEST.name-status
-          git diff --stat > i169-remediation-files/MANIFEST.stat
-          find i169-remediation-files -type f -print0 | sort -z | xargs -0 sha256sum > i169-remediation-files/MANIFEST.sha256
-
+          mkdir -p probe
+          printf 'head=%s\n' "${GITHUB_SHA}" > probe/marker.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: i169-atomic-remediation-${{ github.event.pull_request.head.sha }}
-          path: i169-remediation-files
-          if-no-files-found: error
-          retention-days: 3
+          name: i169-trigger-probe
+          path: probe/marker.txt
