@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use sha2::{Digest, Sha256};
@@ -20,6 +20,8 @@ use crate::{CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTransc
 const SCHEMA_VERSION: i64 = 1;
 const RUNTIME_GENERATION_KEY: &str = "runtime_generation";
 const MAX_TOMBSTONES: usize = MAX_PENDING_SUBMISSIONS * 2;
+const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+const SQLITE_BUSY_RETRY_DELAY: Duration = Duration::from_millis(10);
 
 /// Failure while reading or mutating pending-submission custody.
 #[derive(Debug, Error)]
@@ -549,10 +551,39 @@ impl PendingSubmissionStore {
             std::fs::create_dir_all(parent)?;
         }
         let connection = Connection::open(self.path.as_ref())?;
-        connection.busy_timeout(Duration::from_secs(5))?;
-        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
+        connection.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
+        retry_sqlite_busy(SQLITE_BUSY_TIMEOUT, || {
+            connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")
+        })?;
         Ok(connection)
     }
+}
+
+fn retry_sqlite_busy<T>(
+    timeout: Duration,
+    mut operation: impl FnMut() -> Result<T, rusqlite::Error>,
+) -> Result<T, rusqlite::Error> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match operation() {
+            Err(error) if sqlite_is_busy_or_locked(&error) && Instant::now() < deadline => {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                std::thread::sleep(SQLITE_BUSY_RETRY_DELAY.min(remaining));
+            }
+            result => return result,
+        }
+    }
+}
+
+fn sqlite_is_busy_or_locked(error: &rusqlite::Error) -> bool {
+    matches!(
+        error,
+        rusqlite::Error::SqliteFailure(code, _)
+            if matches!(
+                code.code,
+                rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
+            )
+    )
 }
 
 type RecordTuple = (String, String, String, String, Option<String>);
