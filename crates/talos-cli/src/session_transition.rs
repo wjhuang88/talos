@@ -9,7 +9,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use talos_agent::session::AppServerSession;
+use talos_agent::{PendingSchedulerActor, session::AppServerSession};
 use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::{PendingSubmissionStore, Session};
 use tokio::sync::mpsc;
@@ -134,21 +134,17 @@ impl SessionCommandTarget {
         operation
     }
 
-    /// Revokes every generation-bound proxy immediately and reliably queues a
-    /// shutdown behind the finite set of commands already accepted by the raw
-    /// Actor SQ.
-    ///
-    /// The durable generation fence is committed before this method is called.
-    /// Consequently any structured generation-G command that was queued but
-    /// not yet accepted can only receive `WrongGeneration`; it cannot regain
-    /// Provider authority while generation G+1 is published.
-    fn retire(self) -> JoinHandle<()> {
+    fn cancel_routes(&self) {
         self.route_cancel.cancel();
-        tokio::spawn(async move {
-            if self.sq_tx.send(SessionOp::Shutdown).await.is_ok() {
-                self.sq_tx.closed().await;
-            }
-        })
+    }
+
+    /// Reliably queues shutdown behind the finite raw SQ backlog and waits
+    /// until the Actor receiver has closed. No bounded-queue `Full` result is
+    /// discarded at this ownership boundary.
+    async fn shutdown_actor(&self) {
+        if self.sq_tx.send(SessionOp::Shutdown).await.is_ok() {
+            self.sq_tx.closed().await;
+        }
     }
 }
 
@@ -163,6 +159,12 @@ pub struct CommitResult {
     pub generation: u64,
 }
 
+struct ActiveRuntime {
+    actor_join: JoinHandle<()>,
+    scheduler_cancel: CancellationToken,
+    scheduler_join: JoinHandle<()>,
+}
+
 struct PreparedSession {
     handle: SessionHandle,
     session: Session,
@@ -171,6 +173,7 @@ struct PreparedSession {
 pub struct SessionTransition {
     active_target: SessionCommandTarget,
     active_session: Session,
+    active_runtime: Option<ActiveRuntime>,
     prepared: Option<PreparedSession>,
 }
 
@@ -186,6 +189,7 @@ impl SessionTransition {
         Ok(Self {
             active_target: SessionCommandTarget::new(sq_tx, generation),
             active_session: session,
+            active_runtime: None,
             prepared: None,
         })
     }
@@ -194,6 +198,32 @@ impl SessionTransition {
     #[must_use]
     pub fn active_generation(&self) -> u64 {
         self.active_target.generation
+    }
+
+    /// Creates the exact generation-bound route published to the Bridge and
+    /// Scheduler for the current Actor.
+    #[must_use]
+    pub fn bind_active_sender(&self) -> mpsc::Sender<SessionOp> {
+        self.active_target.bind_sender()
+    }
+
+    /// Attaches the initial production Actor and Scheduler tasks so a later
+    /// replacement can cancel and await both owners before publication.
+    pub fn attach_active_runtime(
+        &mut self,
+        actor_join: JoinHandle<()>,
+        scheduler_cancel: CancellationToken,
+        scheduler_join: JoinHandle<()>,
+    ) -> Result<(), String> {
+        if self.active_runtime.is_some() {
+            return Err("the active Session runtime is already attached".to_string());
+        }
+        self.active_runtime = Some(ActiveRuntime {
+            actor_join,
+            scheduler_cancel,
+            scheduler_join,
+        });
+        Ok(())
     }
 
     pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
@@ -206,15 +236,21 @@ impl SessionTransition {
         Ok(())
     }
 
-    /// Commits one Actor replacement behind an atomic durable generation fence.
+    /// Commits one Actor replacement with an acknowledged fence-and-handoff.
     ///
-    /// Same-Session replacement first proves that generation G owns no
-    /// non-terminal durable custody and advances the journal to G+1 in the same
-    /// SQLite transaction that serializes admission. Only after that point are
-    /// old proxies revoked and reliable Actor shutdown queued. The old Actor may
-    /// finish rejecting already-buffered stale commands, but it cannot acquire
-    /// new custody or enter the Provider while the replacement is published.
-    pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
+    /// For the same logical Session, durable admission and generation advance
+    /// are serialized in one SQLite transaction. The fence is permitted only
+    /// when generation G owns no non-terminal custody. After the fence succeeds
+    /// there are no fallible preparation steps: old proxies are revoked, the
+    /// old Scheduler is cancelled and joined, reliable Actor shutdown is
+    /// queued and joined, and only then is the generation-G+1 Actor spawned and
+    /// published. A crash after the fence therefore leaves durable G+1 with no
+    /// accepted G custody and no surviving process-local G authority.
+    pub async fn commit(
+        &mut self,
+        mut actor: AppServerSession,
+        pending_scheduler: PendingSchedulerActor,
+    ) -> Result<CommitResult, String> {
         let prepared = self
             .prepared
             .as_ref()
@@ -233,15 +269,26 @@ impl SessionTransition {
         let mut prepared = self
             .prepared
             .take()
-            .ok_or_else(|| "prepared transition disappeared during commit".to_string())?;
+            .expect("prepared transition was checked before the durable fence");
 
-        let _retirement = self.active_target.clone().retire();
+        self.retire_active_runtime().await;
 
         actor.set_generation(next_generation);
-        tokio::spawn(async move { actor.run().await });
+        let actor_join = tokio::spawn(async move { actor.run().await });
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
         prepared.handle.sq_tx = new_target.bind_sender();
+        let scheduler_cancel = CancellationToken::new();
+        let scheduler_join = pending_scheduler.spawn(
+            prepared.handle.sq_tx.clone(),
+            next_generation,
+            scheduler_cancel.clone(),
+        );
+        self.active_runtime = Some(ActiveRuntime {
+            actor_join,
+            scheduler_cancel,
+            scheduler_join,
+        });
         self.active_target = new_target;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
 
@@ -250,6 +297,22 @@ impl SessionTransition {
             new_handle: prepared.handle,
             generation: next_generation,
         })
+    }
+
+    async fn retire_active_runtime(&mut self) {
+        self.active_target.cancel_routes();
+        if let Some(runtime) = self.active_runtime.take() {
+            runtime.scheduler_cancel.cancel();
+            if let Err(error) = runtime.scheduler_join.await {
+                tracing::warn!(%error, "retired Session Scheduler task did not join cleanly");
+            }
+            self.active_target.shutdown_actor().await;
+            if let Err(error) = runtime.actor_join.await {
+                tracing::warn!(%error, "retired Session Actor task did not join cleanly");
+            }
+        } else {
+            self.active_target.shutdown_actor().await;
+        }
     }
 
     pub fn rollback(&mut self) {
@@ -295,24 +358,52 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retirement_revokes_proxy_and_waits_through_a_full_raw_queue() {
+    async fn runtime_retirement_waits_through_full_queue_for_scheduler_and_actor() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let temp = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("i169-awaited-runtime-retirement")
+            .unwrap();
         let (raw_tx, mut raw_rx) = mpsc::channel(1);
         raw_tx.send(SessionOp::Interrupt).await.unwrap();
-        let target = SessionCommandTarget::new(raw_tx, 7);
-        let proxy = target.bind_sender();
-        let retirement = target.retire();
+        let mut transition = SessionTransition::new(raw_tx, durable.session().clone()).unwrap();
+        let proxy = transition.bind_active_sender();
 
+        let scheduler_cancel = CancellationToken::new();
+        let scheduler_retired = Arc::new(AtomicBool::new(false));
+        let scheduler_retired_task = scheduler_retired.clone();
+        let scheduler_token = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            scheduler_token.cancelled().await;
+            scheduler_retired_task.store(true, Ordering::SeqCst);
+        });
+
+        let actor_retired = Arc::new(AtomicBool::new(false));
+        let actor_retired_task = actor_retired.clone();
+        let actor_join = tokio::spawn(async move {
+            assert!(matches!(raw_rx.recv().await, Some(SessionOp::Interrupt)));
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            assert!(matches!(raw_rx.recv().await, Some(SessionOp::Shutdown)));
+            actor_retired_task.store(true, Ordering::SeqCst);
+        });
+        transition
+            .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
+            .unwrap();
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            transition.retire_active_runtime(),
+        )
+        .await
+        .expect("retirement must await the old Scheduler and full-queue Actor");
         tokio::time::timeout(std::time::Duration::from_secs(1), proxy.closed())
             .await
             .expect("retirement must revoke every old generation-bound proxy");
-
-        assert!(matches!(raw_rx.recv().await, Some(SessionOp::Interrupt)));
-        assert!(matches!(raw_rx.recv().await, Some(SessionOp::Shutdown)));
-        drop(raw_rx);
-        tokio::time::timeout(std::time::Duration::from_secs(1), retirement)
-            .await
-            .expect("retirement must complete after the old Actor receiver closes")
-            .unwrap();
+        assert!(scheduler_retired.load(Ordering::SeqCst));
+        assert!(actor_retired.load(Ordering::SeqCst));
     }
 
     #[test]

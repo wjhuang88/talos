@@ -213,6 +213,18 @@ fn structured_submission(
     }
 }
 
+fn set_authoritative_generation(actor: &mut AppServerSession, generation: u64) {
+    let store = actor.pending_store.clone();
+    let current = store.runtime_generation().unwrap();
+    for expected in current..generation {
+        assert_eq!(
+            store.advance_runtime_generation(expected).unwrap(),
+            expected + 1
+        );
+    }
+    actor.set_generation(generation);
+}
+
 #[test]
 fn structured_submission_rejects_unbounded_image_metadata() {
     let images = (0..=MAX_SUBMISSION_IMAGE_COUNT)
@@ -417,7 +429,7 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(7);
+    set_authoritative_generation(&mut actor, 7);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -489,7 +501,7 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(11);
+    set_authoritative_generation(&mut actor, 11);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -548,7 +560,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(12);
+    set_authoritative_generation(&mut actor, 12);
     let sq_tx = handle.sq_tx;
     drop(handle.eq_rx);
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -610,7 +622,7 @@ async fn context_budget_pauses_before_submission_started() {
         model_context_limit: 64,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(13);
+    set_authoritative_generation(&mut actor, 13);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -675,7 +687,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(21);
+    set_authoritative_generation(&mut actor, 21);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -754,7 +766,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    actor.set_generation(31);
+    set_authoritative_generation(&mut actor, 31);
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });

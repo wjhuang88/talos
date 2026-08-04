@@ -413,13 +413,8 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 
     let mut transition_guard = transition.lock().await;
-    match transition_guard.commit(actor) {
+    match transition_guard.commit(actor, sched_pending).await {
         Ok(result) => {
-            let _sched_join = sched_pending.spawn(
-                result.new_handle.sq_tx.clone(),
-                result.generation,
-                tokio_util::sync::CancellationToken::new(),
-            );
             let _ = session_watch_tx.send(current_session.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx

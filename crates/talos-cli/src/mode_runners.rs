@@ -338,22 +338,27 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         initial_history,
         model_context_limit,
     };
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),
     );
-    let transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
+    let mut transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
         .map_err(anyhow::Error::msg)?;
     let session_generation = transition_owner.active_generation();
     actor.set_generation(session_generation);
-    let _sched_join = sched_pending.spawn(
+    handle.sq_tx = transition_owner.bind_active_sender();
+    let sq_tx_signal = handle.sq_tx.clone();
+    let actor_join = tokio::spawn(async move { actor.run().await });
+    let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+    let scheduler_join = sched_pending.spawn(
         handle.sq_tx.clone(),
         session_generation,
-        tokio_util::sync::CancellationToken::new(),
+        scheduler_cancel.clone(),
     );
-    let sq_tx_signal = handle.sq_tx.clone();
-    tokio::spawn(async move { actor.run().await });
+    transition_owner
+        .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
+        .map_err(anyhow::Error::msg)?;
 
     let transition = Arc::new(Mutex::new(transition_owner));
     tokio::spawn(async move {

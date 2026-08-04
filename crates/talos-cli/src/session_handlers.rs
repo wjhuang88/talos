@@ -813,13 +813,8 @@ pub(crate) async fn handle_session_new(
         return;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
-            let _sched_join = sched_pending.spawn(
-                result.new_handle.sq_tx.clone(),
-                result.generation,
-                tokio_util::sync::CancellationToken::new(),
-            );
             let _ = session_watch_tx.send(new_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
@@ -1061,13 +1056,8 @@ pub(crate) async fn handle_session_resume(
         return None;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
-            let _sched_join = sched_pending.spawn(
-                result.new_handle.sq_tx.clone(),
-                result.generation,
-                tokio_util::sync::CancellationToken::new(),
-            );
             let _ = session_watch_tx.send(target_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
@@ -1231,13 +1221,8 @@ pub(crate) async fn handle_session_fork(
         return;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
-            let _sched_join = sched_pending.spawn(
-                result.new_handle.sq_tx.clone(),
-                result.generation,
-                tokio_util::sync::CancellationToken::new(),
-            );
             let _ = session_watch_tx.send(child_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
