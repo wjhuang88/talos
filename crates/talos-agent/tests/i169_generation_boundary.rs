@@ -79,7 +79,10 @@ fn submission(
 
 fn advance_store_to(store: &PendingSubmissionStore, generation: u64) {
     for expected in 0..generation {
-        assert_eq!(store.advance_runtime_generation(expected).unwrap(), expected + 1);
+        assert_eq!(
+            store.advance_runtime_generation(expected).unwrap(),
+            expected + 1
+        );
     }
 }
 

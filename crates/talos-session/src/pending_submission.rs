@@ -57,9 +57,7 @@ pub enum PendingSubmissionError {
         actual: u64,
     },
     /// Non-terminal durable custody still belongs to the current generation.
-    #[error(
-        "runtime generation {generation} still owns {pending} non-terminal submission(s)"
-    )]
+    #[error("runtime generation {generation} still owns {pending} non-terminal submission(s)")]
     GenerationBusy {
         /// Generation that still owns custody.
         generation: u64,
