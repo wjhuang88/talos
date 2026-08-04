@@ -113,6 +113,7 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
 
     let calls = Arc::new(AtomicUsize::new(0));
     let release = Arc::new(Notify::new());
