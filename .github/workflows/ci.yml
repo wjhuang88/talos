@@ -1,37 +1,40 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - feat/i169-tui-044-transactional-steering
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  i169-remediation:
-    name: Apply corrected I169 generation handoff remediation
+  build-i169-remediation:
+    name: Build I169 atomic remediation artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: feat/i169-tui-044-transactional-steering
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Verify exact protected parent
         shell: bash
-        run: test "$(git rev-parse HEAD^)" = "692717843b714ea7cb31ac10b6bfc9c162799656"
+        run: test "$(git rev-parse HEAD^)" = "5b34192b01c09e856671b4db61629551e834e60d"
 
-      - name: Execute corrected staged remediation with exact failure capture
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Apply corrected remediation in isolated workspace
         shell: bash
         run: |
-          set +e
-          python3 - <<'PYRUN' > /tmp/i169-remediation.log 2>&1
+          python3 - <<'PYRUN'
           from pathlib import Path
           import textwrap
 
@@ -67,23 +70,7 @@ jobs:
               raise SystemExit(f'unexpected RPC constructor count after patch: {mode_text.count(rpc_old)}')
           mode_path.write_text(mode_text.replace(rpc_old, rpc_new))
           PYRUN
-          status=$?
-          set -e
-          cat /tmp/i169-remediation.log
-          if [[ ${status} -ne 0 ]]; then
-            git reset --hard HEAD
-            cp /tmp/i169-remediation.log .github/i169-remediation-failure.log
-            git config user.name "talos-remediation-bot"
-            git config user.email "actions@users.noreply.github.com"
-            git add .github/i169-remediation-failure.log
-            git commit -m "chore(i169): record remediation failure"
-            git push origin HEAD:feat/i169-tui-044-transactional-steering
-            exit ${status}
-          fi
 
-      - name: Restore persistent CI and remove all temporary assets
-        shell: bash
-        run: |
           git show f8b165eba311ec1de26e01d1940a942e0a48d57c:.github/workflows/ci.yml > .github/workflows/ci.yml
           rm .github/workflows/i169-generation-handoff-remediation.yml
           rm .github/workflows/i169-generation-handoff-launcher.yml
@@ -91,13 +78,39 @@ jobs:
           rm -f .github/i169-remediation-failure.log
           cargo fmt --all
           git diff --check
-          test -n "$(git status --short)"
 
-      - name: Commit exact remediation
+      - name: Run focused remediation tests
         shell: bash
         run: |
-          git config user.name "talos-remediation-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A
-          git commit -m "fix(i169): fence generation handoff before runtime replacement"
-          git push origin HEAD:feat/i169-tui-044-transactional-steering
+          cargo test -p talos-session pending_submission --locked
+          cargo test -p talos-cli session_transition --locked
+          cargo test -p talos-agent --test i169_generation_boundary --test i169_old_generation_reconcile --locked
+
+      - name: Package exact final files
+        shell: bash
+        run: |
+          mkdir -p i169-remediation-files
+          while IFS= read -r path; do
+            mkdir -p "i169-remediation-files/$(dirname "$path")"
+            cp "$path" "i169-remediation-files/$path"
+          done <<'EOF'
+          .github/workflows/ci.yml
+          crates/talos-session/src/pending_submission.rs
+          crates/talos-session/src/pending_submission/tests.rs
+          crates/talos-cli/src/session_transition.rs
+          crates/talos-cli/src/mode_runners.rs
+          crates/talos-cli/src/session_handlers.rs
+          crates/talos-cli/src/model_lifecycle.rs
+          crates/talos-agent/tests/i169_generation_boundary.rs
+          crates/talos-agent/tests/i169_old_generation_reconcile.rs
+          EOF
+          git diff --name-status > i169-remediation-files/MANIFEST.name-status
+          git diff --stat > i169-remediation-files/MANIFEST.stat
+          find i169-remediation-files -type f -print0 | sort -z | xargs -0 sha256sum > i169-remediation-files/MANIFEST.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: i169-atomic-remediation-${{ github.event.pull_request.head.sha }}
+          path: i169-remediation-files
+          if-no-files-found: error
+          retention-days: 3
