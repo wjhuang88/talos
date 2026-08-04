@@ -38,7 +38,7 @@ jobs:
           from pathlib import Path
           workflow = Path('.github/workflows/i169-source-export.yml').read_text()
           matches = re.findall(
-              r"printf '%s' '([A-Za-z0-9+/=]+)' \\| base64 --decode \\| gzip --decompress > /tmp/i169-followup2-testwiring.patch",
+              r"printf '%s' '([A-Za-z0-9+/=]+)' \| base64 --decode \| gzip --decompress > /tmp/i169-followup2-testwiring.patch",
               workflow,
           )
           if len(matches) != 1:
