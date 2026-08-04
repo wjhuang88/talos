@@ -94,7 +94,7 @@ jobs:
           '''
           layout = layout[:success_start] + success_replacement + layout[success_end:]
 
-          helper_end = layout.index('\n/// Test-only compatibility harness', function_start)
+          helper_end = layout.index('\n}\n\n#[test]\nfn provider_construction_cannot_bypass_variant_materialization', function_start) + 2
           helper_guard = layout[function_start:helper_end]
           old_fence = '.find(".quiesce_same_session(session)")\n        .expect("old runtime retirement");'
           new_fence = '.find(".quiesce_same_session_for_activation(session, &activation)")\n        .expect("atomic activation stage and old-runtime retirement");'
