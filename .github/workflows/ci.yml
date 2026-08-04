@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   i169-variant-activation-commit:
-    if: github.event.pull_request.number == 131 && github.sha == '1311a9036d3148edeedf78e220ef6021149f699f'
+    if: github.event.pull_request.number == 131
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
