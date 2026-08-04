@@ -2,100 +2,207 @@ name: CI
 
 on:
   pull_request:
-
-permissions:
-  contents: write
+  push:
+    branches:
+      - main
 
 concurrency:
-  group: i169-doc-eof-trim-${{ github.event.pull_request.number }}-${{ github.sha }}
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  trim-governance-doc-eof:
-    if: github.event.pull_request.number == 131
-    runs-on: ubuntu-latest
+  preflight:
+    name: Format + Check + Clippy + Test
+    runs-on: macos-14
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Trim only trailing blank lines
+      - name: GitHub Actions workflow inventory
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          files = [
-              'docs/backlog/active/TUI-044-transactional-batched-steering-turn.md',
-              'docs/iterations/I169-batched-steering-turn.md',
-              'docs/decisions/056-transactional-steering-submission-boundary.md',
-          ]
-          for name in files:
-              path = Path(name)
-              path.write_text(path.read_text().rstrip() + '\n')
-          PY
-          git diff --check
+          expected="$(mktemp)"
+          actual="$(mktemp)"
+          unexpected="$(mktemp)"
 
-      - name: Commit three-document whitespace correction
+          cat > "${expected}" <<'EOF'
+          .github/workflows/actions-maintenance.yml
+          .github/workflows/ci.yml
+          .github/workflows/pages.yml
+          .github/workflows/release.yml
+          EOF
+
+          find .github/workflows -maxdepth 1 -type f \
+            \( -name '*.yml' -o -name '*.yaml' \) \
+            | sort > "${actual}"
+          comm -13 "${expected}" "${actual}" > "${unexpected}"
+
+          if [[ -s "${unexpected}" ]]; then
+            echo "Unexpected GitHub Actions workflows are not allowed:" >&2
+            cat "${unexpected}" >&2
+            echo "Use an existing persistent workflow, a normal branch/PR, or repository scripts instead of a one-off workflow." >&2
+            exit 1
+          fi
+
+      - name: Diff whitespace validation
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-          BASE_COMMIT: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          set -euo pipefail
-          if git diff --quiet -- \
-            docs/backlog/active/TUI-044-transactional-batched-steering-turn.md \
-            docs/iterations/I169-batched-steering-turn.md \
-            docs/decisions/056-transactional-steering-submission-boundary.md; then
-            echo 'Documents already have canonical EOF; no commit required.'
-            exit 0
+          zero_sha="0000000000000000000000000000000000000000"
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            base_sha="${PR_BASE_SHA}"
+          else
+            base_sha="${PUSH_BEFORE_SHA}"
           fi
-          python3 - <<'PY'
-          import base64
-          import json
-          import os
-          import urllib.request
+          if [[ -z "${base_sha}" || "${base_sha}" == "${zero_sha}" ]]; then
+            base_sha="HEAD^"
+          fi
+          git diff --check "${base_sha}...HEAD"
 
-          repo = os.environ['GITHUB_REPOSITORY']
-          token = os.environ['GH_TOKEN']
-          base_commit = os.environ['BASE_COMMIT']
-          branch = os.environ['HEAD_BRANCH']
-          files = [
-              'docs/backlog/active/TUI-044-transactional-batched-steering-turn.md',
-              'docs/iterations/I169-batched-steering-turn.md',
-              'docs/decisions/056-transactional-steering-submission-boundary.md',
-          ]
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
 
-          def api(method, path, payload=None):
-              data = None if payload is None else json.dumps(payload).encode()
-              request = urllib.request.Request(
-                  f'https://api.github.com/repos/{repo}/{path}',
-                  data=data,
-                  method=method,
-                  headers={
-                      'Authorization': f'Bearer {token}',
-                      'Accept': 'application/vnd.github+json',
-                      'X-GitHub-Api-Version': '2022-11-28',
-                      'Content-Type': 'application/json',
-                  },
-              )
-              with urllib.request.urlopen(request) as response:
-                  return json.load(response)
+      - uses: Swatinem/rust-cache@v2
 
-          commit = api('GET', f'git/commits/{base_commit}')
-          entries = []
-          for path in files:
-              content = base64.b64encode(open(path, 'rb').read()).decode()
-              blob = api('POST', 'git/blobs', {'content': content, 'encoding': 'base64'})
-              entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
-          tree = api('POST', 'git/trees', {'base_tree': commit['tree']['sha'], 'tree': entries})
-          correction = api('POST', 'git/commits', {
-              'message': 'docs(governance): normalize I169 evidence EOF',
-              'tree': tree['sha'],
-              'parents': [base_commit],
-          })
-          api('PATCH', f'git/refs/heads/{branch}', {'sha': correction['sha'], 'force': False})
-          print(correction['sha'])
-          PY
+      - name: Release preflight
+        run: ./scripts/release_preflight.sh
+
+  windows-rust:
+    name: Windows Rust workspace
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Check workspace
+        run: cargo check --workspace --locked
+
+      - name: Clippy workspace
+        run: cargo clippy --workspace --locked -- -D warnings
+
+      - name: Focused PowerShell process, permission, and timeout tests
+        run: |
+          cargo test -p talos-tools --locked windows_spawned_powershell_child_cannot_observe_dangerous_parent_environment -- --nocapture
+          cargo test -p talos-tools --locked platform_command_removes_dangerous_environment_variables -- --nocapture
+          cargo test -p talos-tools --locked test_shell_template_rejects_cross_platform_path_expansion -- --nocapture
+          cargo test -p talos-tools --locked continuous_output_does_not_reset_timeout_deadline -- --nocapture
+          cargo test -p talos-tools --locked timeout_does_not_wait_for_descendant_pipe_eof -- --nocapture
+          cargo test -p talos-tools --locked test_shell_metacharacters_pipe -- --nocapture
+
+      - name: I170 exact-head Windows direct walkthrough
+        shell: pwsh
+        env:
+          I170_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $log = "i170-windows-direct-walkthrough.log"
+          "I170_WORKFLOW exact_head=${{ github.event.pull_request.head.sha || github.sha }}" | Tee-Object -FilePath $log
+          "I170_WORKFLOW event_sha=${{ github.sha }}" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW checked_out_head=$(git rev-parse HEAD)" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW runner_os=$env:RUNNER_OS" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW runner_name=$env:RUNNER_NAME" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW runner_arch=$env:RUNNER_ARCH" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW image_os=$env:ImageOS" | Tee-Object -FilePath $log -Append
+          "I170_WORKFLOW image_version=$env:ImageVersion" | Tee-Object -FilePath $log -Append
+          cargo test -p talos-tools --locked windows_direct_powershell_walkthrough_records_exact_head_and_timeout_evidence -- --nocapture 2>&1 |
+            Tee-Object -FilePath $log -Append
+          $walkthroughExit = $LASTEXITCODE
+          if ($walkthroughExit -ne 0) {
+            exit $walkthroughExit
+          }
+
+      - name: Upload I170 Windows direct walkthrough
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i170-windows-direct-walkthrough-${{ github.event.pull_request.head.sha || github.sha }}
+          path: i170-windows-direct-walkthrough.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Test workspace
+        shell: pwsh
+        run: |
+          cargo test --workspace --locked --no-fail-fast 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
+          $testExit = $LASTEXITCODE
+          if ($testExit -ne 0) {
+            Write-Host "=== Windows workspace failure summary ==="
+            Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed|panicked at" -Context 3,8 |
+              Tee-Object -FilePath windows-workspace-failures.log
+            exit $testExit
+          }
+
+      - name: Upload Windows workspace failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-workspace-test-failure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            windows-workspace-failures.log
+            windows-workspace-tests.log
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Validate project governance
+        shell: pwsh
+        run: ./scripts/validate_project_governance.ps1 .
+
+      - name: Validate collaboration claims
+        shell: bash
+        run: ./scripts/validate_collaboration_claims.sh .
+
+      - name: Rebuilt CLI mock smoke
+        run: cargo run -p talos-cli --locked -- --mock --print --no-init --no-context "windows shell portability smoke"
+
+  remote-governance-reconciliation:
+    name: Remote issue / owner reconciliation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Validate open Issue ownership and synchronization comments
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/validate_remote_issue_owners.py
+
+  windows-installer-fixture:
+    name: Windows installer fixture
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: PowerShell installer fixture (offline)
+        shell: pwsh
+        run: ./scripts/install_fixtures.ps1
