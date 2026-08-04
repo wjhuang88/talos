@@ -1,0 +1,47 @@
+name: I169 final remediation trigger
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/i169-final-trigger.yml
+
+permissions:
+  contents: write
+
+jobs:
+  run-reviewed-gate:
+    if: github.event.pull_request.number == 131
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - name: Execute reviewed final-gate scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -ryaml - <<'RUBY'
+          workflow = YAML.load_file('.github/workflows/i169-source-verify2.yml')
+          steps = workflow.fetch('jobs').fetch('verify-and-publish').fetch('steps')
+          scripts = steps.filter_map.with_index do |step, index|
+            next unless step.key?('run')
+            path = format('/tmp/i169-reviewed-step-%03d.sh', index)
+            File.write(path, "#!/usr/bin/env bash\nset -eo pipefail\n#{step.fetch('run')}\n")
+            path
+          end
+          abort('reviewed gate did not contain executable steps') if scripts.empty?
+          File.write('/tmp/i169-reviewed-steps.list', scripts.join("\n") + "\n")
+          RUBY
+
+          while IFS= read -r script; do
+            echo "::group::Executing ${script}"
+            bash "$script"
+            echo "::endgroup::"
+          done < /tmp/i169-reviewed-steps.list
