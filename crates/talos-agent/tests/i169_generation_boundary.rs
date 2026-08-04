@@ -77,6 +77,12 @@ fn submission(
     }
 }
 
+fn advance_store_to(store: &PendingSubmissionStore, generation: u64) {
+    for expected in 0..generation {
+        assert_eq!(store.advance_runtime_generation(expected).unwrap(), expected + 1);
+    }
+}
+
 async fn receipt(receiver: &mut mpsc::UnboundedReceiver<SubmissionReceipt>) -> SubmissionReceipt {
     tokio::time::timeout(Duration::from_secs(3), receiver.recv())
         .await
@@ -115,6 +121,7 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_store_to(&store, 5);
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
         AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
@@ -168,6 +175,7 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
         .unwrap();
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_store_to(&store, 9);
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
         AppServerSession::new(make_agent(calls.clone()), session_config(temp.path()));
