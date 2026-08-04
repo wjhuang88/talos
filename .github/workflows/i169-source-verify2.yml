@@ -81,54 +81,41 @@ jobs:
           path.write_text(text[:start] + rewritten + text[end:])
           Path('crates/talos-cli/src/mode_runners_tests.rs.rej').unlink()
 
-          def replace_exact(path, old, new, expected=1):
-              file = Path(path)
-              text = file.read_text()
-              actual = text.count(old)
-              if actual != expected:
-                  raise SystemExit(f'{path}: expected {expected} match(es), found {actual}')
-              file.write_text(text.replace(old, new))
+          layout_path = Path('crates/talos-cli/tests/i169_source_layout.rs')
+          layout = layout_path.read_text()
+          function_start = layout.index('fn model_switch_activation_durability_precedes_replacement_publication()')
+          success_start = layout.index('    let success = source', function_start)
+          success_end = layout.index('        .expect("model-switch success publication");', success_start)
+          success_end += len('        .expect("model-switch success publication");\n')
+          success_replacement = '''    let success = publish
+              + source[publish..]
+                  .find("success_message,")
+                  .expect("model-switch success publication after acknowledged route install");
+          '''
+          layout = layout[:success_start] + success_replacement + layout[success_end:]
 
-          layout = 'crates/talos-cli/tests/i169_source_layout.rs'
-          replace_exact(
-              layout,
-              '''    let success = source
-                  .find("MessageSource::System,\\n                success_message")
-                  .expect("model-switch success publication");
-              ''',
-              '''    let success = publish
-                  + source[publish..]
-                      .find("success_message,")
-                      .expect("model-switch success publication after acknowledged route install");
-              ''',
-          )
-          replace_exact(
-              layout,
-              '''        let source = fs::read_to_string(crate_root.join(root))
-                  .unwrap_or_else(|error| panic!("read {root}: {error}"));
-              ''',
-              '''        let source = fs::read_to_string(crate_root.join(root))
-                  .unwrap_or_else(|error| panic!("read {root}: {error}"));
-              let production_source = source
-                  .split("\\n#[cfg(test)]")
-                  .next()
-                  .expect("production source prefix");
-              ''',
-          )
-          replace_exact(
-              layout,
-              '''                !source.contains(forbidden),
-                  "ad-hoc TUI runtime construction escaped the shared builder in {root}: {forbidden}"
-              ''',
-              '''                !production_source.contains(forbidden),
-                  "ad-hoc production TUI runtime construction escaped the shared builder in {root}: {forbidden}"
-              ''',
-          )
-          replace_exact(
-              layout,
-              '        assert!(source.contains("TuiRuntimeBuilder"));\n',
-              '        assert!(production_source.contains("TuiRuntimeBuilder"));\n',
-          )
+          guard_start = layout.index('fn tui_runtime_construction_is_centralized_in_the_shared_builder()')
+          forbidden_at = layout.index('        for forbidden in [', guard_start)
+          production_decl = '''        let production_source = source
+              .split("\\n#[cfg(test)]")
+              .next()
+              .expect("production source prefix");
+          '''
+          if 'let production_source = source' in layout[guard_start:forbidden_at]:
+              raise SystemExit('production-source guard unexpectedly already present')
+          layout = layout[:forbidden_at] + production_decl + layout[forbidden_at:]
+          guard_end = layout.index('\n}\n\n#[test]\nfn every_production_provider_root', guard_start)
+          guard = layout[guard_start:guard_end]
+          replacements = {
+              '!source.contains(forbidden)': '!production_source.contains(forbidden)',
+              'ad-hoc TUI runtime construction escaped the shared builder': 'ad-hoc production TUI runtime construction escaped the shared builder',
+              'assert!(source.contains("TuiRuntimeBuilder"));': 'assert!(production_source.contains("TuiRuntimeBuilder"));',
+          }
+          for old, new in replacements.items():
+              if guard.count(old) != 1:
+                  raise SystemExit(f'guard expected one {old!r}, found {guard.count(old)}')
+              guard = guard.replace(old, new)
+          layout_path.write_text(layout[:guard_start] + guard + layout[guard_end:])
           PY
 
           cargo fmt --all
