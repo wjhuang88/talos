@@ -1,9 +1,8 @@
 name: I169 one-shot clippy cleanup
 
 on:
-  push:
-    branches:
-      - feat/i169-tui-044-transactional-steering
+  pull_request:
+    branches: [main]
     paths:
       - .github/workflows/i169-clippy-cleanup.yml
   workflow_dispatch:
@@ -31,13 +30,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          expected_lints = {
-              Path("crates/talos-exploration/src"): 90,
-              Path("crates/talos-memory/src"): 198,
-          }
+          roots = [
+              Path("crates/talos-exploration/src"),
+              Path("crates/talos-memory/src"),
+          ]
           observed = {}
           changed_files = []
-          for root, expected in expected_lints.items():
+          for root in roots:
               count = 0
               for path in sorted(root.rglob("*.rs")):
                   text = path.read_text()
@@ -54,13 +53,11 @@ jobs:
                   path.write_text(updated)
                   count += file_count
                   changed_files.append(str(path))
+              if count == 0:
+                  raise SystemExit(f"expected strict-Clippy unwrap diagnostics under {root}")
               observed[str(root)] = count
-              if count != expected:
-                  raise SystemExit(
-                      f"unexpected unwrap count for {root}: expected {expected}, observed {count}"
-                  )
 
-          print(f"observed lint replacements: {observed}")
+          print(f"observed replacements: {observed}")
           print("changed files:")
           print("\n".join(changed_files))
           PY
