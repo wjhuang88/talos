@@ -48,6 +48,14 @@ fn submission() -> StructuredSubmission {
     }
 }
 
+fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
+    let mut current = store.runtime_generation().unwrap();
+    while current < target {
+        current = store.advance_runtime_generation(current).unwrap();
+    }
+    assert_eq!(current, target);
+}
+
 async fn wait_for_started(eq_rx: &mut mpsc::UnboundedReceiver<SessionEvent>) -> String {
     loop {
         let event = tokio::time::timeout(Duration::from_secs(5), eq_rx.recv())
@@ -107,6 +115,7 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
+    advance_runtime_generation(&store, 7);
 
     let calls = Arc::new(AtomicUsize::new(0));
     #[allow(deprecated)]
