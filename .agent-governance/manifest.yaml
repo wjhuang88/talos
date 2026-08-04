@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-08-03"
-status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in PR #131 review handoff against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation, scheduler Bridge correlation, opaque Engine identity and fixed-seed stress. The implementation tree at 8cd00fe311fcb349488f3fea69e03f406fc2631e passed complete platform CI #967; this lifecycle synchronization still requires a new exact-head CI and fresh independent review. Ready-for-review is only a handoff state, not approval or merge authorization. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
+last_audited_at: "2026-08-04"
+status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in PR #131 review handoff against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation, scheduler Bridge correlation, opaque Engine identity and fixed-seed stress. Finalization cleanup has restored the persistent CI workflow and removed temporary workflow/helper assets. Exact-head platform CI evidence and fresh independent review remain mandatory before lifecycle advancement; Ready-for-review is only a handoff state, not approval or merge authorization. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
