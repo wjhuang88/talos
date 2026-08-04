@@ -1,0 +1,74 @@
+name: I169 CLI integration Clippy cleanup
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/i169-clippy-cleanup3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.number == 131
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - name: Clarify CLI integration-test failures
+        shell: python
+        run: |
+          from pathlib import Path
+
+          for path in [
+              Path("crates/talos-cli/tests/config_unset.rs"),
+              Path("crates/talos-cli/tests/config_unset_finalization.rs"),
+          ]:
+              text = path.read_text()
+              text = text.replace(
+                  ".unwrap_err()",
+                  '.expect_err("expected test operation to fail")',
+              )
+              text = text.replace(
+                  ".unwrap()",
+                  '.expect("test operation should succeed")',
+              )
+              path.write_text(text)
+
+          path = Path("crates/talos-cli/tests/config_unset.rs")
+          text = path.read_text().replace(
+              'fs::write(&home.join(".talos/config.toml"), new_config)',
+              'fs::write(home.join(".talos/config.toml"), new_config)',
+          )
+          path.write_text(text)
+
+      - name: Format workspace
+        run: cargo fmt --all
+
+      - name: Strict workspace Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Publish source-only cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            crates/talos-cli/tests/config_unset.rs \
+            crates/talos-cli/tests/config_unset_finalization.rs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No source cleanup changes to publish"
+            exit 0
+          fi
+          git commit -m "test(clippy): clarify config unset failures"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
