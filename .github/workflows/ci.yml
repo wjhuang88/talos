@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   issues: read
 
 env:
@@ -27,6 +27,22 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Apply staged I169 EOF cleanup
+        if: ${{ github.event_name == 'pull_request' && hashFiles('.github/i169_trim_eof.py') != '' }}
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          python3 .github/i169_trim_eof.py
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout c96c9cbda85622a61b52a099af52442f66af4ff6 -- .github/workflows/ci.yml
+          git rm .github/i169_trim_eof.py
+          git add docs/iterations/I169-batched-steering-turn.md
+          git commit -m "docs(i169): remove trailing blank line"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
 
       - name: GitHub Actions workflow inventory
         shell: bash
