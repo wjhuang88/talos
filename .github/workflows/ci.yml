@@ -4,15 +4,14 @@ on:
   pull_request:
 
 permissions:
-  contents: write
-  issues: read
+  contents: read
 
 concurrency:
-  group: i169-variant-remediation-${{ github.event.pull_request.number }}
+  group: i169-variant-export-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  i169-variant-activation-remediation:
+  i169-variant-activation-export:
     if: github.event.pull_request.number == 131
     runs-on: macos-14
     steps:
@@ -88,22 +87,29 @@ jobs:
           test ! -e .github/i169_variant_activation_patch.py
           test "$(git hash-object .github/workflows/ci.yml)" = "13c553cad99f9165dda24ab0259b36c5b3a7220c"
 
-      - name: Commit validated product remediation only
+      - name: Package validated files
         shell: bash
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            crates/talos-cli/src/model_lifecycle.rs \
-            crates/talos-cli/src/mode_runtime.rs \
-            crates/talos-cli/src/session_handlers.rs \
-            crates/talos-cli/tests/i169_source_layout.rs \
-            docs/backlog/active/TUI-044-transactional-batched-steering-turn.md \
-            docs/iterations/I169-batched-steering-turn.md \
+          root="${RUNNER_TEMP}/i169-variant-remediation"
+          files=(
+            crates/talos-cli/src/model_lifecycle.rs
+            crates/talos-cli/src/mode_runtime.rs
+            crates/talos-cli/src/session_handlers.rs
+            crates/talos-cli/tests/i169_source_layout.rs
+            docs/backlog/active/TUI-044-transactional-batched-steering-turn.md
+            docs/iterations/I169-batched-steering-turn.md
             docs/decisions/056-transactional-steering-submission-boundary.md
-          git diff --cached --check
-          git commit -m "fix(tui): persist exact model activation identity"
-          git push origin "HEAD:${HEAD_BRANCH}"
+          )
+          for file in "${files[@]}"; do
+            mkdir -p "${root}/$(dirname "${file}")"
+            cp "${file}" "${root}/${file}"
+          done
+          find "${root}" -type f | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: i169-variant-remediation-${{ github.sha }}
+          path: ${{ runner.temp }}/i169-variant-remediation
+          if-no-files-found: error
+          retention-days: 3
