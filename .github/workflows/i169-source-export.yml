@@ -1,4 +1,4 @@
-name: I169 source export
+name: I169 apply remediation
 
 on:
   push:
@@ -6,30 +6,53 @@ on:
       - feat/i169-tui-044-transactional-steering
     paths:
       - .github/workflows/i169-source-export.yml
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/i169-source-export.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export:
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout complete repository
+      - name: Checkout remediation branch
         uses: actions/checkout@v4
         with:
+          ref: feat/i169-tui-044-transactional-steering
           fetch-depth: 0
-      - name: Build repository bundle
+
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Reconstruct and apply remediation
         shell: bash
-        run: git bundle create talos.bundle --all
-      - name: Upload repository bundle
+        run: |
+          set -euo pipefail
+          cat .github/i169-code.patch.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/i169-code.patch
+          git apply --index /tmp/i169-code.patch
+          cargo fmt --all
+          git add -A
+          git rm -f .github/i169-code.patch.gz.b64.part* .github/workflows/i169-source-export.yml
+          git diff --cached --check
+
+      - name: Commit and publish exact remediation tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "talos-governance-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix(tui): make runtime reconstruction session-owned"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
+
+      - name: Export remediated repository bundle
+        shell: bash
+        run: git bundle create talos-remediated.bundle --all
+
+      - name: Upload remediated repository bundle
         uses: actions/upload-artifact@v4
         with:
-          name: i169-source-bundle-${{ github.sha }}
-          path: talos.bundle
+          name: i169-remediated-bundle-${{ github.sha }}
+          path: talos-remediated.bundle
           if-no-files-found: error
           retention-days: 1
