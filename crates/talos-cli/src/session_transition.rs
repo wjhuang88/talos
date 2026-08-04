@@ -13,6 +13,8 @@ use talos_agent::session::AppServerSession;
 use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::{PendingSubmissionStore, Session};
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 type SenderGenerationRegistry = Vec<(mpsc::WeakSender<SessionOp>, u64)>;
 
@@ -67,12 +69,17 @@ pub(crate) fn authoritative_generation_for_sender(sender: &mpsc::Sender<SessionO
 struct SessionCommandTarget {
     sq_tx: mpsc::Sender<SessionOp>,
     generation: u64,
+    route_cancel: CancellationToken,
 }
 
 impl SessionCommandTarget {
     #[must_use]
     fn new(sq_tx: mpsc::Sender<SessionOp>, generation: u64) -> Self {
-        Self { sq_tx, generation }
+        Self {
+            sq_tx,
+            generation,
+            route_cancel: CancellationToken::new(),
+        }
     }
 
     /// Creates a bounded command proxy permanently bound to this Actor target.
@@ -87,7 +94,15 @@ impl SessionCommandTarget {
         register_generation_bound_sender(&proxy_tx, self.generation);
         let target = self.clone();
         tokio::spawn(async move {
-            while let Some(operation) = proxy_rx.recv().await {
+            loop {
+                let operation = tokio::select! {
+                    biased;
+                    _ = target.route_cancel.cancelled() => break,
+                    operation = proxy_rx.recv() => operation,
+                };
+                let Some(operation) = operation else {
+                    break;
+                };
                 let operation = target.bind_operation(operation);
                 if target.sq_tx.send(operation).await.is_err() {
                     break;
@@ -119,8 +134,21 @@ impl SessionCommandTarget {
         operation
     }
 
-    fn try_send(&self, operation: SessionOp) -> Result<(), mpsc::error::TrySendError<SessionOp>> {
-        self.sq_tx.try_send(operation)
+    /// Revokes every generation-bound proxy immediately and reliably queues a
+    /// shutdown behind the finite set of commands already accepted by the raw
+    /// Actor SQ.
+    ///
+    /// The durable generation fence is committed before this method is called.
+    /// Consequently any structured generation-G command that was queued but
+    /// not yet accepted can only receive `WrongGeneration`; it cannot regain
+    /// Provider authority while generation G+1 is published.
+    fn retire(self) -> JoinHandle<()> {
+        self.route_cancel.cancel();
+        tokio::spawn(async move {
+            if self.sq_tx.send(SessionOp::Shutdown).await.is_ok() {
+                self.sq_tx.closed().await;
+            }
+        })
     }
 }
 
@@ -178,8 +206,14 @@ impl SessionTransition {
         Ok(())
     }
 
-    /// Commits one Actor replacement and assigns its authoritative generation
-    /// before the task is spawned or the generation-bound sender is published.
+    /// Commits one Actor replacement behind an atomic durable generation fence.
+    ///
+    /// Same-Session replacement first proves that generation G owns no
+    /// non-terminal durable custody and advances the journal to G+1 in the same
+    /// SQLite transaction that serializes admission. Only after that point are
+    /// old proxies revoked and reliable Actor shutdown queued. The old Actor may
+    /// finish rejecting already-buffered stale commands, but it cannot acquire
+    /// new custody or enter the Provider while the replacement is published.
     pub fn commit(&mut self, mut actor: AppServerSession) -> Result<CommitResult, String> {
         let prepared = self
             .prepared
@@ -190,7 +224,7 @@ impl SessionTransition {
         let next_generation = if same_logical_session {
             pending_store
                 .advance_runtime_generation(self.active_generation())
-                .map_err(|error| format!("failed to advance Session runtime generation: {error}"))?
+                .map_err(|error| format!("failed to fence Session runtime generation: {error}"))?
         } else {
             pending_store.runtime_generation().map_err(|error| {
                 format!("failed to load target Session runtime generation: {error}")
@@ -201,9 +235,10 @@ impl SessionTransition {
             .take()
             .ok_or_else(|| "prepared transition disappeared during commit".to_string())?;
 
+        let _retirement = self.active_target.clone().retire();
+
         actor.set_generation(next_generation);
         tokio::spawn(async move { actor.run().await });
-        let _ = self.active_target.try_send(SessionOp::Shutdown);
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
         prepared.handle.sq_tx = new_target.bind_sender();
@@ -257,6 +292,27 @@ mod tests {
 
         let transition = SessionTransition::new(sender, durable.session().clone()).unwrap();
         assert_eq!(transition.active_generation(), 1);
+    }
+
+    #[tokio::test]
+    async fn retirement_revokes_proxy_and_waits_through_a_full_raw_queue() {
+        let (raw_tx, mut raw_rx) = mpsc::channel(1);
+        raw_tx.send(SessionOp::Interrupt).await.unwrap();
+        let target = SessionCommandTarget::new(raw_tx, 7);
+        let proxy = target.bind_sender();
+        let retirement = target.retire();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), proxy.closed())
+            .await
+            .expect("retirement must revoke every old generation-bound proxy");
+
+        assert!(matches!(raw_rx.recv().await, Some(SessionOp::Interrupt)));
+        assert!(matches!(raw_rx.recv().await, Some(SessionOp::Shutdown)));
+        drop(raw_rx);
+        tokio::time::timeout(std::time::Duration::from_secs(1), retirement)
+            .await
+            .expect("retirement must complete after the old Actor receiver closes")
+            .unwrap();
     }
 
     #[test]
