@@ -1,13 +1,73 @@
-name: I169 finalization maintenance
+name: I169 final governance synchronization
 
 on:
-  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: i169-finalize-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  paused:
+  finalize:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
-      - run: echo "I169 finalization is being completed through repository-maintenance commits."
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify exact staged finalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/i169_finalize_governance.py
+          git merge-base --is-ancestor a476ed6b5d99012602a8ae980df1bea93fb8b930 HEAD
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Apply source cleanup and governance synchronization
+        shell: bash
+        run: python3 .github/i169_finalize_governance.py
+
+      - name: Restore persistent CI and validate finalization
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git show "${BASE_SHA}:.github/workflows/ci.yml" > .github/workflows/ci.yml
+          rm .github/i169_finalize_governance.py
+          cargo fmt --all
+          git diff --check
+          cargo check -p talos-cli --locked
+          cargo clippy -p talos-cli --locked -- -D warnings
+          cargo test -p talos-cli session_transition --locked
+          bash ./scripts/validate_project_governance.sh .
+          bash ./scripts/validate_collaboration_claims.sh .
+
+      - name: Commit with expected-head protection
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${HEAD_REF}"
+          test "$(git rev-parse "origin/${HEAD_REF}")" = "${EXPECTED_HEAD}"
+          git config user.name "talos-remediation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No finalization changes produced" >&2; exit 1; }
+          git commit -m "docs(i169): synchronize awaited handoff review evidence"
+          git push origin "HEAD:${HEAD_REF}"
