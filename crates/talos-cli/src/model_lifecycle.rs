@@ -5,26 +5,19 @@
 
 use std::sync::Arc;
 
-use talos_agent::Agent;
-use talos_agent::session::AppServerSession;
 use talos_config::{Config, ReasoningOptions};
 use talos_conversation::{ModelPickerData, ModelPickerItem, ModelPickerVariantItem};
 use talos_core::message::Message;
 use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
-use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
-use talos_plugin::HookRegistry;
+use talos_core::session::{SessionEvent, SessionOp};
 #[cfg(test)]
 use talos_session::SessionMetadata;
-use talos_session::{Session, SessionError, SessionManager};
+use talos_session::{Session, SessionError};
 use tokio::sync::{Mutex, mpsc, watch};
 
-use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{SessionModelActivation, SessionModelIdentity};
-use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry, register_tui_permission_aware_tools,
-};
 use crate::session_transition::SessionTransition;
-use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
+use crate::tui_runtime_builder::TuiRuntimeBuilder;
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].
 ///
@@ -295,16 +288,12 @@ pub(crate) struct RebuildSessionParams<'a> {
     pub transition: &'a Arc<Mutex<SessionTransition>>,
     pub ui_tx: &'a mpsc::UnboundedSender<talos_conversation::UiOutput>,
     pub model_config: &'a Config,
-    pub hooks: &'a Arc<HookRegistry>,
-    pub workspace_root: &'a std::path::Path,
-    pub mcp_config: &'a talos_config::McpConfig,
+    pub runtime_builder: &'a TuiRuntimeBuilder,
     pub session_watch_tx: &'a watch::Sender<Session>,
     pub sq_tx_watch_tx: &'a watch::Sender<mpsc::Sender<SessionOp>>,
     pub bridge_rx_update_tx:
         &'a mpsc::UnboundedSender<(Session, mpsc::UnboundedReceiver<SessionEvent>)>,
     pub session_watch_rx: &'a watch::Receiver<Session>,
-    pub session_manager: &'a SessionManager,
-    pub api_key: String,
     pub previous_model: String,
     pub previous_provider: String,
     pub previous_variant: Option<String>,
@@ -312,7 +301,6 @@ pub(crate) struct RebuildSessionParams<'a> {
     pub variant: Option<String>,
     pub provider_for_status: String,
     pub success_message: String,
-    pub mock: bool,
 }
 
 /// Shared session rebuild logic for model switching.
@@ -331,15 +319,11 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         transition,
         ui_tx,
         model_config,
-        hooks,
-        workspace_root,
-        mcp_config,
+        runtime_builder,
         session_watch_tx,
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
-        session_manager,
-        api_key,
         previous_model,
         previous_provider,
         previous_variant,
@@ -347,12 +331,9 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         variant,
         provider_for_status,
         success_message,
-        mock,
     } = params;
 
     let (runtime_model_config, _) = materialize_runtime_model_config(model_config);
-
-    let model_context_limit = runtime_model_config.resolve_model_limits().0;
 
     let mut current_session = session_watch_rx.borrow().clone();
     if let Err(e) = current_session.ensure_persisted() {
@@ -371,55 +352,17 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         variant.as_deref(),
     );
 
-    let provider = crate::provider_setup::build_provider(&runtime_model_config, &api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+    let prepared_runtime = match runtime_builder
+        .prepare(&runtime_model_config, &current_session)
+        .await
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let text = format!("[Error] Failed to prepare replacement runtime: {error}\n");
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
             return false;
         }
     };
-    mcp_runtime.report_startup_failures();
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_tui_tool_registry(
-        approval_handler.clone(),
-        workspace_root.to_path_buf(),
-        current_session.id,
-        sched_tools,
-    );
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(runtime_model_config.tool_protocol());
-    crate::mode_runtime::set_image_input_capability(&mut agent, &runtime_model_config);
-    if let Ok(skills) =
-        discover_runtime_skills(workspace_root, runtime_model_config.skills.discover_shared)
-    {
-        apply_runtime_skills(&mut agent, &skills);
-    }
-    crate::mode_runtime::maybe_set_memory_provider(&mut agent, &runtime_model_config);
-    crate::mode_runtime::set_todo_prompt_provider(&mut agent, session_manager, &current_session);
-    match crate::mode_runners::context_files_for_agent(&runtime_model_config, workspace_root, true)
-    {
-        Ok(files) => agent.set_context_files(files),
-        Err(e) => {
-            let text = format!("[Error] Failed to load context files: {e}\n");
-            send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
-            return false;
-        }
-    }
 
     let mut transition_guard = transition.lock().await;
     let history = match establish_model_activation_and_read_final_history(
@@ -448,23 +391,20 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
             return false;
         }
     };
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: history,
-        model_context_limit,
-    };
-
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    actor.set_persistence(
-        current_session.clone(),
-        crate::mode_runtime::session_metadata_for_model(
-            &runtime_model_config.model,
-            &runtime_model_config.provider,
-        ),
-    );
+    let built_runtime = prepared_runtime.finish(history);
+    let handle = built_runtime.handle;
+    let actor = built_runtime.actor;
+    let sched_pending = built_runtime.pending_scheduler;
+    if let Err(error) = transition_guard.prepare_mcp_runtime(built_runtime.mcp_runtime) {
+        let text = format!(
+            "[Error] Failed to retain replacement MCP runtime after fencing: {error}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
+        );
+        send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+        return false;
+    }
     let session_for_prepare = current_session.clone();
     if let Err(e) = transition_guard.prepare(handle, session_for_prepare) {
+        transition_guard.rollback();
         let text = format!(
             "[Error] Failed to prepare model switch after fencing: {e}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
         );
@@ -473,54 +413,60 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 
     match transition_guard.commit(actor, sched_pending).await {
-        Ok(result) => {
-            let _ = session_watch_tx.send(current_session.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((current_session.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!(
-                    "[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed."
+        Ok(result) => match transition_guard
+            .publish_commit(
+                result,
+                current_session.clone(),
+                session_watch_tx,
+                sq_tx_watch_tx,
+                bridge_rx_update_tx,
+            )
+            .await
+        {
+            Ok(_) => {
+                send_stream(
+                    ui_tx,
+                    talos_conversation::MessageSource::System,
+                    success_message,
                 );
-            }
-            send_stream(
-                ui_tx,
-                talos_conversation::MessageSource::System,
-                success_message,
-            );
-            let (ctx_limit, _) = runtime_model_config.resolve_model_limits();
-            let all_models = runtime_model_config.all_models();
-            let meta = talos_config::model::find_model_by_provider(
-                &all_models,
-                &runtime_model_config.provider,
-                &runtime_model_config.model,
-            );
-            let pricing = meta.and_then(|m| m.pricing.as_ref());
-            let _ = ui_tx.send(talos_conversation::UiOutput::Status(
-                talos_conversation::StatusSnapshot {
-                    model_name: model_id.clone(),
-                    provider: provider_for_status,
-                    context_limit: Some(ctx_limit),
-                    input_price_per_million: pricing.and_then(|p| p.input_per_1m),
-                    output_price_per_million: pricing.and_then(|p| p.output_per_1m),
-                    variant: variant.clone(),
-                    ..Default::default()
-                },
-            ));
+                let (ctx_limit, _) = runtime_model_config.resolve_model_limits();
+                let all_models = runtime_model_config.all_models();
+                let meta = talos_config::model::find_model_by_provider(
+                    &all_models,
+                    &runtime_model_config.provider,
+                    &runtime_model_config.model,
+                );
+                let pricing = meta.and_then(|m| m.pricing.as_ref());
+                let _ = ui_tx.send(talos_conversation::UiOutput::Status(
+                    talos_conversation::StatusSnapshot {
+                        model_name: model_id.clone(),
+                        provider: provider_for_status,
+                        context_limit: Some(ctx_limit),
+                        input_price_per_million: pricing.and_then(|p| p.input_per_1m),
+                        output_price_per_million: pricing.and_then(|p| p.output_per_1m),
+                        variant: variant.clone(),
+                        ..Default::default()
+                    },
+                ));
 
-            let mut recent = crate::recent_models::load_recent_models(None);
-            recent.record(crate::recent_models::RecentModelEntry {
-                provider: runtime_model_config.provider.clone(),
-                model_id: runtime_model_config.model.clone(),
-                variant,
-            });
-            if let Err(e) = crate::recent_models::save_recent_models(&recent, None) {
-                tracing::warn!("Failed to persist recent models: {e}");
-            }
+                let mut recent = crate::recent_models::load_recent_models(None);
+                recent.record(crate::recent_models::RecentModelEntry {
+                    provider: runtime_model_config.provider.clone(),
+                    model_id: runtime_model_config.model.clone(),
+                    variant,
+                });
+                if let Err(e) = crate::recent_models::save_recent_models(&recent, None) {
+                    tracing::warn!("Failed to persist recent models: {e}");
+                }
 
-            true
-        }
+                true
+            }
+            Err(e) => {
+                let text = format!("[Error] {e}\n");
+                send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+                false
+            }
+        },
         Err(e) => {
             transition_guard.rollback();
             let text = format!(
@@ -592,6 +538,24 @@ async fn establish_model_activation_and_read_final_history(
         target.clone(),
     );
     if model_activation_tail(session)?.as_ref() == Some(&recovered) {
+        let store = talos_session::PendingSubmissionStore::for_session(session);
+        let state = store.runtime_state().map_err(|error| {
+            FinalHistoryError::Persist(SessionError::ParseError(format!(
+                "failed to read Session runtime activation state: {error}"
+            )))
+        })?;
+        if state
+            .as_ref()
+            .is_some_and(|state| state.activation == recovered)
+        {
+            store
+                .commit_runtime_activation(&recovered.activation_id)
+                .map_err(|error| {
+                    FinalHistoryError::Persist(SessionError::ParseError(format!(
+                        "failed to finalize recovered Session runtime activation: {error}"
+                    )))
+                })?;
+        }
         let marker = model_switch_marker_for_activation(&recovered);
         return verified_activation_history(session, &recovered, &marker);
     }
@@ -609,11 +573,18 @@ async fn persist_model_activation_and_read_final_history(
     previous: &SessionModelIdentity,
     target: &SessionModelIdentity,
 ) -> Result<Vec<Message>, FinalHistoryError> {
-    let generation = transition
-        .quiesce_same_session(session)
+    let activation = SessionModelActivation::new(
+        transition
+            .active_generation()
+            .checked_add(1)
+            .ok_or_else(|| FinalHistoryError::Fence("runtime generation exhausted".to_string()))?,
+        previous.clone(),
+        target.clone(),
+    );
+    transition
+        .quiesce_same_session_for_activation(session, &activation)
         .await
         .map_err(FinalHistoryError::Fence)?;
-    let activation = SessionModelActivation::new(generation, previous.clone(), target.clone());
     let marker = model_switch_marker_for_activation(&activation);
     let marker_metadata = crate::mode_runtime::session_model_activation_metadata(&activation)
         .map_err(|error| {
@@ -627,6 +598,13 @@ async fn persist_model_activation_and_read_final_history(
             .append_with_metadata(&marker, marker_metadata)
             .map_err(FinalHistoryError::Persist)?;
     }
+    talos_session::PendingSubmissionStore::for_session(session)
+        .commit_runtime_activation(&activation.activation_id)
+        .map_err(|error| {
+            FinalHistoryError::Persist(SessionError::ParseError(format!(
+                "failed to commit Session runtime activation: {error}"
+            )))
+        })?;
 
     verified_activation_history(session, &activation, &marker)
 }

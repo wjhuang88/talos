@@ -46,6 +46,7 @@ mod storage;
 mod test_support;
 mod todo_view;
 mod tui_bridge;
+mod tui_runtime_builder;
 mod validation;
 
 use std::io::{self, IsTerminal};

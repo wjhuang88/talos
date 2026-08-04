@@ -40,6 +40,7 @@ mod error;
 mod jsonl;
 mod manager;
 mod pending_submission;
+mod runtime_state;
 mod segment_chain;
 pub mod sqlite;
 mod store;
@@ -62,6 +63,10 @@ pub use manager::{
 };
 pub use pending_submission::{
     PendingSubmissionError, PendingSubmissionRecord, PendingSubmissionStore,
+};
+pub use runtime_state::{
+    SessionRuntimeActivation, SessionRuntimeActivationStatus, SessionRuntimeIdentity,
+    SessionRuntimeState,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 pub use store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};

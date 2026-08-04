@@ -125,7 +125,7 @@ pub(crate) async fn handle_session_delete(
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     selection: Option<String>,
 ) {
-    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let active_id = session_watch_rx.borrow().id;
 
     match &selection {
@@ -560,9 +560,7 @@ pub(crate) async fn handle_session_model(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
-    hooks: &Arc<HookRegistry>,
-    workspace_root: &std::path::Path,
-    mcp_config: &talos_config::McpConfig,
+    runtime_builder: &TuiRuntimeBuilder,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
     bridge_rx_update_tx: &mpsc::UnboundedSender<(
@@ -570,10 +568,8 @@ pub(crate) async fn handle_session_model(
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
-    session_manager: &talos_session::SessionManager,
     model_id: String,
     provider_hint: Option<String>,
-    mock: bool,
 ) -> Option<Config> {
     if model_id.is_empty() {
         let data = build_model_picker_data(config);
@@ -629,7 +625,7 @@ pub(crate) async fn handle_session_model(
         return None;
     }
 
-    let api_key = match model_config.api_key() {
+    let _resolved_api_key = match model_config.api_key() {
         Ok(k) => k,
         Err(e) => {
             let text = format!("[Error] Failed to resolve API key for {provider_name}: {e}\n");
@@ -642,15 +638,11 @@ pub(crate) async fn handle_session_model(
         transition,
         ui_tx,
         model_config: &model_config,
-        hooks,
-        workspace_root,
-        mcp_config,
+        runtime_builder,
         session_watch_tx,
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
-        session_manager,
-        api_key,
         previous_model,
         previous_provider,
         previous_variant,
@@ -658,7 +650,6 @@ pub(crate) async fn handle_session_model(
         variant: model_config.variant.clone(),
         provider_for_status: provider_name.clone(),
         success_message: format!("[System] Switched to model {parsed_model_id}.\n"),
-        mock,
     })
     .await
     {
@@ -684,9 +675,7 @@ pub(crate) async fn handle_session_model_with_credential(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
-    hooks: &Arc<HookRegistry>,
-    workspace_root: &std::path::Path,
-    mcp_config: &talos_config::McpConfig,
+    runtime_builder: &TuiRuntimeBuilder,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
     bridge_rx_update_tx: &mpsc::UnboundedSender<(
@@ -694,9 +683,7 @@ pub(crate) async fn handle_session_model_with_credential(
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
-    session_manager: &talos_session::SessionManager,
     cred: talos_conversation::CredentialResponseData,
-    mock: bool,
 ) -> Option<Config> {
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
@@ -739,7 +726,13 @@ pub(crate) async fn handle_session_model_with_credential(
         (model_id.clone(), None)
     };
 
-    if let Err(e) = model_config.set_active_model(&parsed_model_id) {
+    let qualified_model_id = if parsed_model_id.starts_with(&format!("{}/", cred.provider)) {
+        parsed_model_id.clone()
+    } else {
+        format!("{}/{}", cred.provider, parsed_model_id)
+    };
+
+    if let Err(e) = model_config.set_active_model(&qualified_model_id) {
         let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return None;
@@ -747,22 +740,17 @@ pub(crate) async fn handle_session_model_with_credential(
 
     crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref());
 
-    let api_key = cred.api_key.clone();
     let provider_for_status = model_config.provider.clone();
 
     if rebuild_session_for_model(RebuildSessionParams {
         transition,
         ui_tx,
         model_config: &model_config,
-        hooks,
-        workspace_root,
-        mcp_config,
+        runtime_builder,
         session_watch_tx,
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
-        session_manager,
-        api_key,
         previous_model,
         previous_provider,
         previous_variant,
@@ -772,13 +760,12 @@ pub(crate) async fn handle_session_model_with_credential(
         success_message: format!(
             "[System] Credentials saved. Switched to model {parsed_model_id}.\n"
         ),
-        mock,
     })
     .await
     {
         match ConfigStore::default_store().update_config(|current| {
             current.set_provider_credential(&cred.provider, &cred.api_key);
-            current.set_active_model(&parsed_model_id)?;
+            current.set_active_model(&qualified_model_id)?;
             crate::model_lifecycle::apply_variant_change(current, variant.as_deref());
             Ok(())
         }) {
@@ -799,24 +786,19 @@ pub(crate) async fn handle_session_new(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
-    api_key: &str,
-    hooks: &Arc<HookRegistry>,
-    workspace_root: &std::path::Path,
+    runtime_builder: &TuiRuntimeBuilder,
     session_manager: &talos_session::SessionManager,
-    mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
     bridge_rx_update_tx: &mpsc::UnboundedSender<(
         talos_session::Session,
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
-    model_context_limit: u32,
-    mock: bool,
 ) {
     let mut transition = transition.lock().await;
 
     let session_manager = session_manager.clone();
-    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let new_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
         Ok(s) => s,
         Err(e) => {
@@ -826,57 +808,31 @@ pub(crate) async fn handle_session_new(
         }
     };
 
-    let new_history: Vec<Message> = vec![];
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: new_history,
-        model_context_limit,
-    };
+    if let Err(error) = crate::mode_runtime::ensure_session_runtime_identity(config, &new_session) {
+        let _ = std::fs::remove_file(&new_session.file_path);
+        let text = format!("[Error] Failed to initialize new Session runtime identity: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
 
-    let provider = build_provider(config, api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+    let built_runtime = match runtime_builder.build(config, &new_session, vec![]).await {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let _ = std::fs::remove_file(&new_session.file_path);
+            let text = format!("[Error] Failed to construct new Session runtime: {error}\n");
             send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
-    mcp_runtime.report_startup_failures();
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_tui_tool_registry(
-        approval_handler.clone(),
-        workspace_root.to_path_buf(),
-        new_session.id,
-        sched_tools,
-    );
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root, config.skills.discover_shared) {
-        apply_runtime_skills(&mut agent, &skills);
+    let handle = built_runtime.handle;
+    let actor = built_runtime.actor;
+    let sched_pending = built_runtime.pending_scheduler;
+    if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
+        let _ = std::fs::remove_file(&new_session.file_path);
+        let text = format!("[Error] Failed to retain new Session MCP runtime: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
     }
-    maybe_set_memory_provider(&mut agent, config);
-    set_todo_prompt_provider(&mut agent, &session_manager, &new_session);
-
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    actor.set_persistence(
-        new_session.clone(),
-        crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
-    );
 
     // Clone for watch channel update after commit (new_session is moved into prepare).
     let new_session_for_watch = new_session.clone();
@@ -888,21 +844,30 @@ pub(crate) async fn handle_session_new(
     }
 
     match transition.commit(actor, sched_pending).await {
-        Ok(result) => {
-            let _ = session_watch_tx.send(new_session_for_watch.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((new_session_for_watch.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!(
-                    "[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed."
+        Ok(result) => match transition
+            .publish_commit(
+                result,
+                new_session_for_watch.clone(),
+                session_watch_tx,
+                sq_tx_watch_tx,
+                bridge_rx_update_tx,
+            )
+            .await
+        {
+            Ok(_) => {
+                emit_session_identity_after_queue_clear(
+                    ui_tx,
+                    new_session_for_watch.id.to_string(),
                 );
+                let text =
+                    "[System] New session started. Previous session preserved.\n".to_string();
+                send_stream(ui_tx, MessageSource::System, text);
             }
-            emit_session_identity_after_queue_clear(ui_tx, new_session_for_watch.id.to_string());
-            let text = "[System] New session started. Previous session preserved.\n".to_string();
-            send_stream(ui_tx, MessageSource::System, text);
-        }
+            Err(error) => {
+                let text = format!("[Error] {error}\n");
+                send_stream(ui_tx, MessageSource::Error, text);
+            }
+        },
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&new_session_for_watch.file_path);
@@ -919,24 +884,19 @@ pub(crate) async fn handle_session_resume(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
-    api_key: &str,
-    hooks: &Arc<HookRegistry>,
-    workspace_root: &std::path::Path,
+    runtime_builder: &TuiRuntimeBuilder,
     session_manager: &talos_session::SessionManager,
-    mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
     bridge_rx_update_tx: &mpsc::UnboundedSender<(
         talos_session::Session,
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
-    _model_context_limit: u32,
     session_id: Option<String>,
-    mock: bool,
 ) -> Option<Config> {
     let mut transition = transition.lock().await;
 
-    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
 
     let target_session = match &session_id {
         Some(id) => {
@@ -1028,25 +988,21 @@ pub(crate) async fn handle_session_resume(
         }
     };
 
+    if let Err(error) = crate::mode_runtime::reconcile_session_runtime_state(&target_session) {
+        let text = format!("[Error] Cannot resume stopped Session runtime: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return None;
+    }
     let mut resume_config = config.clone();
     apply_session_model_to_config(&mut resume_config, &target_session);
-    let resume_api_key = match resume_config.api_key() {
-        Ok(key) => key,
-        Err(e) if mock => {
-            tracing::warn!("failed to resolve resumed session api key in mock mode: {e}");
-            api_key.to_string()
-        }
-        Err(e) => {
-            let text = format!(
-                "[Error] Failed to resolve API key for resumed session model '{}': {e}\n",
-                resume_config.model
-            );
-            send_stream(ui_tx, MessageSource::Error, text);
-            return None;
-        }
-    };
-    let resume_model_context_limit = resume_config.resolve_model_limits().0;
-
+    if let Err(error) =
+        crate::mode_runtime::ensure_session_runtime_identity(&resume_config, &target_session)
+    {
+        let text =
+            format!("[Error] Failed to establish resumed Session runtime identity: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return None;
+    }
     let resume_history = match target_session.read_messages() {
         Ok(h) => h,
         Err(e) => {
@@ -1057,69 +1013,25 @@ pub(crate) async fn handle_session_resume(
     };
 
     let resume_history_for_hydrate = resume_history.clone();
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: resume_history,
-        model_context_limit: resume_model_context_limit,
-    };
-
-    let provider = build_provider(&resume_config, &resume_api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-            return None;
-        }
-    };
-    mcp_runtime.report_startup_failures();
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_tui_tool_registry(
-        approval_handler.clone(),
-        workspace_root.to_path_buf(),
-        target_session.id,
-        sched_tools,
-    );
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(resume_config.tool_protocol());
-    if let Ok(skills) =
-        discover_runtime_skills(workspace_root, resume_config.skills.discover_shared)
+    let built_runtime = match runtime_builder
+        .build(&resume_config, &target_session, resume_history)
+        .await
     {
-        apply_runtime_skills(&mut agent, &skills);
-    }
-    maybe_set_memory_provider(&mut agent, &resume_config);
-    set_todo_prompt_provider(&mut agent, session_manager, &target_session);
-    match context_files_for_agent(&resume_config, workspace_root, true) {
-        Ok(files) => agent.set_context_files(files),
-        Err(e) => {
-            let text = format!("[Error] Failed to load context files: {e}\n");
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let text = format!("[Error] Failed to construct resumed Session runtime: {error}\n");
             send_stream(ui_tx, MessageSource::Error, text);
             return None;
         }
+    };
+    let handle = built_runtime.handle;
+    let actor = built_runtime.actor;
+    let sched_pending = built_runtime.pending_scheduler;
+    if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
+        let text = format!("[Error] Failed to retain resumed MCP runtime: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return None;
     }
-
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    actor.set_persistence(
-        target_session.clone(),
-        crate::mode_runtime::session_metadata_for_model(
-            &resume_config.model,
-            &resume_config.provider,
-        ),
-    );
 
     // Clone for watch channel update after commit (target_session is moved into prepare).
     let target_session_for_watch = target_session.clone();
@@ -1131,26 +1043,35 @@ pub(crate) async fn handle_session_resume(
     }
 
     match transition.commit(actor, sched_pending).await {
-        Ok(result) => {
-            let _ = session_watch_tx.send(target_session_for_watch.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((target_session_for_watch.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!(
-                    "[Error] Bridge forwarder unavailable; resumed session events will not be persisted or displayed."
+        Ok(result) => match transition
+            .publish_commit(
+                result,
+                target_session_for_watch.clone(),
+                session_watch_tx,
+                sq_tx_watch_tx,
+                bridge_rx_update_tx,
+            )
+            .await
+        {
+            Ok(_) => {
+                let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
+                emit_session_identity_after_queue_clear(
+                    ui_tx,
+                    target_session_for_watch.id.to_string(),
                 );
+                let text = format!(
+                    "[System] Resumed session {}.\n",
+                    target_session_for_watch.id
+                );
+                send_stream(ui_tx, MessageSource::System, text);
+                Some(resume_config)
             }
-            let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
-            emit_session_identity_after_queue_clear(ui_tx, target_session_for_watch.id.to_string());
-            let text = format!(
-                "[System] Resumed session {}.\n",
-                target_session_for_watch.id
-            );
-            send_stream(ui_tx, MessageSource::System, text);
-            Some(resume_config)
-        }
+            Err(error) => {
+                let text = format!("[Error] {error}\n");
+                send_stream(ui_tx, MessageSource::Error, text);
+                None
+            }
+        },
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&target_session_for_watch.file_path);
@@ -1172,24 +1093,24 @@ pub(crate) async fn handle_session_fork(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
-    api_key: &str,
-    hooks: &Arc<HookRegistry>,
-    workspace_root: &std::path::Path,
+    runtime_builder: &TuiRuntimeBuilder,
     session_manager: &talos_session::SessionManager,
-    mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
     bridge_rx_update_tx: &mpsc::UnboundedSender<(
         talos_session::Session,
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
-    model_context_limit: u32,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
-    mock: bool,
 ) {
     let mut transition = transition.lock().await;
 
     let source_session = session_watch_rx.borrow().clone();
+    if let Err(error) = crate::mode_runtime::reconcile_session_runtime_state(&source_session) {
+        let text = format!("[Error] Cannot fork stopped Session runtime: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
 
     let source_bytes = match source_session.snapshot_bytes() {
         Ok(b) => b,
@@ -1209,7 +1130,7 @@ pub(crate) async fn handle_session_fork(
         }
     };
 
-    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let child_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
         Ok(s) => s,
         Err(e) => {
@@ -1235,56 +1156,69 @@ pub(crate) async fn handle_session_fork(
         return;
     }
 
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: fork_history,
-        model_context_limit,
-    };
-
-    let provider = build_provider(config, api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+    let inherited_identity = match talos_session::PendingSubmissionStore::for_session(
+        &source_session,
+    )
+    .runtime_state()
+    {
+        Ok(Some(state))
+            if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
+        {
+            state.activation.target
+        }
+        Ok(Some(state)) => {
+            let text = format!(
+                "[Error] Source Session activation {} is not committed; fork remains unavailable.\n",
+                state.activation.activation_id
+            );
             send_stream(ui_tx, MessageSource::Error, text);
+            let _ = std::fs::remove_file(&child_path);
+            return;
+        }
+        Ok(None) => talos_session::SessionRuntimeIdentity::new(
+            &config.provider,
+            &config.model,
+            config.variant.as_deref(),
+        ),
+        Err(error) => {
+            let text = format!("[Error] Failed to read source Session runtime identity: {error}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            let _ = std::fs::remove_file(&child_path);
             return;
         }
     };
-    mcp_runtime.report_startup_failures();
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_tui_tool_registry(
-        approval_handler.clone(),
-        workspace_root.to_path_buf(),
-        child_session.id,
-        sched_tools,
-    );
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root, config.skills.discover_shared) {
-        apply_runtime_skills(&mut agent, &skills);
+    if let Err(error) = talos_session::PendingSubmissionStore::for_session(&child_session)
+        .initialize_runtime_identity(inherited_identity)
+    {
+        let text = format!("[Error] Failed to initialize fork runtime identity: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        let _ = std::fs::remove_file(&child_path);
+        return;
     }
-    maybe_set_memory_provider(&mut agent, config);
-    set_todo_prompt_provider(&mut agent, session_manager, &child_session);
 
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    actor.set_persistence(
-        child_session.clone(),
-        crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
-    );
+    let mut fork_config = config.clone();
+    apply_session_model_to_config(&mut fork_config, &child_session);
+    let built_runtime = match runtime_builder
+        .build(&fork_config, &child_session, fork_history)
+        .await
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let text = format!("[Error] Failed to construct fork runtime: {error}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            let _ = std::fs::remove_file(&child_path);
+            return;
+        }
+    };
+    let handle = built_runtime.handle;
+    let actor = built_runtime.actor;
+    let sched_pending = built_runtime.pending_scheduler;
+    if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
+        let text = format!("[Error] Failed to retain fork MCP runtime: {error}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        let _ = std::fs::remove_file(&child_path);
+        return;
+    }
 
     // Clone for watch channel update after commit (child_session is moved into prepare).
     let child_session_for_watch = child_session.clone();
@@ -1296,24 +1230,32 @@ pub(crate) async fn handle_session_fork(
     }
 
     match transition.commit(actor, sched_pending).await {
-        Ok(result) => {
-            let _ = session_watch_tx.send(child_session_for_watch.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((child_session_for_watch.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!(
-                    "[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed."
+        Ok(result) => match transition
+            .publish_commit(
+                result,
+                child_session_for_watch.clone(),
+                session_watch_tx,
+                sq_tx_watch_tx,
+                bridge_rx_update_tx,
+            )
+            .await
+        {
+            Ok(old_session) => {
+                emit_session_identity_after_queue_clear(
+                    ui_tx,
+                    child_session_for_watch.id.to_string(),
                 );
+                let text = format!(
+                    "[System] Forked session {child_id} (source: {}).\n",
+                    old_session.id
+                );
+                send_stream(ui_tx, MessageSource::System, text);
             }
-            emit_session_identity_after_queue_clear(ui_tx, child_session_for_watch.id.to_string());
-            let text = format!(
-                "[System] Forked session {child_id} (source: {}).\n",
-                result.old_session.id
-            );
-            send_stream(ui_tx, MessageSource::System, text);
-        }
+            Err(error) => {
+                let text = format!("[Error] {error}\n");
+                send_stream(ui_tx, MessageSource::Error, text);
+            }
+        },
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&child_session_for_watch.file_path);

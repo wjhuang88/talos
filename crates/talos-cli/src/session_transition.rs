@@ -11,8 +11,10 @@ use std::sync::{Mutex, OnceLock};
 
 use talos_agent::{PendingSchedulerActor, session::AppServerSession};
 use talos_core::session::{SessionHandle, SessionOp};
-use talos_session::{PendingSubmissionStore, Session};
-use tokio::sync::mpsc;
+use talos_session::{PendingSubmissionStore, Session, SessionRuntimeActivation};
+
+use crate::mcp_runtime::McpSessionRuntime;
+use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -155,12 +157,15 @@ pub struct CommitResult {
     /// The handle for the newly active session actor. Its SQ sender is the
     /// generation-binding proxy, not the raw Actor sender.
     pub new_handle: SessionHandle,
+    publication_ready: CancellationToken,
 }
 
 struct ActiveRuntime {
     actor_join: JoinHandle<()>,
     scheduler_cancel: CancellationToken,
     scheduler_join: JoinHandle<()>,
+    publication_abort: CancellationToken,
+    _mcp_runtime: Option<McpSessionRuntime>,
 }
 
 struct PreparedSession {
@@ -174,6 +179,7 @@ pub struct SessionTransition {
     active_runtime: Option<ActiveRuntime>,
     prepared: Option<PreparedSession>,
     quiesced_generation: Option<u64>,
+    prepared_mcp_runtime: Option<McpSessionRuntime>,
 }
 
 impl SessionTransition {
@@ -191,6 +197,7 @@ impl SessionTransition {
             active_runtime: None,
             prepared: None,
             quiesced_generation: None,
+            prepared_mcp_runtime: None,
         })
     }
 
@@ -222,7 +229,28 @@ impl SessionTransition {
             actor_join,
             scheduler_cancel,
             scheduler_join,
+            publication_abort: CancellationToken::new(),
+            _mcp_runtime: None,
         });
+        Ok(())
+    }
+
+    /// Keeps the initial MCP client manager alive for the lifetime of the active runtime.
+    pub fn attach_active_mcp_runtime(&mut self, runtime: McpSessionRuntime) -> Result<(), String> {
+        let active = self
+            .active_runtime
+            .as_mut()
+            .ok_or_else(|| "attach the active Actor runtime before MCP ownership".to_string())?;
+        active._mcp_runtime = Some(runtime);
+        Ok(())
+    }
+
+    /// Installs MCP ownership for the next prepared replacement.
+    pub fn prepare_mcp_runtime(&mut self, runtime: McpSessionRuntime) -> Result<(), String> {
+        if self.prepared_mcp_runtime.is_some() {
+            return Err("an MCP runtime is already prepared".to_string());
+        }
+        self.prepared_mcp_runtime = Some(runtime);
         Ok(())
     }
 
@@ -234,6 +262,44 @@ impl SessionTransition {
     /// accept new durable custody, old command routes are revoked, and the old
     /// Scheduler and Actor have terminated. Reading the transcript afterwards
     /// therefore observes every old-generation Turn completed during retirement.
+    /// Durably stages an exact model activation while fencing the old generation.
+    ///
+    /// The sidecar update and generation fence share the same SQLite immediate
+    /// transaction. The returned generation is not runnable until the caller
+    /// durably appends the matching transcript marker and commits the activation.
+    pub async fn quiesce_same_session_for_activation(
+        &mut self,
+        session: &Session,
+        activation: &SessionRuntimeActivation,
+    ) -> Result<u64, String> {
+        if session.id != self.active_session.id {
+            return Err(
+                "activation quiesce requires the currently active logical Session".to_string(),
+            );
+        }
+        if self.prepared.is_some() {
+            return Err(
+                "cannot quiesce while a session transition is already prepared".to_string(),
+            );
+        }
+        if let Some(generation) = self.quiesced_generation {
+            if generation == activation.generation {
+                return Ok(generation);
+            }
+            return Err(format!(
+                "Session is already quiesced at generation {generation}, not activation generation {}",
+                activation.generation
+            ));
+        }
+
+        let next_generation = PendingSubmissionStore::for_session(session)
+            .stage_runtime_activation(self.active_generation(), activation)
+            .map_err(|error| format!("failed to stage Session runtime activation: {error}"))?;
+        self.retire_active_runtime().await;
+        self.quiesced_generation = Some(next_generation);
+        Ok(next_generation)
+    }
+
     pub async fn quiesce_same_session(&mut self, session: &Session) -> Result<u64, String> {
         if session.id != self.active_session.id {
             return Err("quiesce requires the currently active logical Session".to_string());
@@ -311,20 +377,45 @@ impl SessionTransition {
         self.quiesced_generation = None;
 
         actor.set_generation(next_generation);
-        let actor_join = tokio::spawn(async move { actor.run().await });
+        let publication_ready = CancellationToken::new();
+        let publication_abort = CancellationToken::new();
+        let actor_ready = publication_ready.clone();
+        let actor_abort = publication_abort.clone();
+        let actor_join = tokio::spawn(async move {
+            tokio::select! {
+                _ = actor_ready.cancelled() => actor.run().await,
+                _ = actor_abort.cancelled() => {}
+            }
+        });
 
         let new_target = SessionCommandTarget::new(prepared.handle.sq_tx.clone(), next_generation);
         prepared.handle.sq_tx = new_target.bind_sender();
         let scheduler_cancel = CancellationToken::new();
-        let scheduler_join = pending_scheduler.spawn(
-            prepared.handle.sq_tx.clone(),
-            next_generation,
-            scheduler_cancel.clone(),
-        );
+        let scheduler_ready = publication_ready.clone();
+        let scheduler_abort = publication_abort.clone();
+        let scheduler_sender = prepared.handle.sq_tx.clone();
+        let scheduler_cancel_for_task = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            tokio::select! {
+                _ = scheduler_ready.cancelled() => {
+                    let task = pending_scheduler.spawn(
+                        scheduler_sender,
+                        next_generation,
+                        scheduler_cancel_for_task,
+                    );
+                    if let Err(error) = task.await {
+                        tracing::warn!(%error, "Session Scheduler task did not join cleanly");
+                    }
+                }
+                _ = scheduler_abort.cancelled() => {}
+            }
+        });
         self.active_runtime = Some(ActiveRuntime {
             actor_join,
             scheduler_cancel,
             scheduler_join,
+            publication_abort,
+            _mcp_runtime: self.prepared_mcp_runtime.take(),
         });
         self.active_target = new_target;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
@@ -332,12 +423,77 @@ impl SessionTransition {
         Ok(CommitResult {
             old_session,
             new_handle: prepared.handle,
+            publication_ready,
         })
+    }
+
+    /// Publishes all required replacement routes before allowing the new
+    /// Actor or Scheduler to execute. Any failed ownership handoff leaves the
+    /// new generation durably fenced but stopped and returns an actionable
+    /// error; ordinary success must not be emitted by the caller.
+    pub async fn publish_commit(
+        &mut self,
+        result: CommitResult,
+        session: Session,
+        session_watch_tx: &watch::Sender<Session>,
+        sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
+        bridge_rx_update_tx: &mpsc::UnboundedSender<(
+            Session,
+            mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
+        )>,
+    ) -> Result<Session, String> {
+        let CommitResult {
+            old_session,
+            new_handle,
+            publication_ready,
+        } = result;
+        let SessionHandle { sq_tx, eq_rx } = new_handle;
+
+        let publication = (|| {
+            bridge_rx_update_tx
+                .send((session.clone(), eq_rx))
+                .map_err(|_| "Bridge event route receiver is unavailable".to_string())?;
+            session_watch_tx
+                .send(session)
+                .map_err(|_| "Session watch receiver is unavailable".to_string())?;
+            sq_tx_watch_tx
+                .send(sq_tx)
+                .map_err(|_| "command-route watch receiver is unavailable".to_string())?;
+            Ok::<(), String>(())
+        })();
+
+        match publication {
+            Ok(()) => {
+                publication_ready.cancel();
+                Ok(old_session)
+            }
+            Err(error) => {
+                self.abort_committed_publication().await;
+                Err(format!(
+                    "replacement publication failed after the durable fence: {error}. The new generation is stopped; resume or retry the lifecycle operation"
+                ))
+            }
+        }
+    }
+
+    async fn abort_committed_publication(&mut self) {
+        self.active_target.cancel_routes();
+        if let Some(runtime) = self.active_runtime.take() {
+            runtime.publication_abort.cancel();
+            runtime.scheduler_cancel.cancel();
+            if let Err(error) = runtime.scheduler_join.await {
+                tracing::warn!(%error, "aborted Session Scheduler task did not join cleanly");
+            }
+            if let Err(error) = runtime.actor_join.await {
+                tracing::warn!(%error, "aborted Session Actor task did not join cleanly");
+            }
+        }
     }
 
     async fn retire_active_runtime(&mut self) {
         self.active_target.cancel_routes();
         if let Some(runtime) = self.active_runtime.take() {
+            runtime.publication_abort.cancel();
             runtime.scheduler_cancel.cancel();
             if let Err(error) = runtime.scheduler_join.await {
                 tracing::warn!(%error, "retired Session Scheduler task did not join cleanly");
@@ -353,6 +509,7 @@ impl SessionTransition {
 
     pub fn rollback(&mut self) {
         self.prepared = None;
+        self.prepared_mcp_runtime = None;
     }
 }
 

@@ -135,7 +135,7 @@ async fn initial_provider_dispatch_consumes_the_exact_sealed_plan_once() {
     let expected_estimate = prepared.initial_plan.estimated_tokens;
     assert_eq!(
         expected_estimate,
-        Agent::estimate_provider_request_tokens(&expected_messages, &expected_tools)
+        agent.estimate_provider_request_tokens(&expected_messages, &expected_tools)
     );
     assert_eq!(hook_calls.load(Ordering::SeqCst), 1);
 

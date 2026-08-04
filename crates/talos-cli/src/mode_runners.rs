@@ -39,8 +39,8 @@ use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
-    apply_mcp_fixture_config, maybe_set_memory_provider, session_metadata_for_model,
-    set_todo_prompt_provider,
+    apply_mcp_fixture_config, ensure_session_runtime_identity, maybe_set_memory_provider,
+    reconcile_session_runtime_state, session_metadata_for_model, set_todo_prompt_provider,
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
@@ -63,6 +63,7 @@ use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::todo_view;
 use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
+use crate::tui_runtime_builder::TuiRuntimeBuilder;
 use crate::{Cli, build_hook_registry, event_loop};
 use tokio::sync::Mutex;
 
@@ -227,7 +228,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         ResumeSelection::Latest,
         false,
     )?;
+    reconcile_session_runtime_state(&session)?;
     apply_session_model_to_config(&mut config, &session);
+    if !config.model.is_empty() {
+        ensure_session_runtime_identity(&config, &session)?;
+    }
 
     let startup_action = resolve_startup_model_action(&config, cli.mock, cli.no_init);
     let (needs_model_setup, needs_api_key) = match &startup_action {
@@ -245,11 +250,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         StartupModelAction::Ready => (false, false),
     };
     let mock_for_startup = cli.mock || needs_model_setup || needs_api_key;
-    let api_key = if mock_for_startup {
-        config.api_key().unwrap_or_default()
-    } else {
-        config.api_key().map_err(|e| anyhow!("{e}"))?
-    };
 
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
     let talos_root = crate::storage::resolve_talos_root();
@@ -273,76 +273,42 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     ));
 
     let hooks = build_hook_registry(true);
-    let provider = build_provider(&config, &api_key, cli.mock);
     apply_mcp_fixture_config(&mut config, &cli);
-    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
-    mcp_runtime.report_startup_failures();
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_tui_tool_registry(
-        approval_handler.clone(),
-        workspace_root.to_path_buf(),
-        session.id,
-        sched_tools,
-    );
-    register_tui_permission_aware_tools(
-        &mut registry,
-        mcp_runtime.tools(),
-        approval_handler.clone(),
-    );
-    let loaded_plugin_packages = register_explicit_tui_plugins(
-        &mut registry,
-        &cli.plugin_packages,
-        approval_handler.clone(),
-    )
-    .map_err(anyhow::Error::msg)?;
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
+    let runtime_builder = TuiRuntimeBuilder::new(
+        ui_output_tx.clone(),
         hooks.clone(),
-    );
-    agent.set_tool_protocol(config.tool_protocol());
-    crate::mode_runtime::set_image_input_capability(&mut agent, &config);
-    if !loaded_plugin_packages.is_empty() {
-        let mut policy = ToolPresentationPolicy::runtime_default();
-        for capability in loaded_plugin_packages
-            .iter()
-            .flat_map(|package| package.capabilities.iter())
-        {
-            policy = policy.disclose_tool(capability.clone());
-        }
-        agent.set_tool_presentation_policy(policy);
-    }
-    let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
-    apply_runtime_skills(&mut agent, &runtime_skills);
-    let runtime_skills = Arc::new(Mutex::new(runtime_skills));
-    maybe_set_memory_provider(&mut agent, &config);
-    set_todo_prompt_provider(&mut agent, &session_manager, &session);
-
-    agent.set_context_files(context_files_for_agent(
-        &config,
-        &workspace_root,
+        workspace_root.to_path_buf(),
+        session_manager.clone(),
+        approval_handler.clone(),
+        cli.plugin_packages.clone(),
         !cli.no_context,
-    )?);
+        cli.mock,
+    );
+    let initial_runtime_builder = TuiRuntimeBuilder::new(
+        ui_output_tx.clone(),
+        hooks.clone(),
+        workspace_root.to_path_buf(),
+        session_manager.clone(),
+        approval_handler.clone(),
+        cli.plugin_packages.clone(),
+        !cli.no_context,
+        mock_for_startup,
+    );
 
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();
+    let built_runtime = initial_runtime_builder
+        .build(&config, &session, initial_history)
+        .await
+        .context("failed to construct initial TUI runtime")?;
+    let runtime_skills = Arc::new(Mutex::new(built_runtime.runtime_skills));
+    let loaded_plugin_packages = built_runtime.loaded_plugin_packages;
+    let mcp_diagnostics = built_runtime.mcp_runtime.diagnostics().to_vec();
+    let mut handle = built_runtime.handle;
+    let mut actor = built_runtime.actor;
+    let sched_pending = built_runtime.pending_scheduler;
+    let initial_mcp_runtime = built_runtime.mcp_runtime;
 
-    let (model_context_limit, _) = config.resolve_model_limits();
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history,
-        model_context_limit,
-    };
-    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
-    actor.set_persistence(
-        session.clone(),
-        session_metadata_for_model(&config.model, &config.provider),
-    );
     let mut transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
         .map_err(anyhow::Error::msg)?;
     let session_generation = transition_owner.active_generation();
@@ -358,6 +324,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     );
     transition_owner
         .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
+        .map_err(anyhow::Error::msg)?;
+    transition_owner
+        .attach_active_mcp_runtime(initial_mcp_runtime)
         .map_err(anyhow::Error::msg)?;
 
     let transition = Arc::new(Mutex::new(transition_owner));
@@ -390,17 +359,14 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let transition_for_handler = transition.clone();
     let ui_tx_for_handler = ui_output_tx.clone();
     let config_for_handler = config.clone();
-    let api_key_for_handler = api_key.clone();
-    let hooks_for_handler = hooks.clone();
+    let runtime_builder_for_handler = runtime_builder.clone();
     let workspace_root_for_handler = workspace_root.to_path_buf();
     let session_manager_for_handler = session_manager.clone();
-    let mcp_config_for_handler = config.mcp.clone();
     let session_watch_tx_for_handler = session_watch_tx.clone();
     let sq_tx_watch_tx_for_handler = sq_tx_watch_tx.clone();
     let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
     let session_watch_rx_for_handler = session_watch_rx.clone();
     let model_info_tx_for_handler = model_info_tx.clone();
-    let model_context_limit = config.resolve_model_limits().0;
     let ui_tx_for_wizard = ui_tx_for_handler.clone();
     tokio::spawn(async move {
         let mut config_for_handler = config_for_handler;
@@ -411,16 +377,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
-                        &api_key_for_handler,
-                        &hooks_for_handler,
-                        &workspace_root_for_handler,
+                        &runtime_builder_for_handler,
                         &session_manager_for_handler,
-                        &mcp_config_for_handler,
                         &session_watch_tx_for_handler,
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
-                        model_context_limit,
-                        cli.mock,
                     )
                     .await;
                 }
@@ -429,17 +390,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
-                        &api_key_for_handler,
-                        &hooks_for_handler,
-                        &workspace_root_for_handler,
+                        &runtime_builder_for_handler,
                         &session_manager_for_handler,
-                        &mcp_config_for_handler,
                         &session_watch_tx_for_handler,
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
-                        model_context_limit,
                         req.session_id,
-                        cli.mock,
                     )
                     .await
                     {
@@ -452,17 +408,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
-                        &api_key_for_handler,
-                        &hooks_for_handler,
-                        &workspace_root_for_handler,
+                        &runtime_builder_for_handler,
                         &session_manager_for_handler,
-                        &mcp_config_for_handler,
                         &session_watch_tx_for_handler,
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
-                        model_context_limit,
                         &session_watch_rx_for_handler,
-                        cli.mock,
                     )
                     .await;
                 }
@@ -489,17 +440,13 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
-                        &hooks_for_handler,
-                        &workspace_root_for_handler,
-                        &mcp_config_for_handler,
+                        &runtime_builder_for_handler,
                         &session_watch_tx_for_handler,
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
                         &session_watch_rx_for_handler,
-                        &session_manager_for_handler,
                         req.model_id,
                         req.provider_hint,
-                        cli.mock,
                     )
                     .await
                     {
@@ -512,16 +459,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
-                        &hooks_for_handler,
-                        &workspace_root_for_handler,
-                        &mcp_config_for_handler,
+                        &runtime_builder_for_handler,
                         &session_watch_tx_for_handler,
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
                         &session_watch_rx_for_handler,
-                        &session_manager_for_handler,
                         resp,
-                        cli.mock,
                     )
                     .await
                     {
@@ -659,7 +602,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(skill_diagnostics)
-        .with_mcp_servers(mcp_runtime.diagnostics().to_vec())
+        .with_mcp_servers(mcp_diagnostics)
         .with_hook_declarations(hook_decls.clone())
         .with_loaded_plugins(loaded_plugin_diagnostics.clone())
         .with_workspace_root(workspace_root.clone());

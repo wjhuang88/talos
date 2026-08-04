@@ -5,7 +5,9 @@
 //! - ASCII text: ~4 characters per token
 //! - Non-ASCII text (CJK, etc.): ~2 characters per token
 //!
-//! A 20% error margin is expected and acceptable for estimation purposes.
+//! The request admission layer adds an explicit safety margin for text. Image
+//! parts use a conservative declared-size policy because dimensions are not
+//! always available at this boundary.
 
 use talos_core::message::{Message, Usage};
 
@@ -143,7 +145,15 @@ impl TokenEstimator {
                         talos_core::message::ContentPart::Image {
                             mime, byte_count, ..
                         } => {
-                            Self::estimate_text(mime) + Self::estimate_text(&byte_count.to_string())
+                            // Conservative provider-independent fallback: reserve
+                            // one token per three declared bytes plus a fixed
+                            // framing/vision overhead. This intentionally
+                            // overestimates encoded image cost when exact
+                            // dimensions/provider tile rules are unavailable.
+                            let declared = byte_count.div_ceil(3);
+                            Self::estimate_text(mime)
+                                .saturating_add(u32::try_from(declared).unwrap_or(u32::MAX))
+                                .saturating_add(1024)
                         }
                     })
                     .sum(),

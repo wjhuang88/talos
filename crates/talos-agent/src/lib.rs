@@ -91,7 +91,33 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
-const REQUEST_OUTPUT_RESERVE_TOKENS: u32 = 4096;
+/// Shared admission contract for one complete Provider request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestBudgetSpec {
+    /// Exact output token limit requested in the Provider body.
+    pub requested_output_tokens: u32,
+    /// Conservative margin applied to approximate text/tool/image input cost.
+    pub input_safety_margin_bps: u16,
+    /// Fixed parser/protocol overhead added after the proportional margin.
+    pub fixed_overhead_tokens: u32,
+}
+
+impl RequestBudgetSpec {
+    #[must_use]
+    pub const fn new(requested_output_tokens: u32) -> Self {
+        Self {
+            requested_output_tokens,
+            input_safety_margin_bps: 2_500,
+            fixed_overhead_tokens: 256,
+        }
+    }
+}
+
+impl Default for RequestBudgetSpec {
+    fn default() -> Self {
+        Self::new(4096)
+    }
+}
 
 #[derive(Debug, Clone)]
 struct PendingToolCall {
@@ -227,6 +253,8 @@ pub struct Agent {
     /// `read_image` tool is registered but not presented to the model
     /// (ADR-051 / I154 capability gate).
     image_input_supported: bool,
+    /// Exact output reserve and conservative input-estimation policy.
+    request_budget_spec: RequestBudgetSpec,
 }
 impl Agent {
     pub fn provider(&self) -> &dyn LanguageModel {
@@ -364,13 +392,11 @@ impl Agent {
         if !self.image_input_supported {
             tool_definitions.retain(|definition| definition.name != "read_image");
         }
-        Ok(Self::estimate_provider_request_tokens(
-            &messages,
-            &tool_definitions,
-        ))
+        Ok(self.estimate_provider_request_tokens(&messages, &tool_definitions))
     }
 
     fn estimate_provider_request_tokens(
+        &self,
         messages: &[Message],
         tool_definitions: &[talos_core::provider::ToolDefinition],
     ) -> u32 {
@@ -386,10 +412,16 @@ impl Agent {
                     &definition.parameters.to_string(),
                 ))
         });
-        crate::token::TokenEstimator::new()
+        let raw_input = crate::token::TokenEstimator::new()
             .estimate(messages)
-            .saturating_add(tool_tokens)
-            .saturating_add(REQUEST_OUTPUT_RESERVE_TOKENS)
+            .saturating_add(tool_tokens);
+        let proportional_margin = u64::from(raw_input)
+            .saturating_mul(u64::from(self.request_budget_spec.input_safety_margin_bps))
+            .div_ceil(10_000);
+        raw_input
+            .saturating_add(u32::try_from(proportional_margin).unwrap_or(u32::MAX))
+            .saturating_add(self.request_budget_spec.fixed_overhead_tokens)
+            .saturating_add(self.request_budget_spec.requested_output_tokens)
     }
 
     /// Builds a provider request preview without calling the provider.

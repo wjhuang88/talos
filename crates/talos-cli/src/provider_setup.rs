@@ -35,6 +35,19 @@ pub(crate) fn parse_provider(s: &str) -> anyhow::Result<String> {
     Ok(provider)
 }
 
+/// Exact output token limit shared by Provider construction and request admission.
+///
+/// Models without an explicit configured limit receive a conservative, visible
+/// fallback of one quarter of context, bounded to 4K..32K. The Provider body
+/// and Agent budget use this same value.
+#[must_use]
+pub(crate) fn effective_output_limit(config: &Config) -> u32 {
+    config.output_limit().unwrap_or_else(|| {
+        let (context_limit, _) = config.resolve_model_limits();
+        (context_limit / 4).clamp(4096, 32_768).min(context_limit)
+    })
+}
+
 pub(crate) fn build_provider(
     config: &Config,
     api_key: &str,
@@ -92,7 +105,7 @@ pub(crate) fn build_provider(
             let model_config = provider_config.models.get(&config.model).cloned();
             provider = provider.with_reasoning(
                 model_config.as_ref().and_then(|m| m.reasoning.clone()),
-                config.output_limit(),
+                Some(effective_output_limit(config)),
             );
             provider = provider.with_timeout_config(provider_config.timeout.clone());
             Arc::new(provider)
@@ -106,7 +119,7 @@ pub(crate) fn build_provider(
             let model_config = provider_config.models.get(&config.model).cloned();
             provider = provider.with_reasoning(
                 model_config.as_ref().and_then(|m| m.reasoning.clone()),
-                config.output_limit(),
+                Some(effective_output_limit(config)),
             );
             provider = provider.with_timeout_config(provider_config.timeout.clone());
             Arc::new(provider)

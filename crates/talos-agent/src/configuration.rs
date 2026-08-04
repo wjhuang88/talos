@@ -13,7 +13,9 @@ use talos_skill::SkillIndex;
 use tokio_util::sync::CancellationToken;
 
 use crate::prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
-use crate::{Agent, MemoryProviderCallback, TodoSectionProviderCallback, prompt};
+use crate::{
+    Agent, MemoryProviderCallback, RequestBudgetSpec, TodoSectionProviderCallback, prompt,
+};
 
 impl Agent {
     /// Creates a new agent with the given language model provider and tool
@@ -59,6 +61,7 @@ impl Agent {
             bash_compression_enabled: false,
             tool_output_threshold: 4000,
             image_input_supported: false,
+            request_budget_spec: RequestBudgetSpec::default(),
         }
     }
 
@@ -148,6 +151,7 @@ impl Agent {
             bash_compression_enabled: false,
             tool_output_threshold: 4000,
             image_input_supported: false,
+            request_budget_spec: RequestBudgetSpec::default(),
         }
     }
 
@@ -163,6 +167,16 @@ impl Agent {
         self.model_id = model_id;
         self.replay_reasoning = replay;
         self
+    }
+
+    /// Applies the exact Provider output reserve and conservative input policy.
+    pub fn set_request_budget_spec(&mut self, spec: RequestBudgetSpec) {
+        self.request_budget_spec = spec;
+    }
+
+    #[must_use]
+    pub fn request_budget_spec(&self) -> RequestBudgetSpec {
+        self.request_budget_spec
     }
 
     /// Sets a memory provider callback for injecting memory into the system prompt.

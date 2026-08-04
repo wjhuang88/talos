@@ -14,6 +14,10 @@ use talos_core::submission::{
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::runtime_state::{
+    SessionRuntimeActivation, SessionRuntimeActivationStatus, SessionRuntimeIdentity,
+    SessionRuntimeState,
+};
 use crate::turn_outcome::decode_turn_transcript_outcome;
 use crate::{CompactTextSessionStore, JsonlSessionStore, SessionStore, TurnTranscriptOutcome};
 
@@ -69,6 +73,12 @@ pub enum PendingSubmissionError {
     /// The durable runtime generation cannot advance further.
     #[error("runtime generation exhausted")]
     GenerationExhausted,
+    /// A runtime activation record failed validation or contradicted the durable generation.
+    #[error("invalid Session runtime activation: {0}")]
+    InvalidRuntimeActivation(String),
+    /// A different runtime identity already owns this generation.
+    #[error("Session runtime activation conflict: existing {existing}, requested {requested}")]
+    RuntimeActivationConflict { existing: String, requested: String },
 }
 
 /// Exact durable record returned for Actor recovery.
@@ -135,6 +145,164 @@ impl PendingSubmissionStore {
         Ok(generation)
     }
 
+    /// Loads the compaction-independent current Session runtime identity.
+    pub fn runtime_state(&self) -> Result<Option<SessionRuntimeState>, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let connection = self.connection()?;
+        ensure_schema(&connection)?;
+        load_runtime_state(&connection)
+    }
+
+    /// Initializes a new/legacy Session with an exact committed runtime identity.
+    ///
+    /// Repeating the same initialization is idempotent. A contradictory identity
+    /// at the same durable generation is rejected rather than silently changing
+    /// the Session's reconstruction authority.
+    pub fn initialize_runtime_identity(
+        &self,
+        identity: SessionRuntimeIdentity,
+    ) -> Result<SessionRuntimeState, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let mut connection = self.connection()?;
+        let transaction = immediate(&mut connection)?;
+        ensure_schema(&transaction)?;
+        let generation = load_or_initialize_runtime_generation(&transaction)?;
+        let activation = SessionRuntimeActivation::new(generation, identity.clone(), identity);
+        if let Some(existing) = load_runtime_state(&transaction)? {
+            if existing.activation == activation
+                && existing.status == SessionRuntimeActivationStatus::Committed
+            {
+                transaction.commit()?;
+                return Ok(existing);
+            }
+            return Err(PendingSubmissionError::RuntimeActivationConflict {
+                existing: existing.activation.activation_id,
+                requested: activation.activation_id,
+            });
+        }
+        write_runtime_state(
+            &transaction,
+            &SessionRuntimeState {
+                activation: activation.clone(),
+                status: SessionRuntimeActivationStatus::Committed,
+            },
+        )?;
+        transaction.commit()?;
+        Ok(SessionRuntimeState {
+            activation,
+            status: SessionRuntimeActivationStatus::Committed,
+        })
+    }
+
+    /// Atomically fences generation `G` and stages the exact `G+1` activation.
+    ///
+    /// The transcript marker is committed in a separate append-only store, so
+    /// the sidecar records `pending_marker` until the caller proves that marker
+    /// durable and calls [`Self::commit_runtime_activation`]. A crash at that
+    /// cut point is therefore recoverable without starting a runtime from an
+    /// unproven activation.
+    pub fn stage_runtime_activation(
+        &self,
+        expected: u64,
+        activation: &SessionRuntimeActivation,
+    ) -> Result<u64, PendingSubmissionError> {
+        if !activation.is_valid() {
+            return Err(PendingSubmissionError::InvalidRuntimeActivation(
+                "activation digest/version mismatch".to_string(),
+            ));
+        }
+        let expected_next = expected
+            .checked_add(1)
+            .ok_or(PendingSubmissionError::GenerationExhausted)?;
+        if activation.generation != expected_next {
+            return Err(PendingSubmissionError::InvalidRuntimeActivation(format!(
+                "activation generation {} does not follow expected generation {expected}",
+                activation.generation
+            )));
+        }
+
+        let _guard = self.guard()?;
+        let mut connection = self.connection()?;
+        let transaction = immediate(&mut connection)?;
+        ensure_schema(&transaction)?;
+        let current = load_or_initialize_runtime_generation(&transaction)?;
+
+        if current == activation.generation {
+            let existing = load_runtime_state(&transaction)?.ok_or_else(|| {
+                PendingSubmissionError::InvalidRuntimeActivation(
+                    "generation advanced without runtime activation state".to_string(),
+                )
+            })?;
+            if existing.activation == *activation {
+                transaction.commit()?;
+                return Ok(current);
+            }
+            return Err(PendingSubmissionError::RuntimeActivationConflict {
+                existing: existing.activation.activation_id,
+                requested: activation.activation_id.clone(),
+            });
+        }
+        if current != expected {
+            return Err(PendingSubmissionError::GenerationConflict {
+                expected,
+                actual: current,
+            });
+        }
+        let pending = count_nonterminal(&transaction)?;
+        if pending > 0 {
+            return Err(PendingSubmissionError::GenerationBusy {
+                generation: current,
+                pending,
+            });
+        }
+        transaction.execute(
+            "UPDATE pending_journal_meta SET value = ?2 WHERE key = ?1",
+            params![RUNTIME_GENERATION_KEY, to_i64(activation.generation)],
+        )?;
+        write_runtime_state(
+            &transaction,
+            &SessionRuntimeState {
+                activation: activation.clone(),
+                status: SessionRuntimeActivationStatus::PendingMarker,
+            },
+        )?;
+        transaction.commit()?;
+        Ok(activation.generation)
+    }
+
+    /// Marks a staged activation committed after its exact transcript marker is durable.
+    pub fn commit_runtime_activation(
+        &self,
+        activation_id: &str,
+    ) -> Result<SessionRuntimeState, PendingSubmissionError> {
+        let _guard = self.guard()?;
+        let mut connection = self.connection()?;
+        let transaction = immediate(&mut connection)?;
+        ensure_schema(&transaction)?;
+        let mut state = load_runtime_state(&transaction)?.ok_or_else(|| {
+            PendingSubmissionError::InvalidRuntimeActivation(
+                "no staged runtime activation exists".to_string(),
+            )
+        })?;
+        if state.activation.activation_id != activation_id {
+            return Err(PendingSubmissionError::RuntimeActivationConflict {
+                existing: state.activation.activation_id,
+                requested: activation_id.to_string(),
+            });
+        }
+        let generation = load_or_initialize_runtime_generation(&transaction)?;
+        if generation != state.activation.generation {
+            return Err(PendingSubmissionError::InvalidRuntimeActivation(format!(
+                "runtime state generation {} differs from durable generation {generation}",
+                state.activation.generation
+            )));
+        }
+        state.status = SessionRuntimeActivationStatus::Committed;
+        write_runtime_state(&transaction, &state)?;
+        transaction.commit()?;
+        Ok(state)
+    }
+
     /// Atomically advances the durable generation for a live replacement of
     /// the same logical Session.
     ///
@@ -154,16 +322,11 @@ impl PendingSubmissionStore {
                 actual: current,
             });
         }
-        let pending = transaction.query_row(
-            "SELECT COUNT(*) FROM pending_submissions
-             WHERE state IN ('accepted_pending', 'running', 'paused_pending')",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?;
+        let pending = count_nonterminal(&transaction)?;
         if pending > 0 {
             return Err(PendingSubmissionError::GenerationBusy {
                 generation: current,
-                pending: usize::try_from(pending).unwrap_or(usize::MAX),
+                pending,
             });
         }
         let next = current
@@ -733,6 +896,13 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
              state TEXT NOT NULL,
              turn_id TEXT
          );
+         CREATE TABLE IF NOT EXISTS session_runtime_state (
+             singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+             activation_id TEXT NOT NULL,
+             generation INTEGER NOT NULL,
+             activation_json TEXT NOT NULL,
+             status TEXT NOT NULL CHECK(status IN ('pending_marker', 'committed'))
+         );
          INSERT OR IGNORE INTO pending_journal_meta (key, value)
          VALUES ('schema_version', 1);",
     )?;
@@ -746,6 +916,83 @@ fn ensure_schema(connection: &Connection) -> Result<(), PendingSubmissionError> 
     } else {
         Err(PendingSubmissionError::UnsupportedSchema(version))
     }
+}
+
+fn count_nonterminal(connection: &Connection) -> Result<usize, rusqlite::Error> {
+    let pending = connection.query_row(
+        "SELECT COUNT(*) FROM pending_submissions
+         WHERE state IN ('accepted_pending', 'running', 'paused_pending')",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    Ok(usize::try_from(pending).unwrap_or(usize::MAX))
+}
+
+fn load_runtime_state(
+    connection: &Connection,
+) -> Result<Option<SessionRuntimeState>, PendingSubmissionError> {
+    let row = connection
+        .query_row(
+            "SELECT activation_id, generation, activation_json, status
+             FROM session_runtime_state WHERE singleton = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((activation_id, generation, encoded, status)) = row else {
+        return Ok(None);
+    };
+    let activation: SessionRuntimeActivation = serde_json::from_str(&encoded)?;
+    let status = SessionRuntimeActivationStatus::parse(&status).ok_or_else(|| {
+        PendingSubmissionError::InvalidRuntimeActivation(
+            "unsupported runtime activation status".to_string(),
+        )
+    })?;
+    if !activation.is_valid()
+        || activation.activation_id != activation_id
+        || to_i64(activation.generation) != generation
+    {
+        return Err(PendingSubmissionError::InvalidRuntimeActivation(
+            "stored runtime activation failed identity validation".to_string(),
+        ));
+    }
+    Ok(Some(SessionRuntimeState { activation, status }))
+}
+
+fn write_runtime_state(
+    connection: &Connection,
+    state: &SessionRuntimeState,
+) -> Result<(), PendingSubmissionError> {
+    if !state.activation.is_valid() {
+        return Err(PendingSubmissionError::InvalidRuntimeActivation(
+            "attempted to persist an invalid activation".to_string(),
+        ));
+    }
+    let encoded = serde_json::to_string(&state.activation)?;
+    connection.execute(
+        "INSERT INTO session_runtime_state (
+             singleton, activation_id, generation, activation_json, status
+         ) VALUES (1, ?1, ?2, ?3, ?4)
+         ON CONFLICT(singleton) DO UPDATE SET
+             activation_id = excluded.activation_id,
+             generation = excluded.generation,
+             activation_json = excluded.activation_json,
+             status = excluded.status",
+        params![
+            state.activation.activation_id,
+            to_i64(state.activation.generation),
+            encoded,
+            state.status.as_str(),
+        ],
+    )?;
+    Ok(())
 }
 
 fn load_or_initialize_runtime_generation(

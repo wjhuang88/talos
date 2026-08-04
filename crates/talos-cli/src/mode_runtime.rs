@@ -2,15 +2,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_config::Config;
 use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_session::{
-    PendingSubmissionStore, SessionManager, SessionMetadata, TodoItem, TodoPriority, TodoQuery,
+    PendingSubmissionStore, SessionManager, SessionMetadata, SessionRuntimeActivation,
+    SessionRuntimeActivationStatus, SessionRuntimeIdentity, TodoItem, TodoPriority, TodoQuery,
     TodoRepository, TodoStatus,
 };
 use uuid::Uuid;
@@ -22,76 +21,8 @@ const TODO_PROMPT_MAX_ITEMS: usize = 12;
 const TODO_PROMPT_MAX_CHARS: usize = 2400;
 const SESSION_MODEL_ACTIVATION_PREFIX: &str = "talos:model-activation:v1:";
 
-/// Exact model runtime identity owned by a durable Session.
-///
-/// `None`, an empty string, and the legacy `default` spelling all normalize to
-/// the same baseline variant so live activation and restart reconstruction
-/// cannot disagree about the effective Provider request options.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct SessionModelIdentity {
-    pub provider: String,
-    pub model: String,
-    pub variant: Option<String>,
-}
-
-impl SessionModelIdentity {
-    #[must_use]
-    pub(crate) fn new(provider: &str, model: &str, variant: Option<&str>) -> Self {
-        Self {
-            provider: provider.to_string(),
-            model: model.to_string(),
-            variant: crate::model_lifecycle::normalize_variant_id(variant).map(str::to_string),
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn display_name(&self) -> String {
-        match self.variant.as_deref() {
-            Some(variant) => format!("{}/{}@{variant}", self.provider, self.model),
-            None => format!("{}/{}", self.provider, self.model),
-        }
-    }
-}
-
-/// Machine-readable, append-only activation record.
-///
-/// The generation and exact previous/target identities form the immutable
-/// logical-operation identity. `activation_id` is a deterministic digest of
-/// that tuple, so a retry of the same interrupted activation is stable while a
-/// new transition — including a variant-only transition — is distinct.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct SessionModelActivation {
-    pub version: u8,
-    pub activation_id: String,
-    pub generation: u64,
-    pub previous: SessionModelIdentity,
-    pub target: SessionModelIdentity,
-}
-
-impl SessionModelActivation {
-    #[must_use]
-    pub(crate) fn new(
-        generation: u64,
-        previous: SessionModelIdentity,
-        target: SessionModelIdentity,
-    ) -> Self {
-        let canonical = serde_json::to_vec(&(generation, &previous, &target))
-            .expect("model activation identity contains only serializable values");
-        let digest = Sha256::digest(canonical);
-        let suffix: String = digest
-            .iter()
-            .take(16)
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        Self {
-            version: 1,
-            activation_id: format!("model-activation-g{generation}-{suffix}"),
-            generation,
-            previous,
-            target,
-        }
-    }
-}
+pub(crate) type SessionModelIdentity = SessionRuntimeIdentity;
+pub(crate) type SessionModelActivation = SessionRuntimeActivation;
 
 pub(crate) fn session_model_activation_metadata(
     activation: &SessionModelActivation,
@@ -166,6 +97,24 @@ enum LatestSessionModelInfo {
 }
 
 fn latest_session_model_info(session: &talos_session::Session) -> Option<LatestSessionModelInfo> {
+    match PendingSubmissionStore::for_session(session).runtime_state() {
+        Ok(Some(state)) if state.status == SessionRuntimeActivationStatus::Committed => {
+            return Some(LatestSessionModelInfo::Activation(state.activation.target));
+        }
+        Ok(Some(state)) => {
+            tracing::error!(
+                session_id = %session.id,
+                activation_id = %state.activation.activation_id,
+                "Session runtime activation is staged but its transcript marker is not committed; refusing to treat it as active"
+            );
+            return None;
+        }
+        Ok(None) => {}
+        Err(error) => {
+            tracing::warn!(session_id = %session.id, %error, "failed to load Session runtime state; falling back to transcript metadata");
+        }
+    }
+
     let mut legacy = None;
     for entry in session.read_entries().ok()?.into_iter().rev() {
         if entry.role == "system"
@@ -187,6 +136,45 @@ fn latest_session_model_info(session: &talos_session::Session) -> Option<LatestS
         }
     }
     legacy
+}
+
+pub(crate) fn reconcile_session_runtime_state(session: &talos_session::Session) -> Result<()> {
+    let store = PendingSubmissionStore::for_session(session);
+    let Some(state) = store
+        .runtime_state()
+        .map_err(|error| anyhow!("failed to load Session runtime identity: {error}"))?
+    else {
+        return Ok(());
+    };
+    if state.status == SessionRuntimeActivationStatus::Committed {
+        return Ok(());
+    }
+    let tail = session
+        .read_entries()
+        .map_err(|error| anyhow!("failed to inspect pending Session activation: {error}"))?
+        .last()
+        .and_then(|entry| session_model_activation_from_metadata(&entry.metadata));
+    if tail.as_ref() == Some(&state.activation) {
+        store
+            .commit_runtime_activation(&state.activation.activation_id)
+            .map_err(|error| anyhow!("failed to finalize Session runtime activation: {error}"))?;
+        return Ok(());
+    }
+    Err(anyhow!(
+        "Session runtime activation {} is fenced but its exact transcript marker is absent; the Session remains stopped",
+        state.activation.activation_id
+    ))
+}
+
+pub(crate) fn ensure_session_runtime_identity(
+    config: &Config,
+    session: &talos_session::Session,
+) -> Result<talos_session::SessionRuntimeState> {
+    let identity =
+        SessionRuntimeIdentity::new(&config.provider, &config.model, config.variant.as_deref());
+    PendingSubmissionStore::for_session(session)
+        .initialize_runtime_identity(identity)
+        .map_err(|error| anyhow!("failed to initialize Session runtime identity: {error}"))
 }
 
 pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
@@ -259,6 +247,12 @@ pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
         format_memory_prompt(store_guard.as_ref()?, query, &mem_config)
     });
     agent.set_memory_provider(provider);
+}
+
+pub(crate) fn set_request_budget_spec(agent: &mut Agent, config: &Config) {
+    agent.set_request_budget_spec(talos_agent::RequestBudgetSpec::new(
+        crate::provider_setup::effective_output_limit(config),
+    ));
 }
 
 pub(crate) fn set_image_input_capability(agent: &mut Agent, config: &Config) {
