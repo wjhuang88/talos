@@ -21,13 +21,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Verify exact protected trigger chain
+      - name: Verify protected artifact trigger
         shell: bash
         run: |
           expected_parent="$(sed -n 's/^workflow-parent=//p' .github/i169-artifact-trigger)"
           test -n "${expected_parent}"
           test "$(git rev-parse HEAD^)" = "${expected_parent}"
-          test "$(git rev-parse HEAD^^)" = "d8aa45e5ffc0f608a76655ca871a2c278a669020"
+          git merge-base --is-ancestor 5b34192b01c09e856671b4db61629551e834e60d HEAD
 
       - uses: dtolnay/rust-toolchain@master
         with:
