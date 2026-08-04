@@ -24,8 +24,10 @@ jobs:
       - name: Verify exact protected trigger chain
         shell: bash
         run: |
-          test "$(git rev-parse HEAD^^)" = "c18185a67d2ed46935ee8f841adf52a265ac8679"
-          test -f .github/i169-artifact-trigger
+          expected_parent="$(sed -n 's/^workflow-parent=//p' .github/i169-artifact-trigger)"
+          test -n "${expected_parent}"
+          test "$(git rev-parse HEAD^)" = "${expected_parent}"
+          test "$(git rev-parse HEAD^^)" = "d8aa45e5ffc0f608a76655ca871a2c278a669020"
 
       - uses: dtolnay/rust-toolchain@master
         with:
