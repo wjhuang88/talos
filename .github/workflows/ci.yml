@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
   issues: read
 
 env:
@@ -78,27 +78,6 @@ jobs:
           toolchain: 1.97.0
 
       - uses: Swatinem/rust-cache@v2
-
-      - name: Apply staged I169 remediation
-        if: ${{ github.event_name == 'pull_request' && hashFiles('.github/i169_review_remediation.py') != '' }}
-        shell: bash
-        env:
-          TARGET_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          python3 .github/i169_review_remediation.py
-          cargo fmt --all
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git checkout 35494ac07cf8fc61fc5279e213c6500d541e4d56 -- .github/workflows/ci.yml
-          git rm .github/i169_review_remediation.py
-          git add crates/talos-cli/src/session_transition.rs \
-                  crates/talos-cli/src/model_lifecycle.rs \
-                  crates/talos-cli/src/provider_discovery.rs \
-                  docs/backlog/active/TUI-044-transactional-batched-steering-turn.md \
-                  docs/iterations/I169-batched-steering-turn.md
-          git commit -m "fix(tui): snapshot replacement history after quiescence"
-          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
 
       - name: Release preflight
         run: ./scripts/release_preflight.sh

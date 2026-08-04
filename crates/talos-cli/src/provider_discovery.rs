@@ -10,20 +10,14 @@ use serde::Deserialize;
 const MAX_RESPONSE_BYTES: usize = 1_048_576;
 const MAX_MODEL_COUNT: usize = 1000;
 
-// Discovery is best-effort during provider registration. A dedicated
-// connect timeout prevents an unreachable endpoint from consuming the
-// entire request budget before a TCP connection exists.
-#[cfg(not(test))]
-const DISCOVERY_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(test)]
 const DISCOVERY_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[cfg(not(test))]
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(30);
-// Several unit tests intentionally exercise unreachable loopback/example
-// endpoints while serializing process-global HOME changes. Keep those
-// failures tightly bounded so one network fixture cannot stall every test
-// waiting on the shared HOME mutex.
+// Unit tests intentionally exercise unreachable endpoints while serializing
+// process-global HOME changes. Test-only bounds prevent a network fixture
+// from stalling unrelated tests without changing production timeout policy.
 #[cfg(test)]
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -67,9 +61,10 @@ pub(crate) async fn discover_provider_models(
     api_key: &str,
     protocol: talos_config::ProviderProtocol,
 ) -> Result<Vec<String>, DiscoveryError> {
-    let client = reqwest::Client::builder()
-        .connect_timeout(DISCOVERY_CONNECT_TIMEOUT)
-        .timeout(DISCOVERY_TIMEOUT)
+    let client_builder = reqwest::Client::builder().timeout(DISCOVERY_TIMEOUT);
+    #[cfg(test)]
+    let client_builder = client_builder.connect_timeout(DISCOVERY_CONNECT_TIMEOUT);
+    let client = client_builder
         .build()
         .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 

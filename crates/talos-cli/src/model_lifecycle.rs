@@ -13,7 +13,7 @@ use talos_core::message::Message;
 use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
-use talos_session::{Session, SessionManager};
+use talos_session::{Session, SessionError, SessionManager};
 use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
@@ -331,21 +331,12 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
         return false;
     }
-    let mut history = current_session.read_messages().unwrap_or_default();
     let switch_marker = model_switch_marker(
         &previous_provider,
         &previous_model,
         &model_config.provider,
         &model_config.model,
     );
-    history.push(switch_marker.clone());
-
-    let session_config = SessionConfig {
-        runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: history,
-        model_context_limit,
-    };
 
     let provider = crate::provider_setup::build_provider(&runtime_model_config, &api_key, mock);
     let approval_handler = Arc::new(TuiApprovalHandler::new(
@@ -397,6 +388,37 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     }
 
+    let mut transition_guard = transition.lock().await;
+    let mut history = match read_final_history_after_quiescence(
+        &mut transition_guard,
+        &current_session,
+    )
+    .await
+    {
+        Ok(history) => history,
+        Err(FinalHistoryError::Fence(error)) => {
+            let text = format!(
+                "[Error] Failed to fence model switch: {error}. Previous model remains active.\n"
+            );
+            send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+            return false;
+        }
+        Err(FinalHistoryError::Read(error)) => {
+            let text = format!(
+                "[Error] Model switch fenced the old runtime but failed to read final Session history: {error}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
+            );
+            send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+            return false;
+        }
+    };
+    history.push(switch_marker.clone());
+    let session_config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: workspace_root.to_path_buf(),
+        initial_history: history,
+        model_context_limit,
+    };
+
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     actor.set_persistence(
         current_session.clone(),
@@ -406,13 +428,14 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         ),
     );
     let session_for_prepare = current_session.clone();
-    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
-        let text = format!("[Error] Failed to prepare model switch: {e}\n");
+    if let Err(e) = transition_guard.prepare(handle, session_for_prepare) {
+        let text = format!(
+            "[Error] Failed to prepare model switch after fencing: {e}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
+        );
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
         return false;
     }
 
-    let mut transition_guard = transition.lock().await;
     match transition_guard.commit(actor, sched_pending).await {
         Ok(result) => {
             let _ = session_watch_tx.send(current_session.clone());
@@ -472,12 +495,29 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         Err(e) => {
             transition_guard.rollback();
             let text = format!(
-                "[Error] Failed to commit model switch: {e}. Previous model remains active.\n"
+                "[Error] Failed to publish model switch after fencing: {e}. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.\n"
             );
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
             false
         }
     }
+}
+
+#[derive(Debug)]
+enum FinalHistoryError {
+    Fence(String),
+    Read(SessionError),
+}
+
+async fn read_final_history_after_quiescence(
+    transition: &mut SessionTransition,
+    session: &Session,
+) -> Result<Vec<Message>, FinalHistoryError> {
+    transition
+        .quiesce_same_session(session)
+        .await
+        .map_err(FinalHistoryError::Fence)?;
+    session.read_messages().map_err(FinalHistoryError::Read)
 }
 
 fn model_switch_marker(
@@ -545,6 +585,71 @@ mod tests {
                 m.model_id
             );
         }
+    }
+
+    #[tokio::test]
+    async fn model_rebuild_history_is_read_only_after_old_runtime_quiesces() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(temp.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("i169-model-final-history")
+            .unwrap();
+        let session = durable.session().clone();
+        session
+            .append(&Message::User {
+                content: "history-before-switch".into(),
+            })
+            .unwrap();
+
+        let (raw_tx, mut raw_rx) = mpsc::channel(4);
+        let command_tx = raw_tx.clone();
+        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let actor_session = session.clone();
+        let actor_join = tokio::spawn(async move {
+            while let Some(operation) = raw_rx.recv().await {
+                match operation {
+                    SessionOp::Interrupt => actor_session
+                        .append(&Message::User {
+                            content: "committed-during-handoff".into(),
+                        })
+                        .unwrap(),
+                    SessionOp::Shutdown => break,
+                    _ => {}
+                }
+            }
+        });
+        let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+        let scheduler_token = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            scheduler_token.cancelled().await;
+        });
+        transition
+            .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
+            .unwrap();
+
+        command_tx.send(SessionOp::Interrupt).await.unwrap();
+        let mut history = read_final_history_after_quiescence(&mut transition, &session)
+            .await
+            .unwrap();
+        history.push(model_switch_marker(
+            "old-provider",
+            "old-model",
+            "new-provider",
+            "new-model",
+        ));
+
+        let user_contents: Vec<_> = history
+            .iter()
+            .filter_map(|message| match message {
+                Message::User { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            user_contents,
+            vec!["history-before-switch", "committed-during-handoff"]
+        );
+        assert!(matches!(history.last(), Some(Message::System { .. })));
     }
 
     #[test]

@@ -173,6 +173,7 @@ pub struct SessionTransition {
     active_session: Session,
     active_runtime: Option<ActiveRuntime>,
     prepared: Option<PreparedSession>,
+    quiesced_generation: Option<u64>,
 }
 
 impl SessionTransition {
@@ -189,6 +190,7 @@ impl SessionTransition {
             active_session: session,
             active_runtime: None,
             prepared: None,
+            quiesced_generation: None,
         })
     }
 
@@ -224,6 +226,35 @@ impl SessionTransition {
         Ok(())
     }
 
+    /// Durably fences and retires the active runtime before a same-Session
+    /// replacement reads its canonical final transcript.
+    ///
+    /// Callers must complete Provider, MCP, tool, skill and context preparation
+    /// before entering this boundary. Once it returns, generation G cannot
+    /// accept new durable custody, old command routes are revoked, and the old
+    /// Scheduler and Actor have terminated. Reading the transcript afterwards
+    /// therefore observes every old-generation Turn completed during retirement.
+    pub async fn quiesce_same_session(&mut self, session: &Session) -> Result<u64, String> {
+        if session.id != self.active_session.id {
+            return Err("quiesce requires the currently active logical Session".to_string());
+        }
+        if self.prepared.is_some() {
+            return Err(
+                "cannot quiesce while a session transition is already prepared".to_string(),
+            );
+        }
+        if let Some(generation) = self.quiesced_generation {
+            return Ok(generation);
+        }
+
+        let next_generation = PendingSubmissionStore::for_session(session)
+            .advance_runtime_generation(self.active_generation())
+            .map_err(|error| format!("failed to fence Session runtime generation: {error}"))?;
+        self.retire_active_runtime().await;
+        self.quiesced_generation = Some(next_generation);
+        Ok(next_generation)
+    }
+
     pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
         if self.prepared.is_some() {
             return Err(
@@ -237,13 +268,11 @@ impl SessionTransition {
     /// Commits one Actor replacement with an acknowledged fence-and-handoff.
     ///
     /// For the same logical Session, durable admission and generation advance
-    /// are serialized in one SQLite transaction. The fence is permitted only
-    /// when generation G owns no non-terminal custody. After the fence succeeds
-    /// there are no fallible preparation steps: old proxies are revoked, the
-    /// old Scheduler is cancelled and joined, reliable Actor shutdown is
-    /// queued and joined, and only then is the generation-G+1 Actor spawned and
-    /// published. A crash after the fence therefore leaves durable G+1 with no
-    /// accepted G custody and no surviving process-local G authority.
+    /// are serialized in one SQLite transaction. Callers that need canonical
+    /// final history first use [`Self::quiesce_same_session`], then prepare the
+    /// replacement from the post-retirement transcript. Other transitions fence
+    /// and retire here. In both paths the generation-G+1 Actor is published only
+    /// after generation G has lost process-local authority.
     pub async fn commit(
         &mut self,
         mut actor: AppServerSession,
@@ -254,11 +283,18 @@ impl SessionTransition {
             .as_ref()
             .ok_or_else(|| "no prepared transition to commit".to_string())?;
         let same_logical_session = prepared.session.id == self.active_session.id;
+        let quiesced_generation = self.quiesced_generation;
         let pending_store = PendingSubmissionStore::for_session(&prepared.session);
         let next_generation = if same_logical_session {
-            pending_store
-                .advance_runtime_generation(self.active_generation())
-                .map_err(|error| format!("failed to fence Session runtime generation: {error}"))?
+            if let Some(generation) = quiesced_generation {
+                generation
+            } else {
+                pending_store
+                    .advance_runtime_generation(self.active_generation())
+                    .map_err(|error| {
+                        format!("failed to fence Session runtime generation: {error}")
+                    })?
+            }
         } else {
             pending_store.runtime_generation().map_err(|error| {
                 format!("failed to load target Session runtime generation: {error}")
@@ -269,7 +305,10 @@ impl SessionTransition {
             .take()
             .expect("prepared transition was checked before the durable fence");
 
-        self.retire_active_runtime().await;
+        if quiesced_generation.is_none() {
+            self.retire_active_runtime().await;
+        }
+        self.quiesced_generation = None;
 
         actor.set_generation(next_generation);
         let actor_join = tokio::spawn(async move { actor.run().await });
@@ -401,6 +440,71 @@ mod tests {
             .expect("retirement must revoke every old generation-bound proxy");
         assert!(scheduler_retired.load(Ordering::SeqCst));
         assert!(actor_retired.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn quiesce_waits_for_final_old_generation_transcript_commit() {
+        use talos_core::message::Message;
+
+        let temp = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("i169-final-history-quiescence")
+            .unwrap();
+        let session = durable.session().clone();
+        session
+            .append(&Message::User {
+                content: "before-handoff".into(),
+            })
+            .unwrap();
+
+        let (raw_tx, mut raw_rx) = mpsc::channel(4);
+        let command_tx = raw_tx.clone();
+        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let actor_session = session.clone();
+        let actor_join = tokio::spawn(async move {
+            while let Some(operation) = raw_rx.recv().await {
+                match operation {
+                    SessionOp::Interrupt => actor_session
+                        .append(&Message::User {
+                            content: "final-old-generation-turn".into(),
+                        })
+                        .unwrap(),
+                    SessionOp::Shutdown => break,
+                    _ => {}
+                }
+            }
+        });
+        let scheduler_cancel = CancellationToken::new();
+        let scheduler_token = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            scheduler_token.cancelled().await;
+        });
+        transition
+            .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
+            .unwrap();
+
+        command_tx.send(SessionOp::Interrupt).await.unwrap();
+        assert_eq!(transition.quiesce_same_session(&session).await.unwrap(), 1);
+
+        let history = session.read_messages().unwrap();
+        let user_contents: Vec<_> = history
+            .iter()
+            .filter_map(|message| match message {
+                Message::User { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            user_contents,
+            vec!["before-handoff", "final-old-generation-turn"]
+        );
+        assert_eq!(
+            PendingSubmissionStore::for_session(&session)
+                .runtime_generation()
+                .unwrap(),
+            1
+        );
     }
 
     #[test]

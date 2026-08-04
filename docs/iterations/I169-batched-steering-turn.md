@@ -262,3 +262,11 @@ The latest implementation evidence tightens same-Session generation replacement 
 - Race and reconstruction evidence covers concurrent admission versus fencing, full Actor queues, old-Scheduler cancellation, Actor receiver closure, durable generation 1+ reopen, stale-command rejection, journal state, receipt generation, and Provider call counts.
 
 This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.
+
+## Final-history handoff remediation (2026-08-04)
+
+- Model/provider replacement performs fallible Provider, MCP, tool, skill and context preparation before the irreversible generation fence.
+- It then advances durable generation, revokes old routes, joins the old Scheduler and Actor, reads canonical final transcript history, appends the switch marker, and constructs/publishes the replacement Actor.
+- Focused race evidence queues a final old-generation transcript commit during retirement and proves replacement history observes it before the switch marker.
+- Provider-discovery connection bounding remains test-only; production timeout behavior is outside I169 and unchanged.
+
