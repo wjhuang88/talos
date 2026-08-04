@@ -1,4 +1,4 @@
-name: I169 final remediation trigger
+name: I169 final remediation diagnostics
 
 on:
   pull_request:
@@ -7,10 +7,10 @@ on:
       - .github/workflows/i169-final-trigger.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  run-reviewed-gate:
+  diagnose-reviewed-gate:
     if: github.event.pull_request.number == 131
     runs-on: ubuntu-latest
     steps:
@@ -23,25 +23,36 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - name: Execute reviewed final-gate scripts
+      - name: Apply reviewed remediation
         shell: bash
         run: |
           set -euo pipefail
           ruby -ryaml - <<'RUBY'
           workflow = YAML.load_file('.github/workflows/i169-source-verify2.yml')
-          steps = workflow.fetch('jobs').fetch('verify-and-publish').fetch('steps')
-          scripts = steps.filter_map.with_index do |step, index|
-            next unless step.key?('run')
-            path = format('/tmp/i169-reviewed-step-%03d.sh', index)
-            File.write(path, "#!/usr/bin/env bash\nset -eo pipefail\n#{step.fetch('run')}\n")
-            path
+          step = workflow.fetch('jobs').fetch('verify-and-publish').fetch('steps').find do |candidate|
+            candidate['name'] == 'Apply reviewed remediation'
           end
-          abort('reviewed gate did not contain executable steps') if scripts.empty?
-          File.write('/tmp/i169-reviewed-steps.list', scripts.join("\n") + "\n")
+          abort('reviewed remediation step not found') unless step && step['run']
+          File.write('/tmp/i169-apply-reviewed-remediation.sh', "#!/usr/bin/env bash\nset -eo pipefail\n#{step.fetch('run')}\n")
           RUBY
+          bash /tmp/i169-apply-reviewed-remediation.sh
 
-          while IFS= read -r script; do
-            echo "::group::Executing ${script}"
-            bash "$script"
-            echo "::endgroup::"
-          done < /tmp/i169-reviewed-steps.list
+      - name: Capture strict Clippy diagnostics
+        id: clippy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets --locked -- -D warnings 2>&1 | tee /tmp/i169-strict-clippy.log
+
+      - name: Upload strict Clippy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i169-strict-clippy-diagnostics
+          path: /tmp/i169-strict-clippy.log
+          if-no-files-found: error
+
+      - name: Propagate strict Clippy result
+        if: steps.clippy.outcome == 'failure'
+        run: exit 1
