@@ -3,8 +3,10 @@
 ## Status
 
 Proposed for TUI-044/I169. Preactivation architecture hardening was recorded on 2026-08-02 from
-`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`; I169 remains Planned and no product implementation
-is authorized by this document change.
+`main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`. I169 is Active in PR #131 and has reached a
+fresh independent-review handoff after remediation under maintainer implementation authorization.
+This lifecycle update does not accept ADR-056, complete I169/TUI-044, close Issue #119 or authorize
+merge; Ready-for-review is only a handoff state and is not approval.
 
 The I170 prerequisite completed through PR #126. This decision recovers the reviewed constraints
 preserved by archival Draft PR #120, but neither the historical implementation nor this Proposed
@@ -15,6 +17,13 @@ If accepted, this decision supersedes ADR-049 only for queue consumption, owners
 arbitration, terminal handling, pending-work recovery, structured persistence and request-budget
 semantics. ADR-049's engine-owned read-only queue projection before acknowledgement remains in
 force.
+
+The active PR #131 remediation also treats same-Session model/provider replacement as a durable
+activation barrier: the old generation is fenced and retired, the model-switch marker is committed
+exactly once at the quiescent log tail, and only then may the replacement Actor and its command/event
+routes become reachable. A marker persistence failure is a hard publication failure, not a warning;
+restart/retry must preserve one marker and the same model-visible ordering. This language records the
+implementation under review while ADR-056 remains Proposed.
 
 ## Context
 
@@ -58,7 +67,7 @@ this recovered decision.
 The implementation may use different Rust names, but it must preserve these logical identities:
 
 - `SessionId`: stable logical Session identity.
-- `SessionGeneration`: monotonic actor/runtime generation for one logical Session.
+- `SessionGeneration`: durable runtime epoch for one logical Session. Live replacement advances it atomically; process reconstruction of the same authority rehydrates it unchanged.
 - `QueueItemId`: stable identity of one accepted input item.
 - `BatchId`: stable identity of one compatible queue-prefix snapshot.
 - `ReservationId`: identity of the exact Engine prefix frozen for transfer.
@@ -194,7 +203,7 @@ Minimum journal states are equivalent to:
 AcceptedPending
 Running(turn_id)
 PausedPending
-TerminalCancelled(turn_id)
+TerminalCancelled(turn_id?)
 TerminalError(turn_id)
 Committed(turn_id)
 ```
@@ -272,8 +281,11 @@ a separately approved UX.
 ### 7. Session generation
 
 `SessionGeneration` is assigned by the Session composition root, not inferred only from channel
-object identity. It starts at a defined value for a newly created Session and monotonically
-increments whenever the Actor/runtime instance for the same logical Session is replaced or rebuilt.
+object identity. It starts at a defined value for a newly created Session and is stored durably with
+the Session pending-journal metadata. A live replacement of the Actor/runtime for the same logical
+Session atomically advances the durable generation. A process reconstruction after memory loss
+rehydrates the stored generation unchanged so already accepted envelopes remain addressable; it does
+not invent generation zero or silently rewrite those envelopes.
 
 Every structured Session operation, receipt and canonical Turn event carries:
 
@@ -321,7 +333,9 @@ Pending ordering is deterministic:
 ### 9. Scheduler delivery and SQ-full semantics
 
 Scheduler work uses the same structured submission and Actor receipt boundary. Source identity is
-not encoded only in visible text.
+not encoded only in visible text. Every scheduler owner is spawned from one authoritative
+`{sender, SessionId, SessionGeneration}` target after that generation has been assigned; a raw sender
+or hard-coded generation zero is not a valid delivery route.
 
 A generated scheduler fire receives a stable fire/submission identity. Until the Actor journal
 accepts it, the scheduler remains responsible for that exact fire.
@@ -351,7 +365,12 @@ On matching `Cancelled` or `Error`:
 - Actor-owned submissions that have not started remain durable and become `PausedPending`;
 - scheduler and user pending work retain identities and FIFO/source ordering;
 - automatic advancement stops;
-- an explicit user submission may authorize resume under the arbitration policy above.
+- an explicit user submission may authorize resume under the arbitration policy above when the
+  retained request is admissible;
+- a deterministic pre-Provider failure such as `ContextBudgetExceeded` requires an explicit,
+  generation-bound pre-start resolution. The user may terminalize that exact paused identity as
+  `TerminalCancelled` without Provider execution, after which later accepted work may advance. New
+  input alone must not repeatedly retry an impossible FIFO head forever.
 
 The current failed/cancelled Turn is not silently retried. Any explicit retry UX for that already
 started batch is outside I169 unless separately approved. Partial-turn persistence continues to obey
@@ -504,8 +523,12 @@ AwaitingReceipt
   -> PausedAmbiguous when old Session generation cannot be reconciled
 
 ActorAcceptedPending
-  -> PausedPending after another Turn Cancel/Error
+  -> PausedPending after another Turn Cancel/Error or deterministic pre-start failure
   -> ActorRunning only when arbitration permits
+
+PausedPending
+  -> TerminalCancelled on an explicit exact-generation pre-start cancel
+  -> ActorRunning only through the documented resume policy
 ```
 
 At no point may both Engine and Actor have execution authority. The Engine escrow after send is a
@@ -618,3 +641,34 @@ implementations need a different durable receipt seam, measured pending-journal 
 Actor latency materially regresses, or exact request planning requires Provider-specific policy.
 Any replacement must preserve unique execution authority, recoverable custody, retry and replay
 invariants.
+
+## Independent-review remediation handoff (2026-08-04)
+
+Lifecycle remains unchanged while PR #131 awaits a new independent review: **TUI-044 / I169 are Active, ADR-056 is Proposed, and Issue #119 is Open**.
+
+The latest implementation evidence tightens same-Session generation replacement into one acknowledged ownership handoff:
+
+- SQLite admission and generation advance share one immediate transaction. Generation G cannot advance while any `accepted_pending`, `running`, or `paused_pending` custody remains.
+- After the durable G → G+1 fence, fresh generation-G submissions are rejected as `WrongGeneration` without creating journal custody; historical same-ID reconciliation remains observable.
+- The old generation-bound Bridge route is revoked, the old Scheduler is cancelled and joined, and reliable Actor `Shutdown` is queued and joined before the G+1 Actor and Scheduler are spawned and published.
+- Race and reconstruction evidence covers concurrent admission versus fencing, full Actor queues, old-Scheduler cancellation, Actor receiver closure, durable generation 1+ reopen, stale-command rejection, journal state, receipt generation, and Provider call counts.
+
+This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.
+
+## 2026-08-04 exact activation identity remediation
+
+The current review cycle requires same-Session model activation durability to carry the complete
+ADR-048 identity: provider, model, and normalized variant. PR #131 now records a machine-readable
+activation object containing the durable target generation, deterministic activation ID, exact
+previous identity, and exact target identity. `None`, empty, and `default` variants normalize to the
+same baseline identity.
+
+Visible marker text is not the idempotency key. Only an exact activation object may be reused after
+an interrupted commit/publication cut point; a new intentional switch, including a variant-only
+switch on the same provider/model, creates a distinct activation. Session startup restores the
+variant from this Session-owned record before Provider construction, so a later global config write
+failure cannot silently restore different request semantics.
+
+This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
+Proposed, and Issue #119 remains Open.
+

@@ -114,6 +114,49 @@ impl LanguageModel for PreviewModel {
     }
 }
 
+struct CapturingModel {
+    captured: Arc<Mutex<Vec<Vec<Message>>>>,
+}
+
+#[async_trait]
+impl LanguageModel for CapturingModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured.lock().unwrap().push(messages.to_vec());
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            for event in success_events("captured") {
+                let _ = tx.send(event).await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
+struct CapturingSequenceModel {
+    captured: Arc<Mutex<Vec<Vec<Message>>>>,
+    responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+}
+
+#[async_trait]
+impl LanguageModel for CapturingSequenceModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured.lock().unwrap().push(messages.to_vec());
+        let events = self
+            .responses
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_default();
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            for event in events {
+                let _ = tx.send(event).await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
 fn make_agent(model: impl LanguageModel + 'static) -> Agent {
     #[allow(deprecated)]
     Agent::new(Arc::new(model), ToolRegistry::new())
@@ -149,6 +192,88 @@ async fn collect_events(
     events
 }
 
+fn structured_submission(
+    id: &str,
+    item_id: &str,
+    sender_generation: u64,
+    text: &str,
+    source: SubmissionSource,
+) -> StructuredSubmission {
+    StructuredSubmission {
+        id: id.into(),
+        source,
+        sender_generation,
+        items: vec![SubmissionItem {
+            id: item_id.into(),
+            enqueue_sequence: sender_generation,
+            kind: SubmissionKind::UserTurn,
+            text: text.into(),
+            attachments: Vec::new(),
+        }],
+    }
+}
+
+fn set_authoritative_generation(actor: &mut AppServerSession, generation: u64) {
+    let store = actor.pending_store.clone();
+    let current = store.runtime_generation().unwrap();
+    for expected in current..generation {
+        assert_eq!(
+            store.advance_runtime_generation(expected).unwrap(),
+            expected + 1
+        );
+    }
+    actor.set_generation(generation);
+}
+
+#[test]
+fn structured_submission_rejects_unbounded_image_metadata() {
+    let images = (0..=MAX_SUBMISSION_IMAGE_COUNT)
+        .map(|index| talos_core::message::ContentPart::Image {
+            path: std::path::PathBuf::from(format!("image_{index}.png")),
+            mime: "image/png".into(),
+            byte_count: 1,
+            content_digest: talos_core::message::ContentDigest::default(),
+        })
+        .collect();
+    let submission = StructuredSubmission {
+        id: "image_batch".into(),
+        source: SubmissionSource::User,
+        sender_generation: 1,
+        items: vec![SubmissionItem {
+            id: "image_item".into(),
+            enqueue_sequence: 1,
+            kind: SubmissionKind::UserTurn,
+            text: "images".into(),
+            attachments: images,
+        }],
+    };
+
+    assert_eq!(
+        validate_submission(&submission),
+        Err(SubmissionRejectionReason::LimitExceeded)
+    );
+}
+
+async fn collect_until_completions(
+    eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    completion_count: usize,
+) -> Vec<SessionEvent> {
+    let mut events = Vec::new();
+    while events
+        .iter()
+        .filter(|event| completed_status(event).is_some())
+        .count()
+        < completion_count
+    {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("turn completion event timeout")
+            .expect("session event channel closed before completion");
+        events.push(event);
+    }
+    events
+}
+
 #[tokio::test]
 async fn test_submit_and_receive() {
     let agent = make_agent(MockModel::new(vec![success_events("hello")]));
@@ -160,7 +285,7 @@ async fn test_submit_and_receive() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -172,10 +297,9 @@ async fn test_submit_and_receive() {
         .await
         .unwrap();
 
+    let events = collect_until_completions(&mut eq_rx, 1).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
     assert!(
         events.iter().any(is_turn_started),
@@ -205,7 +329,7 @@ async fn set_skill_context_reaches_request_preview() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
     let actor_task = tokio::spawn(async move { actor.run().await });
 
@@ -222,10 +346,9 @@ async fn set_skill_context_reaches_request_preview() {
         })
         .await
         .unwrap();
+    let events = collect_until_completions(&mut eq_rx, 1).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
     let preview_text = events
         .iter()
         .find_map(|event| match progress_event(event) {
@@ -252,7 +375,7 @@ async fn test_multi_turn() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -271,10 +394,9 @@ async fn test_multi_turn() {
         .await
         .unwrap();
 
+    let events = collect_until_completions(&mut eq_rx, 2).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
     let turn_started_count = events.iter().filter(|e| is_turn_started(e)).count();
     assert_eq!(turn_started_count, 2, "Should have 2 TurnStarted events");
@@ -291,6 +413,423 @@ async fn test_multi_turn() {
     assert!(
         success_count >= 1,
         "Should have at least 1 TurnCompleted(Success)"
+    );
+}
+
+#[tokio::test]
+async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 7);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: StructuredSubmission {
+                id: "batch_a".into(),
+                source: SubmissionSource::User,
+                sender_generation: 7,
+                items: vec![
+                    SubmissionItem {
+                        id: "item_a".into(),
+                        enqueue_sequence: 1,
+                        kind: SubmissionKind::UserTurn,
+                        text: "first".into(),
+                        attachments: Vec::new(),
+                    },
+                    SubmissionItem {
+                        id: "item_b".into(),
+                        enqueue_sequence: 2,
+                        kind: SubmissionKind::UserTurn,
+                        text: "second".into(),
+                        attachments: Vec::new(),
+                    },
+                ],
+            },
+        })
+        .await
+        .unwrap();
+    let mut events = collect_until_completions(&mut eq_rx, 1).await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    while let Ok(event) = eq_rx.try_recv() {
+        events.push(event);
+    }
+
+    let requests = captured.lock().unwrap();
+    let users = requests[0]
+        .iter()
+        .filter_map(|message| match message {
+            Message::User { content } => Some(content.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(users, vec!["first", "second"]);
+    drop(requests);
+
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionQueued { submission_id, .. } if submission_id == "batch_a"
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionStarted { submission_id, .. } if submission_id == "batch_a"
+    )));
+}
+
+#[tokio::test]
+async fn duplicate_submission_reconciles_and_executes_at_most_once() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 11);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+    let submission = structured_submission(
+        "duplicate_batch",
+        "duplicate_item",
+        11,
+        "once",
+        SubmissionSource::User,
+    );
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: submission.clone(),
+        })
+        .await
+        .unwrap();
+    sq_tx
+        .send(SessionOp::SubmitStructured { submission })
+        .await
+        .unwrap();
+
+    let mut events = collect_until_completions(&mut eq_rx, 1).await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    while let Ok(event) = eq_rx.try_recv() {
+        events.push(event);
+    }
+
+    assert_eq!(captured.lock().unwrap().len(), 1);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionReceipt {
+            submission_id,
+            disposition: SubmissionReceiptDisposition::AlreadyAccepted { .. },
+            ..
+        } if submission_id == "duplicate_batch"
+    )));
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        SessionEvent::SubmissionRejected { submission_id, .. }
+            if submission_id == "duplicate_batch"
+    )));
+}
+
+#[tokio::test]
+async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 12);
+    let sq_tx = handle.sq_tx;
+    drop(handle.eq_rx);
+    let actor_task = tokio::spawn(async move { actor.run().await });
+    let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+
+    sq_tx
+        .send(SessionOp::SubmitStructuredTracked {
+            submission: structured_submission(
+                "lost_ack_batch",
+                "lost_ack_item",
+                12,
+                "must run once",
+                SubmissionSource::User,
+            ),
+            receipt_tx: Some(receipt_tx),
+        })
+        .await
+        .unwrap();
+
+    let receipt = tokio::time::timeout(Duration::from_secs(2), receipt_rx.recv())
+        .await
+        .expect("tracked durable receipt timeout")
+        .expect("tracked durable receipt channel");
+    assert!(receipt.disposition.has_durable_custody());
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if captured.lock().unwrap().len() == 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("Actor should execute accepted work without an EQ observer");
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    let requests = captured.lock().unwrap();
+    assert_eq!(requests.len(), 1, "Actor custody must execute exactly once");
+    assert!(
+        requests[0].iter().any(
+            |message| matches!(message, Message::User { content } if content == "must run once")
+        )
+    );
+}
+
+#[tokio::test]
+async fn context_budget_pauses_before_submission_started() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let agent = make_agent(CapturingModel {
+        captured: captured.clone(),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 64,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 13);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "over_budget_batch",
+                "over_budget_item",
+                13,
+                "request",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+
+    let mut events = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            .await
+            .expect("budget pause timeout")
+            .expect("session event channel");
+        let paused = matches!(
+            event,
+            SessionEvent::SubmissionPaused {
+                reason: SubmissionRejectionReason::ContextBudgetExceeded,
+                ..
+            }
+        );
+        events.push(event);
+        if paused {
+            break;
+        }
+    }
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, SessionEvent::SubmissionStarted { .. }))
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, SessionEvent::SubmissionRejected { .. }))
+    );
+    assert!(captured.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
+    let agent = make_agent(SlowModel {
+        delay: Duration::from_secs(30),
+        events: success_events("too late"),
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 21);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    for batch in 0..=4_u64 {
+        let submission = StructuredSubmission {
+            id: format!("bounded_batch_{batch}"),
+            source: SubmissionSource::User,
+            sender_generation: 21,
+            items: (0..MAX_SUBMISSION_BATCH_ITEMS)
+                .map(|item| SubmissionItem {
+                    id: format!("bounded_item_{batch}_{item}"),
+                    enqueue_sequence: batch * MAX_SUBMISSION_BATCH_ITEMS as u64 + item as u64,
+                    kind: SubmissionKind::UserTurn,
+                    text: "x".into(),
+                    attachments: Vec::new(),
+                })
+                .collect(),
+        };
+        sq_tx
+            .send(SessionOp::SubmitStructured { submission })
+            .await
+            .unwrap();
+    }
+
+    let rejected = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(SessionEvent::SubmissionRejected {
+                submission_id,
+                reason: SubmissionRejectionReason::LimitExceeded,
+                ..
+            }) = eq_rx.recv().await
+            {
+                break submission_id;
+            }
+        }
+    })
+    .await
+    .expect("aggregate limit rejection");
+    assert_eq!(rejected, "bounded_batch_4");
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+    let mut closed = Vec::new();
+    while let Ok(event) = eq_rx.try_recv() {
+        if let SessionEvent::SubmissionRejected {
+            submission_id,
+            reason: SubmissionRejectionReason::SessionClosed,
+            ..
+        } = event
+        {
+            closed.push(submission_id);
+        }
+    }
+    assert_eq!(closed.len(), 3, "shutdown must reject every pending batch");
+}
+
+#[tokio::test]
+async fn paused_user_submission_runs_before_retained_scheduler_work() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let responses = Arc::new(Mutex::new(VecDeque::from(vec![
+        vec![AgentEvent::Error {
+            message: "pause".into(),
+        }],
+        success_events("user resumed"),
+        success_events("scheduler resumed"),
+    ])));
+    let agent = make_agent(CapturingSequenceModel {
+        captured: captured.clone(),
+        responses,
+    });
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    set_authoritative_generation(&mut actor, 31);
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "failing_batch",
+                "failing_item",
+                31,
+                "fail first",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+    let _ = collect_until_completions(&mut eq_rx, 1).await;
+
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "scheduler_batch",
+                "scheduler_item",
+                31,
+                "scheduler retained",
+                SubmissionSource::Scheduler,
+            ),
+        })
+        .await
+        .unwrap();
+    sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "user_batch",
+                "user_item",
+                31,
+                "user resumes",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .unwrap();
+    let _ = collect_until_completions(&mut eq_rx, 2).await;
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    let calls = captured.lock().unwrap();
+    let last_users = calls
+        .iter()
+        .map(|messages| {
+            messages
+                .iter()
+                .rev()
+                .find_map(|message| match message {
+                    Message::User { content } => Some(content.as_str()),
+                    _ => None,
+                })
+                .expect("provider call has user message")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        last_users,
+        vec!["fail first", "user resumes", "scheduler retained"]
     );
 }
 
@@ -318,7 +857,7 @@ async fn test_interrupt() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -605,12 +1144,11 @@ async fn test_multi_turn_with_history() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    let eq_rx = handle.eq_rx;
+    let mut eq_rx = handle.eq_rx;
     let sq_tx = handle.sq_tx;
 
     let actor_task = tokio::spawn(async move { actor.run().await });
 
-    // Submit 3 turns
     sq_tx
         .send(SessionOp::Submit {
             message: "turn 1".into(),
@@ -635,10 +1173,9 @@ async fn test_multi_turn_with_history() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
+    let events = collect_until_completions(&mut eq_rx, 3).await;
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;
-
-    let events = collect_events(eq_rx, Duration::from_secs(2)).await;
     let success_count = events
         .iter()
         .filter(|e| {
@@ -650,13 +1187,10 @@ async fn test_multi_turn_with_history() {
         .count();
     assert!(success_count >= 1, "Should have at least 1 Success");
 
-    // Verify the 3rd turn received history from turns 1 and 2
     let captured = captured_messages.lock().unwrap();
     assert!(captured.len() >= 3, "Should have captured at least 3 calls");
 
-    // 3rd call should have messages from turns 1 and 2
     let third_call_messages = &captured[2];
-    // Should have: User(turn 1), Assistant(first response), User(turn 2), Assistant(second response), User(turn 3 with system prompt)
     let user_messages: Vec<_> = third_call_messages
         .iter()
         .filter(|m| matches!(m, Message::User { .. }))
@@ -964,8 +1498,6 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
     );
 }
 
-// ── TOOL-021 fixture: provider error after tool execution drops tool results ──
-
 struct EchoTool;
 
 #[async_trait::async_trait]
@@ -996,7 +1528,6 @@ impl talos_core::tool::AgentTool for EchoTool {
     }
 }
 
-/// Model that sends a tool call, then on second call sends an error.
 struct ToolCallThenErrorModel {
     call_count: Arc<std::sync::atomic::AtomicU8>,
     trailing_fragment: bool,
@@ -1026,7 +1557,6 @@ impl LanguageModel for ToolCallThenErrorModel {
         tokio::spawn(async move {
             let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if n == 0 {
-                // First call: produce a tool call
                 let _ = tx
                     .send(AgentEvent::ToolCall {
                         call: talos_core::message::ToolCall {
@@ -1067,8 +1597,6 @@ impl LanguageModel for ToolCallThenErrorModel {
     }
 }
 
-/// Proves SESSION-006 / I135 FIX: when a provider error occurs after tool execution,
-/// the session NOW persists the completed tool exchange for resume.
 #[tokio::test]
 async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fragment() {
     use talos_session::{SessionManager, SessionMetadata};
@@ -1112,10 +1640,8 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         .await
         .unwrap();
 
-    // Wait for turn completion
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Verify the turn completed with an error
     let has_error_completion = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1126,8 +1652,6 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         has_error_completion,
         "turn should complete with error status"
     );
-    // SESSION-006 / I135 FIX: The tool result IS NOW persisted because the
-    // error branch in turn.rs calls persist_turn_messages with partial_messages.
     let persisted = session.read_messages().unwrap();
     let has_tool_result = persisted
         .iter()
@@ -1165,19 +1689,14 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
     assert_eq!(diagnostics[1].response_ordinal, 2);
 }
 
-/// Proves ADR-042 is preserved with REAL durable persistence: when both
-/// interactive and durable persistence are configured, a provider error
-/// still results in NO durable commit (no EntriesCommitted) while the
-/// interactive session retains the completed tool exchange.
 #[tokio::test]
 async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
-    use talos_session::{DurableSession, PersistencePolicy, SessionManager, SessionMetadata};
+    use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("adr042-real", "").unwrap();
 
-    // Create a real durable session
     let durable = manager
         .create_or_open_session("adr042-real-durable")
         .expect("durable session");
@@ -1195,7 +1714,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
-    // Set BOTH interactive and durable persistence
     actor.set_persistence(
         session.clone(),
         SessionMetadata {
@@ -1219,7 +1737,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Turn must error
     let has_error = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1228,7 +1745,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     });
     assert!(has_error, "turn should error");
 
-    // ADR-042: NO EntriesCommitted on error path — durable failed turns abort
     let has_entries_committed = events
         .iter()
         .any(|e| matches!(e, SessionEvent::EntriesCommitted { .. }));
@@ -1237,7 +1753,6 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
         "ADR-042: no EntriesCommitted on error path — durable failed turns abort"
     );
 
-    // Interactive persistence DOES have the tool result (SESSION-006 fix)
     let persisted = session.read_messages().unwrap();
     let has_tool_result = persisted
         .iter()
@@ -1246,13 +1761,8 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
         has_tool_result,
         "interactive session persists tool result on error (SESSION-006 fix)"
     );
-    // The actor owns the DurableSession. We verify ADR-042 via the
-    // EntriesCommitted event absence (checked above), which is the
-    // authoritative signal that commit_turn was never called.
 }
 
-/// Proves persistence failure is observable: when persist_turn_messages
-/// fails, the error message includes the persistence failure warning.
 #[tokio::test]
 async fn fixture_persistence_failure_is_observable_in_error() {
     use talos_session::{SessionManager, SessionMetadata};
@@ -1261,8 +1771,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("persist-fail", "").unwrap();
 
-    // Deterministically block the concrete session path on every platform:
-    // replace its parent directory with a regular file after creation.
     let session_parent = session
         .file_path
         .parent()
@@ -1306,7 +1814,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // The turn should complete with error (provider error from the model)
     let error_message = events.iter().find_map(|e| match completed_status(e) {
         Some(TurnCompletionStatus::Error { message }) => Some(message.clone()),
         _ => None,
@@ -1323,8 +1830,6 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     );
 }
 
-/// Proves ADR-042 durable transcript is empty after failed turn:
-/// reopens the durable session and verifies no committed entries.
 #[tokio::test]
 async fn fixture_durable_transcript_empty_after_failed_turn() {
     use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
@@ -1333,7 +1838,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("durable-empty", "").unwrap();
 
-    // Create durable session and keep the directory for later reopening
     let durable_external_id = "durable-empty-check";
     let durable = manager
         .create_or_open_session(durable_external_id)
@@ -1374,7 +1878,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // Verify turn errored
     let has_error = events.iter().any(|e| {
         matches!(
             completed_status(e),
@@ -1383,8 +1886,6 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
     });
     assert!(has_error, "turn should error");
 
-    // Reopen the durable session and verify transcript is empty
-    // (ADR-042: failed turns abort, leaving no committed entries)
     let reopened = manager
         .get_session_by_external_id(durable_external_id)
         .expect("durable lookup");

@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-08-01"
-status_note: "High-risk/release-managed profile confirmed. I170/TOOL-023-A/C is Complete at merge commit 592254d73a98166df48da0139a02df67e9cd2cd6 and ADR-057 is Accepted; the direct-child-only timeout residual remains explicitly owned outside I170. TUI-044/I169 is Ready and its I170 prerequisite is satisfied, but implementation is not started and must use a fresh branch from current main. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
+last_audited_at: "2026-08-04"
+status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 remains Active in PR #131 review handoff against current main a03e25436a25f84f117a90362686fc8205e52dde under Proposed ADR-056. Independent-review remediation is implemented for durable pre-start resolution, production terminal recovery, scheduler generation/lifecycle correctness, restart-safe Session generation, scheduler Bridge correlation, opaque Engine identity and fixed-seed stress. Finalization cleanup has restored the persistent CI workflow and removed temporary workflow/helper assets. Provider-discovery failure tests now have bounded test-only latency, and the model-switch integration fixture attaches a production-equivalent old Actor/Scheduler so acknowledged retirement is exercised rather than deadlocked by an unconsumed dummy channel. Exact-head platform CI evidence and fresh independent review remain mandatory before lifecycle advancement; Ready-for-review is only a handoff state, not approval or merge authorization. Recovery PR #120 remains immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,9 +63,11 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Keep I170 completion evidence bound to PR #126, exact implementation Head 8cfe8edb2dbda581244f583fb809591391a54298, CI run 30705366763, walkthrough artifact 8820174164, and merge commit 592254d73a98166df48da0139a02df67e9cd2cd6"
-    - "TUI-044/I169 may be selected from current main only through a fresh implementation branch and explicit activation; do not continue recovery PR #120 or its branch"
+    - "Validate the lifecycle-synchronized PR #131 exact Head against current main a03e25436a25f84f117a90362686fc8205e52dde and request fresh independent review; Ready status is a handoff, not approval or merge authorization"
+    - "Keep ADR-056 Proposed until durable receipt, lost-Ack, pre-start resolution, scheduler/terminal, exact-request, restart and replay evidence passes independent review"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"
+    - "Require locked workspace gates, exact-head Windows/macOS CI, Provider mock/request-preview evidence and rebuilt real-TUI acceptance before I169 Review"
+    - "Keep I170 completion evidence bound to PR #126, exact implementation Head 8cfe8edb2dbda581244f583fb809591391a54298, CI run 30705366763, walkthrough artifact 8820174164, and merge commit 592254d73a98166df48da0139a02df67e9cd2cd6"
     - "Resolve I158 Review independently and keep I159-I162 blocked under their recorded gates"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

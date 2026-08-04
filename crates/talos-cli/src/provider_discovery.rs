@@ -9,7 +9,17 @@ use serde::Deserialize;
 
 const MAX_RESPONSE_BYTES: usize = 1_048_576;
 const MAX_MODEL_COUNT: usize = 1000;
+
+#[cfg(test)]
+const DISCOVERY_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+
+#[cfg(not(test))]
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(30);
+// Unit tests intentionally exercise unreachable endpoints while serializing
+// process-global HOME changes. Test-only bounds prevent a network fixture
+// from stalling unrelated tests without changing production timeout policy.
+#[cfg(test)]
+const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Deserialize)]
 struct ModelsListResponse {
@@ -51,8 +61,10 @@ pub(crate) async fn discover_provider_models(
     api_key: &str,
     protocol: talos_config::ProviderProtocol,
 ) -> Result<Vec<String>, DiscoveryError> {
-    let client = reqwest::Client::builder()
-        .timeout(DISCOVERY_TIMEOUT)
+    let client_builder = reqwest::Client::builder().timeout(DISCOVERY_TIMEOUT);
+    #[cfg(test)]
+    let client_builder = client_builder.connect_timeout(DISCOVERY_CONNECT_TIMEOUT);
+    let client = client_builder
         .build()
         .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
@@ -236,15 +248,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn discover_network_error() {
-        let result = discover_provider_models(
-            "http://127.0.0.1:1",
-            "test-key",
-            talos_config::ProviderProtocol::OpenAIChat,
+    async fn discover_network_error_is_bounded() {
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            discover_provider_models(
+                "http://127.0.0.1:1",
+                "test-key",
+                talos_config::ProviderProtocol::OpenAIChat,
+            ),
         )
-        .await;
+        .await
+        .expect("unreachable discovery must respect the test connect timeout");
 
-        assert!(matches!(result, Err(DiscoveryError::Network(_))));
+        assert!(matches!(
+            result,
+            Err(DiscoveryError::Network(_) | DiscoveryError::Timeout)
+        ));
     }
 
     #[tokio::test]

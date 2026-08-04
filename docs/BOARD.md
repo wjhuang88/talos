@@ -16,6 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I169 Transactional Batched Steering Turn | Active — PR #131 review handoff; activated 2026-08-02 | [TUI-044](backlog/active/TUI-044-transactional-batched-steering-turn.md) / [I169](iterations/I169-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) / [Issue #119](https://github.com/wjhuang88/talos/issues/119) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require durable receipt, exact request-plan, full locked/platform CI and rebuilt real-TUI evidence before Review. |
 | I170 Windows Shell And Portability Recovery | Complete — PR #126 merged (2026-08-01) | [I170](iterations/I170-windows-workspace-validation-unblocker.md) / [TOOL-023-A](backlog/active/TOOL-023-A-bash-timeout-fix.md) / [TOOL-023-C](backlog/active/TOOL-023-C-windows-powershell.md) / [ADR-057](decisions/057-windows-powershell-process-boundary.md) | Completion merge `592254d73a98166df48da0139a02df67e9cd2cd6`; exact Head `8cfe8edb2dbda581244f583fb809591391a54298`, CI `30705366763`, artifact `8820174164`. Direct-child-only timeout residual remains separately owned; archival PR #121 stays immutable. |
 | Four-Month Trust And Productization Plan | Complete (2026-07-12) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [security review](reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116-I119 and LT002 complete. Permission evidence remains diagnostic-only; installer local fixture and socket-capable preflight pass; I085 terminal walkthrough passed. REL-002 remains NO-GO and no release is authorized. |
 | Four-Month Scheduled Follow-Ups | Complete — I124-I127 (2026-07-15) | [execution package](tasks/2026-07-13-scheduled-followups-execution-package.md) / [program plan](tasks/2026-07-13-four-month-scheduled-followups-plan.md) / [I127](iterations/I127-scheduler-reliability-closeout.md) | I127 closes production full-queue handling (`try_send` → bounded tool error) and an independently replayed clean-HOME register/fire/list/cancel/shutdown packet. Full locked validation and governance pass. REL-002 remains NO-GO; no release action. |
@@ -44,7 +45,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Open Issue / Owner Status Reconciliation | Complete (2026-08-01) | [current status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md) / [historical 2026-07-09 matrix](reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md) | All 26 open Issues observed on 2026-08-01 map to one owner document. Issue #119 remains open and Ready after I170 prerequisite completion; all other remote items remain Partial, Deferred, Refinement, Ready, or Blocked rather than Complete. |
+| Open Issue / Owner Status Reconciliation | Complete (2026-08-01) | [current status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md) / [historical 2026-07-09 matrix](reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md) | All 26 open Issues observed on 2026-08-01 map to one owner document. Issue #119 is Active in PR #131 review handoff; all other remote items retain their recorded Partial, Deferred, Refinement, Ready, Review or Blocked state. |
 | I115 Runtime Event Semantic Convergence | Complete | [I115](iterations/I115-runtime-event-semantic-convergence.md) / [ARCH-033](backlog/active/ARCH-033-runtime-event-semantic-convergence.md) | Closed after FIFO content, authoritative lifecycle, actor persistence, cross-surface runtime evidence, full tests, clippy, and governance validation passed. |
 
 ## Blocked / Paused
@@ -58,7 +59,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| TUI-044 Transactional Batched Steering Recovery | Ready — claimed; I170 prerequisite satisfied; not active | [TUI-044](backlog/active/TUI-044-transactional-batched-steering-turn.md) / [I169](iterations/I169-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) / [Issue #119](https://github.com/wjhuang88/talos/issues/119) | Before code changes, re-read current facts, create a fresh branch from the exact current `main`, record explicit activation, keep ADR-056 Proposed, and leave recovery PR #120 immutable. |
 | Memory Admission Safety | P0 Ready — pending iteration | [MEM-010](backlog/active/MEM-010-user-origin-memory-admission.md) / [Issue #114](https://github.com/wjhuang88/talos/issues/114) | Select a bounded correction iteration; prove only user-authored episodes enter new global memory and preserve all other memory/session behavior. |
 | Permission Pipeline Convergence | P0 Refinement — A→E chain unclaimed | [PERM-006](backlog/active/PERM-006-permission-pipeline-convergence.md) / [Issue #52](https://github.com/wjhuang88/talos/issues/52) | Refine and select one child at a time; no implementation may bypass PERM-004/PERM-005 safety or combine pipeline and typed-resource migration. |
 | Runtime Session And Protocol Foundations | P1 Refinement/Blocked | [SESSION-009](backlog/active/SESSION-009-multi-client-session-architecture.md) / [ACP-001](backlog/active/ACP-001-agent-client-protocol-server.md) / [RUNTIME-005](backlog/active/RUNTIME-005-bounded-graceful-shutdown.md) | Accept multi-client and shutdown lifecycle boundaries before ACP or background-job completion claims. |
@@ -80,3 +80,9 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.

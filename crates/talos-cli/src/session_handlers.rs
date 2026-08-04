@@ -528,6 +528,7 @@ pub(crate) async fn handle_session_model(
 
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
+    let previous_variant = config.variant.clone();
     let mut model_config = config.clone();
     if let Err(e) = model_config.set_active_model(&resolve_id) {
         let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
@@ -582,6 +583,7 @@ pub(crate) async fn handle_session_model(
         api_key,
         previous_model,
         previous_provider,
+        previous_variant,
         model_id: parsed_model_id.clone(),
         variant: model_config.variant.clone(),
         provider_for_status: provider_name.clone(),
@@ -628,6 +630,7 @@ pub(crate) async fn handle_session_model_with_credential(
 ) -> Option<Config> {
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
+    let previous_variant = config.variant.clone();
     let credential_provider = cred.provider.clone();
     let credential_api_key = cred.api_key.clone();
     let mut model_config = match ConfigStore::default_store().update_config(|current| {
@@ -692,6 +695,7 @@ pub(crate) async fn handle_session_model_with_credential(
         api_key,
         previous_model,
         previous_provider,
+        previous_variant,
         model_id: parsed_model_id.clone(),
         variant: model_config.variant.clone(),
         provider_for_status,
@@ -799,10 +803,6 @@ pub(crate) async fn handle_session_new(
     set_todo_prompt_provider(&mut agent, &session_manager, &new_session);
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
     actor.set_persistence(
         new_session.clone(),
         crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
@@ -817,7 +817,7 @@ pub(crate) async fn handle_session_new(
         return;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
             let _ = session_watch_tx.send(new_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
@@ -1043,10 +1043,6 @@ pub(crate) async fn handle_session_resume(
     }
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
     actor.set_persistence(
         target_session.clone(),
         crate::mode_runtime::session_metadata_for_model(
@@ -1064,7 +1060,7 @@ pub(crate) async fn handle_session_resume(
         return None;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
             let _ = session_watch_tx.send(target_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
@@ -1215,10 +1211,6 @@ pub(crate) async fn handle_session_fork(
     set_todo_prompt_provider(&mut agent, session_manager, &child_session);
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
     actor.set_persistence(
         child_session.clone(),
         crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
@@ -1233,7 +1225,7 @@ pub(crate) async fn handle_session_fork(
         return;
     }
 
-    match transition.commit(actor) {
+    match transition.commit(actor, sched_pending).await {
         Ok(result) => {
             let _ = session_watch_tx.send(child_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
