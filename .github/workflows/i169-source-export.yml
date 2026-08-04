@@ -40,6 +40,8 @@ jobs:
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part04 | cut -d' ' -f1)" = "f7294301e16aac6b1783c64cfba1d99950a0fc08b74a6e7644f084e972ff920f"
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05a | cut -d' ' -f1)" = "5dfe695b54307f2277f898fcd02a040f9aec229c34c4562b148d8de533a8707a"
           test "$(sha256sum .github/i169-followup2.patch.gz.b64.part05b | cut -d' ' -f1)" = "048d9f2f640c339cb16742e803098316caf5c3d68cef18a31854632c92bdd306"
+          test "$(wc -c < .github/i169-followup2-testfix.patch.gz.b64)" -eq 796
+          test "$(sha256sum .github/i169-followup2-testfix.patch.gz.b64 | cut -d' ' -f1)" = "b090a02733e967a5acdc418e5767655d3edefed3f79c95317740eb8675ee0495"
 
       - name: Apply and format corrected follow-up
         shell: bash
@@ -48,6 +50,9 @@ jobs:
           cat .github/i169-followup2.patch.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/i169-followup2.patch
           test "$(sha256sum /tmp/i169-followup2.patch | cut -d' ' -f1)" = "39e833b09a8074351f4e9ead8696f6db39d50b2cc307bac21b56cbfb83a206ac"
           git apply --index /tmp/i169-followup2.patch
+          base64 --decode .github/i169-followup2-testfix.patch.gz.b64 | gzip --decompress > /tmp/i169-followup2-testfix.patch
+          test "$(sha256sum /tmp/i169-followup2-testfix.patch | cut -d' ' -f1)" = "1f34e7b342f3513dfb344bbfd68e47fa025893ac7ce5c4f5daa79ed3ea0a6924"
+          git apply --index /tmp/i169-followup2-testfix.patch
           cargo fmt --all
           git add -A
           cargo fmt --all -- --check
@@ -74,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm -f .github/i169-followup.patch.gz.b64.part* .github/i169-followup2.patch.gz.b64.part* .github/workflows/i169-source-export.yml
+          git rm -f .github/i169-followup.patch.gz.b64.part* .github/i169-followup2.patch.gz.b64.part* .github/i169-followup2-testfix.patch.gz.b64 .github/workflows/i169-source-export.yml
           git diff --cached --check
           git config user.name "talos-governance-bot"
           git config user.email "actions@users.noreply.github.com"
