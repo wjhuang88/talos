@@ -35,7 +35,8 @@ jobs:
           cat .github/i169-followup.patch.gz.b64.part* | sha256sum
           test "$(cat .github/i169-followup.patch.gz.b64.part* | wc -c)" -eq 9716
           test "$(cat .github/i169-followup.patch.gz.b64.part* | sha256sum | cut -d' ' -f1)" = "e02f60b22bcc7f612e5611a8a943aaa51cdbfcc05b30047a7c37dc068eb331f0"
-          test "$(sha256sum .github/i169-followup.patch.gz.b64.part00 | cut -d' ' -f1)" = "0d383e63e7f9afa82b2b62b8a9815a578c9607877599d9766b8047b55d346e7d"
+          test "$(sha256sum .github/i169-followup.patch.gz.b64.part00a | cut -d' ' -f1)" = "89eeae080cc08b88dec65f8613bb977a9763ffaae5060546562702b3992d2214"
+          test "$(sha256sum .github/i169-followup.patch.gz.b64.part00b | cut -d' ' -f1)" = "f569828e2010bdf9718ab31c99b45a73907e6c67c9d7c82b148a91ea5f06ba1d"
           test "$(sha256sum .github/i169-followup.patch.gz.b64.part01 | cut -d' ' -f1)" = "93885b64a552af8539a3a193f717a28198d4432f7e95c120adf5fd48c0124c4d"
           test "$(sha256sum .github/i169-followup.patch.gz.b64.part02 | cut -d' ' -f1)" = "6afb41cb8767ef737c385a1e929317ee8d1a5f60df3d8597a68369fb4196986f"
 
