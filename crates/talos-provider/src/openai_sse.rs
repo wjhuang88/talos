@@ -495,11 +495,18 @@ mod tests {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::TcpListener;
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test operation should succeed");
+        let addr = listener
+            .local_addr()
+            .expect("test operation should succeed");
 
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener
+                .accept()
+                .await
+                .expect("test operation should succeed");
             let mut req_buf = [0_u8; 1024];
             let _ = socket.read(&mut req_buf).await;
 
@@ -509,14 +516,20 @@ mod tests {
                 "Transfer-Encoding: chunked\r\n",
                 "Connection: close\r\n\r\n"
             );
-            socket.write_all(headers.as_bytes()).await.unwrap();
-            socket.flush().await.unwrap();
+            socket
+                .write_all(headers.as_bytes())
+                .await
+                .expect("test operation should succeed");
+            socket.flush().await.expect("test operation should succeed");
 
             for (delay, payload) in chunks {
                 tokio::time::sleep(delay).await;
                 let frame = format!("{:X}\r\n{}\r\n", payload.len(), payload);
-                socket.write_all(frame.as_bytes()).await.unwrap();
-                socket.flush().await.unwrap();
+                socket
+                    .write_all(frame.as_bytes())
+                    .await
+                    .expect("test operation should succeed");
+                socket.flush().await.expect("test operation should succeed");
             }
 
             if let Some(delay) = close_after {
@@ -622,7 +635,9 @@ mod tests {
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
-        let tool_calls = body["messages"][1]["tool_calls"].as_array().unwrap();
+        let tool_calls = body["messages"][1]["tool_calls"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0]["id"], "call_1");
         assert_eq!(tool_calls[0]["type"], "function");
@@ -664,7 +679,12 @@ mod tests {
         }];
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
-        assert!(body["messages"].as_array().unwrap().is_empty());
+        assert!(
+            body["messages"]
+                .as_array()
+                .expect("test operation should succeed")
+                .is_empty()
+        );
     }
 
     #[test]
@@ -875,7 +895,8 @@ mod tests {
                 "finish_reason": null
             }]
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
         assert_eq!(chunk.choices[0].delta.content, Some("Hello".into()));
         assert!(chunk.choices[0].delta.tool_calls.is_none());
         assert!(chunk.choices[0].delta.reasoning_content.is_none());
@@ -890,7 +911,8 @@ mod tests {
                 "finish_reason": null
             }]
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
         assert_eq!(
             chunk.choices[0].delta.reasoning_content,
             Some("thinking chunk".into())
@@ -939,16 +961,29 @@ mod tests {
                 "finish_reason": null
             }]
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
-        let tool_calls = chunk.choices[0].delta.tool_calls.clone().unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
+        let tool_calls = chunk.choices[0]
+            .delta
+            .tool_calls
+            .clone()
+            .expect("test operation should succeed");
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, Some("call_abc123".into()));
         assert_eq!(
-            tool_calls[0].function.as_ref().unwrap().name,
+            tool_calls[0]
+                .function
+                .as_ref()
+                .expect("test operation should succeed")
+                .name,
             Some("bash".into())
         );
         assert_eq!(
-            tool_calls[0].function.as_ref().unwrap().arguments,
+            tool_calls[0]
+                .function
+                .as_ref()
+                .expect("test operation should succeed")
+                .arguments,
             Some("{\"command\": \"ls\"}".into())
         );
     }
@@ -966,7 +1001,8 @@ mod tests {
                 "finish_reason": "stop"
             }]
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
         assert_eq!(chunk.choices[0].finish_reason, Some("stop".into()));
     }
 
@@ -983,7 +1019,8 @@ mod tests {
                 "finish_reason": "tool_calls"
             }]
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
         assert_eq!(chunk.choices[0].finish_reason, Some("tool_calls".into()));
     }
 
@@ -996,7 +1033,8 @@ mod tests {
             "model": "gpt-4o",
             "choices": []
         }"#;
-        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        let chunk: OpenAIStreamChunk =
+            serde_json::from_str(json_str).expect("test operation should succeed");
         assert!(chunk.choices.is_empty());
     }
 
@@ -1077,7 +1115,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(8);
 
         parse_sse_stream(
@@ -1095,7 +1133,7 @@ mod tests {
             }
         }
 
-        let usage = final_usage.unwrap();
+        let usage = final_usage.expect("test operation should succeed");
         assert_eq!(usage.input_tokens, 123);
         assert_eq!(usage.output_tokens, 45);
         assert_eq!(usage.reasoning_tokens, 9);
@@ -1117,7 +1155,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1167,7 +1205,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1217,7 +1255,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1264,7 +1302,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1314,7 +1352,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1373,7 +1411,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1425,7 +1463,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1479,7 +1517,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1532,7 +1570,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1569,7 +1607,9 @@ mod tests {
     #[tokio::test]
     async fn test_first_packet_timeout() {
         let url = spawn_chunked_sse_server(vec![], Some(Duration::from_secs(3))).await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url)
+            .await
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(2)).await;
@@ -1599,7 +1639,9 @@ mod tests {
             Some(Duration::from_secs(3)),
         )
         .await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url)
+            .await
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
@@ -1636,7 +1678,9 @@ mod tests {
             None,
         )
         .await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url)
+            .await
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
@@ -1681,7 +1725,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1733,7 +1777,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1787,7 +1831,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1835,7 +1879,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1884,7 +1928,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1943,7 +1987,7 @@ mod tests {
             .await;
         let response = reqwest::get(format!("{}/stream", server.url()))
             .await
-            .unwrap();
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(
@@ -1980,7 +2024,7 @@ mod tests {
             tool_call_id: None,
             reasoning_content: None,
         };
-        let json = serde_json::to_value(&msg).unwrap();
+        let json = serde_json::to_value(&msg).expect("test operation should succeed");
         assert_eq!(json["role"], "user");
         assert_eq!(json["content"], "Hello");
         assert!(json["tool_calls"].is_null());
@@ -1998,7 +2042,7 @@ mod tests {
                 arguments: "{\"command\": \"ls\"}".into(),
             },
         };
-        let json = serde_json::to_value(&tc).unwrap();
+        let json = serde_json::to_value(&tc).expect("test operation should succeed");
         assert_eq!(json["id"], "call_1");
         assert_eq!(json["type"], "function");
         assert_eq!(json["function"]["name"], "bash");
@@ -2009,8 +2053,12 @@ mod tests {
         use tokio::io::AsyncReadExt;
         use tokio::net::TcpListener;
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test operation should succeed");
+        let addr = listener
+            .local_addr()
+            .expect("test operation should succeed");
 
         tokio::spawn(async move {
             loop {
@@ -2046,7 +2094,7 @@ mod tests {
         let result = provider.stream(&messages).await;
 
         assert!(result.is_err(), "dispatch timeout must produce an error");
-        let err = result.unwrap_err();
+        let err = result.expect_err("expected test operation to fail");
         match err {
             ProviderError::NetworkError(msg) => {
                 assert!(
@@ -2129,7 +2177,9 @@ mod tests {
             body["messages"][1]["role"], "tool",
             "error tool result must be serialized as tool role"
         );
-        let content = body["messages"][1]["content"].as_str().unwrap();
+        let content = body["messages"][1]["content"]
+            .as_str()
+            .expect("test operation should succeed");
         assert!(
             content.starts_with("Error: "),
             "error result must have 'Error: ' prefix, got: {content}"
@@ -2163,7 +2213,9 @@ mod tests {
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         // F1/F3: success result must NOT have "Error: " prefix
-        let content = body["messages"][1]["content"].as_str().unwrap();
+        let content = body["messages"][1]["content"]
+            .as_str()
+            .expect("test operation should succeed");
         assert!(
             !content.starts_with("Error: "),
             "success result must not have Error prefix"
@@ -2185,7 +2237,7 @@ mod tests {
         // Orphan must not appear in serialized messages
         let tool_msgs: Vec<_> = body["messages"]
             .as_array()
-            .unwrap()
+            .expect("test operation should succeed")
             .iter()
             .filter(|m| m["role"] == "tool")
             .collect();
@@ -2203,22 +2255,37 @@ mod i168_terminal_outcome_tests {
     use tokio::net::TcpListener;
 
     async fn parse_raw_body(body: Vec<u8>) -> Vec<AgentEvent> {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test operation should succeed");
+        let addr = listener
+            .local_addr()
+            .expect("test operation should succeed");
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener
+                .accept()
+                .await
+                .expect("test operation should succeed");
             let mut request = [0_u8; 2048];
             let _ = socket.read(&mut request).await;
             let headers = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
             );
-            socket.write_all(headers.as_bytes()).await.unwrap();
-            socket.write_all(&body).await.unwrap();
-            socket.flush().await.unwrap();
+            socket
+                .write_all(headers.as_bytes())
+                .await
+                .expect("test operation should succeed");
+            socket
+                .write_all(&body)
+                .await
+                .expect("test operation should succeed");
+            socket.flush().await.expect("test operation should succeed");
         });
 
-        let response = reqwest::get(format!("http://{addr}/stream")).await.unwrap();
+        let response = reqwest::get(format!("http://{addr}/stream"))
+            .await
+            .expect("test operation should succeed");
         let (tx, mut rx) = mpsc::channel(32);
         parse_sse_stream(response, tx, Duration::from_secs(5), Duration::from_secs(5)).await;
         let mut events = Vec::new();

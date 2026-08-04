@@ -424,7 +424,9 @@ mod tests {
         let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
-        let blocks = body["messages"][1]["content"].as_array().unwrap();
+        let blocks = body["messages"][1]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0]["type"], "tool_use");
         assert_eq!(blocks[0]["id"], "call_1");
@@ -449,16 +451,29 @@ mod tests {
 
         let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
 
-        assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            body["messages"]
+                .as_array()
+                .expect("test operation should succeed")
+                .len(),
+            1
+        );
         assert_eq!(body["messages"][0]["role"], "user");
-        let system = body["system"].as_array().unwrap();
+        let system = body["system"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(system[0]["type"], "text");
         assert_eq!(system[0]["cache_control"]["type"], "ephemeral");
-        assert!(system[0]["text"].as_str().unwrap().contains("# Identity"));
+        assert!(
+            system[0]["text"]
+                .as_str()
+                .expect("test operation should succeed")
+                .contains("# Identity")
+        );
         assert!(
             system[1]["text"]
                 .as_str()
-                .unwrap()
+                .expect("test operation should succeed")
                 .contains("# Runtime Context")
         );
         assert!(system[1].get("cache_control").is_none());
@@ -506,7 +521,9 @@ mod tests {
             Some(4096),
         );
 
-        let blocks = body["messages"][1]["content"].as_array().unwrap();
+        let blocks = body["messages"][1]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(blocks[0]["type"], "thinking");
         assert_eq!(blocks[0]["thinking"], "reason-step");
         assert_eq!(blocks[0]["signature"], signature);
@@ -638,7 +655,7 @@ mod tests {
         // Anthropic serializes orphan tool results without filtering.
         let user_msgs: Vec<_> = body["messages"]
             .as_array()
-            .unwrap()
+            .expect("test operation should succeed")
             .iter()
             .filter(|m| m["role"] == "user")
             .collect();
@@ -662,7 +679,7 @@ mod tests {
 
         let user_msgs: Vec<_> = body["messages"]
             .as_array()
-            .unwrap()
+            .expect("test operation should succeed")
             .iter()
             .filter(|m| m["role"] == "user")
             .collect();
@@ -682,14 +699,16 @@ mod tests {
     fn multimodal_message_produces_image_content_block() {
         use talos_core::message::{ContentDigest, ContentPart};
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("test.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).unwrap();
+        std::fs::write(&img_path, &png_header).expect("test operation should succeed");
         // ContentPart::Image.path contract: stored path MUST be the
         // canonical path produced at grant time. The TOCTOU guard in
         // image_io rejects any non-canonical stored path.
-        let canonical = img_path.canonicalize().unwrap();
+        let canonical = img_path
+            .canonicalize()
+            .expect("test operation should succeed");
 
         let messages = vec![Message::Multimodal {
             parts: vec![
@@ -706,29 +725,40 @@ mod tests {
         }];
 
         let body = build_request_body("claude-sonnet-4-5-20250514", &messages, &[], None, None);
-        let msgs = body["messages"].as_array().unwrap();
+        let msgs = body["messages"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0]["role"], "user");
 
-        let content = msgs[0]["content"].as_array().unwrap();
+        let content = msgs[0]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(content.len(), 2);
         assert_eq!(content[0]["type"], "text");
         assert_eq!(content[0]["text"], "Describe this");
         assert_eq!(content[1]["type"], "image");
         assert_eq!(content[1]["source"]["type"], "base64");
         assert_eq!(content[1]["source"]["media_type"], "image/png");
-        assert!(!content[1]["source"]["data"].as_str().unwrap().is_empty());
+        assert!(
+            !content[1]["source"]["data"]
+                .as_str()
+                .expect("test operation should succeed")
+                .is_empty()
+        );
     }
 
     #[test]
     fn tool_result_then_multimodal_coalesces_into_single_user_message() {
         use talos_core::message::{ContentDigest, ContentPart, MessageToolResult};
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("shot.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, &png_header).expect("test operation should succeed");
+        let canonical = img_path
+            .canonicalize()
+            .expect("test operation should succeed");
 
         let messages = vec![
             Message::Assistant {
@@ -758,13 +788,17 @@ mod tests {
         ];
 
         let body = build_request_body("claude-sonnet-4-5-20250514", &messages, &[], None, None);
-        let msgs = body["messages"].as_array().unwrap();
+        let msgs = body["messages"]
+            .as_array()
+            .expect("test operation should succeed");
 
         // Assistant message + 1 coalesced user message (tool_result + image merged)
         assert_eq!(msgs.len(), 2, "tool_result + multimodal must coalesce");
         assert_eq!(msgs[1]["role"], "user");
 
-        let content = msgs[1]["content"].as_array().unwrap();
+        let content = msgs[1]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(
             content.len(),
             2,
