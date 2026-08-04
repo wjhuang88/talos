@@ -187,12 +187,11 @@ jobs:
       - name: Strict Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Commit verified remediation and remove temporary facilities
+      - name: Commit verified remediation and remove patch transport
         shell: bash
         run: |
           set -euo pipefail
           find .github -maxdepth 1 -type f -name 'i169-followup*.patch.gz.b64*' -print0 | xargs -0 -r git rm -f --
-          git rm -f .github/workflows/i169-source-export.yml .github/workflows/i169-source-verify2.yml
           git diff --cached --check
           git config user.name talos-governance-bot
           git config user.email actions@users.noreply.github.com
