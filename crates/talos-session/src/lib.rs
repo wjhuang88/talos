@@ -18,7 +18,7 @@
 //!
 //! Each session supports multiple branches. A branch is a linear sequence of entries
 //! rooted at a specific entry. The `fork` method creates a new branch from any existing
-//! entry, enabling tree-structured conversation histories.
+//! entry, enabling tree-structured conversations.
 //!
 //! # Crash Safety
 //!
@@ -35,9 +35,11 @@ pub mod compaction_engine;
 mod compression;
 mod diagnostic;
 mod durable;
+mod durable_recovery;
 mod error;
 mod jsonl;
 mod manager;
+mod pending_submission;
 mod segment_chain;
 pub mod sqlite;
 mod store;
@@ -47,6 +49,7 @@ mod tool_contributions;
 mod topology;
 mod transcript;
 pub use tool_compression::{ToolOutputCompression, compress_tool_output};
+mod turn_outcome;
 mod types;
 
 pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};
@@ -56,6 +59,9 @@ pub use durable::{
 pub use error::SessionError;
 pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+};
+pub use pending_submission::{
+    PendingSubmissionError, PendingSubmissionRecord, PendingSubmissionStore,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 pub use store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
@@ -69,6 +75,7 @@ pub use todo::{
 };
 pub use tool_contributions::todo_tool_contributions_for_sessions_dir;
 pub use transcript::{TranscriptEntry, export_json, export_markdown, read_transcript};
+pub use turn_outcome::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
 #[cfg(test)]

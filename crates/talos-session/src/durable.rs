@@ -13,7 +13,14 @@ use uuid::Uuid;
 
 use crate::diagnostic::is_terminal_diagnostic_content;
 use crate::jsonl::message_parts;
-use crate::{Session, SessionEntry, SessionError, SessionMetadata};
+use crate::turn_outcome::{
+    decode_turn_transcript_outcome, encode_turn_transcript_outcome,
+    is_turn_transcript_outcome_content,
+};
+use crate::{
+    Session, SessionEntry, SessionError, SessionMetadata, TurnTranscriptOutcome,
+    TurnTranscriptOutcomeRecord,
+};
 
 /// One normalized, cursor-addressable durable transcript entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +82,7 @@ pub struct SessionCapabilities {
 /// Result of an idempotent durable turn commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TurnCommit {
-    /// Stable IDs for entries committed by the turn.
+    /// Stable IDs for model-visible entries committed by the turn.
     pub entry_ids: Vec<String>,
     /// Whether this call wrote the turn rather than returning a prior commit.
     pub newly_committed: bool,
@@ -144,7 +151,8 @@ impl DurableSession {
     /// Returns a normalized transcript page after an optional entry-ID cursor.
     ///
     /// The cursor entry is excluded. The method exposes no raw TLOG lines,
-    /// provider payloads, HTTP headers, or `raw_content` metadata.
+    /// provider payloads, HTTP headers, `raw_content` metadata, or hidden
+    /// terminal outcome markers.
     pub fn transcript(
         &self,
         cursor: Option<&str>,
@@ -162,17 +170,22 @@ impl DurableSession {
         Ok(entries
             .into_iter()
             .skip(start)
-            .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+            .filter(|entry| {
+                !is_terminal_diagnostic_content(&entry.content)
+                    && !is_turn_transcript_outcome_content(&entry.content)
+            })
             .take(limit.min(200))
             .map(transcript_entry)
             .collect())
     }
 
-    /// Atomically commits every model-visible message of one successful turn.
+    /// Atomically commits every model-visible message and the hidden Success
+    /// marker of one completed turn.
     ///
-    /// `begin_turn` is intentionally implicit and non-durable: a cancelled,
-    /// denied, or failed turn produces no transcript entry. Repeating a
-    /// committed `turn_id` returns the original IDs without writing duplicates.
+    /// Repeating a committed `turn_id` returns the original model-visible IDs
+    /// without writing duplicates. The outcome marker is written in the same
+    /// atomic replacement as the messages so startup can distinguish a proven
+    /// Success from partial or ambiguous transcript state.
     pub fn commit_turn(
         &self,
         turn_id: &str,
@@ -192,10 +205,18 @@ impl DurableSession {
         let mut existing = self.session.store.read_entries(&self.session.file_path)?;
         let prior_ids = existing
             .iter()
-            .filter(|entry| entry.metadata.turn_id.as_deref() == Some(turn_id))
+            .filter(|entry| {
+                entry.metadata.turn_id.as_deref() == Some(turn_id)
+                    && !is_turn_transcript_outcome_content(&entry.content)
+            })
             .map(|entry| entry.id.clone())
             .collect::<Vec<_>>();
-        if !prior_ids.is_empty() {
+        let has_success_marker = existing.iter().any(|entry| {
+            decode_turn_transcript_outcome(&entry.content).is_some_and(|record| {
+                record.turn_id == turn_id && record.outcome == TurnTranscriptOutcome::Success
+            })
+        });
+        if !prior_ids.is_empty() || has_success_marker {
             return Ok(TurnCommit {
                 entry_ids: prior_ids,
                 newly_committed: false,
@@ -222,6 +243,23 @@ impl DurableSession {
             parent_id = Some(id.clone());
             entry_ids.push(id);
         }
+
+        let marker = TurnTranscriptOutcomeRecord::new(turn_id, TurnTranscriptOutcome::Success);
+        let marker_content = encode_turn_transcript_outcome(&marker)
+            .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+        let marker_id = Uuid::new_v4().to_string();
+        existing.push(SessionEntry {
+            id: marker_id,
+            parent_id,
+            timestamp: Utc::now(),
+            role: "system".into(),
+            content: marker_content,
+            metadata: SessionMetadata {
+                turn_id: Some(turn_id.to_string()),
+                ..SessionMetadata::default()
+            },
+        });
+
         self.session
             .store
             .replace_entries_atomically(&self.session.file_path, &existing)?;
@@ -675,6 +713,16 @@ mod tests {
         assert!(!disk.contains("sk-live-secret"));
         assert!(!disk.contains("session=secret"));
         assert_eq!(session.transcript(None, 20).expect("transcript").len(), 2);
+        assert_eq!(
+            session
+                .session()
+                .read_turn_transcript_outcomes()
+                .expect("outcomes"),
+            vec![TurnTranscriptOutcomeRecord::new(
+                "turn-1",
+                TurnTranscriptOutcome::Success,
+            )]
+        );
     }
 
     #[test]

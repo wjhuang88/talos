@@ -1935,7 +1935,7 @@ mod tests {
         };
 
         let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(512);
-        let _join = pending.spawn(sq_tx, tokio_util::sync::CancellationToken::new());
+        let _join = pending.spawn(sq_tx, 0, tokio_util::sync::CancellationToken::new());
 
         let result = wrapped.execute(serde_json::json!({})).await;
 

@@ -1,305 +1,238 @@
 # Iteration I169: Transactional Batched Steering Turn
 
-> Document status: Planned — preactivation architecture hardening under review; implementation not started
+> Document status: Active — PR #131 review handoff
 > Published plan date: 2026-08-01
 > Preactivation hardening date: 2026-08-02
-> Planned objective: implement Issue #119 from current main using TUI-044 and ADR-056 while preserving structured item boundaries, transactional ownership, recoverable pending custody and durable replay.
-> Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
-> MVP deliverable: a rebuilt Talos TUI proves A/B/C accepted during one active turn start one later model turn as three ordered user items, with durable receipt-based ownership transfer, rollback/reconciliation safety and replay parity.
+> Activation date: 2026-08-02
+> Activation baseline: `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`
+> Implementation branch: `feat/i169-tui-044-transactional-steering`
+> Implementation PR: #131
+> Planned objective: implement Issue #119 using TUI-044 and Proposed ADR-056 while preserving structured item boundaries, transactional ownership, recoverable pending custody, exact request planning and durable replay.
+> Baseline rule: preserve this published objective, dependencies, exclusions, acceptance and validation; changed targets use a new iteration ID.
+> MVP deliverable: a rebuilt Talos TUI proves A/B/C accepted during one active Turn start one later model Turn as three ordered user items, with durable receipt-based transfer, recovery-safe custody and replay parity.
 
-The effective Collaboration Claim is owned by
-`docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`. The I170 prerequisite completed
-in PR #126. I169 remains inactive until the hardened Proposed architecture is reviewed and an
-explicit activation creates a new implementation branch from the then-current `main`.
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Thinking / I169 implementation session 2026-08-02 |
+| Work Slice | I169 execution only: structured identities and Engine escrow, durable session pending journal and receipt reconciliation, one-Turn Actor arbitration, bridge lifecycle correlation, exact Provider request planning, transcript/replay parity and required acceptance evidence. |
+| Claimed At | 2026-08-02 |
+| Source Issue | #119 |
+| Governance Claim PR | #123 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The repository owner explicitly instructed “正式激活并实施 I169”; preactivation architecture PR #129 passed exact-head platform/governance gates and merged before this fresh branch and Draft implementation PR were created. |
+| Implementation PR | #131 |
+| Last Updated | 2026-08-04 |
+| Handoff / Release Condition | Remain Active until the exact PR #131 Head passes the complete Issue #119/ADR-056 matrix and independent review moves the work to Review; no release or completion claim before merge and recorded Completion Commit. |
+
+The effective Story claim is also recorded in
+`docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`. Recovery PR #120 and its branch
+remain immutable.
+
+The maintainer explicitly instructed “正式激活并实施 I169” on 2026-08-02. Preactivation architecture
+PR #129 passed exact-head macOS/Windows, governance, collaboration, mock-smoke and remote-
+reconciliation gates and merged at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`. I169 was activated
+on a fresh branch from that exact commit and is implemented in PR #131 at review handoff.
 
 ## Published Baseline
 
-### Selected Stories
+### Selected Story
 
-| Story | Parent | Status At Selection | Depends On | Outcome |
+| Story | Parent | State At Activation | Depends On | Outcome |
 |---|---|---|---|---|
-| `TUI-044` | None | Ready | TUI-026/I145; ADR-005/006/039/049/056; completed I170 | One transactional, bounded, structured follow-up Turn after matching authoritative Success. |
+| `TUI-044` | None | Active | TUI-026/I145; ADR-005/006/039/042/049; Proposed ADR-056; completed I170 | One transactional, bounded, structured follow-up Turn after matching authoritative Success. |
 
-### Recovery Provenance
+### Provenance And Authorization
 
 - Recovered Issue: #119.
-- Archival implementation PR: #120.
-- Historical exact head: `c984b71022a16169f26dec9f2e4a73b78a41a93d`.
-- Historical branch: `recovery/pr-68-i169-20260731`; immutable and never used for continued
-  development.
-- Recovery implementation is design/test evidence only. It is not current-main CI evidence and is
-  not assumed compatible with the current tool contribution, registry, permission or Session
-  architecture.
-- Original audit baseline: `main@c28fe6a6c70b0115e99372927a29ab4107b06b78`.
-- Satisfied prerequisite baseline: I170 completion at
-  `main@592254d73a98166df48da0139a02df67e9cd2cd6`.
-- Preactivation hardening baseline:
-  `main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`.
-- Activation must re-read and branch from the actual current `main`; evidence SHAs are not a frozen
-  future implementation base.
+- Archival PR/head/branch: #120 / `c984b71022a16169f26dec9f2e4a73b78a41a93d` /
+  `recovery/pr-68-i169-20260731`; immutable and never implementation parents.
+- I170 prerequisite: PR #126.
+- Preactivation architecture hardening: PR #129.
+- Independent Windows fixture repair: PR #130; not I169 product scope.
+- Maintainer authorization: explicit instruction on 2026-08-02 at 02:32 +08:00.
+- Responsible Actor: `@wjhuang88`.
+- Executing Agent: `GPT-5.6 Thinking / I169 implementation session 2026-08-02`.
+- Exact base/branch/PR: `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae` /
+  `feat/i169-tui-044-transactional-steering` / #131.
+- ADR-056 remains Proposed during implementation and independent review.
 
-### Scope
+## Scope
 
-- Structured Engine queue with stable item identity, Session identity/generation, kind/source,
-  exact text, attachments and FIFO sequence.
-- Deterministic Engine-accepted queue-sequence cutoff when matching authoritative completion is
-  processed.
-- Transactional `prepare/reserve/send/durable-accept/reconcile/commit` ownership transfer.
-- Engine escrow after send that is recoverable and visible but cannot execute or re-batch.
-- Session-scoped versioned pending journal, separate from successful transcript, written before
-  Actor acknowledgement.
-- Idempotent `SubmissionAccepted`/`AlreadyAccepted` receipt and authoritative `NotAccepted`
-  reconciliation for lost Ack.
-- Session/generation/batch/receipt/Turn/sequence lifecycle validation with bounded content-free
-  rejection diagnostics.
-- Actor-owned pending arbitration, one active Turn, no normal Submit preemption and source-aware
-  scheduler ordering.
-- Success auto-advance; Cancel/Error pause unstarted pending work; explicit user resume; no automatic
-  replay of an already-started failed/cancelled Turn.
-- Scheduler delivery retention on full/timeout/closed sender; no silent drop or false delivery.
-- Exact initial and continuation Provider Request Plan budgeting with output reserve, using the same
-  sealed plan for validation and send.
-- Successful transcript-before-inbox-finalization ordering and crash recovery without ghost or
-  duplicate execution.
-- Live/persisted/resumed user-item boundary equivalence.
-- Additive public protocol/API changes and preserved
-  `ConversationEngine::drain_steering_queue` compatibility.
-- Current-main governance, collaboration claim, release preflight, CI and real-TUI evidence.
+1. Structured Engine queue with stable item, batch, reservation and attempt identity; Session
+   identity/generation; source/kind; exact text; attachments; FIFO sequence; bounded metadata.
+2. Deterministic Engine-accepted enqueue-sequence cutoff when matching authoritative Success is
+   processed; no wall-clock, `try_recv`, biased-select or inferred-keypress ordering claim.
+3. Transactional `prepare/reserve/send/durable-accept/reconcile/commit` transfer with immutable,
+   non-executable Engine escrow after send until receipt reconciliation.
+4. Versioned session-scoped pending journal separate from successful transcript, with idempotent
+   acceptance, `AlreadyAccepted`, authoritative `NotAccepted`, conflict detection and restart
+   recovery.
+5. Durable Session generation on structured operations, receipts and structured Turn events; live
+   replacement advances it atomically, process reconstruction rehydrates it unchanged, and exact
+   Session/generation/batch/receipt/Turn/sequence validation applies end to end.
+6. Actor-owned user/scheduler arbitration with at most one active Turn, no ordinary Submit
+   preemption, retained delivery under backpressure and deterministic explicit-user resume.
+7. Success auto-advance; Cancel/Error pause unstarted pending work; deterministic pre-start failure
+   has an explicit exact-generation cancel/terminalize action; no automatic replay of an already-
+   started terminal Turn.
+8. A/B/C as distinct ordered User/Multimodal messages in Actor input, Provider requests, successful
+   transcript and resumed history.
+9. Successful transcript commit before pending-journal finalization, with Turn-ID crash recovery and
+   no ghost or duplicate replay.
+10. One sealed exact Provider Request Plan for every initial and continuation call, used by both
+    complete budget validation and actual Provider dispatch.
+11. Additive protocol/API migration preserving public single-item
+    `ConversationEngine::drain_steering_queue` and legacy Session operations.
+12. Focused and full tests, governance, exact-head platform CI, rebuilt real-TUI and Provider
+    mock/request-preview evidence.
 
-### Non-Goals
+## Non-Goals
 
-- No completed I170 Windows shell/process/path/fixture work in the I169 implementation scope.
-- No delimiter-only authoritative batch, concurrent model Turns, persistent cross-Session steering
-  queue, arbitrary queue editing, semantic rewriting/deduplication, global bus, permission/sandbox
-  redesign or unrelated Provider changes.
-- No general persistent task/checkpoint runtime; the pending journal is Session delivery custody.
-- No automatic retry of a started Turn after side effects may have occurred.
-- No historical governance overwrite and no direct merge/rebase/modification of PR #120 or its
-  recovery branch.
+- No I170 process/path/fixture work, concurrent model Turns, global bus, queue editing/reordering,
+  semantic rewrite, permission/sandbox redesign or unrelated Provider protocol change.
+- No persistent cross-Session steering queue or implicit movement across Session/model/Provider
+  changes.
+- No general persistent-task/checkpoint runtime and no automatic retry of a started terminal Turn.
+- No delimiter-joined authoritative representation.
+- No merge, rebase, modification or continued development of PR #120 or its branch.
 
-### Acceptance
+## Acceptance
 
-#### Structured input and cutoff
+### Structured Input And Cutoff
 
-- A/B/C remain three FIFO user items in Actor input, Provider request adaptation, persistence and
-  resume history while producing only one follow-up model Turn.
-- Input accepted after the Engine cutoff forms the next batch.
-- Empty and single-item queues preserve expected behavior.
-- Multiline, attachment, preview, slash and mixed-kind classification preserves boundaries and
-  rejects incompatible batching.
+- A/B/C before cutoff become exactly one later Turn and remain three distinct FIFO user messages in
+  Actor input, Provider adaptation, successful transcript and resume.
+- Cutoff-after input remains for a later batch; empty and single-item behavior remains correct.
+- Multiline, attachments, preview, slash/local, scheduler and incompatible kinds are classified
+  before queueing and preserve per-item boundaries.
 
-#### Ownership and transaction
+### Ownership And Recovery
 
-- Before send, Engine is the sole owner and pre-send failures roll back exactly.
-- After send, Engine holds only non-executable escrow while the addressed Actor may durably acquire
-  execution authority.
-- Actor acknowledgement occurs only after idempotent pending-journal acceptance.
-- Engine queue removal requires a matching receipt for the exact Session, generation, batch and
-  reservation.
-- Lost Ack reconciles through `AlreadyAccepted` or authoritative `NotAccepted`; it never blindly
-  retries into a new Session or generation.
-- At every state there is one execution authority and at least one recoverable copy.
+- Before send, Engine is sole owner and full/closed/reserve-timeout/replaced-sender failures roll
+  back exactly without clearing queue projection.
+- After send, Engine escrow is non-executable; only journal-backed Actor acceptance grants execution
+  authority. One recoverable copy exists until terminal finalization.
+- Ack occurs only after journal commit and must match exact Session, generation, batch, reservation
+  and receipt before Engine removes the exact prefix.
+- Lost Ack reconciles through `AlreadyAccepted` or authoritative `NotAccepted`; ambiguity pauses and
+  conflicting payload fails closed.
+- Actor acceptance survives lost receipt, Actor reconstruction and Session resume.
 
-#### Lifecycle and arbitration
+### Lifecycle And Arbitration
 
-- Stale/duplicate/wrong-session/wrong-turn/wrong-generation/regressive/gap/uncorrelated events do
-  not mutate queue or Turn state.
-- Provider tool-use end is non-terminal for queue advancement.
-- Ordinary Submit never preempts an active Turn.
-- Interrupt targets only the matching active Turn and never removes pending work.
-- Cancel/Error pauses unstarted Actor pending and Engine queued work; an explicit user Submit
-  resumes deterministic user-before-scheduler arbitration.
-- Scheduler cannot bypass Actor arbitration, resume a paused Actor or silently lose an undelivered
-  fire.
+- Provider progress/`TurnEnd` never drains. Only matching canonical Success auto-advances.
+- Wrong Session/generation/batch/Turn, duplicate, regressive, gap and no-active events cannot mutate
+  state.
+- Ordinary Submit never preempts. Interrupt targets only the matching active Turn and does not remove
+  pending work when idle.
+- Cancel/Error pause Engine queued and unstarted Actor pending work. Admissible retained work resumes
+  in retained-user-before-scheduler order; deterministic pre-start failure can be terminalized by an
+  exact-generation command without Provider execution so it cannot pin the FIFO forever.
+- Scheduler cannot bypass Actor arbitration, preempt user work, resume a paused Actor by itself or
+  silently lose an undelivered fire.
 
-#### Persistence and replay
+### Persistence, Request And Compatibility
 
-- Pending acceptance survives lost receipt, Actor reconstruction and Session resume.
-- Unaccepted, prepared or pending work creates no successful transcript message.
-- Successful transcript is atomically/idempotently committed before pending journal finalization.
-- A crash after transcript commit but before inbox cleanup finalizes by Turn identity without
-  re-execution.
-- Resume contains no delimiter-only replay, ghost entry, duplicate item or missing attachment/item
-  boundary.
+- Prepared, unaccepted and pending work creates no successful transcript messages.
+- Success commits transcript before journal finalization; crash recovery finalizes by Turn identity
+  without re-execution.
+- Resume has no delimiter-only replay, ghost, duplicate or missing item/attachment boundary.
+- Item/queue/batch/attachment/journal/Actor/scheduler/initial/continuation/output-reserve limits fail
+  visibly or split only at item boundaries.
+- Every initial and continuation call validates and sends the same exact request plan/fingerprint.
+- Legacy single-item drain and legacy Session operations remain compatible.
 
-#### Bounds, request and compatibility
+## Implementation Slices
 
-- Item, queue, batch, attachment, journal, Actor pending, scheduler delivery, initial request,
-  continuation request and output-reserve limits are visible and item-boundary safe.
-- Initial and continuation calls validate and send the same exact request plan/fingerprint.
-- Existing public single-item drain API and legacy Session operations remain available with their
-  compatible behavior.
+1. **Identity and custody types** — structured input/receipt states plus versioned pending journal.
+2. **Engine reservation** — structured queue, cutoff, preparation/escrow, exact commit/rollback and
+   legacy drain compatibility.
+3. **Protocol and Actor receipt** — additive operations/events, generation, durable accept,
+   reconciliation, no ordinary preemption and pending recovery.
+4. **Actor arbitration and terminal policy** — one active Turn, user/scheduler ordering, Cancel/Error
+   pause and retained scheduler delivery.
+5. **Bridge state machine** — attachment-bound admission, lifecycle validation, bounded send/Ack,
+   reconciliation, UI commit and Session mutation gates.
+6. **Exact request plan** — structured Provider messages, complete initial/continuation budgets and
+   preview fingerprint evidence.
+7. **Transcript/replay** — transcript-before-journal finalization, crash fixtures and resume parity.
+8. **Acceptance closeout** — fixed-seed stress, full locked gates, exact-head CI, real TUI, docs,
+   independent review and ADR disposition.
 
-### Planned Validation
+The pending-journal/receipt slice is the highest-risk review boundary. No slice may weaken the
+Proposed contract merely to match historical PR #120.
 
-#### Engine
+## Planned Validation
 
-- single FIFO drain, multi-item batch, empty queue, cutoff-after input, reservation visibility,
-  Ack-only exact clear, rollback and duplicate identity protection
+- Engine single/empty/multi/cutoff/reservation/escrow/Ack/rollback/conflict tests.
+- Pending journal new/duplicate/conflict/reconcile/reopen/reconstruction/unknown-schema/bound tests.
+- Crash windows before journal commit, after journal commit/before receipt and after transcript
+  commit/before journal finalization.
+- Matching and rejected Session/generation/batch/receipt/Turn/sequence lifecycle tests.
+- Full/closed/timeout/sender replacement/session replacement/lost Ack/rejection/shutdown tests.
+- No ordinary preemption; active-only Interrupt; Cancel/Error retention; explicit user resume and
+  scheduler blocked-delivery tests.
+- A/B/C, multiline, attachments, slash, preview, scheduler and incompatible-kind tests.
+- Exact initial/continuation request-plan fingerprint and complete-budget tests.
+- Fixed-seed interleavings proving no loss, no duplicate execution, FIFO/source order, one execution
+  authority, recoverable custody, at most one active Turn and no cross-Session mutation.
+- `cargo fmt --all -- --check`, locked workspace check/Clippy/tests and `git diff --check`.
+- Governance/collaboration validators, release preflight, exact-head Windows and Unix/macOS CI.
+- Rebuilt real-TUI walkthrough, no-Provider smoke and Provider Request Preview / Mock Request
+  evidence.
 
-#### Receipt / Journal
+## Documentation Targets
 
-- new accept, duplicate identical accept, conflicting payload, lost receipt, `AlreadyAccepted`,
-  authoritative `NotAccepted`, journal reopen, unknown schema, bounded journal and Actor restart
-- crash windows before journal commit, after journal commit/before receipt, after transcript
-  commit/before inbox finalization
+- TUI-044, this iteration and ADR-056.
+- ADR-039/042/049 only where the accepted implementation actually extends their boundary.
+- Board, Product Backlog, iteration index and governance manifest.
+- README/user documentation only after behavior exists.
+- Issue #119 and PR #131 review-handoff synchronization.
 
-#### Lifecycle
+## Risks And Rollback
 
-- matching Success, Cancelled, Error, Provider tool-use non-terminal, stale, duplicate, wrong
-  Session/Turn/generation, regression, gap, no-active-turn and shutdown
-
-#### Channel / Transaction
-
-- full, closed, reserve timeout, sender replacement before send, sender/session replacement after
-  send, Ack loss, Actor rejection and retry/reconciliation without duplication
-
-#### Structured Input / Scheduler
-
-- A/B/C distinct, multiline, attachments, slash, preview, scheduler, mixed incompatible kinds and
-  item identity
-- scheduler blocked-delivery retention, explicit cancellation and no false delivered state
-- paused retained user work, resuming user input and scheduler ordering
-
-#### Request / Bounds / Persistence
-
-- every Issue #119 and ADR-056 bound
-- exact initial and continuation plan fingerprint parity
-- success persistence, Cancel/Error retention, active-batch no-auto-replay, resume parity and no
-  ghost/duplicate/delimiter-only replay
-
-#### Fixed-seed stress
-
-Interleave enqueue, completion, cancel, reserve failure, send, receipt loss, reconcile, scheduler,
-Actor replacement, Session replacement and cutoff boundaries. Check after each step:
-
-- no loss;
-- no duplicate execution;
-- FIFO/source ordering;
-- unique execution authority;
-- at least one recoverable copy for non-terminal work;
-- at most one active Turn;
-- no cross-Session or cross-generation mutation.
-
-#### Full Gates
-
-- `cargo fmt --all -- --check`
-- `cargo check --workspace --locked`
-- `cargo clippy --workspace --locked -- -D warnings`
-- `cargo test --workspace --locked`
-- `git diff --check`
-- governance and collaboration validators
-- release preflight
-- Windows and Unix/macOS exact-head CI
-- rebuilt real TUI walkthrough
-- `--mock` or equivalent no-Provider smoke
-- Provider Request Preview / Mock Request checks for initial and continuation paths
-
-### Documentation To Update During Implementation
-
-- TUI-044 owner
-- ADR-056
-- TUI-026/ADR-049 only where the accepted boundary is extended
-- iteration index, Product Backlog, Board and governance manifest
-- README/user documentation only after behavior exists
-- Issue #119 synchronization comments and implementation PR links
-
-### Risks And Rollback
-
-- Risk: both Engine and Actor believe they may execute one item. Engine escrow is explicitly
-  non-executable; only a durable Actor receipt grants execution authority.
-- Risk: a lost Ack is treated as a failed send and replays the batch. Require receipt reconciliation
-  and `AlreadyAccepted`.
-- Risk: Actor memory loss drops accepted pending work. Ack only after the session pending journal
-  commits.
-- Risk: stale lifecycle events advance a new Session. Bind every operation/event to Session,
-  generation and exact batch/receipt/Turn identity.
-- Risk: scheduler full handling drops work. Retain one exact blocked fire with visible status.
-- Risk: Cancel deletes pending or auto-replays a side-effecting active Turn. Interrupt only the active
-  Turn; retain unstarted pending; never auto-replay the terminal active batch.
-- Risk: transcript and pending inbox diverge. Commit transcript first, then finalize journal, with
-  Turn-ID crash recovery.
-- Risk: context accounting omits tools, overlays or attachments. Budget and send one exact sealed
-  request plan on every Provider call.
-- Risk: public protocol additions break exhaustive downstream matches. Keep legacy variants and
-  document the pre-1.0 additive migration.
-- Rollback: revert the current-main structured implementation while retaining released
-  journal/protocol readers and idempotent cleanup; never rewrite historical recovery objects.
-
-## Preactivation Architecture Decision Record
-
-The 2026-08-02 hardening resolves the eight implementation blockers identified by the current-main
-audit:
-
-| Blocker | Selected Proposed Contract |
-|---|---|
-| Ack meaning | Durable idempotent pending-journal acceptance, before Turn start |
-| Actor pending recovery | Versioned session-scoped pending journal separate from transcript |
-| Lost Ack | Receipt reconciliation with `AlreadyAccepted` / authoritative `NotAccepted` |
-| Generation | Monotonic Session generation assigned by the composition root and carried everywhere |
-| Scheduler full | Retained bounded blocked delivery; no drop/false success |
-| Cancel pending | Interrupt active Turn only; retain and pause unstarted pending |
-| Persistence ordering | Successful transcript commit before pending-journal finalization |
-| Context budget | One exact Provider Request Plan is both validated and sent for every call |
-
-These are Proposed design constraints, not implementation evidence and not ADR acceptance.
-
-## Implementation Slices After Activation
-
-A future fresh implementation PR should use independently reviewable commits:
-
-1. **Identity and protocol** — typed IDs, generation envelope, structured items and legacy
-   compatibility.
-2. **Engine reservation** — cutoff, prepare, escrow, commit/rollback without Actor execution.
-3. **Pending journal and receipt** — durable idempotent accept, `AlreadyAccepted`, conflict and
-   reconciliation. This is the highest-risk slice.
-4. **Actor arbitration** — one active Turn, scheduler delivery, Cancel/Error pause and explicit
-   resume.
-5. **Bridge state machine** — Idle/Prepared/AwaitingReceipt/Reconciling/Running/Cancelling/Paused,
-   lifecycle validation and mutation gates.
-6. **Exact request plan** — structured Provider messages, initial/continuation budget and preview.
-7. **Transcript/replay** — transcript-before-inbox finalization, crash fixtures and migration.
-8. **Acceptance closeout** — stress, full gates, exact-head CI, real TUI, docs and governance.
-
-No product-code slice may be added to the preactivation documentation branch.
-
-## Activation Gate
-
-I170 no longer blocks activation, but I169 remains Planned. Before implementation begins:
-
-1. merge/review the preactivation ADR-056/TUI-044/I169 hardening or explicitly supersede it;
-2. re-read current `main`, Issue #119, open PRs, branches and owner docs;
-3. confirm no newer or overlapping steering implementation authority exists;
-4. receive explicit maintainer instruction to **formally activate and implement I169**;
-5. create a new implementation branch from the exact then-current `main` — not this documentation
-   branch and not the recovery branch;
-6. create a separate Draft implementation PR and record its number;
-7. update I169/TUI-044/Board from Planned/Ready to Active before product-code mutation;
-8. record activation time, Responsible Actor, Executing Agent, baseline SHA, implementation branch
-   and Draft PR;
-9. keep recovery PR #120 and `recovery/pr-68-i169-20260731` immutable;
-10. preserve ADR-056 as Proposed until the fresh implementation and independent review establish
-    acceptance evidence.
+- Dual authority: Engine escrow is non-executable; only durable receipt grants Actor execution.
+- Lost Ack duplicate: exact reconciliation; never blind resend.
+- Actor memory loss: acknowledge only after session journal commit.
+- Stale lifecycle: exact Session/generation/batch/receipt/Turn/sequence checks.
+- Scheduler loss: retain one exact blocked fire with visible state.
+- Terminal side effects: never auto-replay a started Cancelled/Error Turn.
+- Transcript/journal divergence: transcript first, journal finalization second, Turn-ID recovery.
+- Request drift: validate and send one sealed request plan.
+- Public enum migration: retain legacy variants and document pre-1.0 exhaustive-match changes.
+- Rollback before release returns behavior to ADR-049 while retaining any released journal/protocol
+  readers and idempotent cleanup; recovery objects are never rewritten.
 
 ## Actual Activation And Execution
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-01 | Recovery audit | Current main retained only single-item `Vec<String>` steering drain. Historical structured implementation remained missing and required redesign on current Session and composition boundaries. |
-| 2026-08-01 | Governance correction | Historical TUI-041 conflicts with current Issue #69 ownership. TUI-044 was established as the recovered Issue #119 Story. |
-| 2026-08-01 | Prerequisite satisfied | I170 completed through merged PR #126 at `592254d73a98166df48da0139a02df67e9cd2cd6`. The Windows/current-main prerequisite is cleared; no I169 code branch or implementation PR was created by the I170 closeout. |
-| 2026-08-02 | Preactivation audit | Re-read `main@61cbb930bf9e91ddad1bc85fb79f7b13ecad317d`, Issue #119, PR #120, owner documents and current code. No overlapping implementation was found. Eight ownership/recovery blockers were identified. |
-| 2026-08-02 | Architecture hardening | ADR-056/TUI-044/I169 were expanded with durable receipt, pending-journal, lost-Ack reconciliation, generation, scheduler-full, Cancel/Error, persistence-order and exact-request-plan contracts. State remains Planned/Ready; no product code was modified. |
+| 2026-08-01 | Recovery audit | Current main retained unsafe single-item/destructive steering; PR #120 remained archival evidence. |
+| 2026-08-01 | Governance correction | TUI-044 replaced the conflicting historical TUI-041 identifier. |
+| 2026-08-01 | Prerequisite | I170 completed through PR #126. |
+| 2026-08-02 | Architecture hardening | PR #129 defined durable receipt, pending journal, lost-Ack, generation, scheduler, terminal, persistence-order and exact-request contracts. |
+| 2026-08-02 | Baseline repair | PR #130 independently stabilized the Windows loopback test fixture found by PR #129 validation. |
+| 2026-08-02 | Formal activation | Maintainer explicitly authorized implementation; no overlap was found; fresh branch created from exact `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; Draft PR #131 opened. |
+| 2026-08-02 | Slice 1 | Added structured submission identities/bounds and a versioned session-scoped pending journal with durable receipts, idempotent reopen, conflict rejection, pause/recovery and terminal tombstones. |
+| 2026-08-02 | Review baseline port | Copied the preserved Review code for Engine/Actor/Bridge/Agent files into the fresh PR branch as a separately identifiable starting snapshot; recovery refs remain unchanged and the snapshot is not completion evidence. |
+| 2026-08-04 | Review handoff | Remediation code and regression evidence passed CI #967 at `8cd00fe311fcb349488f3fea69e03f406fc2631e`; governance lifecycle is synchronized for a fresh exact-head CI and independent review. ADR-056 remains Proposed and no merge/completion is authorized. |
+| 2026-08-03 | Independent-review remediation | PR #131 returned to Draft. Remediation defines explicit pre-start cancellation, ordinary-Session terminal-outcome recovery, generation-bound scheduler delivery, durable runtime-generation reconstruction, UUID Engine identities and fixed-seed interleaving evidence. Exact-head CI and repeat independent acceptance remain pending. |
 
 ## Verification Evidence
 
-- Governance claim PR #123 is merged and the TUI-044 owner chain is effective on `main`.
-- I170 prerequisite evidence: PR #126, exact implementation Head
-  `8cfe8edb2dbda581244f583fb809591391a54298`, CI run `30705366763`, walkthrough artifact
-  `8820174164`, merge commit `592254d73a98166df48da0139a02df67e9cd2cd6`.
-- Preactivation hardening branch starts exactly at
-  `61cbb930bf9e91ddad1bc85fb79f7b13ecad317d` and changes governance/design documents only.
-- I169 implementation and behavior evidence remain pending explicit activation.
+- Claim PR #123 is merged.
+- Architecture PR #129 exact Head `d0e60d65038cd890e411a44c65783d6dc34a74c7` passed CI
+  `30713776456` before merge `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`.
+- Fixture PR #130 exact Head `fe87c4265bafd1be67e20e635c176eefe08ac6cc` passed CI
+  `30713367293` before merge `57d99596b3882162d0d5b06ace42fb5faed95b3e`.
+- Activation branch and PR #131 remain bound to the exact architecture merge baseline.
+- Independent-review remediation and regression evidence are implemented. The implementation tree at
+  `8cd00fe311fcb349488f3fea69e03f406fc2631e` passed CI #967; this lifecycle synchronization requires
+  a new exact-head CI before fresh independent review.
 
 ## Completion Evidence
 
@@ -307,15 +240,64 @@ I170 no longer blocks activation, but I169 remains Planned. Before implementatio
 
 ## Variance And Residuals
 
-- The historical delimiter-only MVP is explicitly obsolete; TUI-044/ADR-056 structured invariants
-  are authoritative for this recovery.
-- The historical PR #120 in-memory pending/dedupe model is evidence only and does not satisfy the
-  hardened durable receipt/reconciliation contract.
-- I169 remains independent from completed I170 and must start from a fresh current-main branch,
-  never from the recovery branch, PR #120 or the preactivation documentation branch.
-- Satisfying the prerequisite and hardening the Proposed design do not authorize implementation
-  automatically.
+- Historical delimiter-only and in-memory ownership implementations are obsolete evidence, not code
+  authority.
+- I169 remains independent of I170 and does not continue PR #120 or PR #129 branches.
+- Interrupted active-Turn persistence, broader shutdown, general persistent tasks, queue editing and
+  cross-Session movement remain separately owned.
 
 ## Retrospective
 
-- Pending implementation.
+- Pending implementation and independent review.
+
+## Independent-review remediation handoff (2026-08-04)
+
+Lifecycle remains unchanged while PR #131 awaits a new independent review: **TUI-044 / I169 are Active, ADR-056 is Proposed, and Issue #119 is Open**.
+
+The latest implementation evidence tightens same-Session generation replacement into one acknowledged ownership handoff:
+
+- SQLite admission and generation advance share one immediate transaction. Generation G cannot advance while any `accepted_pending`, `running`, or `paused_pending` custody remains.
+- After the durable G → G+1 fence, fresh generation-G submissions are rejected as `WrongGeneration` without creating journal custody; historical same-ID reconciliation remains observable.
+- The old generation-bound Bridge route is revoked, the old Scheduler is cancelled and joined, and reliable Actor `Shutdown` is queued and joined before the G+1 Actor and Scheduler are spawned and published.
+- Race and reconstruction evidence covers concurrent admission versus fencing, full Actor queues, old-Scheduler cancellation, Actor receiver closure, durable generation 1+ reopen, stale-command rejection, journal state, receipt generation, and Provider call counts.
+
+This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.
+
+## Final-history handoff remediation (2026-08-04)
+
+- Model/provider replacement performs fallible Provider, MCP, tool, skill and context preparation before the irreversible generation fence.
+- It then advances durable generation, revokes old routes, joins the old Scheduler and Actor, reads canonical final transcript history, appends the switch marker, and constructs/publishes the replacement Actor.
+- Focused race evidence queues a final old-generation transcript commit during retirement and proves replacement history observes it before the switch marker.
+- Provider-discovery connection bounding remains test-only; production timeout behavior is outside I169 and unchanged.
+
+## Model-switch marker publication remediation (2026-08-04)
+
+The current review cycle adds a durable activation barrier for same-Session model/provider
+replacement. After generation fencing and acknowledged old-runtime retirement, the switch marker is
+committed to the canonical Session log before replacement Actor construction, command/event watch
+publication, success output, or any generation-G+1 user/Scheduler Turn can execute.
+
+The marker commit is tail-idempotent for the quiescent Session. A crash after marker persistence but
+before route publication can retry without creating a second marker, and the replacement Actor is built
+from a fresh read of the same persisted log used by restart/resume. Marker write/read failure publishes
+no replacement route and leaves the fenced Session stopped with an explicit recoverable error.
+
+This remains an **Active** remediation handoff. It does not accept ADR-056, complete TUI-044/I169,
+close Issue #119, approve PR #131, or authorize merge.
+
+## 2026-08-04 exact activation identity remediation
+
+The current review cycle requires same-Session model activation durability to carry the complete
+ADR-048 identity: provider, model, and normalized variant. PR #131 now records a machine-readable
+activation object containing the durable target generation, deterministic activation ID, exact
+previous identity, and exact target identity. `None`, empty, and `default` variants normalize to the
+same baseline identity.
+
+Visible marker text is not the idempotency key. Only an exact activation object may be reused after
+an interrupted commit/publication cut point; a new intentional switch, including a variant-only
+switch on the same provider/model, creates a distinct activation. Session startup restores the
+variant from this Session-owned record before Provider construction, so a later global config write
+failure cannot silently restore different request semantics.
+
+This is implementation evidence under review. TUI-044 and I169 remain Active, ADR-056 remains
+Proposed, and Issue #119 remains Open.

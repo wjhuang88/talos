@@ -854,7 +854,7 @@ fn mock_request_is_model_passthrough_slash_command() {
 }
 
 // ---------------------------------------------------------------------------
-// drain_steering_queue
+// drain_steering_queue / structured steering transaction
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -958,24 +958,13 @@ fn timeout_error_sets_timed_out_phase() {
 }
 
 #[test]
-fn drain_steering_queue_fifo_order() {
+fn drain_steering_queue_preserves_legacy_single_item_fifo_behavior() {
     let mut engine = new_engine();
-    engine.steering_queue.push("first".to_string());
-    engine.steering_queue.push("second".to_string());
-    engine.steering_queue.push("third".to_string());
+    engine.enqueue_steering("first".to_string());
+    engine.enqueue_steering("second".to_string());
 
     assert_eq!(engine.drain_steering_queue(), Some("first".to_string()));
     assert_eq!(engine.drain_steering_queue(), Some("second".to_string()));
-    assert_eq!(engine.drain_steering_queue(), Some("third".to_string()));
-}
-
-#[test]
-fn drain_steering_queue_none_when_empty() {
-    let mut engine = new_engine();
-    assert_eq!(engine.drain_steering_queue(), None);
-
-    engine.steering_queue.push("one".to_string());
-    assert_eq!(engine.drain_steering_queue(), Some("one".to_string()));
     assert_eq!(engine.drain_steering_queue(), None);
 }
 
@@ -1676,7 +1665,7 @@ async fn slash_validate_rejects_host_tool_profiles() {
 #[test]
 fn status_snapshot_reflects_current_state() {
     let mut engine = new_engine();
-    engine.steering_queue.push("steer".to_string());
+    engine.enqueue_steering("steer".to_string());
     engine.followup_queue.push("follow".to_string());
     engine.followup_queue.push("up".to_string());
     engine.is_processing = true;
@@ -2680,7 +2669,7 @@ fn steering_queue_snapshot_truncates_over_4kib() {
 }
 
 #[test]
-fn steering_queue_snapshot_reflects_drain() {
+fn steering_queue_snapshot_reflects_legacy_single_drain() {
     let mut engine = new_engine();
     engine.enqueue_steering("first".into());
     engine.enqueue_steering("second".into());
@@ -2692,6 +2681,97 @@ fn steering_queue_snapshot_reflects_drain() {
     assert_eq!(snap.total_count, 1);
     assert_eq!(snap.entries.len(), 1);
     assert_eq!(snap.entries[0].text, "second");
+}
+
+#[test]
+fn prepared_submission_is_transactional_and_preserves_item_boundaries() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("first".into());
+    engine.enqueue_steering("second".into());
+
+    let submission = engine
+        .prepare_steering_submission()
+        .expect("prepared batch");
+    assert_eq!(submission.items.len(), 2);
+    assert_eq!(submission.items[0].text, "first");
+    assert_eq!(submission.items[1].text, "second");
+    assert_eq!(engine.steering_queue_snapshot().total_count, 2);
+
+    assert!(engine.rollback_prepared_steering(&submission.id));
+    assert_eq!(engine.steering_queue_snapshot().total_count, 2);
+
+    let retry = engine.prepare_steering_submission().expect("retry batch");
+    assert!(engine.commit_prepared_steering(&retry.id));
+    assert_eq!(engine.steering_queue_snapshot().total_count, 0);
+}
+
+#[test]
+fn prepared_submission_stops_before_incompatible_preview_and_binds_attachments() {
+    let mut engine = new_engine();
+    let attachment = talos_core::message::ContentPart::Image {
+        path: "bound.png".into(),
+        mime: "image/png".into(),
+        byte_count: 42,
+        content_digest: Default::default(),
+    };
+    engine.enqueue_structured_steering(
+        "image turn".into(),
+        talos_core::session::SubmissionKind::UserTurn,
+        vec![attachment.clone()],
+    );
+    engine.enqueue_structured_steering(
+        "preview".into(),
+        talos_core::session::SubmissionKind::PreviewRequest,
+        Vec::new(),
+    );
+
+    let first = engine.prepare_steering_submission().expect("user batch");
+    assert_eq!(first.items.len(), 1);
+    assert_eq!(first.items[0].attachments, vec![attachment]);
+    assert!(engine.commit_prepared_steering(&first.id));
+
+    let second = engine.prepare_steering_submission().expect("preview batch");
+    assert_eq!(second.items.len(), 1);
+    assert_eq!(
+        second.items[0].kind,
+        talos_core::session::SubmissionKind::PreviewRequest
+    );
+}
+
+#[test]
+fn transactional_queue_fixed_seed_stress_has_no_loss_or_reordering() {
+    let mut engine = new_engine();
+    let mut expected = Vec::<String>::new();
+    let mut seed = 0x5eed_u64;
+    for index in 0..1_000_u32 {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        if seed % 3 != 0 && expected.len() < 64 {
+            let text = format!("item_{index}");
+            let (accepted, _) = engine.enqueue_structured_steering(
+                text.clone(),
+                talos_core::session::SubmissionKind::UserTurn,
+                Vec::new(),
+            );
+            assert!(accepted);
+            expected.push(text);
+        } else if let Some(submission) = engine.prepare_steering_submission() {
+            let count = submission.items.len();
+            if seed & 1 == 0 {
+                assert!(engine.commit_prepared_steering(&submission.id));
+                expected.drain(..count);
+            } else {
+                assert!(engine.rollback_prepared_steering(&submission.id));
+            }
+        }
+        assert_eq!(
+            engine
+                .steering_queue
+                .iter()
+                .map(|item| item.text.as_str())
+                .collect::<Vec<_>>(),
+            expected.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+    }
 }
 
 #[test]
