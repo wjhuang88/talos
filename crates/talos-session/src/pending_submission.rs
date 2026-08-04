@@ -56,6 +56,16 @@ pub enum PendingSubmissionError {
         /// Generation stored durably for the Session.
         actual: u64,
     },
+    /// Non-terminal durable custody still belongs to the current generation.
+    #[error(
+        "runtime generation {generation} still owns {pending} non-terminal submission(s)"
+    )]
+    GenerationBusy {
+        /// Generation that still owns custody.
+        generation: u64,
+        /// Number of non-terminal durable records.
+        pending: usize,
+    },
     /// The durable runtime generation cannot advance further.
     #[error("runtime generation exhausted")]
     GenerationExhausted,
@@ -127,6 +137,11 @@ impl PendingSubmissionStore {
 
     /// Atomically advances the durable generation for a live replacement of
     /// the same logical Session.
+    ///
+    /// The quiescence check and metadata update execute under the same SQLite
+    /// immediate transaction used by [`Self::accept`]. Therefore either an
+    /// in-flight admission wins and the fence remains at the old generation,
+    /// or the fence wins and every new old-generation admission is rejected.
     pub fn advance_runtime_generation(&self, expected: u64) -> Result<u64, PendingSubmissionError> {
         let _guard = self.guard()?;
         let mut connection = self.connection()?;
@@ -137,6 +152,18 @@ impl PendingSubmissionStore {
             return Err(PendingSubmissionError::GenerationConflict {
                 expected,
                 actual: current,
+            });
+        }
+        let pending = transaction.query_row(
+            "SELECT COUNT(*) FROM pending_submissions
+             WHERE state IN ('accepted_pending', 'running', 'paused_pending')",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        if pending > 0 {
+            return Err(PendingSubmissionError::GenerationBusy {
+                generation: current,
+                pending: usize::try_from(pending).unwrap_or(usize::MAX),
             });
         }
         let next = current
@@ -185,6 +212,12 @@ impl PendingSubmissionStore {
             };
             transaction.commit()?;
             return Ok((row.receipt_id, disposition));
+        }
+
+        let runtime_generation = load_or_initialize_runtime_generation(&transaction)?;
+        if submission.sender_generation != runtime_generation {
+            transaction.commit()?;
+            return Ok(rejected(SubmissionRejectionReason::WrongGeneration));
         }
 
         prune_tombstones(&transaction)?;
