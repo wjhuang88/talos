@@ -58,15 +58,10 @@ jobs:
           path = Path('crates/talos-cli/src/model_lifecycle.rs')
           text = path.read_text()
           old = 'use talos_session::{Session, SessionError, SessionManager, SessionMetadata};\n'
-          new = 'use talos_session::{Session, SessionError, SessionManager};\n'
+          new = 'use talos_session::{Session, SessionError, SessionManager};\n#[cfg(test)]\nuse talos_session::SessionMetadata;\n'
           if text.count(old) != 1:
               raise SystemExit('production SessionMetadata import not found exactly once')
-          text = text.replace(old, new, 1)
-          marker = '    use talos_session::{JsonlSessionStore, SessionEntry, SessionInfo, SessionStore};\n'
-          replacement = '    use talos_session::{\n        JsonlSessionStore, SessionEntry, SessionInfo, SessionMetadata, SessionStore,\n    };\n'
-          if text.count(marker) != 1:
-              raise SystemExit('test talos_session import not found exactly once')
-          path.write_text(text.replace(marker, replacement, 1))
+          path.write_text(text.replace(old, new, 1))
           PY
           rm .github/i169_variant_activation_patch.py
           cp /tmp/i169-original-ci.yml .github/workflows/ci.yml
