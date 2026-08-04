@@ -63,3 +63,9 @@
 ## Closure Rule
 
 An Issue may be closed only after its owner is Complete with implementation/acceptance evidence and the remote Issue has no separately owned residual. This audit intentionally leaves all 28 observed Issues open.
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.

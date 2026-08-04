@@ -155,8 +155,6 @@ pub struct CommitResult {
     /// The handle for the newly active session actor. Its SQ sender is the
     /// generation-binding proxy, not the raw Actor sender.
     pub new_handle: SessionHandle,
-    /// Durable authoritative generation assigned to the replacement Actor.
-    pub generation: u64,
 }
 
 struct ActiveRuntime {
@@ -295,7 +293,6 @@ impl SessionTransition {
         Ok(CommitResult {
             old_session,
             new_handle: prepared.handle,
-            generation: next_generation,
         })
     }
 

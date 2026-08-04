@@ -634,3 +634,16 @@ implementations need a different durable receipt seam, measured pending-journal 
 Actor latency materially regresses, or exact request planning requires Provider-specific policy.
 Any replacement must preserve unique execution authority, recoverable custody, retry and replay
 invariants.
+
+## Independent-review remediation handoff (2026-08-04)
+
+Lifecycle remains unchanged while PR #131 awaits a new independent review: **TUI-044 / I169 are Active, ADR-056 is Proposed, and Issue #119 is Open**.
+
+The latest implementation evidence tightens same-Session generation replacement into one acknowledged ownership handoff:
+
+- SQLite admission and generation advance share one immediate transaction. Generation G cannot advance while any `accepted_pending`, `running`, or `paused_pending` custody remains.
+- After the durable G → G+1 fence, fresh generation-G submissions are rejected as `WrongGeneration` without creating journal custody; historical same-ID reconciliation remains observable.
+- The old generation-bound Bridge route is revoked, the old Scheduler is cancelled and joined, and reliable Actor `Shutdown` is queued and joined before the G+1 Actor and Scheduler are spawned and published.
+- Race and reconstruction evidence covers concurrent admission versus fencing, full Actor queues, old-Scheduler cancellation, Actor receiver closure, durable generation 1+ reopen, stale-command rejection, journal state, receipt generation, and Provider call counts.
+
+This evidence is a review handoff only. It does not mark the Story, Iteration, ADR, Issue, or PR as Complete, Accepted, Approved, or merge-ready; exact-head CI and independent approval remain mandatory gates.

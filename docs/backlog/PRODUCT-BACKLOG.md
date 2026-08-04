@@ -109,3 +109,9 @@ Issue #132 remains open under the PROVIDER-003 Refinement Epic; no child impleme
 until PROVIDER-003-A and a separately claimed child owner establish the required boundary.
 Issue #134 remains open under TUI-046 Refinement; terminal interaction policy, ADR-054 impact,
 iteration selection and a real-terminal validation matrix are still required.
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.

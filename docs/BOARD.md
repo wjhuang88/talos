@@ -80,3 +80,9 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.
