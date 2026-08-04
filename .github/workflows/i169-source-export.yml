@@ -1,0 +1,30 @@
+name: I169 source export
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+    paths:
+      - .github/workflows/i169-source-export.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build repository bundle
+        shell: bash
+        run: git bundle create talos.bundle --all
+      - name: Upload repository bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: i169-source-bundle-${{ github.sha }}
+          path: talos.bundle
+          if-no-files-found: error
+          retention-days: 1
