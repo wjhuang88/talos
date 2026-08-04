@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::*;
 use talos_core::submission::{SubmissionItem, SubmissionKind, SubmissionSource};
 
@@ -5,7 +7,7 @@ fn submission() -> StructuredSubmission {
     StructuredSubmission {
         id: "batch-1".into(),
         source: SubmissionSource::User,
-        sender_generation: 3,
+        sender_generation: 0,
         items: vec![SubmissionItem {
             id: "item-1".into(),
             enqueue_sequence: 1,
@@ -192,6 +194,90 @@ fn runtime_generation_survives_store_reopen_and_advances_atomically() {
         })
     ));
     assert_eq!(reopened.advance_runtime_generation(1).unwrap(), 2);
+}
+
+#[test]
+fn generation_advance_requires_quiescent_custody_and_rejects_fresh_stale_work() {
+    let dir = tempfile::tempdir().unwrap();
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+    let retained = submission();
+    assert_eq!(
+        store.accept(&retained).unwrap().1,
+        SubmissionReceiptDisposition::AcceptedPending
+    );
+    assert!(matches!(
+        store.advance_runtime_generation(0),
+        Err(PendingSubmissionError::GenerationBusy {
+            generation: 0,
+            pending: 1,
+        })
+    ));
+    assert_eq!(store.runtime_generation().unwrap(), 0);
+
+    store.cancel_unstarted(&retained.id).unwrap();
+    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+
+    let mut stale = submission();
+    stale.id = "fresh-stale-batch".into();
+    stale.items[0].id = "fresh-stale-item".into();
+    assert_eq!(
+        store.accept(&stale).unwrap().1,
+        SubmissionReceiptDisposition::Rejected {
+            reason: SubmissionRejectionReason::WrongGeneration,
+        }
+    );
+    assert!(store.get(&stale.id).unwrap().is_none());
+
+    let mut current = stale;
+    current.id = "current-batch".into();
+    current.items[0].id = "current-item".into();
+    current.sender_generation = 1;
+    assert_eq!(
+        store.accept(&current).unwrap().1,
+        SubmissionReceiptDisposition::AcceptedPending
+    );
+}
+
+#[test]
+fn generation_fence_and_accept_are_serialized_across_store_instances() {
+    let dir = tempfile::tempdir().unwrap();
+    let session_file = dir.path().join("session.tlog");
+    let accept_store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let fence_store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let barrier = Arc::new(std::sync::Barrier::new(3));
+
+    let accept_barrier = barrier.clone();
+    let accept = std::thread::spawn(move || {
+        let payload = submission();
+        accept_barrier.wait();
+        accept_store.accept(&payload).unwrap().1
+    });
+    let fence_barrier = barrier.clone();
+    let fence = std::thread::spawn(move || {
+        fence_barrier.wait();
+        fence_store.advance_runtime_generation(0)
+    });
+    barrier.wait();
+
+    let disposition = accept.join().unwrap();
+    let advanced = fence.join().unwrap();
+    match (disposition, advanced) {
+        (
+            SubmissionReceiptDisposition::AcceptedPending,
+            Err(PendingSubmissionError::GenerationBusy {
+                generation: 0,
+                pending: 1,
+            }),
+        )
+        | (
+            SubmissionReceiptDisposition::Rejected {
+                reason: SubmissionRejectionReason::WrongGeneration,
+            },
+            Ok(1),
+        ) => {}
+        unexpected => panic!("accept/fence transaction escaped serialization: {unexpected:?}"),
+    }
 }
 
 #[test]
