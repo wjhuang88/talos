@@ -62,6 +62,25 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          path = Path('crates/talos-cli/src/mode_runners_tests.rs')
+          text = path.read_text()
+          marker = 'Some("nonexistent-provider".to_string())'
+          marker_at = text.index(marker)
+          start = text.rfind('        let model_result = handle_session_model(', 0, marker_at)
+          end = text.index('        .await;', marker_at) + len('        .await;\n')
+          if start < 0:
+              raise SystemExit('failed to locate rejected model-result call')
+          block = text[start:end]
+          for required in ['&hooks,', 'workspace.path(),', '&mcp_config,', '&session_manager,', 'true,']:
+              if required not in block:
+                  raise SystemExit(f'rejected call missing expected token: {required}')
+          rewritten = block.replace(
+              '            &hooks,\n            workspace.path(),\n            &mcp_config,\n',
+              '            &runtime_builder,\n',
+          ).replace('            &session_manager,\n', '').replace('            true,\n', '')
+          path.write_text(text[:start] + rewritten + text[end:])
+          Path('crates/talos-cli/src/mode_runners_tests.rs.rej').unlink()
+
           def replace_exact(path, old, new, expected=1):
               file = Path(path)
               text = file.read_text()
@@ -69,41 +88,6 @@ jobs:
               if actual != expected:
                   raise SystemExit(f'{path}: expected {expected} match(es), found {actual}')
               file.write_text(text.replace(old, new))
-
-          replace_exact(
-              'crates/talos-cli/src/mode_runners_tests.rs',
-              '''        let model_result = handle_session_model(
-                  &transition,
-                  &ui_tx,
-                  &config,
-                  &hooks,
-                  workspace.path(),
-                  &mcp_config,
-                  &session_watch_tx,
-                  &sq_tx_watch_tx,
-                  &bridge_tx,
-                  &session_watch_rx,
-                  &session_manager,
-                  "nonexistent-model".to_string(),
-                  Some("nonexistent-provider".to_string()),
-                  true,
-              )
-              ''',
-              '''        let model_result = handle_session_model(
-                  &transition,
-                  &ui_tx,
-                  &config,
-                  &runtime_builder,
-                  &session_watch_tx,
-                  &sq_tx_watch_tx,
-                  &bridge_tx,
-                  &session_watch_rx,
-                  "nonexistent-model".to_string(),
-                  Some("nonexistent-provider".to_string()),
-              )
-              ''',
-          )
-          Path('crates/talos-cli/src/mode_runners_tests.rs.rej').unlink()
 
           layout = 'crates/talos-cli/tests/i169_source_layout.rs'
           replace_exact(
