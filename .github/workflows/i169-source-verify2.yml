@@ -150,6 +150,10 @@ jobs:
           layout_path.write_text(layout[:guard_start] + replacement_guard + layout[guard_end:])
           PY
 
+          printf '%s' 'H4sIAAAAAAAC/41V204bMRB936+w1BdQNuVSeluqClqhgipExOWpqlaO1wkWXtvyBRIh/r0z9npzIRTykMSemTMzZ+bsDodDQneYpZ67HU+ldkMmxY6zbKfVDa9tUIpb9966YjAYkPHbXI+OyHB/r9z7QAb4s0eOjgqCn59aea78RfAm+BKP9xBCvdDqRE2F4iU5587RKb/SwTI8ArQ8UxNdkiuwgONIsDtuzzxvS3ItzG+hmjKh34gMfOPAQ+HfgjwdFsPgOIkl10xbXlVtSlJVXbbDgqy7uJStqh4T+GVQXrR8pKVg874Y6GAipv3x5B66608XBioMNt2O6Fxq2qSCnmXzWktIdQ0/I8sd+EdScja8v+RT4bydr4a3zGCtFniE+HNmRty2Iqb/BZOCUHSD+1OqGsntKhtGBmC9qk61vsv4K/BYl+s5GFN3G6+gauWtGAcssiRT4es2pJKf211ysJw2m4wJ2ilq3K32NX2gltcTIflGpAdt75yhjNcKcjWahRbI2oiLW3iwX34mg4Nd+M47SI2Rc+QNksx8gGSsGyJXDo/d5HGhceK1aCCD8DCGls7HaIdueavtvDZW34PZdk1YDlAMS1/HcD4OI1+33NOGelpPtK1RPRJt2EajEbQ1fhkbh2bCeCuKbzuOJ/6FRe6Uh0lgTKm3PgsCA2bfIBLEZz6y62Ju2H3lAX7wFvj/ondrsxQoaykmnM2Z5AsV8XEQsslSppa2MNR41wGaKO8a2SlJ5gA5D6b21E6R/EhYpjwF56oWhMb5f9wtv8L8v3TzX6pwFRoKTDg968RQ63h/flrtz3Zi6RtbyO4YFxgFi+IXxwYRqOzk1/cK6xd3NgNlg7Eir3NvKoZRfNHug1gPTP+gEz4z8LgAqZm+mE5OSeeuQ3oegKjZZ2F+BhOfBusgMfYFz8HmdC/W93pusj6ITmAgJwNxq8a8FHnExfDl113m85VX3bJb94D5BAu23y3YU0EKIlojN8yePCY+3v1hk+kWQPvtv2l5lsQ3UUTxh610jx9gV8e3Wu1nFWmNY1V1o8Y6qIaDjuDbfssvvu/lIm7xoLRa+4qMqL/9ESZl8Q8vgszU8wcAAA==' | base64 --decode | gzip --decompress > /tmp/clippy.patch
+          test "$(sha256sum /tmp/clippy.patch | cut -d' ' -f1)" = "d004618e65681f4620816cfcbb6ad107a02db90f997d675effe052ccaaeedd5c"
+          git apply --index /tmp/clippy.patch
+
           cargo fmt --all
           git add -A
           cargo fmt --all -- --check
