@@ -410,7 +410,12 @@ fn test_tools_grouped_by_family_with_stable_sections() {
     assert!(prompt.contains("# Tool Family: File"));
     assert!(prompt.contains("# Tool Family: Git"));
     assert!(
-        prompt.find("# Tool Family: File").unwrap() < prompt.find("# Tool Family: Git").unwrap(),
+        prompt
+            .find("# Tool Family: File")
+            .expect("operation should succeed")
+            < prompt
+                .find("# Tool Family: Git")
+                .expect("operation should succeed"),
         "families should be ordered by stable enum order"
     );
     assert_eq!(
@@ -428,12 +433,14 @@ fn test_tools_grouped_by_family_with_stable_sections() {
 #[test]
 fn test_unchanged_tool_family_section_remains_stable_when_new_family_is_added() {
     fn file_family_section(prompt: &str) -> &str {
-        let start = prompt.find("# Tool Family: File").unwrap();
+        let start = prompt
+            .find("# Tool Family: File")
+            .expect("operation should succeed");
         let after_start = start + "# Tool Family: File".len();
         let end = prompt[after_start..]
             .find("# Tool Family:")
             .map(|offset| after_start + offset)
-            .unwrap_or_else(|| prompt.find("# Skills").unwrap());
+            .unwrap_or_else(|| prompt.find("# Skills").expect("operation should succeed"));
         &prompt[start..end]
     }
 

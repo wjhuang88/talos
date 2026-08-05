@@ -300,6 +300,7 @@ impl SessionTransition {
         Ok(next_generation)
     }
 
+    #[cfg(test)]
     pub async fn quiesce_same_session(&mut self, session: &Session) -> Result<u64, String> {
         if session.id != self.active_session.id {
             return Err("quiesce requires the currently active logical Session".to_string());
@@ -527,27 +528,182 @@ mod tests {
         register_generation_bound_sender(&sender_two, 2);
 
         let (watch_tx, mut watch_rx) = tokio::sync::watch::channel(sender_zero);
-        watch_tx.send(sender_one).unwrap();
-        watch_tx.send(sender_two).unwrap();
+        watch_tx.send(sender_one).expect("operation should succeed");
+        watch_tx.send(sender_two).expect("operation should succeed");
 
-        watch_rx.changed().await.unwrap();
+        watch_rx.changed().await.expect("operation should succeed");
         let current = watch_rx.borrow().clone();
         assert_eq!(authoritative_generation_for_sender(&current), Some(2));
     }
 
     #[test]
     fn transition_rehydrates_the_durable_session_generation() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-transition-generation")
-            .unwrap();
+            .expect("operation should succeed");
         let store = PendingSubmissionStore::for_session(durable.session());
-        assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+        assert_eq!(
+            store
+                .advance_runtime_generation(0)
+                .expect("operation should succeed"),
+            1
+        );
         let (sender, _receiver) = mpsc::channel(1);
 
-        let transition = SessionTransition::new(sender, durable.session().clone()).unwrap();
+        let transition = SessionTransition::new(sender, durable.session().clone())
+            .expect("operation should succeed");
         assert_eq!(transition.active_generation(), 1);
+    }
+
+    async fn publication_failure_fixture(
+        name: &str,
+    ) -> (
+        tempfile::TempDir,
+        SessionTransition,
+        CommitResult,
+        Session,
+        mpsc::Sender<SessionOp>,
+    ) {
+        use std::sync::Arc;
+        use talos_agent::{Agent, create_scheduler_tools};
+        use talos_core::session::{RuntimePolicy, SessionConfig};
+        use talos_core::tool::ToolRegistry;
+        use talos_provider::mock::MockProvider;
+
+        let temp = tempfile::tempdir().expect("operation should succeed");
+        let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
+        let old_session = manager
+            .create_session(&format!("{name}-old"), "")
+            .expect("operation should succeed");
+        let new_session = manager
+            .create_session(&format!("{name}-new"), "")
+            .expect("operation should succeed");
+        let (old_tx, mut old_rx) = mpsc::channel(4);
+        tokio::spawn(async move {
+            while let Some(operation) = old_rx.recv().await {
+                if matches!(operation, SessionOp::Shutdown) {
+                    break;
+                }
+            }
+        });
+        let mut transition =
+            SessionTransition::new(old_tx, old_session).expect("operation should succeed");
+
+        let agent = Agent::with_security(
+            Arc::new(MockProvider::new().with_response("unused")),
+            ToolRegistry::new(),
+            None,
+            None,
+            temp.path().to_path_buf(),
+        );
+        let (handle, actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: temp.path().to_path_buf(),
+                initial_history: Vec::new(),
+                model_context_limit: 32_768,
+            },
+        );
+        let raw_new_sender = handle.sq_tx.clone();
+        let (_, pending_scheduler) = create_scheduler_tools();
+        transition
+            .prepare(handle, new_session.clone())
+            .expect("operation should succeed");
+        let result = transition
+            .commit(actor, pending_scheduler)
+            .await
+            .expect("operation should succeed");
+        (temp, transition, result, new_session, raw_new_sender)
+    }
+
+    async fn assert_publication_failure_stops_new_runtime(
+        transition: &SessionTransition,
+        raw_new_sender: &mpsc::Sender<SessionOp>,
+    ) {
+        assert!(transition.active_runtime.is_none());
+        tokio::time::timeout(std::time::Duration::from_secs(1), raw_new_sender.closed())
+            .await
+            .expect("failed publication must drop the new Actor receiver");
+        assert!(raw_new_sender.is_closed());
+    }
+
+    #[tokio::test]
+    async fn bridge_publication_failure_stops_replacement_without_success() {
+        let (_temp, mut transition, result, new_session, raw_new_sender) =
+            publication_failure_fixture("bridge-publication-failure").await;
+        let (session_watch_tx, _session_watch_rx) = watch::channel(new_session.clone());
+        let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
+        let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
+        let (bridge_tx, bridge_rx) = mpsc::unbounded_channel();
+        drop(bridge_rx);
+
+        let error = transition
+            .publish_commit(
+                result,
+                new_session,
+                &session_watch_tx,
+                &sq_watch_tx,
+                &bridge_tx,
+            )
+            .await
+            .expect_err("operation should fail");
+        assert!(error.contains("Bridge event route receiver is unavailable"));
+        assert!(error.contains("new generation is stopped"));
+        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
+    }
+
+    #[tokio::test]
+    async fn session_watch_publication_failure_stops_replacement_without_success() {
+        let (_temp, mut transition, result, new_session, raw_new_sender) =
+            publication_failure_fixture("session-watch-publication-failure").await;
+        let (session_watch_tx, session_watch_rx) = watch::channel(new_session.clone());
+        drop(session_watch_rx);
+        let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
+        let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
+        let (bridge_tx, _bridge_rx) = mpsc::unbounded_channel();
+
+        let error = transition
+            .publish_commit(
+                result,
+                new_session,
+                &session_watch_tx,
+                &sq_watch_tx,
+                &bridge_tx,
+            )
+            .await
+            .expect_err("operation should fail");
+        assert!(error.contains("Session watch receiver is unavailable"));
+        assert!(error.contains("new generation is stopped"));
+        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
+    }
+
+    #[tokio::test]
+    async fn command_watch_publication_failure_stops_replacement_without_success() {
+        let (_temp, mut transition, result, new_session, raw_new_sender) =
+            publication_failure_fixture("command-watch-publication-failure").await;
+        let (session_watch_tx, _session_watch_rx) = watch::channel(new_session.clone());
+        let (placeholder_tx, placeholder_rx) = mpsc::channel(1);
+        let (sq_watch_tx, sq_watch_rx) = watch::channel(placeholder_tx);
+        drop(sq_watch_rx);
+        drop(placeholder_rx);
+        let (bridge_tx, _bridge_rx) = mpsc::unbounded_channel();
+
+        let error = transition
+            .publish_commit(
+                result,
+                new_session,
+                &session_watch_tx,
+                &sq_watch_tx,
+                &bridge_tx,
+            )
+            .await
+            .expect_err("operation should fail");
+        assert!(error.contains("command-route watch receiver is unavailable"));
+        assert!(error.contains("new generation is stopped"));
+        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
     }
 
     #[tokio::test]
@@ -555,14 +711,18 @@ mod tests {
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
 
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-awaited-runtime-retirement")
-            .unwrap();
+            .expect("operation should succeed");
         let (raw_tx, mut raw_rx) = mpsc::channel(1);
-        raw_tx.send(SessionOp::Interrupt).await.unwrap();
-        let mut transition = SessionTransition::new(raw_tx, durable.session().clone()).unwrap();
+        raw_tx
+            .send(SessionOp::Interrupt)
+            .await
+            .expect("operation should succeed");
+        let mut transition = SessionTransition::new(raw_tx, durable.session().clone())
+            .expect("operation should succeed");
         let proxy = transition.bind_active_sender();
 
         let scheduler_cancel = CancellationToken::new();
@@ -584,7 +744,7 @@ mod tests {
         });
         transition
             .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
-            .unwrap();
+            .expect("operation should succeed");
 
         tokio::time::timeout(
             std::time::Duration::from_secs(1),
@@ -603,21 +763,22 @@ mod tests {
     async fn quiesce_waits_for_final_old_generation_transcript_commit() {
         use talos_core::message::Message;
 
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-final-history-quiescence")
-            .unwrap();
+            .expect("operation should succeed");
         let session = durable.session().clone();
         session
             .append(&Message::User {
                 content: "before-handoff".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let (raw_tx, mut raw_rx) = mpsc::channel(4);
         let command_tx = raw_tx.clone();
-        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let mut transition =
+            SessionTransition::new(raw_tx, session.clone()).expect("operation should succeed");
         let actor_session = session.clone();
         let actor_join = tokio::spawn(async move {
             while let Some(operation) = raw_rx.recv().await {
@@ -626,7 +787,7 @@ mod tests {
                         .append(&Message::User {
                             content: "final-old-generation-turn".into(),
                         })
-                        .unwrap(),
+                        .expect("operation should succeed"),
                     SessionOp::Shutdown => break,
                     _ => {}
                 }
@@ -639,12 +800,21 @@ mod tests {
         });
         transition
             .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
-            .unwrap();
+            .expect("operation should succeed");
 
-        command_tx.send(SessionOp::Interrupt).await.unwrap();
-        assert_eq!(transition.quiesce_same_session(&session).await.unwrap(), 1);
+        command_tx
+            .send(SessionOp::Interrupt)
+            .await
+            .expect("operation should succeed");
+        assert_eq!(
+            transition
+                .quiesce_same_session(&session)
+                .await
+                .expect("operation should succeed"),
+            1
+        );
 
-        let history = session.read_messages().unwrap();
+        let history = session.read_messages().expect("operation should succeed");
         let user_contents: Vec<_> = history
             .iter()
             .filter_map(|message| match message {
@@ -659,7 +829,7 @@ mod tests {
         assert_eq!(
             PendingSubmissionStore::for_session(&session)
                 .runtime_generation()
-                .unwrap(),
+                .expect("operation should succeed"),
             1
         );
     }

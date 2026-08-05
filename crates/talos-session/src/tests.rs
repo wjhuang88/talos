@@ -8,14 +8,16 @@ use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, To
 use uuid::Uuid;
 
 fn test_manager() -> SessionManager {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     SessionManager::with_dir(dir.path().to_path_buf())
 }
 
 #[test]
 fn create_session_creates_file() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     assert!(session.file_path.exists());
     assert_eq!(session.project, "test-project");
@@ -25,7 +27,9 @@ fn create_session_creates_file() {
 #[test]
 fn create_session_uses_correct_directory() {
     let manager = test_manager();
-    let session = manager.create_session("my-project", "my-project").unwrap();
+    let session = manager
+        .create_session("my-project", "my-project")
+        .expect("operation should succeed");
 
     let expected_dir = manager.sessions_dir.join(workspace_dir_name("my-project"));
     assert!(session.file_path.starts_with(expected_dir));
@@ -34,7 +38,9 @@ fn create_session_uses_correct_directory() {
 #[test]
 fn append_and_read_messages() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let msg1 = Message::User {
         content: "Hello!".into(),
@@ -45,10 +51,10 @@ fn append_and_read_messages() {
         reasoning: None,
     };
 
-    session.append(&msg1).unwrap();
-    session.append(&msg2).unwrap();
+    session.append(&msg1).expect("operation should succeed");
+    session.append(&msg2).expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0], msg1);
     assert_eq!(
@@ -64,38 +70,44 @@ fn append_and_read_messages() {
 #[test]
 fn append_event_ignores_transient_thinking_delta() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append_event(&AgentEvent::ThinkingDelta {
             delta: "private reasoning".to_string(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     assert!(entries.is_empty());
 }
 
 #[test]
 fn resume_history_excludes_transient_thinking_delta() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append_event(&AgentEvent::ThinkingDelta {
             delta: "private reasoning".to_string(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "Final answer".to_string(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let resumed = manager.get_session(&session.id).unwrap();
-    let messages = resumed.read_messages().unwrap();
+    let resumed = manager
+        .get_session(&session.id)
+        .expect("operation should succeed");
+    let messages = resumed.read_messages().expect("operation should succeed");
     assert_eq!(
         messages,
         vec![Message::Assistant {
@@ -109,7 +121,9 @@ fn resume_history_excludes_transient_thinking_delta() {
 #[test]
 fn append_and_read_events() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let event1 = AgentEvent::TurnStart;
     let event2 = AgentEvent::TextDelta {
@@ -120,11 +134,17 @@ fn append_and_read_events() {
         usage: Usage::default(),
     };
 
-    session.append_event(&event1).unwrap();
-    session.append_event(&event2).unwrap();
-    session.append_event(&event3).unwrap();
+    session
+        .append_event(&event1)
+        .expect("operation should succeed");
+    session
+        .append_event(&event2)
+        .expect("operation should succeed");
+    session
+        .append_event(&event3)
+        .expect("operation should succeed");
 
-    let events = session.read_events().unwrap();
+    let events = session.read_events().expect("operation should succeed");
     assert_eq!(events.len(), 3);
     assert_eq!(events[0], event1);
     assert_eq!(events[1], event2);
@@ -134,17 +154,21 @@ fn append_and_read_events() {
 #[test]
 fn read_messages_skips_events() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let msg = Message::User {
         content: "test".into(),
     };
     let event = AgentEvent::TurnStart;
 
-    session.append(&msg).unwrap();
-    session.append_event(&event).unwrap();
+    session.append(&msg).expect("operation should succeed");
+    session
+        .append_event(&event)
+        .expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0], msg);
 }
@@ -153,48 +177,64 @@ fn read_messages_skips_events() {
 fn list_sessions() {
     let manager = test_manager();
 
-    let s1 = manager.create_session("project-a", "").unwrap();
-    let s2 = manager.create_session("project-b", "").unwrap();
+    let s1 = manager
+        .create_session("project-a", "")
+        .expect("operation should succeed");
+    let s2 = manager
+        .create_session("project-b", "")
+        .expect("operation should succeed");
 
     // Append a message to s1 so it has a count
     s1.append(&Message::User {
         content: "msg".into(),
     })
-    .unwrap();
+    .expect("operation should succeed");
 
-    let sessions = manager.list_sessions().unwrap();
+    let sessions = manager.list_sessions().expect("operation should succeed");
     assert_eq!(sessions.len(), 2);
 
     let ids: Vec<Uuid> = sessions.iter().map(|s| s.id).collect();
     assert!(ids.contains(&s1.id));
     assert!(ids.contains(&s2.id));
 
-    let s1_info = sessions.iter().find(|s| s.id == s1.id).unwrap();
+    let s1_info = sessions
+        .iter()
+        .find(|s| s.id == s1.id)
+        .expect("operation should succeed");
     assert_eq!(s1_info.message_count, 1);
     assert!(!s1_info.last_message_preview.is_empty());
 
-    let s2_info = sessions.iter().find(|s| s.id == s2.id).unwrap();
+    let s2_info = sessions
+        .iter()
+        .find(|s| s.id == s2.id)
+        .expect("operation should succeed");
     assert_eq!(s2_info.message_count, 0);
 }
 
 #[test]
 fn list_workspace_sessions_filters_by_workspace() {
     let manager = test_manager();
-    let playit = manager.create_session("playit", "playit").unwrap();
-    let talos = manager.create_session("talos", "").unwrap();
+    let playit = manager
+        .create_session("playit", "playit")
+        .expect("operation should succeed");
+    let talos = manager
+        .create_session("talos", "")
+        .expect("operation should succeed");
 
     playit
         .append(&Message::User {
             content: "playit message".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     talos
         .append(&Message::User {
             content: "talos message".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let sessions = manager.list_workspace_sessions("playit").unwrap();
+    let sessions = manager
+        .list_workspace_sessions("playit")
+        .expect("operation should succeed");
 
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].id, playit.id);
@@ -204,24 +244,28 @@ fn list_workspace_sessions_filters_by_workspace() {
 #[test]
 fn latest_workspace_session_returns_most_recent_session() {
     let manager = test_manager();
-    let older = manager.create_session("playit", "playit").unwrap();
-    let newer = manager.create_session("playit", "playit").unwrap();
+    let older = manager
+        .create_session("playit", "playit")
+        .expect("operation should succeed");
+    let newer = manager
+        .create_session("playit", "playit")
+        .expect("operation should succeed");
 
     older
         .append(&Message::User {
             content: "older".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     std::thread::sleep(std::time::Duration::from_millis(10));
     newer
         .append(&Message::User {
             content: "newer".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     let latest = manager
         .latest_workspace_session("playit")
-        .unwrap()
+        .expect("operation should succeed")
         .expect("expected latest session");
 
     assert_eq!(latest.id, newer.id);
@@ -232,7 +276,9 @@ fn latest_workspace_session_returns_most_recent_session() {
 fn latest_workspace_session_returns_none_for_empty_workspace() {
     let manager = test_manager();
 
-    let latest = manager.latest_workspace_session("missing").unwrap();
+    let latest = manager
+        .latest_workspace_session("missing")
+        .expect("operation should succeed");
 
     assert!(latest.is_none());
 }
@@ -240,10 +286,12 @@ fn latest_workspace_session_returns_none_for_empty_workspace() {
 #[test]
 fn get_session_existing() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
     let id = session.id;
 
-    let loaded = manager.get_session(&id).unwrap();
+    let loaded = manager.get_session(&id).expect("operation should succeed");
     assert_eq!(loaded.id, id);
     // project name may differ from display_name on disk readback (MEM-004 hash dirs)
 }
@@ -255,7 +303,7 @@ fn get_session_not_found() {
 
     let result = manager.get_session(&fake_id);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SessionError::SessionNotFound(id) => assert_eq!(id, fake_id),
         other => panic!("expected SessionNotFound, got {other:?}"),
     }
@@ -264,30 +312,32 @@ fn get_session_not_found() {
 #[test]
 fn invalid_json_lines_are_skipped() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     // Write a valid message
     session
         .append(&Message::User {
             content: "valid".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     // Manually append an invalid JSON line
     let mut file = OpenOptions::new()
         .append(true)
         .open(&session.file_path)
-        .unwrap();
-    writeln!(file, "this is not json").unwrap();
+        .expect("operation should succeed");
+    writeln!(file, "this is not json").expect("operation should succeed");
 
     // Append another valid message
     session
         .append(&Message::User {
             content: "also valid".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 2);
     assert_eq!(
         messages[0].clone(),
@@ -306,14 +356,16 @@ fn invalid_json_lines_are_skipped() {
 #[test]
 fn list_sessions_empty_directory() {
     let manager = test_manager();
-    let sessions = manager.list_sessions().unwrap();
+    let sessions = manager.list_sessions().expect("operation should succeed");
     assert!(sessions.is_empty());
 }
 
 #[test]
 fn session_with_tool_calls() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let msg = Message::Assistant {
         content: "Let me check that file.".into(),
@@ -325,9 +377,9 @@ fn session_with_tool_calls() {
         reasoning: None,
     };
 
-    session.append(&msg).unwrap();
+    session.append(&msg).expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 1);
     match &messages[0] {
         Message::Assistant {
@@ -351,13 +403,15 @@ fn session_with_tool_calls() {
 #[test]
 fn session_tool_call_id_matches_tool_result_id_after_resume() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append(&Message::User {
             content: "list files".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: String::new(),
@@ -368,7 +422,7 @@ fn session_tool_call_id_matches_tool_result_id_after_resume() {
             }],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Tool {
             result: MessageToolResult {
@@ -377,9 +431,9 @@ fn session_tool_call_id_matches_tool_result_id_after_resume() {
                 is_error: false,
             },
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 3);
 
     let assistant_tool_id = match &messages[1] {
@@ -399,13 +453,15 @@ fn session_tool_call_id_matches_tool_result_id_after_resume() {
 #[test]
 fn resume_history_drops_orphan_tool_results() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append(&Message::User {
             content: "hello".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Tool {
             result: MessageToolResult {
@@ -414,7 +470,7 @@ fn resume_history_drops_orphan_tool_results() {
                 is_error: false,
             },
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: String::new(),
@@ -425,7 +481,7 @@ fn resume_history_drops_orphan_tool_results() {
             }],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Tool {
             result: MessageToolResult {
@@ -434,7 +490,7 @@ fn resume_history_drops_orphan_tool_results() {
                 is_error: false,
             },
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Tool {
             result: MessageToolResult {
@@ -443,9 +499,9 @@ fn resume_history_drops_orphan_tool_results() {
                 is_error: false,
             },
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
 
     assert_eq!(messages.len(), 3);
     assert!(matches!(messages[0], Message::User { .. }));
@@ -461,7 +517,7 @@ fn resume_history_drops_orphan_tool_results() {
 
 #[test]
 fn ensure_persisted_creates_empty_file_for_deferred_session() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let file_path = dir.path().join("session.jsonl");
     let mut session = Session::new_deferred(
         Uuid::new_v4(),
@@ -472,7 +528,9 @@ fn ensure_persisted_creates_empty_file_for_deferred_session() {
     assert!(!session.persisted);
     assert!(!file_path.exists());
 
-    session.ensure_persisted().unwrap();
+    session
+        .ensure_persisted()
+        .expect("operation should succeed");
 
     assert!(session.persisted);
     assert!(file_path.exists());
@@ -480,7 +538,7 @@ fn ensure_persisted_creates_empty_file_for_deferred_session() {
 
 #[test]
 fn ensure_persisted_does_not_truncate_existing_file() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let file_path = dir.path().join("session.jsonl");
 
     // Simulate: another Session clone (e.g., from a watch channel) already
@@ -499,15 +557,17 @@ fn ensure_persisted_does_not_truncate_existing_file() {
         .append(&Message::User {
             content: "important prior turn".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     prior
         .append(&Message::Assistant {
             content: "important prior answer".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
-    let prior_size = std::fs::metadata(&file_path).unwrap().len();
+        .expect("operation should succeed");
+    let prior_size = std::fs::metadata(&file_path)
+        .expect("operation should succeed")
+        .len();
     assert!(prior_size > 0);
 
     let mut clone = prior.clone();
@@ -516,14 +576,16 @@ fn ensure_persisted_does_not_truncate_existing_file() {
         "Session::Clone copies the persisted bool verbatim"
     );
 
-    clone.ensure_persisted().unwrap();
+    clone.ensure_persisted().expect("operation should succeed");
 
     assert_eq!(
-        std::fs::metadata(&file_path).unwrap().len(),
+        std::fs::metadata(&file_path)
+            .expect("operation should succeed")
+            .len(),
         prior_size,
         "ensure_persisted must not truncate the existing JSONL file"
     );
-    let messages = clone.read_messages().unwrap();
+    let messages = clone.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 2, "prior history must survive the clone");
 }
 
@@ -533,7 +595,7 @@ fn model_switch_simulation_preserves_full_history() {
     // turn cycles through a Session (simulating real TUI usage), a clone
     // through the watch channel must see the full history when used to
     // build a new AppServerSession — as `rebuild_session_for_model` does.
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let file_path = dir.path().join("session.jsonl");
 
     // Stage 1: deferred session is created (TUI startup path).
@@ -552,13 +614,18 @@ fn model_switch_simulation_preserves_full_history() {
         .append(&Message::User {
             content: "summarize the repo".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     // The original session struct still has persisted = false (flag is
     // copied on clone, never updated by append_with_metadata).
     assert!(!session.persisted);
     // But the file does exist and has content.
     assert!(file_path.exists());
-    assert!(std::fs::metadata(&file_path).unwrap().len() > 0);
+    assert!(
+        std::fs::metadata(&file_path)
+            .expect("operation should succeed")
+            .len()
+            > 0
+    );
 
     // Stage 3: agent runs, assistant message and tool result are
     // persisted through the bridge forwarder (also via watch-channel clones).
@@ -569,15 +636,19 @@ fn model_switch_simulation_preserves_full_history() {
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     // Stage 4: user invokes /model. `rebuild_session_for_model` clones
     // from the watch channel, calls ensure_persisted, then read_messages.
     // Before the fix, this truncated the file. After the fix, history
     // is preserved.
     let mut switch_clone = session.clone();
-    switch_clone.ensure_persisted().unwrap();
-    let history = switch_clone.read_messages().unwrap();
+    switch_clone
+        .ensure_persisted()
+        .expect("operation should succeed");
+    let history = switch_clone
+        .read_messages()
+        .expect("operation should succeed");
 
     assert_eq!(
         history.len(),
@@ -599,7 +670,9 @@ fn model_switch_simulation_preserves_full_history() {
 #[test]
 fn session_with_tool_result() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let assistant = Message::Assistant {
         content: String::new(),
@@ -618,10 +691,14 @@ fn session_with_tool_result() {
         },
     };
 
-    session.append(&assistant).unwrap();
-    session.append(&tool_result).unwrap();
+    session
+        .append(&assistant)
+        .expect("operation should succeed");
+    session
+        .append(&tool_result)
+        .expect("operation should succeed");
 
-    let messages = session.read_messages().unwrap();
+    let messages = session.read_messages().expect("operation should succeed");
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0], assistant);
     assert_eq!(
@@ -641,7 +718,9 @@ fn session_with_tool_result() {
 #[test]
 fn session_entry_with_parent_child_relationship() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let msg1 = Message::User {
         content: "Hello".into(),
@@ -652,10 +731,10 @@ fn session_entry_with_parent_child_relationship() {
         reasoning: None,
     };
 
-    session.append(&msg1).unwrap();
-    session.append(&msg2).unwrap();
+    session.append(&msg1).expect("operation should succeed");
+    session.append(&msg2).expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     assert_eq!(entries.len(), 2);
 
     // First entry has no parent
@@ -667,60 +746,70 @@ fn session_entry_with_parent_child_relationship() {
 #[test]
 fn fork_creates_new_branch_with_correct_parent_id() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     // Add some messages
     session
         .append(&Message::User {
             content: "msg1".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "reply1".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "msg2".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     let fork_from_id = entries[1].id.clone(); // Fork from the assistant's reply
 
     let original_branch = session.current_branch.clone();
-    let new_branch_id = session.fork(&fork_from_id).unwrap();
+    let new_branch_id = session
+        .fork(&fork_from_id)
+        .expect("operation should succeed");
 
     // New branch should be different from original
     assert_ne!(new_branch_id, original_branch);
     assert_eq!(session.current_branch, new_branch_id);
 
     // New branch should have entries up to and including the fork point
-    let new_branch = session.get_branch(&new_branch_id).unwrap();
+    let new_branch = session
+        .get_branch(&new_branch_id)
+        .expect("operation should succeed");
     assert_eq!(new_branch.entries.len(), 2);
     assert_eq!(new_branch.root_id, fork_from_id);
 
-    let all_entries = session.read_entries().unwrap();
+    let all_entries = session.read_entries().expect("operation should succeed");
     assert_eq!(all_entries.len(), 3);
 }
 
 #[test]
 fn list_branches_returns_all_branch_ids() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     // Add a message and fork
     session
         .append(&Message::User {
             content: "msg".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
-    session.fork(&entries[0].id).unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
+    session
+        .fork(&entries[0].id)
+        .expect("operation should succeed");
 
     let branches = session.list_branches();
     assert_eq!(branches.len(), 2);
@@ -731,28 +820,32 @@ fn resume_session_loads_existing_jsonl_file() {
     let manager = test_manager();
 
     // Create and populate a session
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
     let session_id = session.id.to_string();
 
     session
         .append(&Message::User {
             content: "Hello".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "Hi there".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     // Resume the session
-    let resumed = manager.resume_session(&session_id).unwrap();
+    let resumed = manager
+        .resume_session(&session_id)
+        .expect("operation should succeed");
     assert_eq!(resumed.id.to_string(), session_id);
 
     // Entries should be loaded
-    let entries = resumed.read_entries().unwrap();
+    let entries = resumed.read_entries().expect("operation should succeed");
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].content, "Hello");
     assert_eq!(entries[1].content, "Hi there");
@@ -761,12 +854,16 @@ fn resume_session_loads_existing_jsonl_file() {
 #[test]
 fn list_sessions_preview_handles_utf8_char_boundary() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
     let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
-    session.append(&Message::User { content }).unwrap();
+    session
+        .append(&Message::User { content })
+        .expect("operation should succeed");
 
-    let sessions = manager.list_sessions().unwrap();
+    let sessions = manager.list_sessions().expect("operation should succeed");
     let info = sessions
         .iter()
         .find(|info| info.id == session.id)
@@ -783,13 +880,16 @@ fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
     let manager = test_manager();
     let id = Uuid::new_v4();
     let project_dir = manager.sessions_dir.join(workspace_dir_name(""));
-    std::fs::create_dir_all(&project_dir).unwrap();
+    std::fs::create_dir_all(&project_dir).expect("operation should succeed");
     let file_path = project_dir.join(format!("{id}.jsonl"));
-    std::fs::File::create(&file_path).unwrap();
+    std::fs::File::create(&file_path).expect("operation should succeed");
 
     let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
-    let mut file = OpenOptions::new().append(true).open(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .append(true)
+        .open(&file_path)
+        .expect("operation should succeed");
     let old_entry = serde_json::json!({
         "type": "message",
         "data": {
@@ -797,9 +897,9 @@ fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
             "content": content
         }
     });
-    writeln!(file, "{old_entry}").unwrap();
+    writeln!(file, "{old_entry}").expect("operation should succeed");
 
-    let sessions = manager.list_sessions().unwrap();
+    let sessions = manager.list_sessions().expect("operation should succeed");
     let info = sessions
         .iter()
         .find(|info| info.id == id)
@@ -816,11 +916,14 @@ fn backward_compatibility_with_old_jsonl_format() {
     let manager = test_manager();
     let id = Uuid::new_v4();
     let project_dir = manager.sessions_dir.join(workspace_dir_name(""));
-    std::fs::create_dir_all(&project_dir).unwrap();
+    std::fs::create_dir_all(&project_dir).expect("operation should succeed");
     let file_path = project_dir.join(format!("{id}.jsonl"));
-    std::fs::File::create(&file_path).unwrap();
+    std::fs::File::create(&file_path).expect("operation should succeed");
 
-    let mut file = OpenOptions::new().append(true).open(&file_path).unwrap();
+    let mut file = OpenOptions::new()
+        .append(true)
+        .open(&file_path)
+        .expect("operation should succeed");
 
     let old_entry1 = serde_json::json!({
         "type": "message",
@@ -837,12 +940,22 @@ fn backward_compatibility_with_old_jsonl_format() {
         }
     });
 
-    writeln!(file, "{}", serde_json::to_string(&old_entry1).unwrap()).unwrap();
-    writeln!(file, "{}", serde_json::to_string(&old_entry2).unwrap()).unwrap();
+    writeln!(
+        file,
+        "{}",
+        serde_json::to_string(&old_entry1).expect("operation should succeed")
+    )
+    .expect("operation should succeed");
+    writeln!(
+        file,
+        "{}",
+        serde_json::to_string(&old_entry2).expect("operation should succeed")
+    )
+    .expect("operation should succeed");
 
     // Read entries - should parse old format correctly
-    let session = manager.get_session(&id).unwrap();
-    let entries = session.read_entries().unwrap();
+    let session = manager.get_session(&id).expect("operation should succeed");
+    let entries = session.read_entries().expect("operation should succeed");
     assert_eq!(entries.len(), 2);
 
     // Entries should have synthetic IDs
@@ -872,8 +985,8 @@ fn session_metadata_serialization() {
         raw_content: None,
     };
 
-    let json = serde_json::to_string(&metadata).unwrap();
-    let decoded: SessionMetadata = serde_json::from_str(&json).unwrap();
+    let json = serde_json::to_string(&metadata).expect("operation should succeed");
+    let decoded: SessionMetadata = serde_json::from_str(&json).expect("operation should succeed");
 
     assert_eq!(decoded.provider, Some("anthropic".into()));
     assert_eq!(decoded.model, Some("claude-sonnet-4".into()));
@@ -900,8 +1013,8 @@ fn session_entry_serialization() {
         },
     };
 
-    let json = serde_json::to_string(&entry).unwrap();
-    let decoded: SessionEntry = serde_json::from_str(&json).unwrap();
+    let json = serde_json::to_string(&entry).expect("operation should succeed");
+    let decoded: SessionEntry = serde_json::from_str(&json).expect("operation should succeed");
 
     assert_eq!(decoded.id, "test-id");
     assert_eq!(decoded.parent_id, Some("parent-id".into()));
@@ -913,7 +1026,9 @@ fn session_entry_serialization() {
 #[test]
 fn append_with_metadata_persists_provider_and_model() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append_with_metadata(
@@ -926,9 +1041,9 @@ fn append_with_metadata_persists_provider_and_model() {
                 ..Default::default()
             },
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     assert_eq!(
         entries[0].metadata.provider,
         Some("zhipu-coding-plan".into())
@@ -949,18 +1064,22 @@ fn session_new_has_single_empty_branch() {
     assert_eq!(session.branches.len(), 1);
     assert_eq!(session.list_branches().len(), 1);
 
-    let branch = session.get_branch(&session.current_branch).unwrap();
+    let branch = session
+        .get_branch(&session.current_branch)
+        .expect("operation should succeed");
     assert!(branch.entries.is_empty());
 }
 
 #[test]
 fn fork_from_nonexistent_entry_returns_error() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     let result = session.fork("nonexistent-id");
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SessionError::EntryNotFound(id) => assert_eq!(id, "nonexistent-id"),
         other => panic!("expected EntryNotFound, got {other:?}"),
     }
@@ -971,31 +1090,41 @@ fn list_sessions_scans_directory_correctly() {
     let manager = test_manager();
 
     // Create sessions in different projects
-    let s1 = manager.create_session("project-alpha", "").unwrap();
-    let s2 = manager.create_session("project-beta", "").unwrap();
+    let s1 = manager
+        .create_session("project-alpha", "")
+        .expect("operation should succeed");
+    let s2 = manager
+        .create_session("project-beta", "")
+        .expect("operation should succeed");
 
     s1.append(&Message::User {
         content: "First message in alpha".into(),
     })
-    .unwrap();
+    .expect("operation should succeed");
 
     s2.append(&Message::User {
         content: "First message in beta".into(),
     })
-    .unwrap();
+    .expect("operation should succeed");
     s2.append(&Message::Assistant {
         content: "Reply in beta".into(),
         tool_calls: vec![],
         reasoning: None,
     })
-    .unwrap();
+    .expect("operation should succeed");
 
-    let sessions = manager.list_sessions().unwrap();
+    let sessions = manager.list_sessions().expect("operation should succeed");
     assert_eq!(sessions.len(), 2);
 
     // Verify both sessions are found
-    let alpha = sessions.iter().find(|s| s.id == s1.id).unwrap();
-    let beta = sessions.iter().find(|s| s.id == s2.id).unwrap();
+    let alpha = sessions
+        .iter()
+        .find(|s| s.id == s1.id)
+        .expect("operation should succeed");
+    let beta = sessions
+        .iter()
+        .find(|s| s.id == s2.id)
+        .expect("operation should succeed");
 
     assert_eq!(alpha.message_count, 1);
     assert_eq!(beta.message_count, 2);
@@ -1012,40 +1141,46 @@ fn list_sessions_scans_directory_correctly() {
 #[test]
 fn fork_from_specific_entry_includes_correct_history() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append(&Message::User {
             content: "msg1".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "reply1".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "msg2".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "reply2".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     assert_eq!(entries.len(), 4);
 
     let fork_from_id = entries[1].id.clone();
-    let new_branch_id = session.fork(&fork_from_id).unwrap();
+    let new_branch_id = session
+        .fork(&fork_from_id)
+        .expect("operation should succeed");
 
-    let new_branch = session.get_branch(&new_branch_id).unwrap();
+    let new_branch = session
+        .get_branch(&new_branch_id)
+        .expect("operation should succeed");
     assert_eq!(new_branch.entries.len(), 2);
     assert_eq!(new_branch.entries[0].content, "msg1");
     assert_eq!(new_branch.entries[1].content, "reply1");
@@ -1054,19 +1189,25 @@ fn fork_from_specific_entry_includes_correct_history() {
 #[test]
 fn fork_from_current_position_includes_all_entries() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append(&Message::User {
             content: "only message".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
-    let last_entry_id = entries.last().unwrap().id.clone();
+    let entries = session.read_entries().expect("operation should succeed");
+    let last_entry_id = entries.last().expect("operation should succeed").id.clone();
 
-    let new_branch_id = session.fork(&last_entry_id).unwrap();
-    let new_branch = session.get_branch(&new_branch_id).unwrap();
+    let new_branch_id = session
+        .fork(&last_entry_id)
+        .expect("operation should succeed");
+    let new_branch = session
+        .get_branch(&new_branch_id)
+        .expect("operation should succeed");
 
     assert_eq!(new_branch.entries.len(), 1);
     assert_eq!(new_branch.entries[0].content, "only message");
@@ -1075,26 +1216,30 @@ fn fork_from_current_position_includes_all_entries() {
 #[test]
 fn forked_session_branch_has_correct_root_id() {
     let manager = test_manager();
-    let mut session = manager.create_session("test-project", "").unwrap();
+    let mut session = manager
+        .create_session("test-project", "")
+        .expect("operation should succeed");
 
     session
         .append(&Message::User {
             content: "root".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "child".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let entries = session.read_entries().unwrap();
+    let entries = session.read_entries().expect("operation should succeed");
     let fork_point = entries[0].id.clone();
 
-    let new_branch_id = session.fork(&fork_point).unwrap();
-    let new_branch = session.get_branch(&new_branch_id).unwrap();
+    let new_branch_id = session.fork(&fork_point).expect("operation should succeed");
+    let new_branch = session
+        .get_branch(&new_branch_id)
+        .expect("operation should succeed");
 
     assert_eq!(new_branch.root_id, fork_point);
 }
@@ -1109,7 +1254,7 @@ fn arch_s5_update_index_reflects_new_session_in_list_recent() {
         .append(&Message::User {
             content: "hello arch s5".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     manager
         .update_index(&session)
@@ -1134,7 +1279,7 @@ fn arch_s5_update_index_reflects_new_session_in_search() {
         .append(&Message::User {
             content: "searchable content alpha".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     manager.update_index(&session).expect("update_index");
 
@@ -1157,7 +1302,7 @@ fn arch_s6_fork_identity_sets_new_id_and_path() {
     let new_id = Uuid::new_v4();
     let new_path = original_path
         .parent()
-        .unwrap()
+        .expect("operation should succeed")
         .join(format!("{new_id}.jsonl"));
     let new_branch = Uuid::new_v4().to_string();
 
@@ -1180,25 +1325,28 @@ fn arch_s6_fork_identity_sets_new_id_and_path() {
 
 #[test]
 fn arch_s6_fork_index_uses_new_identity() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(dir.path().to_path_buf());
-    let mut source = manager.create_session("arch-s6-index", "").unwrap();
+    let mut source = manager
+        .create_session("arch-s6-index", "")
+        .expect("operation should succeed");
     source
         .append(&Message::User {
             content: "source entry".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     let source_id = source.id;
-    let entries = source.read_entries().unwrap();
-    let fork_point = entries.last().unwrap().id.clone();
-    let branch_id = source.fork(&fork_point).unwrap();
+    let entries = source.read_entries().expect("operation should succeed");
+    let fork_point = entries.last().expect("operation should succeed").id.clone();
+    let branch_id = source.fork(&fork_point).expect("operation should succeed");
     let fork_id = Uuid::new_v4();
     let fork_path = dir
         .path()
         .join("arch-s6-index")
         .join(format!("{fork_id}.jsonl"));
-    std::fs::create_dir_all(fork_path.parent().unwrap()).unwrap();
-    std::fs::write(&fork_path, b"").unwrap();
+    std::fs::create_dir_all(fork_path.parent().expect("operation should succeed"))
+        .expect("operation should succeed");
+    std::fs::write(&fork_path, b"").expect("operation should succeed");
     source.with_fork_identity(fork_id, fork_path, branch_id);
 
     manager.update_index(&source).expect("index fork");
@@ -1216,24 +1364,27 @@ fn arch_s6_fork_index_uses_new_identity() {
 
 #[test]
 fn arch_s6_fork_file_receives_subsequent_appends() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(dir.path().to_path_buf());
-    let mut session = manager.create_session("arch-s6-append", "").unwrap();
+    let mut session = manager
+        .create_session("arch-s6-append", "")
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "before fork".into(),
         })
-        .unwrap();
-    let entries = session.read_entries().unwrap();
-    let fork_point = entries.last().unwrap().id.clone();
-    let branch_id = session.fork(&fork_point).unwrap();
+        .expect("operation should succeed");
+    let entries = session.read_entries().expect("operation should succeed");
+    let fork_point = entries.last().expect("operation should succeed").id.clone();
+    let branch_id = session.fork(&fork_point).expect("operation should succeed");
     let fork_id = Uuid::new_v4();
     let fork_path = dir
         .path()
         .join("arch-s6-append")
         .join(format!("{fork_id}.jsonl"));
-    std::fs::create_dir_all(fork_path.parent().unwrap()).unwrap();
-    std::fs::write(&fork_path, b"").unwrap();
+    std::fs::create_dir_all(fork_path.parent().expect("operation should succeed"))
+        .expect("operation should succeed");
+    std::fs::write(&fork_path, b"").expect("operation should succeed");
     session.with_fork_identity(fork_id, fork_path.clone(), branch_id);
 
     session
@@ -1252,7 +1403,7 @@ fn arch_s6_fork_file_receives_subsequent_appends() {
 }
 
 fn make_session_with_two_entries() -> Session {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(dir.path().to_path_buf());
     let session = manager
         .create_session("arch-s6-identity", "")
@@ -1261,59 +1412,62 @@ fn make_session_with_two_entries() -> Session {
         .append(&Message::User {
             content: "first".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "second".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
 }
 
 #[test]
 fn fork_durable_history_clone_source_bytes_unchanged() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(dir.path().to_path_buf());
-    let mut source = manager.create_session("fork-clone-test", "").unwrap();
+    let mut source = manager
+        .create_session("fork-clone-test", "")
+        .expect("operation should succeed");
     source
         .append(&Message::User {
             content: "hello".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     source
         .append(&Message::Assistant {
             content: "world".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let source_bytes_before = std::fs::read(&source.file_path).unwrap();
+    let source_bytes_before = std::fs::read(&source.file_path).expect("operation should succeed");
 
     let child_id = Uuid::new_v4();
     let child_path = dir
         .path()
         .join("fork-clone-test")
         .join(format!("{child_id}.tlog"));
-    std::fs::create_dir_all(child_path.parent().unwrap()).unwrap();
-    std::fs::write(&child_path, &source_bytes_before).unwrap();
+    std::fs::create_dir_all(child_path.parent().expect("operation should succeed"))
+        .expect("operation should succeed");
+    std::fs::write(&child_path, &source_bytes_before).expect("operation should succeed");
 
-    let source_bytes_after = std::fs::read(&source.file_path).unwrap();
+    let source_bytes_after = std::fs::read(&source.file_path).expect("operation should succeed");
     assert_eq!(
         source_bytes_before, source_bytes_after,
         "source session file must be byte-for-byte unchanged after fork clone"
     );
 
-    let child_bytes = std::fs::read(&child_path).unwrap();
+    let child_bytes = std::fs::read(&child_path).expect("operation should succeed");
     assert_eq!(
         source_bytes_before, child_bytes,
         "child session file must be an exact copy of source"
     );
 
     let mut child = Session::new(child_id, "fork-clone-test".into(), "".into(), child_path);
-    let child_messages = child.read_messages().unwrap();
+    let child_messages = child.read_messages().expect("operation should succeed");
     assert_eq!(
         child_messages.len(),
         2,
@@ -1327,12 +1481,12 @@ fn delete_session_removes_file_and_index_entry() {
     let manager = test_manager();
     let session = manager
         .create_session("delete-test", "delete-test")
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "hello".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     let id = session.id;
     assert!(session.file_path.exists(), "precondition: file exists");
@@ -1343,7 +1497,9 @@ fn delete_session_removes_file_and_index_entry() {
         !session.file_path.exists(),
         "session file must be removed from disk"
     );
-    let sessions = manager.list_workspace_sessions("delete-test").unwrap();
+    let sessions = manager
+        .list_workspace_sessions("delete-test")
+        .expect("operation should succeed");
     assert!(
         sessions.iter().all(|s| s.id != id),
         "deleted session must not appear in workspace listing"
@@ -1354,23 +1510,29 @@ fn delete_session_removes_file_and_index_entry() {
 fn cleanup_candidates_respect_max_sessions_and_protected_ids() {
     let manager = test_manager();
     let workspace = "cleanup-protect";
-    let old = manager.create_session("cleanup", workspace).unwrap();
+    let old = manager
+        .create_session("cleanup", workspace)
+        .expect("operation should succeed");
     old.append(&Message::User {
         content: "old".into(),
     })
-    .unwrap();
-    let protected = manager.create_session("cleanup", workspace).unwrap();
+    .expect("operation should succeed");
+    let protected = manager
+        .create_session("cleanup", workspace)
+        .expect("operation should succeed");
     protected
         .append(&Message::User {
             content: "protected".into(),
         })
-        .unwrap();
-    let newest = manager.create_session("cleanup", workspace).unwrap();
+        .expect("operation should succeed");
+    let newest = manager
+        .create_session("cleanup", workspace)
+        .expect("operation should succeed");
     newest
         .append(&Message::User {
             content: "newest".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     let policy = crate::SessionCleanupPolicy {
         workspace_root: Some(workspace.to_string()),
@@ -1379,7 +1541,9 @@ fn cleanup_candidates_respect_max_sessions_and_protected_ids() {
         protected_session_ids: vec![protected.id],
     };
 
-    let candidates = manager.cleanup_candidates(&policy).unwrap();
+    let candidates = manager
+        .cleanup_candidates(&policy)
+        .expect("operation should succeed");
     assert_eq!(
         candidates.len(),
         1,
@@ -1409,19 +1573,27 @@ fn cleanup_candidates_respect_max_sessions_and_protected_ids() {
 fn apply_cleanup_removes_file_and_index_entry() {
     let manager = test_manager();
     let workspace = "cleanup-apply";
-    let stale = manager.create_session("cleanup", workspace).unwrap();
+    let stale = manager
+        .create_session("cleanup", workspace)
+        .expect("operation should succeed");
     stale
         .append(&Message::User {
             content: "stale indexed content".into(),
         })
-        .unwrap();
-    let keep = manager.create_session("cleanup", workspace).unwrap();
+        .expect("operation should succeed");
+    let keep = manager
+        .create_session("cleanup", workspace)
+        .expect("operation should succeed");
     keep.append(&Message::User {
         content: "keep indexed content".into(),
     })
-    .unwrap();
-    manager.update_index(&stale).unwrap();
-    manager.update_index(&keep).unwrap();
+    .expect("operation should succeed");
+    manager
+        .update_index(&stale)
+        .expect("operation should succeed");
+    manager
+        .update_index(&keep)
+        .expect("operation should succeed");
 
     let policy = crate::SessionCleanupPolicy {
         workspace_root: Some(workspace.to_string()),
@@ -1430,7 +1602,9 @@ fn apply_cleanup_removes_file_and_index_entry() {
         protected_session_ids: vec![keep.id],
     };
 
-    let report = manager.apply_cleanup(&policy).unwrap();
+    let report = manager
+        .apply_cleanup(&policy)
+        .expect("operation should succeed");
     assert_eq!(report.removed, 1);
     assert!(report.bytes_removed > 0);
     assert!(
@@ -1444,7 +1618,7 @@ fn apply_cleanup_removes_file_and_index_entry() {
     assert!(
         manager
             .search("stale", 10)
-            .unwrap()
+            .expect("operation should succeed")
             .iter()
             .all(|result| result.session_id != stale.id.to_string()),
         "cleanup must remove deleted session rows from the index"
@@ -1456,17 +1630,23 @@ fn session_index_maintenance_operations_run() {
     let manager = test_manager();
     let session = manager
         .create_session("maintenance", "maintenance-workspace")
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "maintenance indexed content".into(),
         })
-        .unwrap();
-    manager.update_index(&session).unwrap();
+        .expect("operation should succeed");
+    manager
+        .update_index(&session)
+        .expect("operation should succeed");
 
-    manager.checkpoint_index().unwrap();
-    manager.vacuum_index().unwrap();
-    let results = manager.search("maintenance", 10).unwrap();
+    manager
+        .checkpoint_index()
+        .expect("operation should succeed");
+    manager.vacuum_index().expect("operation should succeed");
+    let results = manager
+        .search("maintenance", 10)
+        .expect("operation should succeed");
     assert!(
         results
             .iter()
@@ -1480,19 +1660,19 @@ fn reconcile_index_repairs_stale_entries() {
     let manager = test_manager();
     let session = manager
         .create_session("reconcile-test", "reconcile-test")
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "first".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "hi".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     let fixed = manager.reconcile_index().expect("reconcile should succeed");
     assert!(fixed >= 1, "reconcile should reindex at least one entry");
@@ -1514,22 +1694,22 @@ fn snapshot_bytes_returns_file_contents() {
     let manager = test_manager();
     let session = manager
         .create_session("snapshot-test", "snapshot-test")
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::User {
             content: "first".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "second".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     let bytes = session.snapshot_bytes().expect("snapshot should succeed");
-    let on_disk = std::fs::read(&session.file_path).unwrap();
+    let on_disk = std::fs::read(&session.file_path).expect("operation should succeed");
     assert_eq!(bytes, on_disk, "snapshot must match disk bytes exactly");
     assert!(
         bytes.windows(b"first".len()).any(|w| w == b"first"),
@@ -1546,8 +1726,8 @@ fn snapshot_bytes_missing_file_returns_error() {
     let manager = test_manager();
     let session = manager
         .create_session("snapshot-missing", "snapshot-missing")
-        .unwrap();
-    std::fs::remove_file(&session.file_path).unwrap();
+        .expect("operation should succeed");
+    std::fs::remove_file(&session.file_path).expect("operation should succeed");
 
     let result = session.snapshot_bytes();
     assert!(result.is_err(), "missing file must error, not panic");

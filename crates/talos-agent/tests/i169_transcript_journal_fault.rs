@@ -105,7 +105,7 @@ async fn wait_for_structured_start(eq_rx: &mut mpsc::UnboundedReceiver<SessionEv
 
 #[tokio::test]
 async fn transcript_commit_survives_journal_finalization_failure_without_provider_replay() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let external_id = "i169-transcript-journal-fault";
     let durable = manager
@@ -113,7 +113,12 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("operation should succeed"),
+        1
+    );
 
     let calls = Arc::new(AtomicUsize::new(0));
     let release = Arc::new(Notify::new());
@@ -132,14 +137,14 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
             submission: submission(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let turn_id = wait_for_structured_start(&mut eq_rx).await;
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         store
             .get("transcript-before-journal")
-            .unwrap()
-            .unwrap()
+            .expect("operation should succeed")
+            .expect("operation should succeed")
             .state,
         PendingSubmissionState::Running
     );
@@ -181,16 +186,19 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
     assert_eq!(
         store
             .get("transcript-before-journal")
-            .unwrap()
-            .unwrap()
+            .expect("operation should succeed")
+            .expect("operation should succeed")
             .state,
         PendingSubmissionState::Running,
         "journal finalization failure must leave recoverable Running custody"
     );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
     let reopened = manager
         .create_or_open_session(external_id)
@@ -218,7 +226,7 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
         loop {
             let record = store
                 .get("transcript-before-journal")
-                .unwrap()
+                .expect("operation should succeed")
                 .expect("pending journal record");
             if record.state == PendingSubmissionState::Committed {
                 assert_eq!(record.turn_id.as_deref(), Some(turn_id.as_str()));
@@ -235,6 +243,9 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
         1,
         "restart reconciliation must not replay the Provider turn"
     );
-    restart_sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    restart_task.await.unwrap();
+    restart_sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    restart_task.await.expect("operation should succeed");
 }

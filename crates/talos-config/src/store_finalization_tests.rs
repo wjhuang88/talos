@@ -11,10 +11,10 @@ fn unique_dir(label: &str) -> PathBuf {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("operation should succeed")
             .as_nanos()
     ));
-    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::create_dir_all(&dir).expect("operation should succeed");
     dir
 }
 
@@ -34,7 +34,7 @@ fn finalize_dir(dir: &Path, transaction_id: &str) -> PathBuf {
 
 fn prepare_entries(dir: &Path) -> Vec<PathBuf> {
     std::fs::read_dir(dir)
-        .unwrap()
+        .expect("operation should succeed")
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| {
@@ -74,10 +74,15 @@ fn setup_two_providers(dir: &Path) -> (Vec<u8>, Vec<u8>) {
         .keys
         .insert("custom-b".to_string(), "sk-CREDS-B".to_string());
 
-    let config_bytes = toml::to_string_pretty(&config).unwrap().into_bytes();
-    let credential_bytes = toml::to_string_pretty(&credentials).unwrap().into_bytes();
-    std::fs::write(dir.join("config.toml"), &config_bytes).unwrap();
-    std::fs::write(dir.join("credentials.toml"), &credential_bytes).unwrap();
+    let config_bytes = toml::to_string_pretty(&config)
+        .expect("operation should succeed")
+        .into_bytes();
+    let credential_bytes = toml::to_string_pretty(&credentials)
+        .expect("operation should succeed")
+        .into_bytes();
+    std::fs::write(dir.join("config.toml"), &config_bytes).expect("operation should succeed");
+    std::fs::write(dir.join("credentials.toml"), &credential_bytes)
+        .expect("operation should succeed");
     (config_bytes, credential_bytes)
 }
 
@@ -96,7 +101,7 @@ fn write_manifest(
          credentials_existed_before = {credentials_before}\n\
          credentials_exist_after = {credentials_after}\n"
     );
-    std::fs::write(dir.join("manifest"), manifest).unwrap();
+    std::fs::write(dir.join("manifest"), manifest).expect("operation should succeed");
 }
 
 fn assert_persisted_bytes(dir: &Path, config: &[u8], credentials: &[u8]) {
@@ -325,18 +330,22 @@ fn stale_before_snapshot_is_aborted_without_overwriting_concurrent_state() {
     setup_two_providers(&dir);
     let store = make_store(&dir);
 
-    let mut concurrent_config: Config =
-        toml::from_str(&std::fs::read_to_string(dir.join("config.toml")).unwrap()).unwrap();
+    let mut concurrent_config: Config = toml::from_str(
+        &std::fs::read_to_string(dir.join("config.toml")).expect("operation should succeed"),
+    )
+    .expect("operation should succeed");
     concurrent_config.providers.remove("custom-b");
     let concurrent_config_bytes = toml::to_string_pretty(&concurrent_config)
-        .unwrap()
+        .expect("operation should succeed")
         .into_bytes();
 
-    let mut concurrent_credentials: Credentials =
-        toml::from_str(&std::fs::read_to_string(dir.join("credentials.toml")).unwrap()).unwrap();
+    let mut concurrent_credentials: Credentials = toml::from_str(
+        &std::fs::read_to_string(dir.join("credentials.toml")).expect("operation should succeed"),
+    )
+    .expect("operation should succeed");
     concurrent_credentials.keys.remove("custom-b");
     let concurrent_credential_bytes = toml::to_string_pretty(&concurrent_credentials)
-        .unwrap()
+        .expect("operation should succeed")
         .into_bytes();
 
     let fs = ConcurrentWriteFs::new(
@@ -345,12 +354,14 @@ fn stale_before_snapshot_is_aborted_without_overwriting_concurrent_state() {
         concurrent_config_bytes.clone(),
         concurrent_credential_bytes.clone(),
     );
-    let error = store.run("providers.custom-a", &fs).unwrap_err();
+    let error = store
+        .run("providers.custom-a", &fs)
+        .expect_err("operation should fail");
     assert!(error.to_string().contains("changed concurrently"));
     assert_persisted_bytes(&dir, &concurrent_config_bytes, &concurrent_credential_bytes);
     assert!(!active_dir(&dir).exists());
 
-    let loaded = store.load_effective().unwrap();
+    let loaded = store.load_effective().expect("operation should succeed");
     assert!(loaded.providers.contains_key("custom-a"));
     assert!(!loaded.providers.contains_key("custom-b"));
     let _ = std::fs::remove_dir_all(dir);
@@ -361,9 +372,10 @@ fn stale_prepared_journal_recovery_aborts_without_rollback() {
     let dir = unique_dir("stale-prepared-recovery");
     let (config_before, credentials_before) = setup_two_providers(&dir);
     let active = active_dir(&dir);
-    std::fs::create_dir_all(&active).unwrap();
-    std::fs::write(active.join("config.before"), &config_before).unwrap();
-    std::fs::write(active.join("credentials.before"), &credentials_before).unwrap();
+    std::fs::create_dir_all(&active).expect("operation should succeed");
+    std::fs::write(active.join("config.before"), &config_before).expect("operation should succeed");
+    std::fs::write(active.join("credentials.before"), &credentials_before)
+        .expect("operation should succeed");
     write_manifest(
         &active,
         "Prepared",
@@ -374,20 +386,29 @@ fn stale_prepared_journal_recovery_aborts_without_rollback() {
         true,
     );
 
-    let mut newer_config: Config =
-        toml::from_str(&String::from_utf8(config_before.clone()).unwrap()).unwrap();
+    let mut newer_config: Config = toml::from_str(
+        &String::from_utf8(config_before.clone()).expect("operation should succeed"),
+    )
+    .expect("operation should succeed");
     newer_config.providers.remove("custom-b");
-    let newer_config = toml::to_string_pretty(&newer_config).unwrap().into_bytes();
-    let mut newer_credentials: Credentials =
-        toml::from_str(&String::from_utf8(credentials_before.clone()).unwrap()).unwrap();
+    let newer_config = toml::to_string_pretty(&newer_config)
+        .expect("operation should succeed")
+        .into_bytes();
+    let mut newer_credentials: Credentials = toml::from_str(
+        &String::from_utf8(credentials_before.clone()).expect("operation should succeed"),
+    )
+    .expect("operation should succeed");
     newer_credentials.keys.remove("custom-b");
     let newer_credentials = toml::to_string_pretty(&newer_credentials)
-        .unwrap()
+        .expect("operation should succeed")
         .into_bytes();
-    std::fs::write(dir.join("config.toml"), &newer_config).unwrap();
-    std::fs::write(dir.join("credentials.toml"), &newer_credentials).unwrap();
+    std::fs::write(dir.join("config.toml"), &newer_config).expect("operation should succeed");
+    std::fs::write(dir.join("credentials.toml"), &newer_credentials)
+        .expect("operation should succeed");
 
-    make_store(&dir).recover(&StdFs).unwrap();
+    make_store(&dir)
+        .recover(&StdFs)
+        .expect("operation should succeed");
     assert_persisted_bytes(&dir, &newer_config, &newer_credentials);
     assert!(!active.exists());
     let _ = std::fs::remove_dir_all(dir);
@@ -402,13 +423,13 @@ fn cleanup_ready_marker_is_resynced_before_mutation_becomes_safe() {
     let first_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
     store
         .run("providers.custom-a", &FaultFs::new(first_plan.clone()))
-        .unwrap();
+        .expect("operation should succeed");
     first_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
 
     let second_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeDirectory);
     let error = store
         .run("providers.custom-b", &FaultFs::new(second_plan.clone()))
-        .unwrap_err();
+        .expect_err("operation should fail");
     assert!(error.to_string().contains("finalization is pending"));
     second_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeDirectory]);
     assert!(prepare_entries(&dir).is_empty());
@@ -416,7 +437,7 @@ fn cleanup_ready_marker_is_resynced_before_mutation_becomes_safe() {
     let third_plan = FaultPlan::fail_once(FsOperation::CleanupFinalizeDirectory);
     let outcome = store
         .run("providers.custom-b", &FaultFs::new(third_plan.clone()))
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -432,12 +453,14 @@ fn foreign_prepare_directory_is_never_deleted_automatically() {
     let dir = unique_dir("foreign-prepare");
     setup_two_providers(&dir);
     let prepare = dir.join(".provider-unset-transaction.prepare.foreign-process");
-    std::fs::create_dir_all(&prepare).unwrap();
-    std::fs::write(prepare.join("owner"), b"other-process").unwrap();
+    std::fs::create_dir_all(&prepare).expect("operation should succeed");
+    std::fs::write(prepare.join("owner"), b"other-process").expect("operation should succeed");
 
-    make_store(&dir).load_effective().unwrap();
+    make_store(&dir)
+        .load_effective()
+        .expect("operation should succeed");
     assert_eq!(
-        std::fs::read(prepare.join("owner")).unwrap(),
+        std::fs::read(prepare.join("owner")).expect("operation should succeed"),
         b"other-process"
     );
     assert!(prepare.exists());
@@ -469,16 +492,16 @@ fn ordered_apply_rollback_and_recovery_failures_preserve_journal() {
     assert!(result.is_err());
     assert!(active_dir(&dir).exists());
     assert_eq!(
-        std::fs::read(dir.join("config.toml")).unwrap(),
+        std::fs::read(dir.join("config.toml")).expect("operation should succeed"),
         config_before
     );
     second_plan.assert_consumed_in_order(&[FsOperation::RestoreCredentialsBefore]);
 
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert!(!active_dir(&dir).exists());
     assert_persisted_bytes(&dir, &config_before, &credentials_before);
 
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_persisted_bytes(&dir, &config_before, &credentials_before);
     let _ = std::fs::remove_dir_all(dir);
 }
@@ -491,7 +514,9 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
 
     let finalize_plan = FaultPlan::fail_once(FsOperation::SyncTransactionParentAfterFinalize);
     let finalize_fs = FaultFs::new(finalize_plan.clone());
-    let outcome = store.run("providers.custom-a", &finalize_fs).unwrap();
+    let outcome = store
+        .run("providers.custom-a", &finalize_fs)
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -502,7 +527,7 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
     assert!(!active_dir(&dir).exists());
 
     let residues: Vec<PathBuf> = std::fs::read_dir(&dir)
-        .unwrap()
+        .expect("operation should succeed")
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| {
@@ -515,7 +540,9 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
 
     let retry_plan = FaultPlan::fail_once(FsOperation::SyncFinalizeResidueParent);
     let retry_fs = FaultFs::new(retry_plan.clone());
-    let error = store.run("providers.custom-b", &retry_fs).unwrap_err();
+    let error = store
+        .run("providers.custom-b", &retry_fs)
+        .expect_err("operation should fail");
     assert!(error.to_string().contains("finalization is pending"));
     retry_plan.assert_consumed_in_order(&[FsOperation::SyncFinalizeResidueParent]);
     assert!(prepare_entries(&dir).is_empty());
@@ -525,7 +552,9 @@ fn parent_sync_pending_blocks_mutation_before_prepare_and_retries() {
             .contains(&FsOperation::CreatePrepareDirectory)
     );
 
-    let second_outcome = store.unset_provider("providers.custom-b").unwrap();
+    let second_outcome = store
+        .unset_provider("providers.custom-b")
+        .expect("operation should succeed");
     assert_eq!(
         second_outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -543,12 +572,16 @@ fn cleanup_pending_is_load_safe_and_does_not_block_next_mutation() {
 
     let first_plan = FaultPlan::fail_once(FsOperation::CleanupFinalizeDirectory);
     let first_fs = FaultFs::new(first_plan.clone());
-    store.run("providers.custom-a", &first_fs).unwrap();
+    store
+        .run("providers.custom-a", &first_fs)
+        .expect("operation should succeed");
     first_plan.assert_consumed_in_order(&[FsOperation::CleanupFinalizeDirectory]);
 
     let second_plan = FaultPlan::fail_once(FsOperation::CleanupFinalizeDirectory);
     let second_fs = FaultFs::new(second_plan.clone());
-    let outcome = store.run("providers.custom-b", &second_fs).unwrap();
+    let outcome = store
+        .run("providers.custom-b", &second_fs)
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -558,7 +591,7 @@ fn cleanup_pending_is_load_safe_and_does_not_block_next_mutation() {
     second_plan.assert_consumed_in_order(&[FsOperation::CleanupFinalizeDirectory]);
     assert!(prepare_entries(&dir).is_empty());
 
-    let loaded = store.load_effective().unwrap();
+    let loaded = store.load_effective().expect("operation should succeed");
     assert!(!loaded.providers.contains_key("custom-a"));
     assert!(!loaded.providers.contains_key("custom-b"));
     let _ = std::fs::remove_dir_all(dir);
@@ -572,17 +605,18 @@ fn ambiguous_active_and_finalize_evidence_fails_closed_and_is_preserved() {
 
     let active = active_dir(&dir);
     let finalize = finalize_dir(&dir, transaction_id);
-    std::fs::create_dir_all(&active).unwrap();
-    std::fs::create_dir_all(&finalize).unwrap();
+    std::fs::create_dir_all(&active).expect("operation should succeed");
+    std::fs::create_dir_all(&finalize).expect("operation should succeed");
 
     for journal in [&active, &finalize] {
-        std::fs::write(journal.join("config.after"), &config).unwrap();
-        std::fs::write(journal.join("credentials.after"), &credentials).unwrap();
+        std::fs::write(journal.join("config.after"), &config).expect("operation should succeed");
+        std::fs::write(journal.join("credentials.after"), &credentials)
+            .expect("operation should succeed");
         write_manifest(journal, "Committed", transaction_id, true, true, true, true);
     }
 
     let store = make_store(&dir);
-    let error = store.load_effective().unwrap_err();
+    let error = store.load_effective().expect_err("operation should fail");
     assert!(error.to_string().contains("ambiguous"));
     assert!(active.exists());
     assert!(finalize.exists());
@@ -595,9 +629,10 @@ fn valid_finalize_residue_is_verified_synced_and_cleaned() {
     let (config, credentials) = setup_two_providers(&dir);
     let transaction_id = "residue-1";
     let finalize = finalize_dir(&dir, transaction_id);
-    std::fs::create_dir_all(&finalize).unwrap();
-    std::fs::write(finalize.join("config.after"), &config).unwrap();
-    std::fs::write(finalize.join("credentials.after"), &credentials).unwrap();
+    std::fs::create_dir_all(&finalize).expect("operation should succeed");
+    std::fs::write(finalize.join("config.after"), &config).expect("operation should succeed");
+    std::fs::write(finalize.join("credentials.after"), &credentials)
+        .expect("operation should succeed");
     write_manifest(
         &finalize,
         "Committed",
@@ -611,7 +646,7 @@ fn valid_finalize_residue_is_verified_synced_and_cleaned() {
     let store = make_store(&dir);
     let outcome = store
         .recover_with_purpose(&StdFs, RecoveryPurpose::Mutation)
-        .unwrap();
+        .expect("operation should succeed");
     assert!(matches!(outcome, RecoveryOutcome::Clean));
     assert!(!finalize.exists());
     let _ = std::fs::remove_dir_all(dir);
@@ -622,15 +657,15 @@ fn malformed_finalize_residue_fails_closed_without_leaking_marker() {
     let dir = unique_dir("malformed-residue");
     setup_two_providers(&dir);
     let finalize = finalize_dir(&dir, "broken-1");
-    std::fs::create_dir_all(&finalize).unwrap();
+    std::fs::create_dir_all(&finalize).expect("operation should succeed");
     std::fs::write(
         finalize.join("manifest"),
         "marker = \"sk-FINALIZE-MARKER\"\nbroken = [",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let store = make_store(&dir);
-    let error = store.load_effective().unwrap_err();
+    let error = store.load_effective().expect_err("operation should fail");
     let display = error.to_string();
     let debug = format!("{error:?}");
     assert!(!display.contains("FINALIZE-MARKER"));
@@ -646,8 +681,11 @@ fn rollback_absence_parent_sync_failure_retains_recoverable_journal() {
     credentials
         .keys
         .insert("credentials-only".to_string(), "sk-ONLY".to_string());
-    let credentials_before = toml::to_string_pretty(&credentials).unwrap().into_bytes();
-    std::fs::write(dir.join("credentials.toml"), &credentials_before).unwrap();
+    let credentials_before = toml::to_string_pretty(&credentials)
+        .expect("operation should succeed")
+        .into_bytes();
+    std::fs::write(dir.join("credentials.toml"), &credentials_before)
+        .expect("operation should succeed");
 
     let store = make_store(&dir);
     let plan = FaultPlan::fail_sequence(&[
@@ -663,10 +701,10 @@ fn rollback_absence_parent_sync_failure_retains_recoverable_journal() {
     ]);
     assert!(active_dir(&dir).exists());
 
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert!(!dir.join("config.toml").exists());
     assert_eq!(
-        std::fs::read(dir.join("credentials.toml")).unwrap(),
+        std::fs::read(dir.join("credentials.toml")).expect("operation should succeed"),
         credentials_before
     );
     assert!(!active_dir(&dir).exists());
@@ -681,16 +719,16 @@ fn finalize_symlink_residue_is_not_followed_or_deleted() {
     let dir = unique_dir("symlink-residue");
     setup_two_providers(&dir);
     let outside = unique_dir("symlink-outside");
-    std::fs::write(outside.join("keep"), b"do-not-delete").unwrap();
+    std::fs::write(outside.join("keep"), b"do-not-delete").expect("operation should succeed");
 
     let link = finalize_dir(&dir, "symlink-1");
-    symlink(&outside, &link).unwrap();
+    symlink(&outside, &link).expect("operation should succeed");
 
     let store = make_store(&dir);
-    let error = store.load_effective().unwrap_err();
+    let error = store.load_effective().expect_err("operation should fail");
     assert!(error.to_string().contains("not a real directory"));
     assert_eq!(
-        std::fs::read(outside.join("keep")).unwrap(),
+        std::fs::read(outside.join("keep")).expect("operation should succeed"),
         b"do-not-delete"
     );
     assert!(link.symlink_metadata().is_ok());
@@ -705,27 +743,31 @@ fn semantic_update_does_not_restore_provider_removed_from_stale_snapshot() {
     let dir = unique_dir("semantic-update-stale-snapshot");
     setup_two_providers(&dir);
     let store = make_store(&dir);
-    let stale = store.load_effective().unwrap();
+    let stale = store.load_effective().expect("operation should succeed");
     assert!(stale.providers.contains_key("custom-a"));
 
-    store.unset_provider("providers.custom-a").unwrap();
+    store
+        .unset_provider("providers.custom-a")
+        .expect("operation should succeed");
     let updated = store
         .update_config(|current| {
             current.provider = "custom-b".to_string();
             current.model = "model-b".to_string();
             Ok(())
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     assert!(!updated.providers.contains_key("custom-a"));
     assert_eq!(updated.provider, "custom-b");
     assert_eq!(updated.model, "model-b");
-    let persisted = store.load_effective().unwrap();
+    let persisted = store.load_effective().expect("operation should succeed");
     assert!(!persisted.providers.contains_key("custom-a"));
     assert_eq!(persisted.provider, "custom-b");
     assert_eq!(persisted.model, "model-b");
-    let credentials: Credentials =
-        toml::from_str(&std::fs::read_to_string(dir.join("credentials.toml")).unwrap()).unwrap();
+    let credentials: Credentials = toml::from_str(
+        &std::fs::read_to_string(dir.join("credentials.toml")).expect("operation should succeed"),
+    )
+    .expect("operation should succeed");
     assert!(!credentials.keys.contains_key("custom-a"));
 
     let _ = std::fs::remove_dir_all(dir);
@@ -747,20 +789,22 @@ fn semantic_update_and_provider_unset_share_one_mutation_lock() {
     let update = std::thread::spawn(move || {
         update_store
             .update_config(|current| {
-                entered_tx.send(()).unwrap();
-                release_rx.recv().unwrap();
+                entered_tx.send(()).expect("operation should succeed");
+                release_rx.recv().expect("operation should succeed");
                 current.provider = "custom-b".to_string();
                 current.model = "model-b".to_string();
                 Ok(())
             })
-            .unwrap();
+            .expect("operation should succeed");
     });
-    entered_rx.recv().unwrap();
+    entered_rx.recv().expect("operation should succeed");
 
     let unset_store = Arc::clone(&store);
     let unset = std::thread::spawn(move || {
         let result = unset_store.unset_provider("providers.custom-a");
-        unset_done_tx.send(result).unwrap();
+        unset_done_tx
+            .send(result)
+            .expect("operation should succeed");
     });
 
     assert!(
@@ -769,15 +813,15 @@ fn semantic_update_and_provider_unset_share_one_mutation_lock() {
             .is_err(),
         "provider unset must wait for the in-flight semantic update"
     );
-    release_tx.send(()).unwrap();
-    update.join().unwrap();
+    release_tx.send(()).expect("operation should succeed");
+    update.join().expect("operation should succeed");
     unset_done_rx
         .recv_timeout(Duration::from_secs(5))
-        .unwrap()
-        .unwrap();
-    unset.join().unwrap();
+        .expect("operation should succeed")
+        .expect("operation should succeed");
+    unset.join().expect("operation should succeed");
 
-    let persisted = store.load_effective().unwrap();
+    let persisted = store.load_effective().expect("operation should succeed");
     assert_eq!(persisted.provider, "custom-b");
     assert_eq!(persisted.model, "model-b");
     assert!(!persisted.providers.contains_key("custom-a"));
@@ -801,23 +845,24 @@ fn semantic_update_preserves_placeholders_and_credentials_file_boundary() {
         .insert("custom-b".to_string(), "credential-file-secret".to_string());
     std::fs::write(
         dir.join("config.toml"),
-        toml::to_string_pretty(&config).unwrap(),
+        toml::to_string_pretty(&config).expect("operation should succeed"),
     )
-    .unwrap();
+    .expect("operation should succeed");
     std::fs::write(
         dir.join("credentials.toml"),
-        toml::to_string_pretty(&credentials).unwrap(),
+        toml::to_string_pretty(&credentials).expect("operation should succeed"),
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     make_store(&dir)
         .update_config(|current| {
             current.model = "updated-model".to_string();
             Ok(())
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-    let persisted = std::fs::read_to_string(dir.join("config.toml")).unwrap();
+    let persisted =
+        std::fs::read_to_string(dir.join("config.toml")).expect("operation should succeed");
     assert!(persisted.contains("${CUSTOM_A_API_KEY}"));
     assert!(!persisted.contains("credential-file-secret"));
     assert!(!persisted.contains("custom-b"));

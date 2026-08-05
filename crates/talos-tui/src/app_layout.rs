@@ -186,20 +186,29 @@ mod tests {
             BottomPanelPlacement::AboveInput,
         );
         assert_eq!(
-            layout.panel.unwrap().bottom(),
-            layout.composer_top_pad.unwrap().y
+            layout.panel.expect("operation should succeed").bottom(),
+            layout.composer_top_pad.expect("operation should succeed").y
         );
         assert_eq!(
-            layout.composer_top_pad.unwrap().bottom(),
-            layout.composer.unwrap().y
+            layout
+                .composer_top_pad
+                .expect("operation should succeed")
+                .bottom(),
+            layout.composer.expect("operation should succeed").y
         );
         assert_eq!(
-            layout.composer.unwrap().bottom(),
-            layout.composer_bottom_pad.unwrap().y
+            layout.composer.expect("operation should succeed").bottom(),
+            layout
+                .composer_bottom_pad
+                .expect("operation should succeed")
+                .y
         );
         assert_eq!(
-            layout.composer_bottom_pad.unwrap().bottom(),
-            layout.status.unwrap().y
+            layout
+                .composer_bottom_pad
+                .expect("operation should succeed")
+                .bottom(),
+            layout.status.expect("operation should succeed").y
         );
         assert_bounded_and_ordered(layout);
     }
@@ -212,17 +221,29 @@ mod tests {
             BottomPanelPlacement::BelowInput,
         );
         assert_eq!(
-            layout.composer_top_pad.unwrap().bottom(),
-            layout.composer.unwrap().y
-        );
-        assert_eq!(layout.composer.unwrap().bottom(), layout.panel.unwrap().y);
-        assert_eq!(
-            layout.panel.unwrap().bottom(),
-            layout.composer_bottom_pad.unwrap().y
+            layout
+                .composer_top_pad
+                .expect("operation should succeed")
+                .bottom(),
+            layout.composer.expect("operation should succeed").y
         );
         assert_eq!(
-            layout.composer_bottom_pad.unwrap().bottom(),
-            layout.status.unwrap().y
+            layout.composer.expect("operation should succeed").bottom(),
+            layout.panel.expect("operation should succeed").y
+        );
+        assert_eq!(
+            layout.panel.expect("operation should succeed").bottom(),
+            layout
+                .composer_bottom_pad
+                .expect("operation should succeed")
+                .y
+        );
+        assert_eq!(
+            layout
+                .composer_bottom_pad
+                .expect("operation should succeed")
+                .bottom(),
+            layout.status.expect("operation should succeed").y
         );
         assert_bounded_and_ordered(layout);
     }

@@ -73,9 +73,13 @@ fn submission(id: &str, item_id: &str, generation: u64, text: &str) -> Structure
 }
 
 fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
-    let mut current = store.runtime_generation().unwrap();
+    let mut current = store
+        .runtime_generation()
+        .expect("operation should succeed");
     while current < target {
-        current = store.advance_runtime_generation(current).unwrap();
+        current = store
+            .advance_runtime_generation(current)
+            .expect("operation should succeed");
     }
     assert_eq!(current, target);
 }
@@ -149,19 +153,21 @@ async fn wait_for_state(
 
 #[tokio::test]
 async fn orphan_running_submission_is_never_auto_replayed() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-running-orphan")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_runtime_generation(&store, 1);
     let work = submission("orphan_batch", "orphan_item", 1, "do not replay");
 
-    let (_, accepted) = store.accept(&work).unwrap();
+    let (_, accepted) = store.accept(&work).expect("operation should succeed");
     assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
-    store.mark_running(&work.id, "orphan_turn").unwrap();
+    store
+        .mark_running(&work.id, "orphan_turn")
+        .expect("operation should succeed");
 
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
@@ -180,7 +186,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
             submission: work.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let disposition = wait_for_receipt(&mut eq_rx, &work.id).await;
     assert_eq!(
         disposition,
@@ -193,29 +199,39 @@ async fn orphan_running_submission_is_never_auto_replayed() {
     tokio::time::sleep(Duration::from_millis(150)).await;
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(
-        store.get(&work.id).unwrap().unwrap().state,
+        store
+            .get(&work.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::Running
     );
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
 async fn paused_reconcile_is_observational_until_explicit_user_resume() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-paused-recovery")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_runtime_generation(&store, 2);
     let work = submission("paused_batch", "paused_item", 2, "recover me once");
 
-    let (_, accepted) = store.accept(&work).unwrap();
+    let (_, accepted) = store.accept(&work).expect("operation should succeed");
     assert_eq!(accepted, SubmissionReceiptDisposition::AcceptedPending);
-    assert_eq!(store.pause_unstarted().unwrap(), 1);
+    assert_eq!(
+        store.pause_unstarted().expect("operation should succeed"),
+        1
+    );
 
     let calls = Arc::new(AtomicUsize::new(0));
     let (handle, mut actor) =
@@ -229,7 +245,11 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
     tokio::time::sleep(Duration::from_millis(150)).await;
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(
-        store.get(&work.id).unwrap().unwrap().state,
+        store
+            .get(&work.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::PausedPending
     );
 
@@ -238,7 +258,7 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
             submission: work.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let disposition = wait_for_receipt(&mut eq_rx, &work.id).await;
     assert_eq!(
         disposition,
@@ -255,7 +275,11 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
         "observational reconciliation must not resume paused work"
     );
     assert_eq!(
-        store.get(&work.id).unwrap().unwrap().state,
+        store
+            .get(&work.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::PausedPending
     );
 
@@ -270,7 +294,7 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
             submission: resume.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(
         wait_for_receipt(&mut eq_rx, &resume.id).await,
         SubmissionReceiptDisposition::AcceptedPending
@@ -284,8 +308,8 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
 
     let reopened = manager
         .create_or_open_session("i169-paused-recovery")
-        .unwrap();
-    let messages = reopened.read_messages().unwrap();
+        .expect("operation should succeed");
+    let messages = reopened.read_messages().expect("operation should succeed");
     let user_messages = messages
         .iter()
         .filter_map(|message| match message {
@@ -308,7 +332,10 @@ async fn paused_reconcile_is_observational_until_explicit_user_resume() {
         2
     );
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

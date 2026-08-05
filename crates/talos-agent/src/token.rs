@@ -112,9 +112,8 @@ impl TokenEstimator {
     /// assert!(tokens > 0);
     /// ```
     pub fn estimate(&self, messages: &[Message]) -> u32 {
-        messages
-            .iter()
-            .map(|msg| match msg {
+        messages.iter().fold(0_u32, |total, msg| {
+            let message_tokens = match msg {
                 Message::User { content } => Self::estimate_text(content),
                 Message::System { content, .. } => Self::estimate_text(content),
                 Message::Context { content } => Self::estimate_text(content),
@@ -122,23 +121,17 @@ impl TokenEstimator {
                     content,
                     tool_calls,
                     ..
-                } => {
-                    let text_tokens = Self::estimate_text(content);
-                    let tool_tokens: u32 = tool_calls
-                        .iter()
-                        .map(|tc| {
-                            Self::estimate_text(&tc.name)
-                                + Self::estimate_text(&tc.input.to_string())
-                        })
-                        .sum();
-                    text_tokens + tool_tokens
-                }
-                Message::Tool { result } => {
-                    Self::estimate_text(&result.content) + Self::estimate_text(&result.tool_use_id)
-                }
-                Message::Multimodal { parts } => parts
+                } => tool_calls
                     .iter()
-                    .map(|p| match p {
+                    .fold(Self::estimate_text(content), |tokens, call| {
+                        tokens
+                            .saturating_add(Self::estimate_text(&call.name))
+                            .saturating_add(Self::estimate_text(&call.input.to_string()))
+                    }),
+                Message::Tool { result } => Self::estimate_text(&result.content)
+                    .saturating_add(Self::estimate_text(&result.tool_use_id)),
+                Message::Multimodal { parts } => parts.iter().fold(0_u32, |tokens, part| {
+                    let part_tokens = match part {
                         talos_core::message::ContentPart::Text { text } => {
                             Self::estimate_text(text)
                         }
@@ -155,10 +148,12 @@ impl TokenEstimator {
                                 .saturating_add(u32::try_from(declared).unwrap_or(u32::MAX))
                                 .saturating_add(1024)
                         }
-                    })
-                    .sum(),
-            })
-            .sum()
+                    };
+                    tokens.saturating_add(part_tokens)
+                }),
+            };
+            total.saturating_add(message_tokens)
+        })
     }
 
     /// Estimates the token count for a single string of text.

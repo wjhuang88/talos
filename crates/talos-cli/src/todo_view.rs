@@ -421,9 +421,10 @@ mod tests {
 
     #[test]
     fn todo_list_view_filters_and_sorts_items() {
-        let dir = tempfile::tempdir().unwrap();
-        let repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
-        repo.init_schema().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite"))
+            .expect("operation should succeed");
+        repo.init_schema().expect("operation should succeed");
         let session_id = Uuid::new_v4();
         repo.create(talos_session::CreateTodo {
             session_id,
@@ -433,7 +434,7 @@ mod tests {
             assigned_to_turn: None,
             tags: vec!["ops".to_string()],
         })
-        .unwrap();
+        .expect("operation should succeed");
         let high = repo
             .create(talos_session::CreateTodo {
                 session_id,
@@ -443,7 +444,7 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec!["ops".to_string()],
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let rendered = render_todo_view(
             &repo,
@@ -461,7 +462,7 @@ mod tests {
                 tag: Some("ops".to_string()),
             },
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         assert!(rendered.text.contains("high item"));
         assert!(!rendered.text.contains("medium item"));
@@ -476,9 +477,10 @@ mod tests {
 
     #[test]
     fn todo_export_json_includes_dependencies() {
-        let dir = tempfile::tempdir().unwrap();
-        let repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
-        repo.init_schema().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite"))
+            .expect("operation should succeed");
+        repo.init_schema().expect("operation should succeed");
         let session_id = Uuid::new_v4();
         let parent = repo
             .create(talos_session::CreateTodo {
@@ -489,7 +491,7 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         let child = repo
             .create(talos_session::CreateTodo {
                 session_id,
@@ -499,9 +501,9 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         repo.add_dependency(session_id, parent.id, child.id)
-            .unwrap();
+            .expect("operation should succeed");
 
         let rendered = render_todo_view(
             &repo,
@@ -517,7 +519,7 @@ mod tests {
             },
             talos_session::TodoQuery::default(),
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         assert!(rendered.text.contains("\"items\""));
         assert!(rendered.text.contains("\"dependencies\""));
@@ -527,10 +529,10 @@ mod tests {
 
     #[test]
     fn todo_delete_without_confirm_shows_warning() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut repo =
-            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
-        repo.init_schema().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let mut repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite"))
+            .expect("operation should succeed");
+        repo.init_schema().expect("operation should succeed");
         let session_id = Uuid::new_v4();
         let item = repo
             .create(talos_session::CreateTodo {
@@ -541,21 +543,26 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         let prefix: String = item.id.to_string().chars().take(8).collect();
 
-        let result = handle_todo_delete(&mut repo, session_id, &prefix, false).unwrap();
+        let result = handle_todo_delete(&mut repo, session_id, &prefix, false)
+            .expect("operation should succeed");
 
         assert!(result.contains("--confirm"));
-        assert!(repo.get(session_id, item.id).unwrap().is_some());
+        assert!(
+            repo.get(session_id, item.id)
+                .expect("operation should succeed")
+                .is_some()
+        );
     }
 
     #[test]
     fn todo_delete_with_confirm_removes_item() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut repo =
-            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
-        repo.init_schema().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let mut repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite"))
+            .expect("operation should succeed");
+        repo.init_schema().expect("operation should succeed");
         let session_id = Uuid::new_v4();
         let item = repo
             .create(talos_session::CreateTodo {
@@ -566,22 +573,27 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         let prefix: String = item.id.to_string().chars().take(8).collect();
 
-        let result = handle_todo_delete(&mut repo, session_id, &prefix, true).unwrap();
+        let result = handle_todo_delete(&mut repo, session_id, &prefix, true)
+            .expect("operation should succeed");
 
         assert!(result.contains("Deleted todo"));
         assert!(result.contains("gone"));
-        assert!(repo.get(session_id, item.id).unwrap().is_none());
+        assert!(
+            repo.get(session_id, item.id)
+                .expect("operation should succeed")
+                .is_none()
+        );
     }
 
     #[test]
     fn todo_delete_ambiguous_prefix_rejects() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut repo =
-            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
-        repo.init_schema().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let mut repo = talos_session::TodoRepository::new(&dir.path().join("todos.sqlite"))
+            .expect("operation should succeed");
+        repo.init_schema().expect("operation should succeed");
         let session_id = Uuid::new_v4();
 
         // Create items and find a common 4-char prefix.
@@ -603,8 +615,8 @@ mod tests {
         'outer: for len in (4..8).rev() {
             for i in 0..items.len() {
                 let prefix_i: String = items[i].id.to_string().chars().take(len).collect();
-                for j in (i + 1)..items.len() {
-                    let prefix_j: String = items[j].id.to_string().chars().take(len).collect();
+                for item in items.iter().skip(i + 1) {
+                    let prefix_j: String = item.id.to_string().chars().take(len).collect();
                     if prefix_i == prefix_j {
                         ambiguous_prefix = prefix_i;
                         break 'outer;
@@ -618,7 +630,7 @@ mod tests {
         }
 
         let err = handle_todo_delete(&mut repo, session_id, &ambiguous_prefix, true)
-            .unwrap_err()
+            .expect_err("operation should fail")
             .to_string();
         assert!(err.contains("ambiguous"), "got: {err}");
     }

@@ -128,7 +128,7 @@ mod tests {
         let pattern = PatternExtractor::extract_from_observation(&obs);
         assert!(pattern.is_some());
 
-        let pattern = pattern.unwrap();
+        let pattern = pattern.expect("operation should succeed");
         assert_eq!(pattern.category, "preference");
         assert!(pattern.confidence > 0.0);
     }

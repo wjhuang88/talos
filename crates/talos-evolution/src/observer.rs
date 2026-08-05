@@ -279,7 +279,7 @@ mod tests {
         let text = "前面很多内容 不要用 sed 后面更多内容";
         let pos = TurnObserver::find_marker(text, &["不要用 sed"]);
         assert!(pos.is_some());
-        assert!(text[pos.unwrap()..].starts_with("不要用 sed"));
+        assert!(text[pos.expect("operation should succeed")..].starts_with("不要用 sed"));
     }
 
     #[test]
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn test_capture_window_marker_in_center() {
         let text = "AAAAAAAAAA marker BBBBBBBBBB";
-        let pos = text.find("marker").unwrap();
+        let pos = text.find("marker").expect("operation should succeed");
         let window = TurnObserver::capture_window(text, pos, 20);
 
         assert!(
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_capture_window_marker_at_end() {
         let text = "AAAAAAAAAAAAAAAAAAAA marker";
-        let pos = text.find("marker").unwrap();
+        let pos = text.find("marker").expect("operation should succeed");
         let window = TurnObserver::capture_window(text, pos, 20);
 
         assert!(window.contains("marker"));
@@ -325,7 +325,7 @@ mod tests {
     fn test_capture_window_5mb_input_small_output() {
         let prefix = "x".repeat(5 * 1024 * 1024);
         let text = format!("{}{}", prefix, "不要用 sed");
-        let pos = text.find("不要用 sed").unwrap();
+        let pos = text.find("不要用 sed").expect("operation should succeed");
         let window = TurnObserver::capture_window(&text, pos, 400);
 
         assert!(
@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn test_capture_window_respects_utf8_boundaries() {
         let text = "AAAA 你好世界 marker 你好世界 BBBB";
-        let pos = text.find("marker").unwrap();
+        let pos = text.find("marker").expect("operation should succeed");
         let window = TurnObserver::capture_window(text, pos, 30);
 
         assert!(window.contains("marker"));
@@ -360,7 +360,7 @@ mod tests {
     fn test_capture_window_5mb_with_chinese_tail_contains_marker() {
         let prefix = "system_prompt content ".repeat(200_000);
         let text = format!("{}{}", prefix, "不要用 sed");
-        let pos = text.find("不要用 sed").unwrap();
+        let pos = text.find("不要用 sed").expect("operation should succeed");
         let window = TurnObserver::capture_window(&text, pos, 400);
 
         assert!(

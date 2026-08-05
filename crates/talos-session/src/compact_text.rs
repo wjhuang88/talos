@@ -490,13 +490,15 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_roundtrip_basic");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("test.tlog");
 
         let entry = make_entry("user", "Hello, world!");
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let entries = store.read_entries(&path).unwrap();
+        let entries = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].role, "user");
         assert_eq!(entries[0].content, "Hello, world!");
@@ -510,7 +512,7 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_roundtrip_multi");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("multi.tlog");
 
         let entries = vec![
@@ -520,10 +522,12 @@ mod tests {
         ];
 
         for e in &entries {
-            store.append_entry(&path, e).unwrap();
+            store
+                .append_entry(&path, e)
+                .expect("operation should succeed");
         }
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 3);
         assert_eq!(read[0].content, "What is 2+2?");
         assert_eq!(read[1].content, "The answer is 4.");
@@ -537,17 +541,21 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_parent");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("parent.tlog");
 
         let parent = make_entry("user", "parent message");
         let mut child = make_entry("assistant", "child response");
         child.parent_id = Some(parent.id.clone());
 
-        store.append_entry(&path, &parent).unwrap();
-        store.append_entry(&path, &child).unwrap();
+        store
+            .append_entry(&path, &parent)
+            .expect("operation should succeed");
+        store
+            .append_entry(&path, &child)
+            .expect("operation should succeed");
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 2);
         assert!(read[0].parent_id.is_none());
         assert_eq!(read[1].parent_id, Some(parent.id.clone()));
@@ -560,7 +568,7 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_meta");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("meta.tlog");
 
         let meta = SessionMetadata {
@@ -574,9 +582,11 @@ mod tests {
         };
         let entry = make_entry_with_meta("assistant", "Response with metadata", meta);
 
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].metadata.provider, Some("anthropic".into()));
         assert_eq!(read[0].metadata.model, Some("claude-sonnet-4".into()));
@@ -590,16 +600,18 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_special");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("special.tlog");
 
         // Content with tabs, newlines, and special characters
         let tricky = "line1\nline2\twith\ttabs\nline3\twith more";
         let entry = make_entry("assistant", tricky);
 
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].content, tricky);
 
@@ -611,14 +623,16 @@ mod tests {
         let store = CompactTextSessionStore;
         let dir = std::env::temp_dir().join("tlog_test_unicode");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("unicode.tlog");
 
         let entry = make_entry("user", "你好世界 🌍 Привет мир");
 
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].content, "你好世界 🌍 Привет мир");
 
@@ -629,7 +643,7 @@ mod tests {
     fn corrupt_final_record_skipped() {
         let dir = std::env::temp_dir().join("tlog_test_corrupt");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("corrupt.tlog");
 
         let store = CompactTextSessionStore;
@@ -637,20 +651,20 @@ mod tests {
         // Write two valid entries.
         store
             .append_entry(&path, &make_entry("user", "first"))
-            .unwrap();
+            .expect("operation should succeed");
         store
             .append_entry(&path, &make_entry("assistant", "second"))
-            .unwrap();
+            .expect("operation should succeed");
 
         // Append a truncated/garbage line (simulating crash).
         std::fs::OpenOptions::new()
             .append(true)
             .open(&path)
-            .unwrap()
+            .expect("operation should succeed")
             .write_all(b"E\t0\t999\tincomplete\t-\t")
-            .unwrap();
+            .expect("operation should succeed");
 
-        let read = store.read_entries(&path).unwrap();
+        let read = store.read_entries(&path).expect("operation should succeed");
         assert_eq!(read.len(), 2, "corrupt final record should be skipped");
         assert_eq!(read[0].content, "first");
         assert_eq!(read[1].content, "second");
@@ -662,7 +676,7 @@ mod tests {
     fn read_last_entry_id_returns_last_valid() {
         let dir = std::env::temp_dir().join("tlog_test_last_id");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("last_id.tlog");
 
         let store = CompactTextSessionStore;
@@ -670,9 +684,15 @@ mod tests {
         let e2 = make_entry("assistant", "second");
         let e3 = make_entry("user", "third");
 
-        store.append_entry(&path, &e1).unwrap();
-        store.append_entry(&path, &e2).unwrap();
-        store.append_entry(&path, &e3).unwrap();
+        store
+            .append_entry(&path, &e1)
+            .expect("operation should succeed");
+        store
+            .append_entry(&path, &e2)
+            .expect("operation should succeed");
+        store
+            .append_entry(&path, &e3)
+            .expect("operation should succeed");
 
         let last_id = store.read_last_entry_id(&path);
         assert_eq!(last_id, Some(e3.id));
@@ -684,11 +704,11 @@ mod tests {
     fn read_empty_file_returns_empty() {
         let dir = std::env::temp_dir().join("tlog_test_empty");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("nonexistent.tlog");
 
         let store = CompactTextSessionStore;
-        let entries = store.read_entries(&path).unwrap();
+        let entries = store.read_entries(&path).expect("operation should succeed");
         assert!(entries.is_empty());
 
         std::fs::remove_dir_all(&dir).ok();
@@ -698,18 +718,18 @@ mod tests {
     fn scan_file_counts_and_previews() {
         let dir = std::env::temp_dir().join("tlog_test_scan");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("scan.tlog");
 
         let store = CompactTextSessionStore;
         store
             .append_entry(&path, &make_entry("user", "first message"))
-            .unwrap();
+            .expect("operation should succeed");
         store
             .append_entry(&path, &make_entry("assistant", "second message"))
-            .unwrap();
+            .expect("operation should succeed");
 
-        let info = store.scan_file(&path).unwrap();
+        let info = store.scan_file(&path).expect("operation should succeed");
         assert_eq!(info.message_count, 2);
 
         std::fs::remove_dir_all(&dir).ok();
@@ -726,7 +746,7 @@ mod tests {
         // Write the same entries in both JSONL and .tlog format, measure sizes.
         let dir = std::env::temp_dir().join("tlog_test_density");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
 
         let jsonl_path = dir.join("session.jsonl");
         let tlog_path = dir.join("session.tlog");
@@ -763,17 +783,25 @@ mod tests {
         // Write JSONL
         let jsonl_store = JsonlSessionStore;
         for e in &entries {
-            jsonl_store.append_entry(&jsonl_path, e).unwrap();
+            jsonl_store
+                .append_entry(&jsonl_path, e)
+                .expect("operation should succeed");
         }
 
         // Write .tlog
         let tlog_store = CompactTextSessionStore;
         for e in &entries {
-            tlog_store.append_entry(&tlog_path, e).unwrap();
+            tlog_store
+                .append_entry(&tlog_path, e)
+                .expect("operation should succeed");
         }
 
-        let jsonl_size = std::fs::metadata(&jsonl_path).unwrap().len();
-        let tlog_size = std::fs::metadata(&tlog_path).unwrap().len();
+        let jsonl_size = std::fs::metadata(&jsonl_path)
+            .expect("operation should succeed")
+            .len();
+        let tlog_size = std::fs::metadata(&tlog_path)
+            .expect("operation should succeed")
+            .len();
 
         println!("JSONL: {jsonl_size} bytes");
         println!("TLOG:  {tlog_size} bytes");
@@ -793,8 +821,12 @@ mod tests {
         );
 
         // Verify both have the same number of entries.
-        let jsonl_entries = jsonl_store.read_entries(&jsonl_path).unwrap();
-        let tlog_entries = tlog_store.read_entries(&tlog_path).unwrap();
+        let jsonl_entries = jsonl_store
+            .read_entries(&jsonl_path)
+            .expect("operation should succeed");
+        let tlog_entries = tlog_store
+            .read_entries(&tlog_path)
+            .expect("operation should succeed");
         assert_eq!(jsonl_entries.len(), tlog_entries.len());
         assert_eq!(jsonl_entries.len(), 50);
 

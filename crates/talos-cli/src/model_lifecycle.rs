@@ -717,11 +717,14 @@ fn send_stream(
 mod tests {
     use super::*;
     use std::path::Path;
+    use talos_agent::Agent;
     use talos_config::ProviderConfig;
     use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
     use talos_core::tool::ToolRegistry;
     use talos_provider::mock::MockProvider;
-    use talos_session::{JsonlSessionStore, SessionEntry, SessionInfo, SessionStore};
+    use talos_session::{
+        JsonlSessionStore, SessionEntry, SessionInfo, SessionManager, SessionStore,
+    };
     use uuid::Uuid;
 
     #[derive(Debug)]
@@ -771,9 +774,11 @@ mod tests {
 
     #[test]
     fn ready_models_have_correct_provider_and_context_limit() {
-        let mut config = Config::default();
-        config.model = "claude-sonnet-4-5".to_string();
-        config.provider = "anthropic".to_string();
+        let mut config = Config {
+            model: "claude-sonnet-4-5".to_string(),
+            provider: "anthropic".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "anthropic".to_string(),
             ProviderConfig {
@@ -805,21 +810,22 @@ mod tests {
 
     #[tokio::test]
     async fn model_rebuild_history_is_read_only_after_old_runtime_quiesces() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-model-final-history")
-            .unwrap();
+            .expect("operation should succeed");
         let session = durable.session().clone();
         session
             .append(&Message::User {
                 content: "history-before-switch".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let (raw_tx, mut raw_rx) = mpsc::channel(4);
         let command_tx = raw_tx.clone();
-        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let mut transition =
+            SessionTransition::new(raw_tx, session.clone()).expect("operation should succeed");
         let actor_session = session.clone();
         let actor_join = tokio::spawn(async move {
             while let Some(operation) = raw_rx.recv().await {
@@ -828,7 +834,7 @@ mod tests {
                         .append(&Message::User {
                             content: "committed-during-handoff".into(),
                         })
-                        .unwrap(),
+                        .expect("operation should succeed"),
                     SessionOp::Shutdown => break,
                     _ => {}
                 }
@@ -841,9 +847,12 @@ mod tests {
         });
         transition
             .attach_active_runtime(actor_join, scheduler_cancel, scheduler_join)
-            .unwrap();
+            .expect("operation should succeed");
 
-        command_tx.send(SessionOp::Interrupt).await.unwrap();
+        command_tx
+            .send(SessionOp::Interrupt)
+            .await
+            .expect("operation should succeed");
         let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
         let history = persist_switch_marker_and_read_final_history(
             &mut transition,
@@ -856,7 +865,7 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
         let user_contents: Vec<_> = history
             .iter()
@@ -874,9 +883,9 @@ mod tests {
 
     #[tokio::test]
     async fn model_switch_marker_write_failure_stops_before_publication() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let file_path = temp.path().join("session.jsonl");
-        std::fs::write(&file_path, b"").unwrap();
+        std::fs::write(&file_path, b"").expect("operation should succeed");
         let session = Session::with_store(
             Uuid::new_v4(),
             "test".into(),
@@ -886,7 +895,8 @@ mod tests {
         );
         let (raw_tx, raw_rx) = mpsc::channel(1);
         drop(raw_rx);
-        let mut transition = SessionTransition::new(raw_tx, session.clone()).unwrap();
+        let mut transition =
+            SessionTransition::new(raw_tx, session.clone()).expect("operation should succeed");
         let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
 
         let error = persist_switch_marker_and_read_final_history(
@@ -900,7 +910,7 @@ mod tests {
             },
         )
         .await
-        .unwrap_err();
+        .expect_err("operation should fail");
 
         assert!(matches!(
             error,
@@ -909,25 +919,30 @@ mod tests {
         assert_eq!(
             talos_session::PendingSubmissionStore::for_session(&session)
                 .runtime_generation()
-                .unwrap(),
+                .expect("operation should succeed"),
             1
         );
-        assert!(session.read_entries().unwrap().is_empty());
+        assert!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .is_empty()
+        );
     }
 
     #[tokio::test]
     async fn model_switch_marker_retry_after_restart_is_idempotent_and_replay_equivalent() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-model-marker-retry")
-            .unwrap();
+            .expect("operation should succeed");
         let session = durable.session().clone();
         session
             .append(&Message::User {
                 content: "history-before-switch".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         let marker = model_switch_marker("old-provider", "old-model", "new-provider", "new-model");
         let metadata = SessionMetadata {
             provider: Some("new-provider".into()),
@@ -937,7 +952,8 @@ mod tests {
 
         let (first_tx, first_rx) = mpsc::channel(1);
         drop(first_rx);
-        let mut first_transition = SessionTransition::new(first_tx, session.clone()).unwrap();
+        let mut first_transition =
+            SessionTransition::new(first_tx, session.clone()).expect("operation should succeed");
         let first_history = persist_switch_marker_and_read_final_history(
             &mut first_transition,
             &session,
@@ -945,12 +961,13 @@ mod tests {
             metadata.clone(),
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
         drop(first_transition);
 
         let (restart_tx, restart_rx) = mpsc::channel(1);
         drop(restart_rx);
-        let mut restarted_transition = SessionTransition::new(restart_tx, session.clone()).unwrap();
+        let mut restarted_transition =
+            SessionTransition::new(restart_tx, session.clone()).expect("operation should succeed");
         let retried_history = persist_switch_marker_and_read_final_history(
             &mut restarted_transition,
             &session,
@@ -958,7 +975,7 @@ mod tests {
             metadata,
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
         let Message::System { content, .. } = &marker else {
             unreachable!();
@@ -967,7 +984,7 @@ mod tests {
         assert_eq!(
             session
                 .read_entries()
-                .unwrap()
+                .expect("operation should succeed")
                 .iter()
                 .filter(|entry| entry.role == "system" && entry.content == encoded_marker)
                 .count(),
@@ -983,7 +1000,10 @@ mod tests {
         );
         assert_eq!(
             format!("{retried_history:?}"),
-            format!("{:?}", reopened.read_messages().unwrap())
+            format!(
+                "{:?}",
+                reopened.read_messages().expect("operation should succeed")
+            )
         );
     }
 
@@ -1001,7 +1021,7 @@ mod tests {
 
     #[test]
     fn model_switch_marker_survives_session_jsonl_round_trip() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let session = talos_session::Session::new(
             Uuid::new_v4(),
             "test".into(),
@@ -1019,9 +1039,9 @@ mod tests {
                     ..Default::default()
                 },
             )
-            .unwrap();
+            .expect("operation should succeed");
 
-        let messages = session.read_messages().unwrap();
+        let messages = session.read_messages().expect("operation should succeed");
         assert_eq!(messages.len(), 1);
         let Message::System { content, .. } = &messages[0] else {
             panic!("round-tripped marker must remain a system message");
@@ -1029,7 +1049,7 @@ mod tests {
         assert!(content.contains("anthropic/claude-old"));
         assert!(content.contains("openai/gpt-new"));
 
-        let entries = session.read_entries().unwrap();
+        let entries = session.read_entries().expect("operation should succeed");
         assert_eq!(entries[0].metadata.provider, Some("openai".into()));
         assert_eq!(entries[0].metadata.model, Some("gpt-new".into()));
     }
@@ -1058,8 +1078,8 @@ mod tests {
         let preview = agent
             .preview_request("continue".to_string(), vec![marker])
             .await
-            .unwrap()
-            .unwrap();
+            .expect("operation should succeed")
+            .expect("operation should succeed");
 
         assert!(preview.contains("Model switch"));
         assert!(preview.contains("openai/gpt-new"));
@@ -1067,16 +1087,17 @@ mod tests {
 
     #[tokio::test]
     async fn model_switch_activation_distinguishes_sequential_variant_changes() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-variant-activation-sequence")
-            .unwrap();
+            .expect("operation should succeed");
         let session = durable.session().clone();
 
         let (first_tx, first_rx) = mpsc::channel(1);
         drop(first_rx);
-        let mut first_transition = SessionTransition::new(first_tx, session.clone()).unwrap();
+        let mut first_transition =
+            SessionTransition::new(first_tx, session.clone()).expect("operation should succeed");
         establish_model_activation_and_read_final_history(
             &mut first_transition,
             &session,
@@ -1084,12 +1105,13 @@ mod tests {
             &SessionModelIdentity::new("openai", "o3", Some("high-reasoning")),
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
         drop(first_transition);
 
         let (second_tx, second_rx) = mpsc::channel(1);
         drop(second_rx);
-        let mut second_transition = SessionTransition::new(second_tx, session.clone()).unwrap();
+        let mut second_transition =
+            SessionTransition::new(second_tx, session.clone()).expect("operation should succeed");
         establish_model_activation_and_read_final_history(
             &mut second_transition,
             &session,
@@ -1097,9 +1119,9 @@ mod tests {
             &SessionModelIdentity::new("openai", "o3", Some("low-reasoning")),
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
-        let entries = session.read_entries().unwrap();
+        let entries = session.read_entries().expect("operation should succeed");
         let activations: Vec<_> = entries
             .iter()
             .filter_map(|entry| {
@@ -1122,18 +1144,19 @@ mod tests {
 
     #[tokio::test]
     async fn model_switch_activation_retry_matches_full_logical_identity_once() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(temp.path().join("sessions"));
         let durable = manager
             .create_or_open_session("i169-variant-activation-retry")
-            .unwrap();
+            .expect("operation should succeed");
         let session = durable.session().clone();
         let previous = SessionModelIdentity::new("openai", "o3", Some("low-reasoning"));
         let target = SessionModelIdentity::new("openai", "o3", Some("high-reasoning"));
 
         let (first_tx, first_rx) = mpsc::channel(1);
         drop(first_rx);
-        let mut first_transition = SessionTransition::new(first_tx, session.clone()).unwrap();
+        let mut first_transition =
+            SessionTransition::new(first_tx, session.clone()).expect("operation should succeed");
         let first_history = establish_model_activation_and_read_final_history(
             &mut first_transition,
             &session,
@@ -1141,12 +1164,13 @@ mod tests {
             &target,
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
         drop(first_transition);
 
         let (restart_tx, restart_rx) = mpsc::channel(1);
         drop(restart_rx);
-        let mut restarted_transition = SessionTransition::new(restart_tx, session.clone()).unwrap();
+        let mut restarted_transition =
+            SessionTransition::new(restart_tx, session.clone()).expect("operation should succeed");
         let retried_history = establish_model_activation_and_read_final_history(
             &mut restarted_transition,
             &session,
@@ -1154,9 +1178,9 @@ mod tests {
             &target,
         )
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
-        let entries = session.read_entries().unwrap();
+        let entries = session.read_entries().expect("operation should succeed");
         let activations: Vec<_> = entries
             .iter()
             .filter_map(|entry| {
@@ -1200,9 +1224,11 @@ mod tests {
 
     #[test]
     fn duplicate_model_ids_keep_provider_side_ids_for_structured_switching() {
-        let mut config = Config::default();
-        config.model = "glm-5.2".to_string();
-        config.provider = "zai".to_string();
+        let mut config = Config {
+            model: "glm-5.2".to_string(),
+            provider: "zai".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "zai".to_string(),
             ProviderConfig {
@@ -1248,9 +1274,11 @@ mod tests {
 
     #[test]
     fn unauthenticated_providers_are_omitted_from_model_picker() {
-        let mut config = Config::default();
-        config.model = "claude-sonnet-4-5".to_string();
-        config.provider = "anthropic".to_string();
+        let mut config = Config {
+            model: "claude-sonnet-4-5".to_string(),
+            provider: "anthropic".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "anthropic".to_string(),
             ProviderConfig {
@@ -1284,9 +1312,11 @@ mod tests {
 
     #[test]
     fn is_current_flags_active_model_and_provider() {
-        let mut config = Config::default();
-        config.model = "claude-sonnet-4-5".to_string();
-        config.provider = "anthropic".to_string();
+        let mut config = Config {
+            model: "claude-sonnet-4-5".to_string(),
+            provider: "anthropic".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "anthropic".to_string(),
             ProviderConfig {
@@ -1434,9 +1464,11 @@ mod tests {
 
     #[test]
     fn provider_setup_target_prefers_current_model_for_provider() {
-        let mut config = Config::default();
-        config.model = "glm-5.2".to_string();
-        config.provider = "zai".to_string();
+        let config = Config {
+            model: "glm-5.2".to_string(),
+            provider: "zai".to_string(),
+            ..Default::default()
+        };
 
         let target = provider_setup_target_model(&config, "zai").expect("target model");
 
@@ -1445,9 +1477,11 @@ mod tests {
 
     #[test]
     fn provider_setup_target_falls_back_to_first_provider_model() {
-        let mut config = Config::default();
-        config.model = "claude-sonnet-4-5".to_string();
-        config.provider = "anthropic".to_string();
+        let config = Config {
+            model: "claude-sonnet-4-5".to_string(),
+            provider: "anthropic".to_string(),
+            ..Default::default()
+        };
 
         let target = provider_setup_target_model(&config, "anthropic").expect("target model");
 
@@ -1467,8 +1501,10 @@ mod tests {
     // `Config.variant` and report a change so the caller persists it.
     #[test]
     fn apply_variant_change_clears_when_switching_to_none() {
-        let mut config = Config::default();
-        config.variant = Some("high-reasoning".to_string());
+        let mut config = Config {
+            variant: Some("high-reasoning".to_string()),
+            ..Default::default()
+        };
 
         let changed = apply_variant_change(&mut config, None);
         assert!(changed, "switching Some → None must report a change");
@@ -1477,8 +1513,10 @@ mod tests {
 
     #[test]
     fn apply_variant_change_sets_when_switching_to_some() {
-        let mut config = Config::default();
-        config.variant = None;
+        let mut config = Config {
+            variant: None,
+            ..Default::default()
+        };
 
         let changed = apply_variant_change(&mut config, Some("low-reasoning"));
         assert!(changed, "switching None → Some must report a change");
@@ -1487,8 +1525,10 @@ mod tests {
 
     #[test]
     fn apply_variant_change_updates_when_switching_between_variants() {
-        let mut config = Config::default();
-        config.variant = Some("high-reasoning".to_string());
+        let mut config = Config {
+            variant: Some("high-reasoning".to_string()),
+            ..Default::default()
+        };
 
         let changed = apply_variant_change(&mut config, Some("low-reasoning"));
         assert!(
@@ -1500,8 +1540,10 @@ mod tests {
 
     #[test]
     fn apply_variant_change_noop_when_value_matches() {
-        let mut config = Config::default();
-        config.variant = Some("high-reasoning".to_string());
+        let mut config = Config {
+            variant: Some("high-reasoning".to_string()),
+            ..Default::default()
+        };
 
         let changed = apply_variant_change(&mut config, Some("high-reasoning"));
         assert!(!changed, "identical value must not report a change");
@@ -1510,8 +1552,10 @@ mod tests {
 
     #[test]
     fn apply_variant_change_noop_when_both_none() {
-        let mut config = Config::default();
-        config.variant = None;
+        let mut config = Config {
+            variant: None,
+            ..Default::default()
+        };
 
         let changed = apply_variant_change(&mut config, None);
         assert!(!changed, "None → None must not report a change");

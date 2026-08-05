@@ -55,7 +55,10 @@ impl LanguageModel for RecordingModel {
                 _ => None,
             })
             .unwrap_or_default();
-        self.order.lock().unwrap().push(text.clone());
+        self.order
+            .lock()
+            .expect("operation should succeed")
+            .push(text.clone());
         let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             let _ = tx.send(AgentEvent::TurnStart).await;
@@ -76,9 +79,10 @@ impl LanguageModel for RecordingModel {
 }
 
 fn runtime_skills() -> Arc<tokio::sync::Mutex<crate::skill_runtime::RuntimeSkills>> {
-    let skills_dir = tempfile::tempdir().unwrap();
+    let skills_dir = tempfile::tempdir().expect("operation should succeed");
     Arc::new(tokio::sync::Mutex::new(
-        crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+            .expect("operation should succeed"),
     ))
 }
 
@@ -109,7 +113,7 @@ fn retained_submission(id: &str, sequence: u64, text: &str) -> StructuredSubmiss
 async fn wait_for_order(order: &Arc<Mutex<Vec<String>>>, expected: &[&str]) {
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            let actual = order.lock().unwrap().clone();
+            let actual = order.lock().expect("operation should succeed").clone();
             if actual.len() >= expected.len() {
                 assert_eq!(
                     &actual[..expected.len()],
@@ -167,7 +171,7 @@ async fn wait_for_visible_user_order(
 
 #[tokio::test]
 async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budget() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-bridge-budget")
@@ -217,7 +221,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
 
     user_tx
         .send(UserInput::Message("preserve this exact user input".into()))
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut last_snapshot = SteeringQueueSnapshot {
         entries: Vec::new(),
@@ -258,12 +262,17 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
         "preserve this exact user input"
     );
 
-    user_tx.send(UserInput::Exit).unwrap();
+    user_tx
+        .send(UserInput::Exit)
+        .expect("operation should succeed");
     tokio::time::timeout(Duration::from_secs(2), bridge_task)
         .await
         .expect("bridge exit timeout")
         .expect("bridge task");
-    actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     tokio::time::timeout(Duration::from_secs(2), actor_task)
         .await
         .expect("Actor shutdown timeout")
@@ -281,8 +290,8 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
     register_generation_bound_sender(&sender_two, 2);
 
     let (watch_tx, watch_rx) = tokio::sync::watch::channel(sender_zero);
-    watch_tx.send(sender_one).unwrap();
-    watch_tx.send(sender_two).unwrap();
+    watch_tx.send(sender_one).expect("operation should succeed");
+    watch_tx.send(sender_two).expect("operation should succeed");
 
     let (agent_tx, agent_rx) = mpsc::unbounded_channel();
     let (user_tx, user_rx) = mpsc::unbounded_channel();
@@ -305,7 +314,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
 
     user_tx
         .send(UserInput::Message("generation two".into()))
-        .unwrap();
+        .expect("operation should succeed");
     let operation = tokio::time::timeout(Duration::from_secs(5), receiver_two.recv())
         .await
         .expect("G2 dispatch timeout")
@@ -330,7 +339,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
             total_text_bytes: submission.total_text_bytes(),
             disposition: SubmissionReceiptDisposition::AcceptedPending,
         })
-        .unwrap();
+        .expect("operation should succeed");
     agent_tx
         .send(SessionEvent::StructuredTurnEvent {
             session_id: "session-generation-two".into(),
@@ -342,7 +351,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
             sequence: 0,
             payload: TurnEventPayload::Started,
         })
-        .unwrap();
+        .expect("operation should succeed");
     agent_tx
         .send(SessionEvent::StructuredTurnEvent {
             session_id: "session-generation-two".into(),
@@ -359,7 +368,7 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
                 },
             },
         })
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -379,13 +388,15 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
     .await
     .expect("G2 receipt projection timeout");
 
-    user_tx.send(UserInput::Exit).unwrap();
-    bridge_task.await.unwrap();
+    user_tx
+        .send(UserInput::Exit)
+        .expect("operation should succeed");
+    bridge_task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
 async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-retained-bridge-order")
@@ -394,10 +405,10 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     let u1 = retained_submission("retained-u1", 1, "U1");
     let u2 = retained_submission("retained-u2", 2, "U2");
-    store.accept(&u1).unwrap();
-    store.mark_paused(&u1.id).unwrap();
-    store.accept(&u2).unwrap();
-    store.mark_paused(&u2.id).unwrap();
+    store.accept(&u1).expect("operation should succeed");
+    store.mark_paused(&u1.id).expect("operation should succeed");
+    store.accept(&u2).expect("operation should succeed");
+    store.mark_paused(&u2.id).expect("operation should succeed");
 
     let order = Arc::new(Mutex::new(Vec::new()));
     #[allow(deprecated)]
@@ -437,31 +448,48 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
         },
     ));
 
-    user_tx.send(UserInput::Message("R".into())).unwrap();
+    user_tx
+        .send(UserInput::Message("R".into()))
+        .expect("operation should succeed");
     wait_for_order(&order, &["U1", "U2", "R"]).await;
     assert_eq!(
-        store.get(&u1.id).unwrap().unwrap().state,
+        store
+            .get(&u1.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::Committed
     );
     assert_eq!(
-        store.get(&u2.id).unwrap().unwrap().state,
+        store
+            .get(&u2.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::Committed
     );
 
-    user_tx.send(UserInput::Message("NEXT".into())).unwrap();
+    user_tx
+        .send(UserInput::Message("NEXT".into()))
+        .expect("operation should succeed");
     wait_for_order(&order, &["U1", "U2", "R", "NEXT"]).await;
     let visible = wait_for_visible_user_order(&mut ui_rx, &["U1", "U2", "R", "NEXT"]).await;
     assert_eq!(visible, vec!["U1", "U2", "R", "NEXT"]);
 
-    user_tx.send(UserInput::Exit).unwrap();
-    bridge_task.await.unwrap();
-    actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    user_tx
+        .send(UserInput::Exit)
+        .expect("operation should succeed");
+    bridge_task.await.expect("operation should succeed");
+    actor_sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
 async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptance() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-retained-cancel-pause")
@@ -470,8 +498,10 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     let oversized = "U".repeat(60_000);
     let retained = retained_submission("retained-cancel-u1", 1, &oversized);
-    store.accept(&retained).unwrap();
-    store.mark_paused(&retained.id).unwrap();
+    store.accept(&retained).expect("operation should succeed");
+    store
+        .mark_paused(&retained.id)
+        .expect("operation should succeed");
 
     let order = Arc::new(Mutex::new(Vec::new()));
     #[allow(deprecated)]
@@ -511,7 +541,9 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
         },
     ));
 
-    user_tx.send(UserInput::Message("R".into())).unwrap();
+    user_tx
+        .send(UserInput::Message("R".into()))
+        .expect("operation should succeed");
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match ui_rx.recv().await {
@@ -532,25 +564,42 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
     .await
     .expect("retained pre-start pause must expose a resolution action");
     assert_eq!(
-        store.get(&retained.id).unwrap().unwrap().state,
+        store
+            .get(&retained.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::PausedPending
     );
-    assert!(order.lock().unwrap().is_empty());
+    assert!(order.lock().expect("operation should succeed").is_empty());
 
-    user_tx.send(UserInput::Cancel).unwrap();
+    user_tx
+        .send(UserInput::Cancel)
+        .expect("operation should succeed");
     wait_for_order(&order, &["R"]).await;
     assert_eq!(
-        store.get(&retained.id).unwrap().unwrap().state,
+        store
+            .get(&retained.id)
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::TerminalCancelled
     );
 
-    user_tx.send(UserInput::Message("NEXT".into())).unwrap();
+    user_tx
+        .send(UserInput::Message("NEXT".into()))
+        .expect("operation should succeed");
     wait_for_order(&order, &["R", "NEXT"]).await;
     let visible = wait_for_visible_user_order(&mut ui_rx, &["R", "NEXT"]).await;
     assert_eq!(visible, vec!["R", "NEXT"]);
 
-    user_tx.send(UserInput::Exit).unwrap();
-    bridge_task.await.unwrap();
-    actor_sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    user_tx
+        .send(UserInput::Exit)
+        .expect("operation should succeed");
+    bridge_task.await.expect("operation should succeed");
+    actor_sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }

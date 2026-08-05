@@ -1761,9 +1761,11 @@ mod i168_terminal_tests {
     #[test]
     fn terminal_processing_clear_status_reaches_tui_state() {
         let mut tui = Tui::for_test(TuiState::new(), None);
-        let mut status = talos_conversation::StatusSnapshot::default();
-        status.is_processing = false;
-        status.phase = Some(talos_conversation::TurnPhase::Failed);
+        let status = talos_conversation::StatusSnapshot {
+            is_processing: false,
+            phase: Some(talos_conversation::TurnPhase::Failed),
+            ..Default::default()
+        };
         tui.handle_ui_output(UiOutput::Status(status.clone()));
 
         assert_eq!(tui.state.status, status);

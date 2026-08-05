@@ -11,6 +11,7 @@ use talos_plugin::{HookContext, HookEvent, HookEventKind, HookHandler, HookRegis
 use tokio::sync::mpsc;
 
 use super::*;
+use crate::RequestBudgetSpec;
 
 #[derive(Clone)]
 struct CapturedRequest {
@@ -149,8 +150,8 @@ async fn initial_provider_dispatch_consumes_the_exact_sealed_plan_once() {
         .expect("captured request lock poisoned");
     assert_eq!(captured.len(), 1);
     assert_eq!(
-        serde_json::to_value(&captured[0].messages).unwrap(),
-        serde_json::to_value(&expected_messages).unwrap()
+        serde_json::to_value(&captured[0].messages).expect("operation should succeed"),
+        serde_json::to_value(&expected_messages).expect("operation should succeed")
     );
     assert_eq!(captured[0].tools, expected_tools);
 }
@@ -185,5 +186,127 @@ async fn over_budget_sealed_plan_never_reaches_the_provider() {
             .expect("captured request lock poisoned")
             .is_empty(),
         "a rejected sealed plan must never dispatch"
+    );
+}
+
+#[tokio::test]
+async fn configured_output_limit_above_4096_is_reserved_before_dispatch() {
+    let (model, captured_requests) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_request_budget_spec(RequestBudgetSpec::new(8_192));
+    let items = vec![SubmissionItem {
+        id: "large_output_reserve".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "small input".into(),
+        attachments: Vec::new(),
+    }];
+
+    let result = agent.prepare_session_turn(&items, Vec::new(), 8_191).await;
+    assert!(matches!(
+        result,
+        Err(AgentError::ContextBudgetExceeded { limit: 8_191, .. })
+    ));
+    assert!(
+        captured_requests
+            .lock()
+            .expect("operation should succeed")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn declared_image_size_is_conservatively_budgeted_before_dispatch() {
+    use talos_core::message::ContentPart;
+
+    let (model, captured_requests) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+    agent.set_request_budget_spec(RequestBudgetSpec::new(1));
+    let items = vec![SubmissionItem {
+        id: "large_image".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "inspect".into(),
+        attachments: vec![ContentPart::Image {
+            path: PathBuf::from("/tmp/large.png"),
+            mime: "image/png".into(),
+            byte_count: 3_000_000,
+            content_digest: Default::default(),
+        }],
+    }];
+
+    let result = agent
+        .prepare_session_turn(&items, Vec::new(), 100_000)
+        .await;
+    assert!(matches!(
+        result,
+        Err(AgentError::ContextBudgetExceeded { limit: 100_000, .. })
+    ));
+    assert!(
+        captured_requests
+            .lock()
+            .expect("operation should succeed")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn multiple_declared_images_saturate_budget_instead_of_overflowing() {
+    use talos_core::message::ContentPart;
+
+    let (model, captured_requests) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_image_input_supported(true);
+    agent.set_request_budget_spec(RequestBudgetSpec::new(1));
+    let image = |name: &str| ContentPart::Image {
+        path: PathBuf::from(name),
+        mime: "image/png".into(),
+        byte_count: u64::MAX,
+        content_digest: Default::default(),
+    };
+    let items = vec![SubmissionItem {
+        id: "multiple_huge_images".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "inspect".into(),
+        attachments: vec![image("/tmp/a.png"), image("/tmp/b.png")],
+    }];
+
+    const LIMIT: u32 = u32::MAX - 1;
+    let result = agent.prepare_session_turn(&items, Vec::new(), LIMIT).await;
+    assert!(matches!(
+        result,
+        Err(AgentError::ContextBudgetExceeded {
+            estimated: u32::MAX,
+            limit: LIMIT,
+        })
+    ));
+    assert!(
+        captured_requests
+            .lock()
+            .expect("operation should succeed")
+            .is_empty()
     );
 }

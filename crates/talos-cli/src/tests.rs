@@ -144,28 +144,46 @@ mod tests {
 
     fn empty_runtime_skills()
     -> std::sync::Arc<tokio::sync::Mutex<crate::skill_runtime::RuntimeSkills>> {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         std::sync::Arc::new(tokio::sync::Mutex::new(
-            discover_runtime_skills(dir.path(), false).unwrap(),
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed"),
         ))
     }
 
     #[test]
     fn parse_provider_anthropic() {
-        assert_eq!(parse_provider("anthropic").unwrap(), "anthropic");
-        assert_eq!(parse_provider("Anthropic").unwrap(), "anthropic");
-        assert_eq!(parse_provider("ANTHROPIC").unwrap(), "anthropic");
+        assert_eq!(
+            parse_provider("anthropic").expect("operation should succeed"),
+            "anthropic"
+        );
+        assert_eq!(
+            parse_provider("Anthropic").expect("operation should succeed"),
+            "anthropic"
+        );
+        assert_eq!(
+            parse_provider("ANTHROPIC").expect("operation should succeed"),
+            "anthropic"
+        );
     }
 
     #[test]
     fn parse_provider_openai() {
-        assert_eq!(parse_provider("openai").unwrap(), "openai");
-        assert_eq!(parse_provider("OpenAI").unwrap(), "openai");
+        assert_eq!(
+            parse_provider("openai").expect("operation should succeed"),
+            "openai"
+        );
+        assert_eq!(
+            parse_provider("OpenAI").expect("operation should succeed"),
+            "openai"
+        );
     }
 
     #[test]
     fn parse_provider_custom_name() {
-        assert_eq!(parse_provider("DashScope").unwrap(), "dashscope");
+        assert_eq!(
+            parse_provider("DashScope").expect("operation should succeed"),
+            "dashscope"
+        );
         assert!(parse_provider("").is_err());
     }
 
@@ -279,16 +297,18 @@ mod tests {
             },
         ));
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         user_tx
             .send(UserInput::Message("queued follow-up".to_string()))
-            .unwrap();
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TurnEnd {
                 stop_reason: talos_core::message::StopReason::EndTurn,
                 usage: Default::default(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let submission = receive_structured_submission(&mut interrupt_rx).await;
         assert_eq!(submission.items.len(), 1);
@@ -323,7 +343,7 @@ mod tests {
         assert!(saw_queue_drained_status);
         drop(agent_tx);
         drop(user_tx);
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
@@ -362,7 +382,7 @@ mod tests {
                 provider: "new-provider".to_string(),
                 ..Default::default()
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let status = tokio::time::timeout(std::time::Duration::from_secs(1), async {
             loop {
@@ -413,7 +433,7 @@ mod tests {
                 sequence: 0,
                 payload: TurnEventPayload::Started,
             })
-            .unwrap();
+            .expect("operation should succeed");
         event_tx
             .send(SessionEvent::TurnEvent {
                 session_id: "session_test".into(),
@@ -423,7 +443,7 @@ mod tests {
                     event: AgentEvent::TurnStart,
                 },
             })
-            .unwrap();
+            .expect("operation should succeed");
         tokio::time::timeout(std::time::Duration::from_secs(1), async {
             while let Some(output) = ui_rx.recv().await {
                 if matches!(output, UiOutput::Status(status) if status.is_processing) {
@@ -435,7 +455,7 @@ mod tests {
         .expect("turn start reaches conversation state");
         user_tx
             .send(UserInput::Message("after tool".into()))
-            .unwrap();
+            .expect("operation should succeed");
         event_tx
             .send(SessionEvent::TurnEvent {
                 session_id: "session_test".into(),
@@ -448,7 +468,7 @@ mod tests {
                     },
                 },
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(100), sq_rx.recv())
@@ -469,7 +489,7 @@ mod tests {
                     },
                 },
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let submission = receive_structured_submission(&mut sq_rx).await;
         assert_eq!(submission.items.len(), 1);
@@ -543,7 +563,9 @@ mod tests {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::ToolCall {
                 call: talos_core::message::ToolCall {
@@ -554,7 +576,7 @@ mod tests {
                 provenance: talos_core::tool::ToolProvenance::Native,
                 summary_fields: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::ToolResult {
                 result: talos_core::message::MessageToolResult {
@@ -563,12 +585,12 @@ mod tests {
                     is_error: false,
                 },
             })
-            .unwrap();
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::Error {
                 message: "provider connection reset after tool results".to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let status = collect_terminal_status(&mut ui_rx).await;
@@ -578,7 +600,7 @@ mod tests {
         );
         assert_eq!(status.phase, Some(talos_conversation::TurnPhase::Failed));
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
@@ -586,12 +608,14 @@ mod tests {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::Error {
                 message: "request timed out after 30s".to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let status = collect_terminal_status(&mut ui_rx).await;
@@ -601,7 +625,7 @@ mod tests {
         );
         assert_eq!(status.phase, Some(talos_conversation::TurnPhase::TimedOut));
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
@@ -609,13 +633,15 @@ mod tests {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::Error {
                 message: "network error: request dispatch timeout: no response headers within 1s"
                     .to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let status = collect_terminal_status(&mut ui_rx).await;
@@ -625,7 +651,7 @@ mod tests {
         );
         assert_eq!(status.phase, Some(talos_conversation::TurnPhase::TimedOut));
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
@@ -633,18 +659,20 @@ mod tests {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TextDelta {
                 delta: "partial".to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TurnEnd {
                 stop_reason: talos_core::message::StopReason::MaxTokens,
                 usage: talos_core::message::Usage::default(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let status = collect_terminal_status(&mut ui_rx).await;
@@ -653,7 +681,7 @@ mod tests {
             "runtime must not remain stuck after MaxTokens turn end"
         );
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     // FS03 / RUNTIME-002 FS01 surface #3: prove the conversation loop forwards a terminal
@@ -667,12 +695,14 @@ mod tests {
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
         let error_message = "provider connection reset".to_string();
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::Error {
                 message: error_message.clone(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let mut saw_error_tip = false;
@@ -711,7 +741,7 @@ mod tests {
             "terminal error must emit a terminal Status with is_processing=false"
         );
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
@@ -719,18 +749,20 @@ mod tests {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TextDelta {
                 delta: "completed reply".to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TurnEnd {
                 stop_reason: talos_core::message::StopReason::EndTurn,
                 usage: talos_core::message::Usage::default(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         drop(agent_tx);
 
         let status = collect_terminal_status(&mut ui_rx).await;
@@ -743,7 +775,7 @@ mod tests {
             "normal EndTurn success must reset phase to None"
         );
 
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     // D103 / RUNTIME-002 FS01 surface #3: prove the conversation loop forwards a terminal
@@ -783,16 +815,20 @@ mod tests {
             },
         ));
 
-        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TurnStart)
+            .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::TextDelta {
                 delta: "generating".to_string(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-        user_tx.send(UserInput::Cancel).unwrap();
+        user_tx
+            .send(UserInput::Cancel)
+            .expect("operation should succeed");
 
         let operation =
             tokio::time::timeout(std::time::Duration::from_secs(1), interrupt_rx.recv())
@@ -837,22 +873,22 @@ mod tests {
 
         drop(agent_tx);
         drop(user_tx);
-        loop_handle.await.unwrap();
+        loop_handle.await.expect("operation should succeed");
     }
 
     #[tokio::test]
     async fn conversation_loop_routes_skill_activation_to_session_op() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let skill_dir = dir.path().join(".talos/skills/review");
-        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::create_dir_all(&skill_dir).expect("operation should succeed");
         std::fs::write(
             skill_dir.join("SKILL.md"),
             "---\nname: review\ndescription: Review code\ntriggers:\n  - review\n---\n\n# Review\nCheck safety.\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            discover_runtime_skills(dir.path(), false).unwrap(),
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed"),
         ));
         let skills = runtime_skills.lock().await.diagnostics();
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string())
@@ -886,7 +922,7 @@ mod tests {
 
         user_tx
             .send(UserInput::Message("/skills activate review".to_string()))
-            .unwrap();
+            .expect("operation should succeed");
 
         let op = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
             .await
@@ -895,7 +931,11 @@ mod tests {
         match op {
             talos_core::session::SessionOp::SetSkillContext { name, content } => {
                 assert_eq!(name.as_deref(), Some("review"));
-                assert!(content.unwrap().contains("Check safety."));
+                assert!(
+                    content
+                        .expect("operation should succeed")
+                        .contains("Check safety.")
+                );
             }
             _ => panic!("expected skill context session op"),
         }
@@ -918,9 +958,11 @@ mod tests {
 
     #[test]
     fn model_metadata_context_includes_model_info_without_secret() {
-        let mut config = talos_config::Config::default();
-        config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-5".to_string();
+        let mut config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5".to_string(),
+            ..Default::default()
+        };
         config.set_provider_credential("anthropic", "sk-secret-value");
 
         let file = crate::mode_runtime::model_metadata_context_file(&config);
@@ -934,11 +976,11 @@ mod tests {
 
     #[test]
     fn session_model_metadata_overrides_config_on_resume() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
         let session = manager
             .create_session("test-project", "test-workspace")
-            .unwrap();
+            .expect("operation should succeed");
         session
             .append_with_metadata(
                 &talos_core::message::Message::User {
@@ -950,11 +992,13 @@ mod tests {
                     ..Default::default()
                 },
             )
-            .unwrap();
+            .expect("operation should succeed");
 
-        let mut config = talos_config::Config::default();
-        config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-5".to_string();
+        let mut config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5".to_string(),
+            ..Default::default()
+        };
 
         crate::mode_runtime::apply_session_model_to_config(&mut config, &session);
 
@@ -966,7 +1010,7 @@ mod tests {
 
     #[test]
     fn session_manager_resume_invalid_id() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
 
         let result = manager.resume_session("not-a-valid-uuid");
@@ -975,13 +1019,13 @@ mod tests {
 
     #[test]
     fn session_manager_resume_nonexistent_session() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
 
         let valid_uuid = uuid::Uuid::new_v4().to_string();
         let result = manager.resume_session(&valid_uuid);
         assert!(result.is_err());
-        match result.unwrap_err() {
+        match result.expect_err("operation should fail") {
             talos_session::SessionError::SessionNotFound(_) => {}
             other => panic!("expected SessionNotFound, got {other:?}"),
         }
@@ -989,7 +1033,7 @@ mod tests {
 
     #[test]
     fn session_manager_search_empty_index() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
 
         let results = manager.search("nonexistent", 10);
@@ -1000,12 +1044,12 @@ mod tests {
 
     #[test]
     fn session_manager_list_recent_empty_index() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
 
         let results = manager.list_recent(10);
         assert!(results.is_ok());
-        assert!(results.unwrap().is_empty());
+        assert!(results.expect("operation should succeed").is_empty());
     }
 
     // === Config Display Masking Tests (I046-S3) ===
@@ -1024,7 +1068,8 @@ mod tests {
             )]),
             ..Default::default()
         };
-        let value = config_get_dotted(&config, "providers.custom.api_key").unwrap();
+        let value = config_get_dotted(&config, "providers.custom.api_key")
+            .expect("operation should succeed");
         assert_eq!(value, "sk-test-secret");
     }
 
@@ -1118,7 +1163,7 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn storage_status_missing_home() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let status = collect_storage_status(&talos_root);
         assert!(!status.talos_root_exists);
@@ -1133,22 +1178,26 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn storage_status_populated() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "test-workspace";
-        let s1 = manager.create_session("proj-a", ws).unwrap();
+        let s1 = manager
+            .create_session("proj-a", ws)
+            .expect("operation should succeed");
         s1.append(&Message::User {
             content: "hello".into(),
         })
-        .unwrap();
-        let s2 = manager.create_session("proj-b", ws).unwrap();
+        .expect("operation should succeed");
+        let s2 = manager
+            .create_session("proj-b", ws)
+            .expect("operation should succeed");
         s2.append(&Message::User {
             content: "world".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
         let status = collect_storage_status(&talos_root);
         assert!(status.talos_root_exists);
@@ -1159,18 +1208,20 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn cleanup_dry_run_no_deletion() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "dry-run-ws";
         for i in 0..3 {
-            let s = manager.create_session("proj", ws).unwrap();
+            let s = manager
+                .create_session("proj", ws)
+                .expect("operation should succeed");
             s.append(&Message::User {
                 content: format!("msg-{i}"),
             })
-            .unwrap();
+            .expect("operation should succeed");
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
 
@@ -1180,14 +1231,16 @@ api_key_env = "ANTHROPIC_API_KEY"
             max_age_days: None,
             protected_session_ids: vec![],
         };
-        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        let candidates = manager
+            .cleanup_candidates(&policy)
+            .expect("operation should succeed");
         assert!(!candidates.is_empty());
 
         let before_files: Vec<_> = std::fs::read_dir(&sessions_dir)
-            .unwrap()
+            .expect("operation should succeed")
             .flat_map(|e| e.ok())
             .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).unwrap())
+            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).expect("operation should succeed"))
             .flat_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
@@ -1196,10 +1249,10 @@ api_key_env = "ANTHROPIC_API_KEY"
         print_cleanup_dry_run(&candidates);
 
         let after_files: Vec<_> = std::fs::read_dir(&sessions_dir)
-            .unwrap()
+            .expect("operation should succeed")
             .flat_map(|e| e.ok())
             .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).unwrap())
+            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).expect("operation should succeed"))
             .flat_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
@@ -1214,27 +1267,35 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn cleanup_apply_deletes_jsonl_and_index() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "apply-ws";
-        let stale = manager.create_session("proj", ws).unwrap();
+        let stale = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         stale
             .append(&Message::User {
                 content: "stale content".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let keep = manager.create_session("proj", ws).unwrap();
+        let keep = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         keep.append(&Message::User {
             content: "keep content".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
-        manager.update_index(&stale).unwrap();
-        manager.update_index(&keep).unwrap();
+        manager
+            .update_index(&stale)
+            .expect("operation should succeed");
+        manager
+            .update_index(&keep)
+            .expect("operation should succeed");
 
         let policy = talos_session::SessionCleanupPolicy {
             workspace_root: Some(ws.to_string()),
@@ -1243,12 +1304,16 @@ api_key_env = "ANTHROPIC_API_KEY"
             protected_session_ids: vec![keep.id],
         };
 
-        let report = manager.apply_cleanup(&policy).unwrap();
+        let report = manager
+            .apply_cleanup(&policy)
+            .expect("operation should succeed");
         assert_eq!(report.removed, 1);
         assert!(!stale.file_path.exists(), "stale JSONL must be deleted");
         assert!(keep.file_path.exists(), "protected JSONL must remain");
 
-        let search_results = manager.search("stale", 10).unwrap();
+        let search_results = manager
+            .search("stale", 10)
+            .expect("operation should succeed");
         assert!(
             !search_results
                 .iter()
@@ -1259,24 +1324,28 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn cleanup_protects_active_session() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "protect-ws";
-        let active = manager.create_session("proj", ws).unwrap();
+        let active = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         active
             .append(&Message::User {
                 content: "active".into(),
             })
-            .unwrap();
-        let other = manager.create_session("proj", ws).unwrap();
+            .expect("operation should succeed");
+        let other = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         other
             .append(&Message::User {
                 content: "other".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let policy = talos_session::SessionCleanupPolicy {
             workspace_root: Some(ws.to_string()),
@@ -1285,7 +1354,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             protected_session_ids: vec![active.id],
         };
 
-        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        let candidates = manager
+            .cleanup_candidates(&policy)
+            .expect("operation should succeed");
         assert!(
             !candidates.iter().any(|c| c.id == active.id),
             "active session must never be a cleanup candidate"
@@ -1294,17 +1365,19 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn cleanup_apply_requires_criteria() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "criteria-ws";
-        let s = manager.create_session("proj", ws).unwrap();
+        let s = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         s.append(&Message::User {
             content: "test".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
 
         let policy = talos_session::SessionCleanupPolicy {
             workspace_root: None,
@@ -1313,7 +1386,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             protected_session_ids: vec![],
         };
 
-        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        let candidates = manager
+            .cleanup_candidates(&policy)
+            .expect("operation should succeed");
         assert!(
             candidates.is_empty(),
             "no criteria should yield zero candidates"
@@ -1322,24 +1397,30 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn maintenance_operations_run() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let talos_root = dir.path().join(".talos");
         let sessions_dir = talos_root.join("sessions");
         let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
 
         let ws = "maint-ws";
-        let s = manager.create_session("proj", ws).unwrap();
+        let s = manager
+            .create_session("proj", ws)
+            .expect("operation should succeed");
         s.append(&Message::User {
             content: "maintenance test".into(),
         })
-        .unwrap();
-        manager.update_index(&s).unwrap();
+        .expect("operation should succeed");
+        manager.update_index(&s).expect("operation should succeed");
 
-        manager.checkpoint_index().unwrap();
-        manager.vacuum_index().unwrap();
-        let fixed = manager.reconcile_index().unwrap();
+        manager
+            .checkpoint_index()
+            .expect("operation should succeed");
+        manager.vacuum_index().expect("operation should succeed");
+        let fixed = manager.reconcile_index().expect("operation should succeed");
 
-        let results = manager.search("maintenance", 10).unwrap();
+        let results = manager
+            .search("maintenance", 10)
+            .expect("operation should succeed");
         assert!(
             results.iter().any(|r| r.session_id == s.id.to_string()),
             "sessions must survive maintenance operations"
@@ -1350,12 +1431,14 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn config_subcommand_list_masks_secrets() {
-        let mut config = talos_config::Config::default();
-        config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4".to_string();
+        let mut config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            ..Default::default()
+        };
         config.set_provider_credential("anthropic", "sk-test-secret-123");
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
         let masked = mask_secrets(&toml_str, &config);
         assert!(!masked.contains("sk-test-secret-123"));
         assert!(masked.contains("api_key = ***"));
@@ -1369,29 +1452,35 @@ api_key_env = "ANTHROPIC_API_KEY"
             ..Default::default()
         };
         assert_eq!(
-            config_get_dotted(&config, "model").unwrap(),
+            config_get_dotted(&config, "model").expect("operation should succeed"),
             "claude-sonnet-4"
         );
-        assert_eq!(config_get_dotted(&config, "provider").unwrap(), "anthropic");
+        assert_eq!(
+            config_get_dotted(&config, "provider").expect("operation should succeed"),
+            "anthropic"
+        );
     }
 
     #[test]
     fn config_subcommand_set_persists() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let config_path = dir.path().join("config.toml");
 
-        let mut config = talos_config::Config::default();
-        config.model = "old-model".to_string();
-        let toml_str = toml::to_string_pretty(&config).unwrap();
-        std::fs::write(&config_path, toml_str).unwrap();
+        let mut config = talos_config::Config {
+            model: "old-model".to_string(),
+            ..Default::default()
+        };
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
+        std::fs::write(&config_path, toml_str).expect("operation should succeed");
 
-        let raw = std::fs::read_to_string(&config_path).unwrap();
-        let mut config: talos_config::Config = toml::from_str(&raw).unwrap();
-        config_set_dotted(&mut config, "model", "new-model").unwrap();
-        let saved = toml::to_string_pretty(&config).unwrap();
-        std::fs::write(&config_path, &saved).unwrap();
+        let raw = std::fs::read_to_string(&config_path).expect("operation should succeed");
+        let mut config: talos_config::Config =
+            toml::from_str(&raw).expect("operation should succeed");
+        config_set_dotted(&mut config, "model", "new-model").expect("operation should succeed");
+        let saved = toml::to_string_pretty(&config).expect("operation should succeed");
+        std::fs::write(&config_path, &saved).expect("operation should succeed");
 
-        let reloaded = std::fs::read_to_string(&config_path).unwrap();
+        let reloaded = std::fs::read_to_string(&config_path).expect("operation should succeed");
         assert!(reloaded.contains("new-model"));
         assert!(!reloaded.contains("old-model"));
     }
@@ -1410,7 +1499,8 @@ api_key_env = "ANTHROPIC_API_KEY"
             )]),
             ..Default::default()
         };
-        let raw = config_get_dotted(&config, "providers.anthropic.api_key").unwrap();
+        let raw = config_get_dotted(&config, "providers.anthropic.api_key")
+            .expect("operation should succeed");
         assert_eq!(raw, "sk-should-be-masked");
         assert!(is_secret_key("providers.anthropic.api_key"));
     }
@@ -1418,8 +1508,12 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn config_set_protocol() {
         let mut config = talos_config::Config::default();
-        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat").unwrap();
-        let provider = config.providers.get("my-gw").unwrap();
+        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat")
+            .expect("operation should succeed");
+        let provider = config
+            .providers
+            .get("my-gw")
+            .expect("operation should succeed");
         assert_eq!(
             provider.protocol,
             talos_config::ProviderProtocol::OpenAIChat
@@ -1430,15 +1524,18 @@ api_key_env = "ANTHROPIC_API_KEY"
             "providers.my-gw.protocol",
             "anthropic-messages",
         )
-        .unwrap();
-        let provider = config.providers.get("my-gw").unwrap();
+        .expect("operation should succeed");
+        let provider = config
+            .providers
+            .get("my-gw")
+            .expect("operation should succeed");
         assert_eq!(
             provider.protocol,
             talos_config::ProviderProtocol::AnthropicMessages
         );
 
-        let err =
-            config_set_dotted(&mut config, "providers.my-gw.protocol", "invalid").unwrap_err();
+        let err = config_set_dotted(&mut config, "providers.my-gw.protocol", "invalid")
+            .expect_err("operation should fail");
         assert!(err.to_string().contains("unknown protocol"));
     }
 
@@ -1450,14 +1547,21 @@ api_key_env = "ANTHROPIC_API_KEY"
             "providers.my-gw.models.claude-4.context_limit",
             "200000",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let provider = config.providers.get("my-gw").unwrap();
-        let model = provider.models.get("claude-4").unwrap();
+        let provider = config
+            .providers
+            .get("my-gw")
+            .expect("operation should succeed");
+        let model = provider
+            .models
+            .get("claude-4")
+            .expect("operation should succeed");
         assert_eq!(model.context_limit, Some(200000));
 
         assert_eq!(
-            config_get_dotted(&config, "providers.my-gw.models.claude-4.context_limit").unwrap(),
+            config_get_dotted(&config, "providers.my-gw.models.claude-4.context_limit")
+                .expect("operation should succeed"),
             "200000"
         );
     }
@@ -1470,14 +1574,21 @@ api_key_env = "ANTHROPIC_API_KEY"
             "providers.my-gw.models.claude-4.output_limit",
             "4096",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let provider = config.providers.get("my-gw").unwrap();
-        let model = provider.models.get("claude-4").unwrap();
+        let provider = config
+            .providers
+            .get("my-gw")
+            .expect("operation should succeed");
+        let model = provider
+            .models
+            .get("claude-4")
+            .expect("operation should succeed");
         assert_eq!(model.output_limit, Some(4096));
 
         assert_eq!(
-            config_get_dotted(&config, "providers.my-gw.models.claude-4.output_limit").unwrap(),
+            config_get_dotted(&config, "providers.my-gw.models.claude-4.output_limit")
+                .expect("operation should succeed"),
             "4096"
         );
     }
@@ -1486,11 +1597,12 @@ api_key_env = "ANTHROPIC_API_KEY"
     fn config_get_dashboard_values() {
         let config = talos_config::Config::default();
         assert_eq!(
-            config_get_dotted(&config, "dashboard.enabled").unwrap(),
+            config_get_dotted(&config, "dashboard.enabled").expect("operation should succeed"),
             "true"
         );
         assert_eq!(
-            config_get_dotted(&config, "dashboard.loopback_only").unwrap(),
+            config_get_dotted(&config, "dashboard.loopback_only")
+                .expect("operation should succeed"),
             "true"
         );
     }
@@ -1498,17 +1610,20 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn config_set_dashboard_values() {
         let mut config = talos_config::Config::default();
-        config_set_dotted(&mut config, "dashboard.enabled", "false").unwrap();
-        config_set_dotted(&mut config, "dashboard.loopback_only", "false").unwrap();
+        config_set_dotted(&mut config, "dashboard.enabled", "false")
+            .expect("operation should succeed");
+        config_set_dotted(&mut config, "dashboard.loopback_only", "false")
+            .expect("operation should succeed");
 
         assert!(!config.dashboard.enabled);
         assert!(!config.dashboard.loopback_only);
         assert_eq!(
-            config_get_dotted(&config, "dashboard.enabled").unwrap(),
+            config_get_dotted(&config, "dashboard.enabled").expect("operation should succeed"),
             "false"
         );
         assert_eq!(
-            config_get_dotted(&config, "dashboard.loopback_only").unwrap(),
+            config_get_dotted(&config, "dashboard.loopback_only")
+                .expect("operation should succeed"),
             "false"
         );
     }
@@ -1516,7 +1631,8 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn config_set_dashboard_bool_rejects_invalid_value() {
         let mut config = talos_config::Config::default();
-        let err = config_set_dotted(&mut config, "dashboard.loopback_only", "maybe").unwrap_err();
+        let err = config_set_dotted(&mut config, "dashboard.loopback_only", "maybe")
+            .expect_err("operation should fail");
         assert!(err.to_string().contains("invalid boolean"));
     }
 
@@ -1529,9 +1645,12 @@ api_key_env = "ANTHROPIC_API_KEY"
         };
         let flag_result = config_get_dotted(&config, "model");
         let subcommand_result = config_get_dotted(&config, "model");
-        assert_eq!(flag_result.unwrap(), subcommand_result.unwrap());
+        assert_eq!(
+            flag_result.expect("operation should succeed"),
+            subcommand_result.expect("operation should succeed")
+        );
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
         let masked = mask_secrets(&toml_str, &config);
         assert!(masked.contains("model = \"claude-sonnet-4\""));
     }
@@ -1540,19 +1659,23 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn config_validate_rejects_empty_provider() {
-        let mut config = talos_config::Config::default();
-        config.model = "test".to_string();
-        config.provider = "".to_string();
-        let err = config.validate().unwrap_err();
+        let mut config = talos_config::Config {
+            model: "test".to_string(),
+            provider: "".to_string(),
+            ..Default::default()
+        };
+        let err = config.validate().expect_err("operation should fail");
         assert!(err.to_string().contains("provider"));
     }
 
     #[test]
     fn config_validate_rejects_empty_model() {
-        let mut config = talos_config::Config::default();
-        config.provider = "anthropic".to_string();
-        config.model = "".to_string();
-        let err = config.validate().unwrap_err();
+        let mut config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "".to_string(),
+            ..Default::default()
+        };
+        let err = config.validate().expect_err("operation should fail");
         assert!(err.to_string().contains("model"));
     }
 
@@ -1570,7 +1693,7 @@ api_key_env = "ANTHROPIC_API_KEY"
             )]),
             ..Default::default()
         };
-        let err = config.validate().unwrap_err();
+        let err = config.validate().expect_err("operation should fail");
         assert!(err.to_string().contains("api_key or api_key_env"));
     }
 
@@ -1587,7 +1710,8 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn config_set_dotted_rejects_invalid_protocol() {
         let mut config = talos_config::Config::default();
-        let err = config_set_dotted(&mut config, "providers.gw.protocol", "bogus").unwrap_err();
+        let err = config_set_dotted(&mut config, "providers.gw.protocol", "bogus")
+            .expect_err("operation should fail");
         assert!(err.to_string().contains("unknown protocol"));
     }
 
@@ -1599,7 +1723,7 @@ api_key_env = "ANTHROPIC_API_KEY"
             "providers.gw.models.m.context_limit",
             "not-a-number",
         )
-        .unwrap_err();
+        .expect_err("operation should fail");
         assert!(err.to_string().contains("context_limit"));
     }
 
@@ -1611,16 +1735,19 @@ api_key_env = "ANTHROPIC_API_KEY"
             "providers.anthropic.api_key_env",
             "ANTHROPIC_API_KEY",
         )
-        .unwrap();
+        .expect("operation should succeed");
         assert_eq!(
-            config_get_dotted(&config, "providers.anthropic.api_key_env").unwrap(),
+            config_get_dotted(&config, "providers.anthropic.api_key_env")
+                .expect("operation should succeed"),
             "ANTHROPIC_API_KEY"
         );
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
-        let reloaded: talos_config::Config = toml::from_str(&toml_str).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
+        let reloaded: talos_config::Config =
+            toml::from_str(&toml_str).expect("operation should succeed");
         assert_eq!(
-            config_get_dotted(&reloaded, "providers.anthropic.api_key_env").unwrap(),
+            config_get_dotted(&reloaded, "providers.anthropic.api_key_env")
+                .expect("operation should succeed"),
             "ANTHROPIC_API_KEY"
         );
     }
@@ -1630,7 +1757,7 @@ api_key_env = "ANTHROPIC_API_KEY"
         let mut config = talos_config::Config::default();
         config.set_provider_credential("anthropic", "sk-secret-roundtrip");
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
         let masked = mask_secrets(&toml_str, &config);
         assert!(!masked.contains("sk-secret-roundtrip"));
         assert!(masked.contains("api_key = ***"));
@@ -1642,39 +1769,47 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn config_save_load_roundtrip_preserves_fields() {
-        let mut config = talos_config::Config::default();
-        config.provider = "my-gw".to_string();
-        config.model = "glm-5".to_string();
-        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat").unwrap();
+        let mut config = talos_config::Config {
+            provider: "my-gw".to_string(),
+            model: "glm-5".to_string(),
+            ..Default::default()
+        };
+        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat")
+            .expect("operation should succeed");
         config_set_dotted(
             &mut config,
             "providers.my-gw.base_url",
             "https://gw.example/v1",
         )
-        .unwrap();
-        config_set_dotted(&mut config, "providers.my-gw.api_key_env", "GW_API_KEY").unwrap();
+        .expect("operation should succeed");
+        config_set_dotted(&mut config, "providers.my-gw.api_key_env", "GW_API_KEY")
+            .expect("operation should succeed");
         config_set_dotted(
             &mut config,
             "providers.my-gw.models.glm-5.context_limit",
             "200000",
         )
-        .unwrap();
-        config.validate().unwrap();
+        .expect("operation should succeed");
+        config.validate().expect("operation should succeed");
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
-        let reloaded: talos_config::Config = toml::from_str(&toml_str).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
+        let reloaded: talos_config::Config =
+            toml::from_str(&toml_str).expect("operation should succeed");
         assert_eq!(reloaded.provider, "my-gw");
         assert_eq!(reloaded.model, "glm-5");
         assert_eq!(
-            config_get_dotted(&reloaded, "providers.my-gw.base_url").unwrap(),
+            config_get_dotted(&reloaded, "providers.my-gw.base_url")
+                .expect("operation should succeed"),
             "https://gw.example/v1"
         );
         assert_eq!(
-            config_get_dotted(&reloaded, "providers.my-gw.api_key_env").unwrap(),
+            config_get_dotted(&reloaded, "providers.my-gw.api_key_env")
+                .expect("operation should succeed"),
             "GW_API_KEY"
         );
         assert_eq!(
-            config_get_dotted(&reloaded, "providers.my-gw.models.glm-5.context_limit").unwrap(),
+            config_get_dotted(&reloaded, "providers.my-gw.models.glm-5.context_limit")
+                .expect("operation should succeed"),
             "200000"
         );
     }
@@ -1710,7 +1845,7 @@ api_key_env = "ANTHROPIC_API_KEY"
 
     #[test]
     fn config_unset_cli_requires_confirm() {
-        let err = run_config_unset("providers.test", false).unwrap_err();
+        let err = run_config_unset("providers.test", false).expect_err("operation should fail");
         assert!(
             err.to_string().contains("--confirm"),
             "error must mention --confirm: {err}"
@@ -1724,11 +1859,11 @@ api_key_env = "ANTHROPIC_API_KEY"
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("operation should succeed")
                 .as_nanos()
         );
         let dir = std::env::temp_dir().join(&unique);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let config_path = dir.join("config.toml");
 
         let config = talos_config::Config {
@@ -1745,14 +1880,14 @@ api_key_env = "ANTHROPIC_API_KEY"
             )]),
             ..Default::default()
         };
-        let toml_str = toml::to_string_pretty(&config).unwrap();
-        std::fs::write(&config_path, &toml_str).unwrap();
-        let original = std::fs::read(&config_path).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
+        std::fs::write(&config_path, &toml_str).expect("operation should succeed");
+        let original = std::fs::read(&config_path).expect("operation should succeed");
 
-        let err = run_config_unset("providers.custom-a", false).unwrap_err();
+        let err = run_config_unset("providers.custom-a", false).expect_err("operation should fail");
         assert!(err.to_string().contains("--confirm"));
 
-        let after = std::fs::read(&config_path).unwrap();
+        let after = std::fs::read(&config_path).expect("operation should succeed");
         assert_eq!(
             original, after,
             "file must be byte-identical without --confirm"
@@ -1780,7 +1915,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        let outcome = config.unset_dotted("providers.custom-gw").unwrap();
+        let outcome = config
+            .unset_dotted("providers.custom-gw")
+            .expect("operation should succeed");
         assert_eq!(
             outcome,
             ConfigUnsetOutcome::CustomProviderRemoved {
@@ -1837,9 +1974,11 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.my-gw.api_key").unwrap();
+        config
+            .unset_dotted("providers.my-gw.api_key")
+            .expect("operation should succeed");
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
         assert!(
             !toml_str.contains("sk-super-secret-value"),
             "cleared credential must not appear in serialized output"
@@ -1864,7 +2003,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.my-active").unwrap();
+        config
+            .unset_dotted("providers.my-active")
+            .expect("operation should succeed");
         assert!(!config.providers.contains_key("my-active"));
 
         let provider_config = config.active_provider_config();
@@ -1901,9 +2042,11 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.gw-a").unwrap();
+        config
+            .unset_dotted("providers.gw-a")
+            .expect("operation should succeed");
 
-        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
         let masked = mask_secrets(&toml_str, &config);
         assert!(
             !masked.contains("sk-list-secret"),
@@ -1922,14 +2065,16 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.gw-c.api_key").unwrap();
+        config
+            .unset_dotted("providers.gw-c.api_key")
+            .expect("operation should succeed");
 
         let result = config_get_dotted(&config, "providers.gw-c.api_key");
         assert!(
             result.is_ok(),
             "config_get_dotted should still return the (now-empty) value"
         );
-        assert_eq!(result.unwrap(), "");
+        assert_eq!(result.expect("operation should succeed"), "");
         assert!(
             is_secret_key("providers.gw-c.api_key"),
             "is_secret_key must still identify api_key keys after clear"
@@ -1959,7 +2104,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.my-active").unwrap();
+        config
+            .unset_dotted("providers.my-active")
+            .expect("operation should succeed");
 
         let action = resolve_startup_model_action(&config, false, false);
         assert_eq!(
@@ -1986,7 +2133,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.anthropic").unwrap();
+        config
+            .unset_dotted("providers.anthropic")
+            .expect("operation should succeed");
 
         let action = resolve_startup_model_action(&config, false, false);
         assert_eq!(
@@ -2013,7 +2162,9 @@ api_key_env = "ANTHROPIC_API_KEY"
             },
         );
 
-        config.unset_dotted("providers.my-active").unwrap();
+        config
+            .unset_dotted("providers.my-active")
+            .expect("operation should succeed");
 
         let action = resolve_startup_model_action(&config, false, true);
         assert_eq!(
@@ -2037,7 +2188,9 @@ api_key_env = "ANTHROPIC_API_KEY"
                 ..Default::default()
             },
         );
-        config.unset_dotted("providers.deleted-provider").unwrap();
+        config
+            .unset_dotted("providers.deleted-provider")
+            .expect("operation should succeed");
 
         let _provider_config = config.active_provider_config();
         let _api_result = config.api_key();
@@ -2106,7 +2259,7 @@ mod steering_snapshot_tests {
         });
         assert!(snap.is_some(), "cancel must emit snapshot");
         assert_eq!(
-            snap.unwrap().total_count,
+            snap.expect("operation should succeed").total_count,
             1,
             "cancel must preserve queued message"
         );
@@ -2121,7 +2274,7 @@ mod steering_snapshot_tests {
         });
         assert!(snap2.is_some(), "error must emit snapshot");
         assert_eq!(
-            snap2.unwrap().total_count,
+            snap2.expect("operation should succeed").total_count,
             1,
             "error must preserve queued message"
         );
@@ -2155,9 +2308,10 @@ mod steering_snapshot_tests {
             content_digest: talos_core::message::ContentDigest::default(),
         });
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2176,7 +2330,7 @@ mod steering_snapshot_tests {
 
         user_tx
             .send(UserInput::Message("describe this image".to_string()))
-            .unwrap();
+            .expect("operation should succeed");
 
         let received_op =
             tokio::time::timeout(std::time::Duration::from_secs(2), sq_rx.recv()).await;
@@ -2188,7 +2342,10 @@ mod steering_snapshot_tests {
             received_op.is_ok(),
             "must receive a SessionOp within timeout"
         );
-        match received_op.unwrap().unwrap() {
+        match received_op
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+        {
             talos_core::session::SessionOp::SubmitStructured { submission } => {
                 assert_eq!(submission.items.len(), 1);
                 assert_eq!(submission.items[0].text, "describe this image");
@@ -2224,9 +2381,10 @@ mod steering_snapshot_tests {
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2245,7 +2403,7 @@ mod steering_snapshot_tests {
 
         user_tx
             .send(UserInput::Message("plain text message".to_string()))
-            .unwrap();
+            .expect("operation should succeed");
 
         let received_op =
             tokio::time::timeout(std::time::Duration::from_secs(2), sq_rx.recv()).await;
@@ -2254,7 +2412,10 @@ mod steering_snapshot_tests {
         loop_handle.abort();
 
         assert!(received_op.is_ok());
-        match received_op.unwrap().unwrap() {
+        match received_op
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+        {
             talos_core::session::SessionOp::SubmitStructured { submission } => {
                 assert_eq!(submission.items.len(), 1);
                 assert_eq!(submission.items[0].text, "plain text message");
@@ -2298,9 +2459,10 @@ mod steering_snapshot_tests {
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2323,7 +2485,7 @@ mod steering_snapshot_tests {
             .send(UserInput::Message(
                 "/attach /tmp/this-file-must-not-be-read.png".to_string(),
             ))
-            .unwrap();
+            .expect("operation should succeed");
 
         let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
@@ -2385,9 +2547,10 @@ mod steering_snapshot_tests {
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2408,7 +2571,7 @@ mod steering_snapshot_tests {
             .send(UserInput::Message(
                 "/attach /tmp/this-file-must-not-be-read.png".to_string(),
             ))
-            .unwrap();
+            .expect("operation should succeed");
 
         let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
@@ -2453,14 +2616,14 @@ mod steering_snapshot_tests {
         };
         use talos_core::model::ImageInputCapability;
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("valid.png");
         // A header-only stub fails R4's decoder; encode a real 8x8 PNG so
         // `into_dimensions()` succeeds and `create_image_content_part`
         // returns a valid ContentPart::Image.
         let png = image::RgbaImage::new(8, 8);
         png.save_with_format(&img_path, image::ImageFormat::Png)
-            .unwrap();
+            .expect("operation should succeed");
 
         // Deliberately leave the engine at its fail-closed default. The bridge
         // must apply the initial watch value before processing `/attach`.
@@ -2482,9 +2645,10 @@ mod steering_snapshot_tests {
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2510,7 +2674,7 @@ mod steering_snapshot_tests {
                 "/attach {}",
                 img_path.display()
             )))
-            .unwrap();
+            .expect("operation should succeed");
 
         let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
@@ -2558,9 +2722,10 @@ mod steering_snapshot_tests {
         let (session_tx, mut session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2583,7 +2748,7 @@ mod steering_snapshot_tests {
                 model_id: "discovered-model".to_string(),
                 variant: None,
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let request = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
@@ -2623,9 +2788,10 @@ mod steering_snapshot_tests {
         let (session_tx, mut session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
-        let skills_dir = tempfile::tempdir().unwrap();
+        let skills_dir = tempfile::tempdir().expect("operation should succeed");
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false)
+                .expect("operation should succeed"),
         ));
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -2648,7 +2814,7 @@ mod steering_snapshot_tests {
                 model_id: "some-model".to_string(),
                 variant: None,
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let request = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
@@ -2683,7 +2849,7 @@ mod steering_snapshot_tests {
         };
         use talos_config::ConfigStore;
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let config_path = dir.path().join("config.toml");
         let creds_path = dir.path().join("credentials.toml");
 
@@ -2700,18 +2866,20 @@ mod steering_snapshot_tests {
             },
         );
 
-        let config_toml = toml::to_string_pretty(&config).unwrap();
-        std::fs::write(&config_path, &config_toml).unwrap();
+        let config_toml = toml::to_string_pretty(&config).expect("operation should succeed");
+        std::fs::write(&config_path, &config_toml).expect("operation should succeed");
 
         let mut creds = talos_config::Credentials::default();
         creds
             .keys
             .insert("active-gw".to_string(), "sk-active-creds".to_string());
-        let creds_toml = toml::to_string_pretty(&creds).unwrap();
-        std::fs::write(&creds_path, &creds_toml).unwrap();
+        let creds_toml = toml::to_string_pretty(&creds).expect("operation should succeed");
+        std::fs::write(&creds_path, &creds_toml).expect("operation should succeed");
 
         let store = ConfigStore::with_paths(config_path.clone(), creds_path.clone());
-        let outcome = store.unset_provider("providers.active-gw").unwrap();
+        let outcome = store
+            .unset_provider("providers.active-gw")
+            .expect("operation should succeed");
         assert_eq!(
             outcome,
             talos_config::ConfigUnsetOutcome::CustomProviderRemoved {
@@ -2719,7 +2887,7 @@ mod steering_snapshot_tests {
             }
         );
 
-        let reloaded = store.load_effective().unwrap();
+        let reloaded = store.load_effective().expect("operation should succeed");
         assert!(!reloaded.providers.contains_key("active-gw"));
         assert!(reloaded.api_key().is_err());
 

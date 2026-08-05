@@ -69,21 +69,29 @@ async fn tracked_receipt(
 
 #[test]
 fn generation_advance_refuses_to_orphan_generation_one_custody() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-cross-generation")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("operation should succeed"),
+        1
+    );
 
     let retained = submission("generation-one", 1, "must retain custody");
     assert_eq!(
-        store.accept(&retained).unwrap().1,
+        store.accept(&retained).expect("operation should succeed").1,
         SubmissionReceiptDisposition::AcceptedPending
     );
-    assert_eq!(store.pause_unstarted().unwrap(), 1);
+    assert_eq!(
+        store.pause_unstarted().expect("operation should succeed"),
+        1
+    );
     assert!(matches!(
         store.advance_runtime_generation(1),
         Err(talos_session::PendingSubmissionError::GenerationBusy {
@@ -91,37 +99,62 @@ fn generation_advance_refuses_to_orphan_generation_one_custody() {
             pending: 1,
         })
     ));
-    assert_eq!(store.runtime_generation().unwrap(), 1);
+    assert_eq!(
+        store
+            .runtime_generation()
+            .expect("operation should succeed"),
+        1
+    );
 
-    store.cancel_unstarted(&retained.id).unwrap();
-    assert_eq!(store.advance_runtime_generation(1).unwrap(), 2);
+    store
+        .cancel_unstarted(&retained.id)
+        .expect("operation should succeed");
+    assert_eq!(
+        store
+            .advance_runtime_generation(1)
+            .expect("operation should succeed"),
+        2
+    );
     let stale = submission("late-generation-one", 1, "must reject after fence");
     assert_eq!(
-        store.accept(&stale).unwrap().1,
+        store.accept(&stale).expect("operation should succeed").1,
         SubmissionReceiptDisposition::Rejected {
             reason: talos_core::session::SubmissionRejectionReason::WrongGeneration,
         }
     );
-    assert!(store.get(&stale.id).unwrap().is_none());
+    assert!(
+        store
+            .get(&stale.id)
+            .expect("operation should succeed")
+            .is_none()
+    );
 }
 
 #[tokio::test]
 async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-generation-restart")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("operation should succeed"),
+        1
+    );
 
     let retained = submission("generation-one-retained", 1, "resume after restart");
     assert_eq!(
-        store.accept(&retained).unwrap().1,
+        store.accept(&retained).expect("operation should succeed").1,
         SubmissionReceiptDisposition::AcceptedPending
     );
-    assert_eq!(store.pause_unstarted().unwrap(), 1);
+    assert_eq!(
+        store.pause_unstarted().expect("operation should succeed"),
+        1
+    );
 
     let calls = Arc::new(AtomicUsize::new(0));
     #[allow(deprecated)]
@@ -138,7 +171,9 @@ async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() 
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    let recovered_generation = store.runtime_generation().unwrap();
+    let recovered_generation = store
+        .runtime_generation()
+        .expect("operation should succeed");
     assert_eq!(recovered_generation, 1);
     actor.set_generation(recovered_generation);
     actor.set_durable_persistence(durable, PersistencePolicy::default());
@@ -157,7 +192,7 @@ async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() 
             receipt_tx: Some(resume_receipt_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let receipt = tracked_receipt(&mut resume_receipt_rx).await;
     assert!(receipt.disposition.has_durable_custody());
     assert_eq!(receipt.session_generation, 1);
@@ -166,11 +201,11 @@ async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() 
         loop {
             let retained_committed = store
                 .get(&retained.id)
-                .unwrap()
+                .expect("operation should succeed")
                 .is_some_and(|record| record.state == PendingSubmissionState::Committed);
             let resume_committed = store
                 .get(&resume.id)
-                .unwrap()
+                .expect("operation should succeed")
                 .is_some_and(|record| record.state == PendingSubmissionState::Committed);
             if retained_committed && resume_committed && calls.load(Ordering::SeqCst) == 2 {
                 break;
@@ -189,16 +224,24 @@ async fn process_reconstruction_rehydrates_generation_one_and_resumes_custody() 
             receipt_tx: Some(stale_receipt_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let stale_receipt = tracked_receipt(&mut stale_receipt_rx).await;
     assert!(matches!(
         stale_receipt.disposition,
         SubmissionReceiptDisposition::Rejected { .. }
     ));
-    assert!(store.get(&stale.id).unwrap().is_none());
+    assert!(
+        store
+            .get(&stale.id)
+            .expect("operation should succeed")
+            .is_none()
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 
     while eq_rx.try_recv().is_ok() {}
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }

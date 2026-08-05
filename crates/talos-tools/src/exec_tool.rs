@@ -1249,7 +1249,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn timeout_kills_child() {
-        let temp = TempDir::new().unwrap();
+        let temp = TempDir::new().expect("operation should succeed");
         let tool = ExecTool::new(temp.path().to_path_buf()).with_timeout(Duration::from_secs(30));
         let result = tool
             .execute(serde_json::json!({

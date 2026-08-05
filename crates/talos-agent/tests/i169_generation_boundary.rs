@@ -80,7 +80,9 @@ fn submission(
 fn advance_store_to(store: &PendingSubmissionStore, generation: u64) {
     for expected in 0..generation {
         assert_eq!(
-            store.advance_runtime_generation(expected).unwrap(),
+            store
+                .advance_runtime_generation(expected)
+                .expect("operation should succeed"),
             expected + 1
         );
     }
@@ -103,7 +105,7 @@ async fn wait_for_committed(
         loop {
             let committed = store
                 .get(submission_id)
-                .unwrap()
+                .expect("operation should succeed")
                 .is_some_and(|record| record.state == PendingSubmissionState::Committed);
             if committed && calls.load(Ordering::SeqCst) == expected_calls {
                 break;
@@ -117,11 +119,11 @@ async fn wait_for_committed(
 
 #[tokio::test]
 async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-generation-reject")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_store_to(&store, 5);
@@ -148,7 +150,7 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
             receipt_tx: Some(receipt_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let rejected = receipt(&mut receipt_rx).await;
     assert_eq!(
@@ -161,21 +163,29 @@ async fn stale_generation_is_rejected_before_durable_or_provider_custody() {
             reason: SubmissionRejectionReason::WrongGeneration,
         }
     ));
-    assert!(store.get("stale_generation_batch").unwrap().is_none());
+    assert!(
+        store
+            .get("stale_generation_batch")
+            .expect("operation should succeed")
+            .is_none()
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
 async fn user_and_scheduler_require_the_exact_authoritative_generation() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-generation-accept")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_store_to(&store, 9);
@@ -201,7 +211,7 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
             receipt_tx: Some(user_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let user_receipt = receipt(&mut user_rx).await;
     assert_eq!(user_receipt.session_generation, 9);
     assert!(user_receipt.disposition.has_durable_custody());
@@ -220,7 +230,7 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
                 receipt_tx: Some(stale_tx),
             })
             .await
-            .unwrap();
+            .expect("operation should succeed");
         let stale = receipt(&mut stale_rx).await;
         assert_eq!(
             stale.session_generation, generation,
@@ -232,7 +242,7 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
                 reason: SubmissionRejectionReason::WrongGeneration,
             }
         ));
-        assert!(store.get(id).unwrap().is_none());
+        assert!(store.get(id).expect("operation should succeed").is_none());
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
@@ -248,7 +258,7 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
             receipt_tx: Some(scheduler_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let scheduler_receipt = receipt(&mut scheduler_rx).await;
     assert_eq!(scheduler_receipt.session_generation, 9);
     assert!(scheduler_receipt.disposition.has_durable_custody());
@@ -256,11 +266,14 @@ async fn user_and_scheduler_require_the_exact_authoritative_generation() {
 
     let scheduler_record = store
         .get("scheduler_generation_batch")
-        .unwrap()
+        .expect("operation should succeed")
         .expect("scheduler submission journal record");
     assert_eq!(scheduler_record.submission.sender_generation, 9);
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

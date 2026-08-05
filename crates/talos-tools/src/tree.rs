@@ -178,34 +178,43 @@ mod tests {
 
     #[tokio::test]
     async fn tree_root_first_line_uses_workspace_directory_name() {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        let tmp = tempfile::tempdir().expect("operation should succeed");
+        std::fs::create_dir(tmp.path().join("src")).expect("operation should succeed");
         let tool = TreeTool::new(tmp.path().to_path_buf());
 
         let result = tool
             .execute_inner(serde_json::json!({ "max_depth": 1 }))
             .await
-            .unwrap();
+            .expect("operation should succeed");
 
-        let first_line = result.lines().next().unwrap();
+        let first_line = result.lines().next().expect("operation should succeed");
         assert!(!first_line.trim().is_empty());
         assert_eq!(
             first_line,
-            format!("{}/", tmp.path().file_name().unwrap().to_string_lossy())
+            format!(
+                "{}/",
+                tmp.path()
+                    .file_name()
+                    .expect("operation should succeed")
+                    .to_string_lossy()
+            )
         );
     }
 
     #[tokio::test]
     async fn tree_subdir_first_line_uses_target_relative_name() {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        let tmp = tempfile::tempdir().expect("operation should succeed");
+        std::fs::create_dir(tmp.path().join("src")).expect("operation should succeed");
         let tool = TreeTool::new(tmp.path().to_path_buf());
 
         let result = tool
             .execute_inner(serde_json::json!({ "path": "src", "max_depth": 1 }))
             .await
-            .unwrap();
+            .expect("operation should succeed");
 
-        assert_eq!(result.lines().next().unwrap(), "src/");
+        assert_eq!(
+            result.lines().next().expect("operation should succeed"),
+            "src/"
+        );
     }
 }

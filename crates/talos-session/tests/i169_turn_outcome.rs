@@ -3,7 +3,7 @@ use talos_session::{SessionManager, TurnTranscriptOutcome, TurnTranscriptOutcome
 
 #[test]
 fn transcript_outcome_markers_are_hidden_and_only_success_binds_turn_identity() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let session = manager
         .create_session("i169", temp.path().to_string_lossy().as_ref())

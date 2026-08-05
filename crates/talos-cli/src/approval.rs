@@ -431,7 +431,7 @@ mod tests {
                     "decision": {"Deny": "validation builds are blocked in this workspace"}
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
         let profile = vec![ToolPermissionFacet::with_resource(
             ToolNature::Execute,
             "bash:validation_build:abc123",

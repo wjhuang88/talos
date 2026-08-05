@@ -4,8 +4,8 @@ use std::fs;
 
 #[tokio::test]
 async fn test_delete_file() {
-    let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("temp.txt"), "content").unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
+    fs::write(dir.path().join("temp.txt"), "content").expect("operation should succeed");
 
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool.execute(json!({ "path": "temp.txt" })).await;
@@ -17,9 +17,9 @@ async fn test_delete_file() {
 
 #[tokio::test]
 async fn test_delete_directory() {
-    let dir = tempfile::tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("subdir/nested")).unwrap();
-    fs::write(dir.path().join("subdir/nested/file.txt"), "data").unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
+    fs::create_dir_all(dir.path().join("subdir/nested")).expect("operation should succeed");
+    fs::write(dir.path().join("subdir/nested/file.txt"), "data").expect("operation should succeed");
 
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool.execute(json!({ "path": "subdir" })).await;
@@ -31,8 +31,8 @@ async fn test_delete_directory() {
 
 #[tokio::test]
 async fn test_delete_empty_directory() {
-    let dir = tempfile::tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("empty")).unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
+    fs::create_dir_all(dir.path().join("empty")).expect("operation should succeed");
 
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool.execute(json!({ "path": "empty" })).await;
@@ -43,7 +43,7 @@ async fn test_delete_empty_directory() {
 
 #[tokio::test]
 async fn test_delete_not_found() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool.execute(json!({ "path": "nonexistent.txt" })).await;
 
@@ -53,9 +53,13 @@ async fn test_delete_not_found() {
 
 #[tokio::test]
 async fn test_delete_path_escape() {
-    let dir = tempfile::tempdir().unwrap();
-    let outside = dir.path().parent().unwrap().join("outside_target.txt");
-    fs::write(&outside, "secret").unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
+    let outside = dir
+        .path()
+        .parent()
+        .expect("operation should succeed")
+        .join("outside_target.txt");
+    fs::write(&outside, "secret").expect("operation should succeed");
 
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool
@@ -70,7 +74,7 @@ async fn test_delete_path_escape() {
 
 #[tokio::test]
 async fn test_delete_refuses_workspace_root() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let tool = DeleteTool::new(dir.path().to_path_buf());
     let result = tool.execute(json!({ "path": "." })).await;
 

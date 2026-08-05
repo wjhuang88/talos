@@ -1286,7 +1286,9 @@ fn deny_rule_still_wins_for_external_path() {
 
     let mut engine = PermissionEngine::with_workspace_root(root);
     let config = serde_json::json!({"rules": [{"nature": "Read", "decision": "Deny"}]});
-    engine.load_from_config(&config).unwrap();
+    engine
+        .load_from_config(&config)
+        .expect("operation should succeed");
 
     let facet = ToolPermissionFacet::new(ToolNature::Read);
     let input = serde_json::json!({"path": external.to_string_lossy().to_string()});

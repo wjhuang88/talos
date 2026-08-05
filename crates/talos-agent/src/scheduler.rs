@@ -975,9 +975,9 @@ mod tests {
                 response_tx,
             })
             .await
-            .unwrap();
+            .expect("operation should succeed");
         assert!(matches!(
-            response_rx.await.unwrap(),
+            response_rx.await.expect("operation should succeed"),
             ScheduleRegistrationResult::Registered { .. }
         ));
     }
@@ -1019,7 +1019,7 @@ mod tests {
                 total_text_bytes: submission.total_text_bytes(),
                 disposition,
             })
-            .unwrap();
+            .expect("operation should succeed");
     }
 
     async fn list(handle: &SchedulerHandle) -> Vec<ScheduledTaskInfo> {
@@ -1027,8 +1027,8 @@ mod tests {
         handle
             .send(ScheduleCommand::List { response_tx })
             .await
-            .unwrap();
-        response_rx.await.unwrap()
+            .expect("operation should succeed");
+        response_rx.await.expect("operation should succeed")
     }
 
     #[test]
@@ -1052,7 +1052,7 @@ mod tests {
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
         let (is_submit, submission, receipt_tx) =
-            split_tracked_operation(sq_rx.try_recv().unwrap());
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert!(is_submit);
         assert_eq!(submission.source, SubmissionSource::Scheduler);
         assert_eq!(submission.sender_generation, 7);
@@ -1075,7 +1075,7 @@ mod tests {
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
         let (is_submit, submission, receipt_tx) =
-            split_tracked_operation(sq_rx.try_recv().unwrap());
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert!(is_submit);
         assert_eq!(submission.source, SubmissionSource::Scheduler);
         assert!(
@@ -1102,11 +1102,12 @@ mod tests {
 
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
-        let (_, submitted, _lost_receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (_, submitted, _lost_receipt_tx) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
 
         advance_delivery_retry().await;
         let (is_submit, reconciled, receipt_tx) =
-            split_tracked_operation(sq_rx.try_recv().unwrap());
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert!(!is_submit);
         assert_eq!(reconciled, submitted);
 
@@ -1144,7 +1145,8 @@ mod tests {
 
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
-        let (_, first, receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (_, first, receipt_tx) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         accept(
             &first,
             &receipt_tx,
@@ -1156,7 +1158,8 @@ mod tests {
         yield_times(10).await;
         tokio::time::advance(DELIVERY_RETRY_DELAY).await;
         yield_times(20).await;
-        let (is_submit, retry, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (is_submit, retry, _) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert!(is_submit);
         assert_eq!(retry, first);
         assert_eq!(list(&handle).await.len(), 1);
@@ -1175,15 +1178,17 @@ mod tests {
                 response_tx,
             })
             .await
-            .unwrap();
+            .expect("operation should succeed");
         assert!(response_rx.await.is_ok());
 
         tokio::time::advance(Duration::from_secs(6)).await;
         yield_times(10).await;
-        let (_, first, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (_, first, _) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
 
         advance_delivery_retry().await;
-        let (is_submit, retry, receipt_tx) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (is_submit, retry, receipt_tx) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert!(!is_submit);
         assert_eq!(
             retry.id, first.id,
@@ -1203,7 +1208,8 @@ mod tests {
         assert!(sq_rx.try_recv().is_err());
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
-        let (_, second, _) = split_tracked_operation(sq_rx.try_recv().unwrap());
+        let (_, second, _) =
+            split_tracked_operation(sq_rx.try_recv().expect("operation should succeed"));
         assert_ne!(second.id, first.id);
         assert!(second.id.ends_with(":fire:2"));
     }
@@ -1215,7 +1221,7 @@ mod tests {
         register_one_shot(&handle, "cancel", Duration::from_secs(1)).await;
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(10).await;
-        let _ = sq_rx.try_recv().unwrap();
+        let _ = sq_rx.try_recv().expect("operation should succeed");
 
         let (response_tx, response_rx) = oneshot::channel();
         handle
@@ -1224,9 +1230,9 @@ mod tests {
                 response_tx,
             })
             .await
-            .unwrap();
+            .expect("operation should succeed");
         assert!(matches!(
-            response_rx.await.unwrap(),
+            response_rx.await.expect("operation should succeed"),
             CancelResult::Cancelled
         ));
         tokio::time::advance(Duration::from_secs(10)).await;

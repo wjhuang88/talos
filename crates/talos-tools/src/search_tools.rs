@@ -355,15 +355,17 @@ mod grep_tool_tests {
     use std::fs;
 
     fn make_workspace() -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.rs"), "fn hello() {}\nfn world() {}\n").unwrap();
-        fs::write(dir.path().join("b.txt"), "hello world\nfoo bar\n").unwrap();
-        fs::create_dir_all(dir.path().join("sub")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("a.rs"), "fn hello() {}\nfn world() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("b.txt"), "hello world\nfoo bar\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("sub")).expect("operation should succeed");
         fs::write(
             dir.path().join("sub/c.rs"),
             "hello from sub\nanother line\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         dir
     }
 
@@ -462,10 +464,12 @@ mod grep_tool_tests {
 
     #[tokio::test]
     async fn test_grep_skips_hidden_dirs() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("visible.txt"), "target_text\n").unwrap();
-        fs::create_dir_all(dir.path().join(".hidden")).unwrap();
-        fs::write(dir.path().join(".hidden/secret.txt"), "target_text\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("visible.txt"), "target_text\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join(".hidden")).expect("operation should succeed");
+        fs::write(dir.path().join(".hidden/secret.txt"), "target_text\n")
+            .expect("operation should succeed");
 
         let tool = GrepTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "pattern": "target_text" })).await;
@@ -489,12 +493,12 @@ mod grep_tool_tests {
     #[tokio::test]
     async fn test_grep_path_escape_rejected() {
         let dir = make_workspace();
-        let outside = tempfile::NamedTempFile::new().unwrap();
-        fs::write(outside.path(), "hello outside\n").unwrap();
+        let outside = tempfile::NamedTempFile::new().expect("operation should succeed");
+        fs::write(outside.path(), "hello outside\n").expect("operation should succeed");
         let outside_name = outside
             .path()
             .file_name()
-            .unwrap()
+            .expect("operation should succeed")
             .to_string_lossy()
             .to_string();
         let tool = GrepTool::new(dir.path().to_path_buf());
@@ -508,12 +512,12 @@ mod grep_tool_tests {
 
     #[tokio::test]
     async fn test_grep_reports_oversized_skip_summary() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         fs::write(
             dir.path().join("large.txt"),
             vec![b'x'; 10 * 1024 * 1024 + 1],
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let tool = GrepTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "pattern": "needle" })).await;
@@ -526,8 +530,9 @@ mod grep_tool_tests {
 
     #[tokio::test]
     async fn test_grep_reports_binary_skip_summary() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("binary.txt"), b"before\0needle after\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("binary.txt"), b"before\0needle after\n")
+            .expect("operation should succeed");
 
         let tool = GrepTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "pattern": "needle" })).await;
@@ -553,18 +558,20 @@ mod glob_tool_tests {
     use std::fs;
 
     fn make_workspace() -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("main.rs"), "fn main() {}\n").unwrap();
-        fs::write(dir.path().join("lib.rs"), "pub fn lib() {}\n").unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[package]\n").unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n").unwrap();
-        fs::create_dir_all(dir.path().join("tests")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("main.rs"), "fn main() {}\n").expect("operation should succeed");
+        fs::write(dir.path().join("lib.rs"), "pub fn lib() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("Cargo.toml"), "[package]\n").expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
+        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("tests")).expect("operation should succeed");
         fs::write(
             dir.path().join("tests/integration.rs"),
             "#[test]\nfn test() {}\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         dir
     }
 

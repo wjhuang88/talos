@@ -68,14 +68,19 @@ async fn assert_terminal_recovery(
     outcome: TurnTranscriptOutcome,
     expected: PendingSubmissionState,
 ) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session(external_id)
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("operation should succeed"),
+        1
+    );
     let frozen = submission(submission_id);
     store.accept(&frozen).expect("durable acceptance");
     store
@@ -115,8 +120,11 @@ async fn assert_terminal_recovery(
         0,
         "terminal transcript evidence must never replay Provider execution"
     );
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
@@ -157,14 +165,19 @@ async fn running_success_outcome_recovers_as_committed_without_replay() {
 
 #[tokio::test]
 async fn ordinary_transcript_entry_without_terminal_outcome_remains_frozen_running() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-running-ambiguous-outcome")
         .expect("durable session");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
-    assert_eq!(store.advance_runtime_generation(0).unwrap(), 1);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("operation should succeed"),
+        1
+    );
     let frozen = submission("running-ambiguous-submission");
     let turn_id = "running-ambiguous-turn";
     store.accept(&frozen).expect("durable acceptance");
@@ -215,6 +228,9 @@ async fn ordinary_transcript_entry_without_terminal_outcome_remains_frozen_runni
     assert_eq!(record.turn_id.as_deref(), Some(turn_id));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    task.await.expect("operation should succeed");
 }

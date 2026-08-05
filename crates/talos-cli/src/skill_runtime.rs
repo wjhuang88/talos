@@ -203,37 +203,37 @@ mod tests {
     use talos_provider::mock::MockProvider;
 
     fn write_skill(path: &Path, name: &str, description: &str) {
-        fs::create_dir_all(path).unwrap();
+        fs::create_dir_all(path).expect("operation should succeed");
         fs::write(
             path.join("SKILL.md"),
             format!(
                 "---\nname: {name}\ndescription: {description}\ntriggers:\n  - {name}\n---\n\n# {name}\n"
             ),
         )
-        .unwrap();
+        .expect("operation should succeed");
     }
 
     fn write_skill_with_body(path: &Path, name: &str, description: &str, body: &str) {
-        fs::create_dir_all(path).unwrap();
+        fs::create_dir_all(path).expect("operation should succeed");
         fs::write(
             path.join("SKILL.md"),
             format!(
                 "---\nname: {name}\ndescription: {description}\ntriggers:\n  - {name}\n---\n\n{body}\n"
             ),
         )
-        .unwrap();
+        .expect("operation should succeed");
     }
 
     #[test]
     fn discovers_workspace_skills_for_level0_index() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill(
             &dir.path().join(".talos/skills/review"),
             "review",
             "Review code",
         );
 
-        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).expect("operation should succeed");
 
         let skill = runtime
             .index
@@ -252,16 +252,16 @@ mod tests {
 
     #[test]
     fn bad_skills_are_skipped_without_crashing_startup() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill(&dir.path().join(".talos/skills/ok"), "ok", "Valid skill");
-        fs::create_dir_all(dir.path().join(".talos/skills/bad")).unwrap();
+        fs::create_dir_all(dir.path().join(".talos/skills/bad")).expect("operation should succeed");
         fs::write(
             dir.path().join(".talos/skills/bad/SKILL.md"),
             "not frontmatter",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).expect("operation should succeed");
 
         assert!(runtime.index.iter().any(|skill| skill.name == "ok"));
         assert!(!runtime.index.iter().any(|skill| skill.name == "bad"));
@@ -269,13 +269,13 @@ mod tests {
 
     #[test]
     fn apply_runtime_skills_reaches_agent_prompt() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill(
             &dir.path().join(".talos/skills/planning"),
             "planning",
             "Plan work",
         );
-        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).expect("operation should succeed");
 
         let mut agent = Agent::new(
             Arc::new(MockProvider::new().with_response("ok")),
@@ -291,10 +291,10 @@ mod tests {
 
     #[test]
     fn diagnostic_index_contains_level0_metadata() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill(&dir.path().join(".talos/skills/doc"), "doc", "Write docs");
 
-        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).expect("operation should succeed");
         let index = runtime.diagnostics();
 
         assert!(
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn activate_skill_marks_diagnostic_active_and_returns_body_only_context() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill_with_body(
             &dir.path().join(".talos/skills/review"),
             "review",
@@ -314,8 +314,11 @@ mod tests {
             "# Instructions\nLook for security issues.",
         );
 
-        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
-        let content = runtime.activate("review").unwrap();
+        let mut runtime =
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed");
+        let content = runtime
+            .activate("review")
+            .expect("operation should succeed");
         let diagnostics = runtime.diagnostics();
 
         assert!(content.contains("## Skill Body"));
@@ -329,15 +332,19 @@ mod tests {
 
     #[test]
     fn unknown_skill_activation_is_deterministic_error() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         write_skill(
             &dir.path().join(".talos/skills/review"),
             "review",
             "Review code",
         );
 
-        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
-        let error = runtime.activate("missing").unwrap_err().to_string();
+        let mut runtime =
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed");
+        let error = runtime
+            .activate("missing")
+            .expect_err("operation should fail")
+            .to_string();
 
         assert!(error.contains("skill 'missing' was not found"));
         assert!(runtime.active_name().is_none());
@@ -345,26 +352,37 @@ mod tests {
 
     #[test]
     fn active_skill_reference_is_confined_and_bounded() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let skill_dir = dir.path().join(".talos/skills/review");
         write_skill(&skill_dir, "review", "Review code");
-        fs::write(skill_dir.join("guide.md"), "reference details").unwrap();
+        fs::write(skill_dir.join("guide.md"), "reference details")
+            .expect("operation should succeed");
 
-        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
-        runtime.activate("review").unwrap();
-        let content = runtime.load_reference("guide.md").unwrap();
+        let mut runtime =
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed");
+        runtime
+            .activate("review")
+            .expect("operation should succeed");
+        let content = runtime
+            .load_reference("guide.md")
+            .expect("operation should succeed");
 
         assert!(content.contains("## Reference: guide.md"));
         assert!(content.contains("reference details"));
 
         let parent_error = runtime
             .load_reference("../guide.md")
-            .unwrap_err()
+            .expect_err("operation should fail")
             .to_string();
         assert!(parent_error.contains("reference path must stay inside"));
         let absolute_error = runtime
-            .load_reference(skill_dir.join("guide.md").to_str().unwrap())
-            .unwrap_err()
+            .load_reference(
+                skill_dir
+                    .join("guide.md")
+                    .to_str()
+                    .expect("operation should succeed"),
+            )
+            .expect_err("operation should fail")
             .to_string();
         assert!(absolute_error.contains("reference path must stay inside"));
     }
@@ -380,11 +398,11 @@ mod tests {
 
     #[test]
     fn application_default_adds_shared_skill_root() {
-        let temp_home = tempfile::tempdir().unwrap();
+        let temp_home = tempfile::tempdir().expect("operation should succeed");
         let shared_skills = temp_home.path().join(".agents/skills");
-        fs::create_dir_all(&shared_skills).unwrap();
+        fs::create_dir_all(&shared_skills).expect("operation should succeed");
 
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let config = Config::default();
         assert!(config.skills.discover_shared);
 
@@ -393,13 +411,16 @@ mod tests {
             config.skills.discover_shared,
             Some(temp_home.path()),
         )
-        .unwrap();
+        .expect("operation should succeed");
         assert!(
             runtime.search_paths().iter().any(|p| p == &shared_skills),
             "shared skill root must be in search paths when application default is used"
         );
 
-        let last = runtime.search_paths().last().unwrap();
+        let last = runtime
+            .search_paths()
+            .last()
+            .expect("operation should succeed");
         assert_eq!(
             last, &shared_skills,
             "shared root must be lowest priority (last)"
@@ -408,11 +429,11 @@ mod tests {
 
     #[test]
     fn application_explicit_false_excludes_shared_skill_root() {
-        let temp_home = tempfile::tempdir().unwrap();
+        let temp_home = tempfile::tempdir().expect("operation should succeed");
         let shared_skills = temp_home.path().join(".agents/skills");
-        fs::create_dir_all(&shared_skills).unwrap();
+        fs::create_dir_all(&shared_skills).expect("operation should succeed");
 
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let config = Config {
             skills: talos_config::SkillConfig {
                 discover_shared: false,
@@ -426,7 +447,7 @@ mod tests {
             config.skills.discover_shared,
             Some(temp_home.path()),
         )
-        .unwrap();
+        .expect("operation should succeed");
         assert!(
             !runtime.search_paths().iter().any(|p| p == &shared_skills),
             "shared skill root must NOT be in search paths when explicitly disabled"
@@ -435,11 +456,11 @@ mod tests {
 
     #[test]
     fn shared_skill_is_lowest_priority_end_to_end() {
-        let temp_home = tempfile::tempdir().unwrap();
+        let temp_home = tempfile::tempdir().expect("operation should succeed");
         let shared_dir = temp_home.path().join(".agents/skills/dup-skill");
         write_skill(&shared_dir, "dup-skill", "Shared version");
 
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let proj_dir = workspace.path().join(".talos/skills/dup-skill");
         write_skill(&proj_dir, "dup-skill", "Project version");
 
@@ -449,7 +470,7 @@ mod tests {
             config.skills.discover_shared,
             Some(temp_home.path()),
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let dup: Vec<_> = runtime
             .index
@@ -466,11 +487,12 @@ mod tests {
 
     #[test]
     fn application_without_home_does_not_add_shared_root() {
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let proj_dir = workspace.path().join(".talos/skills/proj-skill");
         write_skill(&proj_dir, "proj-skill", "Project only");
 
-        let runtime = discover_runtime_skills_with_home(workspace.path(), true, None).unwrap();
+        let runtime = discover_runtime_skills_with_home(workspace.path(), true, None)
+            .expect("operation should succeed");
         assert!(
             !runtime
                 .search_paths()
@@ -486,17 +508,18 @@ mod tests {
 
     #[test]
     fn explicit_home_is_used_instead_of_process_environment() {
-        let home_a = tempfile::tempdir().unwrap();
+        let home_a = tempfile::tempdir().expect("operation should succeed");
         let shared_a = home_a.path().join(".agents/skills/skill-a");
         write_skill(&shared_a, "skill-a", "From home A");
 
-        let home_b = tempfile::tempdir().unwrap();
+        let home_b = tempfile::tempdir().expect("operation should succeed");
         let shared_b = home_b.path().join(".agents/skills/skill-b");
         write_skill(&shared_b, "skill-b", "From home B");
 
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let runtime =
-            discover_runtime_skills_with_home(workspace.path(), true, Some(home_a.path())).unwrap();
+            discover_runtime_skills_with_home(workspace.path(), true, Some(home_a.path()))
+                .expect("operation should succeed");
 
         assert!(
             runtime.index.iter().any(|s| s.name == "skill-a"),
@@ -510,11 +533,12 @@ mod tests {
 
     #[test]
     fn discover_runtime_skills_delegates_to_with_home() {
-        let workspace = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
         let proj_dir = workspace.path().join(".talos/skills/proj-skill");
         write_skill(&proj_dir, "proj-skill", "Project skill");
 
-        let runtime = discover_runtime_skills(workspace.path(), false).unwrap();
+        let runtime =
+            discover_runtime_skills(workspace.path(), false).expect("operation should succeed");
         assert!(runtime.index.iter().any(|s| s.name == "proj-skill"));
     }
 }

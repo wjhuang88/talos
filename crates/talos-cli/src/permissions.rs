@@ -287,7 +287,8 @@ mod tests {
 
     #[test]
     fn parse_operation_accepts_tool_json() {
-        let parsed = parse_operation(r#"bash={"command":"cat Cargo.toml"}"#).unwrap();
+        let parsed = parse_operation(r#"bash={"command":"cat Cargo.toml"}"#)
+            .expect("operation should succeed");
 
         assert_eq!(parsed.tool, "bash");
         assert_eq!(parsed.input["command"], "cat Cargo.toml");
@@ -300,7 +301,7 @@ mod tests {
             shell_operation("cargo test second_filter"),
         ];
 
-        let packet = build_preflight_packet(&operations).unwrap();
+        let packet = build_preflight_packet(&operations).expect("operation should succeed");
 
         assert_eq!(packet.operations.len(), 2);
         assert_eq!(packet.operations[0].current_decision, "ask");
@@ -323,7 +324,7 @@ mod tests {
         let command = "rm generated.txt";
         let operations = vec![shell_operation(command)];
 
-        let packet = build_preflight_packet(&operations).unwrap();
+        let packet = build_preflight_packet(&operations).expect("operation should succeed");
 
         assert_eq!(packet.operations[0].current_decision, "ask");
         assert!(
@@ -341,7 +342,7 @@ mod tests {
     #[test]
     fn render_preflight_packet_explains_no_execution_or_rule_install() {
         let operations = vec![shell_operation("cargo test approval")];
-        let packet = build_preflight_packet(&operations).unwrap();
+        let packet = build_preflight_packet(&operations).expect("operation should succeed");
 
         let rendered = render_preflight_packet(&packet);
 

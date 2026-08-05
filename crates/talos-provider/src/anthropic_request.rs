@@ -702,7 +702,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("test.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).expect("test operation should succeed");
+        std::fs::write(&img_path, png_header).expect("test operation should succeed");
         // ContentPart::Image.path contract: stored path MUST be the
         // canonical path produced at grant time. The TOCTOU guard in
         // image_io rejects any non-canonical stored path.
@@ -755,7 +755,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("shot.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).expect("test operation should succeed");
+        std::fs::write(&img_path, png_header).expect("test operation should succeed");
         let canonical = img_path
             .canonicalize()
             .expect("test operation should succeed");

@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn empty_workspace_does_not_panic() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let out = format_governance_summary(dir.path());
         assert!(out.contains("not found"));
     }
@@ -725,35 +725,35 @@ mod tests {
 
     #[test]
     fn full_summary_with_files() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let gov_dir = dir.path().join(".agent-governance");
-        std::fs::create_dir_all(&gov_dir).unwrap();
+        std::fs::create_dir_all(&gov_dir).expect("operation should succeed");
         std::fs::write(
             gov_dir.join("manifest.yaml"),
             "profile: \"high-risk\"\nstatus: \"conformant\"\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let docs_dir = dir.path().join("docs");
-        std::fs::create_dir_all(docs_dir.join("iterations")).unwrap();
+        std::fs::create_dir_all(docs_dir.join("iterations")).expect("operation should succeed");
         std::fs::write(
             docs_dir.join("BOARD.md"),
             "# Board\n\n## Now\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I047 Test | Active | [x](x.md) | Gate |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         std::fs::write(
             docs_dir.join("iterations").join("README.md"),
             "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I080 | Frontline | Planned | no |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let backlog_dir = docs_dir.join("backlog");
-        std::fs::create_dir_all(&backlog_dir).unwrap();
+        std::fs::create_dir_all(&backlog_dir).expect("operation should succeed");
         std::fs::write(
             backlog_dir.join("PRODUCT-BACKLOG.md"),
             "## Active Items\n\n| ID | Title | Status | Priority | Decision Context | Required Reads |\n|---|---|---|---|---|---|\n| TUI-021 | Composer Nav | In Progress | P3 | ctx | reads |\n| CONF-001 | Config | Planned | P2 | ctx | reads |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let out = format_governance_summary(dir.path());
         assert!(out.contains("conformant"));
@@ -775,7 +775,7 @@ mod tests {
 
     #[test]
     fn validation_section_reports_missing_manifest() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let mut out = String::new();
         format_validation(dir.path(), &mut out);
         assert!(out.contains("Status: FAIL"));
@@ -784,14 +784,14 @@ mod tests {
 
     #[test]
     fn validation_section_is_programmatic_without_script() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let gov_dir = dir.path().join(".agent-governance");
-        std::fs::create_dir_all(&gov_dir).unwrap();
+        std::fs::create_dir_all(&gov_dir).expect("operation should succeed");
         std::fs::write(
             gov_dir.join("manifest.yaml"),
             "profile: \"small\"\nstatus: \"conformant\"\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let mut out = String::new();
         format_validation(dir.path(), &mut out);
@@ -802,14 +802,14 @@ mod tests {
 
     #[test]
     fn validation_detects_missing_conformant_capability_file() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let gov_dir = dir.path().join(".agent-governance");
-        std::fs::create_dir_all(&gov_dir).unwrap();
+        std::fs::create_dir_all(&gov_dir).expect("operation should succeed");
         std::fs::write(
             gov_dir.join("manifest.yaml"),
             "profile: \"small\"\nstatus: \"conformant\"\ncapabilities:\n  testing_policy: conformant\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let report = collect_governance_validation(dir.path());
 

@@ -49,9 +49,13 @@ fn submission() -> StructuredSubmission {
 }
 
 fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
-    let mut current = store.runtime_generation().unwrap();
+    let mut current = store
+        .runtime_generation()
+        .expect("operation should succeed");
     while current < target {
-        current = store.advance_runtime_generation(current).unwrap();
+        current = store
+            .advance_runtime_generation(current)
+            .expect("operation should succeed");
     }
     assert_eq!(current, target);
 }
@@ -108,7 +112,7 @@ async fn assert_no_structured_cancellation(
 
 #[tokio::test]
 async fn only_exact_generation_and_turn_cancel_structured_work() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-targeted-interrupt")
@@ -144,20 +148,20 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
             turn_id: "no-active-turn".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     sq_tx
         .send(SessionOp::SubmitStructured {
             submission: submission(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let turn_id = wait_for_started(&mut eq_rx).await;
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         store
             .get("targeted-interrupt-batch")
-            .unwrap()
+            .expect("operation should succeed")
             .expect("durable running record")
             .state,
         PendingSubmissionState::Running
@@ -169,12 +173,12 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
             turn_id: turn_id.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     assert_no_structured_cancellation(&mut eq_rx, &turn_id).await;
     assert_eq!(
         store
             .get("targeted-interrupt-batch")
-            .unwrap()
+            .expect("operation should succeed")
             .expect("record after stale-generation interrupt")
             .state,
         PendingSubmissionState::Running
@@ -186,12 +190,12 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
             turn_id: "wrong-turn-id".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     assert_no_structured_cancellation(&mut eq_rx, &turn_id).await;
     assert_eq!(
         store
             .get("targeted-interrupt-batch")
-            .unwrap()
+            .expect("operation should succeed")
             .expect("record after wrong-turn interrupt")
             .state,
         PendingSubmissionState::Running
@@ -203,7 +207,7 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
             turn_id: turn_id.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -230,12 +234,15 @@ async fn only_exact_generation_and_turn_cancel_structured_work() {
 
     let terminal = store
         .get("targeted-interrupt-batch")
-        .unwrap()
+        .expect("operation should succeed")
         .expect("durable terminal record");
     assert_eq!(terminal.state, PendingSubmissionState::TerminalCancelled);
     assert_eq!(terminal.turn_id.as_deref(), Some(turn_id.as_str()));
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }

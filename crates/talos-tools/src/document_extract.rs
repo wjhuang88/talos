@@ -595,19 +595,21 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_id() -> String {
-        let d = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let d = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("operation should succeed");
         format!("{}{}", d.as_secs(), d.subsec_nanos())
     }
 
     fn create_temp_with_ext(content: &str, ext: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!("test_{}.{}", unique_id(), ext));
-        std::fs::write(&path, content).unwrap();
+        std::fs::write(&path, content).expect("operation should succeed");
         path
     }
 
     fn create_temp_bytes_with_ext(bytes: &[u8], ext: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!("test_{}.{}", unique_id(), ext));
-        std::fs::write(&path, bytes).unwrap();
+        std::fs::write(&path, bytes).expect("operation should succeed");
         path
     }
 
@@ -630,7 +632,7 @@ mod tests {
                 "format": format_hint.unwrap_or("auto"),
             })
         };
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().expect("operation should succeed");
         let result = rt.block_on(tool.execute(input));
         assert!(
             !result.is_error,
@@ -703,7 +705,8 @@ mod tests {
     fn test_extract_binary_returns_metadata() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("test_{}.bin", unique_id()));
-        std::fs::write(&path, &[0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE]).unwrap();
+        std::fs::write(&path, [0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE])
+            .expect("operation should succeed");
         let output = run_extract(&path, None, None);
         assert!(output.contains("binary"));
         assert!(output.contains("unsupported"));
@@ -772,7 +775,7 @@ mod tests {
             "path": "/nonexistent/path/file.txt",
             "format": "auto",
         });
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().expect("operation should succeed");
         let result = rt.block_on(tool.execute(input));
         assert!(result.is_error);
         assert!(result.content.contains("file not found"));

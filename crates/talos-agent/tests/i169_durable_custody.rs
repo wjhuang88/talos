@@ -76,9 +76,13 @@ fn submission(id: &str, item_id: &str, generation: u64, text: &str) -> Structure
 }
 
 fn advance_runtime_generation(store: &PendingSubmissionStore, target: u64) {
-    let mut current = store.runtime_generation().unwrap();
+    let mut current = store
+        .runtime_generation()
+        .expect("operation should succeed");
     while current < target {
-        current = store.advance_runtime_generation(current).unwrap();
+        current = store
+            .advance_runtime_generation(current)
+            .expect("operation should succeed");
     }
     assert_eq!(current, target);
 }
@@ -139,9 +143,11 @@ async fn wait_for_tracked_receipt(
 
 #[tokio::test]
 async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-lost-ack").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-lost-ack")
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_runtime_generation(&store, 7);
@@ -165,13 +171,13 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
             submission: immutable.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::timeout(Duration::from_secs(3), async {
         loop {
             let committed = store
                 .get("lost_ack_batch")
-                .unwrap()
+                .expect("operation should succeed")
                 .is_some_and(|record| record.state == PendingSubmissionState::Committed);
             if committed && calls.load(Ordering::SeqCst) == 1 {
                 break;
@@ -191,7 +197,7 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
             receipt_tx: Some(reconcile_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let reconciled = wait_for_tracked_receipt(&mut reconcile_rx).await;
     assert_eq!(reconciled.submission_id, "lost_ack_batch");
     assert!(matches!(
@@ -211,7 +217,7 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
             receipt_tx: Some(resend_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let resent = wait_for_tracked_receipt(&mut resend_rx).await;
     assert!(matches!(
         resent.disposition,
@@ -224,22 +230,29 @@ async fn lost_ack_reconciles_committed_custody_without_duplicate_execution() {
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
-        store.get("lost_ack_batch").unwrap().unwrap().state,
+        store
+            .get("lost_ack_batch")
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::Committed
     );
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
 async fn shutdown_pauses_unstarted_durable_submissions() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-shutdown-pause")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
     advance_runtime_generation(&store, 1);
@@ -260,7 +273,7 @@ async fn shutdown_pauses_unstarted_durable_submissions() {
             submission: submission("running_batch", "running_item", 1, "run"),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     wait_for_structured_start(&mut eq_rx, "running_batch").await;
 
     sq_tx
@@ -268,30 +281,45 @@ async fn shutdown_pauses_unstarted_durable_submissions() {
             submission: submission("pending_batch_1", "pending_item_1", 1, "later one"),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     wait_for_receipt(&mut eq_rx, "pending_batch_1").await;
     sq_tx
         .send(SessionOp::SubmitStructured {
             submission: submission("pending_batch_2", "pending_item_2", 1, "later two"),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     wait_for_receipt(&mut eq_rx, "pending_batch_2").await;
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
-        store.get("running_batch").unwrap().unwrap().state,
+        store
+            .get("running_batch")
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::TerminalCancelled
     );
     assert_eq!(
-        store.get("pending_batch_1").unwrap().unwrap().state,
+        store
+            .get("pending_batch_1")
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::PausedPending
     );
     assert_eq!(
-        store.get("pending_batch_2").unwrap().unwrap().state,
+        store
+            .get("pending_batch_2")
+            .expect("operation should succeed")
+            .expect("operation should succeed")
+            .state,
         PendingSubmissionState::PausedPending
     );
 }

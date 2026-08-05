@@ -10,8 +10,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_read_file() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("test.txt"), "line1\nline2\nline3\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("test.txt"), "line1\nline2\nline3\n")
+            .expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "test.txt" })).await;
@@ -24,12 +25,12 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_line_range() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         fs::write(
             temp_dir.path().join("test.txt"),
             "line1\nline2\nline3\nline4\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -45,9 +46,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_offset_limit() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
-        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("test.txt"), content).expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -63,8 +64,8 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_offset_zero() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -78,9 +79,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_limit_only() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
-        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("test.txt"), content).expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -96,9 +97,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_pagination_hint() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content: String = (1..=10).map(|i| format!("line{i}\n")).collect();
-        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("test.txt"), content).expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -112,8 +113,8 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_no_truncation_no_hint() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("test.txt"), "a\nb\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\n").expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -126,9 +127,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_offset_takes_precedence() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
-        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("test.txt"), content).expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -150,8 +151,8 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_backward_compat_no_params() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "test.txt" })).await;
@@ -165,9 +166,13 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_path_escape() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let outside = temp_dir.path().parent().unwrap().join("outside.txt");
-        fs::write(&outside, "secret").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        let outside = temp_dir
+            .path()
+            .parent()
+            .expect("operation should succeed")
+            .join("outside.txt");
+        fs::write(&outside, "secret").expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "../outside.txt" })).await;
@@ -180,10 +185,10 @@ mod file_tool_tests {
     async fn external_file_tools_require_exact_structured_authorization() {
         use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
 
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let external_file = external.path().join("outside.txt");
-        fs::write(&external_file, "before").unwrap();
+        fs::write(&external_file, "before").expect("operation should succeed");
         let external_path = external_file.to_string_lossy().to_string();
 
         let read = ReadTool::new(workspace.path().to_path_buf());
@@ -198,7 +203,7 @@ mod file_tool_tests {
             &external_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
         let allowed = read
             .execute_authorized(json!({"path": external_path.clone()}), &[read_grant])
             .await;
@@ -212,7 +217,7 @@ mod file_tool_tests {
             &external_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
         let edit = EditTool::new(workspace.path().to_path_buf());
         let edited = edit
             .execute_authorized(
@@ -225,7 +230,10 @@ mod file_tool_tests {
             )
             .await;
         assert!(!edited.is_error, "{}", edited.content);
-        assert_eq!(fs::read_to_string(&external_file).unwrap(), "after");
+        assert_eq!(
+            fs::read_to_string(&external_file).expect("operation should succeed"),
+            "after"
+        );
 
         let ls_grant = ToolExecutionAuthorization::for_path(
             "ls",
@@ -234,7 +242,7 @@ mod file_tool_tests {
             &external_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
         let listed = LsTool::new(workspace.path().to_path_buf())
             .execute_authorized(json!({"path": external_path.clone()}), &[ls_grant])
             .await;
@@ -249,7 +257,7 @@ mod file_tool_tests {
             &new_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
         let written = WriteTool::new(workspace.path().to_path_buf())
             .execute_authorized(
                 json!({"path": new_path.clone(), "content": "new"}),
@@ -257,7 +265,10 @@ mod file_tool_tests {
             )
             .await;
         assert!(!written.is_error, "{}", written.content);
-        assert_eq!(fs::read_to_string(&new_file).unwrap(), "new");
+        assert_eq!(
+            fs::read_to_string(&new_file).expect("operation should succeed"),
+            "new"
+        );
 
         let delete_grant = ToolExecutionAuthorization::for_path(
             "delete",
@@ -266,7 +277,7 @@ mod file_tool_tests {
             &new_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
         let deleted = DeleteTool::new(workspace.path().to_path_buf())
             .execute_authorized(json!({"path": new_path}), &[delete_grant])
             .await;
@@ -278,12 +289,12 @@ mod file_tool_tests {
     async fn structured_authorization_cannot_be_reused_for_another_path_or_operation() {
         use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
 
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let first = external.path().join("first.txt");
         let second = external.path().join("second.txt");
-        fs::write(&first, "first").unwrap();
-        fs::write(&second, "second").unwrap();
+        fs::write(&first, "first").expect("operation should succeed");
+        fs::write(&second, "second").expect("operation should succeed");
         let grant = ToolExecutionAuthorization::for_path(
             "read",
             ToolNature::Read,
@@ -291,7 +302,7 @@ mod file_tool_tests {
             &first.to_string_lossy(),
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let wrong_path = ReadTool::new(workspace.path().to_path_buf())
             .execute_authorized(
@@ -317,14 +328,14 @@ mod file_tool_tests {
         use std::os::unix::fs::symlink;
         use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
 
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let first = external.path().join("first.txt");
         let second = external.path().join("second.txt");
         let link = external.path().join("selected.txt");
-        fs::write(&first, "first").unwrap();
-        fs::write(&second, "second").unwrap();
-        symlink(&first, &link).unwrap();
+        fs::write(&first, "first").expect("operation should succeed");
+        fs::write(&second, "second").expect("operation should succeed");
+        symlink(&first, &link).expect("operation should succeed");
 
         let link_path = link.to_string_lossy().to_string();
         let grant = ToolExecutionAuthorization::for_path(
@@ -334,10 +345,10 @@ mod file_tool_tests {
             &link_path,
             ToolAuthorizationScope::Once,
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        fs::remove_file(&link).unwrap();
-        symlink(&second, &link).unwrap();
+        fs::remove_file(&link).expect("operation should succeed");
+        symlink(&second, &link).expect("operation should succeed");
 
         let result = ReadTool::new(workspace.path().to_path_buf())
             .execute_authorized(json!({"path": link_path}), &[grant])
@@ -349,8 +360,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_binary_detection() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("binary.bin"), &[0u8, 1, 2, 3]).unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("binary.bin"), &[0u8, 1, 2, 3])
+            .expect("operation should succeed");
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "binary.bin" })).await;
@@ -361,7 +373,7 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_read_tool_file_not_found() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "nonexistent.txt" })).await;
 
@@ -371,7 +383,7 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_write_tool_new_file() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = WriteTool::new(temp_dir.path().to_path_buf());
 
         let result = tool
@@ -384,13 +396,14 @@ mod file_tool_tests {
         assert!(result.content.contains("preview:"));
         assert!(result.content.contains("hello world"));
 
-        let content = fs::read_to_string(temp_dir.path().join("new.txt")).unwrap();
+        let content =
+            fs::read_to_string(temp_dir.path().join("new.txt")).expect("operation should succeed");
         assert_eq!(content, "hello world");
     }
 
     #[tokio::test]
     async fn test_write_tool_large_preview_is_bounded() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = WriteTool::new(temp_dir.path().to_path_buf());
         let content = (0..40)
             .map(|i| format!("line {i}"))
@@ -411,9 +424,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_write_tool_refuses_overwrite() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let file = temp_dir.path().join("existing.txt");
-        fs::write(&file, "old content").unwrap();
+        fs::write(&file, "old content").expect("operation should succeed");
 
         let tool = WriteTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -423,13 +436,13 @@ mod file_tool_tests {
         assert!(result.is_error);
         assert!(result.content.contains("already exists"));
         assert!(result.content.contains("edit tool"));
-        let content = fs::read_to_string(&file).unwrap();
+        let content = fs::read_to_string(&file).expect("operation should succeed");
         assert_eq!(content, "old content");
     }
 
     #[tokio::test]
     async fn test_write_tool_create_parent_dirs() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = WriteTool::new(temp_dir.path().to_path_buf());
 
         let result = tool
@@ -440,15 +453,16 @@ mod file_tool_tests {
             .await;
 
         assert!(!result.is_error);
-        let content = fs::read_to_string(temp_dir.path().join("a/b/c/deep.txt")).unwrap();
+        let content = fs::read_to_string(temp_dir.path().join("a/b/c/deep.txt"))
+            .expect("operation should succeed");
         assert_eq!(content, "deep content");
     }
 
     #[tokio::test]
     async fn test_edit_tool_replace_first_occurrence() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let file = temp_dir.path().join("edit.txt");
-        fs::write(&file, "foo bar foo baz").unwrap();
+        fs::write(&file, "foo bar foo baz").expect("operation should succeed");
 
         let tool = EditTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -464,15 +478,15 @@ mod file_tool_tests {
         assert!(result.content.contains("diff:"));
         assert!(result.content.contains("- foo"));
         assert!(result.content.contains("+ qux"));
-        let content = fs::read_to_string(&file).unwrap();
+        let content = fs::read_to_string(&file).expect("operation should succeed");
         assert_eq!(content, "qux bar foo baz");
     }
 
     #[tokio::test]
     async fn test_edit_tool_no_match() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let file = temp_dir.path().join("edit.txt");
-        fs::write(&file, "hello world").unwrap();
+        fs::write(&file, "hello world").expect("operation should succeed");
 
         let tool = EditTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -489,9 +503,13 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_edit_tool_path_escape() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let outside = temp_dir.path().parent().unwrap().join("outside.txt");
-        fs::write(&outside, "secret").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        let outside = temp_dir
+            .path()
+            .parent()
+            .expect("operation should succeed")
+            .join("outside.txt");
+        fs::write(&outside, "secret").expect("operation should succeed");
 
         let tool = EditTool::new(temp_dir.path().to_path_buf());
         let result = tool
@@ -508,7 +526,7 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn test_edit_tool_file_not_found() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = EditTool::new(temp_dir.path().to_path_buf());
         let result = tool
             .execute(json!({
@@ -541,8 +559,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn snapshot_read_model_projection_is_compact_and_display_projection_is_private() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("source.rs"), "alpha\nbeta\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("source.rs"), "alpha\nbeta\n")
+            .expect("operation should succeed");
         let (read, _, _, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
 
         let result = read.execute(json!({"path": "source.rs"})).await;
@@ -569,7 +588,7 @@ mod file_tool_tests {
 
     #[test]
     fn snapshot_edit_schema_has_no_dangling_root_definitions() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let (_, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let schema = edit.parameters();
         let serialized = schema.to_string();
@@ -584,11 +603,11 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn two_hex_anchor_overhead_is_bounded_against_numbered_read() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content = (1..=200)
             .map(|line| format!("value {line}\n"))
             .collect::<String>();
-        fs::write(temp_dir.path().join("large.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("large.txt"), content).expect("operation should succeed");
         let legacy = ReadTool::new(temp_dir.path().to_path_buf());
         let (snapshot, _, _, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let input = json!({"path": "large.txt", "offset": 0, "limit": 200});
@@ -606,9 +625,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn oversized_snapshot_file_remains_readable_without_anchor_mode() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let content = format!("first\n{}", "x".repeat(2 * 1024 * 1024));
-        fs::write(temp_dir.path().join("large.txt"), content).unwrap();
+        fs::write(temp_dir.path().join("large.txt"), content).expect("operation should succeed");
         let (read, _, _, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let result = read
             .execute(json!({"path": "large.txt", "offset": 0, "limit": 1}))
@@ -620,9 +639,9 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn anchored_edit_commits_selected_range_and_invalidates_snapshot() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("source.rs");
-        fs::write(&path, "alpha\nbeta\ngamma\n").unwrap();
+        fs::write(&path, "alpha\nbeta\ngamma\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "source.rs"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -647,7 +666,7 @@ mod file_tool_tests {
         assert!(!result.content.contains("snapshot"));
         assert!(!result.content.contains("anchor"));
         assert_eq!(
-            fs::read_to_string(&path).unwrap(),
+            fs::read_to_string(&path).expect("operation should succeed"),
             "alpha\ndelta\nepsilon\n"
         );
 
@@ -658,13 +677,13 @@ mod file_tool_tests {
 
     #[tokio::test]
     async fn anchored_edit_rejects_stale_revision_without_mutation() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("source.txt");
-        fs::write(&path, "one\ntwo\n").unwrap();
+        fs::write(&path, "one\ntwo\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "source.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
-        fs::write(&path, "external\none\ntwo\n").unwrap();
+        fs::write(&path, "external\none\ntwo\n").expect("operation should succeed");
 
         let result = edit
             .execute(json!({
@@ -675,14 +694,17 @@ mod file_tool_tests {
             .await;
         assert!(result.is_error);
         assert!(result.content.contains("FILE_REV_MISMATCH"));
-        assert_eq!(fs::read_to_string(&path).unwrap(), "external\none\ntwo\n");
+        assert_eq!(
+            fs::read_to_string(&path).expect("operation should succeed"),
+            "external\none\ntwo\n"
+        );
     }
 
     #[tokio::test]
     async fn anchored_edit_rejects_snapshot_bound_to_another_path() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("one.txt"), "same\n").unwrap();
-        fs::write(temp_dir.path().join("two.txt"), "same\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("one.txt"), "same\n").expect("operation should succeed");
+        fs::write(temp_dir.path().join("two.txt"), "same\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "one.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -697,15 +719,15 @@ mod file_tool_tests {
         assert!(result.is_error);
         assert!(result.content.contains("SNAPSHOT_PATH_MISMATCH"));
         assert_eq!(
-            fs::read_to_string(temp_dir.path().join("two.txt")).unwrap(),
+            fs::read_to_string(temp_dir.path().join("two.txt")).expect("operation should succeed"),
             "same\n"
         );
     }
 
     #[tokio::test]
     async fn anchored_edit_rejects_handle_from_another_runtime_registry() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("one.txt"), "same\n").unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(temp_dir.path().join("one.txt"), "same\n").expect("operation should succeed");
         let (read, _, _, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let (_, _, foreign_edit, _) =
             super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
@@ -722,16 +744,16 @@ mod file_tool_tests {
         assert!(result.is_error);
         assert!(result.content.contains("SNAPSHOT_NOT_FOUND"));
         assert_eq!(
-            fs::read_to_string(temp_dir.path().join("one.txt")).unwrap(),
+            fs::read_to_string(temp_dir.path().join("one.txt")).expect("operation should succeed"),
             "same\n"
         );
     }
 
     #[tokio::test]
     async fn anchored_edit_preserves_crlf_and_final_newline() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("windows.txt");
-        fs::write(&path, b"one\r\ntwo\r\nthree\r\n").unwrap();
+        fs::write(&path, b"one\r\ntwo\r\nthree\r\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "windows.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -744,14 +766,17 @@ mod file_tool_tests {
             }))
             .await;
         assert!(!result.is_error, "{}", result.content);
-        assert_eq!(fs::read(&path).unwrap(), b"one\r\nsecond\r\nthree\r\n");
+        assert_eq!(
+            fs::read(&path).expect("operation should succeed"),
+            b"one\r\nsecond\r\nthree\r\n"
+        );
     }
 
     #[tokio::test]
     async fn anchored_edit_preserves_mixed_terminators_and_missing_final_newline() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("mixed.txt");
-        fs::write(&path, b"one\r\ntwo\nthree").unwrap();
+        fs::write(&path, b"one\r\ntwo\nthree").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "mixed.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -764,12 +789,15 @@ mod file_tool_tests {
             }))
             .await;
         assert!(!result.is_error, "{}", result.content);
-        assert_eq!(fs::read(&path).unwrap(), b"one\r\nsecond\nthree");
+        assert_eq!(
+            fs::read(&path).expect("operation should succeed"),
+            b"one\r\nsecond\nthree"
+        );
     }
 
     #[tokio::test]
     async fn two_digit_collision_cannot_bypass_full_revision_check() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("collision.txt");
         let mut by_code = std::collections::HashMap::<u8, String>::new();
         let (first, second) = (0..=512)
@@ -786,11 +814,11 @@ mod file_tool_tests {
             super::snapshot::digest(first.as_bytes())[0],
             super::snapshot::digest(second.as_bytes())[0]
         );
-        fs::write(&path, format!("{first}\n")).unwrap();
+        fs::write(&path, format!("{first}\n")).expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "collision.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
-        fs::write(&path, format!("{second}\n")).unwrap();
+        fs::write(&path, format!("{second}\n")).expect("operation should succeed");
 
         let result = edit
             .execute(json!({
@@ -801,14 +829,17 @@ mod file_tool_tests {
             .await;
         assert!(result.is_error);
         assert!(result.content.contains("FILE_REV_MISMATCH"));
-        assert_eq!(fs::read_to_string(path).unwrap(), format!("{second}\n"));
+        assert_eq!(
+            fs::read_to_string(path).expect("operation should succeed"),
+            format!("{second}\n")
+        );
     }
 
     #[tokio::test]
     async fn anchored_edit_rejects_bad_hash_and_overlapping_batch() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("source.txt");
-        fs::write(&path, "one\ntwo\nthree\n").unwrap();
+        fs::write(&path, "one\ntwo\nthree\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "source.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -835,14 +866,17 @@ mod file_tool_tests {
             .await;
         assert!(overlapping.is_error);
         assert!(overlapping.content.contains("INVALID_RANGE"));
-        assert_eq!(fs::read_to_string(&path).unwrap(), "one\ntwo\nthree\n");
+        assert_eq!(
+            fs::read_to_string(&path).expect("operation should succeed"),
+            "one\ntwo\nthree\n"
+        );
     }
 
     #[tokio::test]
     async fn anchored_edit_insert_before_after_and_delete_are_one_batch() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("source.txt");
-        fs::write(&path, "a\nb\nc\n").unwrap();
+        fs::write(&path, "a\nb\nc\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "source.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -859,14 +893,17 @@ mod file_tool_tests {
             }))
             .await;
         assert!(!result.is_error, "{}", result.content);
-        assert_eq!(fs::read_to_string(&path).unwrap(), "zero\na\nb\nbetween\n");
+        assert_eq!(
+            fs::read_to_string(&path).expect("operation should succeed"),
+            "zero\na\nb\nbetween\n"
+        );
     }
 
     #[tokio::test]
     async fn concurrent_anchored_edits_allow_exactly_one_stale_snapshot_winner() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("source.txt");
-        fs::write(&path, "original\n").unwrap();
+        fs::write(&path, "original\n").expect("operation should succeed");
         let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
         let read_result = read.execute(json!({"path": "source.txt"})).await;
         let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
@@ -905,27 +942,35 @@ mod file_tool_tests {
                 .count(),
             1
         );
-        let content = fs::read_to_string(&path).unwrap();
+        let content = fs::read_to_string(&path).expect("operation should succeed");
         assert!(content == "first\n" || content == "second\n");
     }
 
     #[test]
     fn test_resolve_workspace_path_within_root() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let file = temp_dir.path().join("subdir/file.txt");
-        fs::create_dir_all(file.parent().unwrap()).unwrap();
-        fs::write(&file, "content").unwrap();
+        fs::create_dir_all(file.parent().expect("operation should succeed"))
+            .expect("operation should succeed");
+        fs::write(&file, "content").expect("operation should succeed");
 
-        let resolved = resolve_workspace_path(temp_dir.path(), "subdir/file.txt").unwrap();
-        assert_eq!(resolved, file.canonicalize().unwrap());
+        let resolved = resolve_workspace_path(temp_dir.path(), "subdir/file.txt")
+            .expect("operation should succeed");
+        assert_eq!(
+            resolved,
+            file.canonicalize().expect("operation should succeed")
+        );
     }
 
     #[test]
     fn test_resolve_workspace_path_escape_rejected() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let result = resolve_workspace_path(temp_dir.path(), "../outside.txt");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), FileToolError::PathEscape(_)));
+        assert!(matches!(
+            result.expect_err("operation should fail"),
+            FileToolError::PathEscape(_)
+        ));
     }
 
     #[cfg(unix)]
@@ -933,17 +978,21 @@ mod file_tool_tests {
     async fn snapshot_read_rejects_symlink_that_escapes_workspace() {
         use std::os::unix::fs::symlink;
 
-        let workspace = tempfile::tempdir().unwrap();
-        let outside = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let outside = tempfile::tempdir().expect("operation should succeed");
         let outside_file = outside.path().join("outside.txt");
-        fs::write(&outside_file, "secret\n").unwrap();
-        symlink(&outside_file, workspace.path().join("link.txt")).unwrap();
+        fs::write(&outside_file, "secret\n").expect("operation should succeed");
+        symlink(&outside_file, workspace.path().join("link.txt"))
+            .expect("operation should succeed");
         let (read, _, _, _) = super::snapshot_aware_file_tools(workspace.path().to_path_buf());
 
         let result = read.execute(json!({"path": "link.txt"})).await;
         assert!(result.is_error);
         assert!(result.content.contains("path escapes workspace root"));
-        assert_eq!(fs::read_to_string(outside_file).unwrap(), "secret\n");
+        assert_eq!(
+            fs::read_to_string(outside_file).expect("operation should succeed"),
+            "secret\n"
+        );
     }
 }
 
@@ -955,12 +1004,13 @@ mod ls_tool_tests {
     use std::fs;
 
     fn make_workspace() -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("main.rs"), "fn main() {}\n").unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[package]\n").unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n").unwrap();
-        fs::write(dir.path().join(".hidden"), "secret\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("main.rs"), "fn main() {}\n").expect("operation should succeed");
+        fs::write(dir.path().join("Cargo.toml"), "[package]\n").expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
+        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join(".hidden"), "secret\n").expect("operation should succeed");
         dir
     }
 
@@ -1016,7 +1066,11 @@ mod ls_tool_tests {
         let result = tool.execute(json!({})).await;
 
         assert!(!result.is_error);
-        let src_line = result.content.lines().find(|l| l.contains("src")).unwrap();
+        let src_line = result
+            .content
+            .lines()
+            .find(|l| l.contains("src"))
+            .expect("operation should succeed");
         assert!(src_line.ends_with('/'));
         assert!(!src_line.contains(' '));
     }
@@ -1032,14 +1086,14 @@ mod ls_tool_tests {
             .content
             .lines()
             .find(|l| l.contains("Cargo.toml"))
-            .unwrap();
+            .expect("operation should succeed");
         assert!(!toml_line.ends_with('/'));
     }
 
     #[tokio::test]
     async fn test_ls_file_shows_size() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.txt"), "hello world").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.txt"), "hello world").expect("operation should succeed");
 
         let tool = LsTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({})).await;
@@ -1049,7 +1103,7 @@ mod ls_tool_tests {
             .content
             .lines()
             .find(|l| l.contains("test.txt"))
-            .unwrap();
+            .expect("operation should succeed");
         assert!(line.ends_with(" 11"));
     }
 
@@ -1074,9 +1128,9 @@ mod ls_tool_tests {
 
     #[tokio::test]
     async fn test_ls_long_format() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.txt"), "hello world").unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.txt"), "hello world").expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
 
         let tool = LsTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "long": true })).await;
@@ -1093,8 +1147,8 @@ mod ls_tool_tests {
 
     #[tokio::test]
     async fn test_ls_long_format_dir() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
 
         let tool = LsTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "long": true })).await;
@@ -1110,8 +1164,8 @@ mod ls_tool_tests {
 
     #[tokio::test]
     async fn test_ls_long_shows_permissions() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.txt"), "content").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.txt"), "content").expect("operation should succeed");
 
         let tool = LsTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "long": true })).await;
@@ -1121,7 +1175,7 @@ mod ls_tool_tests {
             .content
             .lines()
             .find(|l| l.contains("test.txt"))
-            .unwrap();
+            .expect("operation should succeed");
         let perms_field = line.split_whitespace().nth(0).unwrap_or("");
         assert!(perms_field.starts_with('-'));
         assert!(perms_field.len() == 10);

@@ -239,55 +239,55 @@ mod tests {
 
     #[test]
     fn manifest_missing_does_not_panic() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         print_manifest(dir.path());
     }
 
     #[test]
     fn board_missing_does_not_panic() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         print_board_disposition(dir.path());
     }
 
     #[test]
     fn iterations_missing_does_not_panic() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         print_iteration_summary(dir.path());
     }
 
     #[test]
     fn git_status_unavailable_does_not_panic() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         print_git_status(dir.path());
     }
 
     #[test]
     fn full_workspace_parses_without_panic() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
 
         let gov_dir = dir.path().join(".agent-governance");
-        fs::create_dir_all(&gov_dir).unwrap();
+        fs::create_dir_all(&gov_dir).expect("operation should succeed");
         fs::write(
             gov_dir.join("manifest.yaml"),
             "profile: \"high-risk\"\nstatus: \"conformant\"\nlast_audited_at: \"2026-06-25\"\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let docs_dir = dir.path().join("docs");
-        fs::create_dir_all(&docs_dir).unwrap();
+        fs::create_dir_all(&docs_dir).expect("operation should succeed");
         fs::write(
             docs_dir.join("BOARD.md"),
             "# Board\n\n## Now\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I047 Test | Active | [I047](x.md) | Gate |\n\n## Next\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let iter_dir = docs_dir.join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "| ID | Codename | State | Verified |\n|---|---|---|---|\n| I047 | Test | Active | yes |\n| I001 | Done | Complete | yes |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         print_manifest(dir.path());
         print_board_disposition(dir.path());
@@ -296,21 +296,21 @@ mod tests {
 
     #[test]
     fn validation_status_does_not_execute_workspace_script() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let gov_dir = dir.path().join(".agent-governance");
-        fs::create_dir_all(&gov_dir).unwrap();
+        fs::create_dir_all(&gov_dir).expect("operation should succeed");
         fs::write(
             gov_dir.join("manifest.yaml"),
             "profile: \"small\"\nstatus: \"conformant\"\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         let script_dir = dir.path().join("scripts");
-        fs::create_dir_all(&script_dir).unwrap();
+        fs::create_dir_all(&script_dir).expect("operation should succeed");
         fs::write(
             script_dir.join("validate_project_governance.sh"),
             "#!/usr/bin/env bash\ntouch executed-marker\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         print_validation_status(dir.path());
 

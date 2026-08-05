@@ -82,7 +82,7 @@ fn parse_skill_without_frontmatter_errors() {
     let result = SkillLoader::parse(&path);
     assert!(result.is_err());
 
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SkillError::InvalidFrontmatter(msg) => {
             assert!(msg.contains("---"));
         }
@@ -99,7 +99,7 @@ fn parse_invalid_yaml_errors() {
     let result = SkillLoader::parse(&path);
     assert!(result.is_err());
 
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SkillError::YamlParseError(_) => {}
         other => panic!("expected YamlParseError, got: {other:?}"),
     }
@@ -115,7 +115,7 @@ fn parse_missing_required_fields_errors() {
     assert!(result.is_err());
 
     // serde_yaml reports missing fields as YamlParseError
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SkillError::YamlParseError(e) => {
             assert!(e.to_string().contains("description"));
         }
@@ -129,7 +129,7 @@ fn parse_nonexistent_file_errors() {
     let result = SkillLoader::parse(path);
     assert!(result.is_err());
 
-    match result.unwrap_err() {
+    match result.expect_err("operation should fail") {
         SkillError::FileNotFound(p) => {
             assert_eq!(p, path);
         }
@@ -1166,7 +1166,7 @@ fn discover_finds_regular_nested_skill() {
 
 #[test]
 fn test_shared_skills_disabled_when_explicitly_off() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let loader = SkillLoader::for_workspace_with_options(dir.path(), false);
     // ~/.agents/skills should NOT be in search paths when explicitly disabled
     assert!(
@@ -1181,16 +1181,19 @@ fn test_shared_skills_disabled_when_explicitly_off() {
 fn test_shared_skills_enabled_adds_path() {
     let home = home_dir().expect("home dir required");
     let shared_path = home.join(".agents").join("skills");
-    fs::create_dir_all(&shared_path).unwrap();
+    fs::create_dir_all(&shared_path).expect("operation should succeed");
 
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let loader = SkillLoader::for_workspace_with_options(dir.path(), true);
     assert!(
         loader.search_paths.iter().any(|p| p == &shared_path),
         "~/.agents/skills should be in search paths when enabled"
     );
 
-    let last = loader.search_paths.last().unwrap();
+    let last = loader
+        .search_paths
+        .last()
+        .expect("operation should succeed");
     assert_eq!(last, &shared_path);
 }
 
@@ -1198,26 +1201,26 @@ fn test_shared_skills_enabled_adds_path() {
 fn test_dedup_project_shadows_shared() {
     let home = home_dir().expect("home dir required");
     let shared_path = home.join(".agents").join("skills").join("dedup-test");
-    let project_skills = tempfile::tempdir().unwrap();
+    let project_skills = tempfile::tempdir().expect("operation should succeed");
     let proj_skills_dir = project_skills.path().join(".talos/skills/dup-skill");
 
-    fs::create_dir_all(&shared_path).unwrap();
-    fs::create_dir_all(&proj_skills_dir).unwrap();
+    fs::create_dir_all(&shared_path).expect("operation should succeed");
+    fs::create_dir_all(&proj_skills_dir).expect("operation should succeed");
 
     fs::write(
         shared_path.join("SKILL.md"),
         "---\nname: dup-skill\ndescription: Shared version\ntriggers:\n  - dup\n---\n\nShared body.\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     fs::write(
         proj_skills_dir.join("SKILL.md"),
         "---\nname: dup-skill\ndescription: Project version\ntriggers:\n  - dup\n---\n\nProject body.\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let mut loader = SkillLoader::for_workspace_with_options(project_skills.path(), true);
-    loader.discover().unwrap();
+    loader.discover().expect("operation should succeed");
 
     let dup_skills: Vec<_> = loader
         .skills
@@ -1237,24 +1240,24 @@ fn test_dedup_project_shadows_shared() {
 
 #[test]
 fn test_skill_source_tagged_correctly() {
-    let project_skills = tempfile::tempdir().unwrap();
+    let project_skills = tempfile::tempdir().expect("operation should succeed");
     let proj_skills_dir = project_skills.path().join(".talos/skills/proj-skill");
     let shared_dir = project_skills.path().join("shared-skills");
 
-    fs::create_dir_all(&proj_skills_dir).unwrap();
-    fs::create_dir_all(&shared_dir).unwrap();
+    fs::create_dir_all(&proj_skills_dir).expect("operation should succeed");
+    fs::create_dir_all(&shared_dir).expect("operation should succeed");
 
     fs::write(
         shared_dir.join("SKILL.md"),
         "---\nname: shared-only\ndescription: From shared\ntriggers:\n  - shared\n---\n\nShared.\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     fs::write(
         proj_skills_dir.join("SKILL.md"),
         "---\nname: proj-only\ndescription: From project\ntriggers:\n  - proj\n---\n\nProject.\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     // Manually construct loader with known search paths to avoid home-dir race
     let mut loader = SkillLoader {
@@ -1265,14 +1268,14 @@ fn test_skill_source_tagged_correctly() {
         discovery_policy: SkillDiscoveryPolicy::default(),
         discovery_warnings: Vec::new(),
     };
-    loader.discover().unwrap();
+    loader.discover().expect("operation should succeed");
 
     // Project skill should be Project source
     let proj_skill = loader
         .skills
         .iter()
         .find(|s| s.name == "proj-only")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(proj_skill.source, SkillSource::Project);
 
     // Second path skill should be Parent source (not in ~/.talos/skills or workspace .talos/skills)
@@ -1280,14 +1283,20 @@ fn test_skill_source_tagged_correctly() {
         .skills
         .iter()
         .find(|s| s.name == "shared-only")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(shared_skill.source, SkillSource::Parent);
 
     // Verify index propagates source
     let index = loader.get_index();
-    let proj_idx = index.iter().find(|e| e.name == "proj-only").unwrap();
+    let proj_idx = index
+        .iter()
+        .find(|e| e.name == "proj-only")
+        .expect("operation should succeed");
     assert_eq!(proj_idx.source, SkillSource::Project);
-    let shared_idx = index.iter().find(|e| e.name == "shared-only").unwrap();
+    let shared_idx = index
+        .iter()
+        .find(|e| e.name == "shared-only")
+        .expect("operation should succeed");
     assert_eq!(shared_idx.source, SkillSource::Parent);
 }
 
@@ -1301,7 +1310,7 @@ fn test_skill_source_display() {
 
 #[test]
 fn test_shared_skills_not_loaded_when_explicitly_disabled() {
-    let project_skills = tempfile::tempdir().unwrap();
+    let project_skills = tempfile::tempdir().expect("operation should succeed");
     let loader = SkillLoader::for_workspace_with_options(project_skills.path(), false);
     assert!(
         !loader
@@ -1427,7 +1436,11 @@ fn non_adjacent_duplicate_names_follow_first_wins() {
 
     let dup_count = loader.skills.iter().filter(|s| s.name == "dup").count();
     assert_eq!(dup_count, 1, "non-adjacent duplicate removed globally");
-    let dup = loader.skills.iter().find(|s| s.name == "dup").unwrap();
+    let dup = loader
+        .skills
+        .iter()
+        .find(|s| s.name == "dup")
+        .expect("operation should succeed");
     assert_eq!(dup.description, "Version 1", "first occurrence wins");
 }
 

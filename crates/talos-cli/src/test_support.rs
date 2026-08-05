@@ -13,4 +13,4 @@
 #[path = "i169_bridge_integration_tests.rs"]
 mod i169_bridge_integration_tests;
 
-pub(crate) static HOME_ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(crate) static HOME_ENV_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());

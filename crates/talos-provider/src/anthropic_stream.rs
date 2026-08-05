@@ -568,11 +568,13 @@ mod tests {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::TcpListener;
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("operation should succeed");
+        let addr = listener.local_addr().expect("operation should succeed");
 
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener.accept().await.expect("operation should succeed");
             let mut req_buf = [0_u8; 1024];
             let _ = socket.read(&mut req_buf).await;
 
@@ -582,14 +584,20 @@ mod tests {
                 "Transfer-Encoding: chunked\r\n",
                 "Connection: close\r\n\r\n"
             );
-            socket.write_all(headers.as_bytes()).await.unwrap();
-            socket.flush().await.unwrap();
+            socket
+                .write_all(headers.as_bytes())
+                .await
+                .expect("operation should succeed");
+            socket.flush().await.expect("operation should succeed");
 
             for (delay, payload) in chunks {
                 tokio::time::sleep(delay).await;
                 let frame = format!("{:X}\r\n{}\r\n", payload.len(), payload);
-                socket.write_all(frame.as_bytes()).await.unwrap();
-                socket.flush().await.unwrap();
+                socket
+                    .write_all(frame.as_bytes())
+                    .await
+                    .expect("operation should succeed");
+                socket.flush().await.expect("operation should succeed");
             }
 
             if let Some(delay) = close_after {
@@ -692,7 +700,7 @@ mod tests {
 
         let response = reqwest::get(format!("{}/thinking", server.url()))
             .await
-            .unwrap();
+            .expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(32);
         parse_sse_stream(
             response,
@@ -773,7 +781,7 @@ mod tests {
 
         let response = reqwest::get(format!("{}/redacted", server.url()))
             .await
-            .unwrap();
+            .expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(32);
         parse_sse_stream(
             response,
@@ -801,7 +809,7 @@ mod tests {
     #[tokio::test]
     async fn test_first_packet_timeout() {
         let url = spawn_chunked_sse_server(vec![], Some(Duration::from_secs(3))).await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url).await.expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(2)).await;
@@ -840,7 +848,7 @@ mod tests {
             Some(Duration::from_secs(3)),
         )
         .await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url).await.expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
@@ -903,7 +911,7 @@ mod tests {
             ),
         ];
         let url = spawn_chunked_sse_server(stream, None).await;
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url).await.expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(16);
 
         parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
@@ -928,8 +936,10 @@ mod tests {
         use tokio::io::AsyncReadExt;
         use tokio::net::TcpListener;
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("operation should succeed");
+        let addr = listener.local_addr().expect("operation should succeed");
 
         tokio::spawn(async move {
             loop {
@@ -965,7 +975,7 @@ mod tests {
         let result = provider.stream(&messages).await;
 
         assert!(result.is_err(), "dispatch timeout must produce an error");
-        let err = result.unwrap_err();
+        let err = result.expect_err("operation should fail");
         match err {
             ProviderError::NetworkError(msg) => {
                 assert!(
@@ -1032,22 +1042,32 @@ mod i168_terminal_outcome_tests {
     use tokio::net::TcpListener;
 
     async fn parse_body(body: String) -> Vec<AgentEvent> {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("operation should succeed");
+        let addr = listener.local_addr().expect("operation should succeed");
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener.accept().await.expect("operation should succeed");
             let mut request = [0_u8; 2048];
             let _ = socket.read(&mut request).await;
             let headers = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
             );
-            socket.write_all(headers.as_bytes()).await.unwrap();
-            socket.write_all(body.as_bytes()).await.unwrap();
-            socket.flush().await.unwrap();
+            socket
+                .write_all(headers.as_bytes())
+                .await
+                .expect("operation should succeed");
+            socket
+                .write_all(body.as_bytes())
+                .await
+                .expect("operation should succeed");
+            socket.flush().await.expect("operation should succeed");
         });
 
-        let response = reqwest::get(format!("http://{addr}/stream")).await.unwrap();
+        let response = reqwest::get(format!("http://{addr}/stream"))
+            .await
+            .expect("operation should succeed");
         let (tx, mut rx) = mpsc::channel(32);
         parse_sse_stream(response, tx, Duration::from_secs(5), Duration::from_secs(5)).await;
         let mut events = Vec::new();

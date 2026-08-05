@@ -122,16 +122,19 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
         assert_eq!(providers.len(), 1);
 
-        let bailian = providers.get("bailian").unwrap();
+        let bailian = providers.get("bailian").expect("operation should succeed");
         assert_eq!(bailian.protocol, ProviderProtocol::OpenAIChat);
         assert_eq!(bailian.base_url.as_deref(), Some("https://example.com/v1"));
         assert!(bailian.api_key.is_none());
         assert!(bailian.api_key_env.is_none());
 
-        let glm5 = bailian.models.get("glm-5").unwrap();
+        let glm5 = bailian
+            .models
+            .get("glm-5")
+            .expect("operation should succeed");
         assert_eq!(glm5.context_limit, Some(202_752));
         assert_eq!(glm5.output_limit, Some(4096));
     }
@@ -155,20 +158,30 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
         assert_eq!(providers.len(), 2);
 
-        let anthropic = providers.get("anthropic").unwrap();
+        let anthropic = providers
+            .get("anthropic")
+            .expect("operation should succeed");
         assert_eq!(anthropic.protocol, ProviderProtocol::AnthropicMessages);
         assert_eq!(
-            anthropic.models.get("claude-sonnet").unwrap().context_limit,
+            anthropic
+                .models
+                .get("claude-sonnet")
+                .expect("operation should succeed")
+                .context_limit,
             Some(200_000)
         );
 
-        let openai = providers.get("openai").unwrap();
+        let openai = providers.get("openai").expect("operation should succeed");
         assert_eq!(openai.protocol, ProviderProtocol::OpenAIChat);
         assert_eq!(
-            openai.models.get("gpt-4o").unwrap().output_limit,
+            openai
+                .models
+                .get("gpt-4o")
+                .expect("operation should succeed")
+                .output_limit,
             Some(4096)
         );
     }
@@ -182,10 +195,14 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
         assert_eq!(providers.len(), 1);
         assert_eq!(
-            providers.get("custom").unwrap().base_url.as_deref(),
+            providers
+                .get("custom")
+                .expect("operation should succeed")
+                .base_url
+                .as_deref(),
             Some("https://custom.example.com")
         );
     }
@@ -198,10 +215,10 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
         assert_eq!(providers.len(), 1);
 
-        let minimal = providers.get("minimal").unwrap();
+        let minimal = providers.get("minimal").expect("operation should succeed");
         assert_eq!(minimal.protocol, ProviderProtocol::OpenAIChat);
         assert!(minimal.base_url.is_none());
         assert!(minimal.models.is_empty());
@@ -215,9 +232,12 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
         assert_eq!(
-            providers.get("unknown").unwrap().protocol,
+            providers
+                .get("unknown")
+                .expect("operation should succeed")
+                .protocol,
             ProviderProtocol::OpenAIChat
         );
     }
@@ -226,7 +246,7 @@ mod tests {
     fn test_import_invalid_json_fails() {
         let result = import_opencode_providers("not json");
         assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
+        let err = result.expect_err("operation should fail").to_string();
         assert!(err.contains("invalid JSON"));
     }
 
@@ -235,7 +255,7 @@ mod tests {
         let json = r#"{ "provider": { "bad": { "options": "should_be_object" } } }"#;
         let result = import_opencode_providers(json);
         assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
+        let err = result.expect_err("operation should fail").to_string();
         assert!(err.contains("invalid opencode provider schema"));
     }
 
@@ -249,8 +269,13 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
-        let model = providers.get("p").unwrap().models.get("m").unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        let model = providers
+            .get("p")
+            .expect("operation should succeed")
+            .models
+            .get("m")
+            .expect("operation should succeed");
         assert!(model.context_limit.is_none());
         assert!(model.output_limit.is_none());
     }
@@ -265,8 +290,13 @@ mod tests {
             }
         }"#;
 
-        let providers = import_opencode_providers(json).unwrap();
-        let model = providers.get("p").unwrap().models.get("m").unwrap();
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        let model = providers
+            .get("p")
+            .expect("operation should succeed")
+            .models
+            .get("m")
+            .expect("operation should succeed");
         assert_eq!(model.context_limit, Some(1000));
         assert!(model.output_limit.is_none());
     }

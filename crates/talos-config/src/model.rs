@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(m.context_limit, Some(200_000));
         assert_eq!(m.output_limit, Some(8192));
         assert!(m.pricing.is_some());
-        let p = m.pricing.as_ref().unwrap();
+        let p = m.pricing.as_ref().expect("operation should succeed");
         assert_eq!(p.input_per_1m, Some(3.0));
         assert_eq!(p.output_per_1m, Some(15.0));
         assert_eq!(p.cache_read_per_1m, Some(0.30));
@@ -568,8 +568,14 @@ mod tests {
         let cortecs = find_model_by_provider(&models, "cortecs", "glm-5.2");
         assert!(aihubmix.is_some());
         assert!(cortecs.is_some());
-        assert_eq!(aihubmix.unwrap().provider, "aihubmix");
-        assert_eq!(cortecs.unwrap().provider, "cortecs");
+        assert_eq!(
+            aihubmix.expect("operation should succeed").provider,
+            "aihubmix"
+        );
+        assert_eq!(
+            cortecs.expect("operation should succeed").provider,
+            "cortecs"
+        );
     }
 
     #[test]

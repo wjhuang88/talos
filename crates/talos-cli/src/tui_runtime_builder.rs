@@ -14,9 +14,9 @@ use talos_config::Config;
 use talos_core::message::Message;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionHandle};
 use talos_core::tool::ToolPresentationPolicy;
-use talos_plugin::{HookRegistry, LoadedPluginPackage};
+use talos_plugin::HookRegistry;
+use talos_plugin::wasm::LoadedPluginPackage;
 use talos_session::{Session, SessionManager};
-use tokio::sync::mpsc;
 
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
@@ -34,7 +34,6 @@ use crate::skill_runtime::{RuntimeSkills, apply_runtime_skills, discover_runtime
 /// Inputs that are stable across all runtime reconstructions in one TUI process.
 #[derive(Clone)]
 pub(crate) struct TuiRuntimeBuilder {
-    ui_tx: mpsc::UnboundedSender<talos_conversation::UiOutput>,
     hooks: Arc<HookRegistry>,
     workspace_root: PathBuf,
     session_manager: SessionManager,
@@ -74,7 +73,6 @@ impl PreparedTuiRuntime {
             actor,
             pending_scheduler: self.pending_scheduler,
             mcp_runtime: self.mcp_runtime,
-            runtime_config: self.runtime_config,
             runtime_skills: self.runtime_skills,
             loaded_plugin_packages: self.loaded_plugin_packages,
         }
@@ -86,7 +84,6 @@ pub(crate) struct BuiltTuiRuntime {
     pub actor: AppServerSession,
     pub pending_scheduler: PendingSchedulerActor,
     pub mcp_runtime: McpSessionRuntime,
-    pub runtime_config: Config,
     pub runtime_skills: RuntimeSkills,
     pub loaded_plugin_packages: Vec<LoadedPluginPackage>,
 }
@@ -94,7 +91,6 @@ pub(crate) struct BuiltTuiRuntime {
 impl TuiRuntimeBuilder {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        ui_tx: mpsc::UnboundedSender<talos_conversation::UiOutput>,
         hooks: Arc<HookRegistry>,
         workspace_root: PathBuf,
         session_manager: SessionManager,
@@ -104,7 +100,6 @@ impl TuiRuntimeBuilder {
         mock: bool,
     ) -> Self {
         Self {
-            ui_tx,
             hooks,
             workspace_root,
             session_manager,
@@ -113,11 +108,6 @@ impl TuiRuntimeBuilder {
             include_workspace_context,
             mock,
         }
-    }
-
-    #[must_use]
-    pub(crate) fn approval_handler(&self) -> Arc<TuiApprovalHandler> {
-        self.approval_handler.clone()
     }
 
     #[must_use]

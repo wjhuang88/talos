@@ -299,7 +299,12 @@ mod tests {
         )
         .await;
         let store = h.store.lock().expect("store poisoned");
-        assert!(store.get_observations().unwrap().is_empty());
+        assert!(
+            store
+                .get_observations()
+                .expect("operation should succeed")
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -321,7 +326,7 @@ mod tests {
         .await;
 
         let store = h.store.lock().expect("store poisoned");
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1);
         assert_eq!(observations[0].signal_type, SignalType::Error);
     }
@@ -397,7 +402,9 @@ mod tests {
             );
             pattern.confidence = 0.9;
             pattern.evidence_count = 5;
-            store.insert_pattern(&pattern).unwrap();
+            store
+                .insert_pattern(&pattern)
+                .expect("operation should succeed");
         }
 
         let c = ctx();
@@ -439,7 +446,7 @@ mod tests {
         )
         .await;
         let store = h.store.lock().expect("store poisoned");
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1);
         assert_eq!(observations[0].signal_type, SignalType::Correction);
     }
@@ -467,7 +474,12 @@ mod tests {
         )
         .await;
         let store = h.store.lock().expect("store poisoned");
-        assert!(store.get_observations().unwrap().is_empty());
+        assert!(
+            store
+                .get_observations()
+                .expect("operation should succeed")
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -499,7 +511,7 @@ mod tests {
         )
         .await;
         let store = h.store.lock().expect("store poisoned");
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1, "second turn added nothing");
     }
 
@@ -566,7 +578,7 @@ mod tests {
         .await;
 
         let store = h.store.lock().expect("store poisoned");
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1);
         assert!(
             observations[0].context.len() <= 100,
@@ -597,7 +609,7 @@ mod tests {
         }
 
         let store = h.store.lock().expect("store poisoned");
-        let patterns = store.get_all_patterns().unwrap();
+        let patterns = store.get_all_patterns().expect("operation should succeed");
         assert_eq!(
             patterns.len(),
             1,
@@ -615,21 +627,25 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("knowledge.db");
 
-        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("open store");
+        let store = KnowledgeStore::open(db_path.to_str().expect("operation should succeed"))
+            .expect("open store");
 
         let mut pattern = Pattern::new("Big".to_string(), "x".repeat(10_000), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
         let pattern_id = pattern.id.clone();
         drop(store);
 
-        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("reopen store");
+        let store = KnowledgeStore::open(db_path.to_str().expect("operation should succeed"))
+            .expect("reopen store");
         let purged = store.delete_oversized_patterns(4096).expect("purge");
         assert_eq!(purged, 1, "one oversized pattern should be deactivated");
 
-        let patterns = store.get_all_patterns().unwrap();
+        let patterns = store.get_all_patterns().expect("operation should succeed");
         assert_eq!(patterns.len(), 1);
         assert!(
             !patterns[0].active,
@@ -668,7 +684,7 @@ mod tests {
         .await;
 
         let store = h.store.lock().expect("store poisoned");
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1);
         assert!(
             observations[0].context.len() < 500,

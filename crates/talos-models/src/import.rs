@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(m.output_limit, Some(8192));
         assert!(m.capabilities.tools);
         assert!(m.capabilities.reasoning);
-        let p = m.pricing.as_ref().unwrap();
+        let p = m.pricing.as_ref().expect("operation should succeed");
         assert_eq!(p.input_per_1m, Some(3.0));
         assert_eq!(p.output_per_1m, Some(15.0));
 

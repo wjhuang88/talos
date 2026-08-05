@@ -122,7 +122,7 @@ async fn test_successful_streaming_response() {
         _ => None,
     });
     assert!(turn_end.is_some());
-    let (stop_reason, usage) = turn_end.unwrap();
+    let (stop_reason, usage) = turn_end.expect("operation should succeed");
     assert_eq!(stop_reason, &StopReason::EndTurn);
     assert_eq!(usage.input_tokens, 10);
     assert_eq!(usage.output_tokens, 5);
@@ -152,7 +152,7 @@ async fn test_authentication_error() {
 
     let result = provider.stream(&messages).await;
     assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = result.expect_err("operation should fail");
     assert!(err.to_string().contains("authentication failed"));
 
     mock.assert();
@@ -179,7 +179,7 @@ async fn test_rate_limit_error() {
 
     let result = provider.stream(&messages).await;
     assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = result.expect_err("operation should fail");
     assert!(err.to_string().contains("rate limited"));
 
     mock.assert();
@@ -206,7 +206,7 @@ async fn test_server_error() {
 
     let result = provider.stream(&messages).await;
     assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = result.expect_err("operation should fail");
     assert!(err.to_string().contains("server error"));
 
     mock.assert();

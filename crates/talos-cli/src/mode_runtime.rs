@@ -450,10 +450,12 @@ mod tests {
 
     #[test]
     fn todo_prompt_includes_only_active_items() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let session = manager.create_session("project", "").unwrap();
-        let repo = manager.todo_repository().unwrap();
+        let session = manager
+            .create_session("project", "")
+            .expect("operation should succeed");
+        let repo = manager.todo_repository().expect("operation should succeed");
 
         repo.create(CreateTodo {
             session_id: session.id,
@@ -463,7 +465,7 @@ mod tests {
             assigned_to_turn: None,
             tags: vec!["ship".to_string()],
         })
-        .unwrap();
+        .expect("operation should succeed");
         let completed = repo
             .create(CreateTodo {
                 session_id: session.id,
@@ -473,11 +475,12 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         repo.update_status(session.id, completed.id, TodoStatus::Completed)
-            .unwrap();
+            .expect("operation should succeed");
 
-        let prompt = format_session_todo_prompt(&repo, session.id).unwrap();
+        let prompt =
+            format_session_todo_prompt(&repo, session.id).expect("operation should succeed");
         assert!(prompt.contains("Active item"));
         assert!(prompt.contains("Keep this visible"));
         assert!(prompt.contains("tags: ship"));
@@ -486,10 +489,12 @@ mod tests {
 
     #[test]
     fn todo_prompt_is_bounded_by_item_count() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let session = manager.create_session("project", "").unwrap();
-        let repo = manager.todo_repository().unwrap();
+        let session = manager
+            .create_session("project", "")
+            .expect("operation should succeed");
+        let repo = manager.todo_repository().expect("operation should succeed");
 
         for index in 0..(TODO_PROMPT_MAX_ITEMS + 2) {
             repo.create(CreateTodo {
@@ -500,19 +505,20 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         }
 
-        let prompt = format_session_todo_prompt(&repo, session.id).unwrap();
+        let prompt =
+            format_session_todo_prompt(&repo, session.id).expect("operation should succeed");
         assert!(prompt.contains("2 more active item(s) omitted"));
         assert_eq!(prompt.matches("- [").count(), TODO_PROMPT_MAX_ITEMS);
     }
 
     fn activation_test_session(name: &str) -> talos_session::Session {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let root = dir.keep();
         let path = root.join(format!("{name}.jsonl"));
-        std::fs::write(&path, b"").unwrap();
+        std::fs::write(&path, b"").expect("operation should succeed");
         talos_session::Session::new(Uuid::new_v4(), "test".into(), String::new(), path)
     }
 
@@ -523,9 +529,9 @@ mod tests {
                     content: format!("[System] activation {}", activation.activation_id),
                     cache_markers: Vec::new(),
                 },
-                session_model_activation_metadata(activation).unwrap(),
+                session_model_activation_metadata(activation).expect("operation should succeed"),
             )
-            .unwrap();
+            .expect("operation should succeed");
     }
 
     fn provider_reasoning_effort(config: &Config) -> Option<String> {
@@ -542,6 +548,103 @@ mod tests {
     }
 
     #[test]
+    fn session_owned_activation_survives_repeated_production_compaction() {
+        use talos_core::message::Message;
+
+        let session = activation_test_session("compaction-stable-activation");
+        let low = SessionModelIdentity::new("openai", "o3", Some("low-reasoning"));
+        let high = SessionModelIdentity::new("openai", "o3", Some("high-reasoning"));
+        let store = PendingSubmissionStore::for_session(&session);
+        store
+            .initialize_runtime_identity(low.clone())
+            .expect("operation should succeed");
+        let activation = SessionModelActivation::new(1, low, high.clone());
+        store
+            .stage_runtime_activation(0, &activation)
+            .expect("operation should succeed");
+        append_activation(&session, &activation);
+        store
+            .commit_runtime_activation(&activation.activation_id)
+            .expect("operation should succeed");
+
+        for index in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("post-activation-turn-{index}"),
+                })
+                .expect("operation should succeed");
+        }
+        session
+            .compact_archived(50)
+            .expect("operation should succeed");
+        session
+            .compact_archived(50)
+            .expect("operation should succeed");
+
+        assert_eq!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .iter()
+                .filter(|entry| {
+                    session_model_activation_from_metadata(&entry.metadata).is_some()
+                })
+                .count(),
+            0,
+            "compaction must not retain or duplicate an old model-visible marker"
+        );
+        assert_eq!(
+            PendingSubmissionStore::for_session(&session)
+                .runtime_state()
+                .expect("operation should succeed")
+                .expect("operation should succeed")
+                .activation
+                .target,
+            high
+        );
+
+        let mut restarted_global = Config::default();
+        restarted_global
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut restarted_global, Some("low-reasoning"));
+        apply_session_model_to_config(&mut restarted_global, &session);
+
+        assert_eq!(restarted_global.variant.as_deref(), Some("high-reasoning"));
+        assert_eq!(
+            provider_reasoning_effort(&restarted_global).as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
+    fn initial_session_identity_wins_over_later_global_variant_without_switch_marker() {
+        let session = activation_test_session("initial-session-identity");
+        let mut initial = Config::default();
+        initial
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut initial, Some("high-reasoning"));
+        ensure_session_runtime_identity(&initial, &session).expect("operation should succeed");
+        assert!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .is_empty()
+        );
+
+        let mut later_global = initial.clone();
+        crate::model_lifecycle::apply_variant_change(&mut later_global, Some("low-reasoning"));
+        apply_session_model_to_config(&mut later_global, &session);
+
+        assert_eq!(later_global.variant.as_deref(), Some("high-reasoning"));
+        assert_eq!(
+            provider_reasoning_effort(&later_global).as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
     fn session_activation_restores_exact_variant_and_reasoning_options() {
         let session = activation_test_session("restore-variant");
         let activation = SessionModelActivation::new(
@@ -551,8 +654,10 @@ mod tests {
         );
         append_activation(&session, &activation);
 
-        let mut config = Config::default();
-        config.variant = Some("low-reasoning".into());
+        let mut config = Config {
+            variant: Some("low-reasoning".into()),
+            ..Default::default()
+        };
         apply_session_model_to_config(&mut config, &session);
 
         assert_eq!(config.provider, "openai");
@@ -573,8 +678,10 @@ mod tests {
         assert_eq!(activation.target.variant, None);
         append_activation(&session, &activation);
 
-        let mut config = Config::default();
-        config.variant = Some("high-reasoning".into());
+        let mut config = Config {
+            variant: Some("high-reasoning".into()),
+            ..Default::default()
+        };
         apply_session_model_to_config(&mut config, &session);
 
         assert_eq!(config.provider, "openai");

@@ -346,8 +346,9 @@ mod tests {
             attachments: Vec::new(),
         });
         assert_eq!(value.validate(), Ok(()));
-        let encoded = serde_json::to_string(&value).unwrap();
-        let decoded: StructuredSubmission = serde_json::from_str(&encoded).unwrap();
+        let encoded = serde_json::to_string(&value).expect("operation should succeed");
+        let decoded: StructuredSubmission =
+            serde_json::from_str(&encoded).expect("operation should succeed");
         assert_eq!(decoded.items.len(), 2);
         assert_eq!(decoded.items[0].text, "hello");
         assert_eq!(decoded.items[1].text, "world");

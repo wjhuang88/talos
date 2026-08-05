@@ -504,7 +504,10 @@ mod tests {
                 extra_read_paths: vec![],
             };
 
-            let result = sandbox.execute("echo hello", &config).await.unwrap();
+            let result = sandbox
+                .execute("echo hello", &config)
+                .await
+                .expect("operation should succeed");
             assert_eq!(result.exit_code, 0);
             assert!(result.stdout.contains("hello"));
         }
@@ -513,7 +516,7 @@ mod tests {
         #[tokio::test]
         async fn test_bubblewrap_filesystem_restriction() {
             let sandbox = BubblewrapSandbox::new();
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
@@ -541,15 +544,19 @@ mod tests {
         fn test_seatbelt_profile_generation() {
             use crate::macos::SeatbeltSandbox;
 
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
                 extra_read_paths: vec![],
             };
 
-            let profile = SeatbeltSandbox::generate_profile(&config).unwrap();
-            let canonical = workspace.path().canonicalize().unwrap();
+            let profile =
+                SeatbeltSandbox::generate_profile(&config).expect("operation should succeed");
+            let canonical = workspace
+                .path()
+                .canonicalize()
+                .expect("operation should succeed");
 
             assert!(profile.contains("(version 1)"));
             assert!(profile.contains("(deny default)"));
@@ -568,14 +575,15 @@ mod tests {
         fn test_seatbelt_profile_allows_network() {
             use crate::macos::SeatbeltSandbox;
 
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
                 allow_network: true,
                 extra_read_paths: vec![],
             };
 
-            let profile = SeatbeltSandbox::generate_profile(&config).unwrap();
+            let profile =
+                SeatbeltSandbox::generate_profile(&config).expect("operation should succeed");
             assert!(profile.contains("(allow network*)"));
             assert!(!profile.contains("(deny network*)"));
         }
@@ -589,14 +597,17 @@ mod tests {
         #[tokio::test]
         async fn test_seatbelt_basic_execution() {
             let sandbox = SeatbeltSandbox::new();
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
                 extra_read_paths: vec![],
             };
 
-            let result = sandbox.execute("echo hello", &config).await.unwrap();
+            let result = sandbox
+                .execute("echo hello", &config)
+                .await
+                .expect("operation should succeed");
             assert_eq!(result.exit_code, 0);
             assert!(result.stdout.contains("hello"));
         }
@@ -604,7 +615,7 @@ mod tests {
         #[tokio::test]
         async fn test_seatbelt_filesystem_restriction() {
             let sandbox = SeatbeltSandbox::new();
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
@@ -627,7 +638,7 @@ mod tests {
         #[tokio::test]
         async fn test_seatbelt_workspace_write_allowed() {
             let sandbox = SeatbeltSandbox::new();
-            let workspace = tempfile::tempdir().unwrap();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let test_file = workspace.path().join("test.txt");
             let config = SandboxConfig {
                 workspace_root: workspace.path().to_path_buf(),
@@ -638,12 +649,12 @@ mod tests {
             let result = sandbox
                 .execute(&format!("echo hello > {}", test_file.display()), &config)
                 .await
-                .unwrap();
+                .expect("operation should succeed");
 
             assert_eq!(result.exit_code, 0);
 
             // Verify file was written
-            let content = std::fs::read_to_string(&test_file).unwrap();
+            let content = std::fs::read_to_string(&test_file).expect("operation should succeed");
             assert_eq!(content.trim(), "hello");
         }
     }

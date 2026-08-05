@@ -198,7 +198,7 @@ mod tests {
         let (cost, label) = estimate_cost(&status);
         assert!(cost.is_some());
         assert_eq!(label, "Est");
-        let cost = cost.unwrap();
+        let cost = cost.expect("operation should succeed");
         assert!((cost - 0.0105).abs() < 0.0001);
     }
 

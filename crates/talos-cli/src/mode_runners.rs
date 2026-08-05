@@ -21,13 +21,11 @@ use talos_conversation::{
     ContentOutput, ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, TipKind,
     UiOutput, UserInput,
 };
-use talos_core::message::Message;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
 };
 use talos_core::tool::{ToolPresentationPolicy, ToolRegistry};
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
-use talos_plugin::HookRegistry;
 use talos_tools::{
     bash_tool_contribution, git_mutation_tool_contributions, git_read_tool_contributions,
     snapshot_aware_file_tool_contributions, workspace_non_document_tool_contributions,
@@ -38,11 +36,11 @@ use tokio::sync::{mpsc, watch};
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
+pub(crate) use crate::mode_runtime::apply_session_model_to_config;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, ensure_session_runtime_identity, maybe_set_memory_provider,
     reconcile_session_runtime_state, session_metadata_for_model, set_todo_prompt_provider,
 };
-pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
     RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
     rebuild_session_for_model,
@@ -50,9 +48,7 @@ use crate::model_lifecycle::{
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    build_tui_tool_registry, register_explicit_permission_aware_plugins,
-    register_explicit_tui_plugins, register_permission_aware_tools,
-    register_tui_permission_aware_tools,
+    register_explicit_permission_aware_plugins, register_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -125,6 +121,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     );
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_image_input_capability(&mut agent, &config);
+    crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
         for capability in loaded_plugin_packages
@@ -275,7 +272,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
     let runtime_builder = TuiRuntimeBuilder::new(
-        ui_output_tx.clone(),
         hooks.clone(),
         workspace_root.to_path_buf(),
         session_manager.clone(),
@@ -285,7 +281,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         cli.mock,
     );
     let initial_runtime_builder = TuiRuntimeBuilder::new(
-        ui_output_tx.clone(),
         hooks.clone(),
         workspace_root.to_path_buf(),
         session_manager.clone(),
@@ -602,7 +597,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(skill_diagnostics)
-        .with_mcp_servers(mcp_diagnostics)
+        .with_mcp_servers(mcp_diagnostics.clone())
         .with_hook_declarations(hook_decls.clone())
         .with_loaded_plugins(loaded_plugin_diagnostics.clone())
         .with_workspace_root(workspace_root.clone());
@@ -648,7 +643,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     if config.dashboard.enabled {
         let ext_snapshot = talos_conversation::build_extension_snapshot_with_plugins(
-            mcp_runtime.diagnostics(),
+            &mcp_diagnostics,
             &hook_decls,
             &[],
             &loaded_plugin_diagnostics,

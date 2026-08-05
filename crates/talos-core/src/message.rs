@@ -334,8 +334,8 @@ mod tests {
         let msg = Message::User {
             content: "Hello, world!".into(),
         };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: Message = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&msg).expect("operation should succeed");
+        let decoded: Message = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(msg, decoded);
     }
 
@@ -350,8 +350,8 @@ mod tests {
             }],
             reasoning: None,
         };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: Message = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&msg).expect("operation should succeed");
+        let decoded: Message = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(msg, decoded);
     }
 
@@ -364,8 +364,8 @@ mod tests {
                 is_error: false,
             },
         };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: Message = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&msg).expect("operation should succeed");
+        let decoded: Message = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(msg, decoded);
     }
 
@@ -407,8 +407,9 @@ mod tests {
             },
         ];
         for event in events {
-            let json = serde_json::to_string(&event).unwrap();
-            let decoded: AgentEvent = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(&event).expect("operation should succeed");
+            let decoded: AgentEvent =
+                serde_json::from_str(&json).expect("operation should succeed");
             assert_eq!(event, decoded);
         }
     }
@@ -453,8 +454,8 @@ Done."#;
         let part = ContentPart::Text {
             text: "Hello, image!".into(),
         };
-        let json = serde_json::to_string(&part).unwrap();
-        let decoded: ContentPart = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&part).expect("operation should succeed");
+        let decoded: ContentPart = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(part, decoded);
     }
 
@@ -466,8 +467,8 @@ Done."#;
             byte_count: 12345,
             content_digest: ContentDigest::from_raw([7u8; 32]),
         };
-        let json = serde_json::to_string(&part).unwrap();
-        let decoded: ContentPart = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&part).expect("operation should succeed");
+        let decoded: ContentPart = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(part, decoded);
     }
 
@@ -486,8 +487,8 @@ Done."#;
                 },
             ],
         };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: Message = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&msg).expect("operation should succeed");
+        let decoded: Message = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(msg, decoded);
     }
 
@@ -496,8 +497,8 @@ Done."#;
         let msg = Message::User {
             content: "text only".into(),
         };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: Message = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&msg).expect("operation should succeed");
+        let decoded: Message = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(msg, decoded);
     }
 }

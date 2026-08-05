@@ -160,7 +160,10 @@ fn test_layer1_budget_truncates_multibyte_content_on_char_boundary() {
 
     assert_eq!(result.len(), 1);
     if let Message::Tool { result: tr } = &result[0] {
-        let body = tr.content.strip_suffix(TRUNCATION_SUFFIX).unwrap();
+        let body = tr
+            .content
+            .strip_suffix(TRUNCATION_SUFFIX)
+            .expect("operation should succeed");
         assert_eq!(body.chars().count(), MAX_TOOL_RESULT_CHARS);
         assert!(tr.content.ends_with(TRUNCATION_SUFFIX));
     } else {
@@ -312,7 +315,10 @@ async fn test_layer4_collapse_summarizes_old_turns() {
     }
 
     let provider = SummaryMockProvider::new("Summary of old turns");
-    let result = compactor.apply_collapse(messages, &provider).await.unwrap();
+    let result = compactor
+        .apply_collapse(messages, &provider)
+        .await
+        .expect("operation should succeed");
 
     // First message should be the summary
     assert!(
@@ -336,7 +342,7 @@ async fn test_layer4_collapse_no_op_when_under_threshold() {
     let result = compactor
         .apply_collapse(messages.clone(), &provider)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     assert_eq!(result, messages);
 }
@@ -361,7 +367,7 @@ async fn test_layer5_autocompact_summarizes_all_old_turns() {
     let result = compactor
         .apply_autocompact(messages, &provider)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     // First message should be the summary
     assert!(
@@ -382,7 +388,7 @@ async fn test_layer5_autocompact_no_op_when_under_threshold() {
     let result = compactor
         .apply_autocompact(messages.clone(), &provider)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     assert_eq!(result, messages);
 }
@@ -448,7 +454,7 @@ async fn test_circuit_breaker_trips_after_3_failures() {
 
     let result = compactor.compact(messages.clone(), &provider).await;
     assert!(matches!(
-        result.unwrap_err(),
+        result.expect_err("operation should fail"),
         CompactionError::CircuitBreakerTripped
     ));
 }
@@ -473,7 +479,7 @@ async fn test_recent_turns_preserved_verbatim() {
     let result = compactor
         .compact(messages.clone(), &provider)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     // The last 30 messages (10 turns * 3) should match the original last 30
     let original_recent = &messages[messages.len() - 30..];
@@ -498,7 +504,10 @@ async fn test_compaction_continues_conversation_seamlessly() {
     }
 
     let provider = SummaryMockProvider::new("Summary: user asked about files, assistant read them");
-    let compacted = compactor.compact(messages, &provider).await.unwrap();
+    let compacted = compactor
+        .compact(messages, &provider)
+        .await
+        .expect("operation should succeed");
 
     assert!(compacted.len() > 1);
     if let Message::User { content } = &compacted[0] {
@@ -525,7 +534,10 @@ async fn test_compact_stops_early_when_budget_layer_suffices() {
     let messages = vec![tool_msg("call_1", &long_content)];
 
     // Budget layer should truncate and make it fit
-    let result = compactor.compact(messages, &FailingProvider).await.unwrap();
+    let result = compactor
+        .compact(messages, &FailingProvider)
+        .await
+        .expect("operation should succeed");
 
     assert_eq!(result.len(), 1);
     if let Message::Tool { result: tr } = &result[0] {
@@ -553,7 +565,7 @@ async fn test_compact_provider_error_propagates() {
 
     assert!(result.is_err());
     assert!(matches!(
-        result.unwrap_err(),
+        result.expect_err("operation should fail"),
         CompactionError::ProviderError(_)
     ));
 }

@@ -265,11 +265,11 @@ mod tests {
 
         let zhipu = find_model_by_provider(&models, "zhipu", "glm-5.2");
         assert!(zhipu.is_some());
-        assert_eq!(zhipu.unwrap().provider, "zhipu");
+        assert_eq!(zhipu.expect("operation should succeed").provider, "zhipu");
 
         let zai = find_model_by_provider(&models, "zai", "glm-5.2");
         assert!(zai.is_some());
-        assert_eq!(zai.unwrap().provider, "zai");
+        assert_eq!(zai.expect("operation should succeed").provider, "zai");
 
         assert!(find_model_by_provider(&models, "openai", "glm-5.2").is_none());
     }

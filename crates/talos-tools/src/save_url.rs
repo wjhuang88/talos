@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_deserialize_input() {
         let json = r#"{"url": "https://example.com/file.zip", "destination": "/tmp/file.zip"}"#;
-        let input: SaveUrlInput = serde_json::from_str(json).unwrap();
+        let input: SaveUrlInput = serde_json::from_str(json).expect("operation should succeed");
         assert_eq!(input.url, "https://example.com/file.zip");
         assert_eq!(input.destination, "/tmp/file.zip");
     }

@@ -8,6 +8,14 @@ use talos_config::ConfigStore;
 /// a provider returns hundreds of model IDs.
 pub(crate) const MAX_DISCOVERED_MODELS_TO_PERSIST: usize = 32;
 
+fn provider_qualified_model_reference(provider: &str, model_id: &str) -> String {
+    if model_id.starts_with(&format!("{provider}/")) {
+        model_id.to_string()
+    } else {
+        format!("{provider}/{model_id}")
+    }
+}
+
 /// Publish the UI boundary between two successfully committed sessions.
 ///
 /// The queue belongs to the retired conversation engine, so its preview must be
@@ -28,95 +36,6 @@ pub(crate) fn emit_session_identity_after_queue_clear(
     let _ = ui_tx.send(UiOutput::SessionIdentity { id: session_id });
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn committed_session_boundary_clears_preview_before_identity() {
-        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        emit_session_identity_after_queue_clear(&ui_tx, "new-session".to_string());
-
-        assert!(matches!(
-            ui_rx.try_recv().expect("queue-clear output"),
-            UiOutput::SteeringQueueSnapshot(talos_conversation::SteeringQueueSnapshot {
-                entries,
-                total_count: 0,
-                omitted_count: 0,
-            }) if entries.is_empty()
-        ));
-        assert!(matches!(
-            ui_rx.try_recv().expect("session identity output"),
-            UiOutput::SessionIdentity { id } if id == "new-session"
-        ));
-        assert!(
-            ui_rx.try_recv().is_err(),
-            "boundary helper emits only two outputs"
-        );
-    }
-
-    #[tokio::test]
-    async fn normalized_default_model_selection_is_a_true_noop() {
-        let dir = tempfile::tempdir().unwrap();
-        let session_manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
-        let session = session_manager.create_session("project", "").unwrap();
-        let (raw_sq_tx, _raw_sq_rx) = mpsc::channel(4);
-        let transition = Arc::new(Mutex::new(
-            SessionTransition::new(raw_sq_tx.clone(), session.clone()).unwrap(),
-        ));
-        let generation_before = transition.lock().await.active_generation();
-
-        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
-        let (session_watch_tx, session_watch_rx) = watch::channel(session.clone());
-        let (sq_tx_watch_tx, _sq_tx_watch_rx) = watch::channel(raw_sq_tx);
-        let (bridge_rx_update_tx, _bridge_rx_update_rx) = mpsc::unbounded_channel();
-        let hooks = build_hook_registry(true);
-        let mcp_config = talos_config::McpConfig::default();
-
-        let mut config = Config::default();
-        config
-            .set_active_model("openai/o3")
-            .expect("builtin openai/o3 model");
-        crate::model_lifecycle::apply_variant_change(&mut config, None);
-
-        let result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &hooks,
-            dir.path(),
-            &mcp_config,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_rx_update_tx,
-            &session_watch_rx,
-            &session_manager,
-            "o3@DEFAULT".to_string(),
-            Some("openai".to_string()),
-            true,
-        )
-        .await;
-
-        assert!(result.is_none());
-        assert_eq!(
-            transition.lock().await.active_generation(),
-            generation_before,
-            "equivalent baseline selection must not fence or replace the Actor"
-        );
-        assert!(
-            session.read_entries().unwrap().iter().all(|entry| {
-                crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
-                    .is_none()
-            }),
-            "equivalent baseline selection must not append an activation record"
-        );
-        assert!(
-            ui_rx.try_recv().is_err(),
-            "a true no-op must not publish status or error output"
-        );
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_delete(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
@@ -125,7 +44,7 @@ pub(crate) async fn handle_session_delete(
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     selection: Option<String>,
 ) {
-    let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
+    let workspace_root_str = canonical_workspace_root(workspace_root);
     let active_id = session_watch_rx.borrow().id;
 
     match &selection {
@@ -726,11 +645,7 @@ pub(crate) async fn handle_session_model_with_credential(
         (model_id.clone(), None)
     };
 
-    let qualified_model_id = if parsed_model_id.starts_with(&format!("{}/", cred.provider)) {
-        parsed_model_id.clone()
-    } else {
-        format!("{}/{}", cred.provider, parsed_model_id)
-    };
+    let qualified_model_id = provider_qualified_model_reference(&cred.provider, &parsed_model_id);
 
     if let Err(e) = model_config.set_active_model(&qualified_model_id) {
         let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
@@ -837,6 +752,7 @@ pub(crate) async fn handle_session_new(
     // Clone for watch channel update after commit (new_session is moved into prepare).
     let new_session_for_watch = new_session.clone();
     if let Err(e) = transition.prepare(handle, new_session) {
+        transition.rollback();
         let _ = std::fs::remove_file(&new_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare new session: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
@@ -1036,7 +952,7 @@ pub(crate) async fn handle_session_resume(
     // Clone for watch channel update after commit (target_session is moved into prepare).
     let target_session_for_watch = target_session.clone();
     if let Err(e) = transition.prepare(handle, target_session) {
-        let _ = std::fs::remove_file(&target_session_for_watch.file_path);
+        transition.rollback();
         let text = format!("[Error] Failed to prepare resume: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return None;
@@ -1074,7 +990,6 @@ pub(crate) async fn handle_session_resume(
         },
         Err(e) => {
             transition.rollback();
-            let _ = std::fs::remove_file(&target_session_for_watch.file_path);
             let text =
                 format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
@@ -1223,6 +1138,7 @@ pub(crate) async fn handle_session_fork(
     // Clone for watch channel update after commit (child_session is moved into prepare).
     let child_session_for_watch = child_session.clone();
     if let Err(e) = transition.prepare(handle, child_session) {
+        transition.rollback();
         let _ = std::fs::remove_file(&child_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare fork: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
@@ -1261,6 +1177,160 @@ pub(crate) async fn handle_session_fork(
             let _ = std::fs::remove_file(&child_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn committed_session_boundary_clears_preview_before_identity() {
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        emit_session_identity_after_queue_clear(&ui_tx, "new-session".to_string());
+
+        assert!(matches!(
+            ui_rx.try_recv().expect("queue-clear output"),
+            UiOutput::SteeringQueueSnapshot(talos_conversation::SteeringQueueSnapshot {
+                entries,
+                total_count: 0,
+                omitted_count: 0,
+            }) if entries.is_empty()
+        ));
+        assert!(matches!(
+            ui_rx.try_recv().expect("session identity output"),
+            UiOutput::SessionIdentity { id } if id == "new-session"
+        ));
+        assert!(
+            ui_rx.try_recv().is_err(),
+            "boundary helper emits only two outputs"
+        );
+    }
+
+    #[tokio::test]
+    async fn normalized_default_model_selection_is_a_true_noop() {
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let session_manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+        let session = session_manager
+            .create_session("project", "")
+            .expect("operation should succeed");
+        let (raw_sq_tx, _raw_sq_rx) = mpsc::channel(4);
+        let transition = Arc::new(Mutex::new(
+            SessionTransition::new(raw_sq_tx.clone(), session.clone())
+                .expect("operation should succeed"),
+        ));
+        let generation_before = transition.lock().await.active_generation();
+
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+        let (session_watch_tx, session_watch_rx) = watch::channel(session.clone());
+        let (sq_tx_watch_tx, _sq_tx_watch_rx) = watch::channel(raw_sq_tx);
+        let (bridge_rx_update_tx, _bridge_rx_update_rx) = mpsc::unbounded_channel();
+        let hooks = build_hook_registry(true);
+        let approval_handler = Arc::new(TuiApprovalHandler::new(
+            ui_tx.clone(),
+            dir.path().to_path_buf(),
+        ));
+        let runtime_builder = TuiRuntimeBuilder::new(
+            hooks,
+            dir.path().to_path_buf(),
+            session_manager.clone(),
+            approval_handler,
+            Vec::new(),
+            false,
+            true,
+        );
+
+        let mut config = Config::default();
+        config
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut config, None);
+
+        let result = handle_session_model(
+            &transition,
+            &ui_tx,
+            &config,
+            &runtime_builder,
+            &session_watch_tx,
+            &sq_tx_watch_tx,
+            &bridge_rx_update_tx,
+            &session_watch_rx,
+            "o3@DEFAULT".to_string(),
+            Some("openai".to_string()),
+        )
+        .await;
+
+        assert!(result.is_none());
+        assert_eq!(
+            transition.lock().await.active_generation(),
+            generation_before,
+            "equivalent baseline selection must not fence or replace the Actor"
+        );
+        assert!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .iter()
+                .all(|entry| {
+                    crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
+                        .is_none()
+                }),
+            "equivalent baseline selection must not append an activation record"
+        );
+        assert!(
+            ui_rx.try_recv().is_err(),
+            "a true no-op must not publish status or error output"
+        );
+    }
+
+    #[test]
+    fn credential_first_duplicate_model_id_stays_provider_qualified() {
+        use talos_config::ProviderConfig;
+
+        let qualified = provider_qualified_model_reference("zhipuai", "glm-5.2");
+        assert_eq!(qualified, "zhipuai/glm-5.2");
+        assert_eq!(
+            provider_qualified_model_reference("zhipuai", &qualified),
+            qualified
+        );
+
+        let mut live = Config::default();
+        live.providers.insert(
+            "zai".to_string(),
+            ProviderConfig {
+                api_key: Some("credential-a".to_string()),
+                base_url: Some("https://provider-a.invalid/v1".to_string()),
+                ..Default::default()
+            },
+        );
+        live.providers.insert(
+            "zhipuai".to_string(),
+            ProviderConfig {
+                api_key: Some("credential-b".to_string()),
+                base_url: Some("https://provider-b.invalid/v1".to_string()),
+                ..Default::default()
+            },
+        );
+        live.set_active_model(&qualified)
+            .expect("credential-selected duplicate must resolve to Provider B");
+
+        let mut persisted = live.clone();
+        persisted
+            .set_active_model(&qualified)
+            .expect("ConfigStore update uses the same provider-qualified reference");
+
+        for config in [&live, &persisted] {
+            assert_eq!(config.provider, "zhipuai");
+            assert_eq!(config.model, "glm-5.2");
+            assert_eq!(
+                config.api_key().expect("operation should succeed"),
+                "credential-b"
+            );
+            assert_eq!(
+                config.base_url().as_deref(),
+                Some("https://provider-b.invalid/v1")
+            );
         }
     }
 }

@@ -143,14 +143,16 @@ mod tests {
     use tokio::net::TcpListener;
 
     async fn mock_server(status: &str, content_type: &str, body: &str) -> String {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("operation should succeed");
+        let addr = listener.local_addr().expect("operation should succeed");
         let body = body.to_string();
         let status = status.to_string();
         let content_type = content_type.to_string();
 
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _) = listener.accept().await.expect("operation should succeed");
             let mut req_buf = [0u8; 4096];
             let _ = socket.read(&mut req_buf).await;
 
@@ -158,8 +160,11 @@ mod tests {
                 "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            socket.write_all(response.as_bytes()).await.unwrap();
-            socket.flush().await.unwrap();
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("operation should succeed");
+            socket.flush().await.expect("operation should succeed");
         });
 
         format!("http://{addr}")
@@ -175,7 +180,7 @@ mod tests {
                 .await;
 
         assert!(result.is_ok());
-        let models = result.unwrap();
+        let models = result.expect("operation should succeed");
         assert_eq!(models, vec!["gpt-4o", "gpt-4o-mini"]);
     }
 
@@ -193,7 +198,7 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        let models = result.unwrap();
+        let models = result.expect("operation should succeed");
         assert_eq!(
             models,
             vec!["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022"]

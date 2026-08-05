@@ -151,9 +151,12 @@ async fn windows_spawned_powershell_child_cannot_observe_dangerous_parent_enviro
         assert!(!result.content.contains(LD_PRELOAD_SENTINEL));
         assert!(!result.content.contains(DYLD_INSERT_LIBRARIES_SENTINEL));
 
-        assert_eq!(env::var("LD_PRELOAD").unwrap(), LD_PRELOAD_SENTINEL);
         assert_eq!(
-            env::var("DYLD_INSERT_LIBRARIES").unwrap(),
+            env::var("LD_PRELOAD").expect("operation should succeed"),
+            LD_PRELOAD_SENTINEL
+        );
+        assert_eq!(
+            env::var("DYLD_INSERT_LIBRARIES").expect("operation should succeed"),
             DYLD_INSERT_LIBRARIES_SENTINEL
         );
 

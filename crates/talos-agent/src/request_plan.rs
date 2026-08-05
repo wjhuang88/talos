@@ -215,7 +215,7 @@ impl Agent {
 
         let tool_definitions = tool_definitions.to_vec();
         let estimated_tokens =
-            Self::estimate_provider_request_tokens(&owned_messages, &tool_definitions);
+            self.estimate_provider_request_tokens(&owned_messages, &tool_definitions);
         if let Some(limit) = request_context_limit
             && estimated_tokens > limit
         {

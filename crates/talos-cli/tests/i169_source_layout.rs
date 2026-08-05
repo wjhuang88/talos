@@ -39,11 +39,12 @@ fn model_switch_activation_durability_precedes_replacement_publication() {
         .find("transition_guard.commit(")
         .expect("replacement commit boundary");
     let publish = source
-        .find("sq_tx_watch_tx.send(")
-        .expect("replacement SQ publication");
-    let success = source
-        .find("MessageSource::System,\n                success_message")
-        .expect("model-switch success publication");
+        .find(".publish_commit(")
+        .expect("acknowledged replacement publication");
+    let success = publish
+        + source[publish..]
+            .find("success_message,")
+            .expect("model-switch success publication after acknowledged route install");
 
     assert!(barrier < prepare);
     assert!(prepare < commit);
@@ -63,8 +64,8 @@ fn model_switch_activation_durability_precedes_replacement_publication() {
     let helper = &source[helper_start..helper_end];
 
     let fence = helper
-        .find(".quiesce_same_session(session)")
-        .expect("old runtime retirement");
+        .find(".quiesce_same_session_for_activation(session, &activation)")
+        .expect("atomic activation stage and old-runtime retirement");
     let activation = helper
         .find("SessionModelActivation::new(")
         .expect("exact generation + variant-aware activation identity");
@@ -78,14 +79,14 @@ fn model_switch_activation_durability_precedes_replacement_publication() {
         .find("verified_activation_history(session, &activation, &marker)")
         .expect("canonical replay after activation commit");
 
-    assert!(fence < activation);
-    assert!(activation < tail_check);
+    assert!(activation < fence);
+    assert!(fence < tail_check);
     assert!(tail_check < marker_commit);
     assert!(marker_commit < replay);
     assert!(!helper.contains("left_content == right_content"));
     assert!(!helper.contains("transition_guard.prepare("));
     assert!(!helper.contains("transition_guard.commit("));
-    assert!(!helper.contains("sq_tx_watch_tx.send("));
+    assert!(!helper.contains(".publish_commit("));
 }
 
 #[test]
@@ -138,4 +139,61 @@ fn provider_construction_cannot_bypass_variant_materialization() {
         &crate_root.join("src"),
         &crate_root.join("src/provider_setup.rs"),
     );
+}
+
+#[test]
+fn tui_runtime_construction_is_centralized_in_the_shared_builder() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let builder = fs::read_to_string(crate_root.join("src/tui_runtime_builder.rs"))
+        .expect("read TUI runtime builder source");
+    assert!(builder.contains("AppServerSession::new("));
+    assert!(builder.contains("McpSessionRuntime::start("));
+    assert!(builder.contains("set_request_budget_spec("));
+
+    for (root, required_builder_boundary) in [
+        (
+            "src/model_lifecycle.rs",
+            "runtime_builder: &'a TuiRuntimeBuilder",
+        ),
+        (
+            "src/session_handlers.rs",
+            "runtime_builder: &TuiRuntimeBuilder",
+        ),
+    ] {
+        let source = fs::read_to_string(crate_root.join(root))
+            .unwrap_or_else(|error| panic!("read {root}: {error}"));
+        for forbidden in [
+            "AppServerSession::new(",
+            "McpSessionRuntime::start(",
+            "build_tui_tool_registry(",
+        ] {
+            assert!(
+                !source.contains(forbidden),
+                "ad-hoc production TUI runtime construction escaped the shared builder in {root}: {forbidden}"
+            );
+        }
+        assert!(
+            source.contains(required_builder_boundary),
+            "production runtime transition must accept the shared TuiRuntimeBuilder in {root}"
+        );
+    }
+}
+
+#[test]
+fn every_production_provider_root_installs_the_shared_request_budget() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for root in [
+        "src/tui_runtime_builder.rs",
+        "src/mode_print.rs",
+        "src/mode_inline.rs",
+        "src/mode_interactive.rs",
+        "src/mode_runners.rs",
+    ] {
+        let source = fs::read_to_string(crate_root.join(root))
+            .unwrap_or_else(|error| panic!("read {root}: {error}"));
+        assert!(
+            source.contains("set_request_budget_spec("),
+            "Provider dispatch root must install the shared output/image budget: {root}"
+        );
+    }
 }

@@ -326,11 +326,11 @@ mod tests {
             SessionOp::Shutdown,
         ];
         for op in &ops {
-            let json = serde_json::to_string(op).unwrap();
-            let back: SessionOp = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(op).expect("operation should succeed");
+            let back: SessionOp = serde_json::from_str(&json).expect("operation should succeed");
             assert_eq!(
-                serde_json::to_value(op).unwrap(),
-                serde_json::to_value(&back).unwrap()
+                serde_json::to_value(op).expect("operation should succeed"),
+                serde_json::to_value(&back).expect("operation should succeed")
             );
         }
     }
@@ -411,11 +411,11 @@ mod tests {
             },
         ];
         for event in &events {
-            let json = serde_json::to_string(event).unwrap();
-            let back: SessionEvent = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(event).expect("operation should succeed");
+            let back: SessionEvent = serde_json::from_str(&json).expect("operation should succeed");
             assert_eq!(
-                serde_json::to_value(event).unwrap(),
-                serde_json::to_value(&back).unwrap()
+                serde_json::to_value(event).expect("operation should succeed"),
+                serde_json::to_value(&back).expect("operation should succeed")
             );
         }
     }
@@ -428,8 +428,8 @@ mod tests {
             initial_history: vec![],
             model_context_limit: 128_000,
         };
-        let json = serde_json::to_string(&config).unwrap();
-        let back: SessionConfig = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&config).expect("operation should succeed");
+        let back: SessionConfig = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(config.runtime_policy, back.runtime_policy);
         assert_eq!(config.workspace_root, back.workspace_root);
         assert_eq!(config.initial_history, back.initial_history);

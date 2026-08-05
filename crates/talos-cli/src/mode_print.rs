@@ -109,6 +109,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
@@ -367,10 +368,11 @@ mod tests {
     }
 
     fn config_with(provider: &str, model: &str) -> Config {
-        let mut config = Config::default();
-        config.provider = provider.to_string();
-        config.model = model.to_string();
-        config
+        Config {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            ..Default::default()
+        }
     }
 
     fn cli_with_attach(paths: Vec<std::path::PathBuf>) -> Cli {
@@ -406,7 +408,7 @@ mod tests {
             &catalog,
             std::path::Path::new("/tmp"),
         )
-        .unwrap();
+        .expect("operation should succeed");
         match op {
             SessionOp::Submit { message } => assert_eq!(message, "hello"),
             other => panic!("expected Submit, got {other:?}"),
@@ -426,7 +428,7 @@ mod tests {
             &catalog,
             std::path::Path::new("/tmp"),
         )
-        .unwrap();
+        .expect("operation should succeed");
         match op {
             SessionOp::PreviewRequest { message } => assert_eq!(message, "hello"),
             other => panic!("expected PreviewRequest, got {other:?}"),
@@ -452,7 +454,7 @@ mod tests {
             &catalog,
             std::path::Path::new("/tmp"),
         );
-        let err = result.err().expect("Unsupported capability must bail");
+        let err = result.expect_err("Unsupported capability must bail");
         let msg = format!("{err}");
         assert!(
             msg.contains("does not support image input"),
@@ -476,7 +478,7 @@ mod tests {
             &catalog,
             std::path::Path::new("/tmp"),
         );
-        let err = result.err().expect("Unknown capability must bail");
+        let err = result.expect_err("Unknown capability must bail");
         let msg = format!("{err}");
         assert!(msg.contains("Unknown"));
     }
@@ -497,7 +499,7 @@ mod tests {
             &catalog,
             std::path::Path::new("/tmp"),
         );
-        let err = result.err().expect("too many attach paths must bail");
+        let err = result.expect_err("too many attach paths must bail");
         let msg = format!("{err}");
         assert!(msg.contains("Too many --attach paths"));
     }
@@ -507,11 +509,11 @@ mod tests {
     /// decoder succeeds.
     #[test]
     fn attach_succeeds_for_supported_model_with_real_png() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("r8.png");
         let img = image::RgbaImage::new(4, 4);
         img.save_with_format(&img_path, image::ImageFormat::Png)
-            .unwrap();
+            .expect("operation should succeed");
 
         let cli = cli_with_attach(vec![img_path]);
         let config = config_with("openai", "gpt-4o");
@@ -524,7 +526,7 @@ mod tests {
             &catalog,
             dir.path(),
         )
-        .unwrap();
+        .expect("operation should succeed");
         match op {
             SessionOp::SubmitMultimodal { text, attachments } => {
                 assert_eq!(text, "describe");

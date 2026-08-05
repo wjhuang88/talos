@@ -170,11 +170,11 @@ async fn wait_for_state(
 
 #[tokio::test]
 async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-stress-identity")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
 
@@ -195,7 +195,7 @@ async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
             submission: work.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(
         wait_for_receipt(&mut eq_rx, &work.id).await,
         SubmissionReceiptDisposition::AcceptedPending
@@ -219,7 +219,7 @@ async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
         }));
     }
     for sender in senders {
-        sender.await.unwrap();
+        sender.await.expect("operation should succeed");
     }
 
     assert_eq!(
@@ -238,17 +238,22 @@ async fn duplicate_submit_and_reconcile_storm_executes_one_identity_once() {
         ["execute exactly once".to_string()]
     );
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
 async fn distinct_submissions_reach_provider_in_fifo_order_under_burst_load() {
     const COUNT: usize = 8;
 
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
-    let durable = manager.create_or_open_session("i169-stress-fifo").unwrap();
+    let durable = manager
+        .create_or_open_session("i169-stress-fifo")
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
 
@@ -272,7 +277,7 @@ async fn distinct_submissions_reach_provider_in_fifo_order_under_burst_load() {
                 submission: work.clone(),
             })
             .await
-            .unwrap();
+            .expect("operation should succeed");
     }
 
     let completed = wait_for_completions(&mut eq_rx, COUNT).await;
@@ -292,8 +297,11 @@ async fn distinct_submissions_reach_provider_in_fifo_order_under_burst_load() {
         wait_for_state(&store, &work.id, PendingSubmissionState::Committed).await;
     }
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }
 
 #[tokio::test]
@@ -302,11 +310,11 @@ async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
     const STEPS: usize = 128;
     const SEED: u64 = 0x5eed_0169_c057_0d1e;
 
-    let temp = tempfile::tempdir().unwrap();
+    let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
         .create_or_open_session("i169-fixed-seed-interleaving")
-        .unwrap();
+        .expect("operation should succeed");
     let session_id = durable.id().to_string();
     let store = PendingSubmissionStore::for_session_file(durable.file_path(), &session_id);
 
@@ -324,7 +332,7 @@ async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
     let works = (0..COUNT)
         .map(|index| submission(index + 100, format!("seeded-{index}")))
         .collect::<Vec<_>>();
-    let mut first_submit_seen = vec![false; COUNT];
+    let mut first_submit_seen = [false; COUNT];
     let mut expected_order = Vec::with_capacity(COUNT);
     let mut state = SEED;
 
@@ -344,7 +352,10 @@ async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
         } else {
             SessionOp::ReconcileStructured { submission: work }
         };
-        sq_tx.send(operation).await.unwrap();
+        sq_tx
+            .send(operation)
+            .await
+            .expect("operation should succeed");
         if step % 7 == 0 {
             tokio::task::yield_now().await;
         }
@@ -359,7 +370,7 @@ async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
                     submission: works[index].clone(),
                 })
                 .await
-                .unwrap();
+                .expect("operation should succeed");
         }
     }
 
@@ -384,6 +395,9 @@ async fn fixed_seed_interleaving_preserves_single_execution_and_fifo_custody() {
         wait_for_state(&store, &work.id, PendingSubmissionState::Committed).await;
     }
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 }

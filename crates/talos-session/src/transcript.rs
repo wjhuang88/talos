@@ -194,17 +194,19 @@ mod tests {
             make_entry("user", "Hello"),
             make_entry("assistant", "Hi there"),
         ];
-        let json = export_json(&entries).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
         // Should parse back as a JSON array.
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(parsed.len(), 2);
     }
 
     #[test]
     fn export_json_has_correct_fields() {
         let entries = vec![make_entry("user", "test content")];
-        let json = export_json(&entries).unwrap();
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&json).expect("operation should succeed");
 
         let entry = &parsed[0];
         assert_eq!(entry["role"], "user");
@@ -215,15 +217,16 @@ mod tests {
     #[test]
     fn export_json_empty_produces_empty_array() {
         let entries: Vec<SessionEntry> = Vec::new();
-        let json = export_json(&entries).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
         assert_eq!(json, "[]");
     }
 
     #[test]
     fn export_json_preserves_metadata() {
         let entries = vec![make_entry_with_metadata("assistant", "response")];
-        let json = export_json(&entries).unwrap();
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&json).expect("operation should succeed");
 
         let meta = &parsed[0]["metadata"];
         assert_eq!(meta["provider"], "anthropic");
@@ -235,8 +238,9 @@ mod tests {
     #[test]
     fn export_json_omits_empty_metadata() {
         let entries = vec![make_entry("user", "no metadata")];
-        let json = export_json(&entries).unwrap();
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&json).expect("operation should succeed");
 
         // metadata should be absent when empty
         assert!(parsed[0].get("metadata").is_none());
@@ -318,14 +322,16 @@ mod tests {
 
     #[test]
     fn read_transcript_works_with_jsonl_store() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("test.jsonl");
 
         let store = JsonlSessionStore;
         let entry = make_entry("user", "Hello from JSONL");
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let transcript = read_transcript(&store, &path).unwrap();
+        let transcript = read_transcript(&store, &path).expect("operation should succeed");
         assert_eq!(transcript.len(), 1);
         assert_eq!(transcript[0].role, "user");
         assert_eq!(transcript[0].content, "Hello from JSONL");
@@ -333,14 +339,16 @@ mod tests {
 
     #[test]
     fn read_transcript_works_with_tlog_store() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("test.tlog");
 
         let store = CompactTextSessionStore;
         let entry = make_entry("assistant", "Hello from TLOG");
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let transcript = read_transcript(&store, &path).unwrap();
+        let transcript = read_transcript(&store, &path).expect("operation should succeed");
         assert_eq!(transcript.len(), 1);
         assert_eq!(transcript[0].role, "assistant");
         assert_eq!(transcript[0].content, "Hello from TLOG");
@@ -348,17 +356,17 @@ mod tests {
 
     #[test]
     fn read_transcript_empty_session() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("empty.jsonl");
 
         let store = JsonlSessionStore;
-        let transcript = read_transcript(&store, &path).unwrap();
+        let transcript = read_transcript(&store, &path).expect("operation should succeed");
         assert!(transcript.is_empty());
     }
 
     #[test]
     fn read_transcript_multiple_entries() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("multi.tlog");
 
         let store = CompactTextSessionStore;
@@ -368,10 +376,12 @@ mod tests {
             make_entry("system", "Event"),
         ];
         for e in &entries {
-            store.append_entry(&path, e).unwrap();
+            store
+                .append_entry(&path, e)
+                .expect("operation should succeed");
         }
 
-        let transcript = read_transcript(&store, &path).unwrap();
+        let transcript = read_transcript(&store, &path).expect("operation should succeed");
         assert_eq!(transcript.len(), 3);
         assert_eq!(transcript[0].role, "user");
         assert_eq!(transcript[1].role, "assistant");
@@ -380,16 +390,21 @@ mod tests {
 
     #[test]
     fn read_transcript_preserves_metadata() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("meta.jsonl");
 
         let store = JsonlSessionStore;
         let entry = make_entry_with_metadata("assistant", "with metadata");
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
-        let transcript = read_transcript(&store, &path).unwrap();
+        let transcript = read_transcript(&store, &path).expect("operation should succeed");
         assert_eq!(transcript.len(), 1);
-        let meta = transcript[0].metadata.as_ref().unwrap();
+        let meta = transcript[0]
+            .metadata
+            .as_ref()
+            .expect("operation should succeed");
         assert_eq!(meta.provider, Some("anthropic".into()));
         assert_eq!(meta.model, Some("claude-sonnet-4-20250514".into()));
     }
@@ -402,8 +417,9 @@ mod tests {
             make_entry("user", "Hello"),
             make_entry_with_metadata("assistant", "Response"),
         ];
-        let json = export_json(&entries).unwrap();
-        let parsed: Vec<TranscriptEntry> = serde_json::from_str(&json).unwrap();
+        let json = export_json(&entries).expect("operation should succeed");
+        let parsed: Vec<TranscriptEntry> =
+            serde_json::from_str(&json).expect("operation should succeed");
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0].role, "user");

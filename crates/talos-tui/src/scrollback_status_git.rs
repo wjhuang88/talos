@@ -76,8 +76,8 @@ mod tests {
 
     #[test]
     fn test_non_git_directory() {
-        let td = tempdir().unwrap();
-        let summary = get_git_status(td.path().to_str().unwrap());
+        let td = tempdir().expect("operation should succeed");
+        let summary = get_git_status(td.path().to_str().expect("operation should succeed"));
         assert_eq!(summary, None);
     }
 }
@@ -111,17 +111,17 @@ mod tests2 {
             eprintln!("skipping: host git not available");
             return;
         }
-        let td = tempdir().unwrap();
+        let td = tempdir().expect("operation should succeed");
         run_cmd(td.path(), "git", &["init"]);
         run_cmd(td.path(), "git", &["config", "user.name", "Test"]);
         run_cmd(td.path(), "git", &["config", "user.email", "test@test.com"]);
 
-        fs::write(td.path().join("a.txt"), "hello").unwrap();
+        fs::write(td.path().join("a.txt"), "hello").expect("operation should succeed");
         run_cmd(td.path(), "git", &["add", "a.txt"]);
         run_cmd(td.path(), "git", &["commit", "-m", "init"]);
 
         let summary = compute_git_status(td.path()).expect("Should get status");
-        assert_eq!(summary.dirty, false);
+        assert!(!summary.dirty);
         // It should be either main or master
         assert!(
             summary.branch == Some("main".to_string())
@@ -135,19 +135,19 @@ mod tests2 {
             eprintln!("skipping: host git not available");
             return;
         }
-        let td = tempdir().unwrap();
+        let td = tempdir().expect("operation should succeed");
         run_cmd(td.path(), "git", &["init"]);
         run_cmd(td.path(), "git", &["config", "user.name", "Test"]);
         run_cmd(td.path(), "git", &["config", "user.email", "test@test.com"]);
 
-        fs::write(td.path().join("a.txt"), "hello").unwrap();
+        fs::write(td.path().join("a.txt"), "hello").expect("operation should succeed");
         run_cmd(td.path(), "git", &["add", "a.txt"]);
         run_cmd(td.path(), "git", &["commit", "-m", "init"]);
 
-        fs::write(td.path().join("b.txt"), "dirty").unwrap();
+        fs::write(td.path().join("b.txt"), "dirty").expect("operation should succeed");
 
         let summary = compute_git_status(td.path()).expect("Should get status");
-        assert_eq!(summary.dirty, true);
+        assert!(summary.dirty);
     }
 
     #[test]
@@ -156,23 +156,23 @@ mod tests2 {
             eprintln!("skipping: host git not available");
             return;
         }
-        let td = tempdir().unwrap();
+        let td = tempdir().expect("operation should succeed");
         run_cmd(td.path(), "git", &["init"]);
         run_cmd(td.path(), "git", &["config", "user.name", "Test"]);
         run_cmd(td.path(), "git", &["config", "user.email", "test@test.com"]);
 
-        fs::write(td.path().join("a.txt"), "hello").unwrap();
+        fs::write(td.path().join("a.txt"), "hello").expect("operation should succeed");
         run_cmd(td.path(), "git", &["add", "a.txt"]);
         run_cmd(td.path(), "git", &["commit", "-m", "init"]);
 
-        fs::write(td.path().join("b.txt"), "hello2").unwrap();
+        fs::write(td.path().join("b.txt"), "hello2").expect("operation should succeed");
         run_cmd(td.path(), "git", &["add", "b.txt"]);
         run_cmd(td.path(), "git", &["commit", "-m", "second"]);
 
         run_cmd(td.path(), "git", &["checkout", "HEAD^"]);
 
         let summary = compute_git_status(td.path()).expect("Should get status");
-        assert_eq!(summary.dirty, false);
+        assert!(!summary.dirty);
         assert_eq!(summary.branch, None);
     }
 }

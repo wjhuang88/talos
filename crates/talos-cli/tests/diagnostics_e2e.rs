@@ -38,7 +38,7 @@ fn run_diagnostics_text(cwd: &std::path::Path) -> String {
 
 #[test]
 fn json_output_parses_as_serde_value() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let json_str = run_diagnostics_json(dir.path());
     let value: serde_json::Value =
         serde_json::from_str(&json_str).expect("JSON output must parse as serde_json::Value");
@@ -57,7 +57,7 @@ fn json_output_parses_as_serde_value() {
 
 #[test]
 fn json_output_contains_no_secrets() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let json_str = run_diagnostics_json(dir.path());
     let lower = json_str.to_lowercase();
     assert!(!lower.contains("api_key"), "JSON must not contain api_key");
@@ -75,7 +75,7 @@ fn json_output_contains_no_secrets() {
 
 #[test]
 fn json_output_has_no_stale_i085_paused() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let json_str = run_diagnostics_json(dir.path());
     assert!(
         !json_str.contains("I085") || !json_str.contains("Paused"),
@@ -85,18 +85,21 @@ fn json_output_has_no_stale_i085_paused() {
 
 #[test]
 fn json_output_with_clean_iteration_source() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let docs_dir = dir.path().join("docs").join("iterations");
-    std::fs::create_dir_all(&docs_dir).unwrap();
+    std::fs::create_dir_all(&docs_dir).expect("operation should succeed");
     std::fs::write(
         docs_dir.join("README.md"),
         "# Iterations\n\n## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Dynamic Diagnostics | **Active** (2026-07-13) | no |\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let json_str = run_diagnostics_json(dir.path());
-    let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-    let iterations = value["active_iterations"].as_array().unwrap();
+    let value: serde_json::Value =
+        serde_json::from_str(&json_str).expect("operation should succeed");
+    let iterations = value["active_iterations"]
+        .as_array()
+        .expect("operation should succeed");
     assert!(
         iterations
             .iter()
@@ -107,10 +110,13 @@ fn json_output_with_clean_iteration_source() {
 
 #[test]
 fn json_output_when_iteration_index_missing() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let json_str = run_diagnostics_json(dir.path());
-    let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-    let iterations = value["active_iterations"].as_array().unwrap();
+    let value: serde_json::Value =
+        serde_json::from_str(&json_str).expect("operation should succeed");
+    let iterations = value["active_iterations"]
+        .as_array()
+        .expect("operation should succeed");
     assert!(
         iterations.iter().any(|i| {
             i.as_str()
@@ -123,7 +129,7 @@ fn json_output_when_iteration_index_missing() {
 
 #[test]
 fn text_output_works() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let text = run_diagnostics_text(dir.path());
     assert!(
         text.contains("Talos Diagnostics Status"),
@@ -141,9 +147,10 @@ fn text_output_works() {
 
 #[test]
 fn json_output_workspace_root_is_valid_json_string() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("operation should succeed");
     let json_str = run_diagnostics_json(dir.path());
-    let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+    let value: serde_json::Value =
+        serde_json::from_str(&json_str).expect("operation should succeed");
     assert!(
         value["workspace_root"].is_string(),
         "workspace_root must be a JSON string, not raw path"

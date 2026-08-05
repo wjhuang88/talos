@@ -74,11 +74,13 @@ async fn git_diff_produces_unified_diff_content() {
     run(&["config", "user.email", "test@test.com"]);
     run(&["config", "user.name", "Test"]);
 
-    std::fs::write(dir.path().join("test.txt"), "line1\nline2\nline3\n").unwrap();
+    std::fs::write(dir.path().join("test.txt"), "line1\nline2\nline3\n")
+        .expect("operation should succeed");
     run(&["add", "test.txt"]);
     run(&["commit", "-m", "initial"]);
 
-    std::fs::write(dir.path().join("test.txt"), "line1\nmodified\nline3\n").unwrap();
+    std::fs::write(dir.path().join("test.txt"), "line1\nmodified\nline3\n")
+        .expect("operation should succeed");
 
     let tool = GitDiffTool::new(dir.path().to_path_buf());
     let result = tool.execute(serde_json::json!({})).await;
@@ -134,15 +136,16 @@ async fn git_diff_staged_shows_head_vs_index() {
     run(&["config", "user.email", "test@test.com"]);
     run(&["config", "user.name", "Test"]);
 
-    std::fs::write(dir.path().join("file.txt"), "original\n").unwrap();
+    std::fs::write(dir.path().join("file.txt"), "original\n").expect("operation should succeed");
     run(&["add", "file.txt"]);
     run(&["commit", "-m", "initial"]);
 
     // Stage a change, then add an additional unstaged change so the
     // status iterator picks up the file.
-    std::fs::write(dir.path().join("file.txt"), "staged\n").unwrap();
+    std::fs::write(dir.path().join("file.txt"), "staged\n").expect("operation should succeed");
     run(&["add", "file.txt"]);
-    std::fs::write(dir.path().join("file.txt"), "staged\nunstaged\n").unwrap();
+    std::fs::write(dir.path().join("file.txt"), "staged\nunstaged\n")
+        .expect("operation should succeed");
 
     let tool = GitDiffTool::new(dir.path().to_path_buf());
     let staged_result = tool.execute(serde_json::json!({"staged": true})).await;
@@ -194,10 +197,12 @@ async fn git_diff_path_filter_excludes_non_matching() {
     run(&["config", "user.email", "test@test.com"]);
     run(&["config", "user.name", "Test"]);
 
-    std::fs::create_dir_all(dir.path().join("src")).unwrap();
-    std::fs::create_dir_all(dir.path().join("docs")).unwrap();
-    std::fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
-    std::fs::write(dir.path().join("docs/readme.md"), "# README\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
+    std::fs::create_dir_all(dir.path().join("docs")).expect("operation should succeed");
+    std::fs::write(dir.path().join("src/main.rs"), "fn main() {}\n")
+        .expect("operation should succeed");
+    std::fs::write(dir.path().join("docs/readme.md"), "# README\n")
+        .expect("operation should succeed");
     run(&["add", "."]);
     run(&["commit", "-m", "initial"]);
 
@@ -205,8 +210,9 @@ async fn git_diff_path_filter_excludes_non_matching() {
         dir.path().join("src/main.rs"),
         "fn main() { println!(); }\n",
     )
-    .unwrap();
-    std::fs::write(dir.path().join("docs/readme.md"), "# README Updated\n").unwrap();
+    .expect("operation should succeed");
+    std::fs::write(dir.path().join("docs/readme.md"), "# README Updated\n")
+        .expect("operation should succeed");
 
     let tool = GitDiffTool::new(dir.path().to_path_buf());
     let result = tool.execute(serde_json::json!({"path": "src/"})).await;

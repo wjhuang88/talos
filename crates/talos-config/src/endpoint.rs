@@ -194,11 +194,11 @@ mod tests {
     #[test]
     fn validate_provider_protocol_accepts_closed_set() {
         assert_eq!(
-            validate_provider_protocol("openai-chat").unwrap(),
+            validate_provider_protocol("openai-chat").expect("operation should succeed"),
             ProviderProtocol::OpenAIChat
         );
         assert_eq!(
-            validate_provider_protocol("anthropic-messages").unwrap(),
+            validate_provider_protocol("anthropic-messages").expect("operation should succeed"),
             ProviderProtocol::AnthropicMessages
         );
     }
@@ -214,7 +214,10 @@ mod tests {
     fn validate_provider_base_url_accepts_https() {
         let result = validate_provider_base_url("https://api.example.com/v1");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(
+            result.expect("operation should succeed").protocol,
+            ProviderProtocol::OpenAIChat
+        );
     }
 
     #[test]

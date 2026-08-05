@@ -42,6 +42,7 @@ pub(crate) struct TuiApprovalHandler {
 }
 
 impl TuiApprovalHandler {
+    #[cfg(test)]
     pub(crate) fn new(
         ui_output_tx: mpsc::UnboundedSender<UiOutput>,
         workspace_root: PathBuf,
@@ -1097,19 +1098,19 @@ mod tests {
         version: &str,
         tool_name: &str,
     ) -> PathBuf {
-        std::fs::create_dir_all(root).unwrap();
+        std::fs::create_dir_all(root).expect("operation should succeed");
         std::fs::write(
             root.join("talos-plugin.toml"),
             format!(
                 "[plugin]\nname = \"{package_name}\"\nversion = \"{version}\"\ncarrier = \"wasm\"\nartifact = \"demo.wat\"\ndescription = \"collision fixture\"\n\n[[tools]]\nname = \"{tool_name}\"\nhandler = \"demo.wat\"\n"
             ),
         )
-        .unwrap();
+        .expect("operation should succeed");
         std::fs::write(
             root.join("demo.wat"),
             "(module (func (export \"run\") (result i32) i32.const 7))",
         )
-        .unwrap();
+        .expect("operation should succeed");
         root.to_path_buf()
     }
 
@@ -1240,26 +1241,29 @@ mod tests {
                     description: "existing built-in",
                 }),
             ))
-            .unwrap();
+            .expect("operation should succeed");
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
 
         let error =
             register_explicit_permission_aware_plugins(&mut registry, &[package], approval, true)
-                .unwrap_err();
+                .expect_err("operation should fail");
 
         assert_eq!(
             error,
             "duplicate tool registration 'read-only-demo.answer': existing source 'talos-tools:file', incoming source 'plugin:read-only-demo@0.1.0'"
         );
         assert_eq!(
-            registry.get("read-only-demo.answer").unwrap().description(),
+            registry
+                .get("read-only-demo.answer")
+                .expect("operation should succeed")
+                .description(),
             "existing built-in"
         );
     }
 
     #[test]
     fn explicit_plugin_collision_between_packages_is_transactional() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let first =
             write_plugin_fixture(&temp.path().join("first"), "collision", "1.0.0", "answer");
         let second =
@@ -1273,7 +1277,7 @@ mod tests {
             approval,
             true,
         )
-        .unwrap_err();
+        .expect_err("operation should fail");
 
         assert_eq!(
             error,
@@ -1345,7 +1349,7 @@ mod tests {
 
     #[test]
     fn product_registries_have_exact_sorted_inventories() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir().expect("operation should succeed");
         let sessions_dir = temp.path().join("sessions");
         let session_id = Uuid::nil();
 
@@ -1543,7 +1547,7 @@ mod tests {
                             description: "duplicate",
                         }),
                     ))
-                    .unwrap_err();
+                    .expect_err("operation should fail");
                 assert_eq!(error.existing_source.as_str(), source, "{mode} {name}");
                 assert_eq!(error.incoming_source.as_str(), "test:duplicate");
             }
@@ -1582,7 +1586,7 @@ mod tests {
                         description: "duplicate",
                     }),
                 ))
-                .unwrap_err();
+                .expect_err("operation should fail");
             assert_eq!(
                 error.to_string(),
                 "duplicate tool registration 'read': existing source 'talos-tools:file', incoming source 'test:duplicate'",
@@ -1642,7 +1646,7 @@ mod tests {
                         description: "duplicate",
                     }),
                 ))
-                .unwrap_err();
+                .expect_err("operation should fail");
             assert_eq!(
                 error.to_string(),
                 "duplicate tool registration 'find_symbol': existing source 'talos-tools:symbol', incoming source 'test:duplicate'",
@@ -1670,13 +1674,15 @@ mod tests {
 
     #[test]
     fn print_and_tui_registries_include_todo_tools() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let sessions_dir = dir.path().join("sessions");
         let session_id = Uuid::new_v4();
 
         let mut print_registry = ToolRegistry::new();
         for contribution in todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id) {
-            print_registry.register_contribution(contribution).unwrap();
+            print_registry
+                .register_contribution(contribution)
+                .expect("operation should succeed");
         }
         assert!(print_registry.get("todo_create").is_some());
         assert!(print_registry.get("todo_create_batch").is_some());
@@ -1698,7 +1704,9 @@ mod tests {
                     approval: tui_approval.clone(),
                 })
             });
-            tui_registry.register_contribution(contribution).unwrap();
+            tui_registry
+                .register_contribution(contribution)
+                .expect("operation should succeed");
         }
         assert!(tui_registry.get("todo_create").is_some());
         assert!(tui_registry.get("todo_create_batch").is_some());
@@ -1717,7 +1725,7 @@ mod tests {
         // brand-new registry (new Agent, new tool instances) but passes the
         // SAME session.id as before. A todo created through the "before"
         // registry must be visible through the "after" registry.
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let sessions_dir = dir.path().join("sessions");
         let session_id = Uuid::new_v4();
 
@@ -1725,7 +1733,7 @@ mod tests {
         let create_tool = before_tools
             .iter()
             .find(|contribution| contribution.name() == "todo_create")
-            .unwrap()
+            .expect("operation should succeed")
             .tool();
         let created = create_tool
             .execute(serde_json::json!({ "title": "survive model switch" }))
@@ -1737,7 +1745,7 @@ mod tests {
         let query_tool = after_tools
             .iter()
             .find(|contribution| contribution.name() == "todo_query")
-            .unwrap()
+            .expect("operation should succeed")
             .tool();
         let queried = query_tool.execute(serde_json::json!({})).await;
         assert!(queried.content.contains("survive model switch"));
@@ -1753,7 +1761,7 @@ mod tests {
                     "nature": "Execute"
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
 
         let (tools, _pending) = talos_agent::create_scheduler_tools();
         let delay_tool = tools[0].clone();
@@ -1821,7 +1829,7 @@ mod tests {
                     "nature": "Execute"
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
 
         let (tools, _pending) = talos_agent::create_scheduler_tools();
         let schedule_tool = tools[1].clone();
@@ -1882,7 +1890,7 @@ mod tests {
                     "nature": "Execute"
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
 
         let (tools, _pending) = talos_agent::create_scheduler_tools();
         let cancel_tool = tools[3].clone();
@@ -1948,10 +1956,10 @@ mod tests {
 
     #[tokio::test]
     async fn read_image_auto_allowed_for_read_nature() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
+        let canonical = img_path.canonicalize().expect("operation should succeed");
 
         let engine = PermissionEngine::with_workspace_root(dir.path().to_path_buf());
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
@@ -1969,7 +1977,7 @@ mod tests {
                 "test.png",
                 talos_core::tool::ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
 
         let output = wrapped
@@ -1991,7 +1999,7 @@ mod tests {
                     "nature": "Read"
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
 
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
         let wrapped = PermissionAwareTool {
@@ -2010,11 +2018,11 @@ mod tests {
 
     #[tokio::test]
     async fn read_image_path_mismatch_rejected_in_authorized_execution() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_a = dir.path().join("a.png");
-        std::fs::write(&img_a, &[0x89, 0x50, 0x4E, 0x47]).unwrap();
+        std::fs::write(&img_a, [0x89, 0x50, 0x4E, 0x47]).expect("operation should succeed");
         let img_b = dir.path().join("b.png");
-        std::fs::write(&img_b, &[0x89, 0x50, 0x4E, 0x47]).unwrap();
+        std::fs::write(&img_b, [0x89, 0x50, 0x4E, 0x47]).expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -2025,7 +2033,7 @@ mod tests {
                 "a.png",
                 talos_core::tool::ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
 
         let output = tool
@@ -2050,7 +2058,7 @@ mod tests {
                     "nature": "Read"
                 }]
             }))
-            .unwrap();
+            .expect("operation should succeed");
 
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
         let wrapped = PermissionAwareTool {
@@ -2073,11 +2081,11 @@ mod tests {
 
     #[tokio::test]
     async fn read_image_ask_then_approve_external_path_executes_via_tui_handler() {
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let img_path = external.path().join("external.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
+        let canonical = img_path.canonicalize().expect("operation should succeed");
 
         let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
         let handler = Arc::new(TuiApprovalHandler::new(
@@ -2091,7 +2099,7 @@ mod tests {
                 .load_from_config(&serde_json::json!({
                     "rules": [{"decision": "Ask", "nature": "Read"}]
                 }))
-                .unwrap();
+                .expect("operation should succeed");
         }
         let wrapped = TuiPermissionAwareTool {
             inner: Arc::new(ReadImageTool::new(workspace.path().to_path_buf())),

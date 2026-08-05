@@ -77,8 +77,8 @@ mod tests {
     fn no_compressor_round_trip() {
         let c = NoCompressor;
         let data = b"Hello, world! This is test data for compression.";
-        let compressed = c.compress(data).unwrap();
-        let decompressed = c.decompress(&compressed).unwrap();
+        let compressed = c.compress(data).expect("operation should succeed");
+        let decompressed = c.decompress(&compressed).expect("operation should succeed");
         assert_eq!(data.as_slice(), decompressed.as_slice());
         assert_eq!(c.format_tag(), "none");
     }
@@ -86,9 +86,9 @@ mod tests {
     #[test]
     fn no_compressor_preserves_empty() {
         let c = NoCompressor;
-        let compressed = c.compress(b"").unwrap();
+        let compressed = c.compress(b"").expect("operation should succeed");
         assert!(compressed.is_empty());
-        let decompressed = c.decompress(&compressed).unwrap();
+        let decompressed = c.decompress(&compressed).expect("operation should succeed");
         assert!(decompressed.is_empty());
     }
 
@@ -97,12 +97,12 @@ mod tests {
     fn zstd_compressor_round_trip() {
         let c = ZstdCompressor::default();
         let data = b"Hello, world! This is test data for compression.".repeat(100);
-        let compressed = c.compress(&data).unwrap();
+        let compressed = c.compress(&data).expect("operation should succeed");
         assert!(
             compressed.len() < data.len(),
             "zstd should compress repetitive data"
         );
-        let decompressed = c.decompress(&compressed).unwrap();
+        let decompressed = c.decompress(&compressed).expect("operation should succeed");
         assert_eq!(data, decompressed);
         assert_eq!(c.format_tag(), "zstd");
     }

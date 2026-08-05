@@ -213,7 +213,7 @@ mod tests {
     fn chain_round_trip() {
         let dir = std::env::temp_dir().join("chain_test_rt");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
 
         let chain = ChainMetadata {
             segments: vec![
@@ -245,9 +245,9 @@ mod tests {
         };
 
         let path = chain_path(&dir);
-        chain.write(&path).unwrap();
+        chain.write(&path).expect("operation should succeed");
 
-        let read_back = ChainMetadata::read(&path).unwrap();
+        let read_back = ChainMetadata::read(&path).expect("operation should succeed");
         assert_eq!(read_back.segments.len(), 2);
         assert_eq!(read_back.segments[0].segment_id, "head");
         assert_eq!(read_back.segments[0].status, SegmentStatus::Active);
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(read_back.segments[1].archive_format, Some("zstd".into()));
         assert_eq!(read_back.segments[1].ref_count, 2);
 
-        let head = read_back.head_segment().unwrap();
+        let head = read_back.head_segment().expect("operation should succeed");
         assert_eq!(head.segment_id, "head");
 
         let archived: Vec<_> = read_back.archived_segments().collect();
@@ -270,9 +270,9 @@ mod tests {
     fn chain_read_missing_file_returns_empty() {
         let dir = std::env::temp_dir().join("chain_test_missing");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
 
-        let chain = ChainMetadata::read(&chain_path(&dir)).unwrap();
+        let chain = ChainMetadata::read(&chain_path(&dir)).expect("operation should succeed");
         assert!(chain.segments.is_empty());
 
         std::fs::remove_dir_all(&dir).ok();

@@ -58,7 +58,7 @@ impl LanguageModel for MockModel {
     async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(64);
         let events = {
-            let mut responses = self.responses.lock().unwrap();
+            let mut responses = self.responses.lock().expect("operation should succeed");
             responses.pop_front().unwrap_or_default()
         };
         tokio::spawn(async move {
@@ -121,7 +121,10 @@ struct CapturingModel {
 #[async_trait]
 impl LanguageModel for CapturingModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-        self.captured.lock().unwrap().push(messages.to_vec());
+        self.captured
+            .lock()
+            .expect("operation should succeed")
+            .push(messages.to_vec());
         let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             for event in success_events("captured") {
@@ -140,11 +143,14 @@ struct CapturingSequenceModel {
 #[async_trait]
 impl LanguageModel for CapturingSequenceModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-        self.captured.lock().unwrap().push(messages.to_vec());
+        self.captured
+            .lock()
+            .expect("operation should succeed")
+            .push(messages.to_vec());
         let events = self
             .responses
             .lock()
-            .unwrap()
+            .expect("operation should succeed")
             .pop_front()
             .unwrap_or_default();
         let (tx, rx) = mpsc::channel(8);
@@ -215,10 +221,14 @@ fn structured_submission(
 
 fn set_authoritative_generation(actor: &mut AppServerSession, generation: u64) {
     let store = actor.pending_store.clone();
-    let current = store.runtime_generation().unwrap();
+    let current = store
+        .runtime_generation()
+        .expect("operation should succeed");
     for expected in current..generation {
         assert_eq!(
-            store.advance_runtime_generation(expected).unwrap(),
+            store
+                .advance_runtime_generation(expected)
+                .expect("operation should succeed"),
             expected + 1
         );
     }
@@ -295,10 +305,13 @@ async fn test_submit_and_receive() {
             message: "hi".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_until_completions(&mut eq_rx, 1).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
     assert!(
@@ -339,15 +352,18 @@ async fn set_skill_context_reaches_request_preview() {
             content: Some("Review instructions from activated skill.".into()),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     sq_tx
         .send(SessionOp::PreviewRequest {
             message: "verify skill".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let events = collect_until_completions(&mut eq_rx, 1).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
     let preview_text = events
         .iter()
@@ -385,17 +401,20 @@ async fn test_multi_turn() {
             message: "hi".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     sq_tx
         .send(SessionOp::Submit {
             message: "again".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_until_completions(&mut eq_rx, 2).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
     let turn_started_count = events.iter().filter(|e| is_turn_started(e)).count();
@@ -459,15 +478,18 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
             },
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let mut events = collect_until_completions(&mut eq_rx, 1).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     while let Ok(event) = eq_rx.try_recv() {
         events.push(event);
     }
 
-    let requests = captured.lock().unwrap();
+    let requests = captured.lock().expect("operation should succeed");
     let users = requests[0]
         .iter()
         .filter_map(|message| match message {
@@ -518,20 +540,23 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
             submission: submission.clone(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     sq_tx
         .send(SessionOp::SubmitStructured { submission })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut events = collect_until_completions(&mut eq_rx, 1).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     while let Ok(event) = eq_rx.try_recv() {
         events.push(event);
     }
 
-    assert_eq!(captured.lock().unwrap().len(), 1);
+    assert_eq!(captured.lock().expect("operation should succeed").len(), 1);
     assert!(events.iter().any(|event| matches!(
         event,
         SessionEvent::SubmissionReceipt {
@@ -578,7 +603,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
             receipt_tx: Some(receipt_tx),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let receipt = tokio::time::timeout(Duration::from_secs(2), receipt_rx.recv())
         .await
@@ -588,7 +613,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
-            if captured.lock().unwrap().len() == 1 {
+            if captured.lock().expect("operation should succeed").len() == 1 {
                 break;
             }
             tokio::task::yield_now().await;
@@ -597,10 +622,13 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
     .await
     .expect("Actor should execute accepted work without an EQ observer");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
-    let requests = captured.lock().unwrap();
+    let requests = captured.lock().expect("operation should succeed");
     assert_eq!(requests.len(), 1, "Actor custody must execute exactly once");
     assert!(
         requests[0].iter().any(
@@ -638,7 +666,7 @@ async fn context_budget_pauses_before_submission_started() {
             ),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut events = Vec::new();
     loop {
@@ -658,8 +686,11 @@ async fn context_budget_pauses_before_submission_started() {
             break;
         }
     }
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
     assert!(
         !events
@@ -671,7 +702,12 @@ async fn context_budget_pauses_before_submission_started() {
             .iter()
             .any(|event| matches!(event, SessionEvent::SubmissionRejected { .. }))
     );
-    assert!(captured.lock().unwrap().is_empty());
+    assert!(
+        captured
+            .lock()
+            .expect("operation should succeed")
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -710,7 +746,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
         sq_tx
             .send(SessionOp::SubmitStructured { submission })
             .await
-            .unwrap();
+            .expect("operation should succeed");
     }
 
     let rejected = tokio::time::timeout(Duration::from_secs(2), async {
@@ -729,8 +765,11 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
     .expect("aggregate limit rejection");
     assert_eq!(rejected, "bounded_batch_4");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
     let mut closed = Vec::new();
     while let Ok(event) = eq_rx.try_recv() {
         if let SessionEvent::SubmissionRejected {
@@ -782,7 +821,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
             ),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let _ = collect_until_completions(&mut eq_rx, 1).await;
 
     sq_tx
@@ -796,7 +835,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
             ),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     sq_tx
         .send(SessionOp::SubmitStructured {
             submission: structured_submission(
@@ -808,12 +847,15 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
             ),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     let _ = collect_until_completions(&mut eq_rx, 2).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
-    let calls = captured.lock().unwrap();
+    let calls = captured.lock().expect("operation should succeed");
     let last_users = calls
         .iter()
         .map(|messages| {
@@ -867,11 +909,17 @@ async fn test_interrupt() {
             message: "hi".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
-    sq_tx.send(SessionOp::Interrupt).await.unwrap();
+    sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("operation should succeed");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
@@ -903,7 +951,10 @@ async fn test_shutdown() {
 
     let actor_task = tokio::spawn(async move { actor.run().await });
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
 
     let result = tokio::time::timeout(Duration::from_secs(2), actor_task).await;
     assert!(result.is_ok(), "Actor should exit cleanly on Shutdown");
@@ -930,9 +981,12 @@ async fn test_eq_consumer_disconnect() {
             message: "hi".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
 
     let result = tokio::time::timeout(Duration::from_secs(2), actor_task).await;
     assert!(
@@ -959,7 +1013,7 @@ async fn test_sq_backpressure() {
             .try_send(SessionOp::Submit {
                 message: "fill".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
     }
 
     let result = sq_tx.try_send(SessionOp::Submit {
@@ -971,7 +1025,7 @@ async fn test_sq_backpressure() {
     );
     assert!(
         matches!(
-            result.unwrap_err(),
+            result.expect_err("operation should fail"),
             tokio::sync::mpsc::error::TrySendError::Full(_)
         ),
         "Error should be Full, not Closed"
@@ -999,7 +1053,7 @@ async fn test_panic_recovery() {
             message: "panic me".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -1008,11 +1062,14 @@ async fn test_panic_recovery() {
             message: "still here?".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
@@ -1066,20 +1123,26 @@ async fn test_concurrent_submit_and_interrupt() {
             message: "slow turn".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    sq_tx.send(SessionOp::Interrupt).await.unwrap();
+    sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("operation should succeed");
 
     sq_tx
         .send(SessionOp::Submit {
             message: "after interrupt".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
@@ -1117,10 +1180,13 @@ async fn test_multi_turn_with_history() {
     #[async_trait]
     impl LanguageModel for CapturingModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-            self.captured.lock().unwrap().push(messages.to_vec());
+            self.captured
+                .lock()
+                .expect("operation should succeed")
+                .push(messages.to_vec());
             let (tx, rx) = mpsc::channel(64);
             let events = {
-                let mut responses = self.responses.lock().unwrap();
+                let mut responses = self.responses.lock().expect("operation should succeed");
                 responses.pop_front().unwrap_or_default()
             };
             tokio::spawn(async move {
@@ -1154,7 +1220,7 @@ async fn test_multi_turn_with_history() {
             message: "turn 1".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     sq_tx
@@ -1162,7 +1228,7 @@ async fn test_multi_turn_with_history() {
             message: "turn 2".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     sq_tx
@@ -1170,11 +1236,14 @@ async fn test_multi_turn_with_history() {
             message: "turn 3".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let events = collect_until_completions(&mut eq_rx, 3).await;
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
     let success_count = events
         .iter()
@@ -1187,7 +1256,7 @@ async fn test_multi_turn_with_history() {
         .count();
     assert!(success_count >= 1, "Should have at least 1 Success");
 
-    let captured = captured_messages.lock().unwrap();
+    let captured = captured_messages.lock().expect("operation should succeed");
     assert!(captured.len() >= 3, "Should have captured at least 3 calls");
 
     let third_call_messages = &captured[2];
@@ -1220,10 +1289,13 @@ async fn test_interrupt_after_success_preserves_history() {
     #[async_trait]
     impl LanguageModel for CapturingModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-            self.captured.lock().unwrap().push(messages.to_vec());
+            self.captured
+                .lock()
+                .expect("operation should succeed")
+                .push(messages.to_vec());
             let (tx, rx) = mpsc::channel(64);
             let events = {
-                let mut responses = self.responses.lock().unwrap();
+                let mut responses = self.responses.lock().expect("operation should succeed");
                 responses.pop_front().unwrap_or_default()
             };
             tokio::spawn(async move {
@@ -1256,7 +1328,7 @@ async fn test_interrupt_after_success_preserves_history() {
             message: "turn 1".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::timeout(Duration::from_secs(1), async {
         while let Some(event) = eq_rx.recv().await {
             if matches!(
@@ -1270,14 +1342,17 @@ async fn test_interrupt_after_success_preserves_history() {
     .await
     .expect("first turn should complete before timeout");
 
-    sq_tx.send(SessionOp::Interrupt).await.unwrap();
+    sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("operation should succeed");
 
     sq_tx
         .send(SessionOp::Submit {
             message: "turn 2".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::timeout(Duration::from_secs(1), async {
         while let Some(event) = eq_rx.recv().await {
             if matches!(
@@ -1291,10 +1366,13 @@ async fn test_interrupt_after_success_preserves_history() {
     .await
     .expect("second turn should complete before timeout");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
-    let captured = captured_messages.lock().unwrap();
+    let captured = captured_messages.lock().expect("operation should succeed");
     assert!(captured.len() >= 2, "Should have captured 2 calls");
 
     let second_call_messages = &captured[1];
@@ -1317,24 +1395,28 @@ async fn test_initial_history_from_jsonl_resume() {
     use talos_core::message::Message;
     use talos_session::SessionManager;
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("resume-test", "").unwrap();
+    let session = manager
+        .create_session("resume-test", "")
+        .expect("operation should succeed");
     let session_id = session.id.to_string();
     session
         .append(&Message::User {
             content: "prior question".into(),
         })
-        .unwrap();
+        .expect("operation should succeed");
     session
         .append(&Message::Assistant {
             content: "prior answer".into(),
             tool_calls: vec![],
             reasoning: None,
         })
-        .unwrap();
-    let resumed = manager.resume_session(&session_id).unwrap();
-    let prior_history = resumed.read_messages().unwrap();
+        .expect("operation should succeed");
+    let resumed = manager
+        .resume_session(&session_id)
+        .expect("operation should succeed");
+    let prior_history = resumed.read_messages().expect("operation should succeed");
 
     let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
     let responses = Arc::new(Mutex::new(VecDeque::from(vec![success_events(
@@ -1349,10 +1431,13 @@ async fn test_initial_history_from_jsonl_resume() {
     #[async_trait]
     impl LanguageModel for CapturingModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-            self.captured.lock().unwrap().push(messages.to_vec());
+            self.captured
+                .lock()
+                .expect("operation should succeed")
+                .push(messages.to_vec());
             let (tx, rx) = mpsc::channel(64);
             let events = {
-                let mut responses = self.responses.lock().unwrap();
+                let mut responses = self.responses.lock().expect("operation should succeed");
                 responses.pop_front().unwrap_or_default()
             };
             tokio::spawn(async move {
@@ -1383,13 +1468,16 @@ async fn test_initial_history_from_jsonl_resume() {
             message: "new question".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
     let _ = actor_task.await;
 
-    let captured = captured_messages.lock().unwrap();
+    let captured = captured_messages.lock().expect("operation should succeed");
     assert_eq!(captured.len(), 1, "Should have captured exactly 1 call");
 
     let messages = &captured[0];
@@ -1417,9 +1505,11 @@ async fn test_initial_history_from_jsonl_resume() {
 async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_messages() {
     use talos_session::{SessionManager, SessionMetadata};
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("single-flow", "").unwrap();
+    let session = manager
+        .create_session("single-flow", "")
+        .expect("operation should succeed");
     let agent = make_agent(MockModel::new(vec![success_events("persisted answer")]));
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
@@ -1445,7 +1535,7 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
             message: "persist this question".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut sequences = Vec::new();
     let mut session_ids = Vec::new();
@@ -1469,8 +1559,11 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
     .await
     .expect("canonical turn completion");
 
-    sq_tx.send(SessionOp::Shutdown).await.unwrap();
-    actor_task.await.unwrap();
+    sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("operation should succeed");
+    actor_task.await.expect("operation should succeed");
 
     assert_eq!(sequences, (0..sequences.len() as u64).collect::<Vec<_>>());
     assert!(
@@ -1480,7 +1573,7 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
         "every canonical event must carry the durable session identity"
     );
     assert_eq!(
-        session.read_messages().unwrap(),
+        session.read_messages().expect("operation should succeed"),
         vec![
             Message::User {
                 content: "persist this question".into(),
@@ -1493,7 +1586,10 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
         ]
     );
     assert!(
-        session.read_events().unwrap().is_empty(),
+        session
+            .read_events()
+            .expect("operation should succeed")
+            .is_empty(),
         "canonical persistence must not duplicate transient AgentEvents"
     );
 }
@@ -1601,9 +1697,11 @@ impl LanguageModel for ToolCallThenErrorModel {
 async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fragment() {
     use talos_session::{SessionManager, SessionMetadata};
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("error-path", "").unwrap();
+    let session = manager
+        .create_session("error-path", "")
+        .expect("operation should succeed");
 
     let mut registry = ToolRegistry::new();
     registry.register(std::sync::Arc::new(EchoTool));
@@ -1638,7 +1736,7 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
             message: "echo hello".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
@@ -1652,7 +1750,7 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         has_error_completion,
         "turn should complete with error status"
     );
-    let persisted = session.read_messages().unwrap();
+    let persisted = session.read_messages().expect("operation should succeed");
     let has_tool_result = persisted
         .iter()
         .any(|m| matches!(m, Message::Tool { result } if result.content.contains("echo: hello")));
@@ -1675,7 +1773,9 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
         )),
         "the failed continuation fragment must not become a completed assistant fact"
     );
-    let diagnostics = session.read_terminal_diagnostics().unwrap();
+    let diagnostics = session
+        .read_terminal_diagnostics()
+        .expect("operation should succeed");
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
         diagnostics[0].outcome,
@@ -1693,9 +1793,11 @@ async fn failed_continuation_preserves_completed_tool_prefix_without_trailing_fr
 async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
     use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("adr042-real", "").unwrap();
+    let session = manager
+        .create_session("adr042-real", "")
+        .expect("operation should succeed");
 
     let durable = manager
         .create_or_open_session("adr042-real-durable")
@@ -1733,7 +1835,7 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
             message: "echo hello".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
@@ -1753,7 +1855,7 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
         "ADR-042: no EntriesCommitted on error path — durable failed turns abort"
     );
 
-    let persisted = session.read_messages().unwrap();
+    let persisted = session.read_messages().expect("operation should succeed");
     let has_tool_result = persisted
         .iter()
         .any(|m| matches!(m, Message::Tool { result } if result.content.contains("echo: hello")));
@@ -1767,9 +1869,11 @@ async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
 async fn fixture_persistence_failure_is_observable_in_error() {
     use talos_session::{SessionManager, SessionMetadata};
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("persist-fail", "").unwrap();
+    let session = manager
+        .create_session("persist-fail", "")
+        .expect("operation should succeed");
 
     let session_parent = session
         .file_path
@@ -1810,7 +1914,7 @@ async fn fixture_persistence_failure_is_observable_in_error() {
             message: "echo hello".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
@@ -1834,9 +1938,11 @@ async fn fixture_persistence_failure_is_observable_in_error() {
 async fn fixture_durable_transcript_empty_after_failed_turn() {
     use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
 
-    let temp_dir = tempfile::tempdir().unwrap();
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("durable-empty", "").unwrap();
+    let session = manager
+        .create_session("durable-empty", "")
+        .expect("operation should succeed");
 
     let durable_external_id = "durable-empty-check";
     let durable = manager
@@ -1874,7 +1980,7 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
             message: "echo hello".into(),
         })
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
