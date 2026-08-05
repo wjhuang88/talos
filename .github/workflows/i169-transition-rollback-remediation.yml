@@ -67,32 +67,32 @@ jobs:
           PY
           python3 .github/i169_transition_rollback_patch.py
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           path = Path('crates/talos-cli/src/session_transition.rs')
           text = path.read_text()
-          old_call = '''            .publish_commit(
-              result,
-              new_session,
-              &session_watch_tx,
-          '''
-          new_call = '''            .publish_commit(
-              result,
-              new_session.clone(),
-              &session_watch_tx,
-          '''
-          if text.count(old_call) != 3:
-              raise SystemExit(f"expected three publication test ownership calls, found {text.count(old_call)}")
-          text = text.replace(old_call, new_call)
+          ownership_pattern = re.compile(
+              r'(\.publish_commit\(\s*\n\s*result,\s*\n\s*)new_session(,\s*\n\s*&session_watch_tx,)'
+          )
+          text, ownership_count = ownership_pattern.subn(
+              r'\1new_session.clone()\2', text
+          )
+          if ownership_count != 3:
+              raise SystemExit(
+                  f"expected three publication test ownership calls, found {ownership_count}"
+              )
 
-          test_start = text.index('    async fn publication_fails_when_session_watch_has_no_receivers()')
-          test_end = text.index('    #[tokio::test]', test_start + 20)
-          test_text = text[test_start:test_end]
-          watch_assert = '        assert_eq!(session_watch_rx.borrow().id, old_session.id);\n'
-          if test_text.count(watch_assert) != 1:
-              raise SystemExit('expected one invalid assertion in dropped session-watch test')
-          test_text = test_text.replace(watch_assert, '', 1)
-          text = text[:test_start] + test_text + text[test_end:]
+          dropped_assertion_pattern = re.compile(
+              r'(drop\(session_watch_rx\);\n(?:(?!\n\s*#\[tokio::test\]).)*?)'
+              r'\s*assert_eq!\(session_watch_rx\.borrow\(\)\.id, old_session\.id\);\n',
+              re.DOTALL,
+          )
+          text, dropped_assertion_count = dropped_assertion_pattern.subn(r'\1', text)
+          if dropped_assertion_count != 1:
+              raise SystemExit(
+                  f"expected one dropped-watch assertion, found {dropped_assertion_count}"
+              )
           path.write_text(text)
           PY
           cargo fmt --all
