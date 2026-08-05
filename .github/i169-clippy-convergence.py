@@ -3,6 +3,9 @@ import re
 
 FILES = [
     "crates/talos-core/src/submission.rs",
+    "crates/talos-config/src/endpoint.rs",
+    "crates/talos-config/src/store_finalization_tests.rs",
+    "crates/talos-session/tests/i169_turn_outcome.rs",
     "crates/talos-provider/src/anthropic_request.rs",
     "crates/talos-provider/src/anthropic_stream.rs",
     "crates/talos-tui/src/app.rs",
