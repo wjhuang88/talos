@@ -214,3 +214,15 @@ startup, resume, new/fork and headless construction paths. Equivalent baseline s
 Production request-preview tests verify the actual OpenAI request `reasoning_effort`, rather than
 only the persisted label or resolver result. This remains implementation evidence under review;
 TUI-044 and I169 remain Active, ADR-056 remains Proposed, and Issue #119 remains Open.
+
+<!-- PR131-I169-REMEDIATION-2026-08-05 -->
+## PR #131 independent-review remediation checkpoint — 2026-08-05
+
+- Implementation source baseline: `40e4bb95176d60b1d58214788620b4c535fee62e`; current main / merge base: `a03e25436a25f84f117a90362686fc8205e52dde`.
+- Latest independent Review `PRR_kwDOSrj_LM8AAAABIdlncA` remains the governing `CHANGES REQUIRED` verdict until a fresh review binds to the final exact Head.
+- B1/B2/H1/M1/M2 remediation now uses one retryable Session artifact ownership boundary: WAL/SHM/SQLite precede the transcript commit point; rollback preserves primary plus cleanup diagnostics; zero-byte retention counts removals; bounded orphan reconciliation validates UUID/suffix/root/symlink/live-owner safety.
+- Production `/new`, TUI `/fork`, CLI `--fork`, transition publication rollback, Session index and fork-relation cleanup now converge on that ownership boundary while preserving the source Session.
+- Verification workflow `30997867486` passed Linux full `talos-session`/`talos-tools` gates, strict Clippy, Windows open-SQLite-handle retry, Windows redirect `20/20`, Windows full `talos-tools`, and self-cleaned all temporary remediation assets before publishing the source baseline.
+- Lifecycle state is intentionally unchanged. Final exact-head standard CI, rebuilt real-TUI acceptance, evidence synchronization and a fresh independent review remain mandatory before any advancement or merge authorization.
+
+- TUI-044 remains **Active**; this checkpoint is implementation/review evidence, not Story completion.
