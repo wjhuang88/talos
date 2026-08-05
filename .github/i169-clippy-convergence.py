@@ -1,51 +1,51 @@
 from pathlib import Path
 import re
 
-FILES = [
-    "crates/talos-core/src/submission.rs",
-    "crates/talos-config/src/endpoint.rs",
-    "crates/talos-config/src/store_finalization_tests.rs",
-    "crates/talos-session/tests/i169_turn_outcome.rs",
-    "crates/talos-agent/src/prompt/tests.rs",
-    "crates/talos-agent/src/request_plan/tests.rs",
-    "crates/talos-agent/src/scheduler.rs",
-    "crates/talos-agent/tests/i169_durable_custody.rs",
-    "crates/talos-agent/tests/i169_old_generation_reconcile.rs",
-    "crates/talos-provider/src/anthropic_request.rs",
-    "crates/talos-provider/src/anthropic_stream.rs",
-    "crates/talos-tui/src/app.rs",
-    "crates/talos-tui/src/app_layout.rs",
-    "crates/talos-tui/src/app_summary.rs",
-    "crates/talos-tui/src/scrollback_status_git.rs",
-    "crates/talos-tui/src/state_tests.rs",
-    "crates/talos-tui/src/tool_display.rs",
-    "crates/talos-cli/src/approval.rs",
-    "crates/talos-cli/src/i169_bridge_integration_tests.rs",
-    "crates/talos-cli/src/image_authorization.rs",
-    "crates/talos-cli/src/init_wizard.rs",
-    "crates/talos-cli/src/mode_interactive.rs",
-    "crates/talos-cli/src/mode_print.rs",
-    "crates/talos-cli/src/mode_runners_tests.rs",
-    "crates/talos-cli/src/mode_runtime.rs",
-    "crates/talos-cli/src/model_lifecycle.rs",
-    "crates/talos-cli/src/models_browser.rs",
-    "crates/talos-cli/src/permissions.rs",
-    "crates/talos-cli/src/provider_discovery.rs",
-    "crates/talos-cli/src/recent_models.rs",
-    "crates/talos-cli/src/registry.rs",
-    "crates/talos-cli/src/session_handlers.rs",
-    "crates/talos-cli/src/session_transition.rs",
-    "crates/talos-cli/src/storage.rs",
-    "crates/talos-cli/src/todo_view.rs",
-    "crates/talos-cli/src/tui_bridge.rs",
-    "crates/talos-cli/src/tui_runtime_builder.rs",
-]
+# Inline test modules that live in production source files and have already been
+# identified by strict all-targets Clippy. Integration and extracted test files
+# are discovered separately below, so production code is not globally rewritten.
+INLINE_TEST_FILES = {
+    Path("crates/talos-core/src/submission.rs"),
+    Path("crates/talos-config/src/endpoint.rs"),
+    Path("crates/talos-agent/src/scheduler.rs"),
+    Path("crates/talos-provider/src/anthropic_request.rs"),
+    Path("crates/talos-provider/src/anthropic_stream.rs"),
+    Path("crates/talos-tui/src/app.rs"),
+    Path("crates/talos-tui/src/app_layout.rs"),
+    Path("crates/talos-tui/src/app_summary.rs"),
+    Path("crates/talos-tui/src/scrollback_status_git.rs"),
+    Path("crates/talos-tui/src/tool_display.rs"),
+    Path("crates/talos-cli/src/approval.rs"),
+    Path("crates/talos-cli/src/image_authorization.rs"),
+    Path("crates/talos-cli/src/init_wizard.rs"),
+    Path("crates/talos-cli/src/mode_interactive.rs"),
+    Path("crates/talos-cli/src/mode_print.rs"),
+    Path("crates/talos-cli/src/mode_runtime.rs"),
+    Path("crates/talos-cli/src/model_lifecycle.rs"),
+    Path("crates/talos-cli/src/models_browser.rs"),
+    Path("crates/talos-cli/src/permissions.rs"),
+    Path("crates/talos-cli/src/provider_discovery.rs"),
+    Path("crates/talos-cli/src/recent_models.rs"),
+    Path("crates/talos-cli/src/registry.rs"),
+    Path("crates/talos-cli/src/session_handlers.rs"),
+    Path("crates/talos-cli/src/session_transition.rs"),
+    Path("crates/talos-cli/src/storage.rs"),
+    Path("crates/talos-cli/src/todo_view.rs"),
+    Path("crates/talos-cli/src/tui_bridge.rs"),
+    Path("crates/talos-cli/src/tui_runtime_builder.rs"),
+}
 
-for filename in FILES:
-    path = Path(filename)
+TEST_FILES = {
+    path
+    for path in Path("crates").rglob("*.rs")
+    if "tests" in path.parts
+    or path.name == "tests.rs"
+    or path.name.endswith("_tests.rs")
+}
+
+
+def clarify_test_failures(path: Path) -> None:
     text = path.read_text()
-
-    # Preserve failure assertions while avoiding clippy::unwrap_used.
     text = re.sub(
         r"\.err\(\)\s*\.expect\(([^\n]+?)\)",
         r".expect_err(\1)",
@@ -60,6 +60,10 @@ for filename in FILES:
         '.expect("operation should succeed")',
     )
     path.write_text(text)
+
+
+for path in sorted(INLINE_TEST_FILES | TEST_FILES):
+    clarify_test_failures(path)
 
 # Known needless-borrow diagnostics that are not dependent on formatting.
 path = Path("crates/talos-provider/src/anthropic_request.rs")
