@@ -27,7 +27,7 @@ connection_patch_start = text.index(
     "replace_once(\n    pending,\n    '''    fn connection(&self) -> Result<Connection, PendingSubmissionError> {\n"
 )
 connection_patch_end = text.index("\n\nartifacts = ROOT", connection_patch_start)
-identity_scoped_marker_patch = r'''replace_once(
+identity_scoped_marker_patch = r"""replace_once(
     pending,
     '''    pub fn initialize_runtime_identity(
         &self,
@@ -76,7 +76,7 @@ replace_once(
         let connection = Connection::open(self.path.as_ref())?;
 ''',
 )
-'''
+"""
 text = (
     text[:connection_patch_start]
     + identity_scoped_marker_patch
