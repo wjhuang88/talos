@@ -1,0 +1,123 @@
+name: I169 review follow-up remediation
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i169-review-followup-remediation
+  cancel-in-progress: true
+
+jobs:
+  verify-linux:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: i169-review-followup-linux
+      - name: Verify temporary scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor cc3ef56dab5c8722da70cca198c0ae0fa31e8de3 HEAD
+          git diff --name-only cc3ef56dab5c8722da70cca198c0ae0fa31e8de3 HEAD | sort > /tmp/changed.txt
+          printf '%s\n' '.github/workflows/i169-review-followup.yml' 'scripts/i169_review_followup_patch.py' | sort > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+      - name: Apply exact remediation patch
+        run: python3 scripts/i169_review_followup_patch.py
+      - name: Format and inspect patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git diff --check
+          ! grep -R --line-number --fixed-strings -- '--storage-maintenance' crates/talos-cli/src crates/talos-cli/tests
+      - name: Session artifact lifecycle tests
+        run: cargo test -p talos-session --test i169_session_artifact_cleanup
+      - name: Cleanup recovery command tests
+        run: cargo test -p talos-cli cleanup_recovery_command_tests
+      - name: CLI source-boundary tests
+        run: cargo test -p talos-cli --test i169_source_layout
+      - name: Full talos-session tests
+        run: cargo test -p talos-session --all-targets
+      - name: Strict Clippy
+        run: cargo clippy -p talos-session -p talos-cli --all-targets -- -D warnings
+
+  verify-windows:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: i169-review-followup-windows
+      - name: Verify baseline and apply exact patch
+        shell: pwsh
+        run: |
+          git merge-base --is-ancestor cc3ef56dab5c8722da70cca198c0ae0fa31e8de3 HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/i169_review_followup_patch.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Windows Session artifact lifecycle tests
+        run: cargo test -p talos-session --test i169_session_artifact_cleanup
+      - name: Windows cleanup recovery command tests
+        run: cargo test -p talos-cli cleanup_recovery_command_tests
+      - name: Windows CLI source-boundary tests
+        run: cargo test -p talos-cli --test i169_source_layout
+      - name: Windows strict Clippy
+        run: cargo clippy -p talos-session -p talos-cli --all-targets -- -D warnings
+
+  publish-clean-head:
+    if: github.actor != 'github-actions[bot]'
+    needs:
+      - verify-linux
+      - verify-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - name: Replay verified patch and publish clean source Head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor cc3ef56dab5c8722da70cca198c0ae0fa31e8de3 HEAD
+          python3 scripts/i169_review_followup_patch.py
+          cargo fmt --all
+          git diff --check
+          rm .github/workflows/i169-review-followup.yml
+          rm scripts/i169_review_followup_patch.py
+          test ! -e .github/workflows/i169-review-followup.yml
+          test ! -e scripts/i169_review_followup_patch.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(session): make artifact recovery instructions executable'
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
