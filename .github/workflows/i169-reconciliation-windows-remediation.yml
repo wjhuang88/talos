@@ -71,7 +71,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python .github/i169_reconciliation_windows_patch.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo fmt --all -- --check
+          cargo fmt --all
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git diff --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
