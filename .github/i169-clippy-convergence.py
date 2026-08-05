@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 
 FILES = [
+    "crates/talos-core/src/submission.rs",
     "crates/talos-provider/src/anthropic_request.rs",
     "crates/talos-provider/src/anthropic_stream.rs",
     "crates/talos-tui/src/app.rs",
