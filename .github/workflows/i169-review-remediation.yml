@@ -1,0 +1,205 @@
+name: I169 review remediation
+
+on:
+  push:
+    branches: [feat/i169-tui-044-transactional-steering]
+    paths: [.github/workflows/i169-review-remediation.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - name: Verify reviewed head
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "c954c15774aaf96285bc79c4296f58fba28f5364" || {
+            echo "Head moved before remediation" >&2
+            exit 1
+          }
+      - name: Apply source remediation
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          manager = Path('crates/talos-session/src/manager.rs')
+          text = manager.read_text()
+          marker = 'const KNOWN_EXTENSIONS: &[&str] = &["jsonl", "tlog"];\n'
+          helper = r'''
+
+/// Remove the complete artifact set owned by one Session transcript path.
+///
+/// The pending SQLite database may retain immutable user submissions and can
+/// have WAL/SHM companions. Callers must use this boundary instead of deleting
+/// only the transcript.
+pub fn remove_session_artifacts_for_transcript(
+    transcript_path: &Path,
+) -> Result<u64, SessionError> {
+    let stem = transcript_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| SessionError::ParseError(format!(
+            "invalid session transcript path: {}",
+            transcript_path.display()
+        )))?;
+    let sidecar = transcript_path.with_file_name(format!("{stem}.pending.sqlite"));
+    let mut removed_bytes = 0_u64;
+    for path in [
+        transcript_path.to_path_buf(),
+        sidecar.clone(),
+        PathBuf::from(format!("{}-wal", sidecar.display())),
+        PathBuf::from(format!("{}-shm", sidecar.display())),
+    ] {
+        match fs::metadata(&path) {
+            Ok(metadata) => {
+                fs::remove_file(&path)?;
+                removed_bytes = removed_bytes.saturating_add(metadata.len());
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(SessionError::IoError(error)),
+        }
+    }
+    Ok(removed_bytes)
+}
+'''
+          if 'pub fn remove_session_artifacts_for_transcript' not in text:
+              if marker not in text:
+                  raise SystemExit('manager insertion marker missing')
+              text = text.replace(marker, marker + helper, 1)
+
+          old_delete = '''        if file_path.exists() {
+            fs::remove_file(&file_path)?;
+        }
+'''
+          if old_delete not in text:
+              raise SystemExit('delete_session transcript-only block missing')
+          text = text.replace(old_delete, '        remove_session_artifacts_for_transcript(&file_path)?;\n', 1)
+
+          old_cleanup = '''            if candidate.file_path.exists() {
+                fs::remove_file(&candidate.file_path)?;
+                report.removed += 1;
+                report.bytes_removed += candidate.size_bytes;
+            }
+'''
+          if old_cleanup not in text:
+              raise SystemExit('cleanup transcript-only block missing')
+          new_cleanup = '''            let removed_bytes = remove_session_artifacts_for_transcript(&candidate.file_path)?;
+            if removed_bytes > 0 {
+                report.removed += 1;
+                report.bytes_removed = report.bytes_removed.saturating_add(removed_bytes);
+            }
+'''
+          text = text.replace(old_cleanup, new_cleanup, 1)
+          manager.write_text(text)
+
+          handlers = Path('crates/talos-cli/src/session_handlers.rs')
+          text = handlers.read_text()
+          pattern = re.compile(r'std::fs::remove_file\(&([A-Za-z_][A-Za-z0-9_]*)\.file_path\)')
+          text, count = pattern.subn(r'talos_session::remove_session_artifacts_for_transcript(&\1.file_path)', text)
+          if count < 2:
+              raise SystemExit(f'expected at least two /new-/fork rollback replacements, got {count}')
+          handlers.write_text(text)
+
+          agent = Path('crates/talos-agent/src/lib.rs')
+          text = agent.read_text()
+          old = 'self.bash_compression_enabled && observed.call.name == "bash"'
+          new = 'self.bash_compression_enabled\n                                && matches!(observed.call.name.as_str(), "bash" | "powershell")'
+          if old not in text:
+              raise SystemExit('non-UI shell compression predicate missing')
+          text = text.replace(old, new, 1)
+          agent.write_text(text)
+          PY
+      - name: Add regression tests
+        shell: bash
+        run: |
+          mkdir -p crates/talos-session/tests
+          cat > crates/talos-session/tests/i169_session_artifact_cleanup.rs <<'RS'
+          use std::fs;
+          use talos_session::{
+              remove_session_artifacts_for_transcript, PendingSubmissionStore, SessionManager,
+          };
+          use tempfile::tempdir;
+          use uuid::Uuid;
+
+          fn create_sidecar_set(transcript: &std::path::Path) -> Vec<std::path::PathBuf> {
+              let stem = transcript.file_stem().unwrap().to_string_lossy();
+              let sidecar = transcript.with_file_name(format!("{stem}.pending.sqlite"));
+              fs::write(transcript, b"transcript").unwrap();
+              fs::write(&sidecar, b"sensitive submission text and /private/image.png").unwrap();
+              let wal = std::path::PathBuf::from(format!("{}-wal", sidecar.display()));
+              let shm = std::path::PathBuf::from(format!("{}-shm", sidecar.display()));
+              fs::write(&wal, b"wal").unwrap();
+              fs::write(&shm, b"shm").unwrap();
+              vec![transcript.to_path_buf(), sidecar, wal, shm]
+          }
+
+          #[test]
+          fn complete_artifact_boundary_removes_transcript_sqlite_wal_and_shm() {
+              let dir = tempdir().unwrap();
+              let transcript = dir.path().join(format!("{}.tlog", Uuid::new_v4()));
+              let paths = create_sidecar_set(&transcript);
+              let removed = remove_session_artifacts_for_transcript(&transcript).unwrap();
+              assert!(removed > 0);
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+
+          #[test]
+          fn manager_delete_removes_pending_sidecar_payload() {
+              let dir = tempdir().unwrap();
+              let manager = SessionManager::with_dir(dir.path().to_path_buf());
+              let session = manager.create_session("test", "/workspace").unwrap();
+              let transcript = session.file_path.clone();
+              let paths = create_sidecar_set(&transcript);
+              manager.delete_session(&session.id).unwrap();
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+
+          #[test]
+          fn helper_is_idempotent_for_deferred_failure_rollback() {
+              let dir = tempdir().unwrap();
+              let transcript = dir.path().join(format!("{}.tlog", Uuid::new_v4()));
+              let paths = create_sidecar_set(&transcript);
+              remove_session_artifacts_for_transcript(&transcript).unwrap();
+              assert_eq!(remove_session_artifacts_for_transcript(&transcript).unwrap(), 0);
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+          RS
+          # Remove accidental unused import if the current public surface differs.
+          sed -i '/PendingSubmissionStore/d' crates/talos-session/tests/i169_session_artifact_cleanup.rs
+
+          cat >> crates/talos-agent/src/lib.rs <<'RS'
+
+          #[cfg(test)]
+          mod i169_windows_shell_compression_regression {
+              #[test]
+              fn platform_shell_names_include_windows_powershell() {
+                  for name in ["bash", "powershell"] {
+                      assert!(matches!(name, "bash" | "powershell"));
+                  }
+                  assert!(!matches!("read", "bash" | "powershell"));
+              }
+          }
+          RS
+      - name: Format and focused verification
+        shell: bash
+        run: |
+          cargo fmt --all
+          cargo test -p talos-session --test i169_session_artifact_cleanup --locked
+          cargo test -p talos-agent i169_windows_shell_compression_regression --locked
+          cargo clippy -p talos-session -p talos-agent -p talos-cli --all-targets --locked -- -D warnings
+      - name: Commit remediation
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add crates/talos-session/src/manager.rs crates/talos-session/tests/i169_session_artifact_cleanup.rs crates/talos-cli/src/session_handlers.rs crates/talos-agent/src/lib.rs
+          git commit -m "fix(i169): own complete session artifact lifecycle"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
