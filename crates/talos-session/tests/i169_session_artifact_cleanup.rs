@@ -366,3 +366,159 @@ fn rollback_removes_child_index_and_fork_relation_but_preserves_source() {
     assert!(manager.get_session(&child.id).is_err());
     assert!(manager.get_session(&source.id).is_ok());
 }
+
+#[test]
+fn pending_sidecar_creation_first_establishes_transcript_ownership() {
+    let dir = tempdir().expect("create temporary directory");
+    let manager = SessionManager::with_dir(dir.path().join("sessions"));
+    let session = manager
+        .defer_create_session("deferred", "/workspace")
+        .expect("defer Session without a transcript");
+    assert!(!session.file_path.exists());
+
+    let store = talos_session::PendingSubmissionStore::for_session(&session);
+    store
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "provider", "model", None,
+        ))
+        .expect("initialize runtime identity");
+
+    assert!(session.file_path.exists());
+    assert!(store.path().exists());
+    let report = manager
+        .reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy {
+            protected_session_ids: Vec::new(),
+            max_entries: 64,
+            minimum_age: Duration::ZERO,
+        })
+        .expect("reconciliation must preserve transcript-owned sidecar");
+    assert_eq!(report.removed_sets, 0);
+    assert!(store.path().exists());
+
+    manager
+        .rollback_session_artifacts(&session)
+        .expect("rollback complete deferred ownership");
+    assert!(!session.file_path.exists());
+    assert!(!store.path().exists());
+}
+
+#[test]
+fn jsonl_transcript_prevents_orphan_sidecar_deletion() {
+    let dir = tempdir().expect("create temporary directory");
+    let sessions = dir.path().join("sessions");
+    let workspace = sessions.join("workspace");
+    fs::create_dir_all(&workspace).expect("create workspace");
+    let manager = SessionManager::with_dir(sessions);
+    let id = Uuid::new_v4();
+    let jsonl = workspace.join(format!("{id}.jsonl"));
+    let sqlite = workspace.join(format!("{id}.pending.sqlite"));
+    fs::write(&jsonl, b"{}\n").expect("write JSONL transcript");
+    Connection::open(&sqlite).expect("create sidecar");
+
+    let report = manager
+        .reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy {
+            protected_session_ids: Vec::new(),
+            max_entries: 64,
+            minimum_age: Duration::ZERO,
+        })
+        .expect("reconcile JSONL-owned sidecar");
+    assert_eq!(report.removed_sets, 0);
+    assert!(jsonl.exists());
+    assert!(sqlite.exists());
+}
+
+#[test]
+fn orphan_scan_budget_counts_unrelated_directory_entries() {
+    let dir = tempdir().expect("create temporary directory");
+    let sessions = dir.path().join("sessions");
+    let workspace = sessions.join("workspace");
+    fs::create_dir_all(&workspace).expect("create workspace");
+    let manager = SessionManager::with_dir(sessions);
+    for index in 0..32 {
+        fs::write(workspace.join(format!("unrelated-{index}")), b"noise")
+            .expect("write unrelated directory entry");
+    }
+
+    let report = manager
+        .reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy {
+            protected_session_ids: Vec::new(),
+            max_entries: 3,
+            minimum_age: Duration::ZERO,
+        })
+        .expect("bounded reconciliation");
+    assert_eq!(report.scanned_entries, 3);
+    assert!(report.bounded);
+    assert_eq!(report.removed_sets, 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn unix_sidecar_permission_failure_keeps_transcript_and_retry_succeeds() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempdir().expect("create temporary directory");
+    let sessions = dir.path().join("sessions");
+    let manager = SessionManager::with_dir(sessions.clone());
+    let session = manager
+        .create_session("permission", "/workspace")
+        .expect("create Session");
+    let store = talos_session::PendingSubmissionStore::for_session(&session);
+    store
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "provider", "model", None,
+        ))
+        .expect("create sidecar");
+    let parent = session.file_path.parent().expect("Session parent");
+    let original = fs::metadata(parent).expect("parent metadata").permissions();
+    let mut blocked = original.clone();
+    blocked.set_mode(0o500);
+    fs::set_permissions(parent, blocked).expect("block directory deletion");
+
+    let first = manager.delete_session(&session.id);
+    fs::set_permissions(parent, original).expect("restore directory permissions");
+    let error = first.expect_err("permission boundary must reject cleanup");
+    assert!(error.to_string().contains("retryable=true"));
+    assert!(session.file_path.exists());
+
+    manager
+        .delete_session(&session.id)
+        .expect("retry succeeds after restoring permissions");
+    assert!(!session.file_path.exists());
+    assert!(!store.path().exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_open_sqlite_handle_keeps_transcript_and_retry_succeeds() {
+    let dir = tempdir().expect("create temporary directory");
+    let manager = SessionManager::with_dir(dir.path().join("sessions"));
+    let session = manager
+        .create_session("windows-handle", "/workspace")
+        .expect("create Session");
+    let store = talos_session::PendingSubmissionStore::for_session(&session);
+    store
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "provider", "model", None,
+        ))
+        .expect("create sidecar");
+    let connection = Connection::open(store.path()).expect("open live SQLite handle");
+    connection
+        .execute_batch("BEGIN EXCLUSIVE;")
+        .expect("hold exclusive SQLite ownership");
+
+    let error = manager
+        .delete_session(&session.id)
+        .expect_err("Windows open handle must block artifact cleanup");
+    assert!(error.to_string().contains("retryable=true"));
+    assert!(session.file_path.exists());
+
+    connection
+        .execute_batch("ROLLBACK;")
+        .expect("release SQLite lock");
+    drop(connection);
+    manager
+        .delete_session(&session.id)
+        .expect("retry succeeds after closing SQLite handle");
+    assert!(!session.file_path.exists());
+    assert!(!store.path().exists());
+}

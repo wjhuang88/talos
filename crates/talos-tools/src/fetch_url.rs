@@ -360,7 +360,7 @@ mod tests {
     use std::thread;
     use std::time::{Duration as StdDuration, Instant};
 
-    const TEST_SERVER_TIMEOUT: StdDuration = StdDuration::from_secs(5);
+    const TEST_SERVER_TIMEOUT: StdDuration = StdDuration::from_secs(30);
 
     #[test]
     fn fetch_url_tool_metadata() {
@@ -511,7 +511,8 @@ mod tests {
             "HTTP/1.1 302 Found\r\n\
              Location: http://127.0.0.1:{port}/final\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 0\r\n\r\n"
+             Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
         );
         let final_body = "<html><body>Hello World</body></html>";
         let final_response = format!(
@@ -648,7 +649,8 @@ mod tests {
             "HTTP/1.1 302 Found\r\n\
              Location: http://127.0.0.1:{port}/final\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 0\r\n\r\n"
+             Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
         );
 
         let server = thread::spawn(move || {

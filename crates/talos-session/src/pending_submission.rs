@@ -1,5 +1,6 @@
 //! Durable, session-scoped custody for structured submissions (ADR-056).
 
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -162,6 +163,7 @@ impl PendingSubmissionStore {
         &self,
         identity: SessionRuntimeIdentity,
     ) -> Result<SessionRuntimeState, PendingSubmissionError> {
+        self.ensure_transcript_owner_marker()?;
         let _guard = self.guard()?;
         let mut connection = self.connection()?;
         let transaction = immediate(&mut connection)?;
@@ -707,6 +709,24 @@ impl PendingSubmissionStore {
         self.lock
             .lock()
             .map_err(|_| PendingSubmissionError::LockPoisoned)
+    }
+
+    fn ensure_transcript_owner_marker(&self) -> Result<(), PendingSubmissionError> {
+        if self.session_file.exists() {
+            return Ok(());
+        }
+        if let Some(parent) = self.session_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(self.session_file.as_ref())
+        {
+            Ok(_) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+            Err(error) => Err(error.into()),
+        }
     }
 
     fn connection(&self) -> Result<Connection, PendingSubmissionError> {

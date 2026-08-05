@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::SessionError;
 
-/// Default maximum number of recognized sidecar entries inspected in one pass.
+/// Default maximum number of filesystem directory entries inspected in one pass.
 pub const DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES: usize = 4_096;
 /// Default grace period before a transcript-less sidecar can be reconciled.
 pub const DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE: Duration = Duration::from_secs(300);
@@ -41,7 +41,7 @@ impl SessionArtifactCleanupReport {
 pub struct OrphanSidecarReconciliationPolicy {
     /// Session IDs that are live, deferred, or otherwise protected by a caller.
     pub protected_session_ids: Vec<Uuid>,
-    /// Maximum recognized sidecar directory entries inspected in this pass.
+    /// Maximum filesystem directory entries inspected in this pass.
     pub max_entries: usize,
     /// Minimum age required before a transcript-less sidecar can be removed.
     pub minimum_age: Duration,
@@ -71,7 +71,7 @@ pub struct OrphanSidecarFailure {
 /// Result of scanning Session roots for transcript-less pending SQLite artifacts.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrphanSidecarReconciliationReport {
-    /// Number of recognized sidecar directory entries inspected.
+    /// Number of filesystem directory entries inspected, including unrelated names.
     pub scanned_entries: usize,
     /// Number of complete orphan sets for which at least one artifact was removed.
     pub removed_sets: usize,
@@ -287,6 +287,11 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
     let mut blocked: BTreeSet<(PathBuf, Uuid)> = BTreeSet::new();
 
     'workspaces: for workspace_entry in fs::read_dir(&canonical_root)? {
+        if report.scanned_entries >= limit {
+            report.bounded = true;
+            break;
+        }
+        report.scanned_entries = report.scanned_entries.saturating_add(1);
         let workspace_entry = workspace_entry?;
         let metadata = fs::symlink_metadata(workspace_entry.path())?;
         if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
@@ -297,6 +302,11 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
             continue;
         }
         for entry in fs::read_dir(&workspace)? {
+            if report.scanned_entries >= limit {
+                report.bounded = true;
+                break 'workspaces;
+            }
+            report.scanned_entries = report.scanned_entries.saturating_add(1);
             let entry = entry?;
             let name = entry.file_name();
             let Some(name) = name.to_str() else {
@@ -305,11 +315,6 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
             let Some(id) = parse_sidecar_session_id(name) else {
                 continue;
             };
-            if report.scanned_entries >= limit {
-                report.bounded = true;
-                break 'workspaces;
-            }
-            report.scanned_entries = report.scanned_entries.saturating_add(1);
             let key = (workspace.clone(), id);
             if fs::symlink_metadata(entry.path()).is_ok_and(|value| value.file_type().is_symlink())
             {
