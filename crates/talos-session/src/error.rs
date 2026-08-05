@@ -11,13 +11,37 @@ pub enum SessionError {
     IoError(#[from] std::io::Error),
 
     /// Removing one artifact from a Session-owned artifact set failed.
-    #[error("failed to remove session artifact {path}: {source}")]
+    #[error(
+        "failed to remove session artifact {path}: {source}; removed={removed:?}; remaining={remaining:?}; retryable=true"
+    )]
     ArtifactCleanup {
         /// Exact artifact path whose removal failed.
         path: PathBuf,
         /// Underlying filesystem failure.
         #[source]
         source: std::io::Error,
+        /// Paths already removed before the failure.
+        removed: Vec<PathBuf>,
+        /// Paths still present and safe to retry.
+        remaining: Vec<PathBuf>,
+    },
+
+    /// Session index cleanup failed while the transcript remained discoverable.
+    #[error("failed to remove Session {session_id} from the index: {message}")]
+    IndexCleanup {
+        /// Session whose supplementary index/fork rows could not be removed.
+        session_id: Uuid,
+        /// Content-free index diagnostic.
+        message: String,
+    },
+
+    /// Orphan-sidecar validation or SQLite ownership probing failed.
+    #[error("failed to reconcile orphan Session sidecar {path}: {message}")]
+    OrphanReconciliation {
+        /// Exact validated sidecar path.
+        path: PathBuf,
+        /// Content-free validation or SQLite diagnostic.
+        message: String,
     },
 
     /// A line in the JSONL file is not valid JSON.

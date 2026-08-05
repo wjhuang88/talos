@@ -4,7 +4,10 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use talos_core::tool::ToolNature;
 use talos_permission::{PermissionDecision, PermissionEngine};
-use talos_session::{SessionCleanupCandidate, SessionCleanupPolicy, SessionManager};
+use talos_session::{
+    OrphanSidecarReconciliationPolicy, SessionCleanupCandidate, SessionCleanupPolicy,
+    SessionManager,
+};
 
 /// CLI subcommands for local storage visibility and maintenance.
 #[derive(Subcommand, Clone)]
@@ -264,6 +267,29 @@ fn run_storage_maintenance(args: &MaintenanceArgs) -> Result<()> {
                 if fixed == 1 { "y" } else { "ies" }
             ),
             Err(e) => eprintln!("Session index reconcile failed: {e}"),
+        }
+        match manager.reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy::default()) {
+            Ok(report) => {
+                println!(
+                    "Session sidecars: scanned {}, removed {} set(s) / {} artifact(s) / {} byte(s), skipped {}, failures {}, bounded={}.",
+                    report.scanned_entries,
+                    report.removed_sets,
+                    report.removed_artifacts,
+                    report.bytes_removed,
+                    report.skipped_sets,
+                    report.failures.len(),
+                    report.bounded,
+                );
+                for failure in report.failures {
+                    eprintln!(
+                        "Session sidecar reconcile failed for {} at {}: {}",
+                        failure.session_id,
+                        failure.path.display(),
+                        failure.error,
+                    );
+                }
+            }
+            Err(e) => eprintln!("Session sidecar reconcile failed: {e}"),
         }
     }
 

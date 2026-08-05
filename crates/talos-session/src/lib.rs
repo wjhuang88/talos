@@ -30,6 +30,7 @@
 //! Entries without `id` or `parent_id` fields (from older JSONL files) are treated
 //! as part of a single linear branch. They are assigned synthetic IDs on load.
 
+mod artifacts;
 mod compact_text;
 pub mod compaction_engine;
 mod compression;
@@ -53,6 +54,12 @@ pub use tool_compression::{ToolOutputCompression, compress_tool_output};
 mod turn_outcome;
 mod types;
 
+pub use artifacts::{
+    DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES, DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE, OrphanSidecarFailure,
+    OrphanSidecarReconciliationPolicy, OrphanSidecarReconciliationReport,
+    SessionArtifactCleanupReport, remove_session_artifacts_for_transcript,
+    remove_session_sidecars_for_transcript, remove_session_transcript,
+};
 pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};
 pub use durable::{
     DurableSession, DurableTranscriptEntry, PersistencePolicy, SessionCapabilities, TurnCommit,
@@ -60,7 +67,6 @@ pub use durable::{
 pub use error::SessionError;
 pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
-    remove_session_artifacts_for_transcript,
 };
 pub use pending_submission::{
     PendingSubmissionError, PendingSubmissionRecord, PendingSubmissionStore,
