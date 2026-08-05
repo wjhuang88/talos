@@ -1,0 +1,128 @@
+name: I169 reconciliation and Windows remediation
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i169-reconciliation-windows-remediation
+  cancel-in-progress: false
+
+jobs:
+  verify-linux:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 HEAD
+          test -z "$(git diff --name-only ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 -- crates/talos-session crates/talos-tools)"
+          python3 .github/i169_reconciliation_windows_patch.py
+          cargo fmt --all
+          git diff --check
+      - name: Verify Linux lifecycle and network tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p talos-session --locked --test i169_session_artifact_cleanup --no-fail-fast
+          cargo test -p talos-session --locked --no-fail-fast
+          cargo test -p talos-tools --locked --lib fetch_url::tests::redirect_diagnostics_shows_final_url -- --exact --nocapture
+          cargo test -p talos-tools --locked --lib --no-fail-fast
+          cargo clippy -p talos-session -p talos-tools --all-targets --locked -- -D warnings
+
+  verify-windows:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Apply exact patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git merge-base --is-ancestor ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $changed = git diff --name-only ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 -- crates/talos-session crates/talos-tools
+          if ($changed) { throw "unexpected source changes before patch: $changed" }
+          python .github/i169_reconciliation_windows_patch.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Windows SQLite handle lifecycle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo test -p talos-session --locked --test i169_session_artifact_cleanup --no-fail-fast
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Repeat Windows redirect boundary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          1..20 | ForEach-Object {
+            Write-Host "redirect repetition $_/20"
+            cargo test -p talos-tools --locked --lib fetch_url::tests::redirect_diagnostics_shows_final_url -- --exact --nocapture
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Verify Windows talos-tools library
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo test -p talos-tools --locked --lib --no-fail-fast
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy -p talos-session -p talos-tools --all-targets --locked -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  publish-clean-head:
+    needs: [verify-linux, verify-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          components: rustfmt
+      - name: Reapply verified patch and publish clean head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          python3 .github/i169_reconciliation_windows_patch.py
+          cargo fmt --all
+          rm -f \
+            .github/workflows/i169-reconciliation-windows-remediation.yml \
+            .github/i169_reconciliation_windows_patch.py
+          git diff --check
+          test "$(find .github/workflows -maxdepth 1 -type f -name 'i169-*' | wc -l)" -eq 0
+          test ! -e .github/i169_reconciliation_windows_patch.py
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A -- .github crates/talos-session crates/talos-tools
+          git commit -m "fix(session): bound reconciliation and harden Windows tests"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
