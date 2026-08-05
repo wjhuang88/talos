@@ -1,7 +1,8 @@
 //! Session-owned transcript and pending-submission artifact lifecycle.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use crate::SessionError;
 pub const DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES: usize = 4_096;
 /// Default grace period before a transcript-less sidecar can be reconciled.
 pub const DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE: Duration = Duration::from_secs(300);
+const ORPHAN_SIDECAR_SCAN_STATE_FILE: &str = ".orphan-sidecar-scan-budget";
 
 /// Successful deletion details for one Session-owned artifact operation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -272,6 +274,73 @@ fn sqlite_sidecar_is_busy(path: &Path) -> Result<bool, SessionError> {
     }
 }
 
+fn orphan_scan_state_path(canonical_root: &Path) -> PathBuf {
+    canonical_root.join(ORPHAN_SIDECAR_SCAN_STATE_FILE)
+}
+
+fn read_orphan_scan_limit(canonical_root: &Path, base_limit: usize) -> Result<usize, SessionError> {
+    let state_path = orphan_scan_state_path(canonical_root);
+    match fs::symlink_metadata(&state_path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.file_type().is_file() => {
+            return Err(SessionError::OrphanReconciliation {
+                path: state_path,
+                message: "scan continuation state must be a regular file".to_string(),
+            });
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(base_limit),
+        Err(error) => return Err(error.into()),
+    }
+
+    let persisted = fs::read_to_string(&state_path)?
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .filter(|value| *value > 0);
+    match persisted {
+        Some(limit) => Ok(limit.max(base_limit)),
+        None => {
+            fs::remove_file(&state_path)?;
+            Ok(base_limit)
+        }
+    }
+}
+
+fn persist_next_orphan_scan_limit(
+    canonical_root: &Path,
+    current_limit: usize,
+) -> Result<(), SessionError> {
+    let state_path = orphan_scan_state_path(canonical_root);
+    if fs::symlink_metadata(&state_path)
+        .is_ok_and(|metadata| metadata.file_type().is_symlink() || !metadata.file_type().is_file())
+    {
+        return Err(SessionError::OrphanReconciliation {
+            path: state_path,
+            message: "scan continuation state must be a regular file".to_string(),
+        });
+    }
+    let next_limit = current_limit
+        .saturating_mul(2)
+        .max(current_limit.saturating_add(1));
+    let mut state = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&state_path)?;
+    writeln!(state, "{next_limit}")?;
+    state.sync_all()?;
+    Ok(())
+}
+
+fn clear_orphan_scan_limit(canonical_root: &Path) -> Result<(), SessionError> {
+    let state_path = orphan_scan_state_path(canonical_root);
+    match fs::remove_file(state_path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 pub(crate) fn reconcile_orphan_sidecars_in_root(
     sessions_dir: &Path,
     policy: &OrphanSidecarReconciliationPolicy,
@@ -282,17 +351,21 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
     }
     let canonical_root = sessions_dir.canonicalize()?;
     let protected: HashSet<Uuid> = policy.protected_session_ids.iter().copied().collect();
-    let limit = policy.max_entries.max(1);
+    let base_limit = policy.max_entries.max(1);
+    let limit = read_orphan_scan_limit(&canonical_root, base_limit)?;
     let mut sets: BTreeMap<(PathBuf, Uuid), SessionArtifactSet> = BTreeMap::new();
     let mut blocked: BTreeSet<(PathBuf, Uuid)> = BTreeSet::new();
 
     'workspaces: for workspace_entry in fs::read_dir(&canonical_root)? {
+        let workspace_entry = workspace_entry?;
+        if workspace_entry.file_name().to_str() == Some(ORPHAN_SIDECAR_SCAN_STATE_FILE) {
+            continue;
+        }
         if report.scanned_entries >= limit {
             report.bounded = true;
             break;
         }
         report.scanned_entries = report.scanned_entries.saturating_add(1);
-        let workspace_entry = workspace_entry?;
         let metadata = fs::symlink_metadata(workspace_entry.path())?;
         if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
             continue;
@@ -374,6 +447,12 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
                 error: error.to_string(),
             }),
         }
+    }
+
+    if report.bounded {
+        persist_next_orphan_scan_limit(&canonical_root, limit)?;
+    } else {
+        clear_orphan_scan_limit(&canonical_root)?;
     }
 
     Ok(report)

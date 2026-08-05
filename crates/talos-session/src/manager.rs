@@ -98,6 +98,12 @@ impl SessionManager {
         }
         match manager.reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy::default()) {
             Ok(report) => {
+                if report.bounded {
+                    eprintln!(
+                        "Session orphan-sidecar reconciliation reached its safety bound after scanning {} entries; continuation state was saved. Run `talos storage maintenance --reconcile` to continue.",
+                        report.scanned_entries,
+                    );
+                }
                 for failure in report.failures {
                     eprintln!(
                         "Session orphan-sidecar reconciliation failed for {} at {}: {}",

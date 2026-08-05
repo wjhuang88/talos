@@ -217,3 +217,19 @@ fn tui_startup_honors_cli_fork_selection() {
         "TUI startup must route --fork through the durable Session clone path"
     );
 }
+
+#[test]
+fn cleanup_recovery_instructions_match_the_real_command_surface() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let handlers = fs::read_to_string(crate_root.join("src/session_handlers.rs"))
+        .expect("read Session handlers");
+    let setup =
+        fs::read_to_string(crate_root.join("src/session_setup.rs")).expect("read Session setup");
+    let combined = format!("{handlers}\n{setup}");
+
+    assert!(combined.contains("talos storage maintenance --reconcile"));
+    assert!(handlers.contains("/delete <session-uuid>"));
+    assert!(!combined.contains("talos --storage-maintenance"));
+    assert!(!combined.contains("--storage-maintenance --reconcile"));
+    assert!(!combined.contains("via --delete"));
+}

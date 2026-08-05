@@ -36,7 +36,7 @@ pub(crate) fn emit_session_identity_after_queue_clear(
     let _ = ui_tx.send(UiOutput::SessionIdentity { id: session_id });
 }
 
-fn rollback_owned_session_message(
+pub(crate) fn rollback_owned_session_message(
     session_manager: &talos_session::SessionManager,
     session: &talos_session::Session,
     operation: &str,
@@ -50,9 +50,24 @@ fn rollback_owned_session_message(
             report.removed_artifacts, report.bytes_removed,
         ),
         Err(cleanup_error) => format!(
-            "[Error] {operation}: {primary_error}. Cleanup also failed for Session {session_id} at {transcript}: {cleanup_error}. Cleanup is retryable: close open SQLite handles, retry /delete {session_id} while the transcript remains discoverable, or run talos --storage-maintenance --reconcile for a transcript-less sidecar.\n"
+            "[Error] {operation}: {primary_error}. Cleanup also failed for Session {session_id} at {transcript}: {cleanup_error}. Cleanup is retryable: close open SQLite handles, retry /delete {session_id} while the transcript remains discoverable, or run talos storage maintenance --reconcile for a transcript-less sidecar.\n"
         ),
     }
+}
+
+fn resolve_session_delete_target<'a>(
+    sessions: &'a [talos_session::SessionInfo],
+    argument: &str,
+) -> Option<&'a talos_session::SessionInfo> {
+    if let Ok(ordinal) = argument.parse::<usize>()
+        && ordinal >= 1
+        && ordinal <= sessions.len()
+    {
+        return sessions.get(ordinal - 1);
+    }
+
+    let session_id = uuid::Uuid::parse_str(argument).ok()?;
+    sessions.iter().find(|session| session.id == session_id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -119,15 +134,12 @@ pub(crate) async fn handle_session_delete(
             sessions.retain(|s| s.id != active_id);
             sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
 
-            let target = match arg.parse::<usize>() {
-                Ok(n) if n >= 1 && n <= sessions.len() => &sessions[n - 1],
-                _ => {
-                    let text = format!(
-                        "[Error] Invalid selection '{arg}'. Use /delete to pick a session.\n"
-                    );
-                    send_stream(ui_tx, MessageSource::Error, text);
-                    return;
-                }
+            let Some(target) = resolve_session_delete_target(&sessions, arg) else {
+                let text = format!(
+                    "[Error] Invalid selection '{arg}'. Use /delete to pick a session or /delete <session-uuid>.\n"
+                );
+                send_stream(ui_tx, MessageSource::Error, text);
+                return;
             };
 
             let target_id = target.id;
@@ -1535,5 +1547,83 @@ mod tests {
                 Some("https://provider-b.invalid/v1")
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod cleanup_recovery_command_tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn storage_reconcile_instruction_parses_on_the_real_cli_surface() {
+        let cli = crate::Cli::try_parse_from(["talos", "storage", "maintenance", "--reconcile"])
+            .expect("emitted storage maintenance instruction must parse");
+
+        match cli.command {
+            Some(crate::TalosCommand::Storage {
+                command:
+                    crate::storage::StorageCommand::Maintenance {
+                        checkpoint,
+                        vacuum,
+                        reconcile,
+                    },
+            }) => {
+                assert!(!checkpoint);
+                assert!(!vacuum);
+                assert!(reconcile);
+            }
+            _ => panic!("emitted instruction must select storage maintenance reconcile"),
+        }
+    }
+
+    #[tokio::test]
+    async fn cleanup_failure_instructions_parse_and_execute() {
+        let temp = tempfile::tempdir().expect("create cleanup recovery fixture");
+        let sessions_dir = temp.path().join("sessions");
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("create workspace");
+        let workspace_root = canonical_workspace_root(&workspace);
+        let manager = talos_session::SessionManager::with_dir(sessions_dir);
+        let active = manager
+            .create_session("active", &workspace_root)
+            .expect("create active Session");
+        let target = manager
+            .create_session("target", &workspace_root)
+            .expect("create target Session");
+
+        let sidecar = target
+            .file_path
+            .with_file_name(format!("{}.pending.sqlite", target.id));
+        std::fs::create_dir(&sidecar).expect("create blocked sidecar path");
+        std::fs::write(sidecar.join("held"), b"held").expect("hold sidecar path");
+
+        let diagnostic = rollback_owned_session_message(
+            &manager,
+            &target,
+            "forced runtime construction failure",
+            "primary failure",
+        );
+        assert!(diagnostic.contains(&format!("/delete {}", target.id)));
+        assert!(diagnostic.contains("talos storage maintenance --reconcile"));
+        assert!(!diagnostic.contains("--storage-maintenance"));
+        assert!(target.file_path.exists());
+
+        std::fs::remove_file(sidecar.join("held")).expect("release sidecar path");
+        std::fs::remove_dir(&sidecar).expect("remove blocked sidecar directory");
+
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (_active_tx, active_rx) = tokio::sync::watch::channel(active.clone());
+        handle_session_delete(
+            &ui_tx,
+            &workspace,
+            &manager,
+            &active_rx,
+            Some(target.id.to_string()),
+        )
+        .await;
+
+        assert!(manager.get_session(&target.id).is_err());
+        assert!(manager.get_session(&active.id).is_ok());
     }
 }

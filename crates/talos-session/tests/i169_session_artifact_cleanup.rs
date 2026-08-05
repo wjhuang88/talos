@@ -522,3 +522,58 @@ fn windows_open_sqlite_handle_keeps_transcript_and_retry_succeeds() {
     assert!(!session.file_path.exists());
     assert!(!store.path().exists());
 }
+
+#[test]
+fn bounded_orphan_scan_eventually_covers_a_finite_root() {
+    let dir = tempdir().expect("create temporary directory");
+    let sessions = dir.path().join("sessions");
+    let workspace = sessions.join("workspace");
+    fs::create_dir_all(&workspace).expect("create workspace");
+    let manager = SessionManager::with_dir(sessions.clone());
+
+    for index in 0..24 {
+        fs::write(
+            workspace.join(format!("unrelated-{index:02}.txt")),
+            b"unrelated",
+        )
+        .expect("write unrelated prefix entry");
+    }
+    let orphan_id = Uuid::new_v4();
+    let orphan = workspace.join(format!("{orphan_id}.pending.sqlite-wal"));
+    fs::write(&orphan, b"wal").expect("write eventual orphan");
+
+    let policy = OrphanSidecarReconciliationPolicy {
+        protected_session_ids: Vec::new(),
+        max_entries: 2,
+        minimum_age: Duration::ZERO,
+    };
+    let mut saw_bounded = false;
+    let mut max_scanned = 0usize;
+    let mut exhausted = false;
+    for _ in 0..8 {
+        let report = manager
+            .reconcile_orphan_sidecars(&policy)
+            .expect("bounded continuation pass");
+        saw_bounded |= report.bounded;
+        max_scanned = max_scanned.max(report.scanned_entries);
+        if !report.bounded {
+            exhausted = true;
+            break;
+        }
+    }
+
+    assert!(saw_bounded, "the small initial budget must remain bounded");
+    assert!(
+        max_scanned > policy.max_entries,
+        "persisted continuation must expand later bounded passes"
+    );
+    assert!(exhausted, "a finite root must eventually be fully scanned");
+    assert!(
+        !orphan.exists(),
+        "the valid orphan must eventually be reached"
+    );
+    assert!(
+        !sessions.join(".orphan-sidecar-scan-budget").exists(),
+        "exhaustive completion resets continuation state"
+    );
+}

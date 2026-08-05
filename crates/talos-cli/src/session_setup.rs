@@ -427,7 +427,7 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
                 report.bytes_removed,
             )),
             Err(cleanup_error) => Err(anyhow!(
-                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; cleanup also failed: {cleanup_error}; cleanup is retryable after closing open SQLite handles via --delete or --storage-maintenance --reconcile",
+                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; cleanup also failed: {cleanup_error}; cleanup is retryable after closing open SQLite handles via `/delete {new_id}` in the TUI while the transcript remains discoverable, or `talos storage maintenance --reconcile` for a transcript-less sidecar",
                 new_file_path.display(),
             )),
         },

@@ -280,6 +280,11 @@ fn run_storage_maintenance(args: &MaintenanceArgs) -> Result<()> {
                     report.failures.len(),
                     report.bounded,
                 );
+                if report.bounded {
+                    println!(
+                        "Session sidecar scan reached its safety bound; continuation state was saved. Run `talos storage maintenance --reconcile` again to continue."
+                    );
+                }
                 for failure in report.failures {
                     eprintln!(
                         "Session sidecar reconcile failed for {} at {}: {}",
