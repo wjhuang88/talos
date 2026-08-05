@@ -197,3 +197,23 @@ fn every_production_provider_root_installs_the_shared_request_budget() {
         );
     }
 }
+
+#[test]
+fn tui_startup_honors_cli_fork_selection() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = fs::read_to_string(crate_root.join("src/mode_runners.rs"))
+        .expect("read TUI composition root")
+        .replace("\r\n", "\n");
+    let call_start = source
+        .find("let session = resolve_session_for_workspace(")
+        .expect("TUI Session selection call");
+    let call_end = call_start
+        + source[call_start..]
+            .find(")?;")
+            .expect("TUI Session selection call end");
+    let call = &source[call_start..call_end];
+    assert!(
+        call.contains("ResumeSelection::Latest,\n        true,"),
+        "TUI startup must route --fork through the durable Session clone path"
+    );
+}

@@ -223,7 +223,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         &display_name,
         &cli,
         ResumeSelection::Latest,
-        false,
+        true,
     )?;
     reconcile_session_runtime_state(&session)?;
     apply_session_model_to_config(&mut config, &session);
