@@ -1,0 +1,44 @@
+name: I169 review evidence
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+    paths:
+      - scripts/i169_review_evidence.py
+      - .github/workflows/i169-review-evidence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Apply evidence patch
+        run: python3 scripts/i169_review_evidence.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Targeted regressions
+        run: |
+          cargo test -p talos-agent production_shell_compression_predicate_covers_bash_and_powershell_only --locked
+          cargo test -p talos-session --test i169_session_artifact_cleanup --locked
+      - name: Strict affected-crate Clippy
+        run: cargo clippy -p talos-agent -p talos-session --all-targets --locked -- -D warnings
+      - name: Publish reviewed source and remove helper
+        shell: bash
+        run: |
+          rm scripts/i169_review_evidence.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/talos-agent/src/lib.rs crates/talos-session/src/error.rs crates/talos-session/src/manager.rs crates/talos-session/tests/i169_session_artifact_cleanup.rs scripts/i169_review_evidence.py
+          git commit -m "test(i169): close cleanup and PowerShell evidence gaps"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
