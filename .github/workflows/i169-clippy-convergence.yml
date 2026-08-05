@@ -42,6 +42,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/i169-clippy-convergence.py')
+          text = path.read_text()
+          start = text.index('# Remove the superseded non-activation quiesce path.')
+          end = text.index('# Remove construction state that is no longer consumed', start)
+          replacement = '''# Keep the legacy marker compatibility boundary test-only. Production model\n# activation uses quiesce_same_session_for_activation exclusively.\npath = Path("crates/talos-cli/src/session_transition.rs")\ntext = path.read_text()\nneedle = "    pub async fn quiesce_same_session("\nif "    #[cfg(test)]\\n" + needle not in text:\n    if needle not in text:\n        raise RuntimeError("quiesce_same_session compatibility boundary not found")\n    text = text.replace(needle, "    #[cfg(test)]\\n" + needle, 1)\npath.write_text(text)\n\n'''
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
           python3 .github/i169-clippy-convergence.py
           set +e
           cargo clippy --fix --workspace --all-targets --locked --allow-dirty --allow-staged -- -D warnings
