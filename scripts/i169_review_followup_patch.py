@@ -254,8 +254,8 @@ replace_once(
 )
 replace_once(
     "crates/talos-session/src/artifacts.rs",
-    "\n    Ok(report)\n}\n",
-    "\n    if report.bounded {\n        persist_next_orphan_scan_limit(&canonical_root, limit)?;\n    } else {\n        clear_orphan_scan_limit(&canonical_root)?;\n    }\n\n    Ok(report)\n}\n",
+    "            Err(error) => report.failures.push(OrphanSidecarFailure {\n                session_id: id,\n                path: set.sqlite,\n                error: error.to_string(),\n            }),\n        }\n    }\n\n    Ok(report)\n}\n",
+    "            Err(error) => report.failures.push(OrphanSidecarFailure {\n                session_id: id,\n                path: set.sqlite,\n                error: error.to_string(),\n            }),\n        }\n    }\n\n    if report.bounded {\n        persist_next_orphan_scan_limit(&canonical_root, limit)?;\n    } else {\n        clear_orphan_scan_limit(&canonical_root)?;\n    }\n\n    Ok(report)\n}\n",
 )
 
 replace_once(
