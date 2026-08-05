@@ -31,6 +31,6 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git rm scripts/i169_review_remediation.py
-          git add crates/talos-session/src/manager.rs crates/talos-session/tests/i169_session_artifact_cleanup.rs crates/talos-cli/src/session_handlers.rs crates/talos-agent/src/lib.rs
+          git add crates/talos-session/src/manager.rs crates/talos-session/src/lib.rs crates/talos-session/tests/i169_session_artifact_cleanup.rs crates/talos-cli/src/session_handlers.rs crates/talos-agent/src/lib.rs
           git commit -m "fix(i169): own complete session artifact lifecycle"
           git push origin HEAD:feat/i169-tui-044-transactional-steering
