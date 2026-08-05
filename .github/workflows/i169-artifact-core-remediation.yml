@@ -1,0 +1,972 @@
+name: I169 artifact lifecycle remediation
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i169-artifact-core-remediation
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Apply reviewed artifact ownership patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "0e529a31cc84a4511447567fc07d2098182ab7e1"
+
+          cat > crates/talos-session/src/artifacts.rs <<'EOF'
+          //! Session-owned transcript and pending-submission artifact lifecycle.
+
+          use std::collections::{BTreeMap, BTreeSet, HashSet};
+          use std::fs;
+          use std::path::{Path, PathBuf};
+          use std::time::Duration;
+
+          use rusqlite::{Connection, ErrorCode, OpenFlags};
+          use uuid::Uuid;
+
+          use crate::SessionError;
+
+          /// Default maximum number of recognized sidecar entries inspected in one pass.
+          pub const DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES: usize = 4_096;
+          /// Default grace period before a transcript-less sidecar can be reconciled.
+          pub const DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE: Duration = Duration::from_secs(300);
+
+          /// Successful deletion details for one Session-owned artifact operation.
+          #[derive(Debug, Clone, Default, PartialEq, Eq)]
+          pub struct SessionArtifactCleanupReport {
+              /// Number of files actually removed. Missing files do not increment this value.
+              pub removed_artifacts: usize,
+              /// Total bytes reported by filesystem metadata for removed files.
+              pub bytes_removed: u64,
+              /// Exact paths removed, in deletion order.
+              pub removed_paths: Vec<PathBuf>,
+          }
+
+          impl SessionArtifactCleanupReport {
+              pub(crate) fn merge(&mut self, other: Self) {
+                  self.removed_artifacts = self
+                      .removed_artifacts
+                      .saturating_add(other.removed_artifacts);
+                  self.bytes_removed = self.bytes_removed.saturating_add(other.bytes_removed);
+                  self.removed_paths.extend(other.removed_paths);
+              }
+          }
+
+          /// Safety policy for bounded orphan-sidecar reconciliation.
+          #[derive(Debug, Clone, PartialEq, Eq)]
+          pub struct OrphanSidecarReconciliationPolicy {
+              /// Session IDs that are live, deferred, or otherwise protected by a caller.
+              pub protected_session_ids: Vec<Uuid>,
+              /// Maximum recognized sidecar directory entries inspected in this pass.
+              pub max_entries: usize,
+              /// Minimum age required before a transcript-less sidecar can be removed.
+              pub minimum_age: Duration,
+          }
+
+          impl Default for OrphanSidecarReconciliationPolicy {
+              fn default() -> Self {
+                  Self {
+                      protected_session_ids: Vec::new(),
+                      max_entries: DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES,
+                      minimum_age: DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE,
+                  }
+              }
+          }
+
+          /// One reconciliation failure retained without aborting the whole bounded pass.
+          #[derive(Debug, Clone, PartialEq, Eq)]
+          pub struct OrphanSidecarFailure {
+              /// Session ID inferred from the strictly validated filename.
+              pub session_id: Uuid,
+              /// Exact SQLite sidecar path associated with the failed set.
+              pub path: PathBuf,
+              /// Content-free filesystem or SQLite diagnostic.
+              pub error: String,
+          }
+
+          /// Result of scanning Session roots for transcript-less pending SQLite artifacts.
+          #[derive(Debug, Clone, Default, PartialEq, Eq)]
+          pub struct OrphanSidecarReconciliationReport {
+              /// Number of recognized sidecar directory entries inspected.
+              pub scanned_entries: usize,
+              /// Number of complete orphan sets for which at least one artifact was removed.
+              pub removed_sets: usize,
+              /// Number of individual SQLite/WAL/SHM files removed.
+              pub removed_artifacts: usize,
+              /// Total bytes removed from orphan sidecars.
+              pub bytes_removed: u64,
+              /// Number of sets skipped due to safety checks or concurrent disappearance.
+              pub skipped_sets: usize,
+              /// Failures retained for diagnosis; other candidate sets are still processed.
+              pub failures: Vec<OrphanSidecarFailure>,
+              /// Whether the configured scan bound stopped the pass before exhaustion.
+              pub bounded: bool,
+          }
+
+          #[derive(Debug, Clone, PartialEq, Eq)]
+          struct SessionArtifactSet {
+              transcript: PathBuf,
+              sqlite: PathBuf,
+              wal: PathBuf,
+              shm: PathBuf,
+          }
+
+          impl SessionArtifactSet {
+              fn for_transcript(transcript: &Path) -> Result<Self, SessionError> {
+                  let extension = transcript.extension().and_then(|value| value.to_str());
+                  if !matches!(extension, Some("tlog" | "jsonl")) {
+                      return Err(SessionError::ParseError(format!(
+                          "invalid Session transcript extension: {}",
+                          transcript.display()
+                      )));
+                  }
+                  let stem = transcript
+                      .file_stem()
+                      .and_then(|value| value.to_str())
+                      .ok_or_else(|| {
+                          SessionError::ParseError(format!(
+                              "invalid Session transcript path: {}",
+                              transcript.display()
+                          ))
+                      })?;
+                  Uuid::parse_str(stem).map_err(|_| {
+                      SessionError::ParseError(format!(
+                          "Session transcript filename is not a UUID: {}",
+                          transcript.display()
+                      ))
+                  })?;
+                  let sqlite = transcript.with_file_name(format!("{stem}.pending.sqlite"));
+                  Ok(Self {
+                      transcript: transcript.to_path_buf(),
+                      wal: PathBuf::from(format!("{}-wal", sqlite.display())),
+                      shm: PathBuf::from(format!("{}-shm", sqlite.display())),
+                      sqlite,
+                  })
+              }
+
+              fn for_workspace(workspace: &Path, id: Uuid) -> Self {
+                  let sqlite = workspace.join(format!("{id}.pending.sqlite"));
+                  Self {
+                      transcript: workspace.join(format!("{id}.tlog")),
+                      wal: PathBuf::from(format!("{}-wal", sqlite.display())),
+                      shm: PathBuf::from(format!("{}-shm", sqlite.display())),
+                      sqlite,
+                  }
+              }
+
+              fn sidecars(&self) -> [PathBuf; 3] {
+                  [self.wal.clone(), self.shm.clone(), self.sqlite.clone()]
+              }
+          }
+
+          fn existing_paths(paths: &[PathBuf]) -> Vec<PathBuf> {
+              paths
+                  .iter()
+                  .filter(|path| fs::symlink_metadata(path).is_ok())
+                  .cloned()
+                  .collect()
+          }
+
+          fn remove_paths(paths: &[PathBuf]) -> Result<SessionArtifactCleanupReport, SessionError> {
+              let mut report = SessionArtifactCleanupReport::default();
+              for (index, path) in paths.iter().enumerate() {
+                  match fs::symlink_metadata(path) {
+                      Ok(metadata) => {
+                          if let Err(source) = fs::remove_file(path) {
+                              return Err(SessionError::ArtifactCleanup {
+                                  path: path.clone(),
+                                  source,
+                                  removed: report.removed_paths,
+                                  remaining: existing_paths(&paths[index..]),
+                              });
+                          }
+                          report.removed_artifacts = report.removed_artifacts.saturating_add(1);
+                          report.bytes_removed = report.bytes_removed.saturating_add(metadata.len());
+                          report.removed_paths.push(path.clone());
+                      }
+                      Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                      Err(source) => {
+                          return Err(SessionError::ArtifactCleanup {
+                              path: path.clone(),
+                              source,
+                              removed: report.removed_paths,
+                              remaining: existing_paths(&paths[index..]),
+                          });
+                      }
+                  }
+              }
+              Ok(report)
+          }
+
+          /// Removes WAL, SHM and pending SQLite in that order while retaining the transcript.
+          ///
+          /// A failure leaves the transcript discoverable so `/delete` or retention can retry.
+          pub fn remove_session_sidecars_for_transcript(
+              transcript_path: &Path,
+          ) -> Result<SessionArtifactCleanupReport, SessionError> {
+              let set = SessionArtifactSet::for_transcript(transcript_path)?;
+              remove_paths(&set.sidecars())
+          }
+
+          /// Removes only the transcript, the final discoverability commit point.
+          pub fn remove_session_transcript(
+              transcript_path: &Path,
+          ) -> Result<SessionArtifactCleanupReport, SessionError> {
+              let set = SessionArtifactSet::for_transcript(transcript_path)?;
+              remove_paths(&[set.transcript])
+          }
+
+          /// Removes the complete Session-owned filesystem set with transcript last.
+          pub fn remove_session_artifacts_for_transcript(
+              transcript_path: &Path,
+          ) -> Result<SessionArtifactCleanupReport, SessionError> {
+              let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
+              report.merge(remove_session_transcript(transcript_path)?);
+              Ok(report)
+          }
+
+          fn parse_sidecar_session_id(name: &str) -> Option<Uuid> {
+              [
+                  ".pending.sqlite-wal",
+                  ".pending.sqlite-shm",
+                  ".pending.sqlite",
+              ]
+              .iter()
+              .find_map(|suffix| name.strip_suffix(suffix))
+              .and_then(|stem| Uuid::parse_str(stem).ok())
+          }
+
+          fn path_is_symlink(path: &Path) -> bool {
+              fs::symlink_metadata(path)
+                  .is_ok_and(|metadata| metadata.file_type().is_symlink())
+          }
+
+          fn sidecars_are_old_enough(set: &SessionArtifactSet, minimum_age: Duration) -> bool {
+              set.sidecars()
+                  .iter()
+                  .filter_map(|path| fs::symlink_metadata(path).ok())
+                  .all(|metadata| {
+                      metadata
+                          .modified()
+                          .ok()
+                          .and_then(|modified| modified.elapsed().ok())
+                          .is_some_and(|age| age >= minimum_age)
+                  })
+          }
+
+          fn sqlite_sidecar_is_busy(path: &Path) -> Result<bool, SessionError> {
+              if !path.exists() {
+                  return Ok(false);
+              }
+              let connection = Connection::open_with_flags(
+                  path,
+                  OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+              )
+              .map_err(|error| SessionError::OrphanReconciliation {
+                  path: path.to_path_buf(),
+                  message: error.to_string(),
+              })?;
+              connection
+                  .busy_timeout(Duration::ZERO)
+                  .map_err(|error| SessionError::OrphanReconciliation {
+                      path: path.to_path_buf(),
+                      message: error.to_string(),
+                  })?;
+              match connection.execute_batch("BEGIN EXCLUSIVE; ROLLBACK;") {
+                  Ok(()) => Ok(false),
+                  Err(rusqlite::Error::SqliteFailure(failure, _))
+                      if matches!(
+                          failure.code,
+                          ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked
+                      ) =>
+                  {
+                      Ok(true)
+                  }
+                  Err(error) => Err(SessionError::OrphanReconciliation {
+                      path: path.to_path_buf(),
+                      message: error.to_string(),
+                  }),
+              }
+          }
+
+          pub(crate) fn reconcile_orphan_sidecars_in_root(
+              sessions_dir: &Path,
+              policy: &OrphanSidecarReconciliationPolicy,
+          ) -> Result<OrphanSidecarReconciliationReport, SessionError> {
+              let mut report = OrphanSidecarReconciliationReport::default();
+              if !sessions_dir.exists() {
+                  return Ok(report);
+              }
+              let canonical_root = sessions_dir.canonicalize()?;
+              let protected: HashSet<Uuid> =
+                  policy.protected_session_ids.iter().copied().collect();
+              let limit = policy.max_entries.max(1);
+              let mut sets: BTreeMap<(PathBuf, Uuid), SessionArtifactSet> = BTreeMap::new();
+              let mut blocked: BTreeSet<(PathBuf, Uuid)> = BTreeSet::new();
+
+              'workspaces: for workspace_entry in fs::read_dir(&canonical_root)? {
+                  let workspace_entry = workspace_entry?;
+                  let metadata = fs::symlink_metadata(workspace_entry.path())?;
+                  if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
+                      continue;
+                  }
+                  let workspace = workspace_entry.path().canonicalize()?;
+                  if !workspace.starts_with(&canonical_root) {
+                      continue;
+                  }
+                  for entry in fs::read_dir(&workspace)? {
+                      let entry = entry?;
+                      let name = entry.file_name();
+                      let Some(name) = name.to_str() else {
+                          continue;
+                      };
+                      let Some(id) = parse_sidecar_session_id(name) else {
+                          continue;
+                      };
+                      if report.scanned_entries >= limit {
+                          report.bounded = true;
+                          break 'workspaces;
+                      }
+                      report.scanned_entries = report.scanned_entries.saturating_add(1);
+                      let key = (workspace.clone(), id);
+                      if fs::symlink_metadata(entry.path())
+                          .is_ok_and(|value| value.file_type().is_symlink())
+                      {
+                          blocked.insert(key.clone());
+                      }
+                      sets.entry(key)
+                          .or_insert_with(|| SessionArtifactSet::for_workspace(&workspace, id));
+                  }
+              }
+
+              for ((workspace, id), set) in sets {
+                  if blocked.contains(&(workspace.clone(), id)) || protected.contains(&id) {
+                      report.skipped_sets = report.skipped_sets.saturating_add(1);
+                      continue;
+                  }
+                  let tlog = workspace.join(format!("{id}.tlog"));
+                  let jsonl = workspace.join(format!("{id}.jsonl"));
+                  if fs::symlink_metadata(&tlog).is_ok() || fs::symlink_metadata(&jsonl).is_ok() {
+                      report.skipped_sets = report.skipped_sets.saturating_add(1);
+                      continue;
+                  }
+                  if set.sidecars().iter().any(|path| path_is_symlink(path))
+                      || !sidecars_are_old_enough(&set, policy.minimum_age)
+                  {
+                      report.skipped_sets = report.skipped_sets.saturating_add(1);
+                      continue;
+                  }
+                  match sqlite_sidecar_is_busy(&set.sqlite) {
+                      Ok(true) => {
+                          report.skipped_sets = report.skipped_sets.saturating_add(1);
+                          continue;
+                      }
+                      Err(error) => {
+                          report.failures.push(OrphanSidecarFailure {
+                              session_id: id,
+                              path: set.sqlite.clone(),
+                              error: error.to_string(),
+                          });
+                          continue;
+                      }
+                      Ok(false) => {}
+                  }
+                  match remove_paths(&set.sidecars()) {
+                      Ok(cleanup) if cleanup.removed_artifacts > 0 => {
+                          report.removed_sets = report.removed_sets.saturating_add(1);
+                          report.removed_artifacts = report
+                              .removed_artifacts
+                              .saturating_add(cleanup.removed_artifacts);
+                          report.bytes_removed =
+                              report.bytes_removed.saturating_add(cleanup.bytes_removed);
+                      }
+                      Ok(_) => {
+                          report.skipped_sets = report.skipped_sets.saturating_add(1);
+                      }
+                      Err(error) => report.failures.push(OrphanSidecarFailure {
+                          session_id: id,
+                          path: set.sqlite,
+                          error: error.to_string(),
+                      }),
+                  }
+              }
+
+              Ok(report)
+          }
+          EOF
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"expected source block missing in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace(
+              "crates/talos-session/src/lib.rs",
+              "mod compact_text;\n",
+              "mod artifacts;\nmod compact_text;\n",
+          )
+          replace(
+              "crates/talos-session/src/lib.rs",
+              "pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};\n",
+              "pub use artifacts::{\n    DEFAULT_MAX_ORPHAN_SIDECAR_ENTRIES, DEFAULT_ORPHAN_SIDECAR_MINIMUM_AGE,\n    OrphanSidecarFailure, OrphanSidecarReconciliationPolicy,\n    OrphanSidecarReconciliationReport, SessionArtifactCleanupReport,\n    remove_session_artifacts_for_transcript, remove_session_sidecars_for_transcript,\n    remove_session_transcript,\n};\npub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};\n",
+          )
+          replace(
+              "crates/talos-session/src/lib.rs",
+              "pub use manager::{\n    SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,\n    remove_session_artifacts_for_transcript,\n};\n",
+              "pub use manager::{\n    SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,\n};\n",
+          )
+
+          manager = Path("crates/talos-session/src/manager.rs")
+          text = manager.read_text()
+          start = text.index("/// Remove the complete artifact set owned by one Session transcript path.\n")
+          end = text.index("/// Policy for selecting session cleanup candidates.\n")
+          text = text[:start] + text[end:]
+          text = text.replace(
+              "use crate::{DurableSession, Session, SessionError, SessionInfo};\n",
+              "use crate::{\n    DurableSession, OrphanSidecarReconciliationPolicy, OrphanSidecarReconciliationReport,\n    Session, SessionArtifactCleanupReport, SessionError, SessionInfo,\n    remove_session_sidecars_for_transcript, remove_session_transcript,\n};\n",
+              1,
+          )
+          old_delete = '''    #[allow(clippy::collapsible_if)]
+              pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
+                  let file_path = self.find_session_file(id)?;
+                  remove_session_artifacts_for_transcript(&file_path)?;
+                  crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
+                  if let Ok(mut guard) = self.get_or_create_index() {
+                      if let Some(index) = guard.as_mut() {
+                          let _ = index.delete_session(&id.to_string());
+                      }
+                  }
+                  Ok(())
+              }
+          '''.replace("              ", "")
+          new_delete = '''    /// Delete one discoverable Session through the retryable ownership boundary.
+              pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
+                  let file_path = self.find_session_file(id)?;
+                  self.remove_owned_session_artifacts(id, &file_path).map(|_| ())
+              }
+
+              /// Roll back all artifacts owned by a prepared or partially created Session.
+              ///
+              /// Unlike `delete_session`, this does not require the transcript to exist, so
+              /// post-identity initialization failures remain recoverable.
+              pub fn rollback_session_artifacts(
+                  &self,
+                  session: &Session,
+              ) -> Result<SessionArtifactCleanupReport, SessionError> {
+                  self.remove_owned_session_artifacts(&session.id, &session.file_path)
+              }
+
+              fn remove_owned_session_artifacts(
+                  &self,
+                  id: &Uuid,
+                  transcript_path: &Path,
+              ) -> Result<SessionArtifactCleanupReport, SessionError> {
+                  let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
+                  crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
+                  let mut guard = self.get_or_create_index().map_err(|error| {
+                      SessionError::IndexCleanup {
+                          session_id: *id,
+                          message: error.to_string(),
+                      }
+                  })?;
+                  if let Some(index) = guard.as_mut() {
+                      index.delete_session(&id.to_string()).map_err(|error| {
+                          SessionError::IndexCleanup {
+                              session_id: *id,
+                              message: error.to_string(),
+                          }
+                      })?;
+                  }
+                  report.merge(remove_session_transcript(transcript_path)?);
+                  Ok(report)
+              }
+
+              /// Discover and remove safe transcript-less pending SQLite artifacts.
+              pub fn reconcile_orphan_sidecars(
+                  &self,
+                  policy: &OrphanSidecarReconciliationPolicy,
+              ) -> Result<OrphanSidecarReconciliationReport, SessionError> {
+                  crate::artifacts::reconcile_orphan_sidecars_in_root(&self.sessions_dir, policy)
+              }
+          '''.replace("              ", "")
+          if old_delete not in text:
+              raise SystemExit("manager delete block changed unexpectedly")
+          text = text.replace(old_delete, new_delete, 1)
+          old_apply = '''        for candidate in &report.candidates {
+              let removed_bytes = remove_session_artifacts_for_transcript(&candidate.file_path)?;
+              if removed_bytes > 0 {
+                  report.removed += 1;
+                  report.bytes_removed = report.bytes_removed.saturating_add(removed_bytes);
+              }
+
+              if let Ok(mut guard) = self.get_or_create_index()
+                  && let Some(index) = guard.as_mut()
+              {
+                  let _ = index.delete_session(&candidate.id.to_string());
+              }
+          }
+          '''.replace("          ", "")
+          new_apply = '''        for candidate in &report.candidates {
+              let cleanup = self.remove_owned_session_artifacts(&candidate.id, &candidate.file_path)?;
+              report.removed = report.removed.saturating_add(1);
+              report.bytes_removed = report.bytes_removed.saturating_add(cleanup.bytes_removed);
+          }
+          '''.replace("          ", "")
+          if old_apply not in text:
+              raise SystemExit("manager apply_cleanup block changed unexpectedly")
+          text = text.replace(old_apply, new_apply, 1)
+          manager.write_text(text)
+
+          replace(
+              "crates/talos-session/src/error.rs",
+              '''    ArtifactCleanup {
+                  /// Exact artifact path whose removal failed.
+                  path: PathBuf,
+                  /// Underlying filesystem failure.
+                  #[source]
+                  source: std::io::Error,
+              },
+          '''.replace("          ", ""),
+              '''    ArtifactCleanup {
+                  /// Exact artifact path whose removal failed.
+                  path: PathBuf,
+                  /// Underlying filesystem failure.
+                  #[source]
+                  source: std::io::Error,
+                  /// Paths already removed before the failure.
+                  removed: Vec<PathBuf>,
+                  /// Paths still present and safe to retry.
+                  remaining: Vec<PathBuf>,
+              },
+
+              /// Session index cleanup failed while the transcript remained discoverable.
+              #[error("failed to remove Session {session_id} from the index: {message}")]
+              IndexCleanup {
+                  /// Session whose supplementary index/fork rows could not be removed.
+                  session_id: Uuid,
+                  /// Content-free index diagnostic.
+                  message: String,
+              },
+
+              /// Orphan-sidecar validation or SQLite ownership probing failed.
+              #[error("failed to reconcile orphan Session sidecar {path}: {message}")]
+              OrphanReconciliation {
+                  /// Exact validated sidecar path.
+                  path: PathBuf,
+                  /// Content-free validation or SQLite diagnostic.
+                  message: String,
+              },
+          '''.replace("          ", ""),
+          )
+          replace(
+              "crates/talos-session/src/error.rs",
+              '#[error("failed to remove session artifact {path}: {source}")]\n',
+              '#[error("failed to remove session artifact {path}: {source}; removed={removed:?}; remaining={remaining:?}; retryable=true")]\n',
+          )
+
+          storage = Path("crates/talos-cli/src/storage.rs")
+          text = storage.read_text()
+          text = text.replace(
+              "use talos_session::{SessionCleanupCandidate, SessionCleanupPolicy, SessionManager};\n",
+              "use talos_session::{\n    OrphanSidecarReconciliationPolicy, SessionCleanupCandidate, SessionCleanupPolicy,\n    SessionManager,\n};\n",
+              1,
+          )
+          old = '''    if args.reconcile {
+              match manager.reconcile_index() {
+                  Ok(fixed) => println!(
+                      "Session index: reconciled {fixed} entr{}.",
+                      if fixed == 1 { "y" } else { "ies" }
+                  ),
+                  Err(e) => eprintln!("Session index reconcile failed: {e}"),
+              }
+          }
+          '''.replace("          ", "")
+          new = '''    if args.reconcile {
+              match manager.reconcile_index() {
+                  Ok(fixed) => println!(
+                      "Session index: reconciled {fixed} entr{}.",
+                      if fixed == 1 { "y" } else { "ies" }
+                  ),
+                  Err(e) => eprintln!("Session index reconcile failed: {e}"),
+              }
+              match manager.reconcile_orphan_sidecars(
+                  &OrphanSidecarReconciliationPolicy::default(),
+              ) {
+                  Ok(report) => {
+                      println!(
+                          "Session sidecars: scanned {}, removed {} set(s) / {} artifact(s) / {} byte(s), skipped {}, failures {}, bounded={}.",
+                          report.scanned_entries,
+                          report.removed_sets,
+                          report.removed_artifacts,
+                          report.bytes_removed,
+                          report.skipped_sets,
+                          report.failures.len(),
+                          report.bounded,
+                      );
+                      for failure in report.failures {
+                          eprintln!(
+                              "Session sidecar reconcile failed for {} at {}: {}",
+                              failure.session_id,
+                              failure.path.display(),
+                              failure.error,
+                          );
+                      }
+                  }
+                  Err(e) => eprintln!("Session sidecar reconcile failed: {e}"),
+              }
+          }
+          '''.replace("          ", "")
+          if old not in text:
+              raise SystemExit("storage reconciliation block changed unexpectedly")
+          storage.write_text(text.replace(old, new, 1))
+          PY
+
+          cat > crates/talos-session/tests/i169_session_artifact_cleanup.rs <<'EOF'
+          use std::fs;
+          use std::time::Duration;
+
+          use rusqlite::Connection;
+          use talos_session::{
+              OrphanSidecarReconciliationPolicy, SessionCleanupPolicy, SessionManager,
+              remove_session_artifacts_for_transcript,
+          };
+          use tempfile::tempdir;
+          use uuid::Uuid;
+
+          fn artifact_paths(transcript: &std::path::Path) -> Vec<std::path::PathBuf> {
+              let stem = transcript
+                  .file_stem()
+                  .expect("fixture transcript should have a file stem")
+                  .to_string_lossy();
+              let sidecar = transcript.with_file_name(format!("{stem}.pending.sqlite"));
+              vec![
+                  transcript.to_path_buf(),
+                  sidecar.clone(),
+                  std::path::PathBuf::from(format!("{}-wal", sidecar.display())),
+                  std::path::PathBuf::from(format!("{}-shm", sidecar.display())),
+              ]
+          }
+
+          fn create_set(transcript: &std::path::Path) -> Vec<std::path::PathBuf> {
+              let paths = artifact_paths(transcript);
+              fs::write(&paths[0], b"transcript").expect("write transcript fixture");
+              fs::write(&paths[1], b"sensitive submission and /private/image.png")
+                  .expect("write pending sidecar fixture");
+              fs::write(&paths[2], b"wal").expect("write WAL fixture");
+              fs::write(&paths[3], b"shm").expect("write SHM fixture");
+              paths
+          }
+
+          #[test]
+          fn complete_artifact_boundary_removes_sidecars_before_transcript() {
+              let dir = tempdir().expect("create temporary directory");
+              let transcript = dir.path().join(format!("{}.tlog", Uuid::new_v4()));
+              let paths = create_set(&transcript);
+              let report = remove_session_artifacts_for_transcript(&transcript)
+                  .expect("remove complete artifact set");
+              assert_eq!(report.removed_artifacts, 4);
+              assert_eq!(report.removed_paths.last(), Some(&transcript));
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+
+          #[test]
+          fn second_artifact_failure_retains_transcript_and_retry_completes() {
+              let dir = tempdir().expect("create temporary directory");
+              let transcript = dir.path().join(format!("{}.tlog", Uuid::new_v4()));
+              fs::write(&transcript, b"discoverable").expect("write transcript");
+              let paths = artifact_paths(&transcript);
+              fs::create_dir(&paths[1]).expect("create blocked SQLite path");
+              fs::write(paths[1].join("held"), b"held").expect("make directory non-empty");
+              fs::write(&paths[2], b"wal").expect("write WAL");
+              fs::write(&paths[3], b"shm").expect("write SHM");
+
+              let error = remove_session_artifacts_for_transcript(&transcript)
+                  .expect_err("SQLite directory must block cleanup");
+              let message = error.to_string();
+              assert!(message.contains(&paths[1].display().to_string()));
+              assert!(message.contains("retryable=true"));
+              assert!(transcript.exists(), "transcript is the discoverability commit point");
+              assert!(!paths[2].exists());
+              assert!(!paths[3].exists());
+
+              fs::remove_file(paths[1].join("held")).expect("release blocked path");
+              fs::remove_dir(&paths[1]).expect("remove blocked directory");
+              let retry = remove_session_artifacts_for_transcript(&transcript)
+                  .expect("retry complete cleanup");
+              assert_eq!(retry.removed_artifacts, 1);
+              assert!(!transcript.exists());
+          }
+
+          #[test]
+          fn manager_delete_is_retryable_after_sidecar_failure() {
+              let dir = tempdir().expect("create temporary directory");
+              let manager = SessionManager::with_dir(dir.path().to_path_buf());
+              let session = manager
+                  .create_session("test", "/workspace")
+                  .expect("create session fixture");
+              let paths = artifact_paths(&session.file_path);
+              fs::create_dir(&paths[1]).expect("create blocked SQLite path");
+              fs::write(paths[1].join("held"), b"held").expect("make directory non-empty");
+
+              let error = manager
+                  .delete_session(&session.id)
+                  .expect_err("first delete must report exact sidecar failure");
+              assert!(error.to_string().contains(&paths[1].display().to_string()));
+              assert!(session.file_path.exists());
+
+              fs::remove_file(paths[1].join("held")).expect("release blocked path");
+              fs::remove_dir(&paths[1]).expect("remove blocked directory");
+              manager
+                  .delete_session(&session.id)
+                  .expect("retry delete must complete");
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+
+          #[test]
+          fn retention_counts_zero_byte_session_as_removed() {
+              let dir = tempdir().expect("create temporary directory");
+              let manager = SessionManager::with_dir(dir.path().to_path_buf());
+              let session = manager
+                  .create_session("zero", "/workspace")
+                  .expect("create zero-byte session");
+              assert_eq!(fs::metadata(&session.file_path).expect("metadata").len(), 0);
+
+              let report = manager
+                  .apply_cleanup(&SessionCleanupPolicy {
+                      workspace_root: Some("/workspace".to_string()),
+                      max_sessions_per_workspace: Some(0),
+                      ..SessionCleanupPolicy::default()
+                  })
+                  .expect("apply retention cleanup");
+
+              assert_eq!(report.removed, 1);
+              assert_eq!(report.bytes_removed, 0);
+              assert!(!session.file_path.exists());
+          }
+
+          #[test]
+          fn retention_counts_complete_artifact_bytes() {
+              let dir = tempdir().expect("create temporary directory");
+              let manager = SessionManager::with_dir(dir.path().to_path_buf());
+              let session = manager
+                  .create_session("retention", "/workspace")
+                  .expect("create session fixture");
+              let paths = create_set(&session.file_path);
+              let expected_bytes = paths
+                  .iter()
+                  .map(|path| fs::metadata(path).expect("read fixture metadata").len())
+                  .sum::<u64>();
+
+              let report = manager
+                  .apply_cleanup(&SessionCleanupPolicy {
+                      workspace_root: Some("/workspace".to_string()),
+                      max_sessions_per_workspace: Some(0),
+                      ..SessionCleanupPolicy::default()
+                  })
+                  .expect("apply retention cleanup");
+
+              assert_eq!(report.removed, 1);
+              assert_eq!(report.bytes_removed, expected_bytes);
+              assert!(paths.iter().all(|path| !path.exists()));
+          }
+
+          fn orphan_policy(protected_session_ids: Vec<Uuid>) -> OrphanSidecarReconciliationPolicy {
+              OrphanSidecarReconciliationPolicy {
+                  protected_session_ids,
+                  max_entries: 128,
+                  minimum_age: Duration::ZERO,
+              }
+          }
+
+          #[test]
+          fn production_root_scan_reconciles_only_valid_safe_orphans() {
+              let dir = tempdir().expect("create temporary directory");
+              let sessions = dir.path().join("sessions");
+              let workspace = sessions.join("workspace");
+              fs::create_dir_all(&workspace).expect("create workspace");
+              let manager = SessionManager::with_dir(sessions);
+
+              let sqlite_only = Uuid::new_v4();
+              let sqlite_path = workspace.join(format!("{sqlite_only}.pending.sqlite"));
+              Connection::open(&sqlite_path).expect("create valid orphan SQLite");
+
+              let wal_only = Uuid::new_v4();
+              let wal_path = workspace.join(format!("{wal_only}.pending.sqlite-wal"));
+              fs::write(&wal_path, b"wal").expect("write WAL-only orphan");
+
+              let shm_only = Uuid::new_v4();
+              let shm_path = workspace.join(format!("{shm_only}.pending.sqlite-shm"));
+              fs::write(&shm_path, b"shm").expect("write SHM-only orphan");
+
+              let full = Uuid::new_v4();
+              let full_sqlite = workspace.join(format!("{full}.pending.sqlite"));
+              Connection::open(&full_sqlite).expect("create full orphan SQLite");
+              let full_wal = std::path::PathBuf::from(format!("{}-wal", full_sqlite.display()));
+              let full_shm = std::path::PathBuf::from(format!("{}-shm", full_sqlite.display()));
+              fs::write(&full_wal, b"wal").expect("write full WAL");
+              fs::write(&full_shm, b"shm").expect("write full SHM");
+
+              let with_transcript = Uuid::new_v4();
+              let transcript = workspace.join(format!("{with_transcript}.tlog"));
+              fs::write(&transcript, b"live transcript").expect("write transcript");
+              let transcript_sidecar =
+                  workspace.join(format!("{with_transcript}.pending.sqlite"));
+              Connection::open(&transcript_sidecar).expect("create transcript sidecar");
+
+              let protected = Uuid::new_v4();
+              let protected_sidecar = workspace.join(format!("{protected}.pending.sqlite"));
+              Connection::open(&protected_sidecar).expect("create protected sidecar");
+
+              let invalid = workspace.join("not-a-uuid.pending.sqlite");
+              fs::write(&invalid, b"invalid").expect("write invalid name");
+              let similar = workspace.join(format!("{}.pending.sqlite.backup", Uuid::new_v4()));
+              fs::write(&similar, b"similar").expect("write similar suffix");
+
+              let report = manager
+                  .reconcile_orphan_sidecars(&orphan_policy(vec![protected]))
+                  .expect("run bounded orphan reconciliation");
+              assert_eq!(report.removed_sets, 4);
+              assert_eq!(report.removed_artifacts, 6);
+              assert!(report.failures.is_empty());
+              assert!(!report.bounded);
+              assert!(!sqlite_path.exists());
+              assert!(!wal_path.exists());
+              assert!(!shm_path.exists());
+              assert!(!full_sqlite.exists());
+              assert!(!full_wal.exists());
+              assert!(!full_shm.exists());
+              assert!(transcript.exists());
+              assert!(transcript_sidecar.exists());
+              assert!(protected_sidecar.exists());
+              assert!(invalid.exists());
+              assert!(similar.exists());
+
+              let second = manager
+                  .reconcile_orphan_sidecars(&orphan_policy(vec![protected]))
+                  .expect("second reconciliation is idempotent");
+              assert_eq!(second.removed_sets, 0);
+              assert_eq!(second.removed_artifacts, 0);
+          }
+
+          #[test]
+          fn live_sqlite_owner_is_skipped_until_lock_is_released() {
+              let dir = tempdir().expect("create temporary directory");
+              let sessions = dir.path().join("sessions");
+              let workspace = sessions.join("workspace");
+              fs::create_dir_all(&workspace).expect("create workspace");
+              let manager = SessionManager::with_dir(sessions);
+              let id = Uuid::new_v4();
+              let sqlite = workspace.join(format!("{id}.pending.sqlite"));
+              let connection = Connection::open(&sqlite).expect("create SQLite");
+              connection
+                  .execute_batch("CREATE TABLE held(value INTEGER); BEGIN EXCLUSIVE;")
+                  .expect("hold exclusive ownership");
+
+              let first = manager
+                  .reconcile_orphan_sidecars(&orphan_policy(Vec::new()))
+                  .expect("busy reconciliation does not crash");
+              assert_eq!(first.removed_sets, 0);
+              assert!(first.skipped_sets >= 1);
+              assert!(sqlite.exists());
+
+              connection.execute_batch("ROLLBACK;").expect("release lock");
+              drop(connection);
+              let second = manager
+                  .reconcile_orphan_sidecars(&orphan_policy(Vec::new()))
+                  .expect("released orphan is removed");
+              assert_eq!(second.removed_sets, 1);
+              assert!(!sqlite.exists());
+          }
+
+          #[test]
+          fn orphan_scan_is_bounded() {
+              let dir = tempdir().expect("create temporary directory");
+              let sessions = dir.path().join("sessions");
+              let workspace = sessions.join("workspace");
+              fs::create_dir_all(&workspace).expect("create workspace");
+              let manager = SessionManager::with_dir(sessions);
+              for _ in 0..2 {
+                  fs::write(
+                      workspace.join(format!("{}.pending.sqlite-wal", Uuid::new_v4())),
+                      b"wal",
+                  )
+                  .expect("write bounded candidate");
+              }
+              let report = manager
+                  .reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy {
+                      protected_session_ids: Vec::new(),
+                      max_entries: 1,
+                      minimum_age: Duration::ZERO,
+                  })
+                  .expect("bounded reconciliation");
+              assert_eq!(report.scanned_entries, 1);
+              assert!(report.bounded);
+          }
+
+          #[cfg(unix)]
+          #[test]
+          fn orphan_scan_never_follows_sidecar_symlinks() {
+              use std::os::unix::fs::symlink;
+
+              let dir = tempdir().expect("create temporary directory");
+              let sessions = dir.path().join("sessions");
+              let workspace = sessions.join("workspace");
+              fs::create_dir_all(&workspace).expect("create workspace");
+              let manager = SessionManager::with_dir(sessions);
+              let outside = dir.path().join("outside.sqlite");
+              fs::write(&outside, b"outside").expect("write outside target");
+              let link = workspace.join(format!("{}.pending.sqlite", Uuid::new_v4()));
+              symlink(&outside, &link).expect("create sidecar symlink");
+
+              let report = manager
+                  .reconcile_orphan_sidecars(&orphan_policy(Vec::new()))
+                  .expect("symlink reconciliation");
+              assert_eq!(report.removed_sets, 0);
+              assert!(link.exists());
+              assert!(outside.exists());
+          }
+          EOF
+
+          cargo fmt --all
+          git diff --check
+          cargo test -p talos-session --locked --no-fail-fast
+          cargo clippy -p talos-session --all-targets --locked -- -D warnings
+          cargo check -p talos-cli --locked
+
+      - name: Remove temporary workflow and publish verified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/i169-artifact-core-remediation.yml
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add crates/talos-session crates/talos-cli/src/storage.rs .github/workflows/i169-artifact-core-remediation.yml
+          git commit -m "fix(session): make artifact cleanup retryable"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
