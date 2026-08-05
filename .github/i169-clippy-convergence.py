@@ -65,7 +65,14 @@ def clarify_test_failures(path: Path) -> None:
 for path in sorted(INLINE_TEST_FILES | TEST_FILES):
     clarify_test_failures(path)
 
-# Known needless-borrow diagnostics that are not dependent on formatting.
+# Known diagnostics that require imports or exact type changes beyond clippy --fix.
+path = Path("crates/talos-tools/tests/document_boundaries.rs")
+text = path.read_text()
+text = text.replace("use std::path::PathBuf;", "use std::path::{Path, PathBuf};")
+text = text.replace("fn cleanup(path: &PathBuf)", "fn cleanup(path: &Path)")
+text = text.replace("fn run_extract(path: &PathBuf)", "fn run_extract(path: &Path)")
+path.write_text(text)
+
 path = Path("crates/talos-provider/src/anthropic_request.rs")
 text = path.read_text().replace("&png_header", "png_header")
 path.write_text(text)
