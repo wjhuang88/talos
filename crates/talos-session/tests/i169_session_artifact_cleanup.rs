@@ -1,5 +1,7 @@
 use std::fs;
-use talos_session::{SessionManager, remove_session_artifacts_for_transcript};
+use talos_session::{
+    SessionCleanupPolicy, SessionManager, remove_session_artifacts_for_transcript,
+};
 use tempfile::tempdir;
 use uuid::Uuid;
 
@@ -42,6 +44,32 @@ fn manager_delete_removes_pending_payload() {
     manager
         .delete_session(&session.id)
         .expect("delete complete session artifact set");
+    assert!(paths.iter().all(|path| !path.exists()));
+}
+
+#[test]
+fn retention_cleanup_removes_complete_artifact_set_and_counts_all_bytes() {
+    let dir = tempdir().expect("create temporary directory");
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let session = manager
+        .create_session("retention", "/workspace")
+        .expect("create session fixture");
+    let paths = create_set(&session.file_path);
+    let expected_bytes = paths
+        .iter()
+        .map(|path| fs::metadata(path).expect("read fixture metadata").len())
+        .sum::<u64>();
+
+    let report = manager
+        .apply_cleanup(&SessionCleanupPolicy {
+            workspace_root: Some("/workspace".to_string()),
+            max_sessions_per_workspace: Some(0),
+            ..SessionCleanupPolicy::default()
+        })
+        .expect("apply retention cleanup");
+
+    assert_eq!(report.removed, 1);
+    assert_eq!(report.bytes_removed, expected_bytes);
     assert!(paths.iter().all(|path| !path.exists()));
 }
 
