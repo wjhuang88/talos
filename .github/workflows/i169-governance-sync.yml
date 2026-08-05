@@ -62,8 +62,8 @@ jobs:
           PY
 
           git diff --check
-          bash scripts/validate_project_governance.sh
-          bash scripts/validate_collaboration_claims.sh
+          bash scripts/validate_project_governance.sh .
+          bash scripts/validate_collaboration_claims.sh .
           grep -q 'status: Active' docs/backlog/active/TUI-044-transactional-batched-steering-turn.md
           grep -q 'status: Active' docs/iterations/I169-batched-steering-turn.md
           grep -q 'status: Proposed' docs/decisions/056-transactional-steering-submission-boundary.md
