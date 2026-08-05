@@ -445,18 +445,46 @@ mod tests {
         }
     }
 
+    fn read_request_headers(stream: &mut TcpStream) {
+        const MAX_REQUEST_HEADER_BYTES: usize = 64 * 1024;
+        const HEADER_TERMINATOR: &[u8] = b"\r\n\r\n";
+
+        let mut request = Vec::new();
+        let mut chunk = [0u8; 1024];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => {
+                    request.extend_from_slice(&chunk[..read]);
+                    assert!(
+                        request.len() <= MAX_REQUEST_HEADER_BYTES,
+                        "loopback request headers exceeded {MAX_REQUEST_HEADER_BYTES} bytes"
+                    );
+                    if request
+                        .windows(HEADER_TERMINATOR.len())
+                        .any(|window| window == HEADER_TERMINATOR)
+                    {
+                        return;
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) => panic!("read failed: {error}"),
+            }
+        }
+
+        panic!("connection closed before complete HTTP request headers were received");
+    }
+
     fn serve_http(listener: &TcpListener, response: &str) {
         let mut stream = accept_with_timeout(listener);
-        let mut buf = [0u8; 4096];
-        stream.read_exact(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream.write_all(response.as_bytes()).expect("write failed");
         stream.flush().expect("flush failed");
     }
 
     fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
         let mut stream = accept_with_timeout(listener);
-        let mut buf = [0u8; 4096];
-        stream.read_exact(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream
             .write_all(response1.as_bytes())
             .expect("write failed");
@@ -464,7 +492,7 @@ mod tests {
         drop(stream);
 
         let mut stream = accept_with_timeout(listener);
-        stream.read_exact(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream
             .write_all(response2.as_bytes())
             .expect("write failed");
