@@ -1,0 +1,68 @@
+name: I169 transition rollback remediation
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i169-transition-rollback-remediation
+  cancel-in-progress: false
+
+jobs:
+  patch-test-clean:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          components: clippy,rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Apply reviewed rollback patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 793662dfcdf64c8b4f2f9ac78890eb3173841e82 HEAD
+          test -z "$(git diff --name-only 793662dfcdf64c8b4f2f9ac78890eb3173841e82 -- crates/talos-session crates/talos-cli)"
+          python3 .github/i169_transition_rollback_patch.py
+          cargo fmt --all
+          git diff --check
+          ! rg -n 'let _ = (talos_session::)?remove_session_artifacts_for_transcript|let _ = std::fs::remove_file\(&child_path\)' crates/talos-cli/src/session_handlers.rs crates/talos-cli/src/session_setup.rs
+
+      - name: Verify production rollback roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p talos-session --locked --test i169_session_artifact_cleanup --no-fail-fast
+          cargo test -p talos-cli --locked session_transition::tests:: --no-fail-fast
+          cargo test -p talos-cli --locked session_handlers::tests::rollback_ --no-fail-fast
+          cargo test -p talos-cli --locked session_setup::fork_tests:: --no-fail-fast
+          cargo clippy -p talos-session -p talos-cli --all-targets --locked -- -D warnings
+          cargo check -p talos-cli --all-targets --locked
+
+      - name: Publish clean verified rollback head
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/i169-transition-rollback-remediation.yml \
+            .github/i169_transition_rollback_patch.py
+          git diff --check
+          test "$(find .github/workflows -maxdepth 1 -type f -name 'i169-*' | wc -l)" -eq 0
+          test ! -e .github/i169_transition_rollback_patch.py
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A -- .github crates/talos-session crates/talos-cli
+          git commit -m "fix(tui): roll back failed Session ownership"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
