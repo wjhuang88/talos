@@ -63,17 +63,45 @@ jobs:
 
           '''
           text = text[:start] + replacement + text[end:]
-          text = text.replace(
-              '        .await;\\n        assert_eq!(session_watch_rx.borrow().id, old_session.id);\\n',
-              '        .await;\\n',
-              1,
-          )
           path.write_text(text)
           PY
           python3 .github/i169_transition_rollback_patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/talos-cli/src/session_transition.rs')
+          text = path.read_text()
+          old_call = '''            .publish_commit(
+              result,
+              new_session,
+              &session_watch_tx,
+          '''
+          new_call = '''            .publish_commit(
+              result,
+              new_session.clone(),
+              &session_watch_tx,
+          '''
+          if text.count(old_call) != 3:
+              raise SystemExit(f"expected three publication test ownership calls, found {text.count(old_call)}")
+          text = text.replace(old_call, new_call)
+
+          test_start = text.index('    async fn publication_fails_when_session_watch_has_no_receivers()')
+          test_end = text.index('    #[tokio::test]', test_start + 20)
+          test_text = text[test_start:test_end]
+          watch_assert = '        assert_eq!(session_watch_rx.borrow().id, old_session.id);\n'
+          if test_text.count(watch_assert) != 1:
+              raise SystemExit('expected one invalid assertion in dropped session-watch test')
+          test_text = test_text.replace(watch_assert, '', 1)
+          text = text[:test_start] + test_text + text[test_end:]
+          path.write_text(text)
+          PY
           cargo fmt --all
           git diff --check
-          ! rg -n 'let _ = (talos_session::)?remove_session_artifacts_for_transcript|let _ = std::fs::remove_file\(&child_path\)' crates/talos-cli/src/session_handlers.rs crates/talos-cli/src/session_setup.rs
+          if grep -En 'let _ = (talos_session::)?remove_session_artifacts_for_transcript|let _ = std::fs::remove_file\(&child_path\)' \
+            crates/talos-cli/src/session_handlers.rs crates/talos-cli/src/session_setup.rs; then
+            echo 'forbidden swallowed Session cleanup remains' >&2
+            exit 1
+          fi
 
       - name: Verify production rollback roots
         shell: bash
