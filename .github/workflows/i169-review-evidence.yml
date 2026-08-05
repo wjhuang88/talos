@@ -25,8 +25,10 @@ jobs:
           components: rustfmt, clippy
       - name: Apply evidence patch
         run: python3 scripts/i169_review_evidence.py
-      - name: Format
-        run: cargo fmt --all -- --check
+      - name: Format and verify
+        run: |
+          cargo fmt --all
+          cargo fmt --all -- --check
       - name: Targeted regressions
         run: |
           cargo test -p talos-agent production_shell_compression_predicate_covers_bash_and_powershell_only --locked
