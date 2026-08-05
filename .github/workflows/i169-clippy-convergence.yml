@@ -56,16 +56,11 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          for filename in [
-              'crates/talos-conversation/src/governance_summary.rs',
-              'crates/talos-plugin/src/manifest.rs',
-              'crates/talos-plugin/src/wasm.rs',
-          ]:
-              path = Path(filename)
+          for path in Path('crates').rglob('*.rs'):
               text = path.read_text()
               marker = text.find('#[cfg(test)]')
               if marker < 0:
-                  raise RuntimeError(f'test module marker not found in {filename}')
+                  continue
               prefix, tests = text[:marker], text[marker:]
               tests = tests.replace(
                   '.unwrap_err()',
@@ -75,6 +70,11 @@ jobs:
                   '.unwrap()',
                   '.expect("operation should succeed")',
               )
+              if path.as_posix() == 'crates/talos-tools/src/fetch_url.rs':
+                  tests = tests.replace(
+                      'stream.read(&mut buf).expect("read failed");',
+                      'stream.read_exact(&mut buf).expect("read failed");',
+                  )
               path.write_text(prefix + tests)
           PY
           set +e
