@@ -61,6 +61,18 @@ text = text.replace(old, '''            let removed_bytes = remove_session_artif
 ''', 1)
 manager.write_text(text)
 
+session_lib = Path('crates/talos-session/src/lib.rs')
+text = session_lib.read_text()
+old = '''pub use manager::{
+    SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+};'''
+new = '''pub use manager::{
+    SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+    remove_session_artifacts_for_transcript,
+};'''
+assert old in text
+session_lib.write_text(text.replace(old, new, 1))
+
 handlers = Path('crates/talos-cli/src/session_handlers.rs')
 text = handlers.read_text()
 pattern = re.compile(r'std::fs::remove_file\(&([A-Za-z_][A-Za-z0-9_]*)\.file_path\)')
