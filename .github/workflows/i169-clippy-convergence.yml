@@ -53,6 +53,30 @@ jobs:
           path.write_text(text[:start] + replacement + text[end:])
           PY
           python3 .github/i169-clippy-convergence.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for filename in [
+              'crates/talos-conversation/src/governance_summary.rs',
+              'crates/talos-plugin/src/manifest.rs',
+              'crates/talos-plugin/src/wasm.rs',
+          ]:
+              path = Path(filename)
+              text = path.read_text()
+              marker = text.find('#[cfg(test)]')
+              if marker < 0:
+                  raise RuntimeError(f'test module marker not found in {filename}')
+              prefix, tests = text[:marker], text[marker:]
+              tests = tests.replace(
+                  '.unwrap_err()',
+                  '.expect_err("operation should fail")',
+              )
+              tests = tests.replace(
+                  '.unwrap()',
+                  '.expect("operation should succeed")',
+              )
+              path.write_text(prefix + tests)
+          PY
           set +e
           cargo clippy --fix --workspace --all-targets --locked --allow-dirty --allow-staged -- -D warnings
           fix_status=$?
