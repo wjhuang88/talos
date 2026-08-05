@@ -34,11 +34,19 @@ pub fn remove_session_artifacts_for_transcript(
     ] {
         match fs::metadata(&path) {
             Ok(metadata) => {
-                fs::remove_file(&path)?;
+                fs::remove_file(&path).map_err(|source| SessionError::ArtifactCleanup {
+                    path: path.clone(),
+                    source,
+                })?;
                 removed_bytes = removed_bytes.saturating_add(metadata.len());
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(SessionError::IoError(error)),
+            Err(source) => {
+                return Err(SessionError::ArtifactCleanup {
+                    path: path.clone(),
+                    source,
+                });
+            }
         }
     }
     Ok(removed_bytes)

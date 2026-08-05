@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -7,6 +9,16 @@ pub enum SessionError {
     /// An I/O error occurred (file read/write, directory creation, etc.).
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
+
+    /// Removing one artifact from a Session-owned artifact set failed.
+    #[error("failed to remove session artifact {path}: {source}")]
+    ArtifactCleanup {
+        /// Exact artifact path whose removal failed.
+        path: PathBuf,
+        /// Underlying filesystem failure.
+        #[source]
+        source: std::io::Error,
+    },
 
     /// A line in the JSONL file is not valid JSON.
     #[error("invalid JSON in session file: {0}")]

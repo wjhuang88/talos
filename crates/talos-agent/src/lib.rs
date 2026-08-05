@@ -91,6 +91,11 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
+
+fn should_compress_shell_output(tool_name: &str) -> bool {
+    matches!(tool_name, "bash" | "powershell")
+}
+
 /// Shared admission contract for one complete Provider request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RequestBudgetSpec {
@@ -1057,7 +1062,7 @@ impl Agent {
                             ..ui_result.clone()
                         }
                     } else if self.bash_compression_enabled
-                        && matches!(observed.call.name.as_str(), "bash" | "powershell")
+                        && should_compress_shell_output(&observed.call.name)
                     {
                         let compressed =
                             BashOutputCompressor::new().compress(&projection.model_content);
@@ -1212,3 +1217,16 @@ impl Agent {
 #[allow(warnings)]
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod i169_shell_compression_regression {
+    use super::should_compress_shell_output;
+
+    #[test]
+    fn production_shell_compression_predicate_covers_bash_and_powershell_only() {
+        assert!(should_compress_shell_output("bash"));
+        assert!(should_compress_shell_output("powershell"));
+        assert!(!should_compress_shell_output("read"));
+        assert!(!should_compress_shell_output("fetch_url"));
+    }
+}

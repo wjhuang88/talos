@@ -87,3 +87,38 @@ fn failure_rollback_is_idempotent() {
     );
     assert!(paths.iter().all(|path| !path.exists()));
 }
+
+#[test]
+fn orphan_sidecars_are_removed_without_a_transcript() {
+    let dir = tempdir().expect("create temporary directory");
+    let transcript = dir.path().join("orphan.jsonl");
+    let sidecar = transcript.with_file_name("orphan.pending.sqlite");
+    let wal = std::path::PathBuf::from(format!("{}-wal", sidecar.display()));
+    let shm = std::path::PathBuf::from(format!("{}-shm", sidecar.display()));
+    fs::write(&sidecar, b"pending").expect("write orphan pending database");
+    fs::write(&wal, b"wal").expect("write orphan WAL");
+    fs::write(&shm, b"shm").expect("write orphan SHM");
+
+    let removed = remove_session_artifacts_for_transcript(&transcript)
+        .expect("remove orphan Session sidecars");
+
+    assert_eq!(removed, 13);
+    assert!(!transcript.exists());
+    assert!(!sidecar.exists());
+    assert!(!wal.exists());
+    assert!(!shm.exists());
+}
+
+#[test]
+fn cleanup_failure_identifies_the_exact_artifact_path() {
+    let dir = tempdir().expect("create temporary directory");
+    let transcript = dir.path().join("blocked.jsonl");
+    fs::create_dir(&transcript).expect("create non-removable transcript fixture");
+
+    let error = remove_session_artifacts_for_transcript(&transcript)
+        .expect_err("directory fixture must not be reported as successfully removed");
+    let message = error.to_string();
+
+    assert!(message.contains("failed to remove session artifact"));
+    assert!(message.contains(&transcript.display().to_string()));
+}
