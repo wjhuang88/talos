@@ -1,5 +1,6 @@
 name: I169 Review Remediation
 
+# Temporary gate; delete after publishing the reviewed source commit.
 on:
   push:
     branches:
