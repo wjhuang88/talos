@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
           git merge-base --is-ancestor ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 HEAD
           test -z "$(git diff --name-only ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 -- crates/talos-session crates/talos-tools)"
+          python3 .github/i169_patch_fix.py
           python3 .github/i169_reconciliation_windows_patch.py
           cargo fmt --all
           git diff --check
@@ -66,6 +67,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $changed = git diff --name-only ef39359b5d2491447cd973fbf70a3e5eb1a5ec74 -- crates/talos-session crates/talos-tools
           if ($changed) { throw "unexpected source changes before patch: $changed" }
+          python .github/i169_patch_fix.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python .github/i169_reconciliation_windows_patch.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo fmt --all -- --check
@@ -113,14 +116,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          python3 .github/i169_patch_fix.py
           python3 .github/i169_reconciliation_windows_patch.py
           cargo fmt --all
           rm -f \
             .github/workflows/i169-reconciliation-windows-remediation.yml \
-            .github/i169_reconciliation_windows_patch.py
+            .github/i169_reconciliation_windows_patch.py \
+            .github/i169_patch_fix.py
           git diff --check
           test "$(find .github/workflows -maxdepth 1 -type f -name 'i169-*' | wc -l)" -eq 0
           test ! -e .github/i169_reconciliation_windows_patch.py
+          test ! -e .github/i169_patch_fix.py
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A -- .github crates/talos-session crates/talos-tools
