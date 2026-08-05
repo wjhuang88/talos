@@ -303,3 +303,66 @@ fn orphan_scan_never_follows_sidecar_symlinks() {
     assert!(link.exists());
     assert!(outside.exists());
 }
+
+#[test]
+fn rollback_removes_child_index_and_fork_relation_but_preserves_source() {
+    use talos_core::message::Message;
+
+    let dir = tempdir().expect("create temporary directory");
+    let manager = SessionManager::with_dir(dir.path().join("sessions"));
+    let source = manager
+        .create_session("source", "/workspace")
+        .expect("create source Session");
+    source
+        .append(&Message::User {
+            content: "source-entry".to_string(),
+        })
+        .expect("append source entry");
+    let fork_entry_id = source
+        .read_entries()
+        .expect("read source entries")
+        .last()
+        .expect("source entry exists")
+        .id
+        .clone();
+    let child = manager
+        .create_session("child", "/workspace")
+        .expect("create child Session");
+    child
+        .append(&Message::User {
+            content: "child-entry".to_string(),
+        })
+        .expect("append child entry");
+    talos_session::PendingSubmissionStore::for_session(&child)
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "provider", "model", None,
+        ))
+        .expect("initialize child identity");
+    manager.update_index(&source).expect("index source");
+    manager.update_index(&child).expect("index child");
+    manager
+        .record_fork(&source.id, &child.id, &fork_entry_id)
+        .expect("record fork relation");
+    assert_eq!(
+        manager
+            .get_forks(&source.id.to_string())
+            .expect("read source forks")
+            .len(),
+        1
+    );
+
+    manager
+        .rollback_session_artifacts(&child)
+        .expect("rollback child artifact ownership");
+
+    assert!(source.file_path.exists());
+    assert!(!child.file_path.exists());
+    assert!(
+        manager
+            .get_forks(&source.id.to_string())
+            .expect("read source forks after rollback")
+            .is_empty()
+    );
+    assert!(manager.get_session(&child.id).is_err());
+    assert!(manager.get_session(&source.id).is_ok());
+}

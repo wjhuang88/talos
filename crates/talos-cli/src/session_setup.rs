@@ -341,13 +341,13 @@ pub(crate) fn run_list_mode(cli: Cli) -> Result<()> {
 fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Session> {
     let source = manager
         .resume_session(source_session_id)
-        .with_context(|| format!("failed to load source session {source_session_id}"))?;
+        .with_context(|| format!("failed to load source Session {source_session_id}"))?;
 
     let entries = source
         .read_entries()
         .context("failed to read source entries")?;
     if entries.is_empty() {
-        bail!("cannot fork an empty session");
+        bail!("cannot fork an empty Session");
     }
     let fork_entry_id = entries
         .last()
@@ -356,27 +356,26 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
         .clone();
     let source_bytes = source
         .snapshot_bytes()
-        .context("failed to snapshot source session")?;
+        .context("failed to snapshot source Session")?;
 
     let new_id = Uuid::new_v4();
     let project_path = source
         .file_path
         .parent()
-        .context("source session file has no parent directory")?
+        .context("source Session file has no parent directory")?
         .to_path_buf();
     std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
     let new_file_path = project_path.join(format!("{new_id}.{}", source.file_extension()));
+    let mut child = Session::new(
+        new_id,
+        source.project.clone(),
+        source.workspace_root.clone(),
+        new_file_path.clone(),
+    );
 
-    let fork_result = (|| -> Result<Session> {
+    let fork_result = (|| -> Result<()> {
         std::fs::write(&new_file_path, &source_bytes)
-            .context("failed to clone source session bytes")?;
-
-        let mut child = Session::new(
-            new_id,
-            source.project.clone(),
-            source.workspace_root.clone(),
-            new_file_path.clone(),
-        );
+            .context("failed to clone source Session bytes")?;
         child
             .fork(&fork_entry_id)
             .context("failed to create fork branch")?;
@@ -401,42 +400,37 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
             None => {}
         }
 
-        let index_path = manager.sessions_dir().join("index.db");
-        let mut index = talos_session::SessionIndex::new(&index_path)
-            .context("failed to open session index")?;
-        index
-            .init_schema()
-            .context("failed to initialize session index")?;
-        index
-            .index_session(&source)
-            .context("failed to index source session")?;
-        index
-            .index_session(&child)
-            .context("failed to index forked session")?;
-        index
-            .record_fork(source_session_id, &new_id.to_string(), &fork_entry_id)
+        manager
+            .update_index(&source)
+            .context("failed to index source Session")?;
+        manager
+            .update_index(&child)
+            .context("failed to index forked Session")?;
+        manager
+            .record_fork(&source.id, &child.id, &fork_entry_id)
             .context("failed to record fork relationship")?;
-
-        Ok(child)
+        Ok(())
     })();
 
     match fork_result {
-        Ok(child) => {
+        Ok(()) => {
             eprintln!(
-                "Forked session {source_session_id} -> {new_id} (from entry {fork_entry_id})"
+                "Forked Session {source_session_id} -> {new_id} (from entry {fork_entry_id})"
             );
             Ok(child)
         }
-        Err(error) => {
-            let _ = talos_session::remove_session_artifacts_for_transcript(&new_file_path);
-            if let Ok(mut index) =
-                talos_session::SessionIndex::new(&manager.sessions_dir().join("index.db"))
-            {
-                let _ = index.init_schema();
-                let _ = index.delete_session(&new_id.to_string());
-            }
-            Err(error)
-        }
+        Err(primary_error) => match manager.rollback_session_artifacts(&child) {
+            Ok(report) => Err(anyhow!(
+                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; rollback removed {} filesystem artifact(s) / {} byte(s), plus binding and index/fork ownership",
+                new_file_path.display(),
+                report.removed_artifacts,
+                report.bytes_removed,
+            )),
+            Err(cleanup_error) => Err(anyhow!(
+                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; cleanup also failed: {cleanup_error}; cleanup is retryable after closing open SQLite handles via --delete or --storage-maintenance --reconcile",
+                new_file_path.display(),
+            )),
+        },
     }
 }
 

@@ -154,6 +154,8 @@ impl SessionCommandTarget {
 pub struct CommitResult {
     /// The session that was active before the transition.
     pub old_session: Session,
+    /// The stopped command target owned by the old Session before retirement.
+    old_target: SessionCommandTarget,
     /// The handle for the newly active session actor. Its SQ sender is the
     /// generation-binding proxy, not the raw Actor sender.
     pub new_handle: SessionHandle,
@@ -371,6 +373,7 @@ impl SessionTransition {
             .prepared
             .take()
             .expect("prepared transition was checked before the durable fence");
+        let old_target = self.active_target.clone();
 
         if quiesced_generation.is_none() {
             self.retire_active_runtime().await;
@@ -423,6 +426,7 @@ impl SessionTransition {
 
         Ok(CommitResult {
             old_session,
+            old_target,
             new_handle: prepared.handle,
             publication_ready,
         })
@@ -445,6 +449,7 @@ impl SessionTransition {
     ) -> Result<Session, String> {
         let CommitResult {
             old_session,
+            old_target,
             new_handle,
             publication_ready,
         } = result;
@@ -469,9 +474,16 @@ impl SessionTransition {
                 Ok(old_session)
             }
             Err(error) => {
+                let failed_session = self.active_session.clone();
                 self.abort_committed_publication().await;
+                self.active_target = old_target;
+                self.active_session = old_session.clone();
+                session_watch_tx.send_replace(old_session.clone());
                 Err(format!(
-                    "replacement publication failed after the durable fence: {error}. The new generation is stopped; resume or retry the lifecycle operation"
+                    "replacement publication failed after the durable fence: {error}. Failed Session {} is stopped; logical ownership was restored to Session {} at generation {}. Resume or retry the lifecycle operation",
+                    failed_session.id,
+                    old_session.id,
+                    self.active_generation(),
                 ))
             }
         }
@@ -561,8 +573,10 @@ mod tests {
         name: &str,
     ) -> (
         tempfile::TempDir,
+        talos_session::SessionManager,
         SessionTransition,
         CommitResult,
+        Session,
         Session,
         mpsc::Sender<SessionOp>,
     ) {
@@ -588,6 +602,7 @@ mod tests {
                 }
             }
         });
+        let old_session_for_assertion = old_session.clone();
         let mut transition =
             SessionTransition::new(old_tx, old_session).expect("operation should succeed");
 
@@ -616,25 +631,54 @@ mod tests {
             .commit(actor, pending_scheduler)
             .await
             .expect("operation should succeed");
-        (temp, transition, result, new_session, raw_new_sender)
+        (
+            temp,
+            manager,
+            transition,
+            result,
+            old_session_for_assertion,
+            new_session,
+            raw_new_sender,
+        )
     }
 
-    async fn assert_publication_failure_stops_new_runtime(
+    async fn assert_publication_failure_restores_old_owner_and_cleans_child(
+        manager: &talos_session::SessionManager,
         transition: &SessionTransition,
+        old_session: &Session,
+        failed_session: &Session,
         raw_new_sender: &mpsc::Sender<SessionOp>,
     ) {
         assert!(transition.active_runtime.is_none());
+        assert_eq!(transition.active_session.id, old_session.id);
+        assert_eq!(
+            transition.active_generation(),
+            PendingSubmissionStore::for_session(old_session)
+                .runtime_generation()
+                .expect("load restored generation")
+        );
         tokio::time::timeout(std::time::Duration::from_secs(1), raw_new_sender.closed())
             .await
             .expect("failed publication must drop the new Actor receiver");
         assert!(raw_new_sender.is_closed());
+        manager
+            .rollback_session_artifacts(failed_session)
+            .expect("failed child cleanup must succeed after publication abort");
+        assert!(old_session.file_path.exists());
+        assert!(!failed_session.file_path.exists());
+        let sqlite = failed_session
+            .file_path
+            .with_file_name(format!("{}.pending.sqlite", failed_session.id));
+        assert!(!sqlite.exists());
+        assert!(!std::path::PathBuf::from(format!("{}-wal", sqlite.display())).exists());
+        assert!(!std::path::PathBuf::from(format!("{}-shm", sqlite.display())).exists());
     }
 
     #[tokio::test]
     async fn bridge_publication_failure_stops_replacement_without_success() {
-        let (_temp, mut transition, result, new_session, raw_new_sender) =
+        let (_temp, manager, mut transition, result, old_session, new_session, raw_new_sender) =
             publication_failure_fixture("bridge-publication-failure").await;
-        let (session_watch_tx, _session_watch_rx) = watch::channel(new_session.clone());
+        let (session_watch_tx, session_watch_rx) = watch::channel(old_session.clone());
         let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
         let (bridge_tx, bridge_rx) = mpsc::unbounded_channel();
@@ -643,7 +687,7 @@ mod tests {
         let error = transition
             .publish_commit(
                 result,
-                new_session,
+                new_session.clone(),
                 &session_watch_tx,
                 &sq_watch_tx,
                 &bridge_tx,
@@ -651,15 +695,25 @@ mod tests {
             .await
             .expect_err("operation should fail");
         assert!(error.contains("Bridge event route receiver is unavailable"));
-        assert!(error.contains("new generation is stopped"));
-        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
+        assert!(error.contains("logical ownership was restored"));
+        assert!(error.contains(&old_session.id.to_string()));
+        assert!(error.contains(&new_session.id.to_string()));
+        assert_publication_failure_restores_old_owner_and_cleans_child(
+            &manager,
+            &transition,
+            &old_session,
+            &new_session,
+            &raw_new_sender,
+        )
+        .await;
+        assert_eq!(session_watch_rx.borrow().id, old_session.id);
     }
 
     #[tokio::test]
     async fn session_watch_publication_failure_stops_replacement_without_success() {
-        let (_temp, mut transition, result, new_session, raw_new_sender) =
+        let (_temp, manager, mut transition, result, old_session, new_session, raw_new_sender) =
             publication_failure_fixture("session-watch-publication-failure").await;
-        let (session_watch_tx, session_watch_rx) = watch::channel(new_session.clone());
+        let (session_watch_tx, session_watch_rx) = watch::channel(old_session.clone());
         drop(session_watch_rx);
         let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
@@ -668,7 +722,7 @@ mod tests {
         let error = transition
             .publish_commit(
                 result,
-                new_session,
+                new_session.clone(),
                 &session_watch_tx,
                 &sq_watch_tx,
                 &bridge_tx,
@@ -676,15 +730,24 @@ mod tests {
             .await
             .expect_err("operation should fail");
         assert!(error.contains("Session watch receiver is unavailable"));
-        assert!(error.contains("new generation is stopped"));
-        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
+        assert!(error.contains("logical ownership was restored"));
+        assert!(error.contains(&old_session.id.to_string()));
+        assert!(error.contains(&new_session.id.to_string()));
+        assert_publication_failure_restores_old_owner_and_cleans_child(
+            &manager,
+            &transition,
+            &old_session,
+            &new_session,
+            &raw_new_sender,
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn command_watch_publication_failure_stops_replacement_without_success() {
-        let (_temp, mut transition, result, new_session, raw_new_sender) =
+        let (_temp, manager, mut transition, result, old_session, new_session, raw_new_sender) =
             publication_failure_fixture("command-watch-publication-failure").await;
-        let (session_watch_tx, _session_watch_rx) = watch::channel(new_session.clone());
+        let (session_watch_tx, session_watch_rx) = watch::channel(old_session.clone());
         let (placeholder_tx, placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, sq_watch_rx) = watch::channel(placeholder_tx);
         drop(sq_watch_rx);
@@ -694,7 +757,7 @@ mod tests {
         let error = transition
             .publish_commit(
                 result,
-                new_session,
+                new_session.clone(),
                 &session_watch_tx,
                 &sq_watch_tx,
                 &bridge_tx,
@@ -702,8 +765,18 @@ mod tests {
             .await
             .expect_err("operation should fail");
         assert!(error.contains("command-route watch receiver is unavailable"));
-        assert!(error.contains("new generation is stopped"));
-        assert_publication_failure_stops_new_runtime(&transition, &raw_new_sender).await;
+        assert!(error.contains("logical ownership was restored"));
+        assert!(error.contains(&old_session.id.to_string()));
+        assert!(error.contains(&new_session.id.to_string()));
+        assert_publication_failure_restores_old_owner_and_cleans_child(
+            &manager,
+            &transition,
+            &old_session,
+            &new_session,
+            &raw_new_sender,
+        )
+        .await;
+        assert_eq!(session_watch_rx.borrow().id, old_session.id);
     }
 
     #[tokio::test]

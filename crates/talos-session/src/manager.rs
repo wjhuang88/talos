@@ -506,6 +506,22 @@ impl SessionManager {
         index.get_forks(session_id)
     }
 
+    /// Record one source/child fork relationship through the manager-owned index.
+    pub fn record_fork(
+        &self,
+        source_session_id: &Uuid,
+        forked_session_id: &Uuid,
+        fork_entry_id: &str,
+    ) -> Result<(), IndexError> {
+        let mut guard = self.get_or_create_index()?;
+        let index = guard.as_mut().expect("index just created");
+        index.record_fork(
+            &source_session_id.to_string(),
+            &forked_session_id.to_string(),
+            fork_entry_id,
+        )
+    }
+
     #[allow(clippy::collapsible_if)]
     pub fn reconcile_index(&self) -> Result<usize, IndexError> {
         let mut guard = self.get_or_create_index()?;

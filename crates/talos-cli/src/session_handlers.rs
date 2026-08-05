@@ -36,6 +36,25 @@ pub(crate) fn emit_session_identity_after_queue_clear(
     let _ = ui_tx.send(UiOutput::SessionIdentity { id: session_id });
 }
 
+fn rollback_owned_session_message(
+    session_manager: &talos_session::SessionManager,
+    session: &talos_session::Session,
+    operation: &str,
+    primary_error: impl std::fmt::Display,
+) -> String {
+    let session_id = session.id;
+    let transcript = session.file_path.display();
+    match session_manager.rollback_session_artifacts(session) {
+        Ok(report) => format!(
+            "[Error] {operation}: {primary_error}. Rolled back Session {session_id} at {transcript}; removed {} filesystem artifact(s) / {} byte(s), plus binding and index/fork ownership. Previous Session remains unchanged.\n",
+            report.removed_artifacts, report.bytes_removed,
+        ),
+        Err(cleanup_error) => format!(
+            "[Error] {operation}: {primary_error}. Cleanup also failed for Session {session_id} at {transcript}: {cleanup_error}. Cleanup is retryable: close open SQLite handles, retry /delete {session_id} while the transcript remains discoverable, or run talos --storage-maintenance --reconcile for a transcript-less sidecar.\n"
+        ),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_delete(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
@@ -712,20 +731,26 @@ pub(crate) async fn handle_session_new(
 ) {
     let mut transition = transition.lock().await;
 
-    let session_manager = session_manager.clone();
     let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let new_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
-        Ok(s) => s,
-        Err(e) => {
-            let text = format!("[Error] Failed to create new session: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        Ok(session) => session,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to create new session: {error}\n"),
+            );
             return;
         }
     };
 
     if let Err(error) = crate::mode_runtime::ensure_session_runtime_identity(config, &new_session) {
-        let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
-        let text = format!("[Error] Failed to initialize new Session runtime identity: {error}\n");
+        let text = rollback_owned_session_message(
+            session_manager,
+            &new_session,
+            "Failed to initialize new Session runtime identity",
+            error,
+        );
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
@@ -733,8 +758,12 @@ pub(crate) async fn handle_session_new(
     let built_runtime = match runtime_builder.build(config, &new_session, vec![]).await {
         Ok(runtime) => runtime,
         Err(error) => {
-            let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
-            let text = format!("[Error] Failed to construct new Session runtime: {error}\n");
+            let text = rollback_owned_session_message(
+                session_manager,
+                &new_session,
+                "Failed to construct new Session runtime",
+                error,
+            );
             send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
@@ -743,20 +772,26 @@ pub(crate) async fn handle_session_new(
     let actor = built_runtime.actor;
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
-        let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
-        let text = format!("[Error] Failed to retain new Session MCP runtime: {error}\n");
+        transition.rollback();
+        let text = rollback_owned_session_message(
+            session_manager,
+            &new_session,
+            "Failed to retain new Session MCP runtime",
+            error,
+        );
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
-    // Clone for watch channel update after commit (new_session is moved into prepare).
     let new_session_for_watch = new_session.clone();
-    if let Err(e) = transition.prepare(handle, new_session) {
+    if let Err(error) = transition.prepare(handle, new_session) {
         transition.rollback();
-        let _ = talos_session::remove_session_artifacts_for_transcript(
-            &new_session_for_watch.file_path,
+        let text = rollback_owned_session_message(
+            session_manager,
+            &new_session_for_watch,
+            "Failed to prepare new Session",
+            error,
         );
-        let text = format!("[Error] Failed to prepare new session: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
@@ -777,22 +812,30 @@ pub(crate) async fn handle_session_new(
                     ui_tx,
                     new_session_for_watch.id.to_string(),
                 );
-                let text =
-                    "[System] New session started. Previous session preserved.\n".to_string();
-                send_stream(ui_tx, MessageSource::System, text);
+                send_stream(
+                    ui_tx,
+                    MessageSource::System,
+                    "[System] New session started. Previous session preserved.\n".to_string(),
+                );
             }
             Err(error) => {
-                let text = format!("[Error] {error}\n");
+                let text = rollback_owned_session_message(
+                    session_manager,
+                    &new_session_for_watch,
+                    "Failed to publish new Session runtime",
+                    error,
+                );
                 send_stream(ui_tx, MessageSource::Error, text);
             }
         },
-        Err(e) => {
+        Err(error) => {
             transition.rollback();
-            let _ = talos_session::remove_session_artifacts_for_transcript(
-                &new_session_for_watch.file_path,
+            let text = rollback_owned_session_message(
+                session_manager,
+                &new_session_for_watch,
+                "Failed to commit new Session; old Session remains active",
+                error,
             );
-            let text =
-                format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
     }
@@ -1004,9 +1047,8 @@ pub(crate) async fn handle_session_resume(
 
 /// Handle `/fork` — clone the active session's durable history into a child session.
 ///
-/// Copies the source JSONL file to a new path with a fresh UUID, creates a new
-/// [`talos_session::Session`], and swaps the agent context. The source session
-/// remains byte-for-byte unchanged.
+/// Copies the source transcript bytes to a fresh UUID, establishes inherited
+/// runtime identity and fork/index ownership, then publishes one replacement.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_fork(
     transition: &Arc<Mutex<SessionTransition>>,
@@ -1026,92 +1068,156 @@ pub(crate) async fn handle_session_fork(
 
     let source_session = session_watch_rx.borrow().clone();
     if let Err(error) = crate::mode_runtime::reconcile_session_runtime_state(&source_session) {
-        let text = format!("[Error] Cannot fork stopped Session runtime: {error}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!("[Error] Cannot fork stopped Session runtime: {error}\n"),
+        );
         return;
     }
 
     let source_bytes = match source_session.snapshot_bytes() {
-        Ok(b) => b,
-        Err(e) => {
-            let text = format!("[Error] Failed to read source session file: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        Ok(bytes) => bytes,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to read source Session file: {error}\n"),
+            );
             return;
         }
     };
-
     let fork_history = match source_session.read_messages() {
-        Ok(h) => h,
-        Err(e) => {
-            let text = format!("[Error] Failed to read source session history: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        Ok(history) => history,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to read source Session history: {error}\n"),
+            );
+            return;
+        }
+    };
+    let fork_entry_id = match source_session.read_entries() {
+        Ok(entries) => match entries.last() {
+            Some(entry) => entry.id.clone(),
+            None => {
+                send_stream(
+                    ui_tx,
+                    MessageSource::Error,
+                    "[Error] Cannot fork an empty Session.\n".to_string(),
+                );
+                return;
+            }
+        },
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to read source Session entries: {error}\n"),
+            );
             return;
         }
     };
 
     let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let child_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
-        Ok(s) => s,
-        Err(e) => {
-            let text = format!("[Error] Failed to create child session: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
+        Ok(session) => session,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Failed to create child Session: {error}\n"),
+            );
             return;
         }
     };
     let child_id = child_session.id;
-
     let child_path = child_session.file_path.clone();
+
     if let Some(parent) = child_path.parent()
-        && let Err(e) = std::fs::create_dir_all(parent)
+        && let Err(error) = std::fs::create_dir_all(parent)
     {
-        let text = format!("[Error] Failed to create child session directory: {e}\n");
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session,
+            "Failed to create child Session directory",
+            error,
+        );
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
+    if let Err(error) = std::fs::write(&child_path, &source_bytes) {
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session,
+            "Failed to clone source Session history",
+            error,
+        );
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
-    if let Err(e) = std::fs::write(&child_path, &source_bytes) {
-        let text = format!("[Error] Failed to clone session history: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
-    }
-
-    let inherited_identity = match talos_session::PendingSubmissionStore::for_session(
-        &source_session,
-    )
-    .runtime_state()
-    {
-        Ok(Some(state))
-            if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
-        {
-            state.activation.target
-        }
-        Ok(Some(state)) => {
-            let text = format!(
-                "[Error] Source Session activation {} is not committed; fork remains unavailable.\n",
-                state.activation.activation_id
-            );
-            send_stream(ui_tx, MessageSource::Error, text);
-            let _ = std::fs::remove_file(&child_path);
-            return;
-        }
-        Ok(None) => talos_session::SessionRuntimeIdentity::new(
-            &config.provider,
-            &config.model,
-            config.variant.as_deref(),
-        ),
-        Err(error) => {
-            let text = format!("[Error] Failed to read source Session runtime identity: {error}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-            let _ = std::fs::remove_file(&child_path);
-            return;
-        }
-    };
+    let inherited_identity =
+        match talos_session::PendingSubmissionStore::for_session(&source_session).runtime_state() {
+            Ok(Some(state))
+                if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
+            {
+                state.activation.target
+            }
+            Ok(Some(state)) => {
+                let text = rollback_owned_session_message(
+                    session_manager,
+                    &child_session,
+                    "Source Session activation is not committed",
+                    format_args!("activation {}", state.activation.activation_id),
+                );
+                send_stream(ui_tx, MessageSource::Error, text);
+                return;
+            }
+            Ok(None) => talos_session::SessionRuntimeIdentity::new(
+                &config.provider,
+                &config.model,
+                config.variant.as_deref(),
+            ),
+            Err(error) => {
+                let text = rollback_owned_session_message(
+                    session_manager,
+                    &child_session,
+                    "Failed to read source Session runtime identity",
+                    error,
+                );
+                send_stream(ui_tx, MessageSource::Error, text);
+                return;
+            }
+        };
     if let Err(error) = talos_session::PendingSubmissionStore::for_session(&child_session)
         .initialize_runtime_identity(inherited_identity)
     {
-        let text = format!("[Error] Failed to initialize fork runtime identity: {error}\n");
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session,
+            "Failed to initialize fork runtime identity",
+            error,
+        );
         send_stream(ui_tx, MessageSource::Error, text);
-        let _ = std::fs::remove_file(&child_path);
+        return;
+    }
+
+    let index_result = session_manager
+        .update_index(&source_session)
+        .and_then(|()| session_manager.update_index(&child_session))
+        .and_then(|()| {
+            session_manager.record_fork(&source_session.id, &child_session.id, &fork_entry_id)
+        });
+    if let Err(error) = index_result {
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session,
+            "Failed to publish child Session index/fork ownership",
+            error,
+        );
+        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
@@ -1123,9 +1229,13 @@ pub(crate) async fn handle_session_fork(
     {
         Ok(runtime) => runtime,
         Err(error) => {
-            let text = format!("[Error] Failed to construct fork runtime: {error}\n");
+            let text = rollback_owned_session_message(
+                session_manager,
+                &child_session,
+                "Failed to construct fork runtime",
+                error,
+            );
             send_stream(ui_tx, MessageSource::Error, text);
-            let _ = std::fs::remove_file(&child_path);
             return;
         }
     };
@@ -1133,20 +1243,26 @@ pub(crate) async fn handle_session_fork(
     let actor = built_runtime.actor;
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
-        let text = format!("[Error] Failed to retain fork MCP runtime: {error}\n");
+        transition.rollback();
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session,
+            "Failed to retain fork MCP runtime",
+            error,
+        );
         send_stream(ui_tx, MessageSource::Error, text);
-        let _ = std::fs::remove_file(&child_path);
         return;
     }
 
-    // Clone for watch channel update after commit (child_session is moved into prepare).
     let child_session_for_watch = child_session.clone();
-    if let Err(e) = transition.prepare(handle, child_session) {
+    if let Err(error) = transition.prepare(handle, child_session) {
         transition.rollback();
-        let _ = talos_session::remove_session_artifacts_for_transcript(
-            &child_session_for_watch.file_path,
+        let text = rollback_owned_session_message(
+            session_manager,
+            &child_session_for_watch,
+            "Failed to prepare fork",
+            error,
         );
-        let text = format!("[Error] Failed to prepare fork: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
@@ -1167,23 +1283,33 @@ pub(crate) async fn handle_session_fork(
                     ui_tx,
                     child_session_for_watch.id.to_string(),
                 );
-                let text = format!(
-                    "[System] Forked session {child_id} (source: {}).\n",
-                    old_session.id
+                send_stream(
+                    ui_tx,
+                    MessageSource::System,
+                    format!(
+                        "[System] Forked Session {child_id} (source: {}).\n",
+                        old_session.id
+                    ),
                 );
-                send_stream(ui_tx, MessageSource::System, text);
             }
             Err(error) => {
-                let text = format!("[Error] {error}\n");
+                let text = rollback_owned_session_message(
+                    session_manager,
+                    &child_session_for_watch,
+                    "Failed to publish fork runtime",
+                    error,
+                );
                 send_stream(ui_tx, MessageSource::Error, text);
             }
         },
-        Err(e) => {
+        Err(error) => {
             transition.rollback();
-            let _ = talos_session::remove_session_artifacts_for_transcript(
-                &child_session_for_watch.file_path,
+            let text = rollback_owned_session_message(
+                session_manager,
+                &child_session_for_watch,
+                "Failed to commit fork; old Session remains active",
+                error,
             );
-            let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
     }
@@ -1192,6 +1318,75 @@ pub(crate) async fn handle_session_fork(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rollback_diagnostic_preserves_primary_and_cleanup_failures() {
+        let dir = tempfile::tempdir().expect("temporary rollback test directory");
+        let manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+        let child = manager
+            .defer_create_session("talos", "/workspace")
+            .expect("defer child Session");
+        std::fs::create_dir_all(
+            child
+                .file_path
+                .parent()
+                .expect("child transcript has a parent"),
+        )
+        .expect("create child directory");
+        std::fs::write(&child.file_path, b"non-sensitive transcript fixture")
+            .expect("write child transcript");
+        let sqlite = child
+            .file_path
+            .with_file_name(format!("{}.pending.sqlite", child.id));
+        std::fs::create_dir(&sqlite).expect("create blocked SQLite target");
+        std::fs::write(sqlite.join("held"), b"held").expect("make target non-empty");
+
+        let message = rollback_owned_session_message(
+            &manager,
+            &child,
+            "Failed to construct fork runtime",
+            "provider build failed",
+        );
+        assert!(message.contains("provider build failed"));
+        assert!(message.contains("Cleanup also failed"));
+        assert!(message.contains(&child.id.to_string()));
+        assert!(message.contains(&sqlite.display().to_string()));
+        assert!(message.contains("retryable"));
+        assert!(child.file_path.exists());
+        assert!(!message.contains("non-sensitive transcript fixture"));
+
+        std::fs::remove_file(sqlite.join("held")).expect("release blocked target");
+        std::fs::remove_dir(&sqlite).expect("remove blocked target");
+        manager
+            .rollback_session_artifacts(&child)
+            .expect("retry cleanup succeeds");
+    }
+
+    #[test]
+    fn rollback_diagnostic_reports_complete_success_without_content() {
+        let dir = tempfile::tempdir().expect("temporary rollback test directory");
+        let manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+        let child = manager
+            .create_session("talos", "/workspace")
+            .expect("create child Session");
+        talos_session::PendingSubmissionStore::for_session(&child)
+            .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+                "provider", "model", None,
+            ))
+            .expect("initialize child identity");
+
+        let message = rollback_owned_session_message(
+            &manager,
+            &child,
+            "Failed to commit fork",
+            "durable fence failed",
+        );
+        assert!(message.contains("durable fence failed"));
+        assert!(message.contains("Rolled back Session"));
+        assert!(message.contains(&child.id.to_string()));
+        assert!(!child.file_path.exists());
+        assert!(!message.contains("submission"));
+    }
 
     #[test]
     fn committed_session_boundary_clears_preview_before_identity() {
