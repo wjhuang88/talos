@@ -68,9 +68,29 @@ jobs:
           cargo test -p talos-session runtime_activation_stage_is_generation_atomic_and_restart_recoverable --locked
 
       - name: CLI publication and compaction regression tests
+        id: cli_regression
+        continue-on-error: true
+        shell: bash
         run: |
-          cargo test -p talos-cli publication_failure_stops_replacement_without_success --locked
-          cargo test -p talos-cli session_owned_activation_survives_repeated_production_compaction --locked
+          set -o pipefail
+          status=0
+          cargo test -p talos-cli publication_failure_stops_replacement_without_success --locked -- --nocapture 2>&1 | tee /tmp/i169-publication-failure.log || status=1
+          cargo test -p talos-cli session_owned_activation_survives_repeated_production_compaction --locked -- --nocapture 2>&1 | tee /tmp/i169-compaction.log || status=1
+          exit "$status"
+
+      - name: Upload CLI regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i169-cli-regression-diagnostics
+          path: |
+            /tmp/i169-publication-failure.log
+            /tmp/i169-compaction.log
+          if-no-files-found: error
+
+      - name: Propagate CLI regression result
+        if: steps.cli_regression.outcome == 'failure'
+        run: exit 1
 
       - name: Source-layout boundary tests
         run: cargo test -p talos-cli --test i169_source_layout --locked
