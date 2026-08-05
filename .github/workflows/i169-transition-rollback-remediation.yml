@@ -93,6 +93,17 @@ jobs:
               raise SystemExit(
                   f"expected one dropped-watch assertion, found {dropped_assertion_count}"
               )
+
+          old_error_assertion = '        assert!(error.contains("new generation is stopped"));\n'
+          new_error_assertion = '''        assert!(error.contains("logical ownership was restored"));
+          assert!(error.contains(&old_session.id.to_string()));
+          assert!(error.contains(&new_session.id.to_string()));
+          '''
+          if text.count(old_error_assertion) != 3:
+              raise SystemExit(
+                  f"expected three legacy publication error assertions, found {text.count(old_error_assertion)}"
+              )
+          text = text.replace(old_error_assertion, new_error_assertion)
           path.write_text(text)
           PY
           cargo fmt --all
