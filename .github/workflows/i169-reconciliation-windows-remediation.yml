@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: i169-reconciliation-windows-remediation
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify-linux:
