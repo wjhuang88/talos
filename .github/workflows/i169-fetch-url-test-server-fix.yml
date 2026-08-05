@@ -1,0 +1,143 @@
+name: I169 fetch_url test server fix
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/i169-fetch-url-test-server-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    if: github.event.pull_request.number == 131
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - name: Fix bounded HTTP request reads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/talos-tools/src/fetch_url.rs')
+          text = path.read_text()
+          old = '''    fn serve_http(listener: &TcpListener, response: &str) {
+        let mut stream = accept_with_timeout(listener);
+        let mut buf = [0u8; 4096];
+        stream.read_exact(&mut buf).expect("read failed");
+        stream.write_all(response.as_bytes()).expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+
+    fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
+        let mut stream = accept_with_timeout(listener);
+        let mut buf = [0u8; 4096];
+        stream.read_exact(&mut buf).expect("read failed");
+        stream
+            .write_all(response1.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+        drop(stream);
+
+        let mut stream = accept_with_timeout(listener);
+        stream.read_exact(&mut buf).expect("read failed");
+        stream
+            .write_all(response2.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+'''
+          new = '''    fn read_request_headers(stream: &mut TcpStream) {
+        const MAX_REQUEST_HEADER_BYTES: usize = 64 * 1024;
+        const HEADER_TERMINATOR: &[u8] = b"\\r\\n\\r\\n";
+
+        let mut request = Vec::new();
+        let mut chunk = [0u8; 1024];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => {
+                    request.extend_from_slice(&chunk[..read]);
+                    assert!(
+                        request.len() <= MAX_REQUEST_HEADER_BYTES,
+                        "loopback request headers exceeded {MAX_REQUEST_HEADER_BYTES} bytes"
+                    );
+                    if request
+                        .windows(HEADER_TERMINATOR.len())
+                        .any(|window| window == HEADER_TERMINATOR)
+                    {
+                        return;
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) => panic!("read failed: {error}"),
+            }
+        }
+
+        panic!("connection closed before complete HTTP request headers were received");
+    }
+
+    fn serve_http(listener: &TcpListener, response: &str) {
+        let mut stream = accept_with_timeout(listener);
+        read_request_headers(&mut stream);
+        stream.write_all(response.as_bytes()).expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+
+    fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
+        let mut stream = accept_with_timeout(listener);
+        read_request_headers(&mut stream);
+        stream
+            .write_all(response1.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+        drop(stream);
+
+        let mut stream = accept_with_timeout(listener);
+        read_request_headers(&mut stream);
+        stream
+            .write_all(response2.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+'''
+          if old not in text:
+              raise RuntimeError('expected fetch_url test server block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          cargo fmt --all
+          git diff --check
+
+      - name: Targeted fetch_url regressions
+        run: |
+          cargo test -p talos-tools redirect_diagnostics_shows_final_url --locked
+          cargo test -p talos-tools redirect_limit_diagnostics --locked
+          cargo test -p talos-tools redirect_location_is_visible_when_redirects_disabled --locked
+
+      - name: Full talos-tools tests
+        run: cargo test -p talos-tools --locked
+
+      - name: Strict workspace Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Publish verified source fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add crates/talos-tools/src/fetch_url.rs
+          git diff --cached --check
+          git config user.name talos-governance-bot
+          git config user.email actions@users.noreply.github.com
+          git commit -m "test(tools): read loopback HTTP headers incrementally"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
