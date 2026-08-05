@@ -1,0 +1,173 @@
+name: Repair I169 artifact patch anchors
+
+on:
+  push:
+    branches:
+      - feat/i169-tui-044-transactional-steering
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/i169-tui-044-transactional-steering
+          fetch-depth: 0
+
+      - name: Replace brittle text anchors with function boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/i169-artifact-core-remediation.yml')
+          text = path.read_text()
+          text = text.replace("    if: github.actor != 'github-actions[bot]'\n", "", 1)
+          text = text.replace(
+              '          test "$(git rev-parse HEAD^)" = "0e529a31cc84a4511447567fc07d2098182ab7e1"\n',
+              '          git merge-base --is-ancestor 0e529a31cc84a4511447567fc07d2098182ab7e1 HEAD\n',
+              1,
+          )
+
+          start = text.index("          old_delete = '''")
+          end = text.index("          old_apply = '''", start)
+          replacement = r'''          delete_start = text.index(
+              "    #[allow(clippy::collapsible_if)]\n    pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {\n"
+          )
+          delete_end = text.index(
+              "    /// Return sessions that would be removed by `policy` without deleting files.\n",
+              delete_start,
+          )
+          new_delete = '''    /// Delete one discoverable Session through the retryable ownership boundary.
+    pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
+        let file_path = self.find_session_file(id)?;
+        self.remove_owned_session_artifacts(id, &file_path).map(|_| ())
+    }
+
+    /// Roll back all artifacts owned by a prepared or partially created Session.
+    ///
+    /// Unlike `delete_session`, this does not require the transcript to exist, so
+    /// post-identity initialization failures remain recoverable.
+    pub fn rollback_session_artifacts(
+        &self,
+        session: &Session,
+    ) -> Result<SessionArtifactCleanupReport, SessionError> {
+        self.remove_owned_session_artifacts(&session.id, &session.file_path)
+    }
+
+    fn remove_owned_session_artifacts(
+        &self,
+        id: &Uuid,
+        transcript_path: &Path,
+    ) -> Result<SessionArtifactCleanupReport, SessionError> {
+        let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
+        crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
+        let mut guard = self.get_or_create_index().map_err(|error| {
+            SessionError::IndexCleanup {
+                session_id: *id,
+                message: error.to_string(),
+            }
+        })?;
+        if let Some(index) = guard.as_mut() {
+            index.delete_session(&id.to_string()).map_err(|error| {
+                SessionError::IndexCleanup {
+                    session_id: *id,
+                    message: error.to_string(),
+                }
+            })?;
+        }
+        report.merge(remove_session_transcript(transcript_path)?);
+        Ok(report)
+    }
+
+    /// Discover and remove safe transcript-less pending SQLite artifacts.
+    pub fn reconcile_orphan_sidecars(
+        &self,
+        policy: &OrphanSidecarReconciliationPolicy,
+    ) -> Result<OrphanSidecarReconciliationReport, SessionError> {
+        crate::artifacts::reconcile_orphan_sidecars_in_root(&self.sessions_dir, policy)
+    }
+
+'''
+          text = text[:delete_start] + new_delete + text[delete_end:]
+
+'''
+          text = text[:start] + replacement + text[end:]
+
+          start = text.index("          old_apply = '''")
+          end = text.index("          manager.write_text(text)", start)
+          replacement = r'''          apply_owner = text.index("    pub fn apply_cleanup(")
+          apply_start = text.index(
+              "        for candidate in &report.candidates {\n",
+              apply_owner,
+          )
+          apply_end = text.index("\n        Ok(report)", apply_start)
+          new_apply = '''        for candidate in &report.candidates {
+            let cleanup =
+                self.remove_owned_session_artifacts(&candidate.id, &candidate.file_path)?;
+            report.removed = report.removed.saturating_add(1);
+            report.bytes_removed = report.bytes_removed.saturating_add(cleanup.bytes_removed);
+        }
+'''
+          text = text[:apply_start] + new_apply + text[apply_end:]
+          manager.write_text(text)
+'''
+          text = text[:start] + replacement + text[end + len("          manager.write_text(text)\n"):]
+
+          start = text.index("          old = '''    if args.reconcile {")
+          end = text.index("          storage.write_text(text.replace(old, new, 1))", start)
+          replacement = r'''          reconcile_start = text.index("    if args.reconcile {\n")
+          reconcile_end = text.index("\n    Ok(())\n}", reconcile_start)
+          new_reconcile = '''    if args.reconcile {
+        match manager.reconcile_index() {
+            Ok(fixed) => println!(
+                "Session index: reconciled {fixed} entr{}.",
+                if fixed == 1 { "y" } else { "ies" }
+            ),
+            Err(e) => eprintln!("Session index reconcile failed: {e}"),
+        }
+        match manager.reconcile_orphan_sidecars(
+            &OrphanSidecarReconciliationPolicy::default(),
+        ) {
+            Ok(report) => {
+                println!(
+                    "Session sidecars: scanned {}, removed {} set(s) / {} artifact(s) / {} byte(s), skipped {}, failures {}, bounded={}.",
+                    report.scanned_entries,
+                    report.removed_sets,
+                    report.removed_artifacts,
+                    report.bytes_removed,
+                    report.skipped_sets,
+                    report.failures.len(),
+                    report.bounded,
+                );
+                for failure in report.failures {
+                    eprintln!(
+                        "Session sidecar reconcile failed for {} at {}: {}",
+                        failure.session_id,
+                        failure.path.display(),
+                        failure.error,
+                    );
+                }
+            }
+            Err(e) => eprintln!("Session sidecar reconcile failed: {e}"),
+        }
+    }
+'''
+          storage.write_text(text[:reconcile_start] + new_reconcile + text[reconcile_end:])
+'''
+          text = text[:start] + replacement + text[end + len("          storage.write_text(text.replace(old, new, 1))\n"):]
+          path.write_text(text)
+          PY
+
+          rm .github/workflows/i169-artifact-workflow-repair.yml
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows
+          git commit -m "chore(ci): harden I169 patch anchors"
+          git push origin HEAD:feat/i169-tui-044-transactional-steering
