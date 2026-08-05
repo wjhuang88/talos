@@ -11,6 +11,39 @@ use uuid::Uuid;
 
 const KNOWN_EXTENSIONS: &[&str] = &["jsonl", "tlog"];
 
+/// Remove the complete artifact set owned by one Session transcript path.
+pub fn remove_session_artifacts_for_transcript(
+    transcript_path: &Path,
+) -> Result<u64, SessionError> {
+    let stem = transcript_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| {
+            SessionError::ParseError(format!(
+                "invalid session transcript path: {}",
+                transcript_path.display()
+            ))
+        })?;
+    let sidecar = transcript_path.with_file_name(format!("{stem}.pending.sqlite"));
+    let mut removed_bytes = 0_u64;
+    for path in [
+        transcript_path.to_path_buf(),
+        sidecar.clone(),
+        PathBuf::from(format!("{}-wal", sidecar.display())),
+        PathBuf::from(format!("{}-shm", sidecar.display())),
+    ] {
+        match fs::metadata(&path) {
+            Ok(metadata) => {
+                fs::remove_file(&path)?;
+                removed_bytes = removed_bytes.saturating_add(metadata.len());
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(SessionError::IoError(error)),
+        }
+    }
+    Ok(removed_bytes)
+}
+
 /// Policy for selecting session cleanup candidates.
 #[derive(Debug, Clone, Default)]
 pub struct SessionCleanupPolicy {
@@ -581,9 +614,7 @@ impl SessionManager {
     #[allow(clippy::collapsible_if)]
     pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
         let file_path = self.find_session_file(id)?;
-        if file_path.exists() {
-            fs::remove_file(&file_path)?;
-        }
+        remove_session_artifacts_for_transcript(&file_path)?;
         crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
         if let Ok(mut guard) = self.get_or_create_index() {
             if let Some(index) = guard.as_mut() {
@@ -677,10 +708,10 @@ impl SessionManager {
         };
 
         for candidate in &report.candidates {
-            if candidate.file_path.exists() {
-                fs::remove_file(&candidate.file_path)?;
+            let removed_bytes = remove_session_artifacts_for_transcript(&candidate.file_path)?;
+            if removed_bytes > 0 {
                 report.removed += 1;
-                report.bytes_removed += candidate.size_bytes;
+                report.bytes_removed = report.bytes_removed.saturating_add(removed_bytes);
             }
 
             if let Ok(mut guard) = self.get_or_create_index()

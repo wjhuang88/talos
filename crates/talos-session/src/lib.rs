@@ -60,6 +60,7 @@ pub use durable::{
 pub use error::SessionError;
 pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+    remove_session_artifacts_for_transcript,
 };
 pub use pending_submission::{
     PendingSubmissionError, PendingSubmissionRecord, PendingSubmissionStore,

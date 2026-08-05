@@ -724,7 +724,7 @@ pub(crate) async fn handle_session_new(
     };
 
     if let Err(error) = crate::mode_runtime::ensure_session_runtime_identity(config, &new_session) {
-        let _ = std::fs::remove_file(&new_session.file_path);
+        let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
         let text = format!("[Error] Failed to initialize new Session runtime identity: {error}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
@@ -733,7 +733,7 @@ pub(crate) async fn handle_session_new(
     let built_runtime = match runtime_builder.build(config, &new_session, vec![]).await {
         Ok(runtime) => runtime,
         Err(error) => {
-            let _ = std::fs::remove_file(&new_session.file_path);
+            let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
             let text = format!("[Error] Failed to construct new Session runtime: {error}\n");
             send_stream(ui_tx, MessageSource::Error, text);
             return;
@@ -743,7 +743,7 @@ pub(crate) async fn handle_session_new(
     let actor = built_runtime.actor;
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
-        let _ = std::fs::remove_file(&new_session.file_path);
+        let _ = talos_session::remove_session_artifacts_for_transcript(&new_session.file_path);
         let text = format!("[Error] Failed to retain new Session MCP runtime: {error}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
@@ -753,7 +753,9 @@ pub(crate) async fn handle_session_new(
     let new_session_for_watch = new_session.clone();
     if let Err(e) = transition.prepare(handle, new_session) {
         transition.rollback();
-        let _ = std::fs::remove_file(&new_session_for_watch.file_path);
+        let _ = talos_session::remove_session_artifacts_for_transcript(
+            &new_session_for_watch.file_path,
+        );
         let text = format!("[Error] Failed to prepare new session: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
@@ -786,7 +788,9 @@ pub(crate) async fn handle_session_new(
         },
         Err(e) => {
             transition.rollback();
-            let _ = std::fs::remove_file(&new_session_for_watch.file_path);
+            let _ = talos_session::remove_session_artifacts_for_transcript(
+                &new_session_for_watch.file_path,
+            );
             let text =
                 format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
@@ -1139,7 +1143,9 @@ pub(crate) async fn handle_session_fork(
     let child_session_for_watch = child_session.clone();
     if let Err(e) = transition.prepare(handle, child_session) {
         transition.rollback();
-        let _ = std::fs::remove_file(&child_session_for_watch.file_path);
+        let _ = talos_session::remove_session_artifacts_for_transcript(
+            &child_session_for_watch.file_path,
+        );
         let text = format!("[Error] Failed to prepare fork: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
@@ -1174,7 +1180,9 @@ pub(crate) async fn handle_session_fork(
         },
         Err(e) => {
             transition.rollback();
-            let _ = std::fs::remove_file(&child_session_for_watch.file_path);
+            let _ = talos_session::remove_session_artifacts_for_transcript(
+                &child_session_for_watch.file_path,
+            );
             let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
