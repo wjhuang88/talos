@@ -10,6 +10,7 @@ FILES = [
     "crates/talos-agent/src/request_plan/tests.rs",
     "crates/talos-agent/src/scheduler.rs",
     "crates/talos-agent/tests/i169_durable_custody.rs",
+    "crates/talos-agent/tests/i169_old_generation_reconcile.rs",
     "crates/talos-provider/src/anthropic_request.rs",
     "crates/talos-provider/src/anthropic_stream.rs",
     "crates/talos-tui/src/app.rs",
