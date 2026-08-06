@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I169 Transactional Batched Steering Turn | Active — PR #131 review handoff; activated 2026-08-02 | [TUI-044](backlog/active/TUI-044-transactional-batched-steering-turn.md) / [I169](iterations/I169-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) / [Issue #119](https://github.com/wjhuang88/talos/issues/119) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require durable receipt, exact request-plan, full locked/platform CI and rebuilt real-TUI evidence before Review. |
+| I169 Transactional Batched Steering Turn | **Complete — PR #131 merged (2026-08-06)** | [TUI-044](backlog/active/TUI-044-transactional-batched-steering-turn.md) / [I169](iterations/I169-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) / [Issue #119](https://github.com/wjhuang88/talos/issues/119) | Completion merge `685d3b4f4088a172551f8c844a89f5dee9469430`; exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`; CI `31010166558`; rebuilt real-terminal acceptance passed. ADR-056 Accepted and Issue #119 completed. Issue #136 remains independent and non-blocking. |
 | I170 Windows Shell And Portability Recovery | Complete — PR #126 merged (2026-08-01) | [I170](iterations/I170-windows-workspace-validation-unblocker.md) / [TOOL-023-A](backlog/active/TOOL-023-A-bash-timeout-fix.md) / [TOOL-023-C](backlog/active/TOOL-023-C-windows-powershell.md) / [ADR-057](decisions/057-windows-powershell-process-boundary.md) | Completion merge `592254d73a98166df48da0139a02df67e9cd2cd6`; exact Head `8cfe8edb2dbda581244f583fb809591391a54298`, CI `30705366763`, artifact `8820174164`. Direct-child-only timeout residual remains separately owned; archival PR #121 stays immutable. |
 | Four-Month Trust And Productization Plan | Complete (2026-07-12) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [security review](reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116-I119 and LT002 complete. Permission evidence remains diagnostic-only; installer local fixture and socket-capable preflight pass; I085 terminal walkthrough passed. REL-002 remains NO-GO and no release is authorized. |
 | Four-Month Scheduled Follow-Ups | Complete — I124-I127 (2026-07-15) | [execution package](tasks/2026-07-13-scheduled-followups-execution-package.md) / [program plan](tasks/2026-07-13-four-month-scheduled-followups-plan.md) / [I127](iterations/I127-scheduler-reliability-closeout.md) | I127 closes production full-queue handling (`try_send` → bounded tool error) and an independently replayed clean-HOME register/fire/list/cancel/shutdown packet. Full locked validation and governance pass. REL-002 remains NO-GO; no release action. |
@@ -45,7 +45,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Open Issue / Owner Status Reconciliation | Complete (2026-08-01) | [current status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md) / [historical 2026-07-09 matrix](reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md) | All 26 open Issues observed on 2026-08-01 map to one owner document. Issue #119 is Active in PR #131 review handoff; all other remote items retain their recorded Partial, Deferred, Refinement, Ready, Review or Blocked state. |
+| Open Issue / Owner Status Reconciliation | Complete (updated 2026-08-06) | [2026-08-01 status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md) / [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Issue #119 is completed and closed through I169. Issue #136 remains Open under independent `/delete` diagnostic scope. All other remote items retain their recorded owner and state. |
 | I115 Runtime Event Semantic Convergence | Complete | [I115](iterations/I115-runtime-event-semantic-convergence.md) / [ARCH-033](backlog/active/ARCH-033-runtime-event-semantic-convergence.md) | Closed after FIFO content, authoritative lifecycle, actor persistence, cross-surface runtime evidence, full tests, clippy, and governance validation passed. |
 
 ## Blocked / Paused
@@ -63,6 +63,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Permission Pipeline Convergence | P0 Refinement — A→E chain unclaimed | [PERM-006](backlog/active/PERM-006-permission-pipeline-convergence.md) / [Issue #52](https://github.com/wjhuang88/talos/issues/52) | Refine and select one child at a time; no implementation may bypass PERM-004/PERM-005 safety or combine pipeline and typed-resource migration. |
 | Runtime Session And Protocol Foundations | P1 Refinement/Blocked | [SESSION-009](backlog/active/SESSION-009-multi-client-session-architecture.md) / [ACP-001](backlog/active/ACP-001-agent-client-protocol-server.md) / [RUNTIME-005](backlog/active/RUNTIME-005-bounded-graceful-shutdown.md) | Accept multi-client and shutdown lifecycle boundaries before ACP or background-job completion claims. |
 | TUI Regression Intake | P1 Ready/Refinement | [TUI-041](backlog/active/TUI-041-thinking-preview-wrap-and-height.md) / [TUI-042](backlog/active/TUI-042-noop-history-scroll-stability.md) / [TUI-043](backlog/active/TUI-043-tool-placeholder-suppression.md) | Select TUI-043 as a bounded fix or refine TUI-041/TUI-042 with real-terminal validation; preserve ADR-054 ownership. |
+| `/delete` Cleanup-Failure Actionability | P1 Open follow-up | [Issue #136](https://github.com/wjhuang88/talos/issues/136) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) | Add exact executable retry and maintenance guidance while preserving accepted transcript-last cleanup, retryability and no-false-success behavior. |
 | Memory Scope Architecture | P1 Refinement | [MEM-011](backlog/active/MEM-011-extensible-memory-scopes.md) / [Issue #116](https://github.com/wjhuang88/talos/issues/116) | Accept schema/migration ADR and legacy-fixture plan before Ready; no manual database reset or retrieval broadening. |
 | Deferred Product Architecture | P2/P3 Deferred/Refinement | [DESKTOP-001](backlog/active/DESKTOP-001-desktop-product-direction.md) / [AGENT-003](backlog/active/AGENT-003-multi-agent-architecture.md) / [RUNTIME-004](backlog/active/RUNTIME-004-session-health-monitoring.md) | Remain unclaimed until explicitly reprioritized; directional proposals do not authorize implementation. |
 | TUI-037 Dashboard Link In Logo Region | P1 Refinement — first post-I158 disposition | [TUI-037](backlog/active/TUI-037-dashboard-logo-link.md) / [Issue #104](https://github.com/wjhuang88/talos/issues/104) | After I158 Complete or Paused, resolve OSC 8 and token-required loopback navigation gates, then select a dedicated iteration or explicitly record Blocked/Deferred before I159 activation. |
@@ -73,6 +74,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I169 Transactional Batched Steering Turn | **Complete (2026-08-06)** | [I169](iterations/I169-batched-steering-turn.md) / [TUI-044](backlog/active/TUI-044-transactional-batched-steering-turn.md) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) | PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`; exact Head `90165cace4625c0f27616b3e1b9871bcb6a10186`, CI `31010166558`, real-terminal acceptance passed; Issue #119 completed. |
 | I170 Windows Shell And Portability Recovery | Complete (2026-08-01) | [I170](iterations/I170-windows-workspace-validation-unblocker.md) / [ADR-057](decisions/057-windows-powershell-process-boundary.md) | PR #126 merged at `592254d73a98166df48da0139a02df67e9cd2cd6`; TOOL-023-A/C Complete and ADR-057 Accepted. |
 
 ## Later
@@ -81,20 +83,9 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
 
-## I169 review synchronization (2026-08-04)
+## I169 Closeout (2026-08-06)
 
-- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
-- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
-- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.
-
-<!-- PR131-I169-REMEDIATION-2026-08-05 -->
-## PR #131 independent-review remediation checkpoint — 2026-08-05
-
-- Implementation source baseline: `40e4bb95176d60b1d58214788620b4c535fee62e`; current main / merge base: `a03e25436a25f84f117a90362686fc8205e52dde`.
-- Latest independent Review `PRR_kwDOSrj_LM8AAAABIdlncA` remains the governing `CHANGES REQUIRED` verdict until a fresh review binds to the final exact Head.
-- B1/B2/H1/M1/M2 remediation now uses one retryable Session artifact ownership boundary: WAL/SHM/SQLite precede the transcript commit point; rollback preserves primary plus cleanup diagnostics; zero-byte retention counts removals; bounded orphan reconciliation validates UUID/suffix/root/symlink/live-owner safety.
-- Production `/new`, TUI `/fork`, CLI `--fork`, transition publication rollback, Session index and fork-relation cleanup now converge on that ownership boundary while preserving the source Session.
-- Verification workflow `30997867486` passed Linux full `talos-session`/`talos-tools` gates, strict Clippy, Windows open-SQLite-handle retry, Windows redirect `20/20`, Windows full `talos-tools`, and self-cleaned all temporary remediation assets before publishing the source baseline.
-- Lifecycle state is intentionally unchanged. Final exact-head standard CI, rebuilt real-TUI acceptance, evidence synchronization and a fresh independent review remain mandatory before any advancement or merge authorization.
-
-- Derived Board disposition remains PR #131 Draft, TUI-044/I169 Active, ADR-056 Proposed, Issue #119 Open.
+- TUI-044 / I169 are **Complete**; ADR-056 is **Accepted**; Issue #119 is completed and closed.
+- Completion is bound to PR #131 merge commit `685d3b4f4088a172551f8c844a89f5dee9469430`, exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`, CI `31010166558` and rebuilt real-terminal acceptance.
+- Issue #136 remains independently Open and non-blocking for direct `/delete` recovery-command wording.
+- Recovery PR #120 and its branch remain immutable archival evidence.
