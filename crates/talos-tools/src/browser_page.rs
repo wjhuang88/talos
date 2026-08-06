@@ -232,12 +232,13 @@ mod tests {
                     url: "https://user:pass@example.com/account?token=abc&ok=1".to_string(),
                 },
             ]);
-        let json = serde_json::to_string(&record).expect("operation should succeed");
 
-        assert!(!json.contains("user:pass"));
-        assert!(!json.contains("abc"));
-        assert!(json.contains("token=***"));
-        assert!(json.contains("ok=1"));
+        assert_eq!(record.selected_links.len(), 1);
+        let sanitized_url = &record.selected_links[0].url;
+        assert!(!sanitized_url.contains("user:pass"));
+        assert!(!sanitized_url.contains("abc"));
+        assert!(sanitized_url.contains("token=***"));
+        assert!(sanitized_url.contains("ok=1"));
     }
 
     #[tokio::test]

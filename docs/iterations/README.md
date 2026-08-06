@@ -30,7 +30,6 @@ That snapshot is historical evidence and not current activation authority.
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I169 | Transactional Batched Steering Turn | Active — PR #131 review handoff (2026-08-04) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require complete transaction/journal/lifecycle/request/replay evidence, exact-head CI and rebuilt real-TUI acceptance before Review. |
 | I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
@@ -41,14 +40,21 @@ That snapshot is historical evidence and not current activation authority.
 
 | ID | Codename | Final State | Completion Evidence |
 |---|---|---|---|
+| I169 | Transactional Batched Steering Turn | **Complete (2026-08-06)** | PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`; exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`; CI run `31010166558`; rebuilt real-terminal acceptance passed; TUI-044 Complete; ADR-056 Accepted; Issue #119 completed. Issue #136 remains independent and non-blocking. |
 | I170 | Windows Workspace Validation Unblocker | Complete (2026-08-01) | PR #126 squash-merged at `592254d73a98166df48da0139a02df67e9cd2cd6`; exact implementation Head `8cfe8edb2dbda581244f583fb809591391a54298`; CI run `30705366763`; walkthrough artifact `8820174164`; TOOL-023-A/C Complete; ADR-057 Accepted. |
+
+I169's accepted residuals remain explicit:
+
+- Issue #136 owns direct `/delete` cleanup-failure recovery-command wording only;
+- queue editing/reordering, persistent cross-Session steering, retry of a started terminal Turn,
+  broader shutdown and general persistent tasks remain separately owned;
+- no release or REL-002 readiness claim is made.
 
 I170's accepted residuals remain explicit:
 
 - timeout cleanup is guaranteed for the direct shell child, not the complete descendant tree;
 - TOOL-023-B still owns timeout default/configuration;
-- a PowerShell lexer/parser, PowerShell 7 selection and Job Object lifecycle require separate decisions;
-- I170 completion satisfies I169's prerequisite but is not I169 implementation evidence.
+- a PowerShell lexer/parser, PowerShell 7 selection and Job Object lifecycle require separate decisions.
 
 ## Recent Non-Terminal / Completed Context
 
@@ -63,17 +69,18 @@ I170's accepted residuals remain explicit:
 | I157 | Complete (2026-07-30 correction) | Provider removal/credential clear stale-snapshot concurrency correction. |
 | I156 | Complete (2026-07-27) | Narrow-viewport and resize robustness; maintainer Alacritty walkthrough passed. |
 
-## I169 Activation Evidence
+## I169 Completion Evidence
 
-- [x] current `main` re-read at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`;
-- [x] Issue #119, TUI-044, I169 and ADR-056 re-read;
-- [x] no overlapping active steering implementation or newer owner found;
-- [x] fresh branch `feat/i169-tui-044-transactional-steering` created from exact current main;
-- [x] maintainer explicitly instructed formal activation and implementation;
-- [x] TUI-044/I169/Board changed to Active before product-code mutation;
-- [x] Draft implementation PR #131 opened and recorded;
-- [x] recovery PR #120 and `recovery/pr-68-i169-20260731` remain unchanged;
-- [x] exact-head Windows/macOS CI and rebuilt real-TUI acceptance remain implementation gates.
+- [x] activated from the recorded current-main architecture baseline;
+- [x] recovery PR #120 and its branch remained immutable;
+- [x] structured transaction, journal, lifecycle, Scheduler, exact-request and replay behavior implemented;
+- [x] independent review findings remediated;
+- [x] exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186` passed CI `31010166558`;
+- [x] rebuilt release binary completed the real-terminal A/B/C, restart, fork, delete and recovery walkthrough;
+- [x] PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`;
+- [x] TUI-044 marked Complete and ADR-056 marked Accepted;
+- [x] Issue #119 closed as completed;
+- [x] Issue #136 retained as a separately owned non-blocking residual.
 
 ## History
 
@@ -83,9 +90,3 @@ The prior full iteration registry and non-terminal inventory remain available at
 
 Individual plans and completion records remain under `docs/iterations/`; this compact index does not
 replace or rewrite them.
-
-## I169 review synchronization (2026-08-04)
-
-- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
-- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
-- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.

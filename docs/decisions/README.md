@@ -23,14 +23,14 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
-| [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) | Proposed — prerequisite satisfied; I169 not active | I170 is complete, so TUI-044/I169 may be explicitly selected from a fresh current-main branch. Acceptance still requires the fresh structured steering implementation, lifecycle/persistence/budget evidence, exact-head Windows/macOS CI and review. Recovery PR #120 remains archival. |
+| [056: Transactional Steering Submission And Turn Ownership Boundary](056-transactional-steering-submission-boundary.md) | **Accepted (2026-08-06)** | Durable structured queue custody, receipt-based ownership transfer, generation-safe lifecycle, Actor user/Scheduler arbitration, transcript-before-journal finalization and exact request-plan semantics are authoritative. PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`; exact Head `90165cace4625c0f27616b3e1b9871bcb6a10186`, CI `31010166558`, and rebuilt real-terminal acceptance passed. Issue #136 is a non-blocking diagnostic wording residual. |
 | [057: Windows PowerShell Process Boundary](057-windows-powershell-process-boundary.md) | **Accepted (2026-08-01)** | Windows uses one native `powershell.exe -NoLogo -NoProfile -NonInteractive -Command` boundary; Unix retains `bash`/`sh -c`; child environment removal is local; timeout is one absolute direct-child boundary; reusable Windows templates use an inert-token allowlist. PR #126 merged at `592254d73a98166df48da0139a02df67e9cd2cd6`. |
 | [053: Tool Registration Composition](053-tool-registration-composition.md) | Accepted; I158 Review | Current checked-contribution/outer composition boundary remains authoritative. I158 closure still requires scheduler/status exception disposition and final documentation. |
 | [054: Alternate-Screen App-Owned Transcript Rendering](054-alternate-screen-app-owned-transcript-rendering.md) | Accepted | TUI owns full-frame alternate-screen rendering, history reflow and terminal restoration. Current TUI layout follow-ups must preserve this boundary. |
 | [052: SDK Publication And Composition Boundary](052-sdk-publication-and-composition-boundary.md) | Accepted | Runtime/SDK publication and composition work remains gated through I158-I162; no implicit publication authorization. |
-| [049: Steering Queue Projection Boundary](049-steering-queue-projection-boundary.md) | Accepted; partially extended only by a future accepted ADR-056 | Engine owns queued steering state before transactional acknowledgement; UI receives bounded read-only projection. |
-| [042: Embedded Durable Runtime Session Boundary](042-embedded-durable-runtime-session-boundary.md) | Accepted | Durable successful turns and host-selected session binding remain the runtime/session foundation for future steering persistence. |
-| [039: Runtime Event Semantic Single-Flow Boundary](039-runtime-event-semantic-single-flow.md) | Accepted | Canonical ordered lifecycle, live output and actor-owned persistence remain mandatory for I169 and protocol work. |
+| [049: Steering Queue Projection Boundary](049-steering-queue-projection-boundary.md) | Accepted; extended by ADR-056 | Engine owns queued steering state and read-only UI projection before durable Actor acknowledgement. ADR-056 owns transactional consumption, custody and later-Turn execution. |
+| [042: Embedded Durable Runtime Session Boundary](042-embedded-durable-runtime-session-boundary.md) | Accepted | Durable successful turns and host-selected session binding remain the runtime/session foundation for steering persistence. |
+| [039: Runtime Event Semantic Single-Flow Boundary](039-runtime-event-semantic-single-flow.md) | Accepted | Canonical ordered lifecycle, live output and actor-owned persistence remain mandatory for protocol and runtime work. |
 
 ## Accepted Core Boundaries
 
@@ -44,8 +44,7 @@ The following Accepted ADRs remain active unless their own files say they are su
 | [020](020-tree-sitter-code-analysis.md)–[026](026-multi-resource-tool-permissions.md) | tree-sitter, tool-call protocol, shared agent config, credentials, embeddable runtime, ripgrep libraries and multi-resource permissions |
 | [027](027-plugin-runtime-boundary.md)–[034](034-reasoning-thinking-boundary.md) | plugin/runtime extension boundaries, command taxonomy, loopback dashboard, wasmtime review, associative memory policy and reasoning data |
 | [036](036-zstd-compression-dependency.md)–[042](042-embedded-durable-runtime-session-boundary.md) | session compression/log format, workspace trust, runtime events, logical sandbox evidence, scheduler API and durable runtime sessions |
-| [045](045-transient-model-private-tool-projection.md)–[055](055-primary-screen-app-owned-transcript-native-projection.md) | model-private edits, memory admission, external-path authorization, model variants, steering projection, multimodal/image safety, SDK/tool composition and TUI transcript boundaries |
-| [057](057-windows-powershell-process-boundary.md) | Windows-native shell/process/permission/timeout boundary |
+| [045](045-transient-model-private-tool-projection.md)–[057](057-windows-powershell-process-boundary.md) | model-private edits, memory admission, external-path authorization, model variants, transactional steering, multimodal/image safety, SDK/tool composition, TUI transcript and Windows shell/process boundaries |
 
 Use the individual ADR document—not this range summary—when making implementation or review decisions.
 
@@ -56,7 +55,23 @@ Use the individual ADR document—not this range summary—when making implement
 - [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — Persistent task runtime intentionally not authorized.
 - [044: Defer Multi-Instance Discovery](044-defer-multi-instance-discovery.md) — Automatic A2A discovery intentionally not authorized.
 
-## I170 Acceptance Evidence
+## I169 / ADR-056 Acceptance Evidence
+
+ADR-056 acceptance is bound to:
+
+- exact implementation Head `90165cace4625c0f27616b3e1b9871bcb6a10186`;
+- exact-head CI run `31010166558` / CI #1233, attempt 1, all jobs successful;
+- independent architecture/code review and completed remediation;
+- rebuilt real-terminal A/B/C queue, restart, restoration, fork, delete and recovery walkthrough;
+- release binary SHA-256 `2fe9f07679bd3f513165e849c59335ef11f47662852283c8f22051e954b2683d`;
+- merged PR #131 / completion commit `685d3b4f4088a172551f8c844a89f5dee9469430`;
+- maintainer acceptance and merge authorization;
+- TUI-044 / I169 completion and Issue #119 closure.
+
+Issue #136 remains Open and independently owns only direct `/delete` recovery-command wording. It
+does not reopen ADR-056's accepted custody, retryability or no-false-success boundary.
+
+## I170 / ADR-057 Acceptance Evidence
 
 ADR-057 acceptance is bound to:
 

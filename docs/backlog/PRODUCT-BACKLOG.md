@@ -15,14 +15,31 @@ That snapshot is historical evidence, not current activation authority.
 | 0 | Internal validation service | Validation must become an internal callable, language-neutral service; governance must not depend on shell scripts and project adapters must be detected before guidance is injected. | `docs/backlog/active/VALIDATION-001-internal-validation-service.md`; `docs/backlog/active/GOV-003-builtin-project-governance.md`; `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md` |
 | 0 | Permission pipeline convergence | PERM-006 remains Refinement. Select and review A→E children sequentially; no child may broaden PERM-004/PERM-005 policy implicitly. | `docs/backlog/active/PERM-006-permission-pipeline-convergence.md`; PERM-006-A/B/C/D/E |
 | 0 | Memory admission safety | MEM-010 is Ready but unselected. A bounded correction iteration must prove only user-authored episodes enter new global memory. | `docs/backlog/active/MEM-010-user-origin-memory-admission.md`; Issue #114 |
-| 1 | TUI-044 transactional batched steering | **Active in PR #131 review handoff.** Implement only on `feat/i169-tui-044-transactional-steering` synchronized with current `main`. ADR-056 remains Proposed; recovery PR #120 remains immutable. | `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`; `docs/iterations/I169-batched-steering-turn.md`; `docs/decisions/056-transactional-steering-submission-boundary.md`; Issue #119; PR #131 |
 | 1 | TUI regression intake | TUI-043 is Ready; TUI-041, TUI-042, TUI-045 and TUI-046 remain Refinement and require bounded layout/state-transition or terminal-interaction evidence before selection. | `docs/backlog/active/TUI-041-thinking-preview-wrap-and-height.md`; `docs/backlog/active/TUI-042-noop-history-scroll-stability.md`; `docs/backlog/active/TUI-043-tool-placeholder-suppression.md`; `docs/backlog/active/TUI-045-permission-prompt-layout-anchor.md`; `docs/backlog/active/TUI-046-native-text-selection-copy.md` |
 | 1 | Runtime session and protocol foundations | SESSION-009 and RUNTIME-005 remain Refinement; ACP-001 remains Blocked until session attachment, controller ownership and shutdown/finalization boundaries are accepted. | `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/ACP-001-agent-client-protocol-server.md` |
 | 1 | Memory scope architecture | MEM-011 remains Refinement. Accept schema/migration and legacy-fixture decisions before implementation. | `docs/backlog/active/MEM-011-extensible-memory-scopes.md`; Issue #116 |
 | 1 | Provider/runtime reliability follow-ups | Preserve explicit terminal outcomes, usage accounting and bounded request/stream behavior before dependent status/cost UX. | `docs/backlog/active/PROVIDER-001-openai-streaming-usage.md`; `docs/backlog/active/PROVIDER-002-response-reliability-timeout-retry.md`; `docs/backlog/active/PROVIDER-004-text-tool-call-id-collision.md` |
+| 1 | `/delete` cleanup-failure actionability | Issue #136 is Open and independently owns executable recovery-command wording. It must preserve the accepted transcript-last, retryable, no-false-success behavior from I169. | `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`; ADR-056; Issue #136 |
 | 2 | Dynamic provider authentication program | PROVIDER-003 / Issue #132 is a Refinement Epic only. PROVIDER-003-A must accept the capability ADR and threat model before any child can be selected; B/C own shared lifecycle/request contracts and D-G own bounded provider/acquisition slices. | `docs/backlog/active/PROVIDER-003-dynamic-provider-credentials.md`; ADR-013; ADR-023; ADR-057; Issue #132 |
 | 2 | TOOL-023 residual configuration work | TOOL-023-A/C are Complete through I170. TOOL-023-B alone owns the 300-second default/configuration proposal and is not implemented by I170. | `docs/backlog/active/TOOL-023-cross-platform-shell-and-timeout.md`; `docs/backlog/active/TOOL-023-B-configurable-timeout-default.md` |
 | 3 | Deferred product architecture | Desktop, multi-agent, health monitoring, persistent tasks and A2A remain Deferred/Refinement until explicitly reprioritized and ADR-gated. | DESKTOP-001; AGENT-003; RUNTIME-004; TASK-001; A2A-001 |
+
+## I169 Closeout
+
+| ID | Title | Final State | Evidence / Residual |
+|---|---|---|---|
+| I169 | Transactional Batched Steering Turn | **Complete (2026-08-06)** | PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`; exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`; CI `31010166558`; rebuilt real-terminal acceptance passed. |
+| TUI-044 | Transactional Batched Steering Turn | **Complete** | A/B/C remain distinct FIFO messages in one later Turn; durable receipt, restart, replay, fork isolation, complete delete and retryable failure behavior accepted. |
+| ADR-056 | Transactional Steering Submission And Turn Ownership Boundary | **Accepted** | Durable custody, lost-Ack reconciliation, generation-safe lifecycle, Actor arbitration, transcript-before-journal finalization and exact request-plan boundaries are authoritative. |
+| Issue #119 | Recovered transactional steering feature | **Completed** | Acceptance matrix satisfied; implementation and governance reconciliation complete. |
+| Issue #136 | Direct `/delete` recovery-command wording | Open, non-blocking | Separately owns only diagnostic/actionability wording; does not reopen TUI-044/I169 or ADR-056 semantics. |
+
+Required reads:
+
+- `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`
+- `docs/iterations/I169-batched-steering-turn.md`
+- `docs/decisions/056-transactional-steering-submission-boundary.md`
+- PR #131 and Issues #119/#136
 
 ## I170 Closeout
 
@@ -46,11 +63,11 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
-| TUI-044 / I169 | Active — PR #131 review handoff | Remain Active until structured transaction/journal/lifecycle/request/replay implementation, exact-head CI, rebuilt real-TUI evidence and independent ADR-056 review reach Review. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |
 | PROVIDER-004 | Ready | Force unique text-path tool-call IDs and prove cross-turn pairing; keep separate from shell/runtime timeouts. |
+| Issue #136 | Open follow-up | Implement and validate exact `/delete <uuid>` and `talos storage maintenance --reconcile` guidance without changing accepted cleanup ownership. |
 
 ## Review / Partial Items
 
@@ -103,27 +120,9 @@ When an Issue-backed owner transitions to Active, Review, Complete, Blocked or C
 the remote Issue with the causing PR/commit and one-line disposition. Close an Issue only when its
 owner is Complete/Cancelled and no separately owned residual remains.
 
-Issue #119 remains open and Active in PR #131 review handoff. Completion still requires fresh
-independent acceptance, maintainer merge authorization, merge evidence and recorded lifecycle closeout.
+Issue #119 is completed and closed by the I169 post-merge governance closeout. Issue #136 remains
+open under its own diagnostic scope and does not block or reopen I169.
 Issue #132 remains open under the PROVIDER-003 Refinement Epic; no child implementation is authorized
 until PROVIDER-003-A and a separately claimed child owner establish the required boundary.
 Issue #134 remains open under TUI-046 Refinement; terminal interaction policy, ADR-054 impact,
 iteration selection and a real-terminal validation matrix are still required.
-
-## I169 review synchronization (2026-08-04)
-
-- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
-- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
-- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.
-
-<!-- PR131-I169-REMEDIATION-2026-08-05 -->
-## PR #131 independent-review remediation checkpoint — 2026-08-05
-
-- Implementation source baseline: `40e4bb95176d60b1d58214788620b4c535fee62e`; current main / merge base: `a03e25436a25f84f117a90362686fc8205e52dde`.
-- Latest independent Review `PRR_kwDOSrj_LM8AAAABIdlncA` remains the governing `CHANGES REQUIRED` verdict until a fresh review binds to the final exact Head.
-- B1/B2/H1/M1/M2 remediation now uses one retryable Session artifact ownership boundary: WAL/SHM/SQLite precede the transcript commit point; rollback preserves primary plus cleanup diagnostics; zero-byte retention counts removals; bounded orphan reconciliation validates UUID/suffix/root/symlink/live-owner safety.
-- Production `/new`, TUI `/fork`, CLI `--fork`, transition publication rollback, Session index and fork-relation cleanup now converge on that ownership boundary while preserving the source Session.
-- Verification workflow `30997867486` passed Linux full `talos-session`/`talos-tools` gates, strict Clippy, Windows open-SQLite-handle retry, Windows redirect `20/20`, Windows full `talos-tools`, and self-cleaned all temporary remediation assets before publishing the source baseline.
-- Lifecycle state is intentionally unchanged. Final exact-head standard CI, rebuilt real-TUI acceptance, evidence synchronization and a fresh independent review remain mandatory before any advancement or merge authorization.
-
-- Product Backlog disposition remains TUI-044/I169 **Active** under Proposed ADR-056 and open Issue #119.
