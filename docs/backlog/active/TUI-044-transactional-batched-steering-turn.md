@@ -1,5 +1,7 @@
 # TUI-044: Transactional Batched Steering Turn
 
+**Status**: Complete (2026-08-06)
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-044 |
@@ -21,13 +23,14 @@
 | Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Thinking / I169 implementation and acceptance sessions |
+| Work Slice | TUI-044 structured steering queue, transactional transfer, durable Session custody, generation-safe lifecycle, Session fork/delete ownership, automated acceptance and rebuilt real-terminal validation. |
 | Claimed At | 2026-08-01 |
-| Activated At | 2026-08-02 02:32 +08:00 |
-| Completed At | 2026-08-06 |
+| Source Issue | #119 |
 | Governance Claim PR | #123 |
-| Preactivation Architecture PR | #129 |
-| Implementation PR | #131 — merged |
 | Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer activated I169, accepted exact-head automated and real-terminal evidence, classified #136 as independently non-blocking, authorized PR #131 merge and requested governance closeout. |
+| Implementation PR | #131 — merged |
+| Last Updated | 2026-08-06 |
 | Handoff / Release Condition | Satisfied by exact-head automated acceptance, rebuilt real-terminal acceptance, and merge commit `685d3b4f4088a172551f8c844a89f5dee9469430`. |
 
 ## Outcome
