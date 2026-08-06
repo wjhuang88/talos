@@ -452,7 +452,7 @@ handler = "{handler}"
                 i32.const 42))
         "#;
         let module = WasmModule::from_wat(runtime(), wat).expect("compile");
-        assert_eq!(module.execute().unwrap(), 42);
+        assert_eq!(module.execute().expect("operation should succeed"), 42);
     }
 
     #[test]
@@ -466,7 +466,7 @@ handler = "{handler}"
         let module = WasmModule::from_wat(slow_timeout_runtime, wat).expect("compile");
         let started = Instant::now();
 
-        assert_eq!(module.execute().unwrap(), 7);
+        assert_eq!(module.execute().expect("operation should succeed"), 7);
         assert!(
             started.elapsed() < Duration::from_millis(500),
             "successful WASM execution should not wait for the timeout watchdog"
@@ -556,7 +556,7 @@ handler = "{handler}"
                 (call $read_file (i32.const 0))))
         "#;
         let result = WasmModule::from_wat(runtime(), wat);
-        assert!(result.is_err() || result.unwrap().execute().is_err());
+        assert!(result.is_err() || result.expect("operation should succeed").execute().is_err());
     }
 
     #[tokio::test]
@@ -567,8 +567,8 @@ handler = "{handler}"
         let manifest = manifest_with_handler("tool.wasm");
         let mut registry = ToolRegistry::new();
 
-        let count =
-            register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+        let count = register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest)
+            .expect("operation should succeed");
 
         assert_eq!(count, 1);
         let tool = registry.get("demo.answer").expect("tool registered");
@@ -621,7 +621,8 @@ handler = "{handler}"
         fs::write(package.join("tool.wasm"), wasm_i32_const(42)).expect("handler");
         let manifest = manifest_with_handler("tool.wasm");
         let mut registry = ToolRegistry::new();
-        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest)
+            .expect("operation should succeed");
 
         let result = register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest);
 
@@ -645,7 +646,8 @@ handler = "{handler}"
         fs::write(package.join("tool.wasm"), wasm_i32_const(42)).expect("handler");
         let manifest = manifest_with_handler("tool.wasm");
         let mut registry = ToolRegistry::new();
-        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest)
+            .expect("operation should succeed");
         let tool = registry.get("demo.answer").expect("tool registered");
 
         assert!(!talos_core::tool::ToolPresentationPolicy::runtime_default().allows_tool(tool));

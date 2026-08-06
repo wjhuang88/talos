@@ -1228,7 +1228,7 @@ mod tests {
 
         let retrieved = registry.get("echo");
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().name(), "echo");
+        assert_eq!(retrieved.expect("operation should succeed").name(), "echo");
     }
 
     #[test]
@@ -1269,7 +1269,7 @@ mod tests {
         assert!(matches!(result, Err(ToolError::InvalidInput(_))));
         assert!(
             result
-                .unwrap_err()
+                .expect_err("operation should fail")
                 .to_string()
                 .contains("missing required field 'message'")
         );
@@ -1290,7 +1290,7 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(Arc::new(MockTool::new("echo", "Echoes a message")));
 
-        let tool = registry.get("echo").unwrap();
+        let tool = registry.get("echo").expect("operation should succeed");
         let result = tool
             .execute(serde_json::json!({ "message": "hello" }))
             .await;
@@ -1303,7 +1303,7 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(Arc::new(MockTool::new("echo", "Echoes a message")));
 
-        let tool = registry.get("echo").unwrap();
+        let tool = registry.get("echo").expect("operation should succeed");
         let result = tool.execute(serde_json::json!({})).await;
         assert!(result.is_error);
     }
@@ -1318,7 +1318,7 @@ mod tests {
     fn test_tool_parameters_macro() {
         let schema = tool_parameters!(GreetParams);
         assert!(schema.is_object());
-        let obj = schema.as_object().unwrap();
+        let obj = schema.as_object().expect("operation should succeed");
         assert!(obj.contains_key("properties"));
     }
 
@@ -1328,7 +1328,7 @@ mod tests {
         registry.register(Arc::new(MockTool::new("echo", "Original")));
         registry.register(Arc::new(MockTool::new("echo", "Replacement")));
 
-        let tool = registry.get("echo").unwrap();
+        let tool = registry.get("echo").expect("operation should succeed");
         assert_eq!(tool.description(), "Replacement");
     }
 
@@ -1343,9 +1343,17 @@ mod tests {
         assert_eq!(contribution.source().as_str(), "talos-tools:test");
         assert_eq!(contribution.name(), "echo");
         assert_eq!(contribution.tool().description(), "Checked");
-        registry.register_contribution(contribution).unwrap();
+        registry
+            .register_contribution(contribution)
+            .expect("operation should succeed");
 
-        assert_eq!(registry.get("echo").unwrap().description(), "Checked");
+        assert_eq!(
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
+            "Checked"
+        );
     }
 
     #[test]
@@ -1369,14 +1377,14 @@ mod tests {
                 ToolContributionSource::new("talos-tools:file"),
                 Arc::new(MockTool::new("echo", "Original")),
             ))
-            .unwrap();
+            .expect("operation should succeed");
 
         let error = registry
             .register_contribution(ToolContribution::new(
                 ToolContributionSource::new("plugin:demo@0.1.0"),
                 Arc::new(MockTool::new("echo", "Replacement")),
             ))
-            .unwrap_err();
+            .expect_err("operation should fail");
 
         assert_eq!(
             error,
@@ -1390,7 +1398,13 @@ mod tests {
             error.to_string(),
             "duplicate tool registration 'echo': existing source 'talos-tools:file', incoming source 'plugin:demo@0.1.0'"
         );
-        assert_eq!(registry.get("echo").unwrap().description(), "Original");
+        assert_eq!(
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
+            "Original"
+        );
     }
 
     #[test]
@@ -1403,11 +1417,17 @@ mod tests {
                 ToolContributionSource::new("talos-tools:file"),
                 Arc::new(MockTool::new("echo", "Checked")),
             ))
-            .unwrap_err();
+            .expect_err("operation should fail");
 
         assert_eq!(error.existing_source.as_str(), "legacy:unchecked");
         assert_eq!(error.incoming_source.as_str(), "talos-tools:file");
-        assert_eq!(registry.get("echo").unwrap().description(), "Legacy");
+        assert_eq!(
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
+            "Legacy"
+        );
     }
 
     #[test]
@@ -1424,16 +1444,28 @@ mod tests {
                     Arc::new(MockTool::new("reverse", "Reverse")),
                 ),
             ])
-            .unwrap();
+            .expect("operation should succeed");
 
-        assert_eq!(registry.get("echo").unwrap().description(), "Echo");
-        assert_eq!(registry.get("reverse").unwrap().description(), "Reverse");
+        assert_eq!(
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
+            "Echo"
+        );
+        assert_eq!(
+            registry
+                .get("reverse")
+                .expect("operation should succeed")
+                .description(),
+            "Reverse"
+        );
         let error = registry
             .register_contribution(ToolContribution::new(
                 ToolContributionSource::new("plugin:other@1.0.0"),
                 Arc::new(MockTool::new("reverse", "Other")),
             ))
-            .unwrap_err();
+            .expect_err("operation should fail");
         assert_eq!(error.existing_source.as_str(), "plugin:demo@0.1.0");
     }
 
@@ -1445,7 +1477,7 @@ mod tests {
                 ToolContributionSource::new("talos-tools:file"),
                 Arc::new(MockTool::new("echo", "Original")),
             ))
-            .unwrap();
+            .expect("operation should succeed");
 
         let error = registry
             .register_contributions([
@@ -1458,13 +1490,19 @@ mod tests {
                     Arc::new(MockTool::new("echo", "Collision")),
                 ),
             ])
-            .unwrap_err();
+            .expect_err("operation should fail");
 
         assert_eq!(error.tool_name, "echo");
         assert_eq!(error.existing_source.as_str(), "talos-tools:file");
         assert_eq!(error.incoming_source.as_str(), "plugin:demo@0.1.0");
         assert!(registry.get("reverse").is_none());
-        assert_eq!(registry.get("echo").unwrap().description(), "Original");
+        assert_eq!(
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
+            "Original"
+        );
     }
 
     #[test]
@@ -1485,7 +1523,7 @@ mod tests {
                     Arc::new(MockTool::new("echo", "Duplicate")),
                 ),
             ])
-            .unwrap_err();
+            .expect_err("operation should fail");
 
         assert_eq!(error.tool_name, "echo");
         assert_eq!(error.existing_source.as_str(), "plugin:first@1.0.0");
@@ -1501,11 +1539,14 @@ mod tests {
                 ToolContributionSource::new("talos-tools:file"),
                 Arc::new(MockTool::new("echo", "Checked")),
             ))
-            .unwrap();
+            .expect("operation should succeed");
         registry.register(Arc::new(MockTool::new("echo", "Legacy replacement")));
 
         assert_eq!(
-            registry.get("echo").unwrap().description(),
+            registry
+                .get("echo")
+                .expect("operation should succeed")
+                .description(),
             "Legacy replacement"
         );
         let error = registry
@@ -1513,7 +1554,7 @@ mod tests {
                 ToolContributionSource::new("plugin:demo@0.1.0"),
                 Arc::new(MockTool::new("echo", "Plugin")),
             ))
-            .unwrap_err();
+            .expect_err("operation should fail");
         assert_eq!(error.existing_source.as_str(), "legacy:unchecked");
     }
 
@@ -1606,11 +1647,11 @@ mod tests {
             version: "0.1.0".to_string(),
             carrier: "wasm".to_string(),
         };
-        let json = serde_json::to_string(&provenance).unwrap();
+        let json = serde_json::to_string(&provenance).expect("operation should succeed");
         assert!(json.contains("\"type\":\"plugin\""));
         assert!(json.contains("\"name\":\"my-plugin\""));
         assert!(json.contains("\"carrier\":\"wasm\""));
-        let back: ToolProvenance = serde_json::from_str(&json).unwrap();
+        let back: ToolProvenance = serde_json::from_str(&json).expect("operation should succeed");
         assert_eq!(provenance, back);
     }
 
@@ -1628,8 +1669,9 @@ mod tests {
             },
         ];
         for provenance in variants {
-            let json = serde_json::to_string(&provenance).unwrap();
-            let back: ToolProvenance = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(&provenance).expect("operation should succeed");
+            let back: ToolProvenance =
+                serde_json::from_str(&json).expect("operation should succeed");
             assert_eq!(provenance, back);
         }
     }

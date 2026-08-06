@@ -10,10 +10,10 @@ fn unique_home(label: &str) -> PathBuf {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("test operation should succeed")
             .as_nanos()
     ));
-    fs::create_dir_all(home.join(".talos")).unwrap();
+    fs::create_dir_all(home.join(".talos")).expect("test operation should succeed");
     home
 }
 
@@ -43,8 +43,9 @@ fn write_config_and_credentials(home: &Path) -> (Vec<u8>, Vec<u8>) {
     )
     .into_bytes();
     let credentials = format!("custom-a = \"{SECRET}\"\n").into_bytes();
-    fs::write(home.join(".talos/config.toml"), &config).unwrap();
-    fs::write(home.join(".talos/credentials.toml"), &credentials).unwrap();
+    fs::write(home.join(".talos/config.toml"), &config).expect("test operation should succeed");
+    fs::write(home.join(".talos/credentials.toml"), &credentials)
+        .expect("test operation should succeed");
     (config, credentials)
 }
 
@@ -66,7 +67,7 @@ fn write_manifest(
              credentials_exist_after = {credentials_after}\n"
         ),
     )
-    .unwrap();
+    .expect("test operation should succeed");
 }
 
 #[test]
@@ -77,9 +78,10 @@ fn real_cli_verifies_and_cleans_valid_finalize_residue() {
     let finalize = home.join(format!(
         ".talos/.provider-unset-transaction.finalize.{transaction_id}"
     ));
-    fs::create_dir_all(&finalize).unwrap();
-    fs::write(finalize.join("config.after"), &config).unwrap();
-    fs::write(finalize.join("credentials.after"), &credentials).unwrap();
+    fs::create_dir_all(&finalize).expect("test operation should succeed");
+    fs::write(finalize.join("config.after"), &config).expect("test operation should succeed");
+    fs::write(finalize.join("credentials.after"), &credentials)
+        .expect("test operation should succeed");
     write_manifest(
         &finalize,
         "Committed",
@@ -107,12 +109,13 @@ fn real_cli_fails_closed_on_ambiguous_active_and_finalize_evidence() {
     let finalize = home.join(format!(
         ".talos/.provider-unset-transaction.finalize.{transaction_id}"
     ));
-    fs::create_dir_all(&active).unwrap();
-    fs::create_dir_all(&finalize).unwrap();
+    fs::create_dir_all(&active).expect("test operation should succeed");
+    fs::create_dir_all(&finalize).expect("test operation should succeed");
 
     for journal in [&active, &finalize] {
-        fs::write(journal.join("config.after"), &config).unwrap();
-        fs::write(journal.join("credentials.after"), &credentials).unwrap();
+        fs::write(journal.join("config.after"), &config).expect("test operation should succeed");
+        fs::write(journal.join("credentials.after"), &credentials)
+            .expect("test operation should succeed");
         write_manifest(journal, "Committed", transaction_id, true, true, true, true);
     }
 
@@ -136,7 +139,7 @@ fn real_cli_corrupt_credentials_error_is_redacted() {
         home.join(".talos/credentials.toml"),
         format!("leaked = \"{SECRET}\"\nbroken = ["),
     )
-    .unwrap();
+    .expect("test operation should succeed");
 
     let (success, stdout, stderr) = run_cmd(&home, &["config", "list"]);
     assert!(!success);
@@ -156,7 +159,7 @@ fn real_cli_non_utf8_config_fails_closed() {
         home.join(".talos/config.toml"),
         b"provider = \"x\"\nmodel = \"y\"\n\xff\xfe",
     )
-    .unwrap();
+    .expect("test operation should succeed");
 
     let (success, stdout, stderr) = run_cmd(&home, &["config", "list"]);
     assert!(!success);
@@ -174,7 +177,7 @@ fn real_cli_missing_committed_image_fails_closed_and_keeps_journal() {
     let home = unique_home("missing-image");
     let _ = write_config_and_credentials(&home);
     let active = home.join(".talos/.provider-unset-transaction");
-    fs::create_dir_all(&active).unwrap();
+    fs::create_dir_all(&active).expect("test operation should succeed");
     write_manifest(
         &active,
         "Committed",

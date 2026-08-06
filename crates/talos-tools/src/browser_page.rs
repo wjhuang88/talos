@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn record_excludes_cookies() {
         let record = BrowserPageRecord::new_mock("https://example.com", "Test", "text");
-        let json = serde_json::to_string(&record).unwrap();
+        let json = serde_json::to_string(&record).expect("operation should succeed");
         assert!(!json.contains("cookie"));
         assert!(!json.contains("Cookie"));
     }
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn record_excludes_storage() {
         let record = BrowserPageRecord::new_mock("https://example.com", "Test", "text");
-        let json = serde_json::to_string(&record).unwrap();
+        let json = serde_json::to_string(&record).expect("operation should succeed");
         assert!(!json.contains("localStorage"));
         assert!(!json.contains("sessionStorage"));
         assert!(!json.contains("storage"));
@@ -181,7 +181,7 @@ mod tests {
             "Test",
             "text",
         );
-        let json = serde_json::to_string(&record).unwrap();
+        let json = serde_json::to_string(&record).expect("operation should succeed");
         assert!(!json.contains("password"));
         for url in [&record.url, &record.final_url, &record.origin] {
             assert!(!url.contains("abc"));
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn record_excludes_dom_and_screenshots() {
         let record = BrowserPageRecord::new_mock("https://example.com", "Test", "text");
-        let json = serde_json::to_string(&record).unwrap();
+        let json = serde_json::to_string(&record).expect("operation should succeed");
         assert!(!json.contains("dom"));
         assert!(!json.contains("screenshot"));
         assert!(!json.contains("profile_path"));
@@ -232,7 +232,7 @@ mod tests {
                     url: "https://user:pass@example.com/account?token=abc&ok=1".to_string(),
                 },
             ]);
-        let json = serde_json::to_string(&record).unwrap();
+        let json = serde_json::to_string(&record).expect("operation should succeed");
 
         assert!(!json.contains("user:pass"));
         assert!(!json.contains("abc"));
@@ -244,7 +244,10 @@ mod tests {
     async fn mock_connector_returns_canned_record() {
         let record = BrowserPageRecord::new_mock("https://example.com", "Test", "Hello");
         let connector = MockBrowserPageConnector::new().with_record("https://example.com", record);
-        let result = connector.read_page("https://example.com").await.unwrap();
+        let result = connector
+            .read_page("https://example.com")
+            .await
+            .expect("operation should succeed");
         assert_eq!(result.title, "Test");
         assert!(result.visible_text_excerpt.contains("Hello"));
     }
@@ -259,11 +262,13 @@ mod tests {
     #[test]
     fn record_serializes_to_clean_json() {
         let record = BrowserPageRecord::new_mock("https://example.com", "Test", "text");
-        let json: serde_json::Value =
-            serde_json::from_str(&serde_json::to_string(&record).unwrap()).unwrap();
+        let json: serde_json::Value = serde_json::from_str(
+            &serde_json::to_string(&record).expect("operation should succeed"),
+        )
+        .expect("operation should succeed");
         let keys: Vec<&str> = json
             .as_object()
-            .unwrap()
+            .expect("operation should succeed")
             .keys()
             .map(|k| k.as_str())
             .collect();

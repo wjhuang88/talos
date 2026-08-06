@@ -259,9 +259,9 @@ mod diff_tool_tests {
 
     #[tokio::test]
     async fn test_diff_identical_files() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
-        fs::write(dir.path().join("b.txt"), "hello\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("a.txt"), "hello\n").expect("operation should succeed");
+        fs::write(dir.path().join("b.txt"), "hello\n").expect("operation should succeed");
 
         let tool = DiffTool::new(dir.path().to_path_buf());
         let result = tool
@@ -274,9 +274,11 @@ mod diff_tool_tests {
 
     #[tokio::test]
     async fn test_diff_shows_changes() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.txt"), "line1\nline2\nline3\n").unwrap();
-        fs::write(dir.path().join("b.txt"), "line1\nchanged\nline3\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("a.txt"), "line1\nline2\nline3\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("b.txt"), "line1\nchanged\nline3\n")
+            .expect("operation should succeed");
 
         let tool = DiffTool::new(dir.path().to_path_buf());
         let result = tool
@@ -292,8 +294,8 @@ mod diff_tool_tests {
 
     #[tokio::test]
     async fn test_diff_file_not_found() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("a.txt"), "hello\n").expect("operation should succeed");
 
         let tool = DiffTool::new(dir.path().to_path_buf());
         let result = tool
@@ -319,8 +321,8 @@ mod stat_tool_tests {
 
     #[tokio::test]
     async fn test_stat_file() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.txt"), "hello world").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.txt"), "hello world").expect("operation should succeed");
 
         let tool = StatTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "test.txt" })).await;
@@ -332,8 +334,8 @@ mod stat_tool_tests {
 
     #[tokio::test]
     async fn test_stat_directory() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("subdir")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("subdir")).expect("operation should succeed");
 
         let tool = StatTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "subdir" })).await;
@@ -344,7 +346,7 @@ mod stat_tool_tests {
 
     #[tokio::test]
     async fn test_stat_not_found() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let tool = StatTool::new(dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "nonexistent" })).await;
 

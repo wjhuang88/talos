@@ -225,7 +225,7 @@ version = "0.1.0"
 carrier = "wasm"
 artifact = "x.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("name is empty")));
     }
 
@@ -238,7 +238,7 @@ version = ""
 carrier = "wasm"
 artifact = "x.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("version is empty")));
     }
 
@@ -251,7 +251,7 @@ version = "0.1.0"
 carrier = "wasm"
 artifact = ""
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("artifact is empty")));
     }
 
@@ -264,7 +264,7 @@ version = "0.1.0"
 carrier = "lua"
 artifact = "x.lua"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(
             matches!(err, ManifestError::Validation(ref m) if m.contains("carrier must be 'wasm'"))
         );
@@ -279,7 +279,7 @@ version = "0.1.0"
 carrier = "dylib"
 artifact = "x.so"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(
             matches!(err, ManifestError::Validation(ref m) if m.contains("carrier must be 'wasm'"))
         );
@@ -288,7 +288,7 @@ artifact = "x.so"
     #[test]
     fn reject_malformed_toml() {
         let toml = "this is not valid toml {{{";
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Parse(_)));
     }
 
@@ -298,7 +298,7 @@ artifact = "x.so"
 [other]
 key = "value"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Parse(_)));
     }
 
@@ -319,7 +319,7 @@ handler = "a.wasm"
 name = "dup"
 handler = "b.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(
             matches!(err, ManifestError::Validation(ref m) if m.contains("duplicate tool name"))
         );
@@ -338,7 +338,7 @@ artifact = "x.wasm"
 name = ""
 handler = "a.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(
             matches!(err, ManifestError::Validation(ref m) if m.contains("tool name is empty"))
         );
@@ -357,7 +357,7 @@ artifact = "x.wasm"
 name = "t"
 handler = ""
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("empty handler")));
     }
 
@@ -412,7 +412,7 @@ name = "bad"
 event = "MadeUpEvent"
 handler = "hooks/bad.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("unknown event")));
     }
 
@@ -435,7 +435,7 @@ name = "dup"
 event = "TurnComplete"
 handler = "hooks/b.wasm"
 "#;
-        let err = parse_manifest(toml).unwrap_err();
+        let err = parse_manifest(toml).expect_err("operation should fail");
         assert!(
             matches!(err, ManifestError::Validation(ref m) if m.contains("duplicate hook name"))
         );

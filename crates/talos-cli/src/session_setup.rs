@@ -339,69 +339,193 @@ pub(crate) fn run_list_mode(cli: Cli) -> Result<()> {
 }
 
 fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Session> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
     let source = manager
         .resume_session(source_session_id)
-        .with_context(|| format!("failed to load source session {source_session_id}"))?;
+        .with_context(|| format!("failed to load source Session {source_session_id}"))?;
 
     let entries = source
         .read_entries()
         .context("failed to read source entries")?;
     if entries.is_empty() {
-        bail!("cannot fork an empty session");
+        bail!("cannot fork an empty Session");
     }
-
     let fork_entry_id = entries
         .last()
         .expect("entries checked non-empty above")
         .id
         .clone();
+    let source_bytes = source
+        .snapshot_bytes()
+        .context("failed to snapshot source Session")?;
 
     let new_id = Uuid::new_v4();
-    let project_dir = manager
-        .list_sessions()
-        .context("failed to list sessions")?
-        .iter()
-        .find(|s| s.id.to_string() == source_session_id)
-        .map(|s| s.project.clone())
-        .unwrap_or_else(|| "default".to_string());
-
-    let sessions_dir = manager.sessions_dir();
-    let project_path = sessions_dir.join(&project_dir);
+    let project_path = source
+        .file_path
+        .parent()
+        .context("source Session file has no parent directory")?
+        .to_path_buf();
     std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
-
     let new_file_path = project_path.join(format!("{new_id}.{}", source.file_extension()));
-
-    let mut new_session = Session::new(
+    let mut child = Session::new(
         new_id,
-        project_dir.clone(),
+        source.project.clone(),
         source.workspace_root.clone(),
         new_file_path.clone(),
     );
 
-    for entry in &entries {
-        let line = serde_json::to_string(entry).map_err(|e| anyhow!("serialize error: {e}"))?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&new_file_path)
-            .context("failed to create fork file")?;
-        writeln!(file, "{line}").context("failed to write fork entry")?;
+    let fork_result = (|| -> Result<()> {
+        std::fs::write(&new_file_path, &source_bytes)
+            .context("failed to clone source Session bytes")?;
+        child
+            .fork(&fork_entry_id)
+            .context("failed to create fork branch")?;
+
+        match talos_session::PendingSubmissionStore::for_session(&source)
+            .runtime_state()
+            .context("failed to read source Session runtime identity")?
+        {
+            Some(state)
+                if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
+            {
+                talos_session::PendingSubmissionStore::for_session(&child)
+                    .initialize_runtime_identity(state.activation.target)
+                    .context("failed to initialize fork runtime identity")?;
+            }
+            Some(state) => {
+                bail!(
+                    "source Session activation {} is not committed",
+                    state.activation.activation_id
+                );
+            }
+            None => {}
+        }
+
+        manager
+            .update_index(&source)
+            .context("failed to index source Session")?;
+        manager
+            .update_index(&child)
+            .context("failed to index forked Session")?;
+        manager
+            .record_fork(&source.id, &child.id, &fork_entry_id)
+            .context("failed to record fork relationship")?;
+        Ok(())
+    })();
+
+    match fork_result {
+        Ok(()) => {
+            eprintln!(
+                "Forked Session {source_session_id} -> {new_id} (from entry {fork_entry_id})"
+            );
+            Ok(child)
+        }
+        Err(primary_error) => match manager.rollback_session_artifacts(&child) {
+            Ok(report) => Err(anyhow!(
+                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; rollback removed {} filesystem artifact(s) / {} byte(s), plus binding and index/fork ownership",
+                new_file_path.display(),
+                report.removed_artifacts,
+                report.bytes_removed,
+            )),
+            Err(cleanup_error) => Err(anyhow!(
+                "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; cleanup also failed: {cleanup_error}; cleanup is retryable after closing open SQLite handles via `/delete {new_id}` in the TUI while the transcript remains discoverable, or `talos storage maintenance --reconcile` for a transcript-less sidecar",
+                new_file_path.display(),
+            )),
+        },
     }
+}
 
-    new_session
-        .fork(&fork_entry_id)
-        .context("failed to create fork branch")?;
+#[cfg(test)]
+mod fork_tests {
+    use super::*;
+    use clap::Parser;
+    use talos_core::message::Message;
 
-    if let Ok(mut index) = talos_session::SessionIndex::new(&sessions_dir.join("index.db")) {
-        let _ = index.init_schema();
-        let _ = index.record_fork(source_session_id, &new_id.to_string(), &fork_entry_id);
-        let _ = index.index_session(&new_session);
+    #[test]
+    fn cli_fork_copies_tlog_history_runtime_identity_and_index() {
+        let temp = tempfile::tempdir().expect("temporary fork test directory");
+        let sessions_dir = temp.path().join("sessions");
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("create fork test workspace");
+        let workspace_root = canonical_workspace_root(&workspace);
+        let manager = SessionManager::with_dir(sessions_dir);
+
+        let source = manager
+            .create_session("talos", &workspace_root)
+            .expect("create source Session");
+        source
+            .append(&Message::User {
+                content: "fork-source-A".to_string(),
+            })
+            .expect("append first source entry");
+        source
+            .append(&Message::User {
+                content: "fork-source-B".to_string(),
+            })
+            .expect("append second source entry");
+
+        let identity =
+            talos_session::SessionRuntimeIdentity::new("openai", "o3", Some("high-reasoning"));
+        talos_session::PendingSubmissionStore::for_session(&source)
+            .initialize_runtime_identity(identity.clone())
+            .expect("initialize source runtime identity");
+
+        let source_id = source.id.to_string();
+        let source_bytes = source.snapshot_bytes().expect("snapshot source bytes");
+        let source_entries = source.read_entries().expect("read source entries");
+        let source_tip = source_entries
+            .last()
+            .expect("source entries are non-empty")
+            .id
+            .clone();
+        assert_eq!(source.file_extension(), "tlog");
+
+        let cli = Cli::parse_from(["talos", "--fork", source_id.as_str()]);
+        let child = resolve_session_for_workspace(
+            &manager,
+            &workspace_root,
+            "talos",
+            &cli,
+            ResumeSelection::Latest,
+            true,
+        )
+        .expect("resolve CLI fork");
+
+        assert_ne!(child.id, source.id);
+        assert_eq!(child.file_extension(), source.file_extension());
+        assert_eq!(
+            source.snapshot_bytes().expect("resnapshot source bytes"),
+            source_bytes,
+            "fork must not mutate the source transcript"
+        );
+        assert_eq!(
+            child.snapshot_bytes().expect("snapshot child bytes"),
+            source_bytes,
+            "fork must preserve the source store format byte-for-byte"
+        );
+
+        let child_entries = child.read_entries().expect("read child entries");
+        assert_eq!(child_entries.len(), 2);
+        assert_eq!(child_entries[0].content, "fork-source-A");
+        assert_eq!(child_entries[1].content, "fork-source-B");
+
+        let child_runtime = talos_session::PendingSubmissionStore::for_session(&child)
+            .runtime_state()
+            .expect("read child runtime state")
+            .expect("child runtime identity");
+        assert_eq!(
+            child_runtime.status,
+            talos_session::SessionRuntimeActivationStatus::Committed
+        );
+        assert_eq!(child_runtime.activation.target, identity);
+
+        let forks = manager.get_forks(&source_id).expect("read fork index");
+        assert_eq!(forks.len(), 1);
+        assert_eq!(forks[0].forked_session_id, child.id.to_string());
+        assert_eq!(forks[0].fork_entry_id, source_tip);
+
+        let indexed = manager.list_recent(20).expect("list indexed Sessions");
+        assert!(indexed.iter().any(|session| {
+            session.id == child.id && session.message_count == child_entries.len()
+        }));
     }
-
-    eprintln!("Forked session {source_session_id} -> {new_id} (from entry {fork_entry_id})");
-
-    Ok(new_session)
 }

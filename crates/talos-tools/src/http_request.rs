@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn test_deserialize_minimal_input() {
         let json = r#"{"url": "https://example.com"}"#;
-        let input: HttpRequestInput = serde_json::from_str(json).unwrap();
+        let input: HttpRequestInput = serde_json::from_str(json).expect("operation should succeed");
         assert_eq!(input.method, "GET");
         assert_eq!(input.url, "https://example.com");
         assert!(input.body.is_none());
@@ -679,13 +679,23 @@ mod tests {
             "headers": {"Content-Type": "application/json", "Authorization": "Bearer token123"},
             "timeout_secs": 30
         }"#;
-        let input: HttpRequestInput = serde_json::from_str(json).unwrap();
+        let input: HttpRequestInput = serde_json::from_str(json).expect("operation should succeed");
         assert_eq!(input.method, "POST");
         assert_eq!(input.url, "https://api.example.com/data");
         assert_eq!(input.body, Some("{\"key\": \"value\"}".to_string()));
-        let headers = input.headers.unwrap();
-        assert_eq!(headers.get("Content-Type").unwrap(), "application/json");
-        assert_eq!(headers.get("Authorization").unwrap(), "Bearer token123");
+        let headers = input.headers.expect("operation should succeed");
+        assert_eq!(
+            headers
+                .get("Content-Type")
+                .expect("operation should succeed"),
+            "application/json"
+        );
+        assert_eq!(
+            headers
+                .get("Authorization")
+                .expect("operation should succeed"),
+            "Bearer token123"
+        );
         assert_eq!(input.timeout_secs, Some(30));
     }
 

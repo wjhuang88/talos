@@ -487,7 +487,10 @@ mod tests {
         assert!(!removed.contains(&"MY_SAFE_VAR".to_string()));
 
         // Safe var should still be set
-        assert_eq!(env::var("MY_SAFE_VAR").unwrap(), "safe_value");
+        assert_eq!(
+            env::var("MY_SAFE_VAR").expect("operation should succeed"),
+            "safe_value"
+        );
 
         // Cleanup
         unsafe {

@@ -8,7 +8,9 @@ use talos_agent::prompt::ContextFile;
 use talos_config::Config;
 use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_session::{
-    SessionManager, SessionMetadata, TodoItem, TodoPriority, TodoQuery, TodoRepository, TodoStatus,
+    PendingSubmissionStore, SessionManager, SessionMetadata, SessionRuntimeActivation,
+    SessionRuntimeActivationStatus, SessionRuntimeIdentity, TodoItem, TodoPriority, TodoQuery,
+    TodoRepository, TodoStatus,
 };
 use uuid::Uuid;
 
@@ -17,6 +19,47 @@ use crate::Cli;
 const REQUEST_PREVIEW_COMMAND: &str = "/mock-request";
 const TODO_PROMPT_MAX_ITEMS: usize = 12;
 const TODO_PROMPT_MAX_CHARS: usize = 2400;
+const SESSION_MODEL_ACTIVATION_PREFIX: &str = "talos:model-activation:v1:";
+
+pub(crate) type SessionModelIdentity = SessionRuntimeIdentity;
+pub(crate) type SessionModelActivation = SessionRuntimeActivation;
+
+pub(crate) fn session_model_activation_metadata(
+    activation: &SessionModelActivation,
+) -> Result<SessionMetadata, serde_json::Error> {
+    let mut metadata =
+        session_metadata_for_model(&activation.target.model, &activation.target.provider);
+    metadata.raw_content = Some(format!(
+        "{SESSION_MODEL_ACTIVATION_PREFIX}{}",
+        serde_json::to_string(activation)?
+    ));
+    Ok(metadata)
+}
+
+pub(crate) fn session_model_activation_from_metadata(
+    metadata: &SessionMetadata,
+) -> Option<SessionModelActivation> {
+    let payload = metadata
+        .raw_content
+        .as_deref()?
+        .strip_prefix(SESSION_MODEL_ACTIVATION_PREFIX)?;
+    let activation: SessionModelActivation = serde_json::from_str(payload).ok()?;
+    if activation.version != 1 {
+        return None;
+    }
+    let expected = SessionModelActivation::new(
+        activation.generation,
+        activation.previous.clone(),
+        activation.target.clone(),
+    );
+    if activation.activation_id != expected.activation_id
+        || metadata.provider.as_deref() != Some(activation.target.provider.as_str())
+        || metadata.model.as_deref() != Some(activation.target.model.as_str())
+    {
+        return None;
+    }
+    Some(activation)
+}
 
 pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
     let trimmed = input.trim_start();
@@ -26,6 +69,12 @@ pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub(crate) fn runtime_generation_for_session(session: &talos_session::Session) -> Result<u64> {
+    PendingSubmissionStore::for_session(session)
+        .runtime_generation()
+        .map_err(|error| anyhow!("failed to load Session runtime generation: {error}"))
 }
 
 pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {
@@ -42,24 +91,101 @@ pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> Session
     }
 }
 
-fn latest_session_model_info(session: &talos_session::Session) -> Option<(String, String)> {
-    session
-        .read_entries()
-        .ok()?
-        .into_iter()
-        .rev()
-        .find_map(
-            |entry| match (entry.metadata.model, entry.metadata.provider) {
-                (Some(model), Some(provider)) => Some((model, provider)),
-                (Some(model), None) => Some((model, String::new())),
+enum LatestSessionModelInfo {
+    Activation(SessionModelIdentity),
+    Legacy { model: String, provider: String },
+}
+
+fn latest_session_model_info(session: &talos_session::Session) -> Option<LatestSessionModelInfo> {
+    match PendingSubmissionStore::for_session(session).runtime_state() {
+        Ok(Some(state)) if state.status == SessionRuntimeActivationStatus::Committed => {
+            return Some(LatestSessionModelInfo::Activation(state.activation.target));
+        }
+        Ok(Some(state)) => {
+            tracing::error!(
+                session_id = %session.id,
+                activation_id = %state.activation.activation_id,
+                "Session runtime activation is staged but its transcript marker is not committed; refusing to treat it as active"
+            );
+            return None;
+        }
+        Ok(None) => {}
+        Err(error) => {
+            tracing::warn!(session_id = %session.id, %error, "failed to load Session runtime state; falling back to transcript metadata");
+        }
+    }
+
+    let mut legacy = None;
+    for entry in session.read_entries().ok()?.into_iter().rev() {
+        if entry.role == "system"
+            && let Some(activation) = session_model_activation_from_metadata(&entry.metadata)
+        {
+            return Some(LatestSessionModelInfo::Activation(activation.target));
+        }
+        if legacy.is_none() {
+            legacy = match (entry.metadata.model, entry.metadata.provider) {
+                (Some(model), Some(provider)) => {
+                    Some(LatestSessionModelInfo::Legacy { model, provider })
+                }
+                (Some(model), None) => Some(LatestSessionModelInfo::Legacy {
+                    model,
+                    provider: String::new(),
+                }),
                 _ => None,
-            },
-        )
+            };
+        }
+    }
+    legacy
+}
+
+pub(crate) fn reconcile_session_runtime_state(session: &talos_session::Session) -> Result<()> {
+    let store = PendingSubmissionStore::for_session(session);
+    let Some(state) = store
+        .runtime_state()
+        .map_err(|error| anyhow!("failed to load Session runtime identity: {error}"))?
+    else {
+        return Ok(());
+    };
+    if state.status == SessionRuntimeActivationStatus::Committed {
+        return Ok(());
+    }
+    let tail = session
+        .read_entries()
+        .map_err(|error| anyhow!("failed to inspect pending Session activation: {error}"))?
+        .last()
+        .and_then(|entry| session_model_activation_from_metadata(&entry.metadata));
+    if tail.as_ref() == Some(&state.activation) {
+        store
+            .commit_runtime_activation(&state.activation.activation_id)
+            .map_err(|error| anyhow!("failed to finalize Session runtime activation: {error}"))?;
+        return Ok(());
+    }
+    Err(anyhow!(
+        "Session runtime activation {} is fenced but its exact transcript marker is absent; the Session remains stopped",
+        state.activation.activation_id
+    ))
+}
+
+pub(crate) fn ensure_session_runtime_identity(
+    config: &Config,
+    session: &talos_session::Session,
+) -> Result<talos_session::SessionRuntimeState> {
+    let identity =
+        SessionRuntimeIdentity::new(&config.provider, &config.model, config.variant.as_deref());
+    PendingSubmissionStore::for_session(session)
+        .initialize_runtime_identity(identity)
+        .map_err(|error| anyhow!("failed to initialize Session runtime identity: {error}"))
 }
 
 pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
-    let Some((model, provider)) = latest_session_model_info(session) else {
+    let Some(model_info) = latest_session_model_info(session) else {
         return;
+    };
+    let (model, provider, exact_variant) = match model_info {
+        LatestSessionModelInfo::Activation(identity) => {
+            (identity.model, identity.provider, Some(identity.variant))
+        }
+        LatestSessionModelInfo::Legacy { model, provider } => (model, provider, None),
     };
     let model_ref = if provider.is_empty() || model.starts_with(&format!("{provider}/")) {
         model
@@ -72,6 +198,10 @@ pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos
             model = %model_ref,
             "failed to restore session model metadata: {e}"
         );
+        return;
+    }
+    if let Some(variant) = exact_variant {
+        crate::model_lifecycle::apply_variant_change(config, variant.as_deref());
     }
 }
 
@@ -117,6 +247,12 @@ pub(crate) fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
         format_memory_prompt(store_guard.as_ref()?, query, &mem_config)
     });
     agent.set_memory_provider(provider);
+}
+
+pub(crate) fn set_request_budget_spec(agent: &mut Agent, config: &Config) {
+    agent.set_request_budget_spec(talos_agent::RequestBudgetSpec::new(
+        crate::provider_setup::effective_output_limit(config),
+    ));
 }
 
 pub(crate) fn set_image_input_capability(agent: &mut Agent, config: &Config) {
@@ -314,10 +450,12 @@ mod tests {
 
     #[test]
     fn todo_prompt_includes_only_active_items() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let session = manager.create_session("project", "").unwrap();
-        let repo = manager.todo_repository().unwrap();
+        let session = manager
+            .create_session("project", "")
+            .expect("operation should succeed");
+        let repo = manager.todo_repository().expect("operation should succeed");
 
         repo.create(CreateTodo {
             session_id: session.id,
@@ -327,7 +465,7 @@ mod tests {
             assigned_to_turn: None,
             tags: vec!["ship".to_string()],
         })
-        .unwrap();
+        .expect("operation should succeed");
         let completed = repo
             .create(CreateTodo {
                 session_id: session.id,
@@ -337,11 +475,12 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         repo.update_status(session.id, completed.id, TodoStatus::Completed)
-            .unwrap();
+            .expect("operation should succeed");
 
-        let prompt = format_session_todo_prompt(&repo, session.id).unwrap();
+        let prompt =
+            format_session_todo_prompt(&repo, session.id).expect("operation should succeed");
         assert!(prompt.contains("Active item"));
         assert!(prompt.contains("Keep this visible"));
         assert!(prompt.contains("tags: ship"));
@@ -350,10 +489,12 @@ mod tests {
 
     #[test]
     fn todo_prompt_is_bounded_by_item_count() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let session = manager.create_session("project", "").unwrap();
-        let repo = manager.todo_repository().unwrap();
+        let session = manager
+            .create_session("project", "")
+            .expect("operation should succeed");
+        let repo = manager.todo_repository().expect("operation should succeed");
 
         for index in 0..(TODO_PROMPT_MAX_ITEMS + 2) {
             repo.create(CreateTodo {
@@ -364,11 +505,208 @@ mod tests {
                 assigned_to_turn: None,
                 tags: vec![],
             })
-            .unwrap();
+            .expect("operation should succeed");
         }
 
-        let prompt = format_session_todo_prompt(&repo, session.id).unwrap();
+        let prompt =
+            format_session_todo_prompt(&repo, session.id).expect("operation should succeed");
         assert!(prompt.contains("2 more active item(s) omitted"));
         assert_eq!(prompt.matches("- [").count(), TODO_PROMPT_MAX_ITEMS);
+    }
+
+    fn activation_test_session(name: &str) -> talos_session::Session {
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let root = dir.keep();
+        let path = root.join(format!("{name}.jsonl"));
+        std::fs::write(&path, b"").expect("operation should succeed");
+        talos_session::Session::new(Uuid::new_v4(), "test".into(), String::new(), path)
+    }
+
+    fn append_activation(session: &talos_session::Session, activation: &SessionModelActivation) {
+        session
+            .append_with_metadata(
+                &talos_core::message::Message::System {
+                    content: format!("[System] activation {}", activation.activation_id),
+                    cache_markers: Vec::new(),
+                },
+                session_model_activation_metadata(activation).expect("operation should succeed"),
+            )
+            .expect("operation should succeed");
+    }
+
+    fn provider_reasoning_effort(config: &Config) -> Option<String> {
+        let provider = crate::provider_setup::build_provider(config, "sk-test-session", false);
+        let preview = provider
+            .request_preview(&[talos_core::message::Message::User {
+                content: "session reconstruction probe".to_string(),
+            }])
+            .expect("real provider request preview");
+        preview
+            .pointer("/body/reasoning_effort")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    }
+
+    #[test]
+    fn session_owned_activation_survives_repeated_production_compaction() {
+        use talos_core::message::Message;
+
+        let session = activation_test_session("compaction-stable-activation");
+        let low = SessionModelIdentity::new("openai", "o3", Some("low-reasoning"));
+        let high = SessionModelIdentity::new("openai", "o3", Some("high-reasoning"));
+        let store = PendingSubmissionStore::for_session(&session);
+        store
+            .initialize_runtime_identity(low.clone())
+            .expect("operation should succeed");
+        let activation = SessionModelActivation::new(1, low, high.clone());
+        store
+            .stage_runtime_activation(0, &activation)
+            .expect("operation should succeed");
+        append_activation(&session, &activation);
+        store
+            .commit_runtime_activation(&activation.activation_id)
+            .expect("operation should succeed");
+
+        for index in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("post-activation-turn-{index}"),
+                })
+                .expect("operation should succeed");
+        }
+        session
+            .compact_archived(50)
+            .expect("operation should succeed");
+        session
+            .compact_archived(50)
+            .expect("operation should succeed");
+
+        assert_eq!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .iter()
+                .filter(|entry| {
+                    session_model_activation_from_metadata(&entry.metadata).is_some()
+                })
+                .count(),
+            0,
+            "compaction must not retain or duplicate an old model-visible marker"
+        );
+        assert_eq!(
+            PendingSubmissionStore::for_session(&session)
+                .runtime_state()
+                .expect("operation should succeed")
+                .expect("operation should succeed")
+                .activation
+                .target,
+            high
+        );
+
+        let mut restarted_global = Config::default();
+        restarted_global
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut restarted_global, Some("low-reasoning"));
+        apply_session_model_to_config(&mut restarted_global, &session);
+
+        assert_eq!(restarted_global.variant.as_deref(), Some("high-reasoning"));
+        assert_eq!(
+            provider_reasoning_effort(&restarted_global).as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
+    fn initial_session_identity_wins_over_later_global_variant_without_switch_marker() {
+        let session = activation_test_session("initial-session-identity");
+        let mut initial = Config::default();
+        initial
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut initial, Some("high-reasoning"));
+        ensure_session_runtime_identity(&initial, &session).expect("operation should succeed");
+        assert!(
+            session
+                .read_entries()
+                .expect("operation should succeed")
+                .is_empty()
+        );
+
+        let mut later_global = initial.clone();
+        crate::model_lifecycle::apply_variant_change(&mut later_global, Some("low-reasoning"));
+        apply_session_model_to_config(&mut later_global, &session);
+
+        assert_eq!(later_global.variant.as_deref(), Some("high-reasoning"));
+        assert_eq!(
+            provider_reasoning_effort(&later_global).as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
+    fn session_activation_restores_exact_variant_and_reasoning_options() {
+        let session = activation_test_session("restore-variant");
+        let activation = SessionModelActivation::new(
+            7,
+            SessionModelIdentity::new("openai", "o3", Some("low-reasoning")),
+            SessionModelIdentity::new("openai", "o3", Some("high-reasoning")),
+        );
+        append_activation(&session, &activation);
+
+        let mut config = Config {
+            variant: Some("low-reasoning".into()),
+            ..Default::default()
+        };
+        apply_session_model_to_config(&mut config, &session);
+
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.model, "o3");
+        assert_eq!(config.variant.as_deref(), Some("high-reasoning"));
+
+        assert_eq!(provider_reasoning_effort(&config).as_deref(), Some("high"));
+    }
+
+    #[test]
+    fn session_activation_normalizes_default_and_clears_stale_variant() {
+        let session = activation_test_session("clear-variant");
+        let activation = SessionModelActivation::new(
+            8,
+            SessionModelIdentity::new("openai", "o3", Some("high-reasoning")),
+            SessionModelIdentity::new("openai", "gpt-4o", Some("default")),
+        );
+        assert_eq!(activation.target.variant, None);
+        append_activation(&session, &activation);
+
+        let mut config = Config {
+            variant: Some("high-reasoning".into()),
+            ..Default::default()
+        };
+        apply_session_model_to_config(&mut config, &session);
+
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.model, "gpt-4o");
+        assert_eq!(config.variant, None);
+        assert_eq!(provider_reasoning_effort(&config), None);
+    }
+
+    #[test]
+    fn unknown_persisted_variant_restores_identity_but_uses_safe_fallback() {
+        let session = activation_test_session("unknown-variant");
+        let activation = SessionModelActivation::new(
+            9,
+            SessionModelIdentity::new("openai", "o3", None),
+            SessionModelIdentity::new("openai", "o3", Some("deleted-variant")),
+        );
+        append_activation(&session, &activation);
+
+        let mut config = Config::default();
+        apply_session_model_to_config(&mut config, &session);
+        assert_eq!(config.variant.as_deref(), Some("deleted-variant"));
+
+        let (_, resolution) = crate::model_lifecycle::materialize_runtime_model_config(&config);
+        assert_eq!(resolution.reasoning_effort, None);
+        assert!(resolution.diagnostic.is_some());
+        assert_eq!(provider_reasoning_effort(&config), None);
     }
 }

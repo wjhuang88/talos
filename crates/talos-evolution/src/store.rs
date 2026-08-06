@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_store_operations() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
 
         let obs = Observation::new(
             SignalType::Correction,
@@ -429,9 +429,11 @@ mod tests {
             Some("session-1".to_string()),
             Some(5),
         );
-        store.insert_observation(&obs).unwrap();
+        store
+            .insert_observation(&obs)
+            .expect("operation should succeed");
 
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert_eq!(observations.len(), 1);
         assert_eq!(observations[0].signal_type, SignalType::Correction);
 
@@ -442,16 +444,20 @@ mod tests {
         );
         pattern.confidence = 0.8;
         pattern.evidence_count = 3;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
-        let patterns = store.get_active_patterns(0.7).unwrap();
+        let patterns = store
+            .get_active_patterns(0.7)
+            .expect("operation should succeed");
         assert_eq!(patterns.len(), 1);
         assert_eq!(patterns[0].confidence, 0.8);
     }
 
     #[test]
     fn test_update_pattern() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
 
         let mut pattern = Pattern::new(
             "Test pattern".to_string(),
@@ -459,20 +465,24 @@ mod tests {
             "test".to_string(),
         );
         pattern.confidence = 0.5;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
         pattern.confidence = 0.9;
         pattern.evidence_count = 10;
-        store.update_pattern(&pattern).unwrap();
+        store
+            .update_pattern(&pattern)
+            .expect("operation should succeed");
 
-        let patterns = store.get_all_patterns().unwrap();
+        let patterns = store.get_all_patterns().expect("operation should succeed");
         assert_eq!(patterns[0].confidence, 0.9);
         assert_eq!(patterns[0].evidence_count, 10);
     }
 
     #[test]
     fn test_delete_oversized_patterns_deactivates_but_keeps_row() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
 
         let mut pattern = Pattern::new(
             "Big pattern".to_string(),
@@ -480,19 +490,23 @@ mod tests {
             "test".to_string(),
         );
         pattern.confidence = 0.9;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
-        let count = store.delete_oversized_patterns(4096).unwrap();
+        let count = store
+            .delete_oversized_patterns(4096)
+            .expect("operation should succeed");
         assert_eq!(count, 1);
 
-        let all = store.get_all_patterns().unwrap();
+        let all = store.get_all_patterns().expect("operation should succeed");
         assert_eq!(all.len(), 1);
         assert!(!all[0].active, "pattern should be deactivated, not deleted");
     }
 
     #[test]
     fn test_delete_oversized_patterns_returns_count() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
 
         for i in 0..3 {
             let mut pattern = Pattern::new(
@@ -501,16 +515,20 @@ mod tests {
                 "test".to_string(),
             );
             pattern.confidence = 0.9;
-            store.insert_pattern(&pattern).unwrap();
+            store
+                .insert_pattern(&pattern)
+                .expect("operation should succeed");
         }
 
-        let count = store.delete_oversized_patterns(5500).unwrap();
+        let count = store
+            .delete_oversized_patterns(5500)
+            .expect("operation should succeed");
         assert_eq!(count, 2);
     }
 
     #[test]
     fn test_pattern_roundtrip_preserves_content_hash() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
 
         let mut pattern = Pattern::new(
             "Test".to_string(),
@@ -519,9 +537,13 @@ mod tests {
         );
         pattern.confidence = 0.8;
         let original_hash = pattern.content_hash.clone();
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
-        let patterns = store.get_active_patterns(0.0).unwrap();
+        let patterns = store
+            .get_active_patterns(0.0)
+            .expect("operation should succeed");
         assert_eq!(patterns.len(), 1);
         assert_eq!(patterns[0].content_hash, original_hash);
     }
@@ -533,7 +555,7 @@ mod tests {
 
         // Create a v1-schema database (without the new MenteDB columns).
         {
-            let conn = Connection::open(&db_path).unwrap();
+            let conn = Connection::open(&db_path).expect("operation should succeed");
             conn.execute_batch(
                 "CREATE TABLE observations (
                     id TEXT PRIMARY KEY, signal_type TEXT NOT NULL, intensity REAL NOT NULL,
@@ -552,7 +574,7 @@ mod tests {
                     resolved INTEGER NOT NULL DEFAULT 0, winner_id TEXT
                 );",
             )
-            .unwrap();
+            .expect("operation should succeed");
 
             // Insert v1 data.
             conn.execute(
@@ -560,26 +582,27 @@ mod tests {
                  VALUES ('v1-obs', 'Correction', 0.8, 'v1 context', '2026-01-01T00:00:00Z', 'sess-1', 1)",
                 [],
             )
-            .unwrap();
+            .expect("operation should succeed");
             conn.execute(
                 "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash)
                  VALUES ('v1-pat', 'v1 pattern', 'v1 instruction', 0.9, 5, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'preference', 1, 'hash123')",
                 [],
             )
-            .unwrap();
+            .expect("operation should succeed");
         }
 
         // Open with new code — should detect v1 schema and hard-reset.
-        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("open v1 db");
+        let store = KnowledgeStore::open(db_path.to_str().expect("operation should succeed"))
+            .expect("open v1 db");
 
         // Data should be wiped.
-        let observations = store.get_observations().unwrap();
+        let observations = store.get_observations().expect("operation should succeed");
         assert!(
             observations.is_empty(),
             "v1 observations should be wiped, got {:?}",
             observations
         );
-        let patterns = store.get_all_patterns().unwrap();
+        let patterns = store.get_all_patterns().expect("operation should succeed");
         assert!(
             patterns.is_empty(),
             "v1 patterns should be wiped, got {:?}",
@@ -588,8 +611,9 @@ mod tests {
 
         // Second open should be idempotent (no re-reset, schema is now v2).
         drop(store);
-        let store2 = KnowledgeStore::open(db_path.to_str().unwrap()).expect("reopen v2 db");
-        let observations2 = store2.get_observations().unwrap();
+        let store2 = KnowledgeStore::open(db_path.to_str().expect("operation should succeed"))
+            .expect("reopen v2 db");
+        let observations2 = store2.get_observations().expect("operation should succeed");
         assert!(observations2.is_empty(), "second open should not re-reset");
     }
 }

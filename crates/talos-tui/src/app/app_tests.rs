@@ -89,11 +89,13 @@ fn credential_cursor_tracks_masked_buffer() {
 fn credential_and_provider_cursor_positions_are_panel_local() {
     let credential =
         crate::panel_state::BottomPanelState::open_credential_input("provider", None, false, None);
-    let local = scrollback::credential_cursor_position(&credential).unwrap();
+    let local =
+        scrollback::credential_cursor_position(&credential).expect("operation should succeed");
     assert_eq!(local.row, 2);
 
     let provider = crate::panel_state::BottomPanelState::open_provider_wizard();
-    let local = scrollback::provider_wizard_local_cursor_position(&provider).unwrap();
+    let local = scrollback::provider_wizard_local_cursor_position(&provider)
+        .expect("operation should succeed");
     assert_eq!(local.row, 2);
     assert_eq!(local.col, 3);
 }
@@ -104,7 +106,7 @@ fn approval_summary_uses_tool_summary_fields() {
         "command": "cd /repo && git status --short",
         "other": "hidden"
     });
-    let args_str = serde_json::to_string_pretty(&args).unwrap();
+    let args_str = serde_json::to_string_pretty(&args).expect("operation should succeed");
     let summary = tool_display::summarize_tool_args("bash", &args_str, &["command".to_string()]);
 
     assert_eq!(summary, "command: cd /repo && git status --short");
@@ -116,7 +118,7 @@ fn approval_summary_uses_tool_summary_fields() {
 fn tool_args_summary_uses_available_budget_before_truncating() {
     let command = "cargo test -p talos-cli approval::tests::test_always_allow_rule_is_effective_against_default_ask";
     let args = serde_json::json!({ "command": command });
-    let args_str = serde_json::to_string_pretty(&args).unwrap();
+    let args_str = serde_json::to_string_pretty(&args).expect("operation should succeed");
 
     let full =
         tool_display::summarize_tool_args_with_budget(&args_str, &["command".to_string()], 140);
@@ -548,7 +550,12 @@ fn stream_render_state_renders_horizontal_rule() {
     );
 
     let mut segments = lines[0].segments.clone();
-    scrollback::append_fill_segment(&mut segments, lines[0].fill.clone().unwrap(), 20, 3);
+    scrollback::append_fill_segment(
+        &mut segments,
+        lines[0].fill.clone().expect("operation should succeed"),
+        20,
+        3,
+    );
     assert_eq!(scrollback::history_segments_width(&segments), 20);
 }
 
@@ -724,7 +731,7 @@ fn find_symbol_always_summarized() {
         {"name": "App", "kind": "struct"},
         {"name": "App", "kind": "impl"}
     ]))
-    .unwrap();
+    .expect("operation should succeed");
     let display = ToolResultDisplay {
         tool_name: Some("find_symbol".to_string()),
         is_error: false,
@@ -742,7 +749,7 @@ fn find_references_always_summarized() {
         {"file": "main.rs", "line": 25},
         {"file": "lib.rs", "line": 5}
     ]))
-    .unwrap();
+    .expect("operation should succeed");
     let display = ToolResultDisplay {
         tool_name: Some("find_references".to_string()),
         is_error: false,
@@ -822,7 +829,7 @@ fn list_imports_over_threshold_summarized() {
     let imports: Vec<_> = (0..35)
         .map(|i| serde_json::json!({"module": format!("mod_{i}")}))
         .collect();
-    let content = serde_json::to_string_pretty(&imports).unwrap();
+    let content = serde_json::to_string_pretty(&imports).expect("operation should succeed");
     let display = ToolResultDisplay {
         tool_name: Some("list_imports".to_string()),
         is_error: false,
@@ -1520,7 +1527,10 @@ fn entry_point_mouse_wheel_scrolls_history_without_browsing_composer_history() {
 #[test]
 fn entry_point_page_down_uses_history_rect_height_and_end_returns_follow_tail() {
     let mut tui = tui_with_projected_history(4, 10);
-    let first = tui.last_history_projection.first_anchor().unwrap();
+    let first = tui
+        .last_history_projection
+        .first_anchor()
+        .expect("operation should succeed");
     tui.history_scroll.anchor(first, 0);
     tui.last_history_projection = project_history(&tui.transcript, 80, 4, &tui.history_scroll);
     tui.handle_input_event(&key_press(KeyCode::PageDown));

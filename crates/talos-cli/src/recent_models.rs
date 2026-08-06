@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_load_save_recent_models() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let path = dir.path().join("recent.json");
 
         let mut list = load_recent_models(Some(&path));

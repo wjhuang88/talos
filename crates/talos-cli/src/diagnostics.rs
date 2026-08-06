@@ -330,12 +330,12 @@ mod tests {
     fn test_active_iterations_from_clean_source() {
         let dir = tempdir().expect("tempdir");
         let iter_dir = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "# Iterations\n\n## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Dynamic Diagnostics | **Active** (2026-07-13) | no |\n| I001 | Project Scaffold | Complete | yes |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let iterations = collect_active_iterations_at(dir.path());
         assert!(
@@ -365,12 +365,12 @@ mod tests {
     fn test_active_iterations_when_index_malformed() {
         let dir = tempdir().expect("tempdir");
         let iter_dir = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "# Iterations\n\nNo table here, just prose.\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let iterations = collect_active_iterations_at(dir.path());
         assert!(
@@ -383,12 +383,12 @@ mod tests {
     fn test_active_iterations_with_empty_table() {
         let dir = tempdir().expect("tempdir");
         let iter_dir = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let iterations = collect_active_iterations_at(dir.path());
         assert_eq!(
@@ -411,12 +411,12 @@ mod tests {
     fn test_full_summary_from_clean_workspace() {
         let dir = tempdir().expect("tempdir");
         let iter_dir = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "# Iterations\n\n## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Dynamic Diagnostics | **Active** (2026-07-13) | no |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let summary =
             collect_diagnostics_summary_at(dir.path(), dir.path().to_string_lossy().into());
@@ -460,7 +460,7 @@ mod tests {
     fn test_full_summary_from_malformed_workspace() {
         let dir = tempdir().expect("tempdir");
         let iter_dir = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "{{{{not valid markdown{{{{\n\n```\nbinary\x00null\n```\n",
@@ -528,14 +528,14 @@ mod tests {
     fn test_summary_with_unicode_workspace_path() {
         let dir = tempdir().expect("tempdir");
         let unicode_subdir = dir.path().join("テスト");
-        fs::create_dir_all(&unicode_subdir).unwrap();
+        fs::create_dir_all(&unicode_subdir).expect("operation should succeed");
         let iter_dir = unicode_subdir.join("docs").join("iterations");
-        fs::create_dir_all(&iter_dir).unwrap();
+        fs::create_dir_all(&iter_dir).expect("operation should succeed");
         fs::write(
             iter_dir.join("README.md"),
             "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Test | Active | no |\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let summary = collect_diagnostics_summary_at(
             &unicode_subdir,
@@ -544,7 +544,10 @@ mod tests {
         let json_str = serde_json::to_string(&summary).expect("serialize");
         let value: serde_json::Value = serde_json::from_str(&json_str).expect("parse");
         assert!(
-            value["workspace_root"].as_str().unwrap().contains("テスト"),
+            value["workspace_root"]
+                .as_str()
+                .expect("operation should succeed")
+                .contains("テスト"),
             "unicode path should be properly serialized"
         );
     }

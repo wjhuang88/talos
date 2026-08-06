@@ -541,39 +541,41 @@ mod tests {
     use talos_core::message::Message;
 
     fn temp_index() -> (SessionIndex, tempfile::TempDir) {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let db_path = dir.path().join("test_index.db");
-        let index = SessionIndex::new(&db_path).unwrap();
-        index.init_schema().unwrap();
+        let index = SessionIndex::new(&db_path).expect("operation should succeed");
+        index.init_schema().expect("operation should succeed");
         (index, dir)
     }
 
     fn test_session(manager: &SessionManager) -> Session {
-        let session = manager.create_session("test-project", "").unwrap();
+        let session = manager
+            .create_session("test-project", "")
+            .expect("operation should succeed");
         session
             .append(&Message::User {
                 content: "Hello, how do I implement full-text search in Rust?".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         session
             .append(&Message::Assistant {
                 content: "You can use SQLite with FTS5 extension. It provides efficient full-text indexing.".into(),
                 tool_calls: vec![],
                 reasoning: None,
             })
-            .unwrap();
+            .expect("operation should succeed");
         session
             .append(&Message::User {
                 content: "What about ranking and relevance?".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
         session
             .append(&Message::Assistant {
                 content: "FTS5 uses BM25 ranking by default. Lower scores indicate more relevant matches.".into(),
                 tool_calls: vec![],
                 reasoning: None,
             })
-            .unwrap();
+            .expect("operation should succeed");
         session
     }
 
@@ -588,7 +590,7 @@ mod tests {
                 [],
                 |row| row.get(0),
             )
-            .unwrap();
+            .expect("operation should succeed");
 
         assert_eq!(
             table_count, 2,
@@ -598,28 +600,46 @@ mod tests {
 
     #[test]
     fn test_session_indexing() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let info = index.get_session_info(&session.id.to_string()).unwrap();
+        let info = index
+            .get_session_info(&session.id.to_string())
+            .expect("operation should succeed");
         assert!(info.is_some());
-        let info = info.unwrap();
+        let info = info.expect("operation should succeed");
         assert_eq!(info.project, "test-project");
         assert_eq!(info.message_count, 4);
     }
 
     #[test]
     fn test_full_text_search_basic() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("SQLite", 10).unwrap();
+        let results = index
+            .search("SQLite", 10)
+            .expect("operation should succeed");
         assert!(!results.is_empty(), "Should find results for 'SQLite'");
 
         for result in &results {
@@ -629,13 +649,22 @@ mod tests {
 
     #[test]
     fn test_full_text_search_bm25() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("ranking BM25", 10).unwrap();
+        let results = index
+            .search("ranking BM25", 10)
+            .expect("operation should succeed");
         assert!(
             !results.is_empty(),
             "Should find results for 'ranking BM25'"
@@ -651,13 +680,22 @@ mod tests {
 
     #[test]
     fn test_full_text_search_no_results() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("nonexistent_term_xyz_12345", 10).unwrap();
+        let results = index
+            .search("nonexistent_term_xyz_12345", 10)
+            .expect("operation should succeed");
         assert!(
             results.is_empty(),
             "Should return empty results for non-matching query"
@@ -666,14 +704,25 @@ mod tests {
 
     #[test]
     fn test_full_text_search_with_limit() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results_all = index.search("session", 100).unwrap();
-        let results_limited = index.search("session", 2).unwrap();
+        let results_all = index
+            .search("session", 100)
+            .expect("operation should succeed");
+        let results_limited = index
+            .search("session", 2)
+            .expect("operation should succeed");
 
         assert!(results_limited.len() <= 2, "Should respect limit");
         assert!(
@@ -684,13 +733,20 @@ mod tests {
 
     #[test]
     fn test_search_result_snippet() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("Rust", 10).unwrap();
+        let results = index.search("Rust", 10).expect("operation should succeed");
         assert!(!results.is_empty(), "Should find results for 'Rust'");
 
         let found_highlight = results.iter().any(|r| r.snippet.contains("<b>"));
@@ -702,29 +758,42 @@ mod tests {
 
     #[test]
     fn test_list_recent_ordering() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
 
-        let session1 = manager.create_session("project-alpha", "").unwrap();
+        let session1 = manager
+            .create_session("project-alpha", "")
+            .expect("operation should succeed");
         session1
             .append(&Message::User {
                 content: "First session message".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let session2 = manager.create_session("project-beta", "").unwrap();
+        let session2 = manager
+            .create_session("project-beta", "")
+            .expect("operation should succeed");
         session2
             .append(&Message::User {
                 content: "Second session message".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session1).unwrap();
-        index.index_session(&session2).unwrap();
+        index
+            .index_session(&session1)
+            .expect("operation should succeed");
+        index
+            .index_session(&session2)
+            .expect("operation should succeed");
 
-        let recent = index.list_recent(10).unwrap();
+        let recent = index.list_recent(10).expect("operation should succeed");
         assert_eq!(recent.len(), 2, "Should return both sessions");
 
         assert_eq!(
@@ -736,39 +805,58 @@ mod tests {
 
     #[test]
     fn test_list_recent_with_limit() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
-        let db_path = tempfile::tempdir().unwrap().path().join("test_limit.db");
-        let mut index = SessionIndex::new(&db_path).unwrap();
-        index.init_schema().unwrap();
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
+        let db_path = tempfile::tempdir()
+            .expect("operation should succeed")
+            .path()
+            .join("test_limit.db");
+        let mut index = SessionIndex::new(&db_path).expect("operation should succeed");
+        index.init_schema().expect("operation should succeed");
 
         for i in 0..5 {
             let session = manager
                 .create_session(&format!("project-limit-{i}"), "")
-                .unwrap();
+                .expect("operation should succeed");
             session
                 .append(&Message::User {
                     content: format!("Message in project {i}"),
                 })
-                .unwrap();
-            index.index_session(&session).unwrap();
+                .expect("operation should succeed");
+            index
+                .index_session(&session)
+                .expect("operation should succeed");
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
 
-        let limited = index.list_recent(3).unwrap();
+        let limited = index.list_recent(3).expect("operation should succeed");
         assert_eq!(limited.len(), 3, "Should respect limit");
     }
 
     #[test]
     fn test_get_session_info_existing() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let info = index.get_session_info(&session.id.to_string()).unwrap();
+        let info = index
+            .get_session_info(&session.id.to_string())
+            .expect("operation should succeed");
         assert!(info.is_some());
-        let info = info.unwrap();
+        let info = info.expect("operation should succeed");
         assert_eq!(info.id, session.id);
         assert_eq!(info.project, "test-project");
         assert_eq!(info.message_count, 4);
@@ -778,7 +866,9 @@ mod tests {
     fn test_get_session_info_nonexistent() {
         let (index, _dir) = temp_index();
 
-        let info = index.get_session_info("nonexistent-id").unwrap();
+        let info = index
+            .get_session_info("nonexistent-id")
+            .expect("operation should succeed");
         assert!(
             info.is_none(),
             "Should return None for non-existent session"
@@ -787,14 +877,23 @@ mod tests {
 
     #[test]
     fn test_list_all_session_ids() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let s1 = test_session(&manager);
-        let s2 = manager.create_session("test-project", "").unwrap();
+        let s2 = manager
+            .create_session("test-project", "")
+            .expect("operation should succeed");
         let (mut index, _dir) = temp_index();
-        index.index_session(&s1).unwrap();
-        index.index_session(&s2).unwrap();
+        index.index_session(&s1).expect("operation should succeed");
+        index.index_session(&s2).expect("operation should succeed");
 
-        let mut ids = index.list_all_session_ids().unwrap();
+        let mut ids = index
+            .list_all_session_ids()
+            .expect("operation should succeed");
         ids.sort();
         let mut expected = vec![s1.id.to_string(), s2.id.to_string()];
         expected.sort();
@@ -803,33 +902,53 @@ mod tests {
 
     #[test]
     fn test_delete_session_removes_index_entries() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
         index
             .delete_session(&session.id.to_string())
             .expect("delete should succeed");
-        let info = index.get_session_info(&session.id.to_string()).unwrap();
+        let info = index
+            .get_session_info(&session.id.to_string())
+            .expect("operation should succeed");
         assert!(info.is_none(), "index entry should be removed");
-        let ids = index.list_all_session_ids().unwrap();
+        let ids = index
+            .list_all_session_ids()
+            .expect("operation should succeed");
         assert!(!ids.contains(&session.id.to_string()));
     }
 
     #[test]
     fn test_index_session_upsert() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
-        let session = manager.create_session("test-project", "").unwrap();
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
+        let session = manager
+            .create_session("test-project", "")
+            .expect("operation should succeed");
 
         session
             .append(&Message::User {
                 content: "Initial message".into(),
             })
-            .unwrap();
+            .expect("operation should succeed");
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
         session
             .append(&Message::Assistant {
@@ -837,18 +956,24 @@ mod tests {
                 tool_calls: vec![],
                 reasoning: None,
             })
-            .unwrap();
-        index.index_session(&session).unwrap();
+            .expect("operation should succeed");
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let info = index.get_session_info(&session.id.to_string()).unwrap();
+        let info = index
+            .get_session_info(&session.id.to_string())
+            .expect("operation should succeed");
         assert!(info.is_some());
         assert_eq!(
-            info.unwrap().message_count,
+            info.expect("operation should succeed").message_count,
             2,
             "Message count should be updated"
         );
 
-        let results = index.search("message", 100).unwrap();
+        let results = index
+            .search("message", 100)
+            .expect("operation should succeed");
         let unique_count = results
             .iter()
             .filter(|r| r.session_id == session.id.to_string())
@@ -858,25 +983,41 @@ mod tests {
 
     #[test]
     fn test_search_with_phrase_query() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("\"BM25 ranking\"", 10).unwrap();
+        let results = index
+            .search("\"BM25 ranking\"", 10)
+            .expect("operation should succeed");
         assert!(!results.is_empty(), "Should find exact phrase match");
     }
 
     #[test]
     fn test_search_result_timestamp() {
-        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let manager = SessionManager::with_dir(
+            tempfile::tempdir()
+                .expect("operation should succeed")
+                .path()
+                .to_path_buf(),
+        );
         let session = test_session(&manager);
 
         let (mut index, _dir) = temp_index();
-        index.index_session(&session).unwrap();
+        index
+            .index_session(&session)
+            .expect("operation should succeed");
 
-        let results = index.search("Rust", 10).unwrap();
+        let results = index.search("Rust", 10).expect("operation should succeed");
         assert!(!results.is_empty());
 
         for result in &results {
@@ -889,9 +1030,9 @@ mod tests {
 
     #[test]
     fn test_db_path() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let db_path = dir.path().join("test_path.db");
-        let index = SessionIndex::new(&db_path).unwrap();
+        let index = SessionIndex::new(&db_path).expect("operation should succeed");
 
         assert_eq!(index.db_path(), db_path);
     }
@@ -909,7 +1050,7 @@ mod tests {
                 [],
                 |row| row.get(0),
             )
-            .unwrap();
+            .expect("operation should succeed");
 
         assert_eq!(table_count, 1, "forks table should exist");
     }
@@ -920,12 +1061,12 @@ mod tests {
 
         index
             .record_fork("source-session-1", "forked-session-1", "entry-abc")
-            .unwrap();
+            .expect("operation should succeed");
 
         let count: i64 = index
             .conn
             .query_row("SELECT COUNT(*) FROM forks", [], |row| row.get(0))
-            .unwrap();
+            .expect("operation should succeed");
 
         assert_eq!(count, 1, "One fork relationship should be recorded");
     }
@@ -936,22 +1077,26 @@ mod tests {
 
         index
             .record_fork("source-1", "forked-1", "entry-a")
-            .unwrap();
+            .expect("operation should succeed");
         index
             .record_fork("source-1", "forked-2", "entry-b")
-            .unwrap();
+            .expect("operation should succeed");
         index
             .record_fork("source-2", "forked-3", "entry-c")
-            .unwrap();
+            .expect("operation should succeed");
 
-        let forks = index.get_forks("source-1").unwrap();
+        let forks = index
+            .get_forks("source-1")
+            .expect("operation should succeed");
         assert_eq!(forks.len(), 2, "Should return 2 forks for source-1");
 
         let fork_ids: Vec<&str> = forks.iter().map(|f| f.forked_session_id.as_str()).collect();
         assert!(fork_ids.contains(&"forked-1"));
         assert!(fork_ids.contains(&"forked-2"));
 
-        let forks_source2 = index.get_forks("source-2").unwrap();
+        let forks_source2 = index
+            .get_forks("source-2")
+            .expect("operation should succeed");
         assert_eq!(forks_source2.len(), 1);
         assert_eq!(forks_source2[0].forked_session_id, "forked-3");
     }
@@ -960,7 +1105,9 @@ mod tests {
     fn test_get_forks_empty_for_unknown_session() {
         let (index, _dir) = temp_index();
 
-        let forks = index.get_forks("unknown-session").unwrap();
+        let forks = index
+            .get_forks("unknown-session")
+            .expect("operation should succeed");
         assert!(forks.is_empty(), "Should return empty for unknown session");
     }
 
@@ -970,9 +1117,11 @@ mod tests {
 
         index
             .record_fork("source-1", "forked-1", "entry-123")
-            .unwrap();
+            .expect("operation should succeed");
 
-        let forks = index.get_forks("source-1").unwrap();
+        let forks = index
+            .get_forks("source-1")
+            .expect("operation should succeed");
         assert_eq!(forks.len(), 1);
 
         let fork = &forks[0];

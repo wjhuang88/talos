@@ -900,7 +900,7 @@ mod tests {
             "CJK at 40 cols must produce more rows than at 160 cols"
         );
         assert!(
-            lines_wide.len() >= 1,
+            !lines_wide.is_empty(),
             "CJK at 160 cols must produce at least 1 row"
         );
     }
@@ -931,7 +931,11 @@ mod tests {
                 "first head line must be present at {width} cols"
             );
             assert!(
-                lines.last().unwrap().text.contains("line 40"),
+                lines
+                    .last()
+                    .expect("operation should succeed")
+                    .text
+                    .contains("line 40"),
                 "last tail line must be present at {width} cols"
             );
         }
@@ -977,7 +981,7 @@ mod tests {
             narrow.len() > wide.len(),
             "narrow must yield more continuation rows"
         );
-        assert!(wide.len() >= 1);
+        assert!(!wide.is_empty());
     }
 
     #[test]

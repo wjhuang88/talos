@@ -582,7 +582,10 @@ mod tests {
     #[test]
     fn test_open_memory_creates_schema() {
         let catalog = ModelCatalog::open_memory().expect("open in-memory catalog");
-        assert_eq!(catalog.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(
+            catalog.schema_version().expect("operation should succeed"),
+            SCHEMA_VERSION
+        );
     }
 
     #[test]
@@ -590,7 +593,10 @@ mod tests {
         let dir = tempfile::tempdir().expect("create temp dir");
         let db_path = dir.path().join("catalog.db");
         let catalog = ModelCatalog::open(&db_path).expect("open catalog");
-        assert_eq!(catalog.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(
+            catalog.schema_version().expect("operation should succeed"),
+            SCHEMA_VERSION
+        );
         assert!(db_path.exists(), "database file should exist");
     }
 
@@ -598,7 +604,10 @@ mod tests {
     fn test_migrate_is_idempotent() {
         let catalog = ModelCatalog::open_memory().expect("open catalog");
         catalog.migrate().expect("second migration should succeed");
-        assert_eq!(catalog.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(
+            catalog.schema_version().expect("operation should succeed"),
+            SCHEMA_VERSION
+        );
     }
 
     #[test]
@@ -610,8 +619,11 @@ mod tests {
         ];
         seed_models(&catalog, &models, "2025-07-03T00:00:00Z");
 
-        assert_eq!(catalog.model_count().unwrap(), 2);
-        assert_eq!(catalog.provider_count().unwrap(), 2);
+        assert_eq!(catalog.model_count().expect("operation should succeed"), 2);
+        assert_eq!(
+            catalog.provider_count().expect("operation should succeed"),
+            2
+        );
 
         let all = catalog.all_models().expect("all_models");
         assert_eq!(all.len(), 2);
@@ -628,7 +640,7 @@ mod tests {
             "2025-07-03T12:00:00Z",
         );
         assert_eq!(
-            catalog.last_refreshed().unwrap(),
+            catalog.last_refreshed().expect("operation should succeed"),
             Some("2025-07-03T12:00:00Z".to_string())
         );
     }
@@ -641,11 +653,14 @@ mod tests {
             &[sample_model("m1", "p1"), sample_model("m2", "p1")],
             "t1",
         );
-        assert_eq!(catalog.model_count().unwrap(), 2);
+        assert_eq!(catalog.model_count().expect("operation should succeed"), 2);
 
         seed_models(&catalog, &[sample_model("m3", "p2")], "t2");
-        assert_eq!(catalog.model_count().unwrap(), 1);
-        assert_eq!(catalog.provider_count().unwrap(), 1);
+        assert_eq!(catalog.model_count().expect("operation should succeed"), 1);
+        assert_eq!(
+            catalog.provider_count().expect("operation should succeed"),
+            1
+        );
     }
 
     #[test]
@@ -661,12 +676,12 @@ mod tests {
             .find_model("anthropic", "claude-sonnet-4-5")
             .expect("find_model");
         assert!(found.is_some());
-        let m = found.unwrap();
+        let m = found.expect("operation should succeed");
         assert_eq!(m.context_limit, Some(200_000));
         assert_eq!(m.output_limit, Some(8_192));
         assert!(m.capabilities.tools);
         assert!(m.capabilities.reasoning);
-        let p = m.pricing.as_ref().unwrap();
+        let p = m.pricing.as_ref().expect("operation should succeed");
         assert_eq!(p.input_per_1m, Some(3.0));
     }
 
@@ -675,8 +690,18 @@ mod tests {
         let catalog = ModelCatalog::open_memory().expect("open catalog");
         seed_models(&catalog, &[sample_model("m1", "p1")], "t");
 
-        assert!(catalog.find_model("p1", "nonexistent").unwrap().is_none());
-        assert!(catalog.find_model("unknown", "m1").unwrap().is_none());
+        assert!(
+            catalog
+                .find_model("p1", "nonexistent")
+                .expect("operation should succeed")
+                .is_none()
+        );
+        assert!(
+            catalog
+                .find_model("unknown", "m1")
+                .expect("operation should succeed")
+                .is_none()
+        );
     }
 
     #[test]
@@ -692,8 +717,20 @@ mod tests {
             "t",
         );
 
-        assert_eq!(catalog.models_by_provider("anthropic").unwrap().len(), 2);
-        assert_eq!(catalog.models_by_provider("openai").unwrap().len(), 1);
+        assert_eq!(
+            catalog
+                .models_by_provider("anthropic")
+                .expect("operation should succeed")
+                .len(),
+            2
+        );
+        assert_eq!(
+            catalog
+                .models_by_provider("openai")
+                .expect("operation should succeed")
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -708,9 +745,24 @@ mod tests {
             ],
             "t",
         );
-        assert_eq!(catalog.model_count_for_provider("p1").unwrap(), 2);
-        assert_eq!(catalog.model_count_for_provider("p2").unwrap(), 1);
-        assert_eq!(catalog.model_count_for_provider("missing").unwrap(), 0);
+        assert_eq!(
+            catalog
+                .model_count_for_provider("p1")
+                .expect("operation should succeed"),
+            2
+        );
+        assert_eq!(
+            catalog
+                .model_count_for_provider("p2")
+                .expect("operation should succeed"),
+            1
+        );
+        assert_eq!(
+            catalog
+                .model_count_for_provider("missing")
+                .expect("operation should succeed"),
+            0
+        );
     }
 
     #[test]
@@ -757,7 +809,10 @@ mod tests {
             .upsert_model(&sample_model("m1", "test"))
             .expect("upsert_model");
 
-        let found = catalog.find_model("test", "m1").unwrap().unwrap();
+        let found = catalog
+            .find_model("test", "m1")
+            .expect("operation should succeed")
+            .expect("operation should succeed");
         assert!(found.pricing.is_some());
     }
 
@@ -778,8 +833,11 @@ mod tests {
         });
         catalog.upsert_model(&model).expect("upsert_model");
 
-        let found = catalog.find_model("test", "m1").unwrap().unwrap();
-        let p = found.pricing.as_ref().unwrap();
+        let found = catalog
+            .find_model("test", "m1")
+            .expect("operation should succeed")
+            .expect("operation should succeed");
+        let p = found.pricing.as_ref().expect("operation should succeed");
         assert_eq!(p.input_per_1m, Some(10.0));
         assert_eq!(p.output_per_1m, Some(50.0));
         assert_eq!(p.cache_read_per_1m, None);
@@ -798,8 +856,20 @@ mod tests {
             "t",
         );
 
-        assert_eq!(catalog.search_models("claude").unwrap().len(), 2);
-        assert_eq!(catalog.search_models("gpt").unwrap().len(), 1);
+        assert_eq!(
+            catalog
+                .search_models("claude")
+                .expect("operation should succeed")
+                .len(),
+            2
+        );
+        assert_eq!(
+            catalog
+                .search_models("gpt")
+                .expect("operation should succeed")
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -837,25 +907,64 @@ mod tests {
     #[test]
     fn test_meta_set_get() {
         let catalog = ModelCatalog::open_memory().expect("open catalog");
-        assert!(catalog.get_meta("foo").unwrap().is_none());
+        assert!(
+            catalog
+                .get_meta("foo")
+                .expect("operation should succeed")
+                .is_none()
+        );
 
         catalog.set_meta("foo", "bar").expect("set_meta");
-        assert_eq!(catalog.get_meta("foo").unwrap(), Some("bar".to_string()));
+        assert_eq!(
+            catalog.get_meta("foo").expect("operation should succeed"),
+            Some("bar".to_string())
+        );
 
         catalog.set_meta("foo", "baz").expect("set_meta");
-        assert_eq!(catalog.get_meta("foo").unwrap(), Some("baz".to_string()));
+        assert_eq!(
+            catalog.get_meta("foo").expect("operation should succeed"),
+            Some("baz".to_string())
+        );
     }
 
     #[test]
     fn test_empty_catalog_queries() {
         let catalog = ModelCatalog::open_memory().expect("open catalog");
-        assert!(catalog.all_models().unwrap().is_empty());
-        assert!(catalog.all_providers().unwrap().is_empty());
-        assert!(catalog.models_by_provider("none").unwrap().is_empty());
-        assert!(catalog.find_model("none", "none").unwrap().is_none());
-        assert!(catalog.search_models("test").unwrap().is_empty());
-        assert_eq!(catalog.model_count().unwrap(), 0);
-        assert_eq!(catalog.provider_count().unwrap(), 0);
+        assert!(
+            catalog
+                .all_models()
+                .expect("operation should succeed")
+                .is_empty()
+        );
+        assert!(
+            catalog
+                .all_providers()
+                .expect("operation should succeed")
+                .is_empty()
+        );
+        assert!(
+            catalog
+                .models_by_provider("none")
+                .expect("operation should succeed")
+                .is_empty()
+        );
+        assert!(
+            catalog
+                .find_model("none", "none")
+                .expect("operation should succeed")
+                .is_none()
+        );
+        assert!(
+            catalog
+                .search_models("test")
+                .expect("operation should succeed")
+                .is_empty()
+        );
+        assert_eq!(catalog.model_count().expect("operation should succeed"), 0);
+        assert_eq!(
+            catalog.provider_count().expect("operation should succeed"),
+            0
+        );
     }
 
     #[test]
@@ -883,7 +992,10 @@ mod tests {
             .expect("upsert_provider");
         catalog.upsert_model(&model).expect("upsert_model");
 
-        let found = catalog.find_model("test", "test").unwrap().unwrap();
+        let found = catalog
+            .find_model("test", "test")
+            .expect("operation should succeed")
+            .expect("operation should succeed");
         assert_eq!(found.source, model.source);
     }
 
@@ -934,9 +1046,15 @@ mod tests {
     fn test_seed_empty_models() {
         let catalog = ModelCatalog::open_memory().expect("open catalog");
         catalog.seed(&[], &[], "t").expect("seed empty");
-        assert_eq!(catalog.model_count().unwrap(), 0);
-        assert_eq!(catalog.provider_count().unwrap(), 0);
-        assert_eq!(catalog.last_refreshed().unwrap(), Some("t".to_string()));
+        assert_eq!(catalog.model_count().expect("operation should succeed"), 0);
+        assert_eq!(
+            catalog.provider_count().expect("operation should succeed"),
+            0
+        );
+        assert_eq!(
+            catalog.last_refreshed().expect("operation should succeed"),
+            Some("t".to_string())
+        );
     }
 
     #[test]
@@ -972,7 +1090,10 @@ mod tests {
         let stored = catalog.all_providers().expect("all_providers");
         assert_eq!(stored.len(), 2);
 
-        let anthropic = stored.iter().find(|p| p.id == "anthropic").unwrap();
+        let anthropic = stored
+            .iter()
+            .find(|p| p.id == "anthropic")
+            .expect("operation should succeed");
         assert_eq!(anthropic.name, "Anthropic");
         assert_eq!(
             anthropic.api_base_url.as_deref(),
@@ -984,7 +1105,10 @@ mod tests {
             Some("https://docs.anthropic.com")
         );
 
-        let openai = stored.iter().find(|p| p.id == "openai").unwrap();
+        let openai = stored
+            .iter()
+            .find(|p| p.id == "openai")
+            .expect("operation should succeed");
         assert_eq!(openai.name, "OpenAI");
         assert_eq!(
             openai.api_base_url.as_deref(),
@@ -1009,13 +1133,16 @@ mod tests {
         let providers = catalog.all_providers().expect("all_providers");
         assert_eq!(providers.len(), 2);
 
-        let known = providers.iter().find(|p| p.id == "known").unwrap();
+        let known = providers
+            .iter()
+            .find(|p| p.id == "known")
+            .expect("operation should succeed");
         assert_eq!(known.api_base_url.as_deref(), Some("https://api.known.com"));
 
         let unknown = providers
             .iter()
             .find(|p| p.id == "unknown-provider")
-            .unwrap();
+            .expect("operation should succeed");
         assert!(unknown.api_base_url.is_none());
     }
 
@@ -1035,7 +1162,10 @@ mod tests {
         };
         seed_models(&catalog, &[model], "t");
 
-        let found = catalog.find_model("test", "free-model").unwrap().unwrap();
+        let found = catalog
+            .find_model("test", "free-model")
+            .expect("operation should succeed")
+            .expect("operation should succeed");
         assert!(found.pricing.is_none());
         assert_eq!(found.context_limit, Some(100_000));
     }

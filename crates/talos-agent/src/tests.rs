@@ -550,7 +550,10 @@ async fn test_run_collects_text_deltas() {
     ];
 
     let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
-    let response = agent.run("Hi".into()).await.unwrap();
+    let response = agent
+        .run("Hi".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "Hello, world!");
 }
 
@@ -610,7 +613,10 @@ async fn test_turn_start_hook_fires_once_for_tool_turn() {
         Arc::new(hooks),
     );
 
-    let response = agent.run("read file".into()).await.unwrap();
+    let response = agent
+        .run("read file".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "done");
 
     let events = events.lock().await;
@@ -645,7 +651,7 @@ async fn test_run_handles_error_event() {
     let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
     let result = agent.run("Hi".into()).await;
     assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = result.expect_err("operation should fail");
     assert!(matches!(err, AgentError::UnexpectedEvent(_)));
 }
 
@@ -655,7 +661,7 @@ async fn test_run_handles_channel_close_without_turn_end() {
     let agent = Agent::new(Arc::new(MockModel::new(vec![])), ToolRegistry::new());
     let result = agent.run("Hi".into()).await;
     assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = result.expect_err("operation should fail");
     assert!(matches!(err, AgentError::UnexpectedEvent(_)));
 }
 
@@ -965,7 +971,10 @@ async fn test_run_streaming_forwards_events() {
     );
     let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-    let (response, _) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+    let (response, _) = agent
+        .run_streaming("Hi".into(), vec![], tx)
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "Streaming");
 
     let mut received = Vec::new();
@@ -999,7 +1008,10 @@ async fn test_run_streaming_keeps_thinking_out_of_final_history() {
     );
     let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-    let (response, new_messages) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+    let (response, new_messages) = agent
+        .run_streaming("Hi".into(), vec![], tx)
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "Final answer");
     assert!(!response.contains("private reasoning"));
     assert!(matches!(
@@ -1093,7 +1105,7 @@ async fn test_replay_reasoning_false_strips_reasoning_for_provider_messages_only
     let _ = agent
         .run_streaming("continue".into(), history_for_run, tx)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let captured = captured_messages.lock().expect("lock poisoned");
     let first_call_messages = &captured[0];
@@ -1160,7 +1172,10 @@ async fn test_reasoning_complete_blocks_stamped_with_identity_on_assistant_messa
     );
 
     let (tx, _rx) = mpsc::unbounded_channel::<AgentEvent>();
-    let (_response, new_messages) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+    let (_response, new_messages) = agent
+        .run_streaming("Hi".into(), vec![], tx)
+        .await
+        .expect("operation should succeed");
 
     let assistant = new_messages
         .iter()
@@ -1225,7 +1240,10 @@ async fn test_tool_execution_loop_single_call() {
     }));
 
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
-    let response = agent.run("Echo hello".into()).await.unwrap();
+    let response = agent
+        .run("Echo hello".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "The result is: hello");
 }
 
@@ -1280,7 +1298,10 @@ async fn test_tool_execution_loop_multiple_calls() {
     }));
 
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
-    let response = agent.run("Read files".into()).await.unwrap();
+    let response = agent
+        .run("Read files".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "Done reading both files");
 }
 
@@ -1345,7 +1366,10 @@ async fn test_concurrent_read_only_tools() {
     }));
 
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
-    let _response = agent.run("Read files".into()).await.unwrap();
+    let _response = agent
+        .run("Read files".into())
+        .await
+        .expect("operation should succeed");
 
     let log_entries = log.lock().await;
     let starts: Vec<_> = log_entries
@@ -1423,7 +1447,10 @@ async fn test_serial_write_tools() {
     }));
 
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
-    let _response = agent.run("Write files".into()).await.unwrap();
+    let _response = agent
+        .run("Write files".into())
+        .await
+        .expect("operation should succeed");
 
     let log_entries = log.lock().await;
     assert_eq!(log_entries.len(), 4);
@@ -1469,7 +1496,7 @@ async fn test_turn_budget_enforcement() {
         result.is_ok(),
         "budget exceeded should return Ok with messages, not Err"
     );
-    let text = result.unwrap();
+    let text = result.expect("operation should succeed");
     assert!(
         text.contains("limit") || text.contains("preserved"),
         "final text should mention tool call limit: got {text}"
@@ -1522,7 +1549,7 @@ async fn test_turn_budget_allows_50_calls() {
     );
     let result = agent.run("50 tools".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Done");
+    assert_eq!(result.expect("operation should succeed"), "Done");
 }
 
 #[tokio::test]
@@ -1580,7 +1607,7 @@ async fn test_doom_loop_detection() {
         result.is_ok(),
         "doom loop should return Ok with messages, not Err"
     );
-    let text = result.unwrap();
+    let text = result.expect("operation should succeed");
     assert!(
         text.contains("repeated") || text.contains("paused"),
         "final text should mention repeat pattern: got {text}"
@@ -1684,7 +1711,10 @@ async fn test_tool_not_found_returns_error_result() {
     let agent = Agent::new(Arc::new(MockModel::new(responses)), ToolRegistry::new());
     let result = agent.run("Missing tool".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Tool not available");
+    assert_eq!(
+        result.expect("operation should succeed"),
+        "Tool not available"
+    );
 }
 
 #[tokio::test]
@@ -1731,7 +1761,10 @@ async fn test_tool_execution_error_feeds_back_to_provider() {
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
     let result = agent.run("Failing tool".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Tool failed, trying alternative");
+    assert_eq!(
+        result.expect("operation should succeed"),
+        "Tool failed, trying alternative"
+    );
 }
 
 #[tokio::test]
@@ -1804,17 +1837,20 @@ async fn test_mixed_read_only_and_write_tools() {
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
     let result = agent.run("Mixed".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Mixed tools done");
+    assert_eq!(
+        result.expect("operation should succeed"),
+        "Mixed tools done"
+    );
 
     let log_entries = log.lock().await;
     let write_start_idx = log_entries
         .iter()
         .position(|e| e.starts_with("start:write:"))
-        .unwrap();
+        .expect("operation should succeed");
     let write_end_idx = log_entries
         .iter()
         .position(|e| e.starts_with("end:write:"))
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(
         write_end_idx,
         write_start_idx + 1,
@@ -1880,7 +1916,7 @@ async fn test_tool_result_events_broadcast() {
     let _response = agent
         .run_streaming("Echo test".into(), vec![], tx)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut events = Vec::new();
     while let Ok(event) = rx.try_recv() {
@@ -2043,7 +2079,7 @@ async fn test_streaming_tool_events_are_interleaved_per_tool() {
     let _response = agent
         .run_streaming("Echo twice".into(), vec![], tx)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let mut sequence = Vec::new();
     while let Ok(event) = rx.try_recv() {
@@ -2184,7 +2220,7 @@ async fn test_permission_check_blocks_denied_tool() {
 
     let result = agent.run("Test".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Done");
+    assert_eq!(result.expect("operation should succeed"), "Done");
 }
 
 #[tokio::test]
@@ -2251,7 +2287,7 @@ async fn test_permission_check_allows_permitted_tool() {
 
     let result = agent.run("Test".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Result: hello");
+    assert_eq!(result.expect("operation should succeed"), "Result: hello");
 }
 
 #[tokio::test]
@@ -2318,7 +2354,7 @@ async fn test_permission_ask_defaults_to_deny() {
 
     let result = agent.run("Test".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Denied");
+    assert_eq!(result.expect("operation should succeed"), "Denied");
 }
 
 #[tokio::test]
@@ -2441,7 +2477,7 @@ async fn test_sandbox_fallback_when_not_available() {
 
     let result = agent.run("Test".into()).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "Fallback worked");
+    assert_eq!(result.expect("operation should succeed"), "Fallback worked");
 
     let log_entries = log.lock().await;
     assert!(
@@ -2613,7 +2649,10 @@ async fn test_todo_section_provider_reaches_system_prompt() {
         Some("- [in_progress][high] abc123 Finish bounded todo prompt".to_string())
     }));
 
-    let response = agent.run("continue".into()).await.unwrap();
+    let response = agent
+        .run("continue".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "OK");
 
     let prompts = captured_prompts.lock().expect("lock poisoned");
@@ -2793,7 +2832,10 @@ async fn test_tool_presentation_policy_syncs_prompt_and_provider_definitions() {
         Agent::with_security(Arc::new(model), registry, None, None, PathBuf::from("/tmp"));
     agent.set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Git]));
 
-    let response = agent.run("status".into()).await.unwrap();
+    let response = agent
+        .run("status".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "OK");
 
     let prompts = captured_prompts.lock().expect("lock poisoned");
@@ -2865,7 +2907,10 @@ async fn test_unpresented_registered_tool_returns_recoverable_error_without_exec
     );
     agent.set_tool_presentation_policy(ToolPresentationPolicy::always_on());
 
-    let response = agent.run("status".into()).await.unwrap();
+    let response = agent
+        .run("status".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "done");
     assert!(
         execution_log.lock().await.is_empty(),
@@ -2896,7 +2941,10 @@ async fn test_disclosed_backend_updates_provider_schema() {
         ToolPresentationPolicy::always_on().disclose_backend("fetch_url", "browser_page"),
     );
 
-    let response = agent.run("read browser page".into()).await.unwrap();
+    let response = agent
+        .run("read browser page".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "OK");
 
     let captured = captured_tools.lock().expect("lock poisoned");
@@ -2977,7 +3025,10 @@ async fn test_disclosed_browser_backend_still_requires_permission_allow() {
             .disclose_backend("fetch_url", "browser_page"),
     );
 
-    let response = agent.run("read browser page".into()).await.unwrap();
+    let response = agent
+        .run("read browser page".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "done");
     assert!(
         execution_log.lock().await.is_empty(),
@@ -3036,7 +3087,10 @@ async fn test_undisclosed_backend_returns_recoverable_error_without_execution() 
     agent
         .set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Network]));
 
-    let response = agent.run("read browser page".into()).await.unwrap();
+    let response = agent
+        .run("read browser page".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "done");
     assert!(
         execution_log.lock().await.is_empty(),
@@ -3091,7 +3145,10 @@ async fn test_tool_continuation_discloses_backend_for_next_provider_call() {
     agent
         .set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Network]));
 
-    let response = agent.run("read private page".into()).await.unwrap();
+    let response = agent
+        .run("read private page".into())
+        .await
+        .expect("operation should succeed");
     assert_eq!(response, "done");
     assert_eq!(execution_log.lock().await.len(), 1);
 
@@ -3169,7 +3226,7 @@ async fn test_tool_continuation_discloses_tool_for_next_provider_call() {
     let response = agent
         .run("fetch with advanced HTTP if needed".into())
         .await
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(response, "done");
 
     let captured = captured_tools.lock().expect("lock poisoned");
@@ -3207,9 +3264,18 @@ async fn test_stable_prefix_identical_across_turns() {
     let agent = Agent::new(Arc::new(model), ToolRegistry::new());
 
     // Run 3 turns
-    let _ = agent.run("turn 1".into()).await.unwrap();
-    let _ = agent.run("turn 2".into()).await.unwrap();
-    let _ = agent.run("turn 3".into()).await.unwrap();
+    let _ = agent
+        .run("turn 1".into())
+        .await
+        .expect("operation should succeed");
+    let _ = agent
+        .run("turn 2".into())
+        .await
+        .expect("operation should succeed");
+    let _ = agent
+        .run("turn 3".into())
+        .await
+        .expect("operation should succeed");
 
     let prompts = captured.lock().expect("lock poisoned");
     assert_eq!(prompts.len(), 3, "should have 3 system prompts");
@@ -3254,12 +3320,18 @@ async fn test_bash_compression_does_not_change_stable_prefix() {
 
     let (plain_model, plain_prompts) = CapturingModel::new(vec![response_events.clone()]);
     let plain_agent = Agent::new(Arc::new(plain_model), ToolRegistry::new());
-    let _ = plain_agent.run("plain".into()).await.unwrap();
+    let _ = plain_agent
+        .run("plain".into())
+        .await
+        .expect("operation should succeed");
 
     let (compressed_model, compressed_prompts) = CapturingModel::new(vec![response_events]);
     let compressed_agent =
         Agent::new(Arc::new(compressed_model), ToolRegistry::new()).with_bash_compression(true);
-    let _ = compressed_agent.run("compressed".into()).await.unwrap();
+    let _ = compressed_agent
+        .run("compressed".into())
+        .await
+        .expect("operation should succeed");
 
     let plain_prompts = plain_prompts.lock().expect("lock poisoned");
     let compressed_prompts = compressed_prompts.lock().expect("lock poisoned");
@@ -3322,7 +3394,7 @@ async fn test_bash_compression_preserves_ui_result_and_compresses_model_context(
     let (_response, _new_messages) = agent
         .run_streaming("run bash".into(), vec![], tx)
         .await
-        .unwrap();
+        .expect("operation should succeed");
 
     let captured = captured_messages.lock().expect("lock poisoned");
     assert_eq!(captured.len(), 2, "tool turn should call provider twice");
@@ -3366,7 +3438,10 @@ async fn test_stable_prefix_changes_after_set_tools() {
     let mut agent = Agent::new(Arc::new(model), ToolRegistry::new());
 
     // Run first turn
-    let _ = agent.run("turn 1".into()).await.unwrap();
+    let _ = agent
+        .run("turn 1".into())
+        .await
+        .expect("operation should succeed");
 
     // Change tools — should invalidate cache
     agent.set_tools(vec![ToolDescription {
@@ -3376,7 +3451,10 @@ async fn test_stable_prefix_changes_after_set_tools() {
     }]);
 
     // Run second turn
-    let _ = agent.run("turn 2".into()).await.unwrap();
+    let _ = agent
+        .run("turn 2".into())
+        .await
+        .expect("operation should succeed");
 
     let prompts = captured.lock().expect("lock poisoned");
     assert_eq!(prompts.len(), 2, "should have 2 system prompts");
@@ -3419,7 +3497,10 @@ async fn test_stable_prefix_changes_after_set_skill_index() {
         CapturingModel::new(vec![response_events.clone(), response_events.clone()]);
     let mut agent = Agent::new(Arc::new(model), ToolRegistry::new());
 
-    let _ = agent.run("turn 1".into()).await.unwrap();
+    let _ = agent
+        .run("turn 1".into())
+        .await
+        .expect("operation should succeed");
 
     agent.set_skill_index(vec![SkillIndex {
         name: "new-skill".into(),
@@ -3429,7 +3510,10 @@ async fn test_stable_prefix_changes_after_set_skill_index() {
         source: talos_skill::SkillSource::Project,
     }]);
 
-    let _ = agent.run("turn 2".into()).await.unwrap();
+    let _ = agent
+        .run("turn 2".into())
+        .await
+        .expect("operation should succeed");
 
     let prompts = captured.lock().expect("lock poisoned");
     assert_eq!(prompts.len(), 2);
@@ -3859,7 +3943,7 @@ async fn continuation_image_safe_summary_persisted_in_tool_result() {
         tool_msg.is_some(),
         "persisted messages must contain the read_image tool result"
     );
-    let content = &tool_msg.unwrap().content;
+    let content = &tool_msg.expect("operation should succeed").content;
     assert!(
         content.contains("Image read") && content.contains("image/png"),
         "tool result must contain safe summary: {content}"
@@ -4022,7 +4106,7 @@ impl LanguageModel for CancellationMockModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
         let n = self.call.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         {
-            let mut guard = self.captured.lock().unwrap();
+            let mut guard = self.captured.lock().expect("operation should succeed");
             guard.push(messages.to_vec());
         }
         let (tx, rx) = mpsc::channel(64);
@@ -4067,7 +4151,7 @@ async fn continuation_not_resent_after_stream_interruption() {
     let result2 = agent.run_streaming("follow up".into(), vec![], tx2).await;
 
     assert!(result2.is_ok(), "second turn should complete");
-    let calls = captured.lock().unwrap();
+    let calls = captured.lock().expect("operation should succeed");
     assert!(calls.len() >= 3, "at least 3 provider calls");
     if calls.len() >= 3 {
         let third = &calls[2];

@@ -710,7 +710,7 @@ mod tests {
     #[tokio::test]
     async fn binds_to_loopback_only() {
         let server = DashboardServer::new(test_snapshot());
-        let (addr, handle) = server.serve().await.unwrap();
+        let (addr, handle) = server.serve().await.expect("test operation should succeed");
         assert_eq!(addr.ip().to_string(), "127.0.0.1");
         handle.abort();
     }
@@ -760,7 +760,7 @@ mod tests {
     #[tokio::test]
     async fn loopback_only_binds_loopback() {
         let server = DashboardServer::with_loopback_only(test_snapshot(), true);
-        let (addr, handle) = server.serve().await.unwrap();
+        let (addr, handle) = server.serve().await.expect("test operation should succeed");
         assert_eq!(addr.ip().to_string(), "127.0.0.1");
         handle.abort();
     }
@@ -791,7 +791,7 @@ mod tests {
         assert!(
             value["mcp_servers"]
                 .as_array()
-                .unwrap()
+                .expect("test operation should succeed")
                 .iter()
                 .any(|s| { s["name"] == "test-server" && s["connected"] == true }),
             "extensions should include test-server: {body}"
@@ -1125,22 +1125,40 @@ mod tests {
         let mut headers = HeaderMap::new();
         assert!(!accepts_html(&headers)); // no Accept header
 
-        headers.insert(header::ACCEPT, "*/*".parse().unwrap());
+        headers.insert(
+            header::ACCEPT,
+            "*/*".parse().expect("test operation should succeed"),
+        );
         assert!(!accepts_html(&headers));
 
-        headers.insert(header::ACCEPT, "application/json".parse().unwrap());
+        headers.insert(
+            header::ACCEPT,
+            "application/json"
+                .parse()
+                .expect("test operation should succeed"),
+        );
         assert!(!accepts_html(&headers));
 
-        headers.insert(header::ACCEPT, "text/html".parse().unwrap());
+        headers.insert(
+            header::ACCEPT,
+            "text/html".parse().expect("test operation should succeed"),
+        );
         assert!(accepts_html(&headers));
 
         headers.insert(
             header::ACCEPT,
-            "text/html,application/xhtml+xml,*/*;q=0.8".parse().unwrap(),
+            "text/html,application/xhtml+xml,*/*;q=0.8"
+                .parse()
+                .expect("test operation should succeed"),
         );
         assert!(accepts_html(&headers));
 
-        headers.insert(header::ACCEPT, "text/html;charset=utf-8".parse().unwrap());
+        headers.insert(
+            header::ACCEPT,
+            "text/html;charset=utf-8"
+                .parse()
+                .expect("test operation should succeed"),
+        );
         assert!(accepts_html(&headers));
     }
 }

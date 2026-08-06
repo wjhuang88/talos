@@ -4,7 +4,7 @@
 //! and `document_extract` (Read) are separate permission-aware operations with
 //! no implicit chaining.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use talos_core::tool::{AgentTool, ToolNature, ToolResourceKind};
@@ -16,27 +16,29 @@ use talos_tools::{DocumentExtractTool, FetchUrlTool, HttpRequestTool, SaveUrlToo
 // ---------------------------------------------------------------------------
 
 fn unique_id() -> String {
-    let d = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("operation should succeed");
     format!("{}{}", d.as_secs(), d.subsec_nanos())
 }
 
 fn create_temp_file(name: &str, content: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("boundary_test_{}_{}", unique_id(), name));
-    std::fs::write(&path, content).unwrap();
+    std::fs::write(&path, content).expect("operation should succeed");
     path
 }
 
 fn create_temp_binary(name: &str, bytes: &[u8]) -> PathBuf {
     let path = std::env::temp_dir().join(format!("boundary_test_{}_{}", unique_id(), name));
-    std::fs::write(&path, bytes).unwrap();
+    std::fs::write(&path, bytes).expect("operation should succeed");
     path
 }
 
-fn cleanup(path: &PathBuf) {
+fn cleanup(path: &Path) {
     let _ = std::fs::remove_file(path);
 }
 
-fn run_extract(path: &PathBuf) -> String {
+fn run_extract(path: &Path) -> String {
     let workspace_root = path.parent().expect("fixture file has a parent directory");
     let relative_path = path
         .file_name()
@@ -47,7 +49,7 @@ fn run_extract(path: &PathBuf) -> String {
         "path": relative_path,
         "format": "auto",
     });
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().expect("operation should succeed");
     let result = rt.block_on(tool.execute(input));
     assert!(
         !result.is_error,
@@ -107,14 +109,14 @@ fn test_save_url_has_write_and_network_facets() {
     let network_facet = profile
         .iter()
         .find(|f| f.nature == ToolNature::Network)
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(network_facet.resource_kind, Some(ToolResourceKind::Domain));
     assert_eq!(network_facet.resource.as_deref(), Some("example.com"));
 
     let write_facet = profile
         .iter()
         .find(|f| f.nature == ToolNature::Write)
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(write_facet.resource_kind, Some(ToolResourceKind::Path));
     assert_eq!(write_facet.resource.as_deref(), Some("output/data.json"));
 }
@@ -275,7 +277,7 @@ fn test_document_extract_rejects_url_path() {
         "path": "http://example.com/remote/file.txt",
         "format": "auto",
     });
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().expect("operation should succeed");
     let result = rt.block_on(tool.execute(input));
 
     // The tool should NOT make a network request. It should fail because
@@ -427,7 +429,7 @@ fn test_extract_truncation_marker() {
         "format": "auto",
         "max_bytes": 100,
     });
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().expect("operation should succeed");
     let result = rt.block_on(tool.execute(input));
     assert!(
         !result.is_error,

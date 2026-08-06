@@ -375,7 +375,9 @@ mod tests {
 
         // Should be a valid JSON object with "system" key
         assert!(anthropic.get("system").is_some());
-        let system_blocks = anthropic["system"].as_array().unwrap();
+        let system_blocks = anthropic["system"]
+            .as_array()
+            .expect("operation should succeed");
         assert!(!system_blocks.is_empty());
     }
 
@@ -385,7 +387,9 @@ mod tests {
         let prompt = cache.build_system_prompt("Identity.", &[], "");
         let anthropic = prompt.to_anthropic_format();
 
-        let system_blocks = anthropic["system"].as_array().unwrap();
+        let system_blocks = anthropic["system"]
+            .as_array()
+            .expect("operation should succeed");
 
         // Should have 4 blocks: 3 cached + 1 uncached (or 3 cached if no trailing text)
         // At minimum, the first 3 blocks should have cache_control
@@ -402,8 +406,16 @@ mod tests {
 
         // Verify cache_control format
         for block in &cached_blocks {
-            let cc = block["cache_control"].as_object().unwrap();
-            assert_eq!(cc.get("type").unwrap().as_str().unwrap(), "ephemeral");
+            let cc = block["cache_control"]
+                .as_object()
+                .expect("operation should succeed");
+            assert_eq!(
+                cc.get("type")
+                    .expect("operation should succeed")
+                    .as_str()
+                    .expect("operation should succeed"),
+                "ephemeral"
+            );
         }
     }
 
@@ -413,13 +425,15 @@ mod tests {
         let prompt = cache.build_system_prompt("Identity.", &[], "Context.");
         let anthropic = prompt.to_anthropic_format();
 
-        let system_blocks = anthropic["system"].as_array().unwrap();
+        let system_blocks = anthropic["system"]
+            .as_array()
+            .expect("operation should succeed");
 
         // The last block should NOT have cache_control (it's the dynamic part)
         // But since build_system_prompt only builds the static prefix,
         // the last cached block ends at bp3 which is the end of text.
         // So all blocks will be cached in this case.
-        let last_block = system_blocks.last().unwrap();
+        let last_block = system_blocks.last().expect("operation should succeed");
         // When static_prefix ends exactly at bp3, the last block is cached
         assert!(last_block.get("cache_control").is_some());
     }
@@ -432,7 +446,9 @@ mod tests {
         };
         let anthropic = prompt.to_anthropic_format();
 
-        let system_blocks = anthropic["system"].as_array().unwrap();
+        let system_blocks = anthropic["system"]
+            .as_array()
+            .expect("operation should succeed");
         assert_eq!(system_blocks.len(), 1);
         assert_eq!(system_blocks[0]["text"], "");
         // No cache_control on the single block
@@ -542,13 +558,21 @@ mod tests {
         assert!(prompt.full_text().contains("AGENTS.md"));
 
         // Verify Anthropic format
-        let system_blocks = anthropic["system"].as_array().unwrap();
+        let system_blocks = anthropic["system"]
+            .as_array()
+            .expect("operation should succeed");
         assert!(!system_blocks.is_empty());
 
         // Verify tools are in alphabetical order in the output
         let text = prompt.full_text();
-        assert!(text.find("## bash").unwrap() < text.find("## read").unwrap());
-        assert!(text.find("## read").unwrap() < text.find("## write").unwrap());
+        assert!(
+            text.find("## bash").expect("operation should succeed")
+                < text.find("## read").expect("operation should succeed")
+        );
+        assert!(
+            text.find("## read").expect("operation should succeed")
+                < text.find("## write").expect("operation should succeed")
+        );
     }
 
     #[test]

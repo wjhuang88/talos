@@ -631,19 +631,40 @@ mod tests {
         let mut state = CatalogBrowserState::new(sample_rows());
         state.set_query("openai/gpt");
         assert_eq!(state.filtered.len(), 1);
-        assert_eq!(state.selected_row().unwrap().qualified, "openai/gpt-4.1");
+        assert_eq!(
+            state
+                .selected_row()
+                .expect("operation should succeed")
+                .qualified,
+            "openai/gpt-4.1"
+        );
     }
 
     #[test]
     fn navigation_stays_on_model_rows() {
         let mut state = CatalogBrowserState::new(sample_rows());
         state.move_down(1);
-        assert_eq!(state.selected_row().unwrap().qualified, "openai/gpt-4.1");
+        assert_eq!(
+            state
+                .selected_row()
+                .expect("operation should succeed")
+                .qualified,
+            "openai/gpt-4.1"
+        );
         state.move_down(100);
-        assert_eq!(state.selected_row().unwrap().qualified, "openai/gpt-4.1");
+        assert_eq!(
+            state
+                .selected_row()
+                .expect("operation should succeed")
+                .qualified,
+            "openai/gpt-4.1"
+        );
         state.move_up(1);
         assert_eq!(
-            state.selected_row().unwrap().qualified,
+            state
+                .selected_row()
+                .expect("operation should succeed")
+                .qualified,
             "anthropic/claude-sonnet"
         );
     }
@@ -666,10 +687,12 @@ mod tests {
 
     #[test]
     fn provider_setup_updates_target_and_preserves_unrelated_config() {
-        let row = sample_rows().pop().unwrap();
-        let mut config = Config::default();
-        config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet".to_string();
+        let row = sample_rows().pop().expect("operation should succeed");
+        let mut config = Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet".to_string(),
+            ..Default::default()
+        };
         config
             .providers
             .entry("anthropic".to_string())
@@ -682,11 +705,14 @@ mod tests {
             "sk-openai-new",
             "https://custom.openai.test/v1".to_string(),
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         assert_eq!(config.provider, "openai");
         assert_eq!(config.model, "gpt-4.1");
-        let openai = config.providers.get("openai").unwrap();
+        let openai = config
+            .providers
+            .get("openai")
+            .expect("operation should succeed");
         assert_eq!(openai.api_key.as_deref(), Some("sk-openai-new"));
         assert_eq!(openai.api_key_env.as_deref(), Some("OPENAI_API_KEY"));
         assert_eq!(
@@ -704,12 +730,16 @@ mod tests {
 
     #[test]
     fn provider_setup_standard_provider_uses_default_without_typed_url() {
-        let row = sample_rows().pop().unwrap();
+        let row = sample_rows().pop().expect("operation should succeed");
         let mut config = Config::default();
 
-        apply_provider_setup(&mut config, &row, "sk-openai-new", String::new()).unwrap();
+        apply_provider_setup(&mut config, &row, "sk-openai-new", String::new())
+            .expect("operation should succeed");
 
-        let openai = config.providers.get("openai").unwrap();
+        let openai = config
+            .providers
+            .get("openai")
+            .expect("operation should succeed");
         assert_eq!(
             openai.base_url.as_deref(),
             Some("https://api.openai.com/v1")
@@ -735,9 +765,13 @@ mod tests {
         };
         let mut config = Config::default();
 
-        apply_provider_setup(&mut config, &row, "minimax-secret", String::new()).unwrap();
+        apply_provider_setup(&mut config, &row, "minimax-secret", String::new())
+            .expect("operation should succeed");
 
-        let minimax = config.providers.get("minimax-coding-plan").unwrap();
+        let minimax = config
+            .providers
+            .get("minimax-coding-plan")
+            .expect("operation should succeed");
         assert_eq!(
             minimax.protocol,
             talos_config::ProviderProtocol::AnthropicMessages
@@ -767,9 +801,13 @@ mod tests {
         };
         let mut config = Config::default();
 
-        apply_provider_setup(&mut config, &row, "kimi-secret", String::new()).unwrap();
+        apply_provider_setup(&mut config, &row, "kimi-secret", String::new())
+            .expect("operation should succeed");
 
-        let kimi = config.providers.get("kimi-for-coding").unwrap();
+        let kimi = config
+            .providers
+            .get("kimi-for-coding")
+            .expect("operation should succeed");
         assert_eq!(kimi.protocol, ProviderProtocol::AnthropicMessages);
         assert_eq!(
             kimi.base_url.as_deref(),
@@ -779,7 +817,7 @@ mod tests {
 
     #[test]
     fn provider_setup_custom_provider_requires_base_url() {
-        let mut row = sample_rows().pop().unwrap();
+        let mut row = sample_rows().pop().expect("operation should succeed");
         row.provider = "custom-gw".to_string();
         row.qualified = "custom-gw/gpt-4.1".to_string();
         row.api_base_url = None;

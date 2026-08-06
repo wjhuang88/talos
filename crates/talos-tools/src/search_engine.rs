@@ -500,12 +500,16 @@ mod regression_tests {
 
     #[test]
     fn test_gitignore_respected() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("visible.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join("ignored.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join(".gitignore"), "ignored.rs\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("visible.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("ignored.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join(".gitignore"), "ignored.rs\n").expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("visible.rs")));
@@ -514,12 +518,16 @@ mod regression_tests {
 
     #[test]
     fn test_ignore_file_respected() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("visible.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join("ignored.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join(".ignore"), "ignored.rs\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("visible.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("ignored.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join(".ignore"), "ignored.rs\n").expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("visible.rs")));
@@ -528,14 +536,17 @@ mod regression_tests {
 
     #[test]
     fn test_binary_file_skipped() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("text.rs"), "fn target() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("text.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
         let mut binary = vec![b'h', b'e', b'l', b'l', b'o'];
         binary.push(0u8);
         binary.extend_from_slice(b"fn target() {}\n");
-        fs::write(dir.path().join("binary.rs"), &binary).unwrap();
+        fs::write(dir.path().join("binary.rs"), &binary).expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("text.rs")));
@@ -546,15 +557,18 @@ mod regression_tests {
 
     #[test]
     fn test_oversized_file_skipped_and_reported() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("small.rs"), "fn target() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("small.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
         fs::write(
             dir.path().join("large.rs"),
             vec![b'x'; (MAX_FILE_BYTES + 1) as usize],
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("small.rs")));
@@ -565,14 +579,16 @@ mod regression_tests {
 
     #[test]
     fn test_max_results_truncation() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let mut content = String::new();
         for i in 0..20 {
             content.push_str(&format!("fn match_{}() {{}}\n", i));
         }
-        fs::write(dir.path().join("many.rs"), &content).unwrap();
+        fs::write(dir.path().join("many.rs"), &content).expect("operation should succeed");
 
-        let output = engine().search("match_", dir.path(), None, 5).unwrap();
+        let output = engine()
+            .search("match_", dir.path(), None, 5)
+            .expect("operation should succeed");
 
         let total: usize = output.matches.iter().map(|m| m.lines.len()).sum();
         assert_eq!(total, 5);
@@ -581,11 +597,13 @@ mod regression_tests {
 
     #[test]
     fn test_long_match_line_is_output_bounded() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let content = format!("target {}\n", "x".repeat(MAX_MATCH_LINE_BYTES * 2));
-        fs::write(dir.path().join("long.rs"), content).unwrap();
+        fs::write(dir.path().join("long.rs"), content).expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         assert_eq!(output.matches.len(), 1);
         assert!(output.matches[0].lines[0].1.len() <= MAX_MATCH_LINE_BYTES);
@@ -595,10 +613,13 @@ mod regression_tests {
 
     #[test]
     fn test_invalid_utf8_does_not_fail_whole_search() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("mixed.bin"), b"prefix \xff target suffix\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("mixed.bin"), b"prefix \xff target suffix\n")
+            .expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         assert_eq!(output.matches.len(), 1);
         assert!(output.matches[0].lines[0].1.contains("target"));
@@ -607,31 +628,36 @@ mod regression_tests {
     #[cfg(unix)]
     #[test]
     fn test_symlink_not_followed_by_default() {
-        let outside = tempfile::tempdir().unwrap();
-        fs::write(outside.path().join("outside.rs"), "fn target() {}\n").unwrap();
+        let outside = tempfile::tempdir().expect("operation should succeed");
+        fs::write(outside.path().join("outside.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         std::os::unix::fs::symlink(
             outside.path().join("outside.rs"),
             dir.path().join("linked.rs"),
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         assert!(output.matches.is_empty());
     }
 
     #[test]
     fn test_unicode_content() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         fs::write(
             dir.path().join("unicode.rs"),
             "fn 你好() {}\nfn hello() {}\nfn 世界() {}\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let output = engine().search("你好", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("你好", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         assert_eq!(output.matches.len(), 1);
         assert_eq!(output.matches[0].lines.len(), 1);
@@ -640,17 +666,21 @@ mod regression_tests {
 
     #[test]
     fn test_include_with_path_scope() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("main.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join("main.txt"), "fn target() {}\n").unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/lib.rs"), "fn target() {}\n").unwrap();
-        fs::write(dir.path().join("src/lib.txt"), "fn target() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("main.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("main.txt"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("src")).expect("operation should succeed");
+        fs::write(dir.path().join("src/lib.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("src/lib.txt"), "fn target() {}\n")
+            .expect("operation should succeed");
 
-        let pat = glob::Pattern::new("*.rs").unwrap();
+        let pat = glob::Pattern::new("*.rs").expect("operation should succeed");
         let output = engine()
             .search("target", dir.path(), Some(&pat), 50)
-            .unwrap();
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("main.rs")));
@@ -660,12 +690,15 @@ mod regression_tests {
 
     #[test]
     fn test_hidden_dir_at_depth_0() {
-        let hidden_dir = tempfile::tempdir().unwrap();
+        let hidden_dir = tempfile::tempdir().expect("operation should succeed");
         let hidden_path = hidden_dir.path().join(".hidden_project");
-        fs::create_dir_all(&hidden_path).unwrap();
-        fs::write(hidden_path.join("code.rs"), "fn target() {}\n").unwrap();
+        fs::create_dir_all(&hidden_path).expect("operation should succeed");
+        fs::write(hidden_path.join("code.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
 
-        let output = engine().search("target", &hidden_path, None, 50).unwrap();
+        let output = engine()
+            .search("target", &hidden_path, None, 50)
+            .expect("operation should succeed");
 
         assert_eq!(output.matches.len(), 1);
         assert!(output.matches[0].path.contains("code.rs"));
@@ -673,12 +706,15 @@ mod regression_tests {
 
     #[test]
     fn test_target_dir_skipped() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("src.rs"), "fn target() {}\n").unwrap();
-        fs::create_dir_all(dir.path().join("target")).unwrap();
-        fs::write(dir.path().join("target/build.rs"), "fn target() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("src.rs"), "fn target() {}\n").expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("target")).expect("operation should succeed");
+        fs::write(dir.path().join("target/build.rs"), "fn target() {}\n")
+            .expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("src.rs")));
@@ -687,16 +723,19 @@ mod regression_tests {
 
     #[test]
     fn test_node_modules_dir_skipped() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("app.js"), "const target = 1;\n").unwrap();
-        fs::create_dir_all(dir.path().join("node_modules/pkg")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("app.js"), "const target = 1;\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("node_modules/pkg")).expect("operation should succeed");
         fs::write(
             dir.path().join("node_modules/pkg/index.js"),
             "const target = 2;\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let output = engine().search("target", dir.path(), None, 50).unwrap();
+        let output = engine()
+            .search("target", dir.path(), None, 50)
+            .expect("operation should succeed");
 
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("app.js")));
@@ -705,12 +744,13 @@ mod regression_tests {
 
     #[test]
     fn test_single_file_search() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.rs"), "fn hello() {}\nfn world() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.rs"), "fn hello() {}\nfn world() {}\n")
+            .expect("operation should succeed");
 
         let output = engine()
             .search("hello", &dir.path().join("test.rs"), None, 50)
-            .unwrap();
+            .expect("operation should succeed");
 
         assert_eq!(output.matches.len(), 1);
         assert!(output.matches[0].path.contains("test.rs"));
@@ -720,24 +760,25 @@ mod regression_tests {
 
     #[test]
     fn test_no_matches_returns_empty() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("empty.rs"), "fn other() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("empty.rs"), "fn other() {}\n")
+            .expect("operation should succeed");
 
         let output = engine()
             .search("nonexistent_xyz", dir.path(), None, 50)
-            .unwrap();
+            .expect("operation should succeed");
 
         assert!(output.matches.is_empty());
     }
 
     #[test]
     fn test_invalid_regex_returns_error() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("test.rs"), "fn test() {}\n").unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("test.rs"), "fn test() {}\n").expect("operation should succeed");
 
         let result = engine().search("[invalid", dir.path(), None, 50);
         assert!(result.is_err());
-        match result.unwrap_err() {
+        match result.expect_err("operation should fail") {
             SearchError::InvalidRegex(_) => {}
             other => panic!("expected InvalidRegex, got {:?}", other),
         }
@@ -745,22 +786,24 @@ mod regression_tests {
 
     #[test]
     fn test_legacy_parity_basic() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.rs"), "fn hello() {}\nfn world() {}\n").unwrap();
-        fs::write(dir.path().join("b.txt"), "hello world\nfoo bar\n").unwrap();
-        fs::create_dir_all(dir.path().join("sub")).unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("a.rs"), "fn hello() {}\nfn world() {}\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("b.txt"), "hello world\nfoo bar\n")
+            .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("sub")).expect("operation should succeed");
         fs::write(
             dir.path().join("sub/c.rs"),
             "hello from sub\nanother line\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let ripgrep_out = RipgrepSearchEngine
             .search("hello", dir.path(), None, 50)
-            .unwrap();
+            .expect("operation should succeed");
         let legacy_out = LegacySearchEngine
             .search("hello", dir.path(), None, 50)
-            .unwrap();
+            .expect("operation should succeed");
 
         let ripgrep_total: usize = ripgrep_out.matches.iter().map(|m| m.lines.len()).sum();
         let legacy_total: usize = legacy_out.matches.iter().map(|m| m.lines.len()).sum();
@@ -770,14 +813,14 @@ mod regression_tests {
     #[test]
     fn test_talos_repo_query_smoke_matches_legacy() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let include = glob::Pattern::new("*.rs").unwrap();
+        let include = glob::Pattern::new("*.rs").expect("operation should succeed");
 
         let ripgrep_out = RipgrepSearchEngine
             .search("GrepTool", root, Some(&include), 20)
-            .unwrap();
+            .expect("operation should succeed");
         let legacy_out = LegacySearchEngine
             .search("GrepTool", root, Some(&include), 20)
-            .unwrap();
+            .expect("operation should succeed");
 
         let ripgrep_total: usize = ripgrep_out.matches.iter().map(|m| m.lines.len()).sum();
         let legacy_total: usize = legacy_out.matches.iter().map(|m| m.lines.len()).sum();

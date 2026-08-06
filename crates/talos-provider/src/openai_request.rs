@@ -306,14 +306,16 @@ mod tests {
 
     #[test]
     fn multimodal_message_produces_array_content_with_image_url() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("test.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).unwrap();
+        std::fs::write(&img_path, png_header).expect("test operation should succeed");
         // ContentPart::Image.path contract: stored path MUST be the
         // canonical path produced at grant time. The TOCTOU guard in
         // image_io rejects any non-canonical stored path.
-        let canonical = img_path.canonicalize().unwrap();
+        let canonical = img_path
+            .canonicalize()
+            .expect("test operation should succeed");
 
         let messages = vec![Message::Multimodal {
             parts: vec![
@@ -330,11 +332,15 @@ mod tests {
         }];
 
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
-        let msgs = body["messages"].as_array().unwrap();
+        let msgs = body["messages"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0]["role"], "user");
 
-        let content = msgs[0]["content"].as_array().unwrap();
+        let content = msgs[0]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(content.len(), 2);
         assert_eq!(content[0]["type"], "text");
         assert_eq!(content[0]["text"], "What is this?");
@@ -342,7 +348,7 @@ mod tests {
         assert!(
             content[1]["image_url"]["url"]
                 .as_str()
-                .unwrap()
+                .expect("test operation should succeed")
                 .starts_with("data:image/png;base64,")
         );
     }
@@ -361,8 +367,12 @@ mod tests {
         }];
 
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
-        let msgs = body["messages"].as_array().unwrap();
-        let content = msgs[0]["content"].as_array().unwrap();
+        let msgs = body["messages"]
+            .as_array()
+            .expect("test operation should succeed");
+        let content = msgs[0]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(content.len(), 2);
         assert_eq!(content[0]["type"], "text");
         assert_eq!(content[1]["type"], "text");
@@ -372,11 +382,13 @@ mod tests {
     fn tool_result_then_multimodal_produces_separate_messages_in_order() {
         use talos_core::message::{MessageToolResult, ToolCall};
 
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let img_path = dir.path().join("shot.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        std::fs::write(&img_path, &png_header).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, png_header).expect("test operation should succeed");
+        let canonical = img_path
+            .canonicalize()
+            .expect("test operation should succeed");
 
         let messages = vec![
             Message::Assistant {
@@ -406,7 +418,9 @@ mod tests {
         ];
 
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
-        let msgs = body["messages"].as_array().unwrap();
+        let msgs = body["messages"]
+            .as_array()
+            .expect("test operation should succeed");
 
         assert_eq!(msgs.len(), 3, "assistant + tool + user");
         assert_eq!(msgs[0]["role"], "assistant");
@@ -414,7 +428,9 @@ mod tests {
         assert_eq!(msgs[1]["tool_call_id"], "call_1");
         assert_eq!(msgs[2]["role"], "user");
 
-        let content = msgs[2]["content"].as_array().unwrap();
+        let content = msgs[2]["content"]
+            .as_array()
+            .expect("test operation should succeed");
         assert_eq!(content.len(), 1);
         assert_eq!(content[0]["type"], "image_url");
     }

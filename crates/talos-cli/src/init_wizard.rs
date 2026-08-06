@@ -438,15 +438,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_wizard_cancel_on_reconfigure() {
-        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let _lock = HOME_ENV_MUTEX.lock().await;
         let input = b"n\n";
         let mut reader = Cursor::new(input.as_slice());
         let mut writer = Vec::new();
 
         // Set up a temp HOME with an existing config
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let talos_dir = temp_dir.path().join(".talos");
-        std::fs::create_dir_all(&talos_dir).unwrap();
+        std::fs::create_dir_all(&talos_dir).expect("operation should succeed");
         let config_path = talos_dir.join("config.toml");
         std::fs::write(
             &config_path,
@@ -454,7 +454,7 @@ mod tests {
 model = "claude-sonnet-4-5"
 "#,
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         unsafe { std::env::set_var("HOME", temp_dir.path()) };
 
@@ -466,7 +466,8 @@ model = "claude-sonnet-4-5"
         assert!(output.contains("Keeping existing configuration"));
 
         // Config should be unchanged
-        let config_content = std::fs::read_to_string(&config_path).unwrap();
+        let config_content =
+            std::fs::read_to_string(&config_path).expect("operation should succeed");
         assert!(config_content.contains("claude-sonnet-4-5"));
 
         unsafe { std::env::remove_var("HOME") };
@@ -474,7 +475,7 @@ model = "claude-sonnet-4-5"
 
     #[tokio::test]
     async fn test_wizard_saves_on_confirm() {
-        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let _lock = HOME_ENV_MUTEX.lock().await;
         // Simulate: y (reconfigure), provider index for anthropic, ANTHROPIC_API_KEY,
         // first model, n (skip test), y (save).
         // The provider index is discovered dynamically because the dataset size
@@ -490,9 +491,9 @@ model = "claude-sonnet-4-5"
         let mut reader = Cursor::new(input.as_bytes());
         let mut writer = Vec::new();
 
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let talos_dir = temp_dir.path().join(".talos");
-        std::fs::create_dir_all(&talos_dir).unwrap();
+        std::fs::create_dir_all(&talos_dir).expect("operation should succeed");
 
         unsafe { std::env::set_var("HOME", temp_dir.path()) };
 
@@ -503,7 +504,7 @@ model = "claude-sonnet-4-5"
         assert!(output.contains("Configuration saved"));
 
         // Verify config was saved
-        let config = Config::load().unwrap();
+        let config = Config::load().expect("operation should succeed");
         assert!(!config.model.is_empty());
         assert_eq!(config.provider, "anthropic");
 
@@ -512,7 +513,7 @@ model = "claude-sonnet-4-5"
 
     #[tokio::test]
     async fn test_wizard_cancel_on_save() {
-        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let _lock = HOME_ENV_MUTEX.lock().await;
         // Simulate: y (reconfigure), select anthropic dynamically, ANTHROPIC_API_KEY,
         // 1 (model), n (skip test), n (cancel save)
         let models = builtin_models();
@@ -526,9 +527,9 @@ model = "claude-sonnet-4-5"
         let mut reader = Cursor::new(input.as_bytes());
         let mut writer = Vec::new();
 
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let talos_dir = temp_dir.path().join(".talos");
-        std::fs::create_dir_all(&talos_dir).unwrap();
+        std::fs::create_dir_all(&talos_dir).expect("operation should succeed");
 
         unsafe { std::env::set_var("HOME", temp_dir.path()) };
 
@@ -557,7 +558,8 @@ model = "claude-sonnet-4-5"
         for (input, expected) in cases {
             let mut reader = Cursor::new(input.as_bytes());
             let mut writer = Vec::new();
-            let result = prompt_yes_no(&mut writer, &mut reader, "Test? ").unwrap();
+            let result = prompt_yes_no(&mut writer, &mut reader, "Test? ")
+                .expect("operation should succeed");
             assert_eq!(result, expected, "input: {:?}", input);
         }
     }

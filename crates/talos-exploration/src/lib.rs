@@ -694,7 +694,7 @@ mod tests {
 
     #[test]
     fn schema_migration_creates_tables() {
-        let store = ExplorationStore::open_memory().unwrap();
+        let store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         let tables = [
             "schema_version",
@@ -715,33 +715,43 @@ mod tests {
                     params![table],
                     |row| row.get(0),
                 )
-                .unwrap();
+                .expect("test operation should succeed");
             assert_eq!(count, 1, "Table {table} should exist");
         }
     }
 
     #[test]
     fn source_chunk_round_trip() {
-        let mut store = ExplorationStore::open_memory().unwrap();
+        let mut store = ExplorationStore::open_memory().expect("test operation should succeed");
 
-        let run = store.create_run("test query", Some("test plan")).unwrap();
+        let run = store
+            .create_run("test query", Some("test plan"))
+            .expect("test operation should succeed");
         let source = make_source(Some(&run.id), "Test Document");
-        store.insert_source(&source).unwrap();
+        store
+            .insert_source(&source)
+            .expect("test operation should succeed");
 
         let chunk = make_chunk(&source.id, 0, "Rust is a safe systems programming language");
-        store.insert_chunk(&chunk).unwrap();
+        store
+            .insert_chunk(&chunk)
+            .expect("test operation should succeed");
 
-        let results = store.search_chunks("Rust safe programming", 10).unwrap();
+        let results = store
+            .search_chunks("Rust safe programming", 10)
+            .expect("test operation should succeed");
         assert!(!results.is_empty(), "FTS should find the chunk");
         assert_eq!(results[0].chunk_id, chunk.id);
     }
 
     #[test]
     fn fts_search_returns_bounded_results() {
-        let mut store = ExplorationStore::open_memory().unwrap();
+        let mut store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         let source = make_source(None, "Multi-chunk source");
-        store.insert_source(&source).unwrap();
+        store
+            .insert_source(&source)
+            .expect("test operation should succeed");
 
         for i in 0..5 {
             let chunk = make_chunk(
@@ -749,10 +759,14 @@ mod tests {
                 i,
                 &format!("This is chunk number {i} about testing FTS search limits"),
             );
-            store.insert_chunk(&chunk).unwrap();
+            store
+                .insert_chunk(&chunk)
+                .expect("test operation should succeed");
         }
 
-        let results = store.search_chunks("testing FTS search", 3).unwrap();
+        let results = store
+            .search_chunks("testing FTS search", 3)
+            .expect("test operation should succeed");
         assert!(
             results.len() <= 3,
             "Should respect limit of 3, got {}",
@@ -762,10 +776,12 @@ mod tests {
 
     #[test]
     fn claim_citation_validation_fails_on_missing_chunk() {
-        let store = ExplorationStore::open_memory().unwrap();
+        let store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         let claim = make_claim(None, Some("nonexistent-chunk-id"), "some claim");
-        let err = store.insert_claim(&claim).unwrap_err();
+        let err = store
+            .insert_claim(&claim)
+            .expect_err("test operation should fail as expected");
         assert!(
             matches!(err, ExplorationError::CitationValidation(_)),
             "Expected CitationValidation error, got: {err}"
@@ -774,14 +790,16 @@ mod tests {
 
     #[test]
     fn synthesis_citation_validation_fails_on_missing_source() {
-        let store = ExplorationStore::open_memory().unwrap();
+        let store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         let synthesis = make_synthesis(
             None,
             vec!["nonexistent-source-id".to_string()],
             "some conclusion",
         );
-        let err = store.insert_synthesis(&synthesis).unwrap_err();
+        let err = store
+            .insert_synthesis(&synthesis)
+            .expect_err("test operation should fail as expected");
         assert!(
             matches!(err, ExplorationError::CitationValidation(_)),
             "Expected CitationValidation error, got: {err}"
@@ -790,15 +808,21 @@ mod tests {
 
     #[test]
     fn claim_edge_insert_validates_both_claims() {
-        let mut store = ExplorationStore::open_memory().unwrap();
+        let mut store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         // Create one valid claim.
         let source = make_source(None, "Edge test source");
-        store.insert_source(&source).unwrap();
+        store
+            .insert_source(&source)
+            .expect("test operation should succeed");
         let chunk = make_chunk(&source.id, 0, "test text");
-        store.insert_chunk(&chunk).unwrap();
+        store
+            .insert_chunk(&chunk)
+            .expect("test operation should succeed");
         let valid_claim = make_claim(None, Some(&chunk.id), "valid claim");
-        store.insert_claim(&valid_claim).unwrap();
+        store
+            .insert_claim(&valid_claim)
+            .expect("test operation should succeed");
 
         // Edge with nonexistent source claim.
         let edge_bad_src = ClaimEdge {
@@ -808,7 +832,9 @@ mod tests {
             edge_type: EdgeType::Supports,
             created_at: Utc::now(),
         };
-        let err = store.insert_claim_edge(&edge_bad_src).unwrap_err();
+        let err = store
+            .insert_claim_edge(&edge_bad_src)
+            .expect_err("test operation should fail as expected");
         assert!(
             matches!(err, ExplorationError::CitationValidation(_)),
             "Expected CitationValidation for bad source claim, got: {err}"
@@ -822,7 +848,9 @@ mod tests {
             edge_type: EdgeType::Contradicts,
             created_at: Utc::now(),
         };
-        let err = store.insert_claim_edge(&edge_bad_tgt).unwrap_err();
+        let err = store
+            .insert_claim_edge(&edge_bad_tgt)
+            .expect_err("test operation should fail as expected");
         assert!(
             matches!(err, ExplorationError::CitationValidation(_)),
             "Expected CitationValidation for bad target claim, got: {err}"
@@ -831,7 +859,7 @@ mod tests {
 
     #[test]
     fn full_research_run_round_trip() {
-        let mut store = ExplorationStore::open_memory().unwrap();
+        let mut store = ExplorationStore::open_memory().expect("test operation should succeed");
 
         // Create run.
         let run = store
@@ -839,11 +867,13 @@ mod tests {
                 "What is Rust's ownership model?",
                 Some("Research Rust ownership"),
             )
-            .unwrap();
+            .expect("test operation should succeed");
 
         // Insert source.
         let source = make_source(Some(&run.id), "The Rust Book");
-        store.insert_source(&source).unwrap();
+        store
+            .insert_source(&source)
+            .expect("test operation should succeed");
 
         // Insert chunks.
         let chunk1 = make_chunk(
@@ -856,8 +886,12 @@ mod tests {
             1,
             "Borrowing allows references without transferring ownership",
         );
-        store.insert_chunk(&chunk1).unwrap();
-        store.insert_chunk(&chunk2).unwrap();
+        store
+            .insert_chunk(&chunk1)
+            .expect("test operation should succeed");
+        store
+            .insert_chunk(&chunk2)
+            .expect("test operation should succeed");
 
         // Insert claims.
         let claim1 = make_claim(
@@ -870,8 +904,12 @@ mod tests {
             Some(&chunk2.id),
             "Borrowing enables safe references",
         );
-        store.insert_claim(&claim1).unwrap();
-        store.insert_claim(&claim2).unwrap();
+        store
+            .insert_claim(&claim1)
+            .expect("test operation should succeed");
+        store
+            .insert_claim(&claim2)
+            .expect("test operation should succeed");
 
         // Insert claim edge.
         let edge = ClaimEdge {
@@ -881,7 +919,9 @@ mod tests {
             edge_type: EdgeType::Refines,
             created_at: Utc::now(),
         };
-        store.insert_claim_edge(&edge).unwrap();
+        store
+            .insert_claim_edge(&edge)
+            .expect("test operation should succeed");
 
         // Insert synthesis.
         let synthesis = make_synthesis(
@@ -889,54 +929,95 @@ mod tests {
             vec![source.id.clone()],
             "Rust's ownership model eliminates garbage collection",
         );
-        store.insert_synthesis(&synthesis).unwrap();
+        store
+            .insert_synthesis(&synthesis)
+            .expect("test operation should succeed");
 
         // Verify counts.
-        assert_eq!(store.count_sources().unwrap(), 1);
-        assert_eq!(store.count_claims().unwrap(), 2);
+        assert_eq!(
+            store
+                .count_sources()
+                .expect("test operation should succeed"),
+            1
+        );
+        assert_eq!(
+            store.count_claims().expect("test operation should succeed"),
+            2
+        );
 
         // Verify source retrievable.
-        let retrieved_source = store.get_source(&source.id).unwrap();
+        let retrieved_source = store
+            .get_source(&source.id)
+            .expect("test operation should succeed");
         assert!(retrieved_source.is_some());
-        assert_eq!(retrieved_source.unwrap().title, "The Rust Book");
+        assert_eq!(
+            retrieved_source
+                .expect("test operation should succeed")
+                .title,
+            "The Rust Book"
+        );
 
         // Verify FTS search works.
-        let search_results = store.search_chunks("ownership memory", 10).unwrap();
+        let search_results = store
+            .search_chunks("ownership memory", 10)
+            .expect("test operation should succeed");
         assert!(!search_results.is_empty());
     }
 
     #[test]
     fn open_existing_db_idempotent() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
 
         // First open: insert data.
         {
-            let store = ExplorationStore::open(&db_path).unwrap();
-            let run = store.create_run("persistent query", None).unwrap();
+            let store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+            let run = store
+                .create_run("persistent query", None)
+                .expect("test operation should succeed");
             let source = make_source(Some(&run.id), "Persistent Source");
-            store.insert_source(&source).unwrap();
-            assert_eq!(store.count_sources().unwrap(), 1);
+            store
+                .insert_source(&source)
+                .expect("test operation should succeed");
+            assert_eq!(
+                store
+                    .count_sources()
+                    .expect("test operation should succeed"),
+                1
+            );
         }
 
         // Reopen: verify data persists.
         {
-            let store = ExplorationStore::open(&db_path).unwrap();
-            assert_eq!(store.count_sources().unwrap(), 1);
-            let _source = store.get_source("persistent-source").unwrap();
-            let sources_count = store.count_sources().unwrap();
+            let store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+            assert_eq!(
+                store
+                    .count_sources()
+                    .expect("test operation should succeed"),
+                1
+            );
+            let _source = store
+                .get_source("persistent-source")
+                .expect("test operation should succeed");
+            let sources_count = store
+                .count_sources()
+                .expect("test operation should succeed");
             assert_eq!(sources_count, 1, "Data should persist across reopen");
         }
     }
 
     #[test]
     fn search_snippet_multibyte_utf8_no_panic() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().expect("test operation should succeed");
         let db_path = temp_dir.path().join("exploration.db");
-        let mut store = ExplorationStore::open(&db_path).unwrap();
-        let run = store.create_run("test", None).unwrap();
+        let mut store = ExplorationStore::open(&db_path).expect("test operation should succeed");
+        let run = store
+            .create_run("test", None)
+            .expect("test operation should succeed");
         let source = make_source(Some(&run.id), "Multi-byte Test");
-        store.insert_source(&source).unwrap();
+        store
+            .insert_source(&source)
+            .expect("test operation should succeed");
 
         let chinese: String = "你好世界".repeat(25);
         let text =
@@ -948,9 +1029,13 @@ mod tests {
             text,
             token_estimate: None,
         };
-        store.insert_chunk(&chunk).unwrap();
+        store
+            .insert_chunk(&chunk)
+            .expect("test operation should succeed");
 
-        let results = store.search_chunks("KEYWORDSTART", 10).unwrap();
+        let results = store
+            .search_chunks("KEYWORDSTART", 10)
+            .expect("test operation should succeed");
         if !results.is_empty() {
             assert!(results[0].snippet.len() < 500);
         }

@@ -30,7 +30,7 @@ That snapshot is historical evidence and not current activation authority.
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I169 | Transactional Batched Steering Turn | Planned — prerequisite satisfied; not active | TUI-044 is Ready. Re-read current facts, confirm no overlap, create a fresh branch from exact current `main`, record explicit activation, keep ADR-056 Proposed, and leave recovery PR #120 immutable. |
+| I169 | Transactional Batched Steering Turn | Active — PR #131 review handoff (2026-08-04) | Implement only on `feat/i169-tui-044-transactional-steering` from exact base `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`; keep ADR-056 Proposed and recovery PR #120 immutable; require complete transaction/journal/lifecycle/request/replay evidence, exact-head CI and rebuilt real-TUI acceptance before Review. |
 | I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
@@ -48,7 +48,7 @@ I170's accepted residuals remain explicit:
 - timeout cleanup is guaranteed for the direct shell child, not the complete descendant tree;
 - TOOL-023-B still owns timeout default/configuration;
 - a PowerShell lexer/parser, PowerShell 7 selection and Job Object lifecycle require separate decisions;
-- I170 completion satisfies I169's prerequisite but does not activate or implement I169.
+- I170 completion satisfies I169's prerequisite but is not I169 implementation evidence.
 
 ## Recent Non-Terminal / Completed Context
 
@@ -63,17 +63,17 @@ I170's accepted residuals remain explicit:
 | I157 | Complete (2026-07-30 correction) | Provider removal/credential clear stale-snapshot concurrency correction. |
 | I156 | Complete (2026-07-27) | Narrow-viewport and resize robustness; maintainer Alacritty walkthrough passed. |
 
-## I169 Activation Checklist
+## I169 Activation Evidence
 
-I169 may be selected only after all of the following are true at activation time:
-
-- [ ] current `main` SHA and repository state have been re-read;
-- [ ] Issue #119, TUI-044, I169 and ADR-056 are re-read;
-- [ ] no overlapping active steering/session implementation or newer owner exists;
-- [ ] a fresh implementation branch is created from exact current `main`;
-- [ ] I169/TUI-044/Board are changed from Planned/Ready to Active before code mutation;
-- [ ] recovery PR #120 and branch `recovery/pr-68-i169-20260731` remain unchanged;
-- [ ] Windows/macOS exact-head CI and a rebuilt real-TUI acceptance plan remain part of the implementation gate.
+- [x] current `main` re-read at `a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`;
+- [x] Issue #119, TUI-044, I169 and ADR-056 re-read;
+- [x] no overlapping active steering implementation or newer owner found;
+- [x] fresh branch `feat/i169-tui-044-transactional-steering` created from exact current main;
+- [x] maintainer explicitly instructed formal activation and implementation;
+- [x] TUI-044/I169/Board changed to Active before product-code mutation;
+- [x] Draft implementation PR #131 opened and recorded;
+- [x] recovery PR #120 and `recovery/pr-68-i169-20260731` remain unchanged;
+- [x] exact-head Windows/macOS CI and rebuilt real-TUI acceptance remain implementation gates.
 
 ## History
 
@@ -83,3 +83,9 @@ The prior full iteration registry and non-terminal inventory remain available at
 
 Individual plans and completion records remain under `docs/iterations/`; this compact index does not
 replace or rewrite them.
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.

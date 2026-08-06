@@ -884,7 +884,7 @@ mod tests {
             first[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&format!("{SHELL_TOOL_NAME}:read_only_inspection:"))
         );
     }
@@ -937,10 +937,16 @@ mod tests {
             first[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("read_only_inspection", "template"))
         );
-        assert!(first[0].resource.as_deref().unwrap().ends_with(":cat"));
+        assert!(
+            first[0]
+                .resource
+                .as_deref()
+                .expect("operation should succeed")
+                .ends_with(":cat")
+        );
     }
 
     #[test]
@@ -959,7 +965,7 @@ mod tests {
                 profile[0]
                     .resource
                     .as_deref()
-                    .unwrap()
+                    .expect("operation should succeed")
                     .starts_with(&resource_prefix("read_only_inspection", "exact")),
                 "{command} unexpectedly received a reusable template grant"
             );
@@ -981,7 +987,10 @@ mod tests {
 
         for command in commands {
             let profile = tool.permission_profile(&serde_json::json!({ "command": command }));
-            let resource = profile[0].resource.as_deref().unwrap();
+            let resource = profile[0]
+                .resource
+                .as_deref()
+                .expect("operation should succeed");
             assert!(
                 resource.contains(":exact:"),
                 "{command} unexpectedly received a reusable template grant: {resource}"
@@ -1008,14 +1017,14 @@ mod tests {
             parent[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             absolute[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
     }
@@ -1034,14 +1043,14 @@ mod tests {
             first[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("validation_build", "template"))
         );
         assert!(
             first[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .ends_with(":cargo:test")
         );
     }
@@ -1063,21 +1072,21 @@ mod tests {
             find_exec[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("read_only_inspection", "exact"))
         );
         assert!(
             complex[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("complex_shell", "exact"))
         );
         assert!(
             write[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&resource_prefix("write_or_mutating", "exact"))
         );
     }
@@ -1118,7 +1127,7 @@ mod tests {
             profile[0]
                 .resource
                 .as_deref()
-                .unwrap()
+                .expect("operation should succeed")
                 .starts_with(&format!("{SHELL_TOOL_NAME}:complex_shell:"))
         );
     }
@@ -1129,7 +1138,7 @@ mod tests {
         let schema = tool.parameters();
 
         assert!(schema.is_object());
-        let obj = schema.as_object().unwrap();
+        let obj = schema.as_object().expect("operation should succeed");
         assert!(obj.contains_key("properties"));
     }
 

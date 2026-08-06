@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn test_deserialize_minimal_input() {
         let json = r#"{"query": "rust async tokio"}"#;
-        let input: WebSearchInput = serde_json::from_str(json).unwrap();
+        let input: WebSearchInput = serde_json::from_str(json).expect("operation should succeed");
         assert_eq!(input.query, "rust async tokio");
         assert_eq!(input.max_results, 10);
         assert!(input.include_snippets);
@@ -605,7 +605,7 @@ mod tests {
             "max_results": 5,
             "include_snippets": false
         }"#;
-        let input: WebSearchInput = serde_json::from_str(json).unwrap();
+        let input: WebSearchInput = serde_json::from_str(json).expect("operation should succeed");
         assert_eq!(input.query, "rust axum middleware");
         assert_eq!(input.max_results, 5);
         assert!(!input.include_snippets);

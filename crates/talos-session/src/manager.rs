@@ -2,7 +2,11 @@ use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 use crate::store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 use crate::todo::{TodoError, TodoRepository};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
-use crate::{DurableSession, Session, SessionError, SessionInfo};
+use crate::{
+    DurableSession, OrphanSidecarReconciliationPolicy, OrphanSidecarReconciliationReport, Session,
+    SessionArtifactCleanupReport, SessionError, SessionInfo,
+    remove_session_sidecars_for_transcript, remove_session_transcript,
+};
 use chrono::{DateTime, Duration, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,7 +52,7 @@ pub struct SessionCleanupReport {
     pub candidates: Vec<SessionCleanupCandidate>,
     /// Number of candidates actually removed.
     pub removed: usize,
-    /// Total bytes removed from JSONL files.
+    /// Total bytes removed from complete Session-owned artifact sets.
     pub bytes_removed: u64,
 }
 
@@ -89,7 +93,30 @@ impl SessionManager {
             store: Arc::new(CompactTextSessionStore),
             jsonl_store: Arc::new(JsonlSessionStore),
         };
-        let _ = manager.reconcile_index();
+        if let Err(error) = manager.reconcile_index() {
+            eprintln!("Session index reconciliation failed during startup: {error}");
+        }
+        match manager.reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy::default()) {
+            Ok(report) => {
+                if report.bounded {
+                    eprintln!(
+                        "Session orphan-sidecar reconciliation reached its safety bound after scanning {} entries; continuation state was saved. Run `talos storage maintenance --reconcile` to continue.",
+                        report.scanned_entries,
+                    );
+                }
+                for failure in report.failures {
+                    eprintln!(
+                        "Session orphan-sidecar reconciliation failed for {} at {}: {}",
+                        failure.session_id,
+                        failure.path.display(),
+                        failure.error,
+                    );
+                }
+            }
+            Err(error) => {
+                eprintln!("Session orphan-sidecar reconciliation failed during startup: {error}");
+            }
+        }
         Ok(manager)
     }
 
@@ -485,6 +512,22 @@ impl SessionManager {
         index.get_forks(session_id)
     }
 
+    /// Record one source/child fork relationship through the manager-owned index.
+    pub fn record_fork(
+        &self,
+        source_session_id: &Uuid,
+        forked_session_id: &Uuid,
+        fork_entry_id: &str,
+    ) -> Result<(), IndexError> {
+        let mut guard = self.get_or_create_index()?;
+        let index = guard.as_mut().expect("index just created");
+        index.record_fork(
+            &source_session_id.to_string(),
+            &forked_session_id.to_string(),
+            fork_entry_id,
+        )
+    }
+
     #[allow(clippy::collapsible_if)]
     pub fn reconcile_index(&self) -> Result<usize, IndexError> {
         let mut guard = self.get_or_create_index()?;
@@ -578,19 +621,55 @@ impl SessionManager {
         Ok(fixed)
     }
 
-    #[allow(clippy::collapsible_if)]
+    /// Delete one discoverable Session through the retryable ownership boundary.
     pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
         let file_path = self.find_session_file(id)?;
-        if file_path.exists() {
-            fs::remove_file(&file_path)?;
-        }
+        self.remove_owned_session_artifacts(id, &file_path)
+            .map(|_| ())
+    }
+
+    /// Roll back all artifacts owned by a prepared or partially created Session.
+    ///
+    /// Unlike `delete_session`, this does not require the transcript to exist, so
+    /// post-identity initialization failures remain recoverable.
+    pub fn rollback_session_artifacts(
+        &self,
+        session: &Session,
+    ) -> Result<SessionArtifactCleanupReport, SessionError> {
+        self.remove_owned_session_artifacts(&session.id, &session.file_path)
+    }
+
+    fn remove_owned_session_artifacts(
+        &self,
+        id: &Uuid,
+        transcript_path: &Path,
+    ) -> Result<SessionArtifactCleanupReport, SessionError> {
+        let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
         crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
-        if let Ok(mut guard) = self.get_or_create_index() {
-            if let Some(index) = guard.as_mut() {
-                let _ = index.delete_session(&id.to_string());
-            }
+        let mut guard = self
+            .get_or_create_index()
+            .map_err(|error| SessionError::IndexCleanup {
+                session_id: *id,
+                message: error.to_string(),
+            })?;
+        if let Some(index) = guard.as_mut() {
+            index
+                .delete_session(&id.to_string())
+                .map_err(|error| SessionError::IndexCleanup {
+                    session_id: *id,
+                    message: error.to_string(),
+                })?;
         }
-        Ok(())
+        report.merge(remove_session_transcript(transcript_path)?);
+        Ok(report)
+    }
+
+    /// Discover and remove safe transcript-less pending SQLite artifacts.
+    pub fn reconcile_orphan_sidecars(
+        &self,
+        policy: &OrphanSidecarReconciliationPolicy,
+    ) -> Result<OrphanSidecarReconciliationReport, SessionError> {
+        crate::artifacts::reconcile_orphan_sidecars_in_root(&self.sessions_dir, policy)
     }
 
     /// Return sessions that would be removed by `policy` without deleting files.
@@ -677,17 +756,10 @@ impl SessionManager {
         };
 
         for candidate in &report.candidates {
-            if candidate.file_path.exists() {
-                fs::remove_file(&candidate.file_path)?;
-                report.removed += 1;
-                report.bytes_removed += candidate.size_bytes;
-            }
-
-            if let Ok(mut guard) = self.get_or_create_index()
-                && let Some(index) = guard.as_mut()
-            {
-                let _ = index.delete_session(&candidate.id.to_string());
-            }
+            let cleanup =
+                self.remove_owned_session_artifacts(&candidate.id, &candidate.file_path)?;
+            report.removed = report.removed.saturating_add(1);
+            report.bytes_removed = report.bytes_removed.saturating_add(cleanup.bytes_removed);
         }
 
         Ok(report)

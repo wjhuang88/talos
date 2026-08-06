@@ -228,8 +228,8 @@ mod tests {
     fn gradient_runs_dark_to_light_frost() {
         let g = wordmark_gradient(6);
         assert_eq!(g.len(), 6);
-        let first = g.first().copied().unwrap();
-        let last = g.last().copied().unwrap();
+        let first = g.first().copied().expect("operation should succeed");
+        let last = g.last().copied().expect("operation should succeed");
         let lum = |c: Color| match c {
             Color::Rgb(r, gc, b) => r as u32 + gc as u32 + b as u32,
             _ => 0,

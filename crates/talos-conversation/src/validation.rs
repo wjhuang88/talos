@@ -860,14 +860,14 @@ mod tests {
 
     #[test]
     fn governance_plan_lists_internal_check_without_executing_script() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let script_dir = dir.path().join("scripts");
-        fs::create_dir_all(&script_dir).unwrap();
+        fs::create_dir_all(&script_dir).expect("operation should succeed");
         fs::write(
             script_dir.join("validate_project_governance.sh"),
             "#!/usr/bin/env bash\ntouch executed-marker\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let plan = collect_validation_plan(dir.path(), ValidationProfile::Governance);
         let rendered = render_text_plan(&plan);
@@ -880,13 +880,13 @@ mod tests {
 
     #[test]
     fn governance_profile_does_not_require_host_script() {
-        let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".agent-governance")).unwrap();
+        let dir = tempdir().expect("operation should succeed");
+        fs::create_dir_all(dir.path().join(".agent-governance")).expect("operation should succeed");
         fs::write(
             dir.path().join(".agent-governance").join("manifest.yaml"),
             "profile: product\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
 
         let plan = collect_validation_plan(dir.path(), ValidationProfile::Governance);
 
@@ -905,8 +905,9 @@ mod tests {
 
     #[test]
     fn i076_profile_includes_targeted_checks() {
-        let dir = tempdir().unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        let dir = tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n")
+            .expect("operation should succeed");
         let plan = collect_validation_plan(dir.path(), ValidationProfile::I076);
 
         assert!(plan.checks.iter().any(|check| check.id == "provider-usage"));
@@ -916,11 +917,13 @@ mod tests {
 
     #[test]
     fn json_plan_is_structured() {
-        let dir = tempdir().unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        let dir = tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n")
+            .expect("operation should succeed");
         let plan = collect_validation_plan(dir.path(), ValidationProfile::Workspace);
 
-        let value: serde_json::Value = serde_json::from_str(&render_json_plan(&plan)).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&render_json_plan(&plan)).expect("operation should succeed");
 
         assert_eq!(value["profile"], "workspace");
         assert_eq!(value["project_types"][0], "rust");
@@ -929,19 +932,29 @@ mod tests {
             "read-only plan; commands are not executed"
         );
         assert_eq!(value["checks"][0]["execution_mode"], "host_tool");
-        assert!(value["checks"].as_array().unwrap().len() >= 3);
+        assert!(
+            value["checks"]
+                .as_array()
+                .expect("operation should succeed")
+                .len()
+                >= 3
+        );
     }
 
     #[test]
     fn project_type_detection_covers_common_manifests() {
-        let dir = tempdir().unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
-        fs::write(dir.path().join("package.json"), "{}\n").unwrap();
-        fs::write(dir.path().join("pyproject.toml"), "[project]\n").unwrap();
-        fs::write(dir.path().join("go.mod"), "module example.com/test\n").unwrap();
-        fs::write(dir.path().join("pom.xml"), "<project />\n").unwrap();
-        fs::create_dir_all(dir.path().join("docs")).unwrap();
-        fs::write(dir.path().join("docs").join("BOARD.md"), "# Board\n").unwrap();
+        let dir = tempdir().expect("operation should succeed");
+        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("package.json"), "{}\n").expect("operation should succeed");
+        fs::write(dir.path().join("pyproject.toml"), "[project]\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("go.mod"), "module example.com/test\n")
+            .expect("operation should succeed");
+        fs::write(dir.path().join("pom.xml"), "<project />\n").expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("docs")).expect("operation should succeed");
+        fs::write(dir.path().join("docs").join("BOARD.md"), "# Board\n")
+            .expect("operation should succeed");
 
         let detected = detect_project_types(dir.path());
 
@@ -990,13 +1003,13 @@ mod tests {
         ];
 
         for (marker, expected) in cases {
-            let dir = tempdir().unwrap();
+            let dir = tempdir().expect("operation should succeed");
             if let Some(parent) = std::path::Path::new(marker).parent()
                 && !parent.as_os_str().is_empty()
             {
-                fs::create_dir_all(dir.path().join(parent)).unwrap();
+                fs::create_dir_all(dir.path().join(parent)).expect("operation should succeed");
             }
-            fs::write(dir.path().join(marker), "").unwrap();
+            fs::write(dir.path().join(marker), "").expect("operation should succeed");
 
             let detected = detect_project_types(dir.path());
 
@@ -1006,7 +1019,7 @@ mod tests {
 
     #[test]
     fn adapter_instructions_are_injected_only_for_confirmed_types() {
-        let empty = tempdir().unwrap();
+        let empty = tempdir().expect("operation should succeed");
         let empty_plan = collect_validation_plan(empty.path(), ValidationProfile::Governance);
         assert!(
             !empty_plan
@@ -1015,12 +1028,12 @@ mod tests {
                 .any(|finding| finding.message.contains("Rust/Cargo"))
         );
 
-        let governance_only_rust = tempdir().unwrap();
+        let governance_only_rust = tempdir().expect("operation should succeed");
         fs::write(
             governance_only_rust.path().join("Cargo.toml"),
             "[workspace]\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         let governance_plan =
             collect_validation_plan(governance_only_rust.path(), ValidationProfile::Governance);
         assert!(
@@ -1030,8 +1043,9 @@ mod tests {
                 .any(|finding| finding.message.contains("Rust/Cargo"))
         );
 
-        let rust = tempdir().unwrap();
-        fs::write(rust.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        let rust = tempdir().expect("operation should succeed");
+        fs::write(rust.path().join("Cargo.toml"), "[workspace]\n")
+            .expect("operation should succeed");
         let rust_plan = collect_validation_plan(rust.path(), ValidationProfile::Workspace);
         assert!(
             rust_plan
@@ -1043,7 +1057,7 @@ mod tests {
 
     #[test]
     fn cargo_adapter_requires_rust_project_detection() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
 
         let plan = collect_validation_plan(dir.path(), ValidationProfile::Workspace);
 
@@ -1058,7 +1072,7 @@ mod tests {
 
     #[test]
     fn run_records_missing_program_without_hiding_failure() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let check = ValidationCheck {
             id: "missing",
             command: "talos-validation-command-that-should-not-exist",
@@ -1106,8 +1120,8 @@ mod tests {
             }],
         };
 
-        let value: serde_json::Value =
-            serde_json::from_str(&render_json_evidence(&evidence)).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&render_json_evidence(&evidence))
+            .expect("operation should succeed");
 
         assert_eq!(value["profile"], "governance");
         assert_eq!(value["records"][0]["execution_mode"], "internal");

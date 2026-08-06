@@ -133,6 +133,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
         let mut policy = ToolPresentationPolicy::runtime_default();
         for capability in loaded_plugin_packages
@@ -178,13 +179,16 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    let _sched_join = sched_pending.spawn(
-        handle.sq_tx.clone(),
-        tokio_util::sync::CancellationToken::new(),
-    );
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),
+    );
+    let session_generation = crate::mode_runtime::runtime_generation_for_session(&session)?;
+    actor.set_generation(session_generation);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        session_generation,
+        tokio_util::sync::CancellationToken::new(),
     );
     tokio::spawn(async move { actor.run().await });
 
@@ -208,7 +212,7 @@ mod tests {
             talos_permission::PermissionEngine::new(),
         )));
         register_interactive_builtin_contributions(&mut registry, approval, Path::new("."))
-            .unwrap();
+            .expect("operation should succeed");
 
         let mut names = registry
             .list()

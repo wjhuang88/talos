@@ -149,11 +149,12 @@ mod tests {
 
     fn write_real_png(path: &Path) {
         let img = image::RgbaImage::new(2, 2);
-        img.save_with_format(path, image::ImageFormat::Png).unwrap();
+        img.save_with_format(path, image::ImageFormat::Png)
+            .expect("test operation should succeed");
     }
 
     fn digest_of(path: &Path) -> ContentDigest {
-        let bytes = std::fs::read(path).unwrap();
+        let bytes = std::fs::read(path).expect("test operation should succeed");
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         let raw: [u8; 32] = hasher.finalize().into();
@@ -162,10 +163,10 @@ mod tests {
 
     #[test]
     fn matching_canonical_path_and_digest_returns_bytes() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let path = dir.path().join("stable.png");
         write_real_png(&path);
-        let canonical = path.canonicalize().unwrap();
+        let canonical = path.canonicalize().expect("test operation should succeed");
         let digest = digest_of(&canonical);
         match read_image_with_toctou_guard(&canonical, &digest) {
             ImageRead::Bytes(b) => assert!(!b.is_empty()),
@@ -189,16 +190,16 @@ mod tests {
         // canonicalized path. When the stored path is non-canonical
         // (e.g. a symlink that has since been repointed), the two
         // diverge and the guard omits the read.
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let file_a = dir.path().join("a.png");
         let file_b = dir.path().join("b.png");
         write_real_png(&file_a);
         write_real_png(&file_b);
 
         let link = dir.path().join("link.png");
-        std::os::unix::fs::symlink(&file_a, &link).unwrap();
-        std::fs::remove_file(&link).unwrap();
-        std::os::unix::fs::symlink(&file_b, &link).unwrap();
+        std::os::unix::fs::symlink(&file_a, &link).expect("test operation should succeed");
+        std::fs::remove_file(&link).expect("test operation should succeed");
+        std::os::unix::fs::symlink(&file_b, &link).expect("test operation should succeed");
 
         match read_image_with_toctou_guard(&link, &ContentDigest::default()) {
             ImageRead::Omit => {}
@@ -214,10 +215,10 @@ mod tests {
     /// still omit the read.
     #[test]
     fn same_path_replacement_detected_via_digest_mismatch() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let path = dir.path().join("attack.png");
         write_real_png(&path);
-        let canonical = path.canonicalize().unwrap();
+        let canonical = path.canonicalize().expect("test operation should succeed");
         let original_digest = digest_of(&canonical);
 
         // Atomically replace the file at the same canonical path with
@@ -226,8 +227,8 @@ mod tests {
         let other = image::RgbaImage::new(8, 8);
         other
             .save_with_format(&replacement, image::ImageFormat::Png)
-            .unwrap();
-        std::fs::rename(&replacement, &canonical).unwrap();
+            .expect("test operation should succeed");
+        std::fs::rename(&replacement, &canonical).expect("test operation should succeed");
 
         match read_image_with_toctou_guard(&canonical, &original_digest) {
             ImageRead::Omit => {}
@@ -243,17 +244,17 @@ mod tests {
     /// blindly rejecting.
     #[test]
     fn same_path_with_updated_digest_passes() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let path = dir.path().join("rotate.png");
         write_real_png(&path);
-        let canonical = path.canonicalize().unwrap();
+        let canonical = path.canonicalize().expect("test operation should succeed");
 
         let replacement = dir.path().join("r2.png");
         let other = image::RgbaImage::new(8, 8);
         other
             .save_with_format(&replacement, image::ImageFormat::Png)
-            .unwrap();
-        std::fs::rename(&replacement, &canonical).unwrap();
+            .expect("test operation should succeed");
+        std::fs::rename(&replacement, &canonical).expect("test operation should succeed");
 
         let new_digest = digest_of(&canonical);
         match read_image_with_toctou_guard(&canonical, &new_digest) {
@@ -266,10 +267,10 @@ mod tests {
     /// test-fixture escape hatch documented on ContentDigest::default.
     #[test]
     fn zero_digest_sentinel_skips_verification() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let path = dir.path().join("sentinel.png");
         write_real_png(&path);
-        let canonical = path.canonicalize().unwrap();
+        let canonical = path.canonicalize().expect("test operation should succeed");
         match read_image_with_toctou_guard(&canonical, &ContentDigest::default()) {
             ImageRead::Bytes(_) => {}
             ImageRead::Omit => panic!("zero sentinel must skip digest verification"),
@@ -285,16 +286,18 @@ mod tests {
     /// path and digest. Asserts `ImageRead::Omit`.
     #[test]
     fn read_image_content_part_replaced_file_rejected_by_guard() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("test operation should succeed");
         let path = dir.path().join("grant.png");
         write_real_png(&path);
-        let canonical = path.canonicalize().unwrap();
+        let canonical = path.canonicalize().expect("test operation should succeed");
         let grant_digest = digest_of(&canonical);
 
         let content_part = talos_core::message::ContentPart::Image {
             path: canonical.clone(),
             mime: "image/png".to_string(),
-            byte_count: std::fs::metadata(&canonical).unwrap().len(),
+            byte_count: std::fs::metadata(&canonical)
+                .expect("test operation should succeed")
+                .len(),
             content_digest: grant_digest,
         };
 
@@ -302,8 +305,8 @@ mod tests {
         let other = image::RgbaImage::new(16, 16);
         other
             .save_with_format(&replacement, image::ImageFormat::Png)
-            .unwrap();
-        std::fs::rename(&replacement, &canonical).unwrap();
+            .expect("test operation should succeed");
+        std::fs::rename(&replacement, &canonical).expect("test operation should succeed");
 
         match &content_part {
             talos_core::message::ContentPart::Image {

@@ -80,10 +80,10 @@ mod tests {
     /// SEC-001 path check auto-allows workspace-internal reads.
     #[test]
     fn workspace_internal_path_is_allowed() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let engine = engine_with_root(dir.path());
         let inside = dir.path().join("image.png");
-        std::fs::write(&inside, b"data").unwrap();
+        std::fs::write(&inside, b"data").expect("operation should succeed");
         let decision = ImageAuthorization::evaluate(&inside, &engine);
         assert!(
             matches!(decision, ImageAuthorization::Allow),
@@ -96,7 +96,7 @@ mod tests {
     /// paths require explicit approval.
     #[test]
     fn external_path_without_rule_is_ask() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let engine = engine_with_root(dir.path());
         let outside = std::path::Path::new("/tmp/p1-a-external-path-not-allowed.png");
         // Do not create the file — evaluate must NOT touch the fs.
@@ -111,7 +111,7 @@ mod tests {
     /// turns subsequent evaluations from Ask into Allow.
     #[test]
     fn runtime_allow_rule_promotes_ask_to_allow() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let mut engine = engine_with_root(dir.path());
         let outside = std::path::Path::new("/tmp/p1-a-external-ruled.png");
 
@@ -131,7 +131,7 @@ mod tests {
     /// still evaluates to Ask after approving its sibling.
     #[test]
     fn allow_rule_is_scoped_to_exact_path() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let mut engine = engine_with_root(dir.path());
         let approved = std::path::Path::new("/tmp/p1-a-approved.png");
         let other = std::path::Path::new("/tmp/p1-a-other.png");

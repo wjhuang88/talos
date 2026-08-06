@@ -185,7 +185,7 @@ async fn tool_call_produces_stream_and_message() {
     });
 
     assert_eq!(outputs.len(), 2);
-    let display = find_tool_call(&outputs).unwrap();
+    let display = find_tool_call(&outputs).expect("operation should succeed");
     assert_eq!(display.tool_name, "bash");
     assert_eq!(display.provenance, ToolProvenance::Native);
     let status = find_status(&outputs).expect("tool call status");
@@ -201,7 +201,7 @@ async fn tool_call_produces_stream_and_message() {
     assert_eq!(msg.role, MessageRole::Assistant);
     assert_eq!(msg.status, MessageStatus::Completed);
     assert!(msg.content.is_empty());
-    let tc = msg.tool_call.as_ref().unwrap();
+    let tc = msg.tool_call.as_ref().expect("operation should succeed");
     assert_eq!(tc.tool_name, "bash");
     assert_eq!(tc.provenance, ToolProvenance::Native);
     assert!(tc.result.is_none());
@@ -225,7 +225,7 @@ async fn tool_call_closes_previous_stream() {
 
     assert!(matches!(outputs[0], UiOutput::Content(ContentOutput::End)));
     assert_eq!(outputs.len(), 3);
-    let display = find_tool_call(&outputs).unwrap();
+    let display = find_tool_call(&outputs).expect("operation should succeed");
     assert!(matches!(display.provenance, ToolProvenance::Native));
 }
 
@@ -248,7 +248,7 @@ async fn tool_result_produces_stream_and_updates_message() {
     });
 
     assert_eq!(outputs.len(), 2);
-    let display = find_tool_result(&outputs).unwrap();
+    let display = find_tool_result(&outputs).expect("operation should succeed");
     assert_eq!(display.tool_name.as_deref(), Some("read_file"));
     assert!(!display.is_error);
     assert_eq!(display.content, "file contents");
@@ -256,8 +256,8 @@ async fn tool_result_produces_stream_and_updates_message() {
     assert_eq!(status.phase, Some(TurnPhase::Generating));
 
     let msg = &engine.messages[0];
-    let tc = msg.tool_call.as_ref().unwrap();
-    let result = tc.result.as_ref().unwrap();
+    let tc = msg.tool_call.as_ref().expect("operation should succeed");
+    let result = tc.result.as_ref().expect("operation should succeed");
     assert_eq!(result.content, "file contents");
     assert!(!result.is_error);
 }
@@ -276,11 +276,14 @@ async fn tool_result_error_flag_propagates() {
         result: make_tool_result("command not found", true),
     });
 
-    let tc = engine.messages[0].tool_call.as_ref().unwrap();
-    let result = tc.result.as_ref().unwrap();
+    let tc = engine.messages[0]
+        .tool_call
+        .as_ref()
+        .expect("operation should succeed");
+    let result = tc.result.as_ref().expect("operation should succeed");
     assert!(result.is_error);
 
-    let display = find_tool_result(&outputs).unwrap();
+    let display = find_tool_result(&outputs).expect("operation should succeed");
     assert!(display.is_error);
     assert!(display.content.contains("command not found"));
 }
@@ -318,7 +321,7 @@ async fn turn_end_finalizes_and_produces_status() {
     assert_eq!(engine.messages[0].content, "Done.\n");
     assert_eq!(engine.usage, usage);
 
-    let snapshot = find_status(&completed).unwrap();
+    let snapshot = find_status(&completed).expect("operation should succeed");
     assert_eq!(snapshot.model_name, "claude-sonnet-4");
     assert_eq!(snapshot.usage.input_tokens, 100);
     assert_eq!(snapshot.usage.output_tokens, 50);
@@ -349,7 +352,11 @@ async fn turn_end_with_empty_text_still_produces_status() {
             final_text: String::new(),
             new_messages: vec![],
         });
-    assert!(!find_status(&completed).unwrap().is_processing);
+    assert!(
+        !find_status(&completed)
+            .expect("operation should succeed")
+            .is_processing
+    );
 }
 
 #[test]
@@ -389,7 +396,11 @@ fn terminal_max_tokens_is_visible_and_processing_clears_after_completion() {
             final_text: "partial response cut off".to_string(),
             new_messages: vec![],
         });
-    assert!(!find_status(&completed).unwrap().is_processing);
+    assert!(
+        !find_status(&completed)
+            .expect("operation should succeed")
+            .is_processing
+    );
 }
 
 #[test]
@@ -432,9 +443,11 @@ async fn error_clears_turn_and_produces_stream_and_status() {
         _ => None,
     });
     assert_eq!(tip, Some((TipKind::Error, "rate limited".to_string())));
-    let snapshot = find_status(&outputs).unwrap();
+    let snapshot = find_status(&outputs).expect("operation should succeed");
     assert!(!snapshot.is_processing);
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
     assert_eq!(text, "[Error] rate limited");
 }
@@ -457,7 +470,9 @@ async fn handle_user_message_creates_stream_with_prefix() {
     assert!(msg.tool_call.is_none());
 
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::User);
     assert_eq!(text, "hello world");
 }
@@ -471,7 +486,9 @@ async fn handle_user_message_multiline_single_stream() {
     assert_eq!(engine.messages.len(), 1);
     assert_eq!(engine.messages[0].content, "line1\nline2\n");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(text, "line1\nline2");
 }
 
@@ -486,7 +503,9 @@ async fn slash_help_returns_all_commands() {
     let outputs = engine.handle_slash_command("/help");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("/help"));
     assert!(text.contains("/quit"));
     assert!(text.contains("/status"));
@@ -548,7 +567,9 @@ async fn slash_status_shows_model_and_tokens() {
     let outputs = engine.handle_slash_command("/status");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("claude-sonnet-4"));
     assert!(text.contains("42"));
     assert!(text.contains("17"));
@@ -569,7 +590,9 @@ async fn slash_plugins_shows_diagnostics() {
     let outputs = engine.handle_slash_command("/plugins");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("WASM plugin packages: none loaded"));
     assert!(text.contains("Use /mcp for MCP detail"));
     assert!(text.contains("Provenance observations: 1"));
@@ -586,7 +609,9 @@ async fn slash_plugins_notice_does_not_leak_mcp_status() {
 
     let outputs = engine.handle_slash_command("/plugins");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(!text.contains("MCP servers (startup snapshot)"));
     assert!(
         !text.contains("github"),
@@ -605,7 +630,9 @@ async fn slash_plugins_shows_loaded_plugin_packages() {
 
     let outputs = engine.handle_slash_command("/plugins");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(
         text.contains("WASM plugin packages: 1 loaded"),
         "/plugins must show loaded packages: {text}"
@@ -635,7 +662,9 @@ async fn slash_mcp_shows_observations() {
     let outputs = engine.handle_slash_command("/mcp");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("Observed tool provenance"));
     assert!(text.contains("native") && text.contains("5 calls"));
     assert!(text.contains("mcp:github") && text.contains("2 calls"));
@@ -648,7 +677,9 @@ async fn slash_mcp_empty_shows_no_tools_message() {
     let outputs = engine.handle_slash_command("/mcp");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("No MCP servers configured"));
 }
 
@@ -663,7 +694,9 @@ async fn slash_mcp_shows_startup_mcp_status_before_any_call() {
 
     let outputs = engine.handle_slash_command("/mcp");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("MCP servers (startup snapshot)"));
     assert!(text.contains("github (connected, 3 tools)"));
 }
@@ -675,7 +708,9 @@ async fn slash_hooks_shows_read_only_diagnostics() {
     let outputs = engine.handle_slash_command("/hooks");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("Hooks diagnostics"));
     assert!(text.contains("config-introduced hooks: none declared"));
     assert!(text.contains("executable hook carriers: disabled"));
@@ -694,7 +729,9 @@ async fn slash_skills_empty_shows_no_skills_message() {
     let outputs = engine.handle_slash_command("/skills");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("No skills available"));
 }
 
@@ -710,7 +747,9 @@ async fn slash_skills_lists_runtime_skill_metadata() {
     let outputs = engine.handle_slash_command("/skills");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("Available skills"));
     assert!(text.contains("review"));
     assert!(text.contains("Review code"));
@@ -763,7 +802,9 @@ async fn slash_skills_activate_requires_name() {
 
     let outputs = engine.handle_slash_command("/skills activate");
 
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
     assert!(text.contains("Usage: /skills activate <name>"));
 }
@@ -779,7 +820,9 @@ async fn slash_skills_output_shows_source() {
 
     let outputs = engine.handle_slash_command("/skills");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("git-skill (project)"));
     assert!(text.contains("Git operations"));
 }
@@ -795,7 +838,9 @@ async fn slash_skills_shared_shows_shared_source() {
 
     let outputs = engine.handle_slash_command("/skills");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("shared-skill (shared)"));
 }
 
@@ -810,7 +855,9 @@ async fn slash_skills_output_does_not_leak_body() {
 
     let outputs = engine.handle_slash_command("/skills");
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("secret-skill (user)"));
     assert!(text.contains("Does secret things"));
     assert!(!text.contains("## Skill Body"));
@@ -828,7 +875,9 @@ async fn unknown_command_returns_error_stream() {
     let outputs = engine.handle_slash_command("/foobar");
 
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
     assert!(text.contains("Unknown command"));
     assert!(text.contains("/foobar"));
@@ -854,7 +903,7 @@ fn mock_request_is_model_passthrough_slash_command() {
 }
 
 // ---------------------------------------------------------------------------
-// drain_steering_queue
+// drain_steering_queue / structured steering transaction
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -862,7 +911,9 @@ async fn start_user_message_marks_processing_and_streams_user_input() {
     let mut engine = new_engine();
 
     let outputs = engine.start_user_message("hello");
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
 
     assert_eq!(source, MessageSource::User);
     assert_eq!(text, "hello");
@@ -958,24 +1009,13 @@ fn timeout_error_sets_timed_out_phase() {
 }
 
 #[test]
-fn drain_steering_queue_fifo_order() {
+fn drain_steering_queue_preserves_legacy_single_item_fifo_behavior() {
     let mut engine = new_engine();
-    engine.steering_queue.push("first".to_string());
-    engine.steering_queue.push("second".to_string());
-    engine.steering_queue.push("third".to_string());
+    engine.enqueue_steering("first".to_string());
+    engine.enqueue_steering("second".to_string());
 
     assert_eq!(engine.drain_steering_queue(), Some("first".to_string()));
     assert_eq!(engine.drain_steering_queue(), Some("second".to_string()));
-    assert_eq!(engine.drain_steering_queue(), Some("third".to_string()));
-}
-
-#[test]
-fn drain_steering_queue_none_when_empty() {
-    let mut engine = new_engine();
-    assert_eq!(engine.drain_steering_queue(), None);
-
-    engine.steering_queue.push("one".to_string());
-    assert_eq!(engine.drain_steering_queue(), Some("one".to_string()));
     assert_eq!(engine.drain_steering_queue(), None);
 }
 
@@ -1116,12 +1156,12 @@ fn provenance_groups_mcp_servers() {
         .plugin_observations
         .iter()
         .find(|e| e.key == "mcp:github")
-        .unwrap();
+        .expect("operation should succeed");
     let fs = engine
         .plugin_observations
         .iter()
         .find(|e| e.key == "mcp:filesystem")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(github.count, 2);
     assert_eq!(fs.count, 1);
 }
@@ -1541,7 +1581,9 @@ async fn slash_todo_delete_without_id_returns_error() {
 
     let outputs = engine.handle_slash_command("/todo delete");
 
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
     assert!(text.contains("Usage: /todo delete"));
 }
@@ -1599,19 +1641,19 @@ async fn slash_agile_without_workspace_returns_unavailable() {
 
 #[tokio::test]
 async fn slash_agile_with_workspace_returns_governance_summary() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let docs_dir = dir.path().join("docs");
-    std::fs::create_dir_all(docs_dir.join("iterations")).unwrap();
+    std::fs::create_dir_all(docs_dir.join("iterations")).expect("operation should succeed");
     std::fs::write(
         docs_dir.join("BOARD.md"),
         "# Board\n\n## Now\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I080 Test | Active | [x](x.md) | Gate |\n\n## Next\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I081 Next | Planned | [x](x.md) | Evidence |\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
     std::fs::write(
         docs_dir.join("iterations").join("README.md"),
         "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I080 | Frontline | Planned | no |\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let mut engine = ConversationEngine::new("test".to_string(), "test".to_string())
         .with_workspace_root(dir.path().to_path_buf());
@@ -1630,30 +1672,35 @@ async fn slash_validate_without_workspace_returns_unavailable() {
     let mut engine = new_engine();
     let outputs = engine.handle_slash_command("/validate governance");
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("unavailable") || text.contains("no workspace"));
 }
 
 #[tokio::test]
 async fn slash_validate_governance_uses_internal_profile() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().expect("operation should succeed");
     let gov_dir = dir.path().join(".agent-governance");
-    std::fs::create_dir_all(&gov_dir).unwrap();
-    std::fs::write(gov_dir.join("manifest.yaml"), "profile: product\n").unwrap();
+    std::fs::create_dir_all(&gov_dir).expect("operation should succeed");
+    std::fs::write(gov_dir.join("manifest.yaml"), "profile: product\n")
+        .expect("operation should succeed");
     let script_dir = dir.path().join("scripts");
-    std::fs::create_dir_all(&script_dir).unwrap();
+    std::fs::create_dir_all(&script_dir).expect("operation should succeed");
     std::fs::write(
         script_dir.join("validate_project_governance.sh"),
         "#!/usr/bin/env bash\ntouch executed-marker\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let mut engine = ConversationEngine::new("test".to_string(), "test".to_string())
         .with_workspace_root(dir.path().to_path_buf());
     let outputs = engine.handle_slash_command("/validate governance");
 
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("Talos Validation Evidence"));
     assert!(text.contains("internal:governance_validation"));
     assert!(text.contains("execution") || text.contains("allowlisted validation profile"));
@@ -1665,7 +1712,9 @@ async fn slash_validate_rejects_host_tool_profiles() {
     let mut engine = new_engine();
     let outputs = engine.handle_slash_command("/validate workspace");
     assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("Unsupported internal validation profile"));
 }
 
@@ -1676,7 +1725,7 @@ async fn slash_validate_rejects_host_tool_profiles() {
 #[test]
 fn status_snapshot_reflects_current_state() {
     let mut engine = new_engine();
-    engine.steering_queue.push("steer".to_string());
+    engine.enqueue_steering("steer".to_string());
     engine.followup_queue.push("follow".to_string());
     engine.followup_queue.push("up".to_string());
     engine.is_processing = true;
@@ -1707,7 +1756,9 @@ async fn full_turn_lifecycle() {
     let mut engine = new_engine();
 
     let outputs = engine.handle_user_message("What is 2+2?");
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(text, "What is 2+2?");
 
     engine.handle_agent_event(&AgentEvent::TurnStart);
@@ -1725,13 +1776,13 @@ async fn full_turn_lifecycle() {
         provenance: ToolProvenance::Native,
         summary_fields: vec![],
     });
-    let display = find_tool_call(&outputs).unwrap();
+    let display = find_tool_call(&outputs).expect("operation should succeed");
     assert_eq!(display.tool_name, "calculator");
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
         result: make_tool_result("4", false),
     });
-    let result_display = find_tool_result(&outputs).unwrap();
+    let result_display = find_tool_result(&outputs).expect("operation should succeed");
     assert!(result_display.content.contains("4"));
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
@@ -1756,7 +1807,11 @@ async fn full_turn_lifecycle() {
     assert_eq!(last.content, "2+2 equals 4.\n");
 
     assert!(outputs.iter().any(|o| matches!(o, UiOutput::Status(_))));
-    assert!(!find_status(&completed).unwrap().is_processing);
+    assert!(
+        !find_status(&completed)
+            .expect("operation should succeed")
+            .is_processing
+    );
 }
 
 #[test]
@@ -1916,7 +1971,9 @@ fn followup_queue_not_affected_by_conversation_engine() {
 async fn user_message_stream_source_is_user() {
     let mut engine = new_engine();
     let outputs = engine.handle_user_message("test");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::User);
 }
 
@@ -1926,7 +1983,9 @@ async fn error_stream_source_is_error() {
     let outputs = engine.handle_agent_event(&AgentEvent::Error {
         message: "test error".to_string(),
     });
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
 }
 
@@ -1934,7 +1993,9 @@ async fn error_stream_source_is_error() {
 async fn slash_help_stream_source_is_system() {
     let mut engine = new_engine();
     let outputs = engine.handle_slash_command("/help");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
 }
 
@@ -1942,7 +2003,9 @@ async fn slash_help_stream_source_is_system() {
 async fn slash_status_stream_source_is_system() {
     let mut engine = new_engine();
     let outputs = engine.handle_slash_command("/status");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
 }
 
@@ -1950,7 +2013,9 @@ async fn slash_status_stream_source_is_system() {
 async fn unknown_command_stream_source_is_error() {
     let mut engine = new_engine();
     let outputs = engine.handle_slash_command("/unknown");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::Error);
 }
 
@@ -1972,7 +2037,9 @@ async fn slash_fork_refuses_while_processing() {
     engine.is_processing = true;
     let outputs = engine.handle_slash_command("/fork");
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
     assert!(text.contains("Cannot fork a session while a turn is active"));
 }
@@ -1982,7 +2049,9 @@ async fn slash_fork_stream_source_is_system() {
     let mut engine = new_engine();
     engine.is_processing = true;
     let outputs = engine.handle_slash_command("/fork");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
 }
 
@@ -2067,7 +2136,9 @@ async fn slash_model_refuses_while_processing() {
     engine.is_processing = true;
     let outputs = engine.handle_slash_command("/model");
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
+    let (source, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
     assert!(text.contains("Cannot switch models while a turn is active"));
 }
@@ -2077,7 +2148,9 @@ async fn slash_model_stream_source_is_system_when_processing() {
     let mut engine = new_engine();
     engine.is_processing = true;
     let outputs = engine.handle_slash_command("/model claude-sonnet-4");
-    let (source, _) = collect_stream(outputs).await.unwrap();
+    let (source, _) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert_eq!(source, MessageSource::System);
 }
 
@@ -2392,7 +2465,9 @@ async fn slash_mcp_shows_unavailable_server_error() {
         error: Some("connection refused".to_string()),
     }]);
     let outputs = engine.handle_slash_command("/mcp");
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("broken-server"), "server name must appear");
     assert!(
         text.contains("unavailable"),
@@ -2413,7 +2488,9 @@ async fn slash_hooks_shows_disabled_hook() {
         false,
     )]);
     let outputs = engine.handle_slash_command("/hooks");
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("my-hook"), "hook name must appear");
     assert!(text.contains("disabled"), "disabled status must appear");
 }
@@ -2437,7 +2514,9 @@ async fn slash_plugins_shows_summary_counts() {
         },
     ]);
     let outputs = engine.handle_slash_command("/plugins");
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(text.contains("MCP servers: 2"), "total count: {text}");
     assert!(text.contains("1 connected"), "connected count: {text}");
     assert!(text.contains("Hook declarations: 1"), "hook count: {text}");
@@ -2460,7 +2539,9 @@ async fn slash_mcp_shows_collision_warning() {
         },
     ]);
     let outputs = engine.handle_slash_command("/mcp");
-    let (_, text) = collect_stream(outputs).await.unwrap();
+    let (_, text) = collect_stream(outputs)
+        .await
+        .expect("operation should succeed");
     assert!(
         text.contains("collision"),
         "collision must be visible: {text}"
@@ -2494,7 +2575,10 @@ fn extension_snapshot_categorizes_api_key_error() {
         ),
     }]);
     let snap = engine.extension_snapshot();
-    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    let error = snap.mcp_servers[0]
+        .error
+        .as_ref()
+        .expect("operation should succeed");
     assert!(
         !error.contains("sk-secret-key") && !error.contains("api_key"),
         "no raw substring of error text may appear: {error}"
@@ -2510,7 +2594,10 @@ fn extension_snapshot_categorizes_bearer_token_error() {
         error: Some("Authorization: Bearer abc123token failed".to_string()),
     }]);
     let snap = engine.extension_snapshot();
-    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    let error = snap.mcp_servers[0]
+        .error
+        .as_ref()
+        .expect("operation should succeed");
     assert!(
         !error.contains("abc123token") && !error.contains("Bearer"),
         "no raw substring of error text may appear: {error}"
@@ -2526,7 +2613,10 @@ fn extension_snapshot_categorizes_url_query_secret() {
         error: Some("request to https://mcp.example.com/sse?token=hidden&ok=1 failed".to_string()),
     }]);
     let snap = engine.extension_snapshot();
-    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    let error = snap.mcp_servers[0]
+        .error
+        .as_ref()
+        .expect("operation should succeed");
     assert!(
         !error.contains("hidden")
             && !error.contains("token=")
@@ -2545,7 +2635,10 @@ fn extension_snapshot_categorizes_multiple_secrets_in_one_error() {
         error: Some(raw.to_string()),
     }]);
     let snap = engine.extension_snapshot();
-    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    let error = snap.mcp_servers[0]
+        .error
+        .as_ref()
+        .expect("operation should succeed");
     assert!(
         !error.contains("first")
             && !error.contains("second")
@@ -2583,7 +2676,10 @@ fn extension_snapshot_error_is_bounded_category() {
             error: Some(raw.to_string()),
         }]);
         let snap = engine.extension_snapshot();
-        let error = snap.mcp_servers[0].error.as_ref().unwrap();
+        let error = snap.mcp_servers[0]
+            .error
+            .as_ref()
+            .expect("operation should succeed");
         assert_eq!(
             error, expected,
             "raw {raw:?} should categorize as {expected:?}, got {error:?}"
@@ -2680,7 +2776,7 @@ fn steering_queue_snapshot_truncates_over_4kib() {
 }
 
 #[test]
-fn steering_queue_snapshot_reflects_drain() {
+fn steering_queue_snapshot_reflects_legacy_single_drain() {
     let mut engine = new_engine();
     engine.enqueue_steering("first".into());
     engine.enqueue_steering("second".into());
@@ -2692,6 +2788,97 @@ fn steering_queue_snapshot_reflects_drain() {
     assert_eq!(snap.total_count, 1);
     assert_eq!(snap.entries.len(), 1);
     assert_eq!(snap.entries[0].text, "second");
+}
+
+#[test]
+fn prepared_submission_is_transactional_and_preserves_item_boundaries() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("first".into());
+    engine.enqueue_steering("second".into());
+
+    let submission = engine
+        .prepare_steering_submission()
+        .expect("prepared batch");
+    assert_eq!(submission.items.len(), 2);
+    assert_eq!(submission.items[0].text, "first");
+    assert_eq!(submission.items[1].text, "second");
+    assert_eq!(engine.steering_queue_snapshot().total_count, 2);
+
+    assert!(engine.rollback_prepared_steering(&submission.id));
+    assert_eq!(engine.steering_queue_snapshot().total_count, 2);
+
+    let retry = engine.prepare_steering_submission().expect("retry batch");
+    assert!(engine.commit_prepared_steering(&retry.id));
+    assert_eq!(engine.steering_queue_snapshot().total_count, 0);
+}
+
+#[test]
+fn prepared_submission_stops_before_incompatible_preview_and_binds_attachments() {
+    let mut engine = new_engine();
+    let attachment = talos_core::message::ContentPart::Image {
+        path: "bound.png".into(),
+        mime: "image/png".into(),
+        byte_count: 42,
+        content_digest: Default::default(),
+    };
+    engine.enqueue_structured_steering(
+        "image turn".into(),
+        talos_core::session::SubmissionKind::UserTurn,
+        vec![attachment.clone()],
+    );
+    engine.enqueue_structured_steering(
+        "preview".into(),
+        talos_core::session::SubmissionKind::PreviewRequest,
+        Vec::new(),
+    );
+
+    let first = engine.prepare_steering_submission().expect("user batch");
+    assert_eq!(first.items.len(), 1);
+    assert_eq!(first.items[0].attachments, vec![attachment]);
+    assert!(engine.commit_prepared_steering(&first.id));
+
+    let second = engine.prepare_steering_submission().expect("preview batch");
+    assert_eq!(second.items.len(), 1);
+    assert_eq!(
+        second.items[0].kind,
+        talos_core::session::SubmissionKind::PreviewRequest
+    );
+}
+
+#[test]
+fn transactional_queue_fixed_seed_stress_has_no_loss_or_reordering() {
+    let mut engine = new_engine();
+    let mut expected = Vec::<String>::new();
+    let mut seed = 0x5eed_u64;
+    for index in 0..1_000_u32 {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        if seed % 3 != 0 && expected.len() < 64 {
+            let text = format!("item_{index}");
+            let (accepted, _) = engine.enqueue_structured_steering(
+                text.clone(),
+                talos_core::session::SubmissionKind::UserTurn,
+                Vec::new(),
+            );
+            assert!(accepted);
+            expected.push(text);
+        } else if let Some(submission) = engine.prepare_steering_submission() {
+            let count = submission.items.len();
+            if seed & 1 == 0 {
+                assert!(engine.commit_prepared_steering(&submission.id));
+                expected.drain(..count);
+            } else {
+                assert!(engine.rollback_prepared_steering(&submission.id));
+            }
+        }
+        assert_eq!(
+            engine
+                .steering_queue
+                .iter()
+                .map(|item| item.text.as_str())
+                .collect::<Vec<_>>(),
+            expected.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+    }
 }
 
 #[test]

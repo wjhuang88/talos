@@ -144,14 +144,14 @@ mod tests {
 
         let store = WorkspaceTrustStore::new(&dir);
         let ws = dir.join("my-project");
-        std::fs::create_dir_all(&ws).unwrap();
+        std::fs::create_dir_all(&ws).expect("operation should succeed");
 
         assert!(!store.is_trusted(&ws));
-        store.grant_trust(&ws).unwrap();
+        store.grant_trust(&ws).expect("operation should succeed");
         assert!(store.is_trusted(&ws));
         assert_eq!(store.trusted_count(), 1);
 
-        store.revoke_trust(&ws).unwrap();
+        store.revoke_trust(&ws).expect("operation should succeed");
         assert!(!store.is_trusted(&ws));
 
         std::fs::remove_dir_all(&dir).ok();
@@ -162,11 +162,11 @@ mod tests {
         let dir = test_directory("trust_test_persist");
 
         let ws = dir.join("workspace-a");
-        std::fs::create_dir_all(&ws).unwrap();
+        std::fs::create_dir_all(&ws).expect("operation should succeed");
 
         {
             let store = WorkspaceTrustStore::new(&dir);
-            store.grant_trust(&ws).unwrap();
+            store.grant_trust(&ws).expect("operation should succeed");
         }
 
         {
@@ -186,7 +186,7 @@ mod tests {
 
         assert!(!is_git_workspace(&dir));
 
-        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        std::fs::create_dir_all(dir.join(".git")).expect("operation should succeed");
         assert!(is_git_workspace(&dir));
 
         std::fs::remove_dir_all(&dir).ok();
@@ -195,10 +195,10 @@ mod tests {
     #[test]
     fn is_within_repo_boundary_check() {
         let dir = test_directory("trust_test_boundary");
-        std::fs::create_dir_all(dir.join("subdir")).unwrap();
+        std::fs::create_dir_all(dir.join("subdir")).expect("operation should succeed");
 
         let inner = dir.join("subdir").join("file.txt");
-        std::fs::write(&inner, "test").unwrap();
+        std::fs::write(&inner, "test").expect("operation should succeed");
 
         assert!(is_within_repo(&dir, &inner));
         let outside = std::env::temp_dir().join("other-trust-test");

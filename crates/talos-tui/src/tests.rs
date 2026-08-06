@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn test_nord_primary_text_contrast_is_wcag_aa() {
         use crate::theme::nord::*;
-        let cr = contrast_ratio(NORD4, NORD0).unwrap();
+        let cr = contrast_ratio(NORD4, NORD0).expect("operation should succeed");
         assert!(
             cr >= 4.5,
             "NORD4 against NORD0 has contrast ratio {} (need >= 4.5)",
@@ -2315,7 +2315,7 @@ mod tests {
         // Step 5: Confirm
         let action = state.wizard_advance();
         assert!(action.is_some());
-        match action.unwrap() {
+        match action.expect("operation should succeed") {
             crate::state::PanelAction::RegisterCustomProvider {
                 name,
                 protocol,

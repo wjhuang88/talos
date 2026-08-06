@@ -1052,14 +1052,16 @@ mod tests {
             TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
         ));
         assert_eq!(executions.load(Ordering::SeqCst), 1);
-        let records = approval_records.lock().expect("records lock is available");
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].tool_name, "record_write");
-        assert_eq!(
-            records[0].arguments,
-            serde_json::json!({"message": "approved"})
-        );
-        assert_eq!(records[0].summary_fields, vec!["message"]);
+        {
+            let records = approval_records.lock().expect("records lock is available");
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].tool_name, "record_write");
+            assert_eq!(
+                records[0].arguments,
+                serde_json::json!({"message": "approved"})
+            );
+            assert_eq!(records[0].summary_fields, vec!["message"]);
+        }
 
         runtime.shutdown().await.expect("shutdown succeeds");
     }
@@ -1198,13 +1200,14 @@ mod tests {
             .await
             .expect("turn completes");
         assert!(matches!(status, TurnCompletionStatus::Success { .. }));
-        let records = approval_records.lock().expect("records lock");
-        assert_eq!(records.len(), 1);
-        assert_eq!(
-            records[0].arguments,
-            serde_json::json!({"path": "src/lib.rs"})
-        );
-        drop(records);
+        {
+            let records = approval_records.lock().expect("records lock");
+            assert_eq!(records.len(), 1);
+            assert_eq!(
+                records[0].arguments,
+                serde_json::json!({"path": "src/lib.rs"})
+            );
+        }
         runtime.shutdown().await.expect("shutdown succeeds");
     }
 

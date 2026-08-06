@@ -185,9 +185,9 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_returns_image_part_for_valid_png() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -198,7 +198,7 @@ mod tests {
                 "test.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
         let output = tool
             .execute_authorized_with_output(
@@ -224,7 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_path_escape() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let output = tool
             .execute_authorized_with_output(serde_json::json!({"path": "/etc/passwd"}), &[])
@@ -239,7 +239,7 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_nonexistent_file() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let output = tool
             .execute_authorized_with_output(serde_json::json!({"path": "no_such_file.png"}), &[])
@@ -251,9 +251,9 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_directory() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let subdir = dir.path().join("subdir");
-        std::fs::create_dir(&subdir).unwrap();
+        std::fs::create_dir(&subdir).expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let output = tool
@@ -305,9 +305,9 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_text_file_with_png_extension() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let fake_png = dir.path().join("fake.png");
-        std::fs::write(&fake_png, b"not a png file").unwrap();
+        std::fs::write(&fake_png, b"not a png file").expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -318,7 +318,7 @@ mod tests {
                 "fake.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
         let output = tool
             .execute_authorized_with_output(
@@ -333,11 +333,11 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_attach_image_authorization() {
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let img_path = external.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
+        let canonical = img_path.canonicalize().expect("operation should succeed");
 
         let tool = ReadImageTool::new(workspace.path().to_path_buf());
         let attach_auth = vec![
@@ -348,7 +348,7 @@ mod tests {
                 "test.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
         let output = tool
             .execute_authorized_with_output(
@@ -366,11 +366,11 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_read_authorization() {
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
         let img_path = external.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
+        let canonical = img_path.canonicalize().expect("operation should succeed");
 
         let tool = ReadImageTool::new(workspace.path().to_path_buf());
         let read_auth = vec![
@@ -381,7 +381,7 @@ mod tests {
                 "test.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
         let output = tool
             .execute_authorized_with_output(
@@ -399,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_fifo() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let fifo_path = dir.path().join("pipe.png");
         #[cfg(unix)]
         {
@@ -417,7 +417,7 @@ mod tests {
                     "pipe.png",
                     ToolAuthorizationScope::Once,
                 )
-                .unwrap(),
+                .expect("operation should succeed"),
             ];
             let output = tool
                 .execute_authorized_with_output(
@@ -437,11 +437,11 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn execute_authorized_rejects_symlink_retarget() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let real_png = dir.path().join("real.png");
-        std::fs::write(&real_png, MINIMAL_PNG).unwrap();
+        std::fs::write(&real_png, MINIMAL_PNG).expect("operation should succeed");
         let link = dir.path().join("link.png");
-        std::os::unix::fs::symlink(&real_png, &link).unwrap();
+        std::os::unix::fs::symlink(&real_png, &link).expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -452,11 +452,12 @@ mod tests {
                 "link.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
 
-        std::fs::remove_file(&link).unwrap();
-        std::os::unix::fs::symlink(dir.path().join("not_a_file.txt"), &link).unwrap();
+        std::fs::remove_file(&link).expect("operation should succeed");
+        std::os::unix::fs::symlink(dir.path().join("not_a_file.txt"), &link)
+            .expect("operation should succeed");
         let output = tool
             .execute_authorized_with_output(
                 serde_json::json!({"path": link.to_string_lossy()}),
@@ -469,9 +470,9 @@ mod tests {
 
     #[tokio::test]
     async fn execute_authorized_rejects_replaced_file_content() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -482,7 +483,7 @@ mod tests {
                 "test.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
 
         let output1 = tool
@@ -497,7 +498,7 @@ mod tests {
             output1.result.content
         );
 
-        std::fs::write(&img_path, b"replaced with text").unwrap();
+        std::fs::write(&img_path, b"replaced with text").expect("operation should succeed");
         let output2 = tool
             .execute_authorized_with_output(
                 serde_json::json!({"path": img_path.to_string_lossy()}),
@@ -518,10 +519,10 @@ mod tests {
     /// See image_io tests: same_path_replacement_detected_via_digest_mismatch.
     #[tokio::test]
     async fn execute_authorized_produces_non_zero_content_digest() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let img_path = dir.path().join("test.png");
-        std::fs::write(&img_path, MINIMAL_PNG).unwrap();
-        let canonical = img_path.canonicalize().unwrap();
+        std::fs::write(&img_path, MINIMAL_PNG).expect("operation should succeed");
+        let canonical = img_path.canonicalize().expect("operation should succeed");
 
         let tool = ReadImageTool::new(dir.path().to_path_buf());
         let auth = vec![
@@ -532,7 +533,7 @@ mod tests {
                 "test.png",
                 ToolAuthorizationScope::Once,
             )
-            .unwrap(),
+            .expect("operation should succeed"),
         ];
 
         let output = tool
@@ -555,7 +556,7 @@ mod tests {
                     bytes.iter().any(|b| *b != 0),
                     "content digest must be a real SHA-256, not the zero sentinel"
                 );
-                let file_bytes = std::fs::read(path).unwrap();
+                let file_bytes = std::fs::read(path).expect("operation should succeed");
                 use sha2::Digest;
                 let mut hasher = sha2::Sha256::new();
                 hasher.update(&file_bytes);
@@ -569,9 +570,9 @@ mod tests {
                 let other = image::RgbaImage::new(8, 8);
                 other
                     .save_with_format(&replacement, image::ImageFormat::Png)
-                    .unwrap();
-                std::fs::rename(&replacement, path).unwrap();
-                let new_bytes = std::fs::read(path).unwrap();
+                    .expect("operation should succeed");
+                std::fs::rename(&replacement, path).expect("operation should succeed");
+                let new_bytes = std::fs::read(path).expect("operation should succeed");
                 let mut hasher2 = sha2::Sha256::new();
                 hasher2.update(&new_bytes);
                 let new_digest: [u8; 32] = hasher2.finalize().into();

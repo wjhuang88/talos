@@ -416,7 +416,9 @@ fn paste_still_updates_slash_query_and_composer() {
 fn approval_state_preserves_full_multibyte_arguments() {
     let cmd = "gh issue create --title \"feat: write 和 edit 工具应显示内容输出\" --label bug";
     let state = BottomPanelState::open_approval("bash", cmd);
-    if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
+    if let PanelKind::Approval { arguments, .. } =
+        state.kind.as_ref().expect("operation should succeed")
+    {
         assert_eq!(arguments, cmd);
     }
 }
@@ -424,7 +426,9 @@ fn approval_state_preserves_full_multibyte_arguments() {
 #[test]
 fn approval_truncation_short_string_unchanged() {
     let state = BottomPanelState::open_approval("bash", "ls -la");
-    if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
+    if let PanelKind::Approval { arguments, .. } =
+        state.kind.as_ref().expect("operation should succeed")
+    {
         assert_eq!(arguments, "ls -la");
     }
 }

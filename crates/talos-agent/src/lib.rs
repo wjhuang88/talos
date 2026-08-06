@@ -51,6 +51,7 @@ mod configuration;
 pub mod context;
 mod helpers;
 pub mod prompt;
+mod request_plan;
 mod scheduler;
 pub mod session;
 mod tool_execution;
@@ -79,6 +80,7 @@ use crate::configuration::describe_presented_tools;
 
 pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
+pub(crate) use request_plan::PreparedSessionTurn;
 
 /// Maximum number of tool calls allowed per turn before budget exhaustion.
 const MAX_TOOL_CALLS_PER_TURN: usize = 50;
@@ -89,6 +91,38 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
+
+fn should_compress_shell_output(tool_name: &str) -> bool {
+    matches!(tool_name, "bash" | "powershell")
+}
+
+/// Shared admission contract for one complete Provider request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestBudgetSpec {
+    /// Exact output token limit requested in the Provider body.
+    pub requested_output_tokens: u32,
+    /// Conservative margin applied to approximate text/tool/image input cost.
+    pub input_safety_margin_bps: u16,
+    /// Fixed parser/protocol overhead added after the proportional margin.
+    pub fixed_overhead_tokens: u32,
+}
+
+impl RequestBudgetSpec {
+    #[must_use]
+    pub const fn new(requested_output_tokens: u32) -> Self {
+        Self {
+            requested_output_tokens,
+            input_safety_margin_bps: 2_500,
+            fixed_overhead_tokens: 256,
+        }
+    }
+}
+
+impl Default for RequestBudgetSpec {
+    fn default() -> Self {
+        Self::new(4096)
+    }
+}
 
 #[derive(Debug, Clone)]
 struct PendingToolCall {
@@ -118,6 +152,15 @@ pub enum AgentError {
     /// The turn exceeds the maximum allowed tool call budget.
     #[error("turn budget exceeded: maximum of {MAX_TOOL_CALLS_PER_TURN} tool calls per turn")]
     TurnBudgetExceeded,
+
+    /// The next provider request would exceed the configured model context.
+    #[error("request context budget exceeded: estimated {estimated} tokens, limit {limit}")]
+    ContextBudgetExceeded {
+        /// Estimated request tokens, including tool definitions and output reserve.
+        estimated: u32,
+        /// Configured model context limit.
+        limit: u32,
+    },
 
     /// A potential doom loop was detected — the same tool was called with
     /// identical arguments multiple times in a single turn.
@@ -215,6 +258,8 @@ pub struct Agent {
     /// `read_image` tool is registered but not presented to the model
     /// (ADR-051 / I154 capability gate).
     image_input_supported: bool,
+    /// Exact output reserve and conservative input-estimation policy.
+    request_budget_spec: RequestBudgetSpec,
 }
 impl Agent {
     pub fn provider(&self) -> &dyn LanguageModel {
@@ -270,6 +315,7 @@ impl Agent {
     /// assistant/tool messages. On error, this may contain a valid prefix
     /// of completed exchanges that should be persisted; incomplete streamed
     /// assistant fragments are never included.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn(
         &self,
         user_message: String,
@@ -283,6 +329,7 @@ impl Agent {
     /// Session turn with multimodal content (MODEL-009-D/I152).
     /// Constructs `Message::Multimodal` instead of `Message::User`
     /// when image attachments are present.
+    #[allow(dead_code)]
     pub(crate) async fn run_for_session_turn_multimodal(
         &self,
         user_message: String,
@@ -301,6 +348,85 @@ impl Agent {
             },
         )
         .await
+    }
+
+    /// Runs one actor turn from an ordered structured submission.
+    ///
+    /// Each item remains a distinct persisted user message. Text projection is
+    /// used only for memory lookup; it is never the authoritative transcript.
+    /// Estimates the initial provider request produced for a structured
+    /// session submission, including dynamic prompt sections, workspace
+    /// context, native tool definitions, multimodal inputs, and an output
+    /// reserve. This remains a diagnostic estimate only; Session execution is
+    /// authorized by the sealed plan returned from `prepare_session_turn`.
+    #[allow(dead_code)]
+    pub(crate) async fn estimate_session_request_tokens(
+        &self,
+        items: &[talos_core::session::SubmissionItem],
+        history: Vec<Message>,
+    ) -> AgentResult<u32> {
+        let memory_query = items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let hook_ctx = HookContext::new(TurnId::new(), self.workspace_root.clone());
+        let (mut messages, _) = self
+            .build_provider_messages(memory_query, history, &hook_ctx)
+            .await?;
+        messages.pop();
+        messages.extend(items.iter().map(|item| {
+            if item.attachments.is_empty() {
+                Message::User {
+                    content: item.text.clone(),
+                }
+            } else {
+                let mut parts = Vec::with_capacity(item.attachments.len() + 1);
+                if !item.text.is_empty() {
+                    parts.push(talos_core::message::ContentPart::Text {
+                        text: item.text.clone(),
+                    });
+                }
+                parts.extend(item.attachments.clone());
+                Message::Multimodal { parts }
+            }
+        }));
+
+        let (_, mut tool_definitions, _) =
+            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
+        if !self.image_input_supported {
+            tool_definitions.retain(|definition| definition.name != "read_image");
+        }
+        Ok(self.estimate_provider_request_tokens(&messages, &tool_definitions))
+    }
+
+    fn estimate_provider_request_tokens(
+        &self,
+        messages: &[Message],
+        tool_definitions: &[talos_core::provider::ToolDefinition],
+    ) -> u32 {
+        let tool_tokens = tool_definitions.iter().fold(0_u32, |total, definition| {
+            total
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.name,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.description,
+                ))
+                .saturating_add(crate::token::TokenEstimator::estimate_text(
+                    &definition.parameters.to_string(),
+                ))
+        });
+        let raw_input = crate::token::TokenEstimator::new()
+            .estimate(messages)
+            .saturating_add(tool_tokens);
+        let proportional_margin = u64::from(raw_input)
+            .saturating_mul(u64::from(self.request_budget_spec.input_safety_margin_bps))
+            .div_ceil(10_000);
+        raw_input
+            .saturating_add(u32::try_from(proportional_margin).unwrap_or(u32::MAX))
+            .saturating_add(self.request_budget_spec.fixed_overhead_tokens)
+            .saturating_add(self.request_budget_spec.requested_output_tokens)
     }
 
     /// Builds a provider request preview without calling the provider.
@@ -406,6 +532,7 @@ impl Agent {
 
     /// Like `build_provider_messages` but pushes `Message::Multimodal`
     /// instead of `Message::User` when attachments are present.
+    #[allow(dead_code)]
     async fn build_provider_messages_with_attachments(
         &self,
         user_message: String,
@@ -446,113 +573,88 @@ impl Agent {
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         attachments: Option<Vec<talos_core::message::ContentPart>>,
     ) -> (AgentResult<String>, Vec<Message>) {
-        let turn_id = TurnId::new();
-        let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
-
-        let (mut messages, persist_start) = match if let Some(atts) = attachments {
-            self.build_provider_messages_with_attachments(user_message, history, &hook_ctx, atts)
-                .await
-        } else {
-            self.build_provider_messages(user_message, history, &hook_ctx)
-                .await
-        } {
-            Ok(messages) => messages,
-            Err(error) => {
-                self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
-                return (Err(error), Vec::new());
+        let input_messages = if let Some(atts) = attachments {
+            let mut parts = Vec::with_capacity(atts.len() + 1);
+            if !user_message.is_empty() {
+                parts.push(talos_core::message::ContentPart::Text {
+                    text: user_message.clone(),
+                });
             }
+            parts.extend(atts);
+            vec![Message::Multimodal { parts }]
+        } else {
+            vec![Message::User {
+                content: user_message.clone(),
+            }]
         };
+        self.run_inner_with_messages(user_message, input_messages, history, event_tx, None)
+            .await
+    }
 
-        let mut total_tool_calls: usize = 0;
-        let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
-        let mut active_tool_presentation_policy = self.tool_presentation_policy.clone();
-        let (_, mut active_tool_definitions, mut active_presented_tool_names) =
-            describe_presented_tools(&self.tools, &active_tool_presentation_policy);
-
-        if !self.image_input_supported {
-            active_tool_definitions.retain(|td| td.name != "read_image");
-            active_presented_tool_names.retain(|n| n != "read_image");
-        }
-
-        // Transient continuation parts collected from tool execution (ADR-051).
-        // Consumed once by the next stream_with_tools call as a
-        // Message::Multimodal overlay; never persisted. If the provider
-        // call fails or the turn ends, the parts are discarded.
-        let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
-
-        if let Err(error) = self
-            .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
+    async fn run_inner_with_messages(
+        &self,
+        memory_query: String,
+        input_messages: Vec<Message>,
+        history: Vec<Message>,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        request_context_limit: Option<u32>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let prepared = match self
+            .prepare_turn_start(memory_query, input_messages, history, request_context_limit)
             .await
         {
-            self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
-            return (Err(error), Vec::new());
-        }
+            Ok(prepared) => prepared,
+            Err(error) => return (Err(error), Vec::new()),
+        };
+        self.run_prepared_inner(prepared, event_tx).await
+    }
+
+    async fn run_prepared_inner(
+        &self,
+        prepared: PreparedSessionTurn,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let PreparedSessionTurn {
+            hook_ctx,
+            mut messages,
+            persist_start,
+            mut active_tool_presentation_policy,
+            mut active_tool_definitions,
+            mut active_presented_tool_names,
+            initial_plan,
+            request_context_limit,
+        } = prepared;
+        let mut total_tool_calls: usize = 0;
+        let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
+        let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
+        let mut initial_plan = Some(initial_plan);
 
         let (result, final_status) = 'turn_loop: loop {
-            let hook_messages = self.persistence_projection(&messages);
-            let observed_provider_messages = match self
-                .run_hook(
-                    &hook_ctx,
-                    HookEvent::BeforeProviderCall {
-                        messages: &hook_messages,
-                    },
-                )
-                .await
-            {
-                Ok(HookOutcome::Continue(HookEvent::BeforeProviderCall { messages }))
-                | Ok(HookOutcome::Skip(HookEvent::BeforeProviderCall { messages })) => messages,
-                Ok(_) => messages.as_slice(),
-                Err(error) => {
-                    break (Err(error), TurnStatus::Denied);
+            let plan = if let Some(plan) = initial_plan.take() {
+                plan
+            } else {
+                match self
+                    .seal_provider_request_plan(
+                        &hook_ctx,
+                        &messages,
+                        &active_tool_definitions,
+                        &mut pending_continuation_parts,
+                        request_context_limit,
+                    )
+                    .await
+                {
+                    Ok(plan) => plan,
+                    Err(error) => break (Err(error), TurnStatus::Denied),
                 }
             };
-            let provider_messages = if observed_provider_messages == hook_messages.as_slice() {
-                messages.as_slice()
-            } else {
-                observed_provider_messages
-            };
-
-            let filtered_provider_messages;
-            let provider_messages = if self.replay_reasoning {
-                provider_messages
-            } else {
-                filtered_provider_messages = provider_messages
-                    .iter()
-                    .map(|message| {
-                        if let Message::Assistant {
-                            content,
-                            tool_calls,
-                            reasoning: Some(_),
-                        } = message
-                        {
-                            Message::Assistant {
-                                content: content.clone(),
-                                tool_calls: tool_calls.clone(),
-                                reasoning: None,
-                            }
-                        } else {
-                            message.clone()
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                filtered_provider_messages.as_slice()
-            };
-
-            let continuation_overlay: Vec<Message>;
-            let provider_messages = if pending_continuation_parts.is_empty() {
-                provider_messages
-            } else {
-                let mut msgs = provider_messages.to_vec();
-                msgs.push(Message::Multimodal {
-                    parts: std::mem::take(&mut pending_continuation_parts),
-                });
-                continuation_overlay = msgs;
-                continuation_overlay.as_slice()
-            };
+            tracing::trace!(
+                estimated_tokens = plan.estimated_tokens,
+                "dispatching sealed provider request plan"
+            );
 
             let mut rx = match self
                 .provider
-                .stream_with_tools(provider_messages, &active_tool_definitions)
+                .stream_with_tools(&plan.messages, &plan.tool_definitions)
                 .await
             {
                 Ok(rx) => rx,
@@ -960,7 +1062,7 @@ impl Agent {
                             ..ui_result.clone()
                         }
                     } else if self.bash_compression_enabled
-                        && matches!(observed.call.name.as_str(), "bash" | "powershell")
+                        && should_compress_shell_output(&observed.call.name)
                     {
                         let compressed =
                             BashOutputCompressor::new().compress(&projection.model_content);
@@ -1115,3 +1217,16 @@ impl Agent {
 #[allow(warnings)]
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod i169_shell_compression_regression {
+    use super::should_compress_shell_output;
+
+    #[test]
+    fn production_shell_compression_predicate_covers_bash_and_powershell_only() {
+        assert!(should_compress_shell_output("bash"));
+        assert!(should_compress_shell_output("powershell"));
+        assert!(!should_compress_shell_output("read"));
+        assert!(!should_compress_shell_output("fetch_url"));
+    }
+}

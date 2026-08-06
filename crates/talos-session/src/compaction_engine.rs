@@ -233,7 +233,7 @@ mod tests {
         let store = Arc::new(CompactTextSessionStore);
         let dir = std::env::temp_dir().join("compact_test_threshold");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("head.tlog");
 
         let entry = SessionEntry {
@@ -244,7 +244,9 @@ mod tests {
             content: "hello".into(),
             metadata: crate::SessionMetadata::default(),
         };
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
         let engine = CompactionEngine::new(store);
         assert!(!engine.should_compact(&path, 10));
@@ -257,7 +259,7 @@ mod tests {
         let store = Arc::new(CompactTextSessionStore);
         let dir = std::env::temp_dir().join("compact_test_over");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("head.tlog");
 
         for _ in 0..5 {
@@ -269,7 +271,9 @@ mod tests {
                 content: "test entry".into(),
                 metadata: crate::SessionMetadata::default(),
             };
-            store.append_entry(&path, &entry).unwrap();
+            store
+                .append_entry(&path, &entry)
+                .expect("operation should succeed");
         }
 
         let engine = CompactionEngine::new(store);
@@ -283,7 +287,7 @@ mod tests {
         let store = Arc::new(CompactTextSessionStore);
         let dir = std::env::temp_dir().join("compact_test_freeze");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("head.tlog");
 
         for i in 0..10 {
@@ -295,11 +299,15 @@ mod tests {
                 content: format!("entry {i}"),
                 metadata: crate::SessionMetadata::default(),
             };
-            store.append_entry(&path, &entry).unwrap();
+            store
+                .append_entry(&path, &entry)
+                .expect("operation should succeed");
         }
 
         let engine = CompactionEngine::new(store);
-        let result = engine.compact_segment(&path, &dir, 3).unwrap();
+        let result = engine
+            .compact_segment(&path, &dir, 3)
+            .expect("operation should succeed");
 
         match result {
             CompactionResult::Compacted {
@@ -321,7 +329,7 @@ mod tests {
         let store = Arc::new(CompactTextSessionStore);
         let dir = std::env::temp_dir().join("compact_test_skip");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("operation should succeed");
         let path = dir.join("head.tlog");
 
         let entry = SessionEntry {
@@ -332,10 +340,14 @@ mod tests {
             content: "single entry".into(),
             metadata: crate::SessionMetadata::default(),
         };
-        store.append_entry(&path, &entry).unwrap();
+        store
+            .append_entry(&path, &entry)
+            .expect("operation should succeed");
 
         let engine = CompactionEngine::new(store);
-        let result = engine.compact_segment(&path, &dir, 10).unwrap();
+        let result = engine
+            .compact_segment(&path, &dir, 10)
+            .expect("operation should succeed");
         assert!(matches!(result, CompactionResult::Skipped));
 
         std::fs::remove_dir_all(&dir).ok();

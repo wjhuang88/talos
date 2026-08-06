@@ -33,7 +33,7 @@ fn build_connect_picker_data_none_falls_back_without_blocking() {
 
 #[tokio::test]
 async fn handle_connect_with_credential_writes_new_provider_api_key_and_base_url() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -67,7 +67,7 @@ async fn handle_connect_with_credential_writes_new_provider_api_key_and_base_url
 
 #[tokio::test]
 async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let mut config = Config::default();
@@ -139,7 +139,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
 
 #[tokio::test]
 async fn handle_connect_with_credential_updates_base_url_when_provided() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let mut config = Config::default();
@@ -168,7 +168,10 @@ async fn handle_connect_with_credential_updates_base_url_when_provided() {
     .await
     .expect("update must succeed");
 
-    let groq = new_config.providers.get("groq").unwrap();
+    let groq = new_config
+        .providers
+        .get("groq")
+        .expect("operation should succeed");
     assert_eq!(
         groq.base_url.as_deref(),
         Some("https://new.groq.example/v1"),
@@ -223,7 +226,7 @@ async fn handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint() {
 
 #[tokio::test]
 async fn handle_connect_with_credential_sets_anthropic_protocol_for_minimax_endpoint() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -350,7 +353,7 @@ fn dashboard_notifications_are_transient_and_never_include_tokens() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_openai_chat_succeeds() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -384,7 +387,7 @@ async fn handle_register_custom_provider_openai_chat_succeeds() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_anthropic_messages_succeeds() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -417,7 +420,7 @@ async fn handle_register_custom_provider_anthropic_messages_succeeds() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_invalid_name_no_partial_write() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
         let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -437,7 +440,7 @@ async fn handle_register_custom_provider_invalid_name_no_partial_write() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_invalid_protocol_no_partial_write() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
         let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -457,7 +460,7 @@ async fn handle_register_custom_provider_invalid_protocol_no_partial_write() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_non_https_url_no_partial_write() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
         let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -477,7 +480,7 @@ async fn handle_register_custom_provider_non_https_url_no_partial_write() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_empty_key_no_partial_write() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
         let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -497,7 +500,7 @@ async fn handle_register_custom_provider_empty_key_no_partial_write() {
 
 #[tokio::test]
 async fn handle_register_custom_provider_update_preserves_unrelated_providers() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let mut config = Config::default();
@@ -552,7 +555,7 @@ async fn handle_register_custom_provider_update_preserves_unrelated_providers() 
 
 #[tokio::test]
 async fn handle_register_custom_provider_loopback_http_allowed() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -592,24 +595,29 @@ async fn r9_discovered_models_persisted_atomically_with_provider() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("operation should succeed");
+    let addr = listener.local_addr().expect("operation should succeed");
     let base_url = format!("http://{addr}/v1");
 
     let body = r#"{"data":[{"id":"gw-1"},{"id":"gw-2"},{"id":"gw-3"}]}"#;
     tokio::spawn(async move {
-        let (mut socket, _) = listener.accept().await.unwrap();
+        let (mut socket, _) = listener.accept().await.expect("operation should succeed");
         let mut req_buf = [0u8; 4096];
         let _ = socket.read(&mut req_buf).await;
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
         );
-        socket.write_all(response.as_bytes()).await.unwrap();
-        socket.flush().await.unwrap();
+        socket
+            .write_all(response.as_bytes())
+            .await
+            .expect("operation should succeed");
+        socket.flush().await.expect("operation should succeed");
     });
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -658,7 +666,7 @@ async fn r9_discovered_models_persisted_atomically_with_provider() {
 /// best-effort.
 #[tokio::test]
 async fn r9_provider_saved_when_discovery_fails() {
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -698,12 +706,14 @@ async fn spawn_mock_models_server(body: String) -> String {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("operation should succeed");
+    let addr = listener.local_addr().expect("operation should succeed");
     let url = format!("http://{addr}");
 
     tokio::spawn(async move {
-        let (mut socket, _) = listener.accept().await.unwrap();
+        let (mut socket, _) = listener.accept().await.expect("operation should succeed");
         let mut req_buf = [0u8; 4096];
         let _ = socket.read(&mut req_buf).await;
         let response = format!(
@@ -727,7 +737,7 @@ async fn p1_discovered_models_visible_in_all_models() {
     let body = r#"{"data":[{"id":"p1-model-a"},{"id":"p1-model-b"}]}"#;
     let base_url = spawn_mock_models_server(body.to_string()).await;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -764,7 +774,7 @@ async fn p1_anthropic_discovery_models_visible_in_all_models() {
     let body = r#"{"data":[{"id":"claude-p1-a"},{"id":"claude-p1-b"}]}"#;
     let base_url = spawn_mock_models_server(body.to_string()).await;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -804,7 +814,7 @@ async fn p1_credential_redaction_in_discovery_messages() {
     let base_url = spawn_mock_models_server(body.to_string()).await;
     let secret = "super-secret-key-12345";
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let _new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -821,11 +831,9 @@ async fn p1_credential_redaction_in_discovery_messages() {
 
         let mut messages = Vec::new();
         while let Some(output) = rx.recv().await {
-            match output {
-                UiOutput::Content(talos_conversation::ContentOutput::Block { text, .. }) => {
-                    messages.push(text);
-                }
-                _ => {}
+            if let UiOutput::Content(talos_conversation::ContentOutput::Block { text, .. }) = output
+            {
+                messages.push(text);
             }
         }
 
@@ -848,7 +856,7 @@ async fn p1_structured_identity_for_slash_and_at_model_ids() {
     let body = r#"{"data":[{"id":"org/model-v1"},{"id":"model@variant"}]}"#;
     let base_url = spawn_mock_models_server(body.to_string()).await;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -887,7 +895,7 @@ async fn p1_update_preserves_unrelated_models() {
     let body = r#"{"data":[{"id":"discovered-1"}]}"#;
     let base_url = spawn_mock_models_server(body.to_string()).await;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         // First: register with a manually-added model.
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
@@ -904,7 +912,7 @@ async fn p1_update_preserves_unrelated_models() {
         config
             .providers
             .get_mut("update-gw")
-            .unwrap()
+            .expect("operation should succeed")
             .models
             .insert("manual-model".to_string(), Default::default());
         config.save().expect("persist manual model");
@@ -952,7 +960,7 @@ async fn p1_update_preserves_unrelated_models() {
 async fn p1_manual_fallback_after_discovery_failure() {
     use talos_config::model::find_model_by_provider;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -977,7 +985,7 @@ async fn p1_manual_fallback_after_discovery_failure() {
     config
         .providers
         .get_mut("fallback-gw")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert("manually-entered-model".to_string(), Default::default());
 
@@ -1001,7 +1009,7 @@ async fn p1_selecting_discovered_model_sets_active_identity() {
     let body = r#"{"data":[{"id":"select-me"}]}"#;
     let base_url = spawn_mock_models_server(body.to_string()).await;
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let mut new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -1056,7 +1064,7 @@ fn p1fix_provider_hint_disambiguates_cross_provider_duplicates() {
     config
         .providers
         .get_mut("provider-a")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert("shared-model".to_string(), Default::default());
 
@@ -1070,7 +1078,7 @@ fn p1fix_provider_hint_disambiguates_cross_provider_duplicates() {
     config
         .providers
         .get_mut("provider-b")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert("shared-model".to_string(), Default::default());
 
@@ -1104,7 +1112,7 @@ fn p1fix_provider_hint_flows_to_set_active_model() {
     config
         .providers
         .get_mut("p1fix-gw")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert("p1fix-model".to_string(), Default::default());
 
@@ -1127,9 +1135,11 @@ fn p1fix_provider_hint_flows_to_set_active_model() {
 /// verifies the set_active_model failure path directly.
 #[test]
 fn p1fix_activation_failure_preserves_old_config() {
-    let mut config = Config::default();
-    config.model = "original-model".to_string();
-    config.provider = "original-provider".to_string();
+    let mut config = Config {
+        model: "original-model".to_string(),
+        provider: "original-provider".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "original-provider".to_string(),
         ProviderConfig {
@@ -1168,12 +1178,14 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         bridge_second_err: bool,
     }
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
-        let workspace = tempfile::tempdir().unwrap();
-        let mut config = Config::default();
-        config.model = "original-model".to_string();
-        config.provider = "original-gw".to_string();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let mut config = Config {
+            model: "original-model".to_string(),
+            provider: "original-gw".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "original-gw".to_string(),
             ProviderConfig {
@@ -1195,7 +1207,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         config
             .providers
             .get_mut("target-gw")
-            .unwrap()
+            .expect("operation should succeed")
             .models
             .insert("target-model".to_string(), Default::default());
         config.save().expect("persist runtime baseline");
@@ -1206,37 +1218,63 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
         let session = session_manager
             .create_session("p1fix3-success", "test-ws")
-            .unwrap();
+            .expect("operation should succeed");
         let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
-        let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
+        let (sq_tx, mut sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
         let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
         let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
             talos_session::Session,
             mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
         )>();
-        let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
-            sq_tx,
-            session.clone(),
-        )));
-        let mcp_config = talos_config::McpConfig::default();
-
-        let model_result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &hooks,
-            workspace.path(),
-            &mcp_config,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_tx,
-            &session_watch_rx,
-            &session_manager,
-            "target-model".to_string(),
-            Some("target-gw".to_string()),
+        let old_actor_join = tokio::spawn(async move {
+            while let Some(operation) = sq_rx.recv().await {
+                if matches!(operation, talos_core::session::SessionOp::Shutdown) {
+                    break;
+                }
+            }
+        });
+        let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+        let scheduler_token = scheduler_cancel.clone();
+        let scheduler_join = tokio::spawn(async move {
+            scheduler_token.cancelled().await;
+        });
+        let mut transition_owner =
+            SessionTransition::new(sq_tx, session.clone()).expect("operation should succeed");
+        transition_owner
+            .attach_active_runtime(old_actor_join, scheduler_cancel, scheduler_join)
+            .expect("operation should succeed");
+        let transition = Arc::new(tokio::sync::Mutex::new(transition_owner));
+        let approval_handler = Arc::new(TuiApprovalHandler::new(
+            ui_tx.clone(),
+            workspace.path().to_path_buf(),
+        ));
+        let runtime_builder = TuiRuntimeBuilder::new(
+            hooks,
+            workspace.path().to_path_buf(),
+            session_manager.clone(),
+            approval_handler,
+            Vec::new(),
+            false,
             true,
+        );
+
+        let model_result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            handle_session_model(
+                &transition,
+                &ui_tx,
+                &config,
+                &runtime_builder,
+                &session_watch_tx,
+                &sq_tx_watch_tx,
+                &bridge_tx,
+                &session_watch_rx,
+                "target-model".to_string(),
+                Some("target-gw".to_string()),
+            ),
         )
-        .await;
+        .await
+        .expect("production-equivalent model switch must not hang");
 
         let new_config = model_result.expect("model switch to mock must succeed");
         let bridge_update_ok = bridge_rx.try_recv().is_ok();
@@ -1279,12 +1317,14 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
         watched_session_id: uuid::Uuid,
     }
 
-    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let _lock = HOME_ENV_MUTEX.lock().await;
     let result = with_isolated_home(|| async {
-        let workspace = tempfile::tempdir().unwrap();
-        let mut config = Config::default();
-        config.model = "original-model".to_string();
-        config.provider = "original-gw".to_string();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let mut config = Config {
+            model: "original-model".to_string(),
+            provider: "original-gw".to_string(),
+            ..Default::default()
+        };
         config.providers.insert(
             "original-gw".to_string(),
             ProviderConfig {
@@ -1301,7 +1341,7 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
             talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
         let session = session_manager
             .create_session("p1fix3-fail", "test-ws")
-            .unwrap();
+            .expect("operation should succeed");
         let original_session_id = session.id;
         let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
         let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
@@ -1310,27 +1350,34 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
             talos_session::Session,
             mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
         )>();
-        let transition = Arc::new(tokio::sync::Mutex::new(SessionTransition::new(
-            sq_tx,
-            session.clone(),
-        )));
-        let mcp_config = talos_config::McpConfig::default();
+        let transition = Arc::new(tokio::sync::Mutex::new(
+            SessionTransition::new(sq_tx, session.clone()).expect("operation should succeed"),
+        ));
+        let approval_handler = Arc::new(TuiApprovalHandler::new(
+            ui_tx.clone(),
+            workspace.path().to_path_buf(),
+        ));
+        let runtime_builder = TuiRuntimeBuilder::new(
+            hooks,
+            workspace.path().to_path_buf(),
+            session_manager.clone(),
+            approval_handler,
+            Vec::new(),
+            false,
+            true,
+        );
 
         let model_result = handle_session_model(
             &transition,
             &ui_tx,
             &config,
-            &hooks,
-            workspace.path(),
-            &mcp_config,
+            &runtime_builder,
             &session_watch_tx,
             &sq_tx_watch_tx,
             &bridge_tx,
             &session_watch_rx,
-            &session_manager,
             "nonexistent-model".to_string(),
             Some("nonexistent-provider".to_string()),
-            true,
         )
         .await;
 

@@ -9,7 +9,7 @@ static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 #[test]
 fn test_substitute_env_vars_replaces_known_vars() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("TALOS_TEST_KEY", "secret123") };
     let input = "key = \"${TALOS_TEST_KEY}\"";
     let output = substitute_env_vars(input);
@@ -26,7 +26,7 @@ fn test_substitute_env_vars_leaves_unknown_vars() {
 
 #[test]
 fn test_substitute_env_vars_multiple_substitutions() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe {
         env::set_var("TALOS_A", "hello");
         env::set_var("TALOS_B", "world");
@@ -62,7 +62,7 @@ fn test_default_config() {
 
 #[test]
 fn test_api_key_from_env_anthropic() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key-anthropic") };
     let config = Config {
         variant: None,
@@ -77,7 +77,10 @@ fn test_api_key_from_env_anthropic() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    assert_eq!(config.api_key().unwrap(), "env-key-anthropic");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "env-key-anthropic"
+    );
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
 }
 
@@ -106,7 +109,7 @@ model = "test"
 enabled = true
 loopback_only = true
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(config.dashboard.enabled);
     assert!(config.dashboard.loopback_only);
 }
@@ -120,13 +123,13 @@ model = "test"
 [dashboard]
 enabled = true
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(config.dashboard.loopback_only);
 }
 
 #[test]
 fn test_api_key_from_env_openai() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };
     let config = Config {
         variant: None,
@@ -141,13 +144,16 @@ fn test_api_key_from_env_openai() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    assert_eq!(config.api_key().unwrap(), "env-key-openai");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "env-key-openai"
+    );
     unsafe { env::remove_var("OPENAI_API_KEY") };
 }
 
 #[test]
 fn test_api_key_from_env_openai_compat() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::remove_var("OPENAI_API_KEY") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-style-key") };
     let config = Config {
@@ -163,13 +169,16 @@ fn test_api_key_from_env_openai_compat() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    assert_eq!(config.api_key().unwrap(), "bailian-style-key");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "bailian-style-key"
+    );
     unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
 }
 
 #[test]
 fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("OPENAI_API_KEY", "real-openai-key") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
     let config = Config {
@@ -185,14 +194,17 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    assert_eq!(config.api_key().unwrap(), "real-openai-key");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "real-openai-key"
+    );
     unsafe { env::remove_var("OPENAI_API_KEY") };
     unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
 }
 
 #[test]
 fn test_api_key_anthropic_does_not_check_openai_compat_env() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "should-not-be-used") };
     let config = Config {
@@ -208,7 +220,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    let err = config.api_key().unwrap_err();
+    let err = config.api_key().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
     let msg = err.to_string();
     assert!(msg.contains("ANTHROPIC_API_KEY"));
@@ -218,7 +230,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
 
 #[test]
 fn test_api_key_missing_error() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config = Config {
         variant: None,
@@ -233,7 +245,7 @@ fn test_api_key_missing_error() {
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
     };
-    let err = config.api_key().unwrap_err();
+    let err = config.api_key().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
     let msg = err.to_string();
     assert!(msg.contains("ANTHROPIC_API_KEY"));
@@ -283,7 +295,7 @@ fn test_base_url_parsed_from_toml() {
             base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
             api_key_env = "DASHSCOPE_API_KEY"
         "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert_eq!(
         config.base_url().as_deref(),
         Some("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
@@ -346,7 +358,7 @@ fn test_builtin_anthropic_custom_endpoint_keeps_anthropic_protocol() {
 
 #[test]
 fn test_custom_provider_api_key_env() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("DASHSCOPE_API_KEY", "dashscope-key") };
     let config = Config {
         variant: None,
@@ -371,7 +383,10 @@ fn test_custom_provider_api_key_env() {
         dashboard: DashboardConfig::default(),
     };
 
-    assert_eq!(config.api_key().unwrap(), "dashscope-key");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "dashscope-key"
+    );
     unsafe { env::remove_var("DASHSCOPE_API_KEY") };
 }
 
@@ -443,7 +458,7 @@ fn test_log_config_parsed_from_toml() {
             format = "compact"
             filter = "talos_provider=debug,talos_agent=info"
         "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert_eq!(config.log.level.as_deref(), Some("warn"));
     assert_eq!(config.log.format, LogFormat::Compact);
     assert_eq!(
@@ -467,12 +482,12 @@ fn test_load_nonexistent_file() {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("operation should succeed")
             .as_nanos()
     ));
-    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::create_dir_all(&dir).expect("operation should succeed");
     let store = ConfigStore::with_paths(dir.join("config.toml"), dir.join("credentials.toml"));
-    let config = store.load_effective().unwrap();
+    let config = store.load_effective().expect("operation should succeed");
     assert_eq!(config.provider, "anthropic");
     assert!(config.model.is_empty());
     let _ = std::fs::remove_dir_all(dir);
@@ -488,10 +503,10 @@ fn test_load_nonexistent_file() {
 /// `Config::load()` call would fail identically.
 #[test]
 fn test_load_existing_file_with_empty_model_succeeds() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_load_empty_model");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+    fs::create_dir_all(tmp_dir.join(".talos")).expect("operation should succeed");
     let prev_home = std::env::var_os("HOME");
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
@@ -499,7 +514,7 @@ fn test_load_existing_file_with_empty_model_succeeds() {
 provider = "anthropic"
 model = ""
 "#;
-    fs::write(Config::default_path(), config_toml).unwrap();
+    fs::write(Config::default_path(), config_toml).expect("operation should succeed");
 
     let result = Config::load();
     assert!(
@@ -507,7 +522,7 @@ model = ""
         "loading a config.toml with an empty model must succeed, not error: {:?}",
         result.err()
     );
-    let config = result.unwrap();
+    let config = result.expect("operation should succeed");
     assert!(config.model.is_empty());
     assert_eq!(config.provider, "anthropic");
 
@@ -524,10 +539,10 @@ model = ""
 /// run.
 #[test]
 fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_recover_empty_model");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+    fs::create_dir_all(tmp_dir.join(".talos")).expect("operation should succeed");
     let prev_home = std::env::var_os("HOME");
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
@@ -535,7 +550,7 @@ fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
         Config::default_path(),
         "provider = \"anthropic\"\nmodel = \"\"\n",
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let mut config = Config::load().expect("load must succeed even with empty model on disk");
     config.model = "claude-sonnet-4-5".to_string();
@@ -580,8 +595,8 @@ fn test_provider_serialization() {
         dashboard: DashboardConfig::default(),
     };
 
-    let a_str = toml::to_string(&config_anthropic).unwrap();
-    let o_str = toml::to_string(&config_openai).unwrap();
+    let a_str = toml::to_string(&config_anthropic).expect("operation should succeed");
+    let o_str = toml::to_string(&config_openai).expect("operation should succeed");
 
     assert!(a_str.contains("anthropic"));
     assert!(o_str.contains("openai"));
@@ -593,7 +608,7 @@ fn test_config_from_toml() {
             provider = "openai"
             model = "gpt-4"
         "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert_eq!(config.provider, "openai");
     assert_eq!(config.model, "gpt-4");
 }
@@ -609,13 +624,16 @@ fn test_inline_api_key_parsed_from_toml() {
             base_url = "https://example.com/v1"
             api_key = "sk-inline-secret"
         "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
-    assert_eq!(config.api_key().unwrap(), "sk-inline-secret");
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "sk-inline-secret"
+    );
 }
 
 #[test]
 fn test_inline_api_key_precedence_over_env() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("DASHSCOPE_API_KEY", "env-key-should-not-be-used") };
     let config: Config = toml::from_str(
         r#"
@@ -628,14 +646,17 @@ fn test_inline_api_key_precedence_over_env() {
             api_key_env = "DASHSCOPE_API_KEY"
         "#,
     )
-    .unwrap();
-    assert_eq!(config.api_key().unwrap(), "inline-key-wins");
+    .expect("operation should succeed");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "inline-key-wins"
+    );
     unsafe { env::remove_var("DASHSCOPE_API_KEY") };
 }
 
 #[test]
 fn test_inline_api_key_anthropic_overrides_builtin() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config: Config = toml::from_str(
         r#"
@@ -646,8 +667,11 @@ fn test_inline_api_key_anthropic_overrides_builtin() {
             api_key = "inline-anthropic-key"
         "#,
     )
-    .unwrap();
-    assert_eq!(config.api_key().unwrap(), "inline-anthropic-key");
+    .expect("operation should succeed");
+    assert_eq!(
+        config.api_key().expect("operation should succeed"),
+        "inline-anthropic-key"
+    );
 }
 
 #[test]
@@ -701,7 +725,7 @@ fn test_validate_rejects_neither_api_key_nor_api_key_env() {
         )]),
         ..Default::default()
     };
-    let err = config.validate().unwrap_err();
+    let err = config.validate().expect_err("operation should fail");
     assert!(err.to_string().contains("api_key or api_key_env"));
 }
 
@@ -722,8 +746,8 @@ fn test_inline_api_key_is_serialized_in_config_toml() {
             api_key_env = "DASHSCOPE_API_KEY"
         "#,
     )
-    .unwrap();
-    let serialized = toml::to_string(&config).unwrap();
+    .expect("operation should succeed");
+    let serialized = toml::to_string(&config).expect("operation should succeed");
     assert!(serialized.contains("sk-very-secret"));
     assert!(serialized.contains("api_key ="));
 }
@@ -847,16 +871,16 @@ fn test_credentials_default_path() {
 
 #[test]
 fn test_credentials_load_nonexistent_returns_empty() {
-    let creds = Credentials::load().unwrap();
+    let creds = Credentials::load().expect("operation should succeed");
     assert!(creds.keys.is_empty());
 }
 
 #[test]
 fn test_credentials_save_and_load_roundtrip() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_creds");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(&tmp_dir).unwrap();
+    fs::create_dir_all(&tmp_dir).expect("operation should succeed");
 
     let creds_path = tmp_dir.join("credentials.toml");
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
@@ -868,9 +892,9 @@ fn test_credentials_save_and_load_roundtrip() {
     creds
         .keys
         .insert("openai".to_string(), "sk-openai-key".to_string());
-    creds.save().unwrap();
+    creds.save().expect("operation should succeed");
 
-    let loaded = Credentials::load().unwrap();
+    let loaded = Credentials::load().expect("operation should succeed");
     assert_eq!(
         loaded.keys.get("anthropic"),
         Some(&"sk-test-key".to_string())
@@ -894,7 +918,7 @@ fn test_provider_authenticated_with_inline_key() {
 
 #[test]
 fn test_provider_authenticated_with_env_var() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key") };
     let config = Config::default();
     assert!(config.provider_authenticated("anthropic"));
@@ -903,7 +927,7 @@ fn test_provider_authenticated_with_env_var() {
 
 #[test]
 fn test_provider_authenticated_returns_false_when_no_key() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config = Config {
         variant: None,
@@ -925,7 +949,7 @@ fn test_set_active_model_sets_provider_from_catalog() {
     let mut config = Config::default();
     config
         .set_active_model("anthropic/claude-sonnet-4-5")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(config.model, "claude-sonnet-4-5");
     assert_eq!(config.provider, "anthropic");
     assert!(config.providers.contains_key("anthropic"));
@@ -934,7 +958,9 @@ fn test_set_active_model_sets_provider_from_catalog() {
 #[test]
 fn test_set_active_model_openai() {
     let mut config = Config::default();
-    config.set_active_model("gpt-4o-2024-05-13").unwrap();
+    config
+        .set_active_model("gpt-4o-2024-05-13")
+        .expect("operation should succeed");
     assert_eq!(config.model, "gpt-4o-2024-05-13");
     assert_eq!(config.provider, "openai");
     assert!(config.providers.contains_key("openai"));
@@ -945,7 +971,7 @@ fn test_set_active_model_unknown_model_errors() {
     let mut config = Config::default();
     let err = config
         .set_active_model("nonexistent-model-xyz")
-        .unwrap_err();
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("nonexistent-model-xyz"));
     assert!(err.to_string().contains("not found"));
 }
@@ -955,7 +981,10 @@ fn test_set_provider_credential_creates_new_provider() {
     let mut config = Config::default();
     config.set_provider_credential("custom-provider", "sk-custom-key");
     assert!(config.providers.contains_key("custom-provider"));
-    let provider = config.providers.get("custom-provider").unwrap();
+    let provider = config
+        .providers
+        .get("custom-provider")
+        .expect("operation should succeed");
     assert_eq!(provider.api_key.as_deref(), Some("sk-custom-key"));
 }
 
@@ -964,7 +993,10 @@ fn test_set_provider_credential_overwrites_existing() {
     let mut config = Config::default();
     config.set_provider_credential("anthropic", "old-key");
     config.set_provider_credential("anthropic", "new-key");
-    let provider = config.providers.get("anthropic").unwrap();
+    let provider = config
+        .providers
+        .get("anthropic")
+        .expect("operation should succeed");
     assert_eq!(provider.api_key.as_deref(), Some("new-key"));
 }
 
@@ -974,20 +1006,22 @@ fn test_save_writes_api_key_in_config_toml() {
     // the silent data-loss bug where keys were moved to a separate
     // credentials.toml without the user knowing. Display masking
     // remains the responsibility of `talos config list`/`get`.
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_save");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(&tmp_dir.join(".talos")).unwrap();
+    fs::create_dir_all(&tmp_dir.join(".talos")).expect("operation should succeed");
     let prev_home = std::env::var_os("HOME");
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
-    let mut config = Config::default();
-    config.model = "claude-sonnet-4-5".to_string();
+    let mut config = Config {
+        model: "claude-sonnet-4-5".to_string(),
+        ..Default::default()
+    };
     config.set_provider_credential("anthropic", "sk-secret-key");
-    config.save().unwrap();
+    config.save().expect("operation should succeed");
 
     let config_path = Config::default_path();
-    let config_content = fs::read_to_string(&config_path).unwrap();
+    let config_content = fs::read_to_string(&config_path).expect("operation should succeed");
     assert!(config_content.contains("sk-secret-key"));
 
     // No credentials.toml should be written anymore.
@@ -1006,25 +1040,28 @@ fn test_save_writes_api_key_in_config_toml() {
 
 #[test]
 fn test_load_merges_credentials() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_load_merge");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+    fs::create_dir_all(tmp_dir.join(".talos")).expect("operation should succeed");
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
     let config_toml = r#"
 provider = "anthropic"
 model = "claude-sonnet-4-5"
 "#;
-    fs::write(Config::default_path(), config_toml).unwrap();
+    fs::write(Config::default_path(), config_toml).expect("operation should succeed");
 
     let creds_toml = r#"
 anthropic = "sk-merged-key"
 "#;
-    fs::write(Credentials::default_path(), creds_toml).unwrap();
+    fs::write(Credentials::default_path(), creds_toml).expect("operation should succeed");
 
-    let config = Config::load().unwrap();
-    let provider = config.providers.get("anthropic").unwrap();
+    let config = Config::load().expect("operation should succeed");
+    let provider = config
+        .providers
+        .get("anthropic")
+        .expect("operation should succeed");
     assert_eq!(provider.api_key.as_deref(), Some("sk-merged-key"));
 
     unsafe { env::remove_var("HOME") };
@@ -1040,12 +1077,12 @@ anthropic = "sk-merged-key"
 /// `talos config list`/`get`, not the serializer.
 #[test]
 fn test_save_preserves_inline_api_key_from_config_toml() {
-    let _lock = ENV_MUTEX.lock().unwrap();
+    let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     let tmp_dir = env::temp_dir().join("talos_test_roundtrip");
     let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(&tmp_dir).unwrap();
+    fs::create_dir_all(&tmp_dir).expect("operation should succeed");
     let talos_dir = &tmp_dir.join(".talos");
-    fs::create_dir_all(&talos_dir).unwrap();
+    fs::create_dir_all(&talos_dir).expect("operation should succeed");
     let prev_home = std::env::var_os("HOME");
     unsafe { env::set_var("HOME", &tmp_dir.to_string_lossy().as_ref()) };
 
@@ -1057,19 +1094,23 @@ model = "claude-sonnet-4-5"
 protocol = "anthropic-messages"
 api_key = "sk-inline-secret-from-config"
 "#;
-    fs::write(Config::default_path(), config_toml).unwrap();
+    fs::write(Config::default_path(), config_toml).expect("operation should succeed");
 
-    let config = Config::load().unwrap();
-    let provider = config.providers.get("anthropic").unwrap();
+    let config = Config::load().expect("operation should succeed");
+    let provider = config
+        .providers
+        .get("anthropic")
+        .expect("operation should succeed");
     assert_eq!(
         provider.api_key.as_deref(),
         Some("sk-inline-secret-from-config"),
         "api_key must be loaded from config.toml during deserialization"
     );
 
-    config.save().unwrap();
+    config.save().expect("operation should succeed");
 
-    let saved_config = fs::read_to_string(Config::default_path()).unwrap();
+    let saved_config =
+        fs::read_to_string(Config::default_path()).expect("operation should succeed");
     assert!(
         saved_config.contains("sk-inline-secret-from-config"),
         "api_key must be present in saved config.toml (regression for I045 data-loss bug)"
@@ -1081,8 +1122,11 @@ api_key = "sk-inline-secret-from-config"
         "credentials.toml should not be written anymore"
     );
 
-    let config2 = Config::load().unwrap();
-    let provider2 = config2.providers.get("anthropic").unwrap();
+    let config2 = Config::load().expect("operation should succeed");
+    let provider2 = config2
+        .providers
+        .get("anthropic")
+        .expect("operation should succeed");
     assert_eq!(
         provider2.api_key.as_deref(),
         Some("sk-inline-secret-from-config"),
@@ -1108,8 +1152,11 @@ fn test_skip_serializing_does_not_skip_deserialization() {
             [providers.test]
             api_key = "hello-from-toml"
         "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
-    let provider = config.providers.get("test").unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
+    let provider = config
+        .providers
+        .get("test")
+        .expect("operation should succeed");
     assert_eq!(provider.api_key.as_deref(), Some("hello-from-toml"));
 }
 
@@ -1157,7 +1204,9 @@ fn test_set_active_model_errors_on_ambiguous_bare_id() {
         providers: HashMap::new(),
         ..Default::default()
     };
-    let err = config.set_active_model("glm-5.2").unwrap_err();
+    let err = config
+        .set_active_model("glm-5.2")
+        .expect_err("operation should fail");
     let msg = err.to_string();
     assert!(
         msg.contains("multiple providers"),
@@ -1175,7 +1224,9 @@ fn test_set_active_model_provider_qualified_resolves_correctly() {
         providers: HashMap::new(),
         ..Default::default()
     };
-    config.set_active_model("aihubmix/glm-5.2").unwrap();
+    config
+        .set_active_model("aihubmix/glm-5.2")
+        .expect("operation should succeed");
     assert_eq!(config.model, "glm-5.2");
     assert_eq!(config.provider, "aihubmix");
     assert!(config.providers.contains_key("aihubmix"));
@@ -1189,7 +1240,9 @@ fn test_set_active_model_unique_bare_id_still_works() {
         providers: HashMap::new(),
         ..Default::default()
     };
-    config.set_active_model("gpt-4o-2024-05-13").unwrap();
+    config
+        .set_active_model("gpt-4o-2024-05-13")
+        .expect("operation should succeed");
     assert_eq!(config.model, "gpt-4o-2024-05-13");
     assert_eq!(config.provider, "openai");
 }
@@ -1237,14 +1290,14 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
     let cortecs_entry = all
         .iter()
         .find(|m| m.id == "glm-5.2" && m.provider == "cortecs")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(cortecs_entry.context_limit, Some(50_000));
     assert_eq!(cortecs_entry.output_limit, Some(1000));
     // The aihubmix entry should be untouched.
     let aihubmix_entry = all
         .iter()
         .find(|m| m.id == "glm-5.2" && m.provider == "aihubmix")
-        .unwrap();
+        .expect("operation should succeed");
     assert_eq!(aihubmix_entry.context_limit, Some(1_000_000));
 }
 
@@ -1309,7 +1362,7 @@ model = "test"
 [skills]
 discover_shared = true
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(config.skills.discover_shared);
 }
 
@@ -1322,7 +1375,7 @@ fn test_skill_config_serializes() {
         },
         ..Default::default()
     };
-    let serialized = toml::to_string(&config).unwrap();
+    let serialized = toml::to_string(&config).expect("operation should succeed");
     assert!(serialized.contains("discover_shared"));
     assert!(serialized.contains("true"));
 }
@@ -1333,7 +1386,7 @@ fn skill_config_defaults_shared_on_when_section_missing() {
 provider = "anthropic"
 model = "test"
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(
         config.skills.discover_shared,
         "missing [skills] section must default to true"
@@ -1348,7 +1401,7 @@ model = "test"
 
 [skills]
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(
         config.skills.discover_shared,
         "empty [skills] section must default to true"
@@ -1364,7 +1417,7 @@ model = "test"
 [skills]
 discover_shared = false
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(
         !config.skills.discover_shared,
         "explicit false must be preserved"
@@ -1380,7 +1433,7 @@ model = "test"
 [skills]
 discover_shared = true
 "#;
-    let config: Config = toml::from_str(toml_str).unwrap();
+    let config: Config = toml::from_str(toml_str).expect("operation should succeed");
     assert!(
         config.skills.discover_shared,
         "explicit true must be preserved"
@@ -1415,7 +1468,7 @@ fn test_provider_timeout_config_parsed_from_toml() {
             backoff_max_ms = 2000
         "#,
     )
-    .unwrap();
+    .expect("operation should succeed");
 
     let timeout = &config.providers["openai"].timeout;
     assert_eq!(timeout.first_packet_timeout_secs, 12);
@@ -1452,7 +1505,10 @@ fn test_all_models_with_catalog_overlays_builtin() {
 
     let found = model::find_model_by_provider(&merged, "catalog-provider", "catalog-only-model");
     assert!(found.is_some());
-    assert_eq!(found.unwrap().context_limit, Some(500_000));
+    assert_eq!(
+        found.expect("operation should succeed").context_limit,
+        Some(500_000)
+    );
 }
 
 #[test]
@@ -1476,16 +1532,19 @@ fn test_all_models_with_catalog_replaces_builtin_entry() {
     }];
 
     let merged = config.all_models_with_catalog(Some(&catalog_models));
-    let found = model::find_model_by_provider(&merged, &first.provider, &first.id).unwrap();
+    let found = model::find_model_by_provider(&merged, &first.provider, &first.id)
+        .expect("operation should succeed");
     assert_eq!(found.context_limit, Some(999_999));
     assert_eq!(found.output_limit, Some(99_999));
 }
 
 #[test]
 fn test_all_models_with_catalog_user_config_overrides_catalog() {
-    let mut config = Config::default();
-    config.provider = "test".to_string();
-    config.model = "m1".to_string();
+    let mut config = Config {
+        provider: "test".to_string(),
+        model: "m1".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "test".to_string(),
         ProviderConfig {
@@ -1517,7 +1576,8 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
     }];
 
     let merged = config.all_models_with_catalog(Some(&catalog_models));
-    let found = model::find_model_by_provider(&merged, "test", "m1").unwrap();
+    let found =
+        model::find_model_by_provider(&merged, "test", "m1").expect("operation should succeed");
     assert_eq!(found.context_limit, Some(42_000));
     assert_eq!(found.output_limit, Some(4_200));
     assert_eq!(found.source, model::ModelSource::Manual);
@@ -1533,9 +1593,11 @@ fn test_all_models_with_catalog_none_matches_all_models() {
 
 #[test]
 fn test_resolve_model_limits_with_catalog_precedence() {
-    let mut config = Config::default();
-    config.provider = "test-provider".to_string();
-    config.model = "test-model".to_string();
+    let mut config = Config {
+        provider: "test-provider".to_string(),
+        model: "test-model".to_string(),
+        ..Default::default()
+    };
 
     let catalog_models = vec![model::ModelMetadata {
         variants: vec![],
@@ -1556,9 +1618,11 @@ fn test_resolve_model_limits_with_catalog_precedence() {
 
 #[test]
 fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
-    let mut config = Config::default();
-    config.provider = "tp".to_string();
-    config.model = "tm".to_string();
+    let mut config = Config {
+        provider: "tp".to_string(),
+        model: "tm".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "tp".to_string(),
         ProviderConfig {
@@ -1594,9 +1658,11 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
 
 #[test]
 fn test_resolve_model_limits_with_catalog_none_falls_back_to_builtin() {
-    let mut config = Config::default();
-    config.provider = "anthropic".to_string();
-    config.model = "claude-sonnet-4-5".to_string();
+    let mut config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
+        ..Default::default()
+    };
 
     let from_catalog = config.resolve_model_limits_with_catalog(None);
     let from_builtin = config.resolve_model_limits();
@@ -1605,9 +1671,11 @@ fn test_resolve_model_limits_with_catalog_none_falls_back_to_builtin() {
 
 #[test]
 fn test_resolve_model_limits_with_catalog_fallback_for_unknown() {
-    let mut config = Config::default();
-    config.provider = "unknown".to_string();
-    config.model = "unknown-model".to_string();
+    let mut config = Config {
+        provider: "unknown".to_string(),
+        model: "unknown-model".to_string(),
+        ..Default::default()
+    };
 
     let catalog_models: Vec<model::ModelMetadata> = vec![];
     let (ctx, out) = config.resolve_model_limits_with_catalog(Some(&catalog_models));
@@ -1617,9 +1685,11 @@ fn test_resolve_model_limits_with_catalog_fallback_for_unknown() {
 
 #[test]
 fn test_resolve_model_limits_with_empty_catalog_does_not_block() {
-    let mut config = Config::default();
-    config.provider = "anthropic".to_string();
-    config.model = "claude-sonnet-4-5".to_string();
+    let mut config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
+        ..Default::default()
+    };
 
     let empty_catalog: Vec<model::ModelMetadata> = vec![];
     let (ctx, _) = config.resolve_model_limits_with_catalog(Some(&empty_catalog));
@@ -1630,9 +1700,11 @@ fn test_resolve_model_limits_with_empty_catalog_does_not_block() {
 fn test_custom_model_image_input_override_enables_capability() {
     use talos_core::model::ImageInputCapability;
 
-    let mut config = Config::default();
-    config.provider = "my-gateway".to_string();
-    config.model = "custom-vision-model".to_string();
+    let mut config = Config {
+        provider: "my-gateway".to_string(),
+        model: "custom-vision-model".to_string(),
+        ..Default::default()
+    };
 
     config.providers.insert(
         "my-gateway".to_string(),
@@ -1642,7 +1714,10 @@ fn test_custom_model_image_input_override_enables_capability() {
         },
     );
 
-    let provider = config.providers.get_mut("my-gateway").unwrap();
+    let provider = config
+        .providers
+        .get_mut("my-gateway")
+        .expect("operation should succeed");
     provider.models.insert(
         "custom-vision-model".to_string(),
         ModelConfig {
@@ -1654,7 +1729,11 @@ fn test_custom_model_image_input_override_enables_capability() {
     let all = config.all_models();
     let meta = model::find_model_by_provider(&all, "my-gateway", "custom-vision-model");
     assert!(meta.is_some());
-    assert!(meta.unwrap().capabilities.image_input);
+    assert!(
+        meta.expect("operation should succeed")
+            .capabilities
+            .image_input
+    );
 
     let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
         &all,
@@ -1669,9 +1748,11 @@ fn test_custom_model_image_input_override_enables_capability() {
 fn test_custom_model_without_image_input_override_is_unknown() {
     use talos_core::model::ImageInputCapability;
 
-    let mut config = Config::default();
-    config.provider = "my-gateway".to_string();
-    config.model = "custom-model".to_string();
+    let mut config = Config {
+        provider: "my-gateway".to_string(),
+        model: "custom-model".to_string(),
+        ..Default::default()
+    };
 
     config.providers.insert(
         "my-gateway".to_string(),
@@ -1684,14 +1765,19 @@ fn test_custom_model_without_image_input_override_is_unknown() {
     config
         .providers
         .get_mut("my-gateway")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert("custom-model".to_string(), ModelConfig::default());
 
     let all = config.all_models();
     let meta = model::find_model_by_provider(&all, "my-gateway", "custom-model");
     assert!(meta.is_some());
-    assert!(!meta.unwrap().capabilities.image_input);
+    assert!(
+        !meta
+            .expect("operation should succeed")
+            .capabilities
+            .image_input
+    );
 
     let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
         &all,
@@ -1706,9 +1792,11 @@ fn test_custom_model_without_image_input_override_is_unknown() {
 fn test_image_input_override_on_existing_catalog_model() {
     use talos_core::model::ImageInputCapability;
 
-    let mut config = Config::default();
-    config.provider = "anthropic".to_string();
-    config.model = "claude-sonnet-4-5".to_string();
+    let mut config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
+        ..Default::default()
+    };
 
     config.providers.insert(
         "anthropic".to_string(),
@@ -1720,7 +1808,7 @@ fn test_image_input_override_on_existing_catalog_model() {
     config
         .providers
         .get_mut("anthropic")
-        .unwrap()
+        .expect("operation should succeed")
         .models
         .insert(
             "claude-sonnet-4-5".to_string(),
@@ -1733,7 +1821,12 @@ fn test_image_input_override_on_existing_catalog_model() {
     let all = config.all_models();
     let meta = model::find_model_by_provider(&all, "anthropic", "claude-sonnet-4-5");
     assert!(meta.is_some());
-    assert!(!meta.unwrap().capabilities.image_input);
+    assert!(
+        !meta
+            .expect("operation should succeed")
+            .capabilities
+            .image_input
+    );
 
     let cap = ImageInputCapability::from_metadata(model::find_model_by_provider(
         &all,
@@ -1789,7 +1882,9 @@ fn make_config_with_two_custom_providers() -> Config {
 #[test]
 fn unset_custom_provider_removes_only_target_entry() {
     let mut config = make_config_with_two_custom_providers();
-    let outcome = config.unset_dotted("providers.custom-a").unwrap();
+    let outcome = config
+        .unset_dotted("providers.custom-a")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -1798,7 +1893,10 @@ fn unset_custom_provider_removes_only_target_entry() {
     );
     assert!(!config.providers.contains_key("custom-a"));
     assert!(config.providers.contains_key("custom-b"));
-    let b = config.providers.get("custom-b").unwrap();
+    let b = config
+        .providers
+        .get("custom-b")
+        .expect("operation should succeed");
     assert_eq!(b.base_url.as_deref(), Some("https://b.example.com/v1"));
 }
 
@@ -1827,7 +1925,9 @@ fn unset_builtin_provider_removes_only_user_configuration() {
         },
     );
 
-    let outcome = config.unset_dotted("providers.anthropic").unwrap();
+    let outcome = config
+        .unset_dotted("providers.anthropic")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::BuiltinProviderDisconnected {
@@ -1842,14 +1942,19 @@ fn unset_builtin_provider_removes_only_user_configuration() {
 #[test]
 fn unset_provider_api_key_preserves_other_fields() {
     let mut config = make_config_with_two_custom_providers();
-    let outcome = config.unset_dotted("providers.custom-a.api_key").unwrap();
+    let outcome = config
+        .unset_dotted("providers.custom-a.api_key")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::ApiKeyCleared {
             name: "custom-a".to_string()
         }
     );
-    let a = config.providers.get("custom-a").unwrap();
+    let a = config
+        .providers
+        .get("custom-a")
+        .expect("operation should succeed");
     assert!(a.api_key.is_none());
     assert_eq!(a.protocol, ProviderProtocol::OpenAIChat);
     assert_eq!(a.base_url.as_deref(), Some("https://a.example.com/v1"));
@@ -1859,11 +1964,19 @@ fn unset_provider_api_key_preserves_other_fields() {
 #[test]
 fn unset_provider_api_key_preserves_model_overrides() {
     let mut config = make_config_with_two_custom_providers();
-    config.unset_dotted("providers.custom-a.api_key").unwrap();
-    let a = config.providers.get("custom-a").unwrap();
+    config
+        .unset_dotted("providers.custom-a.api_key")
+        .expect("operation should succeed");
+    let a = config
+        .providers
+        .get("custom-a")
+        .expect("operation should succeed");
     assert!(a.models.contains_key("model-a"));
     assert_eq!(
-        a.models.get("model-a").unwrap().context_limit,
+        a.models
+            .get("model-a")
+            .expect("operation should succeed")
+            .context_limit,
         Some(128_000)
     );
 }
@@ -1871,14 +1984,16 @@ fn unset_provider_api_key_preserves_model_overrides() {
 #[test]
 fn unset_provider_api_key_is_omitted_from_toml() {
     let mut config = make_config_with_two_custom_providers();
-    config.unset_dotted("providers.custom-a.api_key").unwrap();
-    let toml_str = toml::to_string_pretty(&config).unwrap();
-    let reloaded: Config = toml::from_str(&toml_str).unwrap();
+    config
+        .unset_dotted("providers.custom-a.api_key")
+        .expect("operation should succeed");
+    let toml_str = toml::to_string_pretty(&config).expect("operation should succeed");
+    let reloaded: Config = toml::from_str(&toml_str).expect("operation should succeed");
     assert!(
         reloaded
             .providers
             .get("custom-a")
-            .unwrap()
+            .expect("operation should succeed")
             .api_key
             .is_none()
     );
@@ -1886,7 +2001,10 @@ fn unset_provider_api_key_is_omitted_from_toml() {
         !toml_str.contains("key-a"),
         "cleared credential value must not appear in serialized TOML"
     );
-    let a = reloaded.providers.get("custom-a").unwrap();
+    let a = reloaded
+        .providers
+        .get("custom-a")
+        .expect("operation should succeed");
     assert_eq!(a.base_url.as_deref(), Some("https://a.example.com/v1"));
     assert_eq!(a.api_key_env.as_deref(), Some("CUSTOM_A_KEY"));
 }
@@ -1895,7 +2013,9 @@ fn unset_provider_api_key_is_omitted_from_toml() {
 fn unset_provider_does_not_modify_unrelated_providers() {
     let mut config = make_config_with_two_custom_providers();
     let b_snapshot = config.providers.get("custom-b").cloned();
-    config.unset_dotted("providers.custom-a").unwrap();
+    config
+        .unset_dotted("providers.custom-a")
+        .expect("operation should succeed");
     assert_eq!(
         config.providers.get("custom-b"),
         b_snapshot.as_ref(),
@@ -1906,10 +2026,12 @@ fn unset_provider_does_not_modify_unrelated_providers() {
 #[test]
 fn unset_unknown_provider_does_not_mutate_config() {
     let mut config = make_config_with_two_custom_providers();
-    let snapshot = toml::to_string_pretty(&config).unwrap();
-    let err = config.unset_dotted("providers.nonexistent").unwrap_err();
+    let snapshot = toml::to_string_pretty(&config).expect("operation should succeed");
+    let err = config
+        .unset_dotted("providers.nonexistent")
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("not found"));
-    let after = toml::to_string_pretty(&config).unwrap();
+    let after = toml::to_string_pretty(&config).expect("operation should succeed");
     assert_eq!(
         snapshot, after,
         "config must be unchanged on not-found error"
@@ -1919,17 +2041,25 @@ fn unset_unknown_provider_does_not_mutate_config() {
 #[test]
 fn unset_invalid_dotted_key_does_not_mutate_config() {
     let mut config = make_config_with_two_custom_providers();
-    let snapshot = toml::to_string_pretty(&config).unwrap();
+    let snapshot = toml::to_string_pretty(&config).expect("operation should succeed");
 
-    let err = config.unset_dotted("model").unwrap_err();
+    let err = config
+        .unset_dotted("model")
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("unsupported unset key"));
-    assert_eq!(snapshot, toml::to_string_pretty(&config).unwrap());
+    assert_eq!(
+        snapshot,
+        toml::to_string_pretty(&config).expect("operation should succeed")
+    );
 
     let err = config
         .unset_dotted("providers.custom-a.base_url")
-        .unwrap_err();
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("unsupported unset key"));
-    assert_eq!(snapshot, toml::to_string_pretty(&config).unwrap());
+    assert_eq!(
+        snapshot,
+        toml::to_string_pretty(&config).expect("operation should succeed")
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1946,22 +2076,22 @@ fn unique_test_dir(label: &str) -> PathBuf {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("operation should succeed")
             .as_nanos()
     );
     let dir = std::env::temp_dir().join(&unique);
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).expect("operation should succeed");
     dir
 }
 
 fn write_test_config(dir: &Path, config: &Config) {
-    let toml_str = toml::to_string_pretty(config).unwrap();
-    fs::write(dir.join("config.toml"), &toml_str).unwrap();
+    let toml_str = toml::to_string_pretty(config).expect("operation should succeed");
+    fs::write(dir.join("config.toml"), &toml_str).expect("operation should succeed");
 }
 
 fn write_test_credentials(dir: &Path, creds: &Credentials) {
-    let toml_str = toml::to_string_pretty(creds).unwrap();
-    fs::write(dir.join("credentials.toml"), &toml_str).unwrap();
+    let toml_str = toml::to_string_pretty(creds).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), &toml_str).expect("operation should succeed");
 }
 
 fn make_store(dir: &Path) -> ConfigStore {
@@ -1969,11 +2099,11 @@ fn make_store(dir: &Path) -> ConfigStore {
 }
 
 fn reload_via_config_load(dir: &Path) -> Config {
-    let raw = fs::read_to_string(dir.join("config.toml")).unwrap();
-    let mut config: Config = toml::from_str(&raw).unwrap();
+    let raw = fs::read_to_string(dir.join("config.toml")).expect("operation should succeed");
+    let mut config: Config = toml::from_str(&raw).expect("operation should succeed");
     let creds_path = dir.join("credentials.toml");
     if creds_path.exists() {
-        let raw_creds = fs::read_to_string(&creds_path).unwrap();
+        let raw_creds = fs::read_to_string(&creds_path).expect("operation should succeed");
         if let Ok(creds) = toml::from_str::<Credentials>(&raw_creds) {
             for (name, key) in &creds.keys {
                 if let Some(provider) = config.providers.get_mut(name) {
@@ -1999,9 +2129,11 @@ fn reload_via_config_load(dir: &Path) -> Config {
 #[test]
 fn store_unset_custom_provider_removes_from_both_files() {
     let dir = unique_test_dir("custom-both");
-    let mut config = Config::default();
-    config.provider = "custom-a".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "custom-a".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "custom-a".to_string(),
         ProviderConfig {
@@ -2029,7 +2161,9 @@ fn store_unset_custom_provider_removes_from_both_files() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.custom-a").unwrap();
+    let outcome = store
+        .unset_provider("providers.custom-a")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -2041,7 +2175,8 @@ fn store_unset_custom_provider_removes_from_both_files() {
     assert!(!reloaded.providers.contains_key("custom-a"));
     assert!(reloaded.providers.contains_key("custom-b"));
 
-    let creds_raw = fs::read_to_string(dir.join("credentials.toml")).unwrap();
+    let creds_raw =
+        fs::read_to_string(dir.join("credentials.toml")).expect("operation should succeed");
     assert!(
         !creds_raw.contains("custom-a"),
         "credential for removed provider must be gone from credentials.toml"
@@ -2071,7 +2206,9 @@ fn store_unset_builtin_provider_clears_credentials() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.anthropic").unwrap();
+    let outcome = store
+        .unset_provider("providers.anthropic")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::BuiltinProviderDisconnected {
@@ -2112,7 +2249,9 @@ fn store_unset_api_key_clears_from_both_sources() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.my-gw.api_key").unwrap();
+    let outcome = store
+        .unset_provider("providers.my-gw.api_key")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::ApiKeyCleared {
@@ -2121,7 +2260,10 @@ fn store_unset_api_key_clears_from_both_sources() {
     );
 
     let reloaded = reload_via_config_load(&dir);
-    let gw = reloaded.providers.get("my-gw").unwrap();
+    let gw = reloaded
+        .providers
+        .get("my-gw")
+        .expect("operation should succeed");
     assert!(gw.api_key.is_none(), "api_key must be None after clear");
     assert_eq!(
         gw.base_url.as_deref(),
@@ -2137,9 +2279,11 @@ fn store_unset_api_key_clears_from_both_sources() {
 #[test]
 fn store_unset_no_credential_resurrection_on_reload() {
     let dir = unique_test_dir("no-resurrection");
-    let mut config = Config::default();
-    config.provider = "custom-x".to_string();
-    config.model = "model-x".to_string();
+    let mut config = Config {
+        provider: "custom-x".to_string(),
+        model: "model-x".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "custom-x".to_string(),
         ProviderConfig {
@@ -2156,7 +2300,9 @@ fn store_unset_no_credential_resurrection_on_reload() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    store.unset_provider("providers.custom-x").unwrap();
+    store
+        .unset_provider("providers.custom-x")
+        .expect("operation should succeed");
 
     let reloaded = reload_via_config_load(&dir);
     assert!(
@@ -2180,7 +2326,9 @@ fn store_unset_credentials_only_builtin() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.anthropic").unwrap();
+    let outcome = store
+        .unset_provider("providers.anthropic")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::BuiltinProviderDisconnected {
@@ -2210,7 +2358,9 @@ fn store_unset_credentials_only_custom() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.old-custom").unwrap();
+    let outcome = store
+        .unset_provider("providers.old-custom")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -2239,15 +2389,17 @@ fn store_unset_not_found_leaves_both_files_unchanged() {
         .insert("custom-a".to_string(), "sk-a".to_string());
     write_test_credentials(&dir, &creds);
 
-    let config_before = fs::read(dir.join("config.toml")).unwrap();
-    let creds_before = fs::read(dir.join("credentials.toml")).unwrap();
+    let config_before = fs::read(dir.join("config.toml")).expect("operation should succeed");
+    let creds_before = fs::read(dir.join("credentials.toml")).expect("operation should succeed");
 
     let store = make_store(&dir);
-    let err = store.unset_provider("providers.nonexistent").unwrap_err();
+    let err = store
+        .unset_provider("providers.nonexistent")
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("not found"));
 
-    let config_after = fs::read(dir.join("config.toml")).unwrap();
-    let creds_after = fs::read(dir.join("credentials.toml")).unwrap();
+    let config_after = fs::read(dir.join("config.toml")).expect("operation should succeed");
+    let creds_after = fs::read(dir.join("credentials.toml")).expect("operation should succeed");
     assert_eq!(
         config_before, config_after,
         "config.toml must be byte-identical"
@@ -2265,13 +2417,15 @@ fn store_unset_invalid_key_leaves_both_files_unchanged() {
     let dir = unique_test_dir("invalid-key");
     write_test_config(&dir, &make_config_with_two_custom_providers());
 
-    let config_before = fs::read(dir.join("config.toml")).unwrap();
+    let config_before = fs::read(dir.join("config.toml")).expect("operation should succeed");
 
     let store = make_store(&dir);
-    let err = store.unset_provider("model").unwrap_err();
+    let err = store
+        .unset_provider("model")
+        .expect_err("operation should fail");
     assert!(err.to_string().contains("unsupported unset key"));
 
-    let config_after = fs::read(dir.join("config.toml")).unwrap();
+    let config_after = fs::read(dir.join("config.toml")).expect("operation should succeed");
     assert_eq!(config_before, config_after);
 
     let _ = fs::remove_dir_all(&dir);
@@ -2283,11 +2437,18 @@ fn store_unset_no_temp_residual() {
     write_test_config(&dir, &make_config_with_two_custom_providers());
 
     let store = make_store(&dir);
-    store.unset_provider("providers.custom-a").unwrap();
+    store
+        .unset_provider("providers.custom-a")
+        .expect("operation should succeed");
 
     let entries: Vec<String> = fs::read_dir(&dir)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .expect("operation should succeed")
+        .map(|e| {
+            e.expect("operation should succeed")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
     assert!(
         !entries.iter().any(|n| n.contains(".atomic-tmp")),
@@ -2334,9 +2495,12 @@ fn store_unset_unrelated_credentials_preserved() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    store.unset_provider("providers.target").unwrap();
+    store
+        .unset_provider("providers.target")
+        .expect("operation should succeed");
 
-    let creds_raw = fs::read_to_string(dir.join("credentials.toml")).unwrap();
+    let creds_raw =
+        fs::read_to_string(dir.join("credentials.toml")).expect("operation should succeed");
     assert!(!creds_raw.contains("target"));
     assert!(creds_raw.contains("keeper"));
     assert!(creds_raw.contains("orphan"));
@@ -2365,12 +2529,14 @@ fn store_unset_credential_not_in_files_after_success() {
     write_test_credentials(&dir, &creds);
 
     let store = make_store(&dir);
-    store.unset_provider("providers.secret-gw").unwrap();
+    store
+        .unset_provider("providers.secret-gw")
+        .expect("operation should succeed");
 
-    let config_raw = fs::read_to_string(dir.join("config.toml")).unwrap();
+    let config_raw = fs::read_to_string(dir.join("config.toml")).expect("operation should succeed");
     let creds_path = dir.join("credentials.toml");
     let creds_raw = if creds_path.exists() {
-        fs::read_to_string(&creds_path).unwrap()
+        fs::read_to_string(&creds_path).expect("operation should succeed")
     } else {
         String::new()
     };
@@ -2497,13 +2663,13 @@ fn write_both_files(
     config: &Config,
     creds: Option<&Credentials>,
 ) -> (Vec<u8>, Vec<u8>) {
-    let config_toml = toml::to_string_pretty(config).unwrap();
-    fs::write(dir.join("config.toml"), &config_toml).unwrap();
+    let config_toml = toml::to_string_pretty(config).expect("operation should succeed");
+    fs::write(dir.join("config.toml"), &config_toml).expect("operation should succeed");
     let config_bytes = config_toml.as_bytes().to_vec();
 
     let creds_bytes = if let Some(c) = creds {
-        let creds_toml = toml::to_string_pretty(c).unwrap();
-        fs::write(dir.join("credentials.toml"), &creds_toml).unwrap();
+        let creds_toml = toml::to_string_pretty(c).expect("operation should succeed");
+        fs::write(dir.join("credentials.toml"), &creds_toml).expect("operation should succeed");
         creds_toml.as_bytes().to_vec()
     } else {
         Vec::new()
@@ -2521,9 +2687,11 @@ fn read_both_files(dir: &Path) -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn config_write_failure_leaves_both_files_byte_identical() {
     let dir = unique_test_dir("config-fail");
-    let mut config = Config::default();
-    config.provider = "custom-a".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "custom-a".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "custom-a".to_string(),
         ProviderConfig {
@@ -2558,9 +2726,11 @@ fn config_write_failure_leaves_both_files_byte_identical() {
 #[test]
 fn credentials_write_failure_rolls_back_both_files() {
     let dir = unique_test_dir("creds-fail-rollback");
-    let mut config = Config::default();
-    config.provider = "custom-a".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "custom-a".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "custom-a".to_string(),
         ProviderConfig {
@@ -2607,9 +2777,11 @@ fn credentials_write_failure_rolls_back_both_files() {
 #[test]
 fn credentials_removal_failure_rolls_back_both_files() {
     let dir = unique_test_dir("creds-remove-rollback");
-    let mut config = Config::default();
-    config.provider = "only-one".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "only-one".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "only-one".to_string(),
         ProviderConfig {
@@ -2649,11 +2821,18 @@ fn transaction_success_no_temp_residual() {
     write_both_files(&dir, &config, None);
 
     let store = make_store(&dir);
-    store.unset_provider("providers.target").unwrap();
+    store
+        .unset_provider("providers.target")
+        .expect("operation should succeed");
 
     let entries: Vec<String> = fs::read_dir(&dir)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .expect("operation should succeed")
+        .map(|e| {
+            e.expect("operation should succeed")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
     assert!(
         !entries.iter().any(|n| n.contains(".tmp")),
@@ -2666,9 +2845,11 @@ fn transaction_success_no_temp_residual() {
 #[test]
 fn credentials_only_custom_provider_still_merged_on_load() {
     let dir = unique_test_dir("custom-merge");
-    let mut config = Config::default();
-    config.provider = "real-provider".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "real-provider".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "real-provider".to_string(),
         ProviderConfig {
@@ -2697,9 +2878,11 @@ fn credentials_only_custom_provider_still_merged_on_load() {
 #[test]
 fn builtin_credential_without_config_entry_still_injected() {
     let dir = unique_test_dir("builtin-inject");
-    let mut config = Config::default();
-    config.provider = "anthropic".to_string();
-    config.model = "claude-test".to_string();
+    let mut config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-test".to_string(),
+        ..Default::default()
+    };
     write_both_files(&dir, &config, None);
 
     let mut creds = Credentials::default();
@@ -2717,7 +2900,7 @@ fn builtin_credential_without_config_entry_still_injected() {
         reloaded
             .providers
             .get("anthropic")
-            .unwrap()
+            .expect("operation should succeed")
             .api_key
             .as_deref(),
         Some("sk-ant-legacy")
@@ -2754,10 +2937,13 @@ fn success_writes_config_first_then_credentials() {
     write_both_files(&dir, &config, Some(&creds));
 
     let store = make_store(&dir);
-    store.unset_provider("providers.gw-a").unwrap();
+    store
+        .unset_provider("providers.gw-a")
+        .expect("operation should succeed");
 
     let (config_after, creds_after) = read_both_files(&dir);
-    let parsed_config: Config = toml::from_str(&String::from_utf8_lossy(&config_after)).unwrap();
+    let parsed_config: Config =
+        toml::from_str(&String::from_utf8_lossy(&config_after)).expect("operation should succeed");
     assert!(!parsed_config.providers.contains_key("gw-a"));
     assert!(parsed_config.providers.contains_key("gw-b"));
 
@@ -2772,9 +2958,11 @@ fn success_writes_config_first_then_credentials() {
 #[test]
 fn unrelated_config_sections_preserved_after_unset() {
     let dir = unique_test_dir("unrelated-sections");
-    let mut config = Config::default();
-    config.provider = "keep-me".to_string();
-    config.model = "model-x".to_string();
+    let mut config = Config {
+        provider: "keep-me".to_string(),
+        model: "model-x".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "keep-me".to_string(),
         ProviderConfig {
@@ -2802,16 +2990,25 @@ fn unrelated_config_sections_preserved_after_unset() {
     write_both_files(&dir, &config, None);
 
     let store = make_store(&dir);
-    store.unset_provider("providers.remove-me").unwrap();
+    store
+        .unset_provider("providers.remove-me")
+        .expect("operation should succeed");
 
-    let config_after = std::fs::read_to_string(dir.join("config.toml")).unwrap();
-    let parsed: Config = toml::from_str(&config_after).unwrap();
-    let keep = parsed.providers.get("keep-me").unwrap();
+    let config_after =
+        std::fs::read_to_string(dir.join("config.toml")).expect("operation should succeed");
+    let parsed: Config = toml::from_str(&config_after).expect("operation should succeed");
+    let keep = parsed
+        .providers
+        .get("keep-me")
+        .expect("operation should succeed");
     assert_eq!(keep.base_url.as_deref(), Some("https://keep.example.com"));
     assert_eq!(keep.api_key_env.as_deref(), Some("KEEP_KEY"));
     assert!(keep.models.contains_key("model-x"));
     assert_eq!(
-        keep.models.get("model-x").unwrap().context_limit,
+        keep.models
+            .get("model-x")
+            .expect("operation should succeed")
+            .context_limit,
         Some(200_000)
     );
 
@@ -2832,7 +3029,9 @@ fn credential_not_in_error_or_debug() {
     write_both_files(&dir, &config, None);
 
     let store = make_store(&dir);
-    let err = store.unset_provider("providers.nonexistent").unwrap_err();
+    let err = store
+        .unset_provider("providers.nonexistent")
+        .expect_err("operation should fail");
     assert!(
         !err.to_string().contains("MARKER-DO-NOT-LEAK"),
         "error must not contain credential marker"
@@ -2850,9 +3049,11 @@ fn credential_not_in_error_or_debug() {
 // ---------------------------------------------------------------------------
 
 fn make_full_config() -> (Config, Credentials) {
-    let mut config = Config::default();
-    config.provider = "custom-a".to_string();
-    config.model = "model-a".to_string();
+    let mut config = Config {
+        provider: "custom-a".to_string(),
+        model: "model-a".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "custom-a".to_string(),
         ProviderConfig {
@@ -3012,7 +3213,7 @@ fn committed_finalize_rename_failure_returns_success() {
         active_dir(&dir).exists(),
         "active journal may remain for recovery"
     );
-    let cfg_after = fs::read(dir.join("config.toml")).unwrap();
+    let cfg_after = fs::read(dir.join("config.toml")).expect("operation should succeed");
     assert_ne!(
         cfg_after, cfg_b,
         "config must reflect committed after state"
@@ -3025,19 +3226,19 @@ fn committed_active_journal_does_not_block_load_effective() {
     let dir = unique_test_dir("committed-active-load");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
     let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
     let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
-    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
-    fs::write(txn_dir.join("credentials.after"), cred_after).unwrap();
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
+    fs::write(txn_dir.join("config.after"), cfg_after).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.after"), cred_after).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Committed", "load-1", true, true, true, true);
-    fs::write(dir.join("config.toml"), cfg_after).unwrap();
-    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+    fs::write(dir.join("config.toml"), cfg_after).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), cred_after).expect("operation should succeed");
 
     let store = make_store(&dir);
-    let config = store.load_effective().unwrap();
+    let config = store.load_effective().expect("operation should succeed");
     assert!(config.providers.contains_key("custom-b"));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3047,13 +3248,13 @@ fn rolled_back_active_journal_does_not_block_load() {
     let dir = unique_test_dir("rolledback-active-load");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "RolledBack", "load-2", true, true, true, true);
 
     let store = make_store(&dir);
-    let config = store.load_effective().unwrap();
+    let config = store.load_effective().expect("operation should succeed");
     assert!(config.providers.contains_key("custom-a"));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3063,17 +3264,19 @@ fn active_journal_committed_recovers_then_allows_new_unset() {
     let dir = unique_test_dir("active-then-unset");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
-    fs::write(txn_dir.join("config.after"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.after"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
+    fs::write(txn_dir.join("config.after"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.after"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Committed", "block-1", true, true, true, true);
-    fs::write(dir.join("config.toml"), &cfg_b).unwrap();
-    fs::write(dir.join("credentials.toml"), &cred_b).unwrap();
+    fs::write(dir.join("config.toml"), &cfg_b).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), &cred_b).expect("operation should succeed");
 
     let store = make_store(&dir);
-    let outcome = store.unset_provider("providers.custom-b").unwrap();
+    let outcome = store
+        .unset_provider("providers.custom-b")
+        .expect("operation should succeed");
     assert_eq!(
         outcome,
         ConfigUnsetOutcome::CustomProviderRemoved {
@@ -3100,7 +3303,7 @@ fn write_toml_manifest(
          credentials_existed_before = {}\ncredentials_exist_after = {}\n",
         phase, txn_id, cfg_before, cfg_after, cred_before, cred_after
     );
-    fs::write(dir.join("manifest"), m).unwrap();
+    fs::write(dir.join("manifest"), m).expect("operation should succeed");
 }
 
 #[test]
@@ -3108,13 +3311,13 @@ fn interruption_prepared_recovers_before_state() {
     let dir = unique_test_dir("int-prepared");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Prepared", "int-1", true, true, true, true);
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
@@ -3162,7 +3365,7 @@ fn apply_failure_then_rollback_success_then_second_recovery_completes() {
     );
 
     let store2 = make_store(&dir);
-    store2.recover(&StdFs).unwrap();
+    store2.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3172,12 +3375,12 @@ fn recovery_restore_config_succeeds_credentials_fails_retains_journal() {
     let dir = unique_test_dir("composite-3");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
-    fs::write(txn_dir.join("config.after"), b"new").unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
+    fs::write(txn_dir.join("config.after"), b"new").expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Applying", "comp-3", true, true, true, true);
-    fs::write(dir.join("config.toml"), b"new").unwrap();
+    fs::write(dir.join("config.toml"), b"new").expect("operation should succeed");
 
     let store = make_store(&dir);
     let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::RestoreCredentialsBefore));
@@ -3191,7 +3394,7 @@ fn recovery_restore_config_succeeds_credentials_fails_retains_journal() {
     assert_eq!(cfg_after, cfg_b, "config should be restored to before");
 
     let store2 = make_store(&dir);
-    store2.recover(&StdFs).unwrap();
+    store2.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(
         !txn_dir.exists(),
@@ -3205,8 +3408,8 @@ fn malformed_finalize_residue_is_preserved_and_fails_closed() {
     let dir = unique_test_dir("finalize-retain");
     let _ = setup_full_fixture(&dir);
     let finalize_dir = dir.join(".provider-unset-transaction.finalize.orphan-3");
-    fs::create_dir_all(&finalize_dir).unwrap();
-    fs::write(finalize_dir.join("manifest"), b"stale").unwrap();
+    fs::create_dir_all(&finalize_dir).expect("operation should succeed");
+    fs::write(finalize_dir.join("manifest"), b"stale").expect("operation should succeed");
 
     let store = make_store(&dir);
     assert!(store.recover(&StdFs).is_err());
@@ -3217,17 +3420,19 @@ fn malformed_finalize_residue_is_preserved_and_fails_closed() {
 #[test]
 fn corrupt_credentials_marker_not_in_display_or_debug() {
     let dir = unique_test_dir("cred-leak-2");
-    let mut config = Config::default();
-    config.provider = "x".to_string();
-    config.model = "y".to_string();
+    let mut config = Config {
+        provider: "x".to_string(),
+        model: "y".to_string(),
+        ..Default::default()
+    };
     write_both_files(&dir, &config, None);
     fs::write(
         dir.join("credentials.toml"),
         "leaked = \"sk-MARKER-LEAKED-CREDENTIAL\"\nbroken = [",
     )
-    .unwrap();
+    .expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     let display = err.to_string();
     let debug = format!("{err:?}");
     assert!(!display.contains("MARKER-LEAKED-CREDENTIAL"));
@@ -3240,14 +3445,14 @@ fn corrupt_credentials_marker_not_in_display_or_debug() {
 #[test]
 fn corrupt_config_marker_not_in_display_or_debug() {
     let dir = unique_test_dir("cfg-leak");
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).expect("operation should succeed");
     fs::write(
         dir.join("config.toml"),
         "provider = \"x\"\nmodel = \"y\"\n[providers.x\napi_key = \"sk-MARKER-CONFIG-LEAK\"",
     )
-    .unwrap();
+    .expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     let display = err.to_string();
     let debug = format!("{err:?}");
     assert!(!display.contains("MARKER-CONFIG-LEAK"));
@@ -3260,14 +3465,14 @@ fn interruption_applying_after_config_recovers_before() {
     let dir = unique_test_dir("int-applying-cfg");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Applying", "int-2", true, true, true, true);
-    fs::write(dir.join("config.toml"), b"new config after").unwrap();
+    fs::write(dir.join("config.toml"), b"new config after").expect("operation should succeed");
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
@@ -3277,15 +3482,15 @@ fn interruption_applying_after_config_recovers_before() {
 fn interruption_committed_preserves_after_state() {
     let dir = unique_test_dir("int-committed");
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
     let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
-    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    fs::write(txn_dir.join("config.after"), cfg_after).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Committed", "int-3", true, true, true, false);
-    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+    fs::write(dir.join("config.toml"), cfg_after).expect("operation should succeed");
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
-    let cfg_actual = fs::read(dir.join("config.toml")).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
+    let cfg_actual = fs::read(dir.join("config.toml")).expect("operation should succeed");
     assert_eq!(cfg_actual.as_slice(), cfg_after);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
@@ -3296,13 +3501,13 @@ fn interruption_rolled_back_verifies_before() {
     let dir = unique_test_dir("int-rolledback");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "RolledBack", "int-4", true, true, true, true);
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
@@ -3312,17 +3517,19 @@ fn interruption_rolled_back_verifies_before() {
 fn interruption_committed_credentials_absent_recovers() {
     let dir = unique_test_dir("int-committed-absent");
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
     let cfg_after = b"provider = \"x\"\nmodel = \"y\"\n";
-    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
+    fs::write(txn_dir.join("config.after"), cfg_after).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Committed", "int-5", true, true, true, false);
-    fs::write(dir.join("config.toml"), cfg_after).unwrap();
+    fs::write(dir.join("config.toml"), cfg_after).expect("operation should succeed");
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert!(!txn_dir.exists());
     assert_eq!(
-        fs::read(dir.join("config.toml")).unwrap().as_slice(),
+        fs::read(dir.join("config.toml"))
+            .expect("operation should succeed")
+            .as_slice(),
         cfg_after
     );
     let _ = fs::remove_dir_all(&dir);
@@ -3333,9 +3540,11 @@ fn interruption_committed_credentials_absent_recovers() {
 #[test]
 fn builtin_second_file_failure_rolls_back() {
     let dir = unique_test_dir("builtin-2nd-fail");
-    let mut config = Config::default();
-    config.provider = "anthropic".to_string();
-    config.model = "claude-test".to_string();
+    let mut config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-test".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "anthropic".to_string(),
         ProviderConfig {
@@ -3397,17 +3606,17 @@ fn repeated_recovery_is_idempotent() {
     let dir = unique_test_dir("recovery-idem");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Prepared", "idem-1", true, true, true, true);
 
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
 
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3417,9 +3626,11 @@ fn repeated_recovery_is_idempotent() {
 #[test]
 fn transaction_error_does_not_leak_secret() {
     let dir = unique_test_dir("err-no-leak");
-    let mut config = Config::default();
-    config.provider = "secret-gw".to_string();
-    config.model = "m".to_string();
+    let mut config = Config {
+        provider: "secret-gw".to_string(),
+        model: "m".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(
         "secret-gw".to_string(),
         ProviderConfig {
@@ -3435,7 +3646,9 @@ fn transaction_error_does_not_leak_secret() {
 
     let store = make_store(&dir);
     let fs = FaultyFs::new(FaultPlan::fail_once(FsOperation::ReplaceConfigAfter));
-    let err = store.run("providers.secret-gw", &fs).unwrap_err();
+    let err = store
+        .run("providers.secret-gw", &fs)
+        .expect_err("operation should fail");
     assert!(!err.to_string().contains("MARKER-SECRET"));
     assert!(!err.to_string().contains("CREDS-SECRET"));
     assert!(!format!("{err:?}").contains("MARKER-SECRET"));
@@ -3449,13 +3662,16 @@ fn transaction_error_does_not_leak_secret() {
 #[test]
 fn load_effective_rejects_corrupt_credentials() {
     let dir = unique_test_dir("corrupt-cred");
-    let mut config = Config::default();
-    config.provider = "x".to_string();
-    config.model = "y".to_string();
+    let mut config = Config {
+        provider: "x".to_string(),
+        model: "y".to_string(),
+        ..Default::default()
+    };
     write_both_files(&dir, &config, None);
-    fs::write(dir.join("credentials.toml"), "not valid toml [[[").unwrap();
+    fs::write(dir.join("credentials.toml"), "not valid toml [[[")
+        .expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::ParseError(_)));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3463,13 +3679,16 @@ fn load_effective_rejects_corrupt_credentials() {
 #[test]
 fn load_effective_rejects_non_utf8_credentials() {
     let dir = unique_test_dir("nonutf8-cred");
-    let mut config = Config::default();
-    config.provider = "x".to_string();
-    config.model = "y".to_string();
+    let mut config = Config {
+        provider: "x".to_string(),
+        model: "y".to_string(),
+        ..Default::default()
+    };
     write_both_files(&dir, &config, None);
-    fs::write(dir.join("credentials.toml"), b"invalid \xff\xfe utf8").unwrap();
+    fs::write(dir.join("credentials.toml"), b"invalid \xff\xfe utf8")
+        .expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     assert!(matches!(
         err,
         ConfigError::ParseError(_) | ConfigError::IoError(_)
@@ -3480,10 +3699,10 @@ fn load_effective_rejects_non_utf8_credentials() {
 #[test]
 fn missing_config_does_not_hide_corrupt_credentials() {
     let dir = unique_test_dir("missing-cfg-corrupt-cred");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("credentials.toml"), "broken [[[[").unwrap();
+    fs::create_dir_all(&dir).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), "broken [[[[").expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::ParseError(_)));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3491,17 +3710,19 @@ fn missing_config_does_not_hide_corrupt_credentials() {
 #[test]
 fn corrupt_credentials_error_does_not_leak_secret() {
     let dir = unique_test_dir("corrupt-cred-leak");
-    let mut config = Config::default();
-    config.provider = "x".to_string();
-    config.model = "y".to_string();
+    let mut config = Config {
+        provider: "x".to_string(),
+        model: "y".to_string(),
+        ..Default::default()
+    };
     write_both_files(&dir, &config, None);
     fs::write(
         dir.join("credentials.toml"),
         "my-provider = \"sk-MARKER-CORRUPT-CREDENTIAL\"\nbroken = [",
     )
-    .unwrap();
+    .expect("operation should succeed");
     let store = make_store(&dir);
-    let err = store.load_effective().unwrap_err();
+    let err = store.load_effective().expect_err("operation should fail");
     let display = err.to_string();
     let debug = format!("{err:?}");
     assert!(!display.contains("MARKER-CORRUPT-CREDENTIAL"));
@@ -3516,8 +3737,8 @@ fn malformed_finalize_residue_blocks_new_mutation() {
     let dir = unique_test_dir("finalize-residue-invalid");
     let (cfg_before, cred_before) = setup_full_fixture(&dir);
     let residue_dir = dir.join(".provider-unset-transaction.finalize.orphan-1");
-    fs::create_dir_all(&residue_dir).unwrap();
-    fs::write(residue_dir.join("manifest"), b"stale").unwrap();
+    fs::create_dir_all(&residue_dir).expect("operation should succeed");
+    fs::write(residue_dir.join("manifest"), b"stale").expect("operation should succeed");
     let store = make_store(&dir);
     assert!(store.unset_provider("providers.custom-a").is_err());
     assert_both_unchanged(&dir, &cfg_before, &cred_before);
@@ -3530,11 +3751,11 @@ fn prepare_residue_does_not_block_load_effective() {
     let dir = unique_test_dir("prepare-residue-load");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let residue_dir = dir.join(".provider-unset-transaction.prepare.orphan-2");
-    fs::create_dir_all(&residue_dir).unwrap();
-    fs::write(residue_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(residue_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&residue_dir).expect("operation should succeed");
+    fs::write(residue_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(residue_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     let store = make_store(&dir);
-    let config = store.load_effective().unwrap();
+    let config = store.load_effective().expect("operation should succeed");
     assert!(config.providers.contains_key("custom-a"));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3544,18 +3765,18 @@ fn interruption_applying_after_credentials_recovers_before() {
     let dir = unique_test_dir("int-applying-cred");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     let cfg_after = b"provider = \"custom-b\"\nmodel = \"model-a\"\n";
     let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
-    fs::write(txn_dir.join("config.after"), cfg_after).unwrap();
-    fs::write(txn_dir.join("credentials.after"), cred_after).unwrap();
+    fs::write(txn_dir.join("config.after"), cfg_after).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.after"), cred_after).expect("operation should succeed");
     write_toml_manifest(&txn_dir, "Applying", "int-6", true, true, true, true);
-    fs::write(dir.join("config.toml"), cfg_after).unwrap();
-    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+    fs::write(dir.join("config.toml"), cfg_after).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), cred_after).expect("operation should succeed");
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
@@ -3566,9 +3787,9 @@ fn interruption_rollback_required_completes_rollback() {
     let dir = unique_test_dir("int-rbrequired");
     let (cfg_b, cred_b) = setup_full_fixture(&dir);
     let txn_dir = active_dir(&dir);
-    fs::create_dir_all(&txn_dir).unwrap();
-    fs::write(txn_dir.join("config.before"), &cfg_b).unwrap();
-    fs::write(txn_dir.join("credentials.before"), &cred_b).unwrap();
+    fs::create_dir_all(&txn_dir).expect("operation should succeed");
+    fs::write(txn_dir.join("config.before"), &cfg_b).expect("operation should succeed");
+    fs::write(txn_dir.join("credentials.before"), &cred_b).expect("operation should succeed");
     let cred_after = b"custom-b = \"sk-CREDS-B\"\n";
     write_toml_manifest(
         &txn_dir,
@@ -3579,10 +3800,10 @@ fn interruption_rollback_required_completes_rollback() {
         true,
         true,
     );
-    fs::write(dir.join("config.toml"), &cfg_b).unwrap();
-    fs::write(dir.join("credentials.toml"), cred_after).unwrap();
+    fs::write(dir.join("config.toml"), &cfg_b).expect("operation should succeed");
+    fs::write(dir.join("credentials.toml"), cred_after).expect("operation should succeed");
     let store = make_store(&dir);
-    store.recover(&StdFs).unwrap();
+    store.recover(&StdFs).expect("operation should succeed");
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);

@@ -260,8 +260,8 @@ mod tests {
     #[test]
     fn insert_iteration_record_adds_row_after_table_separator() {
         let content = "# Iteration\n\n| Date | Type | Record |\n|---|---|---|\n";
-        let updated =
-            insert_iteration_record(content, "| 2026-07-04 | Execution | Done |").unwrap();
+        let updated = insert_iteration_record(content, "| 2026-07-04 | Execution | Done |")
+            .expect("operation should succeed");
 
         assert!(updated.contains(
             "| Date | Type | Record |\n|---|---|---|\n| 2026-07-04 | Execution | Done |"
@@ -278,11 +278,11 @@ mod tests {
 
     #[test]
     fn resolve_iteration_doc_rejects_ambiguous_matches() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let iterations = dir.path().join("docs").join("iterations");
-        fs::create_dir_all(&iterations).unwrap();
-        fs::write(iterations.join("I123-one.md"), "").unwrap();
-        fs::write(iterations.join("I123-two.md"), "").unwrap();
+        fs::create_dir_all(&iterations).expect("operation should succeed");
+        fs::write(iterations.join("I123-one.md"), "").expect("operation should succeed");
+        fs::write(iterations.join("I123-two.md"), "").expect("operation should succeed");
 
         let err = resolve_iteration_doc(dir.path(), "I123").expect_err("ambiguous docs fail");
 
@@ -306,14 +306,15 @@ mod tests {
 
     #[test]
     fn apply_iteration_record_uses_internal_validation_not_host_script() {
-        let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".agent-governance")).unwrap();
+        let dir = tempdir().expect("operation should succeed");
+        fs::create_dir_all(dir.path().join(".agent-governance")).expect("operation should succeed");
         fs::write(
             dir.path().join(".agent-governance").join("manifest.yaml"),
             "profile: personal\nstatus: adopting\n",
         )
-        .unwrap();
-        fs::create_dir_all(dir.path().join("docs").join("iterations")).unwrap();
+        .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("docs").join("iterations"))
+            .expect("operation should succeed");
         fs::write(
             dir.path()
                 .join("docs")
@@ -321,15 +322,15 @@ mod tests {
                 .join("I123-internal-validation.md"),
             "# Iteration I123\n\n| Date | Type | Record |\n|---|---|---|\n",
         )
-        .unwrap();
-        fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        .expect("operation should succeed");
+        fs::create_dir_all(dir.path().join("scripts")).expect("operation should succeed");
         fs::write(
             dir.path()
                 .join("scripts")
                 .join("validate_project_governance.sh"),
             "#!/usr/bin/env bash\ntouch executed-marker\nexit 42\n",
         )
-        .unwrap();
+        .expect("operation should succeed");
         let plan = build_iteration_record_plan(
             dir.path(),
             &IterationRecordArgs {
@@ -339,12 +340,12 @@ mod tests {
                 record: "Internal validation path".to_string(),
             },
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        apply_iteration_record_plan(dir.path(), &plan).unwrap();
+        apply_iteration_record_plan(dir.path(), &plan).expect("operation should succeed");
 
         assert!(!dir.path().join("executed-marker").exists());
-        let updated = fs::read_to_string(plan.owner_doc).unwrap();
+        let updated = fs::read_to_string(plan.owner_doc).expect("operation should succeed");
         assert!(updated.contains("Internal validation path"));
     }
 }

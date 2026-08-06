@@ -4,7 +4,10 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use talos_core::tool::ToolNature;
 use talos_permission::{PermissionDecision, PermissionEngine};
-use talos_session::{SessionCleanupCandidate, SessionCleanupPolicy, SessionManager};
+use talos_session::{
+    OrphanSidecarReconciliationPolicy, SessionCleanupCandidate, SessionCleanupPolicy,
+    SessionManager,
+};
 
 /// CLI subcommands for local storage visibility and maintenance.
 #[derive(Subcommand, Clone)]
@@ -264,6 +267,34 @@ fn run_storage_maintenance(args: &MaintenanceArgs) -> Result<()> {
                 if fixed == 1 { "y" } else { "ies" }
             ),
             Err(e) => eprintln!("Session index reconcile failed: {e}"),
+        }
+        match manager.reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy::default()) {
+            Ok(report) => {
+                println!(
+                    "Session sidecars: scanned {}, removed {} set(s) / {} artifact(s) / {} byte(s), skipped {}, failures {}, bounded={}.",
+                    report.scanned_entries,
+                    report.removed_sets,
+                    report.removed_artifacts,
+                    report.bytes_removed,
+                    report.skipped_sets,
+                    report.failures.len(),
+                    report.bounded,
+                );
+                if report.bounded {
+                    println!(
+                        "Session sidecar scan reached its safety bound; continuation state was saved. Run `talos storage maintenance --reconcile` again to continue."
+                    );
+                }
+                for failure in report.failures {
+                    eprintln!(
+                        "Session sidecar reconcile failed for {} at {}: {}",
+                        failure.session_id,
+                        failure.path.display(),
+                        failure.error,
+                    );
+                }
+            }
+            Err(e) => eprintln!("Session sidecar reconcile failed: {e}"),
         }
     }
 
@@ -570,7 +601,9 @@ mod tests {
                 "decision": "Deny"
             }]
         });
-        engine.load_from_config(&config).unwrap();
+        engine
+            .load_from_config(&config)
+            .expect("operation should succeed");
 
         let input = serde_json::json!({
             "operation": "storage_cleanup",
@@ -605,7 +638,9 @@ mod tests {
                 "decision": "Allow"
             }]
         });
-        engine.load_from_config(&config).unwrap();
+        engine
+            .load_from_config(&config)
+            .expect("operation should succeed");
 
         let input = serde_json::json!({
             "operation": "storage_cleanup",
@@ -627,7 +662,9 @@ mod tests {
                 "decision": "Deny"
             }]
         });
-        engine.load_from_config(&config).unwrap();
+        engine
+            .load_from_config(&config)
+            .expect("operation should succeed");
 
         let empty: &[talos_session::SessionCleanupCandidate] = &[];
         let decision = authorize_cleanup(&engine, empty);
@@ -694,17 +731,18 @@ mod tests {
 
     #[test]
     fn storage_permission_engine_loads_project_rules() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let rule_dir = dir.path().join(".talos");
-        std::fs::create_dir_all(&rule_dir).unwrap();
+        std::fs::create_dir_all(&rule_dir).expect("operation should succeed");
         let rule_path = rule_dir.join("permissions.json");
         std::fs::write(
             &rule_path,
             r#"{"rules":[{"tool_name":"storage_cleanup","path_pattern":null,"decision":"Deny"}]}"#,
         )
-        .unwrap();
+        .expect("operation should succeed");
 
-        let engine = storage_permission_engine_from_paths(vec![rule_path]).unwrap();
+        let engine = storage_permission_engine_from_paths(vec![rule_path])
+            .expect("operation should succeed");
 
         let empty: &[talos_session::SessionCleanupCandidate] = &[];
         let decision = authorize_cleanup(&engine, empty);
@@ -713,9 +751,10 @@ mod tests {
 
     #[test]
     fn storage_permission_engine_rejects_malformed_rules() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("operation should succeed");
         let rule_path = dir.path().join("permissions.json");
-        std::fs::write(&rule_path, r#"{"rules":"not-an-array"}"#).unwrap();
+        std::fs::write(&rule_path, r#"{"rules":"not-an-array"}"#)
+            .expect("operation should succeed");
 
         let result = storage_permission_engine_from_paths(vec![rule_path]);
 

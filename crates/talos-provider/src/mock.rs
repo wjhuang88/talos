@@ -640,26 +640,38 @@ mod tests {
             .with_streaming(vec!["streaming".into(), " response".into()]);
 
         // 1: text response
-        let rx = provider.stream(&[]).await.unwrap();
+        let rx = provider
+            .stream(&[])
+            .await
+            .expect("operation should succeed");
         let events = collect_events(rx).await;
         assert!(matches!(
             &events[1], AgentEvent::TextDelta { delta } if delta == "text response"
         ));
 
         // 2: tool call
-        let rx = provider.stream(&[]).await.unwrap();
+        let rx = provider
+            .stream(&[])
+            .await
+            .expect("operation should succeed");
         let events = collect_events(rx).await;
         assert!(matches!(&events[1], AgentEvent::ToolCall { call, .. } if call.name == "bash"));
 
         // 3: error
-        let rx = provider.stream(&[]).await.unwrap();
+        let rx = provider
+            .stream(&[])
+            .await
+            .expect("operation should succeed");
         let events = collect_events(rx).await;
         assert!(
             matches!(&events[1], AgentEvent::Error { message } if message.contains("authentication"))
         );
 
         // 4: streaming
-        let rx = provider.stream(&[]).await.unwrap();
+        let rx = provider
+            .stream(&[])
+            .await
+            .expect("operation should succeed");
         let events = collect_events(rx).await;
         assert_eq!(events.len(), 4); // TurnStart + 2 deltas + TurnEnd
     }
@@ -671,7 +683,10 @@ mod tests {
         assert_eq!(provider.queue_len(), 2);
 
         // Consume one
-        let rx = provider.stream(&[]).await.unwrap();
+        let rx = provider
+            .stream(&[])
+            .await
+            .expect("operation should succeed");
         let _ = collect_events(rx).await;
         assert_eq!(provider.queue_len(), 1);
     }

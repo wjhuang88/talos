@@ -360,7 +360,7 @@ mod tests {
     use std::thread;
     use std::time::{Duration as StdDuration, Instant};
 
-    const TEST_SERVER_TIMEOUT: StdDuration = StdDuration::from_secs(5);
+    const TEST_SERVER_TIMEOUT: StdDuration = StdDuration::from_secs(30);
 
     #[test]
     fn fetch_url_tool_metadata() {
@@ -445,18 +445,46 @@ mod tests {
         }
     }
 
+    fn read_request_headers(stream: &mut TcpStream) {
+        const MAX_REQUEST_HEADER_BYTES: usize = 64 * 1024;
+        const HEADER_TERMINATOR: &[u8] = b"\r\n\r\n";
+
+        let mut request = Vec::new();
+        let mut chunk = [0u8; 1024];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => {
+                    request.extend_from_slice(&chunk[..read]);
+                    assert!(
+                        request.len() <= MAX_REQUEST_HEADER_BYTES,
+                        "loopback request headers exceeded {MAX_REQUEST_HEADER_BYTES} bytes"
+                    );
+                    if request
+                        .windows(HEADER_TERMINATOR.len())
+                        .any(|window| window == HEADER_TERMINATOR)
+                    {
+                        return;
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) => panic!("read failed: {error}"),
+            }
+        }
+
+        panic!("connection closed before complete HTTP request headers were received");
+    }
+
     fn serve_http(listener: &TcpListener, response: &str) {
         let mut stream = accept_with_timeout(listener);
-        let mut buf = [0u8; 4096];
-        stream.read(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream.write_all(response.as_bytes()).expect("write failed");
         stream.flush().expect("flush failed");
     }
 
     fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
         let mut stream = accept_with_timeout(listener);
-        let mut buf = [0u8; 4096];
-        stream.read(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream
             .write_all(response1.as_bytes())
             .expect("write failed");
@@ -464,7 +492,7 @@ mod tests {
         drop(stream);
 
         let mut stream = accept_with_timeout(listener);
-        stream.read(&mut buf).expect("read failed");
+        read_request_headers(&mut stream);
         stream
             .write_all(response2.as_bytes())
             .expect("write failed");
@@ -474,13 +502,17 @@ mod tests {
     #[tokio::test]
     async fn redirect_diagnostics_shows_final_url() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let redirect_response = format!(
             "HTTP/1.1 302 Found\r\n\
              Location: http://127.0.0.1:{port}/final\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 0\r\n\r\n"
+             Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
         );
         let final_body = "<html><body>Hello World</body></html>";
         let final_response = format!(
@@ -502,7 +534,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(
@@ -520,7 +552,10 @@ mod tests {
     #[tokio::test]
     async fn content_type_summary_in_output() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let body = "<html><body>Hello World</body></html>";
         let response = format!(
@@ -542,7 +577,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(
@@ -557,7 +592,10 @@ mod tests {
     #[tokio::test]
     async fn sparse_html_hint_for_spa_content() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let mut html_body = String::from("<html><head>");
         for i in 0..200 {
@@ -584,7 +622,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(
@@ -602,13 +640,17 @@ mod tests {
     #[tokio::test]
     async fn continuation_emitted_for_redirect_status() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let redirect_response = format!(
             "HTTP/1.1 302 Found\r\n\
              Location: http://127.0.0.1:{port}/final\r\n\
              Content-Type: text/html\r\n\
-             Content-Length: 0\r\n\r\n"
+             Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
         );
 
         let server = thread::spawn(move || {
@@ -622,7 +664,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(result.content.contains("302"));
@@ -636,7 +678,10 @@ mod tests {
     #[tokio::test]
     async fn continuation_emitted_for_sparse_html() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let mut html_body = String::from("<html><head>");
         for i in 0..200 {
@@ -663,7 +708,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(
@@ -676,7 +721,10 @@ mod tests {
     #[tokio::test]
     async fn no_continuation_for_normal_html() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
-        let port = listener.local_addr().unwrap().port();
+        let port = listener
+            .local_addr()
+            .expect("operation should succeed")
+            .port();
 
         let body = "<html><body><h1>Welcome to Our Website</h1>\
                     <p>This is a normal page with enough text content to exceed the \
@@ -705,7 +753,7 @@ mod tests {
             }))
             .await;
 
-        server.join().unwrap();
+        server.join().expect("operation should succeed");
 
         assert!(!result.is_error);
         assert!(

@@ -11,7 +11,7 @@
 - No open Issue is closed by this reconciliation: none has a Complete owner that also matches the remaining remote scope.
 - Deferred, Refinement, Ready, Partial, and Blocked remain open states; “registered” does not mean “scheduled”.
 - Recovered Issue #119 is assigned to TUI-044 because current main already assigns TUI-041 to Issue #69.
-- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite, but TUI-044/I169 implementation is not started and Issue #119 remains open.
+- I170 completed through PR #126 and clears Issue #119's Windows/current-main prerequisite; TUI-044/I169 is Active in PR #131 review handoff and Issue #119 remains open.
 - Intake Issues #124, #125 and #134 are registered as unclaimed Refinement owners MODEL-011, TUI-045 and TUI-046; this reconciliation does not authorize implementation.
 - Issue #132 is assigned to PROVIDER-003 as an architecture/decomposition Epic. Its bounded child identities are recorded, but no child is claimed, selected, or authorized.
 - REL-001 and DATA-001 historical owner drift is corrected to Complete; they are not currently open GitHub Issues.
@@ -43,7 +43,7 @@
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Ready | Bounded fix; iteration/claim still required. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
-| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Ready — prerequisite satisfied | Keep open: claim is established and I170 completed, but activation, fresh current-main implementation, ADR-056 review, exact-head CI and a separate implementation PR remain required. |
+| [#119](https://github.com/wjhuang88/talos/issues/119) | transactional batched steering recovery | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Active | PR #131 implements I169; keep open until complete acceptance, ADR-056 review, exact-head CI and merge evidence. |
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Intake registered; probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Intake registered; layout ownership and real-terminal acceptance remain unclaimed. |
 | [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement Epic | Architecture/decomposition owner only; PROVIDER-003-A ADR/threat model and a separately claimed bounded child are required before implementation. |
@@ -63,3 +63,21 @@
 ## Closure Rule
 
 An Issue may be closed only after its owner is Complete with implementation/acceptance evidence and the remote Issue has no separately owned residual. This audit intentionally leaves all 28 observed Issues open.
+
+## I169 review synchronization (2026-08-04)
+
+- TUI-044 / I169 remain **Active**; ADR-056 remains **Proposed**; Issue #119 remains **Open**.
+- PR #131 now carries an atomic durable generation fence plus awaited old Scheduler/Actor retirement before G+1 publication, with production-path race, reconstruction, journal, Bridge, receipt-generation, stale-command, and Provider-call evidence.
+- This synchronization records implementation and review evidence only. It does not claim Complete, Accepted, Approved, merge-ready, or merged status; exact-head CI and a new independent review remain required.
+
+<!-- PR131-I169-REMEDIATION-2026-08-05 -->
+## PR #131 independent-review remediation checkpoint — 2026-08-05
+
+- Implementation source baseline: `40e4bb95176d60b1d58214788620b4c535fee62e`; current main / merge base: `a03e25436a25f84f117a90362686fc8205e52dde`.
+- Latest independent Review `PRR_kwDOSrj_LM8AAAABIdlncA` remains the governing `CHANGES REQUIRED` verdict until a fresh review binds to the final exact Head.
+- B1/B2/H1/M1/M2 remediation now uses one retryable Session artifact ownership boundary: WAL/SHM/SQLite precede the transcript commit point; rollback preserves primary plus cleanup diagnostics; zero-byte retention counts removals; bounded orphan reconciliation validates UUID/suffix/root/symlink/live-owner safety.
+- Production `/new`, TUI `/fork`, CLI `--fork`, transition publication rollback, Session index and fork-relation cleanup now converge on that ownership boundary while preserving the source Session.
+- Verification workflow `30997867486` passed Linux full `talos-session`/`talos-tools` gates, strict Clippy, Windows open-SQLite-handle retry, Windows redirect `20/20`, Windows full `talos-tools`, and self-cleaned all temporary remediation assets before publishing the source baseline.
+- Lifecycle state is intentionally unchanged. Final exact-head standard CI, rebuilt real-TUI acceptance, evidence synchronization and a fresh independent review remain mandatory before any advancement or merge authorization.
+
+- Status-matrix disposition remains Issue #119 Open, TUI-044/I169 Active, ADR-056 Proposed, PR #131 Draft.

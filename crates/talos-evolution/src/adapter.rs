@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_get_evolution_context_empty() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let config = EvolutionConfig::default();
         let adapter = BehaviorAdapter::new(&store, config);
 
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_get_evolution_context_with_patterns() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let config = EvolutionConfig::default();
 
         let mut pattern = Pattern::new(
@@ -119,7 +119,9 @@ mod tests {
         );
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
         let adapter = BehaviorAdapter::new(&store, config);
         let context = adapter.get_evolution_context();
@@ -130,14 +132,16 @@ mod tests {
 
     #[test]
     fn test_get_evolution_context_caps_output_bytes() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let mut config = EvolutionConfig::default();
         config.max_output_bytes = 200;
 
         let mut pattern = Pattern::new("Test".to_string(), "x".repeat(150), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
         let adapter = BehaviorAdapter::new(&store, config);
         let context = adapter.get_evolution_context();
@@ -151,14 +155,16 @@ mod tests {
 
     #[test]
     fn test_get_evolution_context_drops_oversized_single_pattern() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let mut config = EvolutionConfig::default();
         config.max_output_bytes = 100;
 
         let mut pattern = Pattern::new("Big".to_string(), "x".repeat(5000), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
-        store.insert_pattern(&pattern).unwrap();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
 
         let adapter = BehaviorAdapter::new(&store, config);
         let context = adapter.get_evolution_context();
@@ -176,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_get_evolution_context_orders_by_confidence_first() {
-        let store = KnowledgeStore::open_memory().unwrap();
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let mut config = EvolutionConfig::default();
         config.max_output_bytes = 500;
         config.min_confidence = 0.0;
@@ -189,15 +195,17 @@ mod tests {
             );
             pattern.confidence = conf;
             pattern.evidence_count = 5;
-            store.insert_pattern(&pattern).unwrap();
+            store
+                .insert_pattern(&pattern)
+                .expect("operation should succeed");
         }
 
         let adapter = BehaviorAdapter::new(&store, config);
         let context = adapter.get_evolution_context();
 
-        let high_pos = context.find("[high]").unwrap();
-        let mid_pos = context.find("[mid]").unwrap();
-        let low_pos = context.find("[low]").unwrap();
+        let high_pos = context.find("[high]").expect("operation should succeed");
+        let mid_pos = context.find("[mid]").expect("operation should succeed");
+        let low_pos = context.find("[low]").expect("operation should succeed");
         assert!(
             high_pos < mid_pos,
             "high confidence should appear before mid"

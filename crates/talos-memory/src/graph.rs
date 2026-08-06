@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn schema_migration_creates_graph_tables() {
-        let store = MemoryStore::open_memory().unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
         let count: i64 = store
             .conn
             .query_row(
@@ -391,63 +391,85 @@ mod tests {
                 [],
                 |row| row.get(0),
             )
-            .unwrap();
+            .expect("test operation should succeed");
         assert!(count >= 2);
     }
 
     #[test]
     fn upsert_and_get_node() {
-        let store = MemoryStore::open_memory().unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
         let node = make_node("n1", "WEB-005", 0.9);
-        store.graph_upsert_node(&node).unwrap();
-        let retrieved = store.graph_get_node("n1").unwrap().unwrap();
+        store
+            .graph_upsert_node(&node)
+            .expect("test operation should succeed");
+        let retrieved = store
+            .graph_get_node("n1")
+            .expect("test operation should succeed")
+            .expect("test operation should succeed");
         assert_eq!(retrieved.label, "WEB-005");
         assert!((retrieved.impression_strength - 0.9).abs() < 0.01);
     }
 
     #[test]
     fn upsert_node_is_idempotent() {
-        let store = MemoryStore::open_memory().unwrap();
-        store.graph_upsert_node(&make_node("n1", "A", 0.5)).unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("n1", "A", 0.5))
+            .expect("test operation should succeed");
         store
             .graph_upsert_node(&make_node("n1", "A-updated", 0.8))
-            .unwrap();
-        let node = store.graph_get_node("n1").unwrap().unwrap();
+            .expect("test operation should succeed");
+        let node = store
+            .graph_get_node("n1")
+            .expect("test operation should succeed")
+            .expect("test operation should succeed");
         assert_eq!(node.label, "A-updated");
         assert!((node.impression_strength - 0.8).abs() < 0.01);
     }
 
     #[test]
     fn upsert_edge_is_idempotent() {
-        let store = MemoryStore::open_memory().unwrap();
-        store.graph_upsert_node(&make_node("n1", "A", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("n2", "B", 1.0)).unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("n1", "A", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("n2", "B", 1.0))
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("n1", "n2", "used_with", 0.5))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("n1", "n2", "used_with", 0.9))
-            .unwrap();
-        let results = store.graph_recall(&["n1"], 3, 0.3, 10).unwrap();
+            .expect("test operation should succeed");
+        let results = store
+            .graph_recall(&["n1"], 3, 0.3, 10)
+            .expect("test operation should succeed");
         assert_eq!(results.len(), 1);
         assert!((results[0].score - 0.9).abs() < 0.15);
     }
 
     #[test]
     fn recall_returns_direct_neighbors_sorted_by_score() {
-        let store = MemoryStore::open_memory().unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
         store
             .graph_upsert_node(&make_node("seed", "seed", 1.0))
-            .unwrap();
-        store.graph_upsert_node(&make_node("a", "A", 0.8)).unwrap();
-        store.graph_upsert_node(&make_node("b", "B", 0.4)).unwrap();
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("a", "A", 0.8))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("b", "B", 0.4))
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("seed", "a", "used_with", 0.9))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("seed", "b", "used_with", 0.5))
-            .unwrap();
-        let results = store.graph_recall(&["seed"], 3, 0.3, 10).unwrap();
+            .expect("test operation should succeed");
+        let results = store
+            .graph_recall(&["seed"], 3, 0.3, 10)
+            .expect("test operation should succeed");
         assert_eq!(results.len(), 2);
         assert!(results[0].score > results[1].score);
         assert_eq!(results[0].node.id, "a");
@@ -455,17 +477,25 @@ mod tests {
 
     #[test]
     fn recall_multi_hop_traverses_graph() {
-        let store = MemoryStore::open_memory().unwrap();
-        store.graph_upsert_node(&make_node("a", "A", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("b", "B", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("c", "C", 1.0)).unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("a", "A", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("b", "B", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("c", "C", 1.0))
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("a", "b", "used_with", 0.8))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("b", "c", "used_with", 0.7))
-            .unwrap();
-        let results = store.graph_recall(&["a"], 3, 0.3, 10).unwrap();
+            .expect("test operation should succeed");
+        let results = store
+            .graph_recall(&["a"], 3, 0.3, 10)
+            .expect("test operation should succeed");
         let ids: Vec<&str> = results.iter().map(|r| r.node.id.as_str()).collect();
         assert!(ids.contains(&"b"));
         assert!(ids.contains(&"c"));
@@ -473,23 +503,25 @@ mod tests {
 
     #[test]
     fn recall_respects_min_edge_weight() {
-        let store = MemoryStore::open_memory().unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
         store
             .graph_upsert_node(&make_node("seed", "S", 1.0))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_node(&make_node("strong", "Strong", 1.0))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_node(&make_node("weak", "Weak", 1.0))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("seed", "strong", "used_with", 0.8))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("seed", "weak", "used_with", 0.1))
-            .unwrap();
-        let results = store.graph_recall(&["seed"], 3, 0.3, 10).unwrap();
+            .expect("test operation should succeed");
+        let results = store
+            .graph_recall(&["seed"], 3, 0.3, 10)
+            .expect("test operation should succeed");
         let ids: Vec<&str> = results.iter().map(|r| r.node.id.as_str()).collect();
         assert!(ids.contains(&"strong"));
         assert!(!ids.contains(&"weak"));
@@ -497,21 +529,31 @@ mod tests {
 
     #[test]
     fn recall_respects_max_hops() {
-        let store = MemoryStore::open_memory().unwrap();
-        store.graph_upsert_node(&make_node("a", "A", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("b", "B", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("c", "C", 1.0)).unwrap();
-        store.graph_upsert_node(&make_node("d", "D", 1.0)).unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("a", "A", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("b", "B", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("c", "C", 1.0))
+            .expect("test operation should succeed");
+        store
+            .graph_upsert_node(&make_node("d", "D", 1.0))
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("a", "b", "used_with", 0.9))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("b", "c", "used_with", 0.9))
-            .unwrap();
+            .expect("test operation should succeed");
         store
             .graph_upsert_edge(&make_edge("c", "d", "used_with", 0.9))
-            .unwrap();
-        let results = store.graph_recall(&["a"], 2, 0.3, 10).unwrap();
+            .expect("test operation should succeed");
+        let results = store
+            .graph_recall(&["a"], 2, 0.3, 10)
+            .expect("test operation should succeed");
         let ids: Vec<&str> = results.iter().map(|r| r.node.id.as_str()).collect();
         assert!(ids.contains(&"b"));
         assert!(ids.contains(&"c"));
@@ -520,31 +562,43 @@ mod tests {
 
     #[test]
     fn recall_empty_seeds_returns_empty() {
-        let store = MemoryStore::open_memory().unwrap();
-        let results = store.graph_recall(&[], 3, 0.3, 10).unwrap();
+        let store = MemoryStore::open_memory().expect("test operation should succeed");
+        let results = store
+            .graph_recall(&[], 3, 0.3, 10)
+            .expect("test operation should succeed");
         assert!(results.is_empty());
     }
 
     #[test]
     fn recall_deterministic_for_same_graph_state() {
-        let store1 = MemoryStore::open_memory().unwrap();
-        let store2 = MemoryStore::open_memory().unwrap();
+        let store1 = MemoryStore::open_memory().expect("test operation should succeed");
+        let store2 = MemoryStore::open_memory().expect("test operation should succeed");
         for store in [&store1, &store2] {
-            store.graph_upsert_node(&make_node("a", "A", 1.0)).unwrap();
-            store.graph_upsert_node(&make_node("b", "B", 0.8)).unwrap();
-            store.graph_upsert_node(&make_node("c", "C", 0.6)).unwrap();
+            store
+                .graph_upsert_node(&make_node("a", "A", 1.0))
+                .expect("test operation should succeed");
+            store
+                .graph_upsert_node(&make_node("b", "B", 0.8))
+                .expect("test operation should succeed");
+            store
+                .graph_upsert_node(&make_node("c", "C", 0.6))
+                .expect("test operation should succeed");
             store
                 .graph_upsert_edge(&make_edge("a", "b", "used_with", 0.9))
-                .unwrap();
+                .expect("test operation should succeed");
             store
                 .graph_upsert_edge(&make_edge("a", "c", "used_with", 0.5))
-                .unwrap();
+                .expect("test operation should succeed");
             store
                 .graph_upsert_edge(&make_edge("b", "c", "used_with", 0.7))
-                .unwrap();
+                .expect("test operation should succeed");
         }
-        let r1 = store1.graph_recall(&["a"], 3, 0.3, 10).unwrap();
-        let r2 = store2.graph_recall(&["a"], 3, 0.3, 10).unwrap();
+        let r1 = store1
+            .graph_recall(&["a"], 3, 0.3, 10)
+            .expect("test operation should succeed");
+        let r2 = store2
+            .graph_recall(&["a"], 3, 0.3, 10)
+            .expect("test operation should succeed");
         assert_eq!(r1.len(), r2.len());
         for (a, b) in r1.iter().zip(r2.iter()) {
             assert_eq!(a.node.id, b.node.id);

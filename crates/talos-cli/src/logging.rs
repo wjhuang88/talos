@@ -236,31 +236,37 @@ mod tests {
 
     #[test]
     fn file_rotates_when_exceeding_max_size() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let path = dir.path().join("test.log");
 
-        let writer = RotatingWriter::new(path.clone(), 1, 3).unwrap();
+        let writer = RotatingWriter::new(path.clone(), 1, 3).expect("operation should succeed");
 
         let chunk = vec![b'x'; 500_000];
-        (&writer).write_all(&chunk).unwrap();
+        (&writer)
+            .write_all(&chunk)
+            .expect("operation should succeed");
         assert!(path.exists());
         assert!(!dir.path().join("test.log.1").exists());
 
-        (&writer).write_all(&chunk).unwrap();
+        (&writer)
+            .write_all(&chunk)
+            .expect("operation should succeed");
         assert!(path.exists());
         assert!(dir.path().join("test.log.1").exists());
     }
 
     #[test]
     fn old_files_beyond_max_files_are_deleted() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let path = dir.path().join("test.log");
 
-        let writer = RotatingWriter::new(path.clone(), 1, 2).unwrap();
+        let writer = RotatingWriter::new(path.clone(), 1, 2).expect("operation should succeed");
 
         let chunk = vec![b'x'; 500_000];
         for _ in 0..5 {
-            (&writer).write_all(&chunk).unwrap();
+            (&writer)
+                .write_all(&chunk)
+                .expect("operation should succeed");
         }
 
         assert!(path.exists());
@@ -271,16 +277,21 @@ mod tests {
 
     #[test]
     fn rotation_shifts_existing_files() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("operation should succeed");
         let path = dir.path().join("test.log");
 
-        let writer = RotatingWriter::new(path.clone(), 1, 5).unwrap();
+        let writer = RotatingWriter::new(path.clone(), 1, 5).expect("operation should succeed");
 
         let chunk = vec![b'x'; 500_000];
-        (&writer).write_all(&chunk).unwrap();
-        (&writer).write_all(&chunk).unwrap();
+        (&writer)
+            .write_all(&chunk)
+            .expect("operation should succeed");
+        (&writer)
+            .write_all(&chunk)
+            .expect("operation should succeed");
 
-        let content_1 = fs::read_to_string(dir.path().join("test.log.1")).unwrap();
+        let content_1 =
+            fs::read_to_string(dir.path().join("test.log.1")).expect("operation should succeed");
         assert_eq!(content_1.len(), 500_000);
     }
 
@@ -295,7 +306,7 @@ mod tests {
     fn resolve_file_config_tui_enables_by_default() {
         let config = resolve_file_config(None, true);
         assert!(config.is_some());
-        let fc = config.unwrap();
+        let fc = config.expect("operation should succeed");
         assert!(fc.enabled);
     }
 
@@ -330,6 +341,6 @@ mod tests {
         };
         let config = resolve_file_config(Some(&log_config), false);
         assert!(config.is_some());
-        assert_eq!(config.unwrap().max_size_mb, 32);
+        assert_eq!(config.expect("operation should succeed").max_size_mb, 32);
     }
 }
