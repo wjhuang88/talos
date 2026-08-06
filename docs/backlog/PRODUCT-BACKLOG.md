@@ -63,6 +63,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
+| ARCH-034-D / I171 | Ready / Planned | Establish an effective claim, reproduce the current v0.7.0 architecture baseline, and create one bounded owner per accepted finding; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |

@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Type | Architecture Epic |
-| Status | Audit complete — remediation gated |
+| Status | Rebaseline planned — remediation gated |
 | Priority | P1 |
-| Selected Iteration | I144 audit only (Complete 2026-07-20) |
+| Selected Iteration | I144 historical audit (Complete); I171 current-state rebaseline (Planned) |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
@@ -38,6 +38,9 @@ fitness checks that prevent uncontrolled code accumulation.
    implements accepted ADR-053 through I158. Contribution/profile implementation and deterministic
    inventory evidence are merged; scheduler/status exception ownership plus ARCHITECTURE, TOOL-003,
    and F01 disposition remain the final closeout gates. I158 is Review, not Complete.
+5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Ready current-state
+   v0.7.0 rebaseline. It preserves I144 history and creates bounded remediation owners; no
+   production refactor is authorized.
 
 ## Audit Dimensions
 
