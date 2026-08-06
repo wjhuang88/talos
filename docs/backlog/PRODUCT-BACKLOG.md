@@ -63,7 +63,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
-| ARCH-034-D / I171 | Ready / Planned | Establish an effective claim, reproduce the current v0.7.0 architecture baseline, and create one bounded owner per accepted finding; no production refactor. |
+| ARCH-034-D / I171 | In Progress / Active | Claim #138 effective at `349d0cd1`; current v0.7.0 audit/register and bounded owner creation in progress; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |
@@ -75,6 +75,8 @@ Required reads:
 | ID | State | Required Disposition |
 |---|---|---|
 | I158 / ARCH-034-R01 | Review | Resolve scheduler/status contribution exceptions and final documentation before Complete/Paused. |
+| ARCH-034-R02..R03 / R05..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
+| ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
 | PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |

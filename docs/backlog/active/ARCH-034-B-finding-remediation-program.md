@@ -4,7 +4,7 @@
 |---|---|
 | Type | Technical Epic child |
 | Parent Epic | ARCH-034 |
-| Status | Refinement — blocked on ARCH-034-A |
+| Status | Refinement — current findings accepted; production work remains separately claimed |
 | Priority | P1 after accepted findings |
 
 ## Execution Contract

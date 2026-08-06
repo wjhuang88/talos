@@ -246,11 +246,17 @@ All crates are pure Rust, actively maintained, and widely used. No C dependencie
 
 ## Registration
 
-All new tools must be registered in:
+The following list records the original TOOL-003 implementation surface:
 - `build_print_tool_registry()` — print mode
 - `build_tui_tool_registry()` — TUI mode
 - `build_mcp_tool_registry()` — MCP server mode
 - `run_interactive_mode()` — interactive REPL (currently missing symbol tools too)
+
+Current extension guidance (ADR-053/I158): reusable built-ins have one authoritative
+`ToolContribution` declaration in the implementing crate. CLI/runtime composition profiles select
+the contribution and apply their existing permission wrappers/runtime inputs. Do not copy a new
+constructor into every builder. Runtime-created scheduler tools and the CLI-owned MCP `status` tool
+are explicit exceptions documented in `docs/reference/ARCHITECTURE.md`.
 
 ## Permission Rules
 
