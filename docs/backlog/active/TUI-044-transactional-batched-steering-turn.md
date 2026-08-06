@@ -95,7 +95,7 @@ The real-terminal walkthrough verified:
 - Source Session: `9e937a59-a700-47eb-9a29-2affb800aa00`.
 - Fork child Session: `32c30467-8d3a-493e-bfb3-60b5e773c2ca`.
 - Recovery Session: `a971f883-9749-445c-90c9-17fe23eb79a9`.
-- Completion / merge commit: `685d3b4f4088a172551f8c844a89f5dee9469430`.
+- Completion Commit: `685d3b4f4088a172551f8c844a89f5dee9469430`.
 - Accepted decision: ADR-056.
 - Source Issue: #119, completed and closed by governance closeout.
 
