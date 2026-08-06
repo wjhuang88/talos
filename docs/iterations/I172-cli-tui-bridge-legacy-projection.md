@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-06 |
 | Work Slice | Private extraction of legacy `TurnEvent` and structured-legacy compatibility projection handlers only. |
 | Claimed At | 2026-08-06 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #140 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |

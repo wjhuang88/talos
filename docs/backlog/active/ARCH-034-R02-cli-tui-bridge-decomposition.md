@@ -13,13 +13,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 active architecture session 2026-08-06 |
 | Work Slice | Extract only the legacy `TurnEvent` and structured-legacy compatibility projection handlers into a private module behind the existing `tui_bridge` entry points; preserve event ordering, state transitions, channel topology, custody, cancellation, and all output text. |
 | Claimed At | 2026-08-06 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #140 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
