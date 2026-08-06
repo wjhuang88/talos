@@ -63,6 +63,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
+    - "Establish I171/ARCH-034-D ownership and rebaseline the v0.7.0 workspace before selecting new ARCH-034 production remediation; preserve I144 as historical evidence"
     - "Keep TUI-044/I169 completion evidence bound to PR #131, exact Head 90165cace4625c0f27616b3e1b9871bcb6a10186, CI run 31010166558, rebuilt real-terminal evidence, and merge commit 685d3b4f4088a172551f8c844a89f5dee9469430"
     - "Track Issue #136 independently as a non-blocking direct /delete diagnostic-actionability correction; do not reopen TUI-044/I169 or ADR-056 semantics"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"

@@ -31,6 +31,7 @@ That snapshot is historical evidence and not current activation authority.
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
+| I171 | Workspace Architecture Rebaseline | Planned | Claim ARCH-034-D, reproduce the v0.7.0 architecture baseline, and create bounded remediation owners; no production refactor. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
