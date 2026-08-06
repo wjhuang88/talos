@@ -40,7 +40,7 @@
       <header class="talos-lead">
         <h1>安装</h1>
         <p>
-          请选择与你平台匹配的安装方式。对于 v0.6.1，官方安装器和
+          请选择与你平台匹配的安装方式。对于 v0.7.0，官方安装器和
           release 压缩包是受支持的二进制入口。crates.io 上的 Cargo install
           形态已经规划，但尚未发布。
         </p>
@@ -66,18 +66,18 @@
         </p>
         <div class="talos-codeblock">
           <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.6.1 sh
+  | TALOS_VERSION=v0.7.0 sh
 ~/.talos/bin/talos --version</code></pre>
         </div>
         <p>Windows x86_64 PowerShell：</p>
         <div class="talos-codeblock">
-          <pre><code>$env:TALOS_VERSION = 'v0.6.1'
+          <pre><code>$env:TALOS_VERSION = 'v0.7.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 &amp; "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION</code></pre>
         </div>
         <p>
-          请将 <code>v0.6.1</code> 替换为需要的 release tag。安装器会覆盖目标
+          请将 <code>v0.7.0</code> 替换为需要的 release tag。安装器会覆盖目标
           安装目录中的二进制文件，但不会回退配置或会话数据。Talos 仍处于
           pre-1.0；运行旧版本前建议备份 <code>~/.talos</code>，也可以设置
           <code>TALOS_INSTALL_DIR</code>，在隔离目录中试用旧版本。需要恢复到

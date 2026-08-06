@@ -41,7 +41,7 @@
         <h1>Install</h1>
         <p>
           Pick the install path for your platform. The official installers and
-          release archives are the supported binary entrypoints for v0.6.1.
+          release archives are the supported binary entrypoints for v0.7.0.
           Cargo install from crates.io is planned, but not published yet.
         </p>
       </header>
@@ -65,18 +65,18 @@
         </p>
         <div class="talos-codeblock">
           <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.6.1 sh
+  | TALOS_VERSION=v0.7.0 sh
 ~/.talos/bin/talos --version</code></pre>
         </div>
         <p>For Windows x86_64 PowerShell:</p>
         <div class="talos-codeblock">
-          <pre><code>$env:TALOS_VERSION = 'v0.6.1'
+          <pre><code>$env:TALOS_VERSION = 'v0.7.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 &amp; "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION</code></pre>
         </div>
         <p>
-          Replace <code>v0.6.1</code> with the release tag you need. The
+          Replace <code>v0.7.0</code> with the release tag you need. The
           installer overwrites the binary in the selected install directory;
           it does not roll back configuration or session data. Talos is
           pre-1.0, so back up <code>~/.talos</code> before running an older
