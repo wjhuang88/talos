@@ -1,6 +1,6 @@
 # Iteration I169: Transactional Batched Steering Turn
 
-> Document status: **Complete (2026-08-06)**
+> Document status: Complete (2026-08-06)
 > Published plan date: 2026-08-01
 > Preactivation hardening date: 2026-08-02
 > Activation date: 2026-08-02
@@ -8,7 +8,7 @@
 > Activation baseline: `main@a9faf4a8b7db2b87eaf87a288338e36f5f2f7eae`
 > Implementation branch: `feat/i169-tui-044-transactional-steering`
 > Implementation PR: #131 — merged
-> Completion commit: `685d3b4f4088a172551f8c844a89f5dee9469430`
+> Completion Commit: `685d3b4f4088a172551f8c844a89f5dee9469430`
 > Accepted exact Head: `90165cace4625c0f27616b3e1b9871bcb6a10186`
 > Objective: implement Issue #119 / TUI-044 under ADR-056 with structured queue boundaries,
 > transactional ownership transfer, durable pending custody, exact request planning and replay parity.
@@ -29,6 +29,7 @@
 | Implementation PR | #131 — merged |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer authorized formal activation, accepted exact-head automated and real-terminal evidence, classified #136 as a non-blocking independent residual, and explicitly authorized merge and closeout. |
+| Last Updated | 2026-08-06 |
 | Handoff / Release Condition | Satisfied. Completion evidence is recorded below; ADR-056 is Accepted and TUI-044 is Complete. |
 
 ## Selected Story And Decision
@@ -38,7 +39,7 @@
 | [TUI-044](../backlog/active/TUI-044-transactional-batched-steering-turn.md) | Complete | Compatible queued steering becomes one bounded later Turn while original user-item boundaries and FIFO order remain intact. |
 | [ADR-056](../decisions/056-transactional-steering-submission-boundary.md) | Accepted | Durable receipt, unique execution authority, generation-safe lifecycle, Actor arbitration, transcript-before-journal finalization and exact request-plan boundaries are authoritative. |
 | [Issue #119](https://github.com/wjhuang88/talos/issues/119) | Completed | Acceptance matrix satisfied and implementation merged. |
-| [Issue #136](https://github.com/wjhuang88/talos/issues/136) | Open, non-blocking | Owns only executable recovery-command wording on the direct `/delete` failure surface. |
+| [Issue #136](https://github.com/wjhuang88/talos/issues/136) | Open, non-blocking | Owned by TUI-047 for executable recovery-command wording on the direct `/delete` failure surface. |
 
 ## Delivered Scope
 
@@ -132,14 +133,14 @@ The walkthrough proved:
 - Accepted decision: ADR-056.
 - Completed Story: TUI-044.
 - Completed Issue: #119.
-- Independent residual: #136, Open and non-blocking.
+- Independent residual: #136 / TUI-047, Open and non-blocking.
 - Recovery PR #120 and its branch remain archival and untouched.
 
 ## Variance And Residuals
 
-- Issue #136 owns the missing executable recovery-command text on direct `/delete` cleanup failure.
-  Underlying cleanup retryability, transcript-last ownership, index consistency and no-false-success
-  behavior are accepted and complete.
+- Issue #136 / TUI-047 owns the missing executable recovery-command text on direct `/delete`
+  cleanup failure. Underlying cleanup retryability, transcript-last ownership, index consistency and
+  no-false-success behavior are accepted and complete.
 - Queue editing/reordering, persistent cross-Session steering, automatic retry of a started terminal
   Turn, broader graceful shutdown, general persistent tasks and multi-controller arbitration require
   separate owners.
