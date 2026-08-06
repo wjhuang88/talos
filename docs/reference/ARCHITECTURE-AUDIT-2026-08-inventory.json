@@ -1,0 +1,1055 @@
+{
+  "baseline_commit": "5ab3b0f2a42a9dbcc9737d12a675eaf07469bc28",
+  "crates": [
+    {
+      "fan_in": 2,
+      "fan_out": 8,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-memory",
+        "talos-permission",
+        "talos-plugin",
+        "talos-sandbox",
+        "talos-session",
+        "talos-skill",
+        "talos-tools"
+      ],
+      "name": "talos-agent",
+      "path": "crates/talos-agent",
+      "production_lines": 8074,
+      "raw_lines": 17641,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 0,
+      "fan_out": 17,
+      "internal_dependencies": [
+        "talos-agent",
+        "talos-config",
+        "talos-conversation",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-exploration",
+        "talos-mcp",
+        "talos-memory",
+        "talos-permission",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-session",
+        "talos-skill",
+        "talos-tools",
+        "talos-tui"
+      ],
+      "name": "talos-cli",
+      "path": "crates/talos-cli",
+      "production_lines": 14853,
+      "raw_lines": 25768,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 2,
+      "fan_out": 1,
+      "internal_dependencies": [
+        "talos-core"
+      ],
+      "name": "talos-config",
+      "path": "crates/talos-config",
+      "production_lines": 4051,
+      "raw_lines": 9442,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 2,
+      "fan_out": 2,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-plugin"
+      ],
+      "name": "talos-conversation",
+      "path": "crates/talos-conversation",
+      "production_lines": 4212,
+      "raw_lines": 7788,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 16,
+      "fan_out": 0,
+      "internal_dependencies": [],
+      "name": "talos-core",
+      "path": "crates/talos-core",
+      "production_lines": 2539,
+      "raw_lines": 3954,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 0,
+      "internal_dependencies": [],
+      "name": "talos-dashboard",
+      "path": "crates/talos-dashboard",
+      "production_lines": 483,
+      "raw_lines": 1164,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 2,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-plugin"
+      ],
+      "name": "talos-evolution",
+      "path": "crates/talos-evolution",
+      "production_lines": 1488,
+      "raw_lines": 2711,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 0,
+      "internal_dependencies": [],
+      "name": "talos-exploration",
+      "path": "crates/talos-exploration",
+      "production_lines": 1151,
+      "raw_lines": 1988,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 4,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-permission",
+        "talos-plugin",
+        "talos-tools"
+      ],
+      "name": "talos-mcp",
+      "path": "crates/talos-mcp",
+      "production_lines": 1730,
+      "raw_lines": 1976,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 2,
+      "fan_out": 0,
+      "internal_dependencies": [],
+      "name": "talos-memory",
+      "path": "crates/talos-memory",
+      "production_lines": 2411,
+      "raw_lines": 4279,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 0,
+      "fan_out": 1,
+      "internal_dependencies": [
+        "talos-core"
+      ],
+      "name": "talos-models",
+      "path": "crates/talos-models",
+      "production_lines": 866,
+      "raw_lines": 1715,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 7,
+      "fan_out": 1,
+      "internal_dependencies": [
+        "talos-core"
+      ],
+      "name": "talos-permission",
+      "path": "crates/talos-permission",
+      "production_lines": 1326,
+      "raw_lines": 3058,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 7,
+      "fan_out": 2,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-permission"
+      ],
+      "name": "talos-plugin",
+      "path": "crates/talos-plugin",
+      "production_lines": 1151,
+      "raw_lines": 1812,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 2,
+      "fan_out": 2,
+      "internal_dependencies": [
+        "talos-config",
+        "talos-core"
+      ],
+      "name": "talos-provider",
+      "path": "crates/talos-provider",
+      "production_lines": 2930,
+      "raw_lines": 6668,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 2,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-plugin"
+      ],
+      "name": "talos-rpc",
+      "path": "crates/talos-rpc",
+      "production_lines": 682,
+      "raw_lines": 682,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 0,
+      "fan_out": 9,
+      "internal_dependencies": [
+        "talos-agent",
+        "talos-core",
+        "talos-permission",
+        "talos-plugin",
+        "talos-provider",
+        "talos-sandbox",
+        "talos-session",
+        "talos-skill",
+        "talos-tools"
+      ],
+      "name": "talos-runtime",
+      "path": "crates/talos-runtime",
+      "production_lines": 602,
+      "raw_lines": 1627,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 3,
+      "fan_out": 1,
+      "internal_dependencies": [
+        "talos-core"
+      ],
+      "name": "talos-sandbox",
+      "path": "crates/talos-sandbox",
+      "production_lines": 758,
+      "raw_lines": 1248,
+      "unsafe_lexical_candidates": 4
+    },
+    {
+      "fan_in": 3,
+      "fan_out": 1,
+      "internal_dependencies": [
+        "talos-core"
+      ],
+      "name": "talos-session",
+      "path": "crates/talos-session",
+      "production_lines": 8026,
+      "raw_lines": 12889,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 3,
+      "fan_out": 0,
+      "internal_dependencies": [],
+      "name": "talos-skill",
+      "path": "crates/talos-skill",
+      "production_lines": 886,
+      "raw_lines": 3119,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "fan_in": 4,
+      "fan_out": 3,
+      "internal_dependencies": [
+        "talos-core",
+        "talos-permission",
+        "talos-sandbox"
+      ],
+      "name": "talos-tools",
+      "path": "crates/talos-tools",
+      "production_lines": 9749,
+      "raw_lines": 15129,
+      "unsafe_lexical_candidates": 1
+    },
+    {
+      "fan_in": 1,
+      "fan_out": 3,
+      "internal_dependencies": [
+        "talos-conversation",
+        "talos-core",
+        "talos-permission"
+      ],
+      "name": "talos-tui",
+      "path": "crates/talos-tui",
+      "production_lines": 9975,
+      "raw_lines": 19114,
+      "unsafe_lexical_candidates": 0
+    }
+  ],
+  "hot_files": [
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/session.rs",
+      "production_lines": 1386,
+      "raw_lines": 1386,
+      "recent_commits": 23,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/session_transition.rs",
+      "production_lines": 528,
+      "raw_lines": 926,
+      "recent_commits": 19,
+      "test_boundary_line": 529,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/tui_bridge.rs",
+      "production_lines": 2091,
+      "raw_lines": 2164,
+      "recent_commits": 15,
+      "test_boundary_line": 2092,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/pending_submission.rs",
+      "production_lines": 1097,
+      "raw_lines": 1097,
+      "recent_commits": 15,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-core",
+      "path": "crates/talos-core/src/session.rs",
+      "production_lines": 265,
+      "raw_lines": 438,
+      "recent_commits": 12,
+      "test_boundary_line": 266,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/session/turn.rs",
+      "production_lines": 481,
+      "raw_lines": 481,
+      "recent_commits": 11,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/session_handlers.rs",
+      "production_lines": 1329,
+      "raw_lines": 1629,
+      "recent_commits": 10,
+      "test_boundary_line": 1330,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/model_lifecycle.rs",
+      "production_lines": 715,
+      "raw_lines": 1564,
+      "recent_commits": 9,
+      "test_boundary_line": 716,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/scheduler.rs",
+      "production_lines": 945,
+      "raw_lines": 1251,
+      "recent_commits": 7,
+      "test_boundary_line": 946,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_runners.rs",
+      "production_lines": 783,
+      "raw_lines": 783,
+      "recent_commits": 7,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/lib.rs",
+      "production_lines": 95,
+      "raw_lines": 95,
+      "recent_commits": 6,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/lib.rs",
+      "production_lines": 1220,
+      "raw_lines": 1232,
+      "recent_commits": 5,
+      "test_boundary_line": 1221,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/manager.rs",
+      "production_lines": 922,
+      "raw_lines": 967,
+      "recent_commits": 5,
+      "test_boundary_line": 923,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_runtime.rs",
+      "production_lines": 445,
+      "raw_lines": 712,
+      "recent_commits": 5,
+      "test_boundary_line": 446,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/fetch_url.rs",
+      "production_lines": 354,
+      "raw_lines": 765,
+      "recent_commits": 5,
+      "test_boundary_line": 355,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-core",
+      "path": "crates/talos-core/src/submission.rs",
+      "production_lines": 318,
+      "raw_lines": 404,
+      "recent_commits": 5,
+      "test_boundary_line": 319,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/jsonl.rs",
+      "production_lines": 315,
+      "raw_lines": 315,
+      "recent_commits": 5,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-conversation",
+      "path": "crates/talos-conversation/src/engine.rs",
+      "production_lines": 1651,
+      "raw_lines": 1651,
+      "recent_commits": 4,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/provider_discovery.rs",
+      "production_lines": 138,
+      "raw_lines": 314,
+      "recent_commits": 4,
+      "test_boundary_line": 139,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/storage.rs",
+      "production_lines": 588,
+      "raw_lines": 763,
+      "recent_commits": 3,
+      "test_boundary_line": 589,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/artifacts.rs",
+      "production_lines": 459,
+      "raw_lines": 459,
+      "recent_commits": 3,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/session_setup.rs",
+      "production_lines": 436,
+      "raw_lines": 531,
+      "recent_commits": 3,
+      "test_boundary_line": 437,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_inline.rs",
+      "production_lines": 340,
+      "raw_lines": 340,
+      "recent_commits": 3,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/request_plan.rs",
+      "production_lines": 237,
+      "raw_lines": 237,
+      "recent_commits": 3,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_interactive.rs",
+      "production_lines": 198,
+      "raw_lines": 251,
+      "recent_commits": 3,
+      "test_boundary_line": 199,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/registry.rs",
+      "production_lines": 1059,
+      "raw_lines": 2172,
+      "recent_commits": 2,
+      "test_boundary_line": 1060,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-provider",
+      "path": "crates/talos-provider/src/anthropic_request.rs",
+      "production_lines": 387,
+      "raw_lines": 811,
+      "recent_commits": 2,
+      "test_boundary_line": 388,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_print.rs",
+      "production_lines": 343,
+      "raw_lines": 544,
+      "recent_commits": 2,
+      "test_boundary_line": 344,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/token.rs",
+      "production_lines": 337,
+      "raw_lines": 666,
+      "recent_commits": 2,
+      "test_boundary_line": 338,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/tui_runtime_builder.rs",
+      "production_lines": 222,
+      "raw_lines": 222,
+      "recent_commits": 2,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    }
+  ],
+  "large_files": [
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/tui_bridge.rs",
+      "production_lines": 2091,
+      "raw_lines": 2164,
+      "recent_commits": 15,
+      "test_boundary_line": 2092,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/app.rs",
+      "production_lines": 1719,
+      "raw_lines": 1774,
+      "recent_commits": 1,
+      "test_boundary_line": 1720,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/todo.rs",
+      "production_lines": 1653,
+      "raw_lines": 2353,
+      "recent_commits": 0,
+      "test_boundary_line": 1654,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-conversation",
+      "path": "crates/talos-conversation/src/engine.rs",
+      "production_lines": 1651,
+      "raw_lines": 1651,
+      "recent_commits": 4,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/scrollback.rs",
+      "production_lines": 1530,
+      "raw_lines": 1770,
+      "recent_commits": 0,
+      "test_boundary_line": 1531,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/session.rs",
+      "production_lines": 1386,
+      "raw_lines": 1386,
+      "recent_commits": 23,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/session_handlers.rs",
+      "production_lines": 1329,
+      "raw_lines": 1629,
+      "recent_commits": 10,
+      "test_boundary_line": 1330,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/lib.rs",
+      "production_lines": 1220,
+      "raw_lines": 1232,
+      "recent_commits": 5,
+      "test_boundary_line": 1221,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-core",
+      "path": "crates/talos-core/src/tool.rs",
+      "production_lines": 1103,
+      "raw_lines": 1731,
+      "recent_commits": 1,
+      "test_boundary_line": 1104,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/pending_submission.rs",
+      "production_lines": 1097,
+      "raw_lines": 1097,
+      "recent_commits": 15,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/registry.rs",
+      "production_lines": 1059,
+      "raw_lines": 2172,
+      "recent_commits": 2,
+      "test_boundary_line": 1060,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/scheduler.rs",
+      "production_lines": 945,
+      "raw_lines": 1251,
+      "recent_commits": 7,
+      "test_boundary_line": 946,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/main.rs",
+      "production_lines": 936,
+      "raw_lines": 936,
+      "recent_commits": 1,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/manager.rs",
+      "production_lines": 922,
+      "raw_lines": 967,
+      "recent_commits": 5,
+      "test_boundary_line": 923,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/exec_tool.rs",
+      "production_lines": 916,
+      "raw_lines": 1298,
+      "recent_commits": 1,
+      "test_boundary_line": 917,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-conversation",
+      "path": "crates/talos-conversation/src/validation.rs",
+      "production_lines": 851,
+      "raw_lines": 1144,
+      "recent_commits": 1,
+      "test_boundary_line": 852,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/tool_execution.rs",
+      "production_lines": 796,
+      "raw_lines": 868,
+      "recent_commits": 0,
+      "test_boundary_line": 797,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/mode_runners.rs",
+      "production_lines": 783,
+      "raw_lines": 783,
+      "recent_commits": 7,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-mcp",
+      "path": "crates/talos-mcp/src/client/transport.rs",
+      "production_lines": 778,
+      "raw_lines": 963,
+      "recent_commits": 0,
+      "test_boundary_line": 779,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/panel_state.rs",
+      "production_lines": 750,
+      "raw_lines": 750,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/symbol.rs",
+      "production_lines": 735,
+      "raw_lines": 735,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/model_lifecycle.rs",
+      "production_lines": 715,
+      "raw_lines": 1564,
+      "recent_commits": 9,
+      "test_boundary_line": 716,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/bash_tool.rs",
+      "production_lines": 715,
+      "raw_lines": 1451,
+      "recent_commits": 1,
+      "test_boundary_line": 716,
+      "unsafe_lexical_candidates": 1
+    },
+    {
+      "crate": "talos-conversation",
+      "path": "crates/talos-conversation/src/governance_summary.rs",
+      "production_lines": 698,
+      "raw_lines": 821,
+      "recent_commits": 1,
+      "test_boundary_line": 699,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/state.rs",
+      "production_lines": 681,
+      "raw_lines": 681,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/git.rs",
+      "production_lines": 664,
+      "raw_lines": 664,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-memory",
+      "path": "crates/talos-memory/src/store.rs",
+      "production_lines": 659,
+      "raw_lines": 659,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/durable.rs",
+      "production_lines": 649,
+      "raw_lines": 893,
+      "recent_commits": 1,
+      "test_boundary_line": 650,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/file_tools/write_edit_tools.rs",
+      "production_lines": 647,
+      "raw_lines": 647,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/scrollback_markdown.rs",
+      "production_lines": 644,
+      "raw_lines": 644,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-exploration",
+      "path": "crates/talos-exploration/src/lib.rs",
+      "production_lines": 641,
+      "raw_lines": 1043,
+      "recent_commits": 1,
+      "test_boundary_line": 642,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-permission",
+      "path": "crates/talos-permission/src/lib.rs",
+      "production_lines": 635,
+      "raw_lines": 635,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/prompt/builder.rs",
+      "production_lines": 626,
+      "raw_lines": 626,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/inline_terminal.rs",
+      "production_lines": 626,
+      "raw_lines": 994,
+      "recent_commits": 0,
+      "test_boundary_line": 627,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-conversation",
+      "path": "crates/talos-conversation/src/types.rs",
+      "production_lines": 619,
+      "raw_lines": 619,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-config",
+      "path": "crates/talos-config/src/config.rs",
+      "production_lines": 605,
+      "raw_lines": 605,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-agent",
+      "path": "crates/talos-agent/src/compaction/engine.rs",
+      "production_lines": 604,
+      "raw_lines": 604,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-runtime",
+      "path": "crates/talos-runtime/src/lib.rs",
+      "production_lines": 602,
+      "raw_lines": 1627,
+      "recent_commits": 1,
+      "test_boundary_line": 603,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/models_browser.rs",
+      "production_lines": 593,
+      "raw_lines": 869,
+      "recent_commits": 1,
+      "test_boundary_line": 594,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/document_extract.rs",
+      "production_lines": 591,
+      "raw_lines": 957,
+      "recent_commits": 1,
+      "test_boundary_line": 592,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/storage.rs",
+      "production_lines": 588,
+      "raw_lines": 763,
+      "recent_commits": 3,
+      "test_boundary_line": 589,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-config",
+      "path": "crates/talos-config/src/store/recovery.rs",
+      "production_lines": 585,
+      "raw_lines": 585,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-provider",
+      "path": "crates/talos-provider/src/anthropic_stream.rs",
+      "production_lines": 552,
+      "raw_lines": 1219,
+      "recent_commits": 1,
+      "test_boundary_line": 553,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-memory",
+      "path": "crates/talos-memory/src/consolidation.rs",
+      "production_lines": 542,
+      "raw_lines": 965,
+      "recent_commits": 1,
+      "test_boundary_line": 543,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-models",
+      "path": "crates/talos-models/src/store.rs",
+      "production_lines": 535,
+      "raw_lines": 1172,
+      "recent_commits": 1,
+      "test_boundary_line": 536,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tui",
+      "path": "crates/talos-tui/src/tool_display.rs",
+      "production_lines": 535,
+      "raw_lines": 1062,
+      "recent_commits": 1,
+      "test_boundary_line": 536,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-session",
+      "path": "crates/talos-session/src/sqlite.rs",
+      "production_lines": 534,
+      "raw_lines": 1135,
+      "recent_commits": 1,
+      "test_boundary_line": 535,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/http_request.rs",
+      "production_lines": 530,
+      "raw_lines": 708,
+      "recent_commits": 1,
+      "test_boundary_line": 531,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-tools",
+      "path": "crates/talos-tools/src/web_search.rs",
+      "production_lines": 530,
+      "raw_lines": 689,
+      "recent_commits": 1,
+      "test_boundary_line": 531,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-cli",
+      "path": "crates/talos-cli/src/session_transition.rs",
+      "production_lines": 528,
+      "raw_lines": 926,
+      "recent_commits": 19,
+      "test_boundary_line": 529,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-config",
+      "path": "crates/talos-config/src/store/journal.rs",
+      "production_lines": 516,
+      "raw_lines": 516,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-config",
+      "path": "crates/talos-config/src/types.rs",
+      "production_lines": 514,
+      "raw_lines": 514,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    },
+    {
+      "crate": "talos-config",
+      "path": "crates/talos-config/src/store.rs",
+      "production_lines": 501,
+      "raw_lines": 501,
+      "recent_commits": 0,
+      "test_boundary_line": null,
+      "unsafe_lexical_candidates": 0
+    }
+  ],
+  "method": {
+    "hotspots": "distinct commits touching each Rust file in the latest 200 commits",
+    "large_file_threshold": 500,
+    "package_authority": "cargo metadata --locked --no-deps --format-version 1",
+    "production_lines": "physical source lines excluding tests directories, tests.rs, *_tests.rs, test_support.rs, and the conventional trailing item-scoped #[cfg(test)] module"
+  },
+  "schema_version": 1,
+  "workspace": {
+    "crate_count": 21,
+    "dependency_cycles": [],
+    "production_lines": 77943,
+    "raw_lines": 143772,
+    "unsafe_lexical_candidates": 5
+  }
+}

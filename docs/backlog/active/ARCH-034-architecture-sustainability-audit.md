@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Type | Architecture Epic |
-| Status | Rebaseline planned — remediation gated |
+| Status | Rebaseline Complete — remediation separately gated |
 | Priority | P1 |
-| Selected Iteration | I144 historical audit (Complete); I171 current-state rebaseline (Planned) |
+| Selected Iteration | I144 historical audit (Complete); I171 current-state rebaseline (Active) |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
@@ -17,10 +17,10 @@ fitness checks that prevent uncontrolled code accumulation.
 
 ## Current Evidence Snapshot
 
-- 21 workspace crates and roughly 111k raw Rust lines including tests.
-- Largest raw roots include `scheduler.rs` (3230), `todo.rs` (2353),
-  `openai_sse.rs` (2197), `talos-runtime/lib.rs` (1624), CLI registry (1350),
-  TUI app (1334), conversation engine (1267), and core tool types (1264).
+- 21 workspace crates, 143,772 raw Rust lines, and 77,943 production lines under the
+  August measurement convention.
+- Current large-root and hotspot evidence is maintained in
+  `docs/reference/ARCHITECTURE-AUDIT-2026-08-inventory.json`; July/v0.4 counts remain historical.
 - Raw LOC is a locator, not a verdict: several roots contain large inline tests or
   intentionally cohesive state machines.
 - `talos-cli` has the highest internal dependency fan-out (17). Existing ARCH-022,
@@ -34,13 +34,15 @@ fitness checks that prevent uncontrolled code accumulation.
    blocked on accepted A findings; one behavior-preserving story per root/seam.
 3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement,
    introduces only evidence-backed prevention checks after A/B.
-4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Review,
-   implements accepted ADR-053 through I158. Contribution/profile implementation and deterministic
-   inventory evidence are merged; scheduler/status exception ownership plus ARCHITECTURE, TOOL-003,
-   and F01 disposition remain the final closeout gates. I158 is Review, not Complete.
-5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Ready current-state
-   v0.7.0 rebaseline. It preserves I144 history and creates bounded remediation owners; no
-   production refactor is authorized.
+4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Complete,
+   with implementation, explicit scheduler/status exceptions, and documentation closeout evidenced
+   by `c88c1d1a`.
+5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Complete current-state
+   v0.7.0 rebaseline. Claim #138 is effective on `main`; no production refactor was authorized by
+   I171.
+6. [ARCH-034-R02](ARCH-034-R02-cli-tui-bridge-decomposition.md) through
+   [ARCH-034-R11](ARCH-034-R11-architecture-documentation-truth.md) — bounded current-state
+   owners created from the August register; each remains unselected until separately claimed.
 
 ## Audit Dimensions
 

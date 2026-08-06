@@ -170,6 +170,20 @@ mod tests {
         format!("http://{addr}")
     }
 
+    async fn network_failure_server() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("operation should succeed");
+        let addr = listener.local_addr().expect("operation should succeed");
+
+        tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.expect("operation should succeed");
+            drop(socket);
+        });
+
+        format!("http://{addr}")
+    }
+
     #[tokio::test]
     async fn discover_openai_chat_models_success() {
         let body = r#"{"data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"}]}"#;
@@ -254,13 +268,10 @@ mod tests {
 
     #[tokio::test]
     async fn discover_network_error_is_bounded() {
+        let url = network_failure_server().await;
         let result = tokio::time::timeout(
             Duration::from_secs(2),
-            discover_provider_models(
-                "http://127.0.0.1:1",
-                "test-key",
-                talos_config::ProviderProtocol::OpenAIChat,
-            ),
+            discover_provider_models(&url, "test-key", talos_config::ProviderProtocol::OpenAIChat),
         )
         .await
         .expect("unreachable discovery must respect the test connect timeout");

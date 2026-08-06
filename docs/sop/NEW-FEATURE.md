@@ -69,9 +69,17 @@ Follow `GIT-WORKFLOW.md`:
 ### Adding a Tool (talos-tools)
 
 1. Implement the `AgentTool` trait.
-2. Register in the tool registry.
-3. Add unit tests for the tool logic.
-4. Add permission rules if the tool modifies files.
+2. Add one authoritative `ToolContribution` constructor/list entry in the implementing crate.
+3. Select that contribution explicitly in each applicable CLI/runtime profile; keep permission
+   wrappers and runtime inputs at the outer composition root.
+4. Add unit tests for tool logic, contribution source/collision behavior, and exact profile
+   membership.
+5. Define `permission_profile()` for every side effect/resource; all write-capable tools still pass
+   through the permission pipeline.
+
+Scheduler tools are runtime-injected because they require a live scheduler handle; the MCP
+`status` tool is CLI-product-local. These are documented exceptions, not a template for reusable
+built-ins. See ADR-053 and `docs/reference/ARCHITECTURE.md`.
 
 ### Adding a Provider (talos-provider)
 

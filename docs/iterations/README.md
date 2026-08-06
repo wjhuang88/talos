@@ -28,11 +28,14 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
+I158 and I171 completion evidence: `Completion Commit: c88c1d1a` (existing implementation/audit
+closeout evidence; status synchronization commits do not self-certify completion).
+
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I158 | Tool Registration Composition Consolidation | Review | Resolve scheduler/status contribution exception ownership and final architecture/tool-extension/finding documentation before Complete or Paused. |
-| I171 | Workspace Architecture Rebaseline | Planned | Claim ARCH-034-D, reproduce the v0.7.0 architecture baseline, and create bounded remediation owners; no production refactor. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires I158 Complete/Paused and a recorded TUI-037 disposition. |
+| I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
+| I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires the completed I158 baseline and a recorded TUI-037 disposition before activation. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |

@@ -1,6 +1,6 @@
 # Iteration I171: Workspace Architecture Rebaseline
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-08-06
 > Planned objective: re-audit the current v0.7.0 workspace and produce a complete, reproducible,
 > bounded remediation queue without changing product/runtime/public API behavior.
@@ -63,11 +63,11 @@
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| A1 | Establish current baseline | Clean-state, non-terminal inventory, graph, scale, locked validation results | Effective claim | Commands recorded with true outcomes | Record reproducible blocker | Planned |
-| A2 | Measure and trace architecture | Current crate/root/hotspot/extension/native-boundary evidence | A1 | Every ARCH-034-D audit dimension covered | Mark evidence unknown and add validation task | Planned |
-| A3 | Reconcile findings | August report plus machine-readable register | A2 | Every prior/new finding has disposition and owner | Keep unresolved finding Proposed | Planned |
-| A4 | Repair deterministic audit baseline | Only justified test/audit-harness defects fixed | A1/A2 | Full required validation passes without production behavior change | Separate bounded blocker story | Planned |
-| A5 | Synchronize governance | Parent/children, iteration index, backlog, Board, manifest consistent | A3/A4 | Both governance validators and semantic owner audit pass | Retain Review with exact residual | Planned |
+| A1 | Establish current baseline | Clean-state, non-terminal inventory, graph, scale, locked validation results | Effective claim | Commands recorded with true outcomes | Record reproducible blocker | Done |
+| A2 | Measure and trace architecture | Current crate/root/hotspot/extension/native-boundary evidence | A1 | Every ARCH-034-D audit dimension covered | Mark evidence unknown and add validation task | Done |
+| A3 | Reconcile findings | August report plus machine-readable register | A2 | Every prior/new finding has disposition and owner | Keep unresolved finding Proposed | Done |
+| A4 | Repair deterministic audit baseline | Only justified test/audit-harness defects fixed | A1/A2 | Full required validation passes without production behavior change | Separate bounded blocker story | Done — `5ab3b0f2` |
+| A5 | Synchronize governance | Parent/children, iteration index, backlog, Board, manifest consistent | A3/A4 | Both governance validators and semantic owner audit pass | Retain Review with exact residual | Done — `c88c1d1a` |
 
 ## Published Baseline
 
@@ -115,19 +115,35 @@ reproducible from current source; a narrow passing check cannot substitute for t
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-06 | Planning | Preliminary read-only evidence: current main is v0.7.0; governance/claim/scale/fmt/check/all-target Clippy pass; workspace test repeatedly exposes a provider-discovery unreachable-endpoint fixture timeout; no production edit made. |
+| 2026-08-06 | Activation | Claim PR #138 passed exact-head Linux/Windows CI and merge-time CAS, then merged at `349d0cd1`; implementation branch created from that effective claim. |
+| 2026-08-06 | Evidence | Added deterministic architecture inventory harness and loopback network-failure fixture in `5ab3b0f2`; produced the August report/register and R02-R11 owners without production edits. |
 
 ## Verification Evidence
 
-- Pending effective claim and execution.
+- Claim PR #138 exact-head CI run `31077504918`: Linux release preflight, Windows workspace,
+  Windows installer, and remote owner reconciliation all passed.
+- Claim merge: `349d0cd1`; audit/test harness implementation: `5ab3b0f2`.
+- `scripts/audit_architecture.py .`: PASS; 21 crates, 143,772 raw lines, 77,943 production lines,
+  no internal dependency cycle, five production unsafe lexical candidates.
+- Isolated provider discovery bounded-network-error test: PASS.
+- Full locked workspace validation, governance validators, scale assessment, and diff checks passed
+  after the audit/test-harness repair and documentation synchronization. The sandbox-restricted
+  environment could not bind loopback sockets for 16 existing network-mock tests; the same locked
+  workspace test command was rerun in the authorized non-sandbox environment and all tests passed.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; iteration is Planned.
+- Completion Commit: `c88c1d1a` (existing audit/report/register and owner-synchronization evidence;
+  this status update does not cite itself as completion evidence).
 
 ## Variance And Residuals
 
 - Production remediation remains outside I171 and must use later claimed iterations.
+- Python 3 is a Soft host dependency for audit tooling only. It is already used by repository CI;
+  the script fails clearly if absent. Replace it with a Rust-native project tool only if CI/platform
+  availability makes this harness non-runnable; do not add a runtime dependency for audit metrics.
 
 ## Retrospective
 
-- Pending execution.
+- The current-state audit is reproducible and all accepted findings have an explicit disposition or
+  bounded owner. Production remediation remains separately claimed under R02-R11.

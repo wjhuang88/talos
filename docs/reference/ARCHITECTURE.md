@@ -102,18 +102,20 @@ provides the parsed and indexed skill data while explicit Level 1/2 activation r
 
 ### CLI Runtime Boundary
 
-`talos-cli` keeps argument parsing and top-level mode dispatch in `main.rs`. Mode execution is
-isolated in `mode_runners.rs` so startup composition can be reviewed without scrolling through the
-full TUI/print/inline/RPC/MCP execution bodies.
+`talos-cli` keeps argument parsing and top-level mode dispatch in `main.rs`. `mode_runners.rs`
+coordinates shared startup and delegates mode-specific execution to focused modules; TUI runtime
+construction, session lifecycle workflows, and model activation have separate owners.
 
 | Module | Responsibility |
 |--------|----------------|
 | `main.rs` | `Cli`, `Mode`, logging setup, mode selection, and hook registry construction. |
-| `mode_runners.rs` | Execution bodies for print, TUI, inline REPL, legacy interactive REPL, RPC, and MCP server modes. |
-| `registry.rs` | Tool registry construction and permission-aware wrappers. |
+| `mode_runners.rs` | Shared startup and dispatch for print, TUI, inline/legacy interactive, RPC, and MCP modes. |
+| `mode_print.rs` / `mode_inline.rs` / `mode_interactive.rs` | Mode-specific execution bodies. |
+| `registry.rs` | Explicit tool profile composition, collision checks, and permission-aware wrappers. |
 | `session_setup.rs` | Workspace/session resolution and session utility modes (`--search`, `--list`, `--learned`). |
 | `provider_setup.rs` | Provider parsing and provider/client config construction. |
 | `mcp_runtime.rs` | Session-scoped MCP startup, cached discovery results, child-process lifetime, and status projection. |
+| `session_handlers.rs` / `model_lifecycle.rs` | Session command workflows and transactional model activation. |
 | `tui_bridge.rs` / `event_loop.rs` | TUI and legacy interactive event-loop bridges. |
 
 ### MCP Session Boundary
@@ -190,6 +192,27 @@ execute the tool.
 
 Tool prompt content is grouped into stable family sections. Adding or removing one family should
 not rewrite unchanged family blocks, preserving provider cache friendliness.
+
+### Tool Contribution And Profile Composition
+
+Concrete tools are declared by the crate that implements them and selected explicitly by the
+product composition root. `talos-core` owns only `AgentTool`, `ToolContribution`, source identity,
+collision diagnostics, presentation policy, and `ToolRegistry`; it does not depend on concrete
+tool crates.
+
+| Owner | Contribution boundary | Composition verdict |
+|---|---|---|
+| `talos-tools` | Shell, file, workspace, network, image, git, and symbol contribution functions | Authoritative built-in declarations |
+| `talos-session` | Session-bound Todo contributions | Authoritative session-tool declarations |
+| `talos-cli` | Print/TUI/MCP/interactive profile selection and permission wrappers | Expected outer composition root |
+| `talos-agent` scheduler | Runtime-created tools passed into print/TUI construction | Explicit runtime-injection exception; no static contribution can own the live scheduler handle |
+| CLI MCP `status` | Product-local diagnostic tool | Explicit CLI product exception; not a reusable capability crate |
+| Plugins/MCP adapters | Explicit contribution wrappers with source identity | Runtime extension path; duplicate names fail deterministically |
+
+Adding a reusable built-in starts in its implementing crate's contribution module, then adds an
+explicit capability/profile selection at the applicable composition root. Do not duplicate the
+constructor across every registry builder, hide registration in global initialization, or move
+runtime/product-specific dependencies into `talos-core`.
 
 ## Crate Distribution
 

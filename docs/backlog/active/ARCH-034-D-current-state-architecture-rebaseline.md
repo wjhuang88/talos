@@ -4,9 +4,9 @@
 |---|---|
 | Type | Architecture Spike / Validation Repair |
 | Parent Epic | ARCH-034 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P1 |
-| Selected Iteration | I171 (Planned; Claim PR #138 pending target-branch merge) |
+| Selected Iteration | I171 (Active; Claim PR #138 effective on `main@349d0cd1`) |
 | Preserved behavior | All product/runtime/public API behavior |
 
 ## Problem

@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-06"
-status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 is Complete through merged PR #131 at completion commit 685d3b4f4088a172551f8c844a89f5dee9469430; exact accepted Head 90165cace4625c0f27616b3e1b9871bcb6a10186 passed CI run 31010166558 and rebuilt real-terminal acceptance. ADR-056 is Accepted and Issue #119 is completed by the post-merge governance closeout. Issue #136 remains independently Open and non-blocking for direct /delete recovery-command wording. Recovery PRs #120/#121 remain immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158 remains Review; I159-I162 remain Blocked. REL-002 remains NO-GO."
+status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 is Complete through merged PR #131 at completion commit 685d3b4f4088a172551f8c844a89f5dee9469430; exact accepted Head 90165cace4625c0f27616b3e1b9871bcb6a10186 passed CI run 31010166558 and rebuilt real-terminal acceptance. ADR-056 is Accepted and Issue #119 is completed by the post-merge governance closeout. Issue #136 remains independently Open and non-blocking for direct /delete recovery-command wording. Recovery PRs #120/#121 remain immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158/ARCH-034-R01 is Complete with existing evidence c88c1d1a; I171/ARCH-034-D is Complete with existing evidence c88c1d1a. TUI-037 requires explicit disposition before I159; I159-I162 remain Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,8 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Establish I171/ARCH-034-D ownership and rebaseline the v0.7.0 workspace before selecting new ARCH-034 production remediation; preserve I144 as historical evidence"
+    - "Complete I171/ARCH-034-D locked validation and synchronize the August audit/register and R02-R11 owners; preserve I144 as historical evidence"
+    - "Keep ARCH-034-R02/R03/R05-R11 Ready but unclaimed until I171 closes; keep ARCH-034-R04 Refinement pending independent security review"
     - "Keep TUI-044/I169 completion evidence bound to PR #131, exact Head 90165cace4625c0f27616b3e1b9871bcb6a10186, CI run 31010166558, rebuilt real-terminal evidence, and merge commit 685d3b4f4088a172551f8c844a89f5dee9469430"
     - "Track Issue #136 independently as a non-blocking direct /delete diagnostic-actionability correction; do not reopen TUI-044/I169 or ADR-056 semantics"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"
