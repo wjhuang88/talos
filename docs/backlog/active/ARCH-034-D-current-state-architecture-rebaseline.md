@@ -6,7 +6,7 @@
 | Parent Epic | ARCH-034 |
 | Status | Ready |
 | Priority | P1 |
-| Selected Iteration | I171 (Planned; claim not yet effective) |
+| Selected Iteration | I171 (Planned; Claim PR #138 pending target-branch merge) |
 | Preserved behavior | All product/runtime/public API behavior |
 
 ## Problem

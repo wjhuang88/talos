@@ -16,15 +16,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 active architecture session 2026-08-06 |
 | Work Slice | Current v0.7.0 whole-workspace architecture rebaseline, test/audit-harness-only baseline repair, finding reconciliation, and bounded remediation owner creation; no production refactor. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-06 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #138 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested a complete governance-based whole-project architecture audit and behavior-preserving remediation on 2026-08-06; claim becomes effective only after exact-head CI, both governance validators, merge-time CAS, and recorded single-maintainer reason. |
+| Authorization Evidence | User requested a complete governance-based whole-project architecture audit and behavior-preserving remediation on 2026-08-06. No independent reviewer is currently available for this audit-only claim; Single-maintainer merge requires exact-head CI, both governance validators, merge-time CAS, and no unresolved blocking feedback. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-06 |
 | Handoff / Release Condition | Release if the rebaseline cannot be reproduced or if scope requires a production, public-API, permission, sandbox, or process-hardening change. |
