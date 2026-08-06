@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Type | Architecture Epic |
-| Status | Rebaseline in progress — remediation separately gated |
+| Status | Rebaseline Complete — remediation separately gated |
 | Priority | P1 |
 | Selected Iteration | I144 historical audit (Complete); I171 current-state rebaseline (Active) |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
@@ -34,13 +34,12 @@ fitness checks that prevent uncontrolled code accumulation.
    blocked on accepted A findings; one behavior-preserving story per root/seam.
 3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement,
    introduces only evidence-backed prevention checks after A/B.
-4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Review,
-   implements accepted ADR-053 through I158. Contribution/profile implementation and deterministic
-   inventory evidence are merged; scheduler/status exception ownership plus ARCHITECTURE, TOOL-003,
-   and F01 disposition remain the final closeout gates. I158 is Review, not Complete.
-5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Active current-state
-   v0.7.0 rebaseline. Claim #138 is effective on `main`; the audit is active and creates bounded
-   remediation owners; no production refactor is authorized by I171.
+4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Complete,
+   with implementation, explicit scheduler/status exceptions, and documentation closeout evidenced
+   by `c88c1d1a`.
+5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Complete current-state
+   v0.7.0 rebaseline. Claim #138 is effective on `main`; no production refactor was authorized by
+   I171.
 6. [ARCH-034-R02](ARCH-034-R02-cli-tui-bridge-decomposition.md) through
    [ARCH-034-R11](ARCH-034-R11-architecture-documentation-truth.md) — bounded current-state
    owners created from the August register; each remains unselected until separately claimed.

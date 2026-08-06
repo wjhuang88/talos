@@ -5,13 +5,13 @@
 | Story ID | ARCH-034-R01 |
 | Type | Architecture / Technical Story |
 | Parent Epic | ARCH-034 |
-| Status | Review — implementation and deterministic profile evidence merged; exception/documentation closeout pending |
+| Status | Complete — implementation, exception decision, and documentation closeout accepted |
 | Priority | P1 |
 | Source | ARCH-034-F01 audit finding; maintainer requirement, 2026-07-22 |
 | Estimated effort | M (3–5 developer days, excluding review/acceptance) |
 | Depends on | ARCH-034-A accepted audit; ADR-006; tool permission boundary |
 | Blocks | Future built-in tool additions and ARCH-031-A feature-boundary work |
-| Selected Iteration | I158 (Review — implementation evidence through `ec4d918f`; not Complete) |
+| Selected Iteration | I158 (Complete — implementation/evidence through `ec4d918f`; closeout `c88c1d1a`) |
 
 ## Problem
 
@@ -176,11 +176,19 @@ sole Active implementation iteration and this Story is now In Progress.
 - #105 merged as `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14` and proves deterministic complete Print/TUI equality plus MCP's explicit `status` / no-`read_image` / no-Todo differences.
 - Exact-head CI runs `30625383505` and `30626150159` passed release preflight and the Windows fixture; existing permission, plugin, MCP, presentation, `read_image`, safe projection, and one-shot continuation tests remained green.
 
-## Remaining Review Gates
+## Review Closure
 
-- Decide and document whether runtime-supplied scheduler tools and the CLI-owned MCP `status` tool are justified explicit profile/runtime exceptions to “every built-in has one authoritative contribution,” or migrate them in a new bounded implementation slice.
-- Update `docs/reference/ARCHITECTURE.md`, TOOL-003 developer extension guidance, and ARCH-034-F01 finding disposition to match the implemented model.
-- Re-run the complete validation ladder after those gates, record an existing completion commit, then synchronize parent/derived views to Complete. Until then the Story remains Review.
+- Runtime-supplied scheduler tools and the CLI-owned MCP `status` tool are accepted as explicit
+  profile/runtime exceptions. Their ownership and construction boundaries are documented in
+  `docs/reference/ARCHITECTURE.md`; no hidden auto-registration is introduced.
+- TOOL-003 and the ARCH-034-F01 disposition were synchronized with the implemented contribution
+  model in the architecture closeout.
+- Complete locked validation and governance checks passed after documentation synchronization.
+
+## Completion Evidence
+
+- Completion Commit: `c88c1d1a` (existing architecture closeout and finding-disposition evidence;
+  the later status synchronization commit does not self-certify completion).
 
 ## Risks / Rollback
 

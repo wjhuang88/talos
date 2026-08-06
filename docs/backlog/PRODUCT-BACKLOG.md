@@ -11,7 +11,7 @@ That snapshot is historical evidence, not current activation authority.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
-| 0 | v0.6 Runtime Productization Program | I158 is Review, not Complete. Resolve scheduler/status contribution ownership and final architecture/tool-extension documentation. TUI-037 must be dispositioned after I158 reaches Complete or Paused; I159-I162 remain Blocked. | `docs/tasks/2026-07-28-four-month-v06-execution-package.md`; `docs/iterations/I158-tool-registration-composition.md`; `docs/backlog/active/TUI-037-dashboard-logo-link.md`; ADR-053 |
+| 0 | v0.6 Runtime Productization Program | I158 is Complete with `c88c1d1a`; TUI-037 must now receive an explicit disposition before I159 activation; I159-I162 remain Blocked. | `docs/tasks/2026-07-28-four-month-v06-execution-package.md`; `docs/iterations/I158-tool-registration-composition.md`; `docs/backlog/active/TUI-037-dashboard-logo-link.md`; ADR-053 |
 | 0 | Internal validation service | Validation must become an internal callable, language-neutral service; governance must not depend on shell scripts and project adapters must be detected before guidance is injected. | `docs/backlog/active/VALIDATION-001-internal-validation-service.md`; `docs/backlog/active/GOV-003-builtin-project-governance.md`; `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md` |
 | 0 | Permission pipeline convergence | PERM-006 remains Refinement. Select and review A→E children sequentially; no child may broaden PERM-004/PERM-005 policy implicitly. | `docs/backlog/active/PERM-006-permission-pipeline-convergence.md`; PERM-006-A/B/C/D/E |
 | 0 | Memory admission safety | MEM-010 is Ready but unselected. A bounded correction iteration must prove only user-authored episodes enter new global memory. | `docs/backlog/active/MEM-010-user-origin-memory-admission.md`; Issue #114 |
@@ -63,7 +63,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
-| ARCH-034-D / I171 | In Progress / Active | Claim #138 effective at `349d0cd1`; current v0.7.0 audit/register and bounded owner creation in progress; no production refactor. |
+| ARCH-034-D / I171 | Complete | Completion Commit `c88c1d1a`; current v0.7.0 audit/register and bounded owner creation validated; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |
@@ -74,7 +74,7 @@ Required reads:
 
 | ID | State | Required Disposition |
 |---|---|---|
-| I158 / ARCH-034-R01 | Review | Resolve scheduler/status contribution exceptions and final documentation before Complete/Paused. |
+| I158 / ARCH-034-R01 | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and final architecture/extension/finding documentation accepted. |
 | ARCH-034-R02..R03 / R05..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |

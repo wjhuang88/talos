@@ -6,8 +6,8 @@
 | Type | Architecture / Cargo Boundary Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I158 |
-| Status | Refinement — blocked on I158 |
-| Depends on | ADR-052; ADR-053 Accepted; ARCH-034-R01/I158 Complete |
+| Status | Refinement — blocked on TUI-037 disposition |
+| Depends on | ADR-052; ADR-053 Accepted; ARCH-034-R01/I158 Complete; TUI-037 disposition |
 | Selected Iteration | I159 (Planned/Blocked) |
 | User/maintainer value | Embedders can use a lightweight local read-only tool surface without compiling unrelated heavy capability families |
 

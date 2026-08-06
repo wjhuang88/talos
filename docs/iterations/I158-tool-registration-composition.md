@@ -1,6 +1,6 @@
 # Iteration I158: Tool Registration Composition Consolidation
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-07-26
 > Planned objective: Print, TUI, and MCP tool registries are assembled from one explicit contribution model with preserved permission and capability behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -158,7 +158,7 @@ If a stop condition occurs:
 | 2026-07-31 | Activation | Baseline `e539537d` (`main` after I168 merge). No other implementation iteration is Active or in Review. ADR-053 Accepted; ARCH-034-R01 moved to In Progress. Primary executor is GPT-5.6 Thinking through the connected GitHub repository workflow. Begin with the additive core contract and red tests; retain all old builders until equivalence evidence passes. |
 | 2026-07-31 | Implementation | Contribution/collision contract and owning-crate factories landed through #77, #82, #85, #93, #95, #98, #99, #100, #101, and #102. Interactive composition was rebuilt from effective Claim #112 and merged as `9d2926ed04a6c4666d7895fbb6bdb4099907daf8` without constructing excluded `exec` or `document_extract`. |
 | 2026-07-31 | Evidence | Deterministic exact Print/TUI/MCP profile inventory evidence merged through #105 as `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`. Exact-head CI run `30626150159` passed macOS release preflight and the Windows installer fixture. |
-| 2026-07-31 | Review disposition | Implementation and profile-equivalence slices are merged. I158 moves to Review, not Complete: scheduler/status contribution ownership and final ARCHITECTURE/TOOL-003/F01 documentation disposition remain unresolved. Claim #112 is Released after this bounded synchronization. |
+| 2026-08-06 | Completion disposition | Scheduler/status exceptions were accepted as explicit profile/runtime boundaries and ARCHITECTURE, TOOL-003, and F01 documentation was synchronized. Existing closeout evidence is `c88c1d1a`; Claim #112 remains Released. |
 
 ## Verification Evidence
 
@@ -169,15 +169,19 @@ If a stop condition occurs:
 
 ## Completion Evidence
 
-- Completion Commit: not yet assigned; delivery remains Review.
+- Completion Commit: `c88c1d1a` (existing architecture closeout and finding-disposition evidence;
+  the later status synchronization commit does not self-certify completion).
 - Existing implementation/evidence commits on `main`: `9d2926ed04a6c4666d7895fbb6bdb4099907daf8` and `ec4d918f1fb72b0ab2ddbdcaa24809cc61707d14`; earlier contribution chain is recorded under Actual Activation And Execution.
-- Complete is blocked until the remaining acceptance and documentation residuals below are resolved and revalidated. This status-only synchronization does not cite itself as implementation completion.
+- The scheduler/status exceptions and documentation residuals were resolved in the architecture
+  closeout. TUI-037 remains independently gated and is not part of I158.
 
 ## Variance And Residuals
 
-- The accepted contribution model is implemented for tool-owning groups and product profiles, but scheduler tools and the CLI-owned MCP `status` tool remain explicit raw registrations. Architecture/maintainer review must either record these as justified runtime/profile exceptions or migrate them through focused authoritative contributions before Complete.
-- `docs/reference/ARCHITECTURE.md`, developer-facing TOOL-003 extension guidance, ARCH-034-F01 disposition, and parent-program closure language still require a dedicated documentation/finding closeout slice.
-- No user-visible inventory or permission behavior changed. TUI-037 remains blocked because its gate requires I158 Complete or Paused; Review is not sufficient.
+- The accepted contribution model is implemented for tool-owning groups and product profiles.
+  Scheduler tools and the CLI-owned MCP `status` tool remain explicit raw registrations by design;
+  their exceptions are documented and do not imply global discovery.
+- No user-visible inventory or permission behavior changed. TUI-037 remains independently blocked
+  pending its OSC 8/token-required loopback design gates.
 
 ## REL-002 Execution Record
 
