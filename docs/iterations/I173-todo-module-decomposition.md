@@ -1,6 +1,6 @@
 # Iteration I173: Todo Module Decomposition
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose `talos-session/src/todo.rs` into private responsibility modules without changing Todo behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #148 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #149 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Claim merge precedes implementation branch; release if public-path, SQL, serialization, permission, or output equivalence cannot be proven. |
 
@@ -71,6 +71,23 @@ No Active or Review iteration overlaps this work. I172/R02 is Complete with Comp
 - `bash scripts/validate_collaboration_claims.sh .`
 - `git diff --check`
 - Exact-head Unix/Windows CI and rebuilt CLI smoke.
+
+## Actual Activation And Execution
+
+| Date | Type | Record |
+|---|---|---|
+| 2026-08-07 | Activation | Claim PR #148 passed exact-head CI run `31140533666`; merge-time CAS confirmed head `9700e196` against base `cc743601`, and the claim merged at `e9836ddf`. The implementation branch starts from that effective claim. |
+| 2026-08-07 | Implementation | Moved the existing Todo model, SQLite repository, formatted output, nine tool adapters, and unit tests into private responsibility modules behind the unchanged `todo` facade. Added source-layout and compile-path regression coverage. |
+| 2026-08-07 | Review | Draft implementation PR #149 opened from implementation commit `e4818e34`; exact-head CI and merge-time CAS remain required. |
+
+## Verification Evidence
+
+- `cargo test -p talos-session --locked --no-fail-fast`: passed (171 unit tests, 23 integration tests, and doc tests, including two I173 regression tests).
+- `cargo fmt --all -- --check`, `cargo check --workspace --locked`, and `cargo clippy --workspace --all-targets --locked -- -D warnings`: passed.
+- `cargo test --workspace --locked --no-fail-fast`: passed outside the workspace sandbox; the sandboxed attempt failed only where local listeners, `sandbox-exec`, or restricted filesystem operations were denied.
+- `./scripts/release_preflight.sh`: passed outside the workspace sandbox.
+- `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, and `git diff --check`: passed.
+- Exact-head implementation CI and rebuilt CLI smoke remain pending the implementation PR.
 
 ## Completion Evidence
 
