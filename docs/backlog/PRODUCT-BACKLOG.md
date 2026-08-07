@@ -78,6 +78,9 @@ Required reads:
 | ARCH-034-R02 | Ready / claim pending | I172 claim-only PR proposes one private legacy projection seam; implementation starts only after claim merge. |
 | ARCH-034-R03 / R05..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
+| DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
+| SERVER-001 | Intake — Issue #142 | Serve/connect protocol adapter architecture requires one authoritative runtime/session/permission path and dependency refinement before implementation. [Owner](active/SERVER-001-serve-connect-protocol-adapters.md) |
+| TOOL-025 | Intake — Issue #143 | RTK-derived shell filtering requires bounded source selection, provenance review, and preservation of Talos execution authorities before implementation. [Owner](active/TOOL-025-rtk-derived-semantic-output-filters.md) |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
 | PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |
