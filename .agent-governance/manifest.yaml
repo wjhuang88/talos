@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-06"
-status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 is Complete through merged PR #131 at completion commit 685d3b4f4088a172551f8c844a89f5dee9469430; exact accepted Head 90165cace4625c0f27616b3e1b9871bcb6a10186 passed CI run 31010166558 and rebuilt real-terminal acceptance. ADR-056 is Accepted and Issue #119 is completed by the post-merge governance closeout. Issue #136 remains independently Open and non-blocking for direct /delete recovery-command wording. Issues #141 DATA-002, #142 SERVER-001, #143 TOOL-025, and #146 MODEL-012 are newly registered Intake owners; no implementation authorization is implied. Recovery PRs #120/#121 remain immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158/ARCH-034-R01, I171/ARCH-034-D, and I172/ARCH-034-R02 are Complete with evidence c88c1d1a and `4084138dc0652d3200045847d42518d9ecb66231` respectively. I173/ARCH-034-R03 is proposed Claimed through PR #148 for private Todo module decomposition only; ownership becomes effective only when #148 merges. TUI-037 requires explicit disposition before I159; I159-I162 remain Blocked. REL-002 remains NO-GO."
+status_note: "High-risk/release-managed profile confirmed. TUI-044/I169 is Complete through merged PR #131 at completion commit 685d3b4f4088a172551f8c844a89f5dee9469430; exact accepted Head 90165cace4625c0f27616b3e1b9871bcb6a10186 passed CI run 31010166558 and rebuilt real-terminal acceptance. ADR-056 is Accepted and Issue #119 is completed by the post-merge governance closeout. Issue #136 remains independently Open and non-blocking for direct /delete recovery-command wording. Issues #141 DATA-002, #142 SERVER-001, #143 TOOL-025, and #146 MODEL-012 are newly registered Intake owners; no implementation authorization is implied. Recovery PRs #120/#121 remain immutable. I170/TOOL-023-A/C is Complete and ADR-057 Accepted. I158/ARCH-034-R01, I171/ARCH-034-D, and I172/ARCH-034-R02 are Complete with evidence c88c1d1a and `4084138dc0652d3200045847d42518d9ecb66231` respectively. I173/ARCH-034-R03 is Active under Claim #148 effective at `e9836ddf` for private Todo module decomposition only. TUI-037 requires explicit disposition before I159; I159-I162 remain Blocked. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -64,7 +64,7 @@ migration:
   legacy_assets: []
   next_actions:
     - "Complete I171/ARCH-034-D locked validation and synchronize the August audit/register and R02-R11 owners; preserve I144 as historical evidence"
-    - "Keep ARCH-034-R03/R05-R11 Ready but unclaimed until the bounded R02 claim and implementation close; keep ARCH-034-R04 Refinement pending independent security review"
+    - "Execute I173/ARCH-034-R03 only within Claim #148's private Todo module decomposition; keep ARCH-034-R05-R11 Ready and unclaimed, and keep ARCH-034-R04 Refinement pending independent security review"
     - "Keep TUI-044/I169 completion evidence bound to PR #131, exact Head 90165cace4625c0f27616b3e1b9871bcb6a10186, CI run 31010166558, rebuilt real-terminal evidence, and merge commit 685d3b4f4088a172551f8c844a89f5dee9469430"
     - "Track Issue #136 independently as a non-blocking direct /delete diagnostic-actionability correction; do not reopen TUI-044/I169 or ADR-056 semantics"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"

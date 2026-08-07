@@ -72,6 +72,22 @@ No Active or Review iteration overlaps this work. I172/R02 is Complete with Comp
 - `git diff --check`
 - Exact-head Unix/Windows CI and rebuilt CLI smoke.
 
+## Actual Activation And Execution
+
+| Date | Type | Record |
+|---|---|---|
+| 2026-08-07 | Activation | Claim PR #148 passed exact-head CI run `31140533666`; merge-time CAS confirmed head `9700e196` against base `cc743601`, and the claim merged at `e9836ddf`. The implementation branch starts from that effective claim. |
+| 2026-08-07 | Implementation | Moved the existing Todo model, SQLite repository, formatted output, nine tool adapters, and unit tests into private responsibility modules behind the unchanged `todo` facade. Added source-layout and compile-path regression coverage. |
+
+## Verification Evidence
+
+- `cargo test -p talos-session --locked --no-fail-fast`: passed (171 unit tests, 23 integration tests, and doc tests, including two I173 regression tests).
+- `cargo fmt --all -- --check`, `cargo check --workspace --locked`, and `cargo clippy --workspace --all-targets --locked -- -D warnings`: passed.
+- `cargo test --workspace --locked --no-fail-fast`: passed outside the workspace sandbox; the sandboxed attempt failed only where local listeners, `sandbox-exec`, or restricted filesystem operations were denied.
+- `./scripts/release_preflight.sh`: passed outside the workspace sandbox.
+- `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, and `git diff --check`: passed.
+- Exact-head implementation CI and rebuilt CLI smoke remain pending the implementation PR.
+
 ## Completion Evidence
 
 - Completion Commit: not assigned; retain Planned/Review until implementation evidence exists.

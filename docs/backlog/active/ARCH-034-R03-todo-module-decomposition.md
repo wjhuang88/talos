@@ -6,7 +6,7 @@
 | Finding | ARCH-034-F06 |
 | Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I173 (Active; Claim PR #148 proposed) |
+| Selected Iteration | I173 (Active; Claim PR #148 effective at `e9836ddf`) |
 | Preserved behavior | Todo schema, SQL, idempotency, dependency validation, tools, and permissions |
 
 ## Collaboration Claim
