@@ -1,6 +1,21 @@
 use std::fs;
 use std::path::Path;
 
+fn session_handler_sources(crate_root: &Path) -> String {
+    [
+        "src/session_handlers.rs",
+        "src/session_handlers/provider_model.rs",
+        "src/session_handlers/lifecycle.rs",
+    ]
+    .into_iter()
+    .map(|path| {
+        fs::read_to_string(crate_root.join(path))
+            .unwrap_or_else(|error| panic!("read {path}: {error}"))
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
 #[test]
 fn transactional_bridge_sources_are_normal_rust_modules() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -107,8 +122,7 @@ fn provider_construction_cannot_bypass_variant_materialization() {
         .expect("read model lifecycle source");
     assert!(lifecycle.contains("pub(crate) fn materialize_runtime_model_config("));
 
-    let handlers = fs::read_to_string(crate_root.join("src/session_handlers.rs"))
-        .expect("read session handlers source");
+    let handlers = session_handler_sources(crate_root);
     assert!(handlers.contains("same_model_activation_identity(config, &model_config)"));
     assert!(!handlers.contains("config.variant == variant"));
 
@@ -160,8 +174,12 @@ fn tui_runtime_construction_is_centralized_in_the_shared_builder() {
             "runtime_builder: &TuiRuntimeBuilder",
         ),
     ] {
-        let source = fs::read_to_string(crate_root.join(root))
-            .unwrap_or_else(|error| panic!("read {root}: {error}"));
+        let source = if root == "src/session_handlers.rs" {
+            session_handler_sources(crate_root)
+        } else {
+            fs::read_to_string(crate_root.join(root))
+                .unwrap_or_else(|error| panic!("read {root}: {error}"))
+        };
         for forbidden in [
             "AppServerSession::new(",
             "McpSessionRuntime::start(",
@@ -221,8 +239,7 @@ fn tui_startup_honors_cli_fork_selection() {
 #[test]
 fn cleanup_recovery_instructions_match_the_real_command_surface() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let handlers = fs::read_to_string(crate_root.join("src/session_handlers.rs"))
-        .expect("read Session handlers");
+    let handlers = session_handler_sources(crate_root);
     let setup =
         fs::read_to_string(crate_root.join("src/session_setup.rs")).expect("read Session setup");
     let combined = format!("{handlers}\n{setup}");
