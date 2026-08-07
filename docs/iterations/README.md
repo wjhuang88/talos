@@ -47,7 +47,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I177 | Agent Session Custody Decomposition | Complete | Completion Commit `f505eea8` (squash merge of implementation `786aa571`); PR #162; exact-head CI `31166594367` passed. |
 | I178 | Pending Submission Store Decomposition | Complete | Completion Commit `f92634803560dc50e0b15ca8d7d511e9928c983f` (squash merge of source implementation `c662a7e6`); PR #165; exact-head CI `31180591881` passed. |
 | I179 | Core Tool Facade Decomposition | Complete | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed. |
-| I180 | Architecture Documentation Truth | Active | Claim PR #170 is effective at `1ca03fdf`; current-state architecture documentation reconciliation is in progress on the implementation branch. |
+| I180 | Architecture Documentation Truth | Review | Implementation PR #171 contains source commit `fd8ac75d`; exact-head CI and merge evidence are pending. R04 remains excluded. |
 
 ## Completed This Closeout
 

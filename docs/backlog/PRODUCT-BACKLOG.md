@@ -82,7 +82,7 @@ Required reads:
 | ARCH-034-R08 / I177 | Complete | Completion Commit `f505eea8` (squash merge of implementation `786aa571`); PR #162; exact-head CI `31166594367` passed. |
 | ARCH-034-R09 / I178 | Complete | Completion Commit `f92634803560dc50e0b15ca8d7d511e9928c983f` (squash merge of source implementation `c662a7e6`); PR #165; exact-head CI `31180591881` passed. |
 | ARCH-034-R10 / I179 | Complete | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed. |
-| ARCH-034-R11 / I180 | In Progress / claimed in PR #170 | Claim is effective at `1ca03fdf`; current-state architecture documentation reconciliation is in progress. R04 remains excluded pending independent security review. |
+| ARCH-034-R11 / I180 | Review / implementation PR #171 | Source commit `fd8ac75d` reconciles current architecture truth; exact-head CI and merge evidence are pending. R04 remains excluded pending independent security review. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
