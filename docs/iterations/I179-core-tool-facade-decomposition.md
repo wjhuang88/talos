@@ -1,6 +1,6 @@
 # Iteration I179: Core Tool Facade Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose private result/presentation, authorization, tool-trait, contribution/registry, and protocol responsibilities from `talos-core/src/tool.rs` without changing public paths or behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing result/presentation, authorization, `AgentTool`, contribution/registry, and protocol implementations from `talos-core/src/tool.rs` into private responsibility modules behind the unchanged public `talos_core::tool` facade; preserve every public path/name, visibility, trait default, object-safety property, serialization/schema shape, authorization normalization/comparison rule, registry replacement/collision/validation semantic, diagnostic, macro, dependency, and protocol parse/config behavior. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #168 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Release if exact public-path/API/serialization/trait/registry/authorization/protocol equivalence cannot be proven; any API redesign or semver change requires a separate story, ADR, and migration plan. |
+| Handoff / Release Condition | Closed after implementation PR #168 merged; any public path/API/serialization/trait/registry/authorization/protocol, dependency, or behavior change requires a separate story, ADR, and migration plan where applicable. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -102,6 +102,7 @@ correct, dependency-free public facade.
 | 2026-08-07 | Claim submission | Draft governance claim PR #167 opened; the exact finalized `Claimed` record is submitted for claim-only CI and merge-time CAS. No implementation authority exists until #167 merges to `main`. |
 | 2026-08-07 | Activation | Claim PR #167 finalized head `168d96b0ea9aedb9d3850c800f0cedddb09e76ef` passed exact-head CI `31183822345`; merge-time CAS confirmed no overlapping claim, implementation PR, or blocking feedback, and the claim merged as `9a5419e496db4f059ed841917d8ee9f099d377f6`. Implementation started from that effective claim. |
 | 2026-08-07 | Review submission | The 1,731-line `tool.rs` was reduced to a 26-line stable facade over private result/presentation, authorization, `AgentTool`, registry, protocol, and test modules in source implementation commit `63d494c5`. Downstream public-path and private source-layout probes were added, and Draft implementation PR #168 was opened for exact-head CI and merge review. |
+| 2026-08-07 | Completion | PR #168 squash-merged at `dafc9be08736aee91e0f9cdd92e5226930808061` from accepted exact Head `7b646a4d33cb17a21258e31d86ce1fe8d01b1929` after exact-head CI `31189425069`; merge-time CAS, both governance validators, remote owner reconciliation, installer fixture, rebuilt CLI smoke, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -111,10 +112,12 @@ correct, dependency-free public facade.
 - `cargo check --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked --no-fail-fast`: passed.
 - `./scripts/release_preflight.sh`: passed locked workspace format, check, Clippy, tests, doctests, governance, collaboration-claim, site, installer, and release gates.
 - The sorted string-literal multiset, public struct/enum/trait names, public inherent method names, and `AgentTool` trait method names match effective claim merge `9a5419e4` across the facade plus private modules.
+- Exact-head CI `31189425069` passed Unix/Windows workspace, both governance validators, remote owner reconciliation, installer fixture, and rebuilt CLI smoke checks.
+- Merge-time CAS confirmed base `9a5419e496db4f059ed841917d8ee9f099d377f6`, head `7b646a4d33cb17a21258e31d86ce1fe8d01b1929`, no blocking reviews/comments, and no overlapping claim or implementation PR.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Review until implementation PR #168 merges and closeout records reachable evidence.
+- Completion Commit: `dafc9be08736aee91e0f9cdd92e5226930808061`
 
 ## Variance And Residuals
 
@@ -124,6 +127,6 @@ correct, dependency-free public facade.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private core tool-facade source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was required.
 - Lessons: none recorded.
