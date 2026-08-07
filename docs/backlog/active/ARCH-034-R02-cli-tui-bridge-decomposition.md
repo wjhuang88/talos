@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F21 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | Not selected |
+| Selected Iteration | I172 (Active; Claim PR #140 effective at `46f72750`) |
 | Preserved behavior | Event order, custody receipts, cancellation, session transitions, and TUI output |
 
 ## Collaboration Claim
