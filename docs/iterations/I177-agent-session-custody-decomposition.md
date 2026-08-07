@@ -1,6 +1,6 @@
 # Iteration I177: Agent Session Custody Decomposition
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose private durable-custody and reconciliation responsibilities from `talos-agent/src/session.rs` without changing Session behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #161 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #162 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
 
@@ -101,6 +101,7 @@ remain immutable archival evidence and do not authorize implementation.
 |---|---|---|
 | 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #161 proposes ownership; the claim remains ineffective until its finalized head merges. |
 | 2026-08-07 | Activation | Claim PR #161 exact-head CI `31163434854` passed; merge-time CAS confirmed finalized head `58876190abf9ed2f437090fec94464f009cf06e4`, no overlapping PR or blocking feedback, and the claim merged as `9bc6012cab231de877bc1a933d1575c841394aa8`. Implementation started from that effective claim. |
+| 2026-08-07 | Review submission | Behavior-preserving custody helper decomposition was committed as `786aa571`; Draft implementation PR #162 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 

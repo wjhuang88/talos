@@ -22,7 +22,7 @@
 | Governance Claim PR | #161 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #162 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
 
