@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Reconcile `docs/reference/ARCHITECTURE.md` current-state workspace, crate, CLI, tool-contribution, extension, and composition descriptions against root `Cargo.toml` and current source; explicitly distinguish historical iteration-era snapshots from current facts; update directly affected architecture indexes/registers with non-semantic factual status only; preserve every runtime/API/dependency/decision/security behavior and route any ADR-007/R0 semantic or process-hardening conclusion to ARCH-034-R04. |
 | Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #170 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, scale assessment, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
@@ -110,6 +110,7 @@ is the final Ready non-security child in the August architecture register.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | I180 selected after inventorying non-terminal work, confirming I179/R10 closure, and finding no overlapping effective claim or implementation PR. |
+| 2026-08-07 | Claim submission | Draft governance claim PR #170 opened; the exact finalized `Claimed` record is submitted for claim-only CI, scale validation, and merge-time CAS. No documentation implementation authority exists until #170 merges to `main`. |
 
 ## Verification Evidence
 
