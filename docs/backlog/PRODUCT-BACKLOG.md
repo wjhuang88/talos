@@ -79,7 +79,7 @@ Required reads:
 | ARCH-034-R05 / I174 | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
 | ARCH-034-R06 / I175 | Complete | Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8`; PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04`; exact-head CI `31152972959` passed. R04 remains Refinement pending independent security review. |
 | ARCH-034-R07 / I176 | Complete | Completion Commit `1de3243d`; PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea`; exact-head CI `31160309818` passed. R04 remains Refinement pending independent security review. |
-| ARCH-034-R08 / I177 | Planned / claimed in PR #161 | Private agent Session custody/reconciliation decomposition selected; no implementation authority exists until the finalized governance claim merges to `main`. |
+| ARCH-034-R08 / I177 | Review | Implementation PR #162 contains evidence commit `786aa571`; claim PR #161 merged as `9bc6012cab231de877bc1a933d1575c841394aa8` after exact-head CI `31163434854`. |
 | ARCH-034-R09..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I177 and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |

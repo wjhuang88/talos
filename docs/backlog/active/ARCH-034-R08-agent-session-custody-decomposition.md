@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F24 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I177 (Planned; Claim PR #161) |
+| Selected Iteration | I177 (Active; Claim PR #161) |
 | Preserved behavior | Actor ordering, generation fences, receipts, recovery, pause/cancel, and archive |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #161 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #162 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
 
