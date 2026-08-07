@@ -1,6 +1,6 @@
 # Iteration I174: TUI App Coordinator Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose `talos-tui/src/app.rs` into private input, stream/output, and frame-coordination modules without changing TUI behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing TUI input dispatch, stream/UI-output handling, and frame construction helpers into private modules behind the current `app` facade; preserve `Tui` fields and public paths, `Tui::run` lifecycle and `tokio::select!` priority, render order, key/mouse/approval behavior, scrollback anchoring, cursor placement, output strings, and terminal restoration. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #152 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Claim merge precedes implementation branch; release if the split requires any public API, lifecycle, select-order, rendering, input, output, or terminal behavior change. |
+| Handoff / Release Condition | Closed after implementation PR #152 merged; any future public API, lifecycle, select-order, rendering, input, output, or terminal behavior change requires a separate story. |
 
 ## Non-Terminal Inventory At Selection
 
@@ -45,7 +45,7 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| ARCH-034-R05 | ARCH-034 | Ready | I171 architecture register and existing TUI behavior tests | One behavior-preserving private source split behind the current `Tui` facade. |
+| ARCH-034-R05 | ARCH-034 | Complete | I171 architecture register and existing TUI behavior tests | One behavior-preserving private source split behind the current `Tui` facade. |
 
 ### Scope
 
@@ -99,6 +99,7 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 | 2026-08-07 | Activation | Claim PR #151 exact-head CI `31147027316` passed; merge-time CAS confirmed head `0ffb5400` against base `58fa3683`, and the claim merged as `49ff4e24`. Implementation starts from that effective claim. |
 | 2026-08-07 | Implementation | Moved existing private input, stream/UI-output, and frame-coordination methods into three private `app` submodules. `Tui`, every public method, `Tui::run`, terminal lifecycle, and all method bodies remain mechanically equivalent apart from required `pub(super)` visibility. Added source-layout and public-root-path regression coverage. |
 | 2026-08-07 | Review | Implementation PR #152 opened from implementation commit `e4248bfe`; exact-head CI and merge-time CAS remain required. |
+| 2026-08-07 | Completion | PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17` after exact-head CI `31148908291`; merge-time CAS, governance validators, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -109,11 +110,12 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 - `./scripts/release_preflight.sh`: passed.
 - `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, and `git diff --check`: passed.
 - Mechanical `diff -uBw` comparison of all moved input, output, and frame method ranges against the claim baseline: no differences after removing required `pub(super)` visibility.
-- Exact-head implementation CI and rebuilt CLI smoke remain pending on PR #152.
+- Exact-head implementation CI `31148908291` passed Unix/Windows workspace, governance, and rebuilt CLI smoke checks.
+- PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; merge-time CAS confirmed base `49ff4e24bc1072569f145e8eea735e9500094a92`, head `f681599176eca7f3d25801d1da98bdd623a99f5e`, no reviews/comments, and no overlapping claim or implementation work.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned/Review until implementation evidence exists.
+- Completion Commit: e4248bfedd17c91aebb24c80c60580fcbcebec62
 
 ## Variance And Residuals
 
@@ -122,6 +124,6 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending the implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private TUI source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was needed.
 - Lessons: none recorded.
