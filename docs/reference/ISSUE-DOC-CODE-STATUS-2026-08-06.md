@@ -2,8 +2,8 @@
 
 **Repository baseline**: `main@685d3b4f4088a172551f8c844a89f5dee9469430`
 **Closeout PR**: #137
-**Remote scope**: all 32 open GitHub Issues after Issue #119 completion, Issue #136 registration,
-and intake registration of Issues #141–#143 and #146
+**Remote scope**: all 33 open GitHub Issues after Issue #119 completion, Issue #136 registration,
+and intake registration of Issues #141–#143, #146, and #155
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
@@ -13,6 +13,8 @@ and intake registration of Issues #141–#143 and #146
   implementation PR #131 and accepted exact-head evidence.
 - Issue #136 is independently owned by TUI-047 and remains open as a non-blocking Ready diagnostic
   correction; it does not reopen TUI-044/I169 or ADR-056.
+- Issue #155 is independently owned by SKILL-004 as unclaimed Intake compatibility work; its
+  registration does not expand or block I175.
 - Recovery PRs #120/#121 and their branches remain immutable archival evidence.
 - Deferred, Refinement, Ready, Partial and Blocked remain open states; registration does not imply
   selection or implementation authorization.
@@ -53,6 +55,7 @@ and intake registration of Issues #141–#143 and #146
 | [#142](https://github.com/wjhuang88/talos/issues/142) | serve/connect protocol adapter architecture | [SERVER-001](../backlog/active/SERVER-001-serve-connect-protocol-adapters.md) | Intake | P1 architecture intake; dependency and single-runtime boundary refinement required. |
 | [#143](https://github.com/wjhuang88/talos/issues/143) | RTK-derived semantic shell output filters | [TOOL-025](../backlog/active/TOOL-025-rtk-derived-semantic-output-filters.md) | Intake | P1 source/provenance and behavior-boundary refinement required before extraction. |
 | [#146](https://github.com/wjhuang88/talos/issues/146) | optional utility model role and bounded routing | [MODEL-012](../backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md) | Intake | P2 model-role, routing, TUI, compatibility, and evaluation refinement required before implementation. |
+| [#155](https://github.com/wjhuang88/talos/issues/155) | SkillLoader rejects `SKILL.md` without triggers | [SKILL-004](../backlog/active/SKILL-004-optional-skill-triggers-compatibility.md) | Intake | P1 skill-format compatibility intake; contract decision, fixtures, iteration, and claim required before implementation. |
 
 ## Closed In This Reconciliation
 

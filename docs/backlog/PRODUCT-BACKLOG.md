@@ -85,6 +85,7 @@ Required reads:
 | SERVER-001 | Intake — Issue #142 | Serve/connect protocol adapter architecture requires one authoritative runtime/session/permission path and dependency refinement before implementation. [Owner](active/SERVER-001-serve-connect-protocol-adapters.md) |
 | TOOL-025 | Intake — Issue #143 | RTK-derived shell filtering requires bounded source selection, provenance review, and preservation of Talos execution authorities before implementation. [Owner](active/TOOL-025-rtk-derived-semantic-output-filters.md) |
 | MODEL-012 | Intake — Issue #146 | Optional Utility Model role requires additive configuration, explicit task routing, canonical provider ownership, and evaluation refinement before implementation. [Owner](active/MODEL-012-utility-model-role-and-bounded-routing.md) |
+| SKILL-004 | Intake — Issue #155 | Optional `SKILL.md` triggers compatibility requires a public-contract decision, parser fixtures, and a separately claimed runnable iteration. [Owner](active/SKILL-004-optional-skill-triggers-compatibility.md) |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
 | PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |
