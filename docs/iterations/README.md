@@ -43,7 +43,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I173 | Todo Module Decomposition | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | I174 | TUI App Coordinator Decomposition | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
 | I175 | Conversation Engine Decomposition | Complete | Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8`; PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04`; exact-head CI `31152972959` passed. R04 remains blocked; R07-R11 stay Ready/unclaimed. |
-| I176 | CLI Session Handler Decomposition | Planned | Governance-only claim PR pending; implementation starts only after the finalized claim merges. R04 remains blocked pending independent security review; R08-R11 stay Ready/unclaimed. |
+| I176 | CLI Session Handler Decomposition | Planned | Governance-only claim PR #158; implementation starts only after the finalized claim merges. R04 remains blocked pending independent security review; R08-R11 stay Ready/unclaimed. |
 
 ## Completed This Closeout
 

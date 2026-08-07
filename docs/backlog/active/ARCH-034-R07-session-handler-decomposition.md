@@ -6,20 +6,20 @@
 | Finding | ARCH-034-F23 |
 | Status | Ready |
 | Priority | P2 |
-| Selected Iteration | I176 (Planned; claim PR pending) |
+| Selected Iteration | I176 (Planned; Claim PR #158) |
 | Preserved behavior | Session lifecycle ordering, rollback, model activation, and UI diagnostics |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing private provider/connect/model workflows and session delete/new/resume/fork workflows into private modules behind the current `session_handlers` facade; preserve handler paths/signatures, transition and UI channel ownership, CLI syntax, persistence, model identity, commit/rollback/publication ordering, exact diagnostics, and cleanup recovery behavior. |
 | Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #158 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |

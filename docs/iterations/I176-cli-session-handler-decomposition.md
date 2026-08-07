@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing private provider/connect/model workflows and session delete/new/resume/fork workflows into private modules behind the current `session_handlers` facade; preserve handler paths/signatures, transition and UI channel ownership, CLI syntax, persistence, model identity, commit/rollback/publication ordering, exact diagnostics, and cleanup recovery behavior. |
 | Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #158 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
@@ -100,7 +100,7 @@ the completed R01-R03, R05, and R06 seams are prerequisites/context only. Open r
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-07 | Planning | I176 selected after inventorying blocked/paused work, confirming I175/R06 completion, and finding no overlapping effective claim or implementation PR. A governance-only draft claim is being prepared; the claim remains ineffective until finalized and merged. |
+| 2026-08-07 | Planning | I176 selected after inventorying blocked/paused work, confirming I175/R06 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #158 proposes ownership; the claim remains ineffective until merged. |
 
 ## Verification Evidence
 
