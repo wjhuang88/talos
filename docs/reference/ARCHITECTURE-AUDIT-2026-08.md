@@ -130,6 +130,14 @@ F04 and F08 are closed by locked Clippy; F11/F12/F14/F15/F16/F17/F18 are closed 
 F05/F06/F13/F19 remain represented by R05/R03/R04. New F20-F26 capture the current source
 organization and documentation drift that the July/v0.4 baseline could not see.
 
+### Remediation Status (2026-08-07)
+
+- I180 reconciles the F26 current-state workspace, CLI composition, tool contribution, storage,
+  plugin, and MCP documentation against source evidence. The original finding proof above remains
+  an audit-time observation rather than being rewritten.
+- ADR-007/R0 security meaning, native-boundary containment, and process-hardening conclusions remain
+  outside I180 and owned by ARCH-034-R04 pending independent security review.
+
 ## Validation Evidence
 
 The claim PR exact-head CI passed Linux format/check/Clippy/tests, Windows workspace tests, Windows
@@ -161,7 +169,7 @@ remediation slices. No production refactor is claimed by I171 itself.
 | ARCH-034-R08 | Agent custody/reconciliation helpers | Structured submission tests |
 | ARCH-034-R09 | Pending submission schema/state split | SQLite/restart tests |
 | ARCH-034-R10 | `talos-core::tool` private source split | Public API compatibility checks |
-| ARCH-034-R11 | Current architecture/ADR documentation truth | DOC-CHECK; security review for ADR semantics |
+| ARCH-034-R11 | Current architecture documentation truth | I180 DOC-CHECK/source trace; ADR/R0 semantics remain with R04 |
 
 I171 is complete only after these owner records exist, statuses mirror the register, and the
 production owners are separately claimed before implementation. This audit does not silently

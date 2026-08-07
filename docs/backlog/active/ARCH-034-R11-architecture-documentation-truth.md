@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F26 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P1 |
-| Selected Iteration | I180 (Planned; governance claim PR #170) |
+| Selected Iteration | I180 (Active; claim PR #170 merged to `main` as `1ca03fdf`) |
 | Preserved behavior | Documentation-only; historical evidence remains immutable |
 
 ## Collaboration Claim
@@ -51,3 +51,15 @@ cannot be changed without R04 review.
 ## Rollback / Residual
 
 Revert inaccurate prose. Any decision change belongs to a new ADR or R04 security review.
+
+## Execution Evidence (In Progress)
+
+- Source-to-document trace covers the root workspace member list, CLI composition modules,
+  `talos-tools`/`talos-session` contribution sources, plugin manifest/WASM carrier, MCP session
+  startup, direct internal dependency edges, and the R01 scheduler/status exceptions.
+- `docs/reference/ARCHITECTURE.md` was updated with factual current-state boundaries and explicit
+  historical labels. No production, test, dependency, API, permission, sandbox, or process-
+  hardening files changed.
+- ADR-007/R0 semantics were not edited; security interpretation remains the R04 residual.
+- Standard release preflight, both governance validators, scale assessment, architecture audit
+  harness, stale-claim search, scope check, and `git diff --check` passed locally on 2026-08-07.

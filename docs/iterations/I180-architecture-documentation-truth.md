@@ -1,6 +1,6 @@
 # Iteration I180: Architecture Documentation Truth
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-07
 > Planned objective: reconcile current architecture, crate/composition, extension, and historical-status documentation with source evidence without changing runtime behavior or decision semantics.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -23,8 +23,8 @@
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if a claimed current fact lacks source evidence or requires decision/security interpretation; any ADR-007/R0 semantic or process-hardening change remains blocked on independent R04 security review. |
 
-This proposed claim is ineffective until a finalized `Claimed` record with the actual governance
-PR number merges into `main`.
+The finalized `Claimed` record became effective on `main` at merge commit
+`1ca03fdf8d262eba4d1de2374e43f2c1a94882dd`; the implementation branch starts from that commit.
 
 ## Closure Ledger
 
@@ -111,10 +111,37 @@ is the final Ready non-security child in the August architecture register.
 |---|---|---|
 | 2026-08-07 | Planning | I180 selected after inventorying non-terminal work, confirming I179/R10 closure, and finding no overlapping effective claim or implementation PR. |
 | 2026-08-07 | Claim submission | Draft governance claim PR #170 opened; the exact finalized `Claimed` record is submitted for claim-only CI, scale validation, and merge-time CAS. No documentation implementation authority exists until #170 merges to `main`. |
+| 2026-08-07 | Claim activation | PR #170 squash-merged to `main` as `1ca03fdf8d262eba4d1de2374e43f2c1a94882dd` after exact-head CAS, CI `31193474992`, both governance validators, scale assessment, and `git diff --check` passed. Implementation branch `docs/i180-architecture-documentation-truth` starts from that commit. |
+| 2026-08-07 | Implementation | Current-state architecture documentation reconciliation is implemented on this branch; production/runtime behavior and ADR-007/R0 semantics remain unchanged. |
 
 ## Verification Evidence
 
-- Claim-only source/document inventory is recorded in the session; implementation evidence is intentionally absent until the claim becomes effective.
+### Source-to-Document Trace
+
+| Current fact | Source evidence | Architecture surface |
+|---|---|---|
+| Workspace membership and publication boundary | Root `Cargo.toml`; crate manifests; ADR-052 and publication matrix | Cargo workspace and distribution sections |
+| CLI composition ownership | `crates/talos-cli/src/main.rs`, `mode_runners.rs`, `mode_runtime.rs`, `tui_runtime_builder.rs`, `registry.rs`, `runtime_adapter.rs`, `session_transition.rs` | CLI Runtime Boundary and dependency graph |
+| Built-in contribution ownership | `crates/talos-tools/src/contributions.rs`; `crates/talos-session/src/tool_contributions.rs` | Tool Contribution And Profile Composition |
+| Scheduler and MCP `status` exceptions | `crates/talos-agent/src/scheduler.rs`; `crates/talos-cli/src/registry.rs`; I158/R01 closeout | Composition exception table |
+| Plugin carrier and extension path | `crates/talos-plugin/src/manifest.rs`, `wasm.rs`; ADR-027 | Plugin System |
+| MCP session lifecycle | `crates/talos-cli/src/mcp_runtime.rs`; `crates/talos-mcp/src/client/` | MCP Session Boundary |
+| Storage/file boundaries | `crates/talos-session/Cargo.toml`, `crates/talos-evolution/Cargo.toml`, `crates/talos-memory/Cargo.toml`, `crates/talos-exploration/Cargo.toml`, and `crates/talos-cli/src/storage.rs` | Storage Architecture |
+| Historical versus current labels | August architecture audit and finding register | Current-state note and historical storage phases |
+
+The claim-only exact-head CI evidence remains recorded above; implementation exact-head PR CI is
+pending the review gate.
+
+### Local Implementation Validation (2026-08-07)
+
+- `./scripts/release_preflight.sh`: PASS for site/installer validation, governance, locked workspace
+  check, Clippy, tests, and doctests.
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+- `bash scripts/validate_collaboration_claims.sh .`: PASS, 0 warnings.
+- `scripts/assess_project_scale.sh .`: PASS; high-risk, release-managed, on-demand remains the
+  recommended profile/mode.
+- `scripts/audit_architecture.py .`: PASS; 21 crates and 0 dependency cycles.
+- Stale-current-claim search, documentation-only scope check, and `git diff --check`: PASS.
 
 ## Completion Evidence
 
