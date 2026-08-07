@@ -1,6 +1,6 @@
 # Iteration I178: Pending Submission Store Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose private schema, query, row-mapping, retry, identity, and encoding responsibilities from `talos-session/src/pending_submission.rs` without changing persistence or submission behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Extract private schema/query/encoding and row-mapping helpers from `talos-session/src/pending_submission.rs` behind `PendingSubmissionStore`; preserve SQLite schema and SQL text, transaction modes, retry bounds, paths, identity/generation fencing, transition guards, recovery, cleanup, diagnostics, public methods, serialization, and dependency boundaries. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #165 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Release if schema, transaction, state, recovery, identity, or public API equivalence cannot be proven; any schema evolution requires a separate migration story. |
+| Handoff / Release Condition | Closed after implementation PR #165 merged; any schema, transaction, state, recovery, identity, public API, dependency, or behavior change requires a separate story and migration/ADR review where applicable. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -99,6 +99,7 @@ closure and the current-state audit identified an independent persistence source
 | 2026-08-07 | Planning | I178 selected after inventorying non-terminal work, confirming I177/R08 closure, and finding no overlapping effective claim or implementation PR. |
 | 2026-08-07 | Activation | Claim PR #164 exact-head CI `31178649512` passed; merge-time CAS confirmed finalized head `7ff34c021177a2ff2ba64c85605d7fd66d4dcd50`, no overlapping PR or blocking feedback, and the claim merged as `7b87902dd215e03ac8a3f331b535d8af286c96d2`. Implementation started from that effective claim. |
 | 2026-08-07 | Review submission | Behavior-preserving private persistence source decomposition was committed as `c662a7e6`; Draft implementation PR #165 was opened for exact-head CI and merge review. |
+| 2026-08-07 | Completion | PR #165 squash-merged at `f92634803560dc50e0b15ca8d7d511e9928c983f` from accepted exact Head `1fc4b761d38f6b2c35722da869f28fdd93a7b519` after exact-head CI `31180591881`; merge-time CAS, both governance validators, remote owner reconciliation, installer fixture, rebuilt CLI smoke, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -107,10 +108,12 @@ closure and the current-state audit identified an independent persistence source
 - `cargo clippy -p talos-session --all-targets --locked -- -D warnings`: passed.
 - `./scripts/release_preflight.sh`: passed locked workspace format, check, Clippy, tests, doctests, governance, collaboration-claim, site, installer, and release gates.
 - The complete sorted string-literal multiset, including every SQL statement, state encoding, and diagnostic, matches effective claim merge `7b87902d` across the facade plus new private modules.
+- Exact-head CI `31180591881` passed Unix/Windows workspace, both governance validators, remote owner reconciliation, installer fixture, and rebuilt CLI smoke checks.
+- Merge-time CAS confirmed base `7b87902dd215e03ac8a3f331b535d8af286c96d2`, head `1fc4b761d38f6b2c35722da869f28fdd93a7b519`, no blocking reviews/comments, and no overlapping claim or implementation PR.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Review until implementation PR #165 merges and closeout records reachable evidence.
+- Completion Commit: `f92634803560dc50e0b15ca8d7d511e9928c983f`
 
 ## Variance And Residuals
 
@@ -119,6 +122,6 @@ closure and the current-state audit identified an independent persistence source
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private pending-submission persistence source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was needed.
 - Lessons: none recorded.
