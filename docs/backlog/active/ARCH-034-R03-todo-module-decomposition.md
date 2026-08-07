@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F06 |
-| Status | In Progress |
+| Status | Review |
 | Priority | P2 |
-| Selected Iteration | I173 (Active; Claim PR #148 effective at `e9836ddf`) |
+| Selected Iteration | I173 (Review; Implementation PR #149) |
 | Preserved behavior | Todo schema, SQL, idempotency, dependency validation, tools, and permissions |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #148 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #149 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any schema, SQL, permission, public-path, or output change. |
 
