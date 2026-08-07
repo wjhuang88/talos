@@ -9,6 +9,23 @@
 | Selected Iteration | Not selected |
 | Preserved behavior | Event order, custody receipts, cancellation, session transitions, and TUI output |
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 active architecture session 2026-08-06 |
+| Work Slice | Extract only the legacy `TurnEvent` and structured-legacy compatibility projection handlers into a private module behind the existing `tui_bridge` entry points; preserve event ordering, state transitions, channel topology, custody, cancellation, and all output text. |
+| Claimed At | 2026-08-06 |
+| Source Issue | None |
+| Governance Claim PR | #140 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-06 |
+| Handoff / Release Condition | Release after claim merge if the seam cannot be extracted without changing ordering or private-state ownership. |
+
 ## Problem And Boundary
 
 `talos-cli/src/tui_bridge.rs` is a 2,091-line, high-change orchestration seam. It owns the
