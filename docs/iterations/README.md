@@ -40,6 +40,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
 | I172 | CLI/TUI Bridge Legacy Projection Decomposition | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
+| I173 | Todo Module Decomposition | Planned / claim pending | Claim-only plan for private model/repository/formatting/tool-adapter ownership; no production implementation before effective claim merge. |
 
 ## Completed This Closeout
 
