@@ -1,6 +1,6 @@
 # Iteration I177: Agent Session Custody Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose private durable-custody and reconciliation responsibilities from `talos-agent/src/session.rs` without changing Session behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Extract private durable custody/reconciliation, admission/rejection/receipt projection, pending-shutdown release, structured-turn finish, and pause/cancel helpers from `talos-agent/src/session.rs` while keeping `AppServerSession` as the sole actor and mutable state owner; preserve actor ordering, generation fences, receipts, recovery, pause/cancel, archive, diagnostics, event order, persistence protocol, and public API. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #162 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
+| Handoff / Release Condition | Closed after implementation PR #162 merged; any actor redesign, state ownership, persistence/event/diagnostic, public API, dependency, or behavior change requires a separate story and ADR where applicable. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -102,6 +102,7 @@ remain immutable archival evidence and do not authorize implementation.
 | 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #161 proposes ownership; the claim remains ineffective until its finalized head merges. |
 | 2026-08-07 | Activation | Claim PR #161 exact-head CI `31163434854` passed; merge-time CAS confirmed finalized head `58876190abf9ed2f437090fec94464f009cf06e4`, no overlapping PR or blocking feedback, and the claim merged as `9bc6012cab231de877bc1a933d1575c841394aa8`. Implementation started from that effective claim. |
 | 2026-08-07 | Review submission | Behavior-preserving custody helper decomposition was committed as `786aa571`; Draft implementation PR #162 was opened for exact-head CI and merge review. |
+| 2026-08-07 | Completion | PR #162 squash-merged at `f505eea8` after exact-head CI `31166594367`; merge-time CAS, both governance validators, remote owner reconciliation, installer fixture, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -114,7 +115,7 @@ remain immutable archival evidence and do not authorize implementation.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned until the claim and implementation evidence exist.
+- Completion Commit: `f505eea8`
 
 ## Variance And Residuals
 
@@ -123,6 +124,6 @@ remain immutable archival evidence and do not authorize implementation.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private agent Session custody/reconciliation source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was needed.
 - Lessons: none recorded.
