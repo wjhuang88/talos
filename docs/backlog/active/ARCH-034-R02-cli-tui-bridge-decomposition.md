@@ -4,7 +4,7 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F21 |
-| Status | In Progress |
+| Status | Complete |
 | Priority | P2 |
 | Selected Iteration | I172 (Active; Claim PR #140 effective at `46f72750`) |
 | Preserved behavior | Event order, custody receipts, cancellation, session transitions, and TUI output |
@@ -22,8 +22,8 @@
 | Governance Claim PR | #140 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-06 |
+| Implementation PR | #144 (merged at `c1dc67ae`) |
+| Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release after claim merge if the seam cannot be extracted without changing ordering or private-state ownership. |
 
 ## Problem And Boundary
@@ -55,3 +55,14 @@ low-cohesion inside that boundary.
 
 Revert the private extraction if ordering equivalence cannot be proven. Protocol redesign belongs
 to a separate ADR-backed story.
+
+## Completion Evidence
+
+- Completion Commit: `4084138dc0652d3200045847d42518d9ecb66231`.
+- Implementation PR #144 merged at `c1dc67ae8e3a117dd39ede91143c5f6bcd2d17c4`.
+- Exact-head CI run `31137882248` passed Unix format/check/clippy/test, Windows workspace,
+  Windows installer, and remote issue/owner reconciliation checks.
+- `crates/talos-cli/src/tui_bridge/legacy_projection.rs` owns the extracted legacy and
+  structured-legacy handlers while `tui_bridge.rs` retains the facade and runtime entry points.
+- Source-layout and focused CLI tests passed; public API, event order, custody, cancellation,
+  permissions, persistence, and output behavior were preserved.
