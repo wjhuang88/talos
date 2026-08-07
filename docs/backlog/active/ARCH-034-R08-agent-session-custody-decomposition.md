@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F24 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I177 (Planned; Claim PR #161) |
+| Selected Iteration | I177 (Active; Claim PR #161) |
 | Preserved behavior | Actor ordering, generation fences, receipts, recovery, pause/cancel, and archive |
 
 ## Collaboration Claim

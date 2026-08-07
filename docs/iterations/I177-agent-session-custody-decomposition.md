@@ -1,6 +1,6 @@
 # Iteration I177: Agent Session Custody Decomposition
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-07
 > Planned objective: decompose private durable-custody and reconciliation responsibilities from `talos-agent/src/session.rs` without changing Session behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -100,10 +100,16 @@ remain immutable archival evidence and do not authorize implementation.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #161 proposes ownership; the claim remains ineffective until its finalized head merges. |
+| 2026-08-07 | Activation | Claim PR #161 exact-head CI `31163434854` passed; merge-time CAS confirmed finalized head `58876190abf9ed2f437090fec94464f009cf06e4`, no overlapping PR or blocking feedback, and the claim merged as `9bc6012cab231de877bc1a933d1575c841394aa8`. Implementation started from that effective claim. |
 
 ## Verification Evidence
 
-- Claim validation and implementation evidence will be appended after the claim and implementation phases.
+- Claim exact-head CI `31163434854` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke checks.
+- `cargo test -p talos-agent --locked --no-fail-fast`: passed 257 unit tests, all I169 custody/recovery/generation/interrupt/stress integration tests, the I177 source-layout regression, and 12 doctests.
+- `cargo clippy -p talos-agent --all-targets --locked -- -D warnings`: passed.
+- `./scripts/release_preflight.sh`: passed locked workspace format, check, Clippy, tests, doctests, governance, collaboration-claim, site, installer, and release gates.
+- Re-extracting the custody helper token stream from `session/custody.rs` matched claim merge `9bc6012cab231de877bc1a933d1575c841394aa8` after normalizing only required `pub(super)` visibility, rustfmt whitespace, and syntax-neutral trailing commas.
+- The first focused test attempt stopped before a code verdict because the filesystem had 344 MiB free; `cargo clean` removed only reproducible workspace build artifacts, restored about 25 GiB free, and the identical locked test command then passed.
 
 ## Completion Evidence
 
