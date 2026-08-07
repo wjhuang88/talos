@@ -78,7 +78,8 @@ Required reads:
 | ARCH-034-R02 / I172 | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | ARCH-034-R05 / I174 | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
 | ARCH-034-R06 / I175 | Complete | Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8`; PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04`; exact-head CI `31152972959` passed. R04 remains Refinement pending independent security review. |
-| ARCH-034-R07..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
+| ARCH-034-R07 / I176 | Planned / claim PR pending | CLI provider/model and Session lifecycle handler seam; claim must be effective before implementation. R04 remains Refinement pending independent security review. |
+| ARCH-034-R08..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I176 and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
