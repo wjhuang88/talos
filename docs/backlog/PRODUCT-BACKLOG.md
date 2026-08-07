@@ -81,7 +81,8 @@ Required reads:
 | ARCH-034-R07 / I176 | Complete | Completion Commit `1de3243d`; PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea`; exact-head CI `31160309818` passed. R04 remains Refinement pending independent security review. |
 | ARCH-034-R08 / I177 | Complete | Completion Commit `f505eea8` (squash merge of implementation `786aa571`); PR #162; exact-head CI `31166594367` passed. |
 | ARCH-034-R09 / I178 | Complete | Completion Commit `f92634803560dc50e0b15ca8d7d511e9928c983f` (squash merge of source implementation `c662a7e6`); PR #165; exact-head CI `31180591881` passed. |
-| ARCH-034-R10..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I178 closure and dependency checks. |
+| ARCH-034-R10 / I179 | Planned / claimed in PR #167 | Private `talos-core::tool` facade source decomposition selected; no implementation authority exists until the finalized governance claim merges to `main`. |
+| ARCH-034-R11 | Ready | Separately claim the documentation-truth seam after I179 and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
