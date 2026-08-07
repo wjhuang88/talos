@@ -1,6 +1,6 @@
 # Iteration I178: Pending Submission Store Decomposition
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose private schema, query, row-mapping, retry, identity, and encoding responsibilities from `talos-session/src/pending_submission.rs` without changing persistence or submission behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #164 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #165 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if schema, transaction, state, recovery, identity, or public API equivalence cannot be proven; any schema evolution requires a separate migration story. |
 
@@ -97,14 +97,20 @@ closure and the current-state audit identified an independent persistence source
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | I178 selected after inventorying non-terminal work, confirming I177/R08 closure, and finding no overlapping effective claim or implementation PR. |
+| 2026-08-07 | Activation | Claim PR #164 exact-head CI `31178649512` passed; merge-time CAS confirmed finalized head `7ff34c021177a2ff2ba64c85605d7fd66d4dcd50`, no overlapping PR or blocking feedback, and the claim merged as `7b87902dd215e03ac8a3f331b535d8af286c96d2`. Implementation started from that effective claim. |
+| 2026-08-07 | Review submission | Behavior-preserving private persistence source decomposition was committed as `c662a7e6`; Draft implementation PR #165 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 
-- Claim-only preflight and current scale assessment are recorded in the session log; implementation evidence is intentionally absent until the claim becomes effective.
+- Claim exact-head CI `31178649512` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke checks.
+- `cargo test -p talos-session --locked --no-fail-fast`: passed 171 unit tests, I168/I169 runtime/cleanup/outcome integration tests, I173 and I178 source-layout/API probes, and doctests.
+- `cargo clippy -p talos-session --all-targets --locked -- -D warnings`: passed.
+- `./scripts/release_preflight.sh`: passed locked workspace format, check, Clippy, tests, doctests, governance, collaboration-claim, site, installer, and release gates.
+- The complete sorted string-literal multiset, including every SQL statement, state encoding, and diagnostic, matches effective claim merge `7b87902d` across the facade plus new private modules.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned until claim and implementation evidence exist.
+- Completion Commit: not assigned; retain Review until implementation PR #165 merges and closeout records reachable evidence.
 
 ## Variance And Residuals
 
