@@ -1,6 +1,6 @@
 # Iteration I176: CLI Session Handler Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose private provider/model and session-lifecycle responsibilities from `talos-cli/src/session_handlers.rs` without changing CLI or Session behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing private provider/connect/model workflows and session delete/new/resume/fork workflows into private modules behind the current `session_handlers` facade; preserve handler paths/signatures, transition and UI channel ownership, CLI syntax, persistence, model identity, commit/rollback/publication ordering, exact diagnostics, and cleanup recovery behavior. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #159 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Release if the split requires any handler path/signature, transition/UI ownership, CLI syntax, persistence, model identity, ordering, diagnostic, cleanup recovery, dependency, or behavior change. |
+| Handoff / Release Condition | Closed after implementation PR #159 merged; any future handler path/signature, transition/UI ownership, CLI syntax, persistence, model identity, ordering, diagnostic, cleanup recovery, dependency, or behavior change requires a separate story. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -103,6 +103,7 @@ the completed R01-R03, R05, and R06 seams are prerequisites/context only. Open r
 | 2026-08-07 | Planning | I176 selected after inventorying blocked/paused work, confirming I175/R06 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #158 proposes ownership; the claim remains ineffective until merged. |
 | 2026-08-07 | Activation | Claim PR #158 exact-head CI `31156407297` passed; merge-time CAS confirmed finalized head `4aa8f44982c2010dcff57cb2db4ffc84d6a1c7ae`, no overlapping PR or blocking feedback, and the claim merged as `97c252a1493e66cfb8ccbe5ff64d0643a92255d7`. Implementation started from that effective claim. |
 | 2026-08-07 | Review submission | Behavior-preserving source decomposition was committed as `1de3243d`; Draft implementation PR #159 was opened for exact-head CI and merge review. |
+| 2026-08-07 | Completion | PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea` after exact-head CI `31160309818`; merge-time CAS, both governance validators, remote owner reconciliation, installer fixture, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -113,7 +114,7 @@ the completed R01-R03, R05, and R06 seams are prerequisites/context only. Open r
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Review until exact-head CI, merge-time CAS, implementation merge, and closeout complete.
+- Completion Commit: `1de3243d`
 
 ## Variance And Residuals
 
@@ -122,6 +123,6 @@ the completed R01-R03, R05, and R06 seams are prerequisites/context only. Open r
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private CLI session-handler source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was needed.
 - Lessons: none recorded.
