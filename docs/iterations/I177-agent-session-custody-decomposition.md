@@ -1,0 +1,121 @@
+# Iteration I177: Agent Session Custody Decomposition
+
+> Document status: Planned
+> Published plan date: 2026-08-07
+> Planned objective: decompose private durable-custody and reconciliation responsibilities from `talos-agent/src/session.rs` without changing Session behavior.
+> Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
+> MVP deliverable: the existing `AppServerSession` remains the sole actor and state owner while private custody/reconciliation workflows have separate source ownership and all existing structured-submission, recovery, generation, pause/cancel, receipt, shutdown, and archive behavior remains unchanged.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
+| Work Slice | Extract private durable custody/reconciliation, admission/rejection/receipt projection, pending-shutdown release, structured-turn finish, and pause/cancel helpers from `talos-agent/src/session.rs` while keeping `AppServerSession` as the sole actor and mutable state owner; preserve actor ordering, generation fences, receipts, recovery, pause/cancel, archive, diagnostics, event order, persistence protocol, and public API. |
+| Claimed At | 2026-08-07 |
+| Source Issue | None |
+| Governance Claim PR | #161 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-07 |
+| Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
+
+Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
+finalized `Claimed` record is merged into `main`.
+
+## Non-Terminal Inventory At Selection
+
+| Item | State | Disposition |
+|---|---|---|
+| I159 | Blocked | Unchanged; TUI-037 disposition remains required. |
+| I160 | Blocked | Unchanged; requires I159 closure. |
+| I161 | Blocked | Unchanged; requires I160 and independent security review. |
+| I162 | Blocked | Unchanged; requires I161 and publication authorization. |
+| I164 | Paused | Historical superseded target; no activation. |
+| Recovery PRs #120/#121 | Open archival evidence | Immutable; no implementation authority. |
+| ARCH-034-R04 | Refinement | Native/panic/unsafe boundary remains excluded pending independent security review. |
+| ARCH-034-R07 / I176 | Closed | Delivery evidence `1de3243d`; no overlap with agent Session custody ownership. |
+| ARCH-034-R09..R11 | Ready / unclaimed | Retained for later independent claims; no overlap with this custody split. |
+
+No Active, Review, or other Planned iteration overlaps this work. I171 architecture evidence and
+the completed R01-R03 and R05-R07 seams are prerequisites/context only. Open recovery PRs #120/#121
+remain immutable archival evidence and do not authorize implementation.
+
+## Published Baseline
+
+### Selected Stories
+
+| Story | Parent | Status At Selection | Depends On | Outcome |
+|---|---|---|---|---|
+| ARCH-034-R08 | ARCH-034 | Ready | I171 architecture register, I169 durable-custody behavior, and existing agent Session tests | One behavior-preserving private custody/reconciliation source split behind `AppServerSession`. |
+
+### Scope
+
+- Keep `AppServerSession` as the sole actor, run-loop coordinator, and owner of mutable Session state.
+- Move existing private custody reconciliation, admission/rejection/receipt projection, pending-shutdown release, structured-turn finish, and pause/cancel helpers into one private child module.
+- Keep state access explicit through the current actor reference and helper parameters/results; the child module cannot own an independent actor, queue, store, or generation state machine.
+- Add source-layout regression evidence that the custody module stays private and actor orchestration remains in `session.rs`.
+
+### Non-Goals
+
+- No run-loop, channel, queue, scheduler, retry, persistence protocol, generation-fence, receipt, pause/cancel, archive, event-ordering, diagnostic, public API, dependency, feature, or security-boundary change.
+- No actor redesign and no changes to R04 or R09-R11.
+
+### Acceptance
+
+- Given existing callers, `AppServerSession` and every public Session API continue to compile unchanged.
+- Given accepted, rejected, replayed, paused, cancelled, interrupted, completed, and shutdown submissions, durable-store transitions, generation checks, receipts, events, diagnostics, queue ordering, and archive decisions remain unchanged.
+- Given the new source layout, custody/reconciliation helpers have private source ownership without independently owning or mutating actor state outside explicit parameters and the current `AppServerSession` receiver.
+- Existing I169 durable-custody, crash-replay, generation, targeted-interrupt, stress, terminal-recovery, transcript-journal, and agent Session tests pass unchanged, with a focused source-layout regression added.
+
+### Planned Validation
+
+- `cargo test -p talos-agent --locked --no-fail-fast`
+- `cargo fmt --all -- --check`
+- `cargo check --workspace --locked`
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`
+- `cargo test --workspace --locked --no-fail-fast`
+- `./scripts/release_preflight.sh`
+- `scripts/validate_project_governance.sh .`
+- `bash scripts/validate_collaboration_claims.sh .`
+- `git diff --check`
+- Mechanical source-body equivalence check against the effective claim merge, normalizing only module plumbing and required private visibility changes.
+- Exact-head Unix/Windows CI and rebuilt CLI smoke.
+
+### Documentation To Update
+
+- Synchronize ARCH-034-R08, `docs/iterations/README.md`, `docs/backlog/PRODUCT-BACKLOG.md`, `docs/BOARD.md`, and the governance manifest.
+- No user-facing behavior documentation change is expected because this infrastructure-only deliverable preserves behavior.
+
+### Risks And Rollback
+
+- Risk: moving stateful helpers changes borrow lifetimes, actor ordering, generation fences, durable custody, receipt/event projection, pause/cancel, shutdown release, or exact diagnostics despite compiling.
+- Rollback: revert the private module move if mechanical equivalence and existing custody tests cannot be shown; behavior or actor-design changes require a separate story and, where applicable, an ADR.
+
+## Actual Activation And Execution
+
+| Date | Type | Record |
+|---|---|---|
+| 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #161 proposes ownership; the claim remains ineffective until its finalized head merges. |
+
+## Verification Evidence
+
+- Claim validation and implementation evidence will be appended after the claim and implementation phases.
+
+## Completion Evidence
+
+- Completion Commit: not assigned; retain Planned until the claim and implementation evidence exist.
+
+## Variance And Residuals
+
+- R04 remains Refinement pending independent security review.
+- R09-R11 remain separately owned and independently claimable after I177 closes.
+
+## Retrospective
+
+- Outcome: pending.
+- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Lessons: none recorded.
