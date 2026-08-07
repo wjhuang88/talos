@@ -1,6 +1,6 @@
 # Iteration I173: Todo Module Decomposition
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-07
 > Planned objective: decompose `talos-session/src/todo.rs` into private responsibility modules without changing Todo behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing Todo domain types, SQLite repository logic, display formatting, and nine AgentTool adapters into private submodules behind the current `todo` facade; preserve every public path, schema, SQL/query order, idempotency/dependency rule, tool name, contribution, permission facet, and output string. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #148 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |

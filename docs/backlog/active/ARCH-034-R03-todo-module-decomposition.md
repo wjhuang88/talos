@@ -4,22 +4,22 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F06 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I173 (Planned; claim PR pending) |
+| Selected Iteration | I173 (Active; Claim PR #148 proposed) |
 | Preserved behavior | Todo schema, SQL, idempotency, dependency validation, tools, and permissions |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Private model, repository, formatting, and nine-tool-adapter decomposition behind the current `todo` facade with exact public-path, SQL, schema, permission, contribution-order, and output preservation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #148 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
