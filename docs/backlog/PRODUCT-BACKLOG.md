@@ -77,7 +77,7 @@ Required reads:
 | I158 / ARCH-034-R01 | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and final architecture/extension/finding documentation accepted. |
 | ARCH-034-R02 / I172 | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | ARCH-034-R05 / I174 | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
-| ARCH-034-R06 / I175 | Planned / claim PR #154 | ConversationEngine command/projection seam; claim must be effective before implementation. R04 remains Refinement pending independent security review. |
+| ARCH-034-R06 / I175 | Review / PR #156 | Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8` contains the behavior-preserving ConversationEngine command/projection source decomposition; exact-head CI and merge acceptance remain pending. R04 remains Refinement pending independent security review. |
 | ARCH-034-R06..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
@@ -85,6 +85,7 @@ Required reads:
 | SERVER-001 | Intake — Issue #142 | Serve/connect protocol adapter architecture requires one authoritative runtime/session/permission path and dependency refinement before implementation. [Owner](active/SERVER-001-serve-connect-protocol-adapters.md) |
 | TOOL-025 | Intake — Issue #143 | RTK-derived shell filtering requires bounded source selection, provenance review, and preservation of Talos execution authorities before implementation. [Owner](active/TOOL-025-rtk-derived-semantic-output-filters.md) |
 | MODEL-012 | Intake — Issue #146 | Optional Utility Model role requires additive configuration, explicit task routing, canonical provider ownership, and evaluation refinement before implementation. [Owner](active/MODEL-012-utility-model-role-and-bounded-routing.md) |
+| SKILL-004 | Intake — Issue #155 | Optional `SKILL.md` triggers compatibility requires a public-contract decision, parser fixtures, and a separately claimed runnable iteration. [Owner](active/SKILL-004-optional-skill-triggers-compatibility.md) |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
 | PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |

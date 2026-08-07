@@ -42,7 +42,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I172 | CLI/TUI Bridge Legacy Projection Decomposition | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | I173 | Todo Module Decomposition | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | I174 | TUI App Coordinator Decomposition | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
-| I175 | Conversation Engine Decomposition | Planned | Governance-only claim PR #154; implementation starts only after the finalized claim merges. R04 remains blocked pending independent security review; R07-R11 stay Ready/unclaimed. |
+| I175 | Conversation Engine Decomposition | Review | Implementation PR #156 contains behavior-preserving command/projection source decomposition at Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8`; exact-head CI and merge acceptance remain pending. R04 remains blocked; R07-R11 stay Ready/unclaimed. |
 
 ## Completed This Closeout
 

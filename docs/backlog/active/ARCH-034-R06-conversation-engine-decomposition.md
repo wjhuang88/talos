@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F22 |
-| Status | Ready |
+| Status | Review |
 | Priority | P2 |
-| Selected Iteration | I175 (Planned; Claim PR #154) |
+| Selected Iteration | I175 (Review; Implementation PR #156) |
 | Preserved behavior | ConversationEngine API, output ordering, commands, steering, and transcripts |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #154 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #156 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any public API, state-ownership, command/output, transcript, extension snapshot, plugin/skill, dependency, or behavior change. |
 
