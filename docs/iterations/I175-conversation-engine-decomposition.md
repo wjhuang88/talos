@@ -1,6 +1,6 @@
 # Iteration I175: Conversation Engine Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose private command and projection responsibilities from `talos-conversation/src/engine.rs` without changing conversation behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing private slash-command dispatch and transcript/extension projection helpers into private modules behind the current `ConversationEngine` facade; preserve public paths, turn/steering state ownership, command semantics, exact output text/order, transcript formats, plugin/skill behavior, and extension snapshot contents. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #156 |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Release if the split requires any public API, state-ownership, command/output, transcript, extension snapshot, plugin/skill, dependency, or behavior change. |
+| Handoff / Release Condition | Closed after implementation PR #156 merged; any future public API, state-ownership, command/output, transcript, extension snapshot, plugin/skill, dependency, or behavior change requires a separate story. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -101,6 +101,7 @@ the completed R02, R03, and R05 seams are prerequisites/context only.
 | 2026-08-07 | Activation | Claim PR #154 exact-head CI `31150975042` passed; merge-time CAS confirmed head `6d07a9b6` against base `ed1ea8e7`, no overlap or blocking review, and the claim merged as `69c345f0`. Implementation starts from that effective claim. |
 | 2026-08-07 | Review submission | Behavior-preserving source decomposition was committed as `5c45322245788e12316dffbe1f9cfacef390eff8`; implementation PR #156 was opened for exact-head CI and merge review. |
 | 2026-08-07 | Governance drift repair | Initial implementation CI run `31152579142` was superseded because live Issue #155 was not yet in the status matrix; independent SKILL-004 Intake registration and the required reconciliation comment repaired that unrelated drift without changing I175 scope. |
+| 2026-08-07 | Completion | PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04` after exact-head CI `31152972959`; merge-time CAS, both governance validators, remote owner reconciliation, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -109,10 +110,12 @@ the completed R02, R03, and R05 seams are prerequisites/context only.
 - Local implementation validation passed the planned locked conversation/workspace test, format, check, Clippy, release-preflight, governance-validator, collaboration-validator, and diff-check commands.
 - Moved todo parsing, command registry/handlers/completion, transcript projection, and extension builders were whitespace-insensitive equivalent to claim merge `69c345f05c988e2d220349756693fb64824b1d35`.
 - `scripts/validate_remote_issue_owners.py` passed for all 33 open Issues after SKILL-004/#155 registration; the failed superseded run was not a code or I175 acceptance result.
+- Exact-head implementation CI `31152972959` passed Unix/Windows workspace, governance, remote owner reconciliation, and rebuilt CLI smoke checks.
+- PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04`; merge-time CAS confirmed base `69c345f05c988e2d220349756693fb64824b1d35`, head `f966e92da821d94ce552cda8cfc4507fd11da09e`, no reviews/comments, and no new overlapping claim or implementation work.
 
 ## Completion Evidence
 
-- Completion Commit: `5c45322245788e12316dffbe1f9cfacef390eff8` (existing implementation evidence; completion remains pending accepted exact-head CI, merge, and closeout).
+- Completion Commit: `5c45322245788e12316dffbe1f9cfacef390eff8`
 
 ## Variance And Residuals
 
@@ -121,6 +124,6 @@ the completed R02, R03, and R05 seams are prerequisites/context only.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result; no user-facing behavior documentation change is planned.
+- Outcome: Complete; behavior-preserving private conversation command/projection source decomposition delivered.
+- Documentation: governance owners synchronized; no user-facing behavior documentation change was needed.
 - Lessons: none recorded.
