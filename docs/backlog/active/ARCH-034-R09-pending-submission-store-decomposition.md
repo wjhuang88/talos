@@ -6,7 +6,24 @@
 | Finding | ARCH-034-F25 |
 | Status | Ready |
 | Priority | P2 |
-| Selected Iteration | Not selected |
+| Selected Iteration | I178 (Planned; claim PR #164) |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
+| Work Slice | Extract private schema/query/encoding and row-mapping helpers from `talos-session/src/pending_submission.rs` behind `PendingSubmissionStore`; preserve SQLite schema and SQL text, transaction modes, retry bounds, paths, identity/generation fencing, transition guards, recovery, cleanup, diagnostics, public methods, serialization, and dependency boundaries. |
+| Claimed At | 2026-08-07 |
+| Source Issue | None |
+| Governance Claim PR | #164 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-07 |
+| Handoff / Release Condition | Release if schema, transaction, state, recovery, identity, or public API equivalence cannot be proven; any schema evolution requires a separate migration story. |
 | Preserved behavior | SQLite schema, transactions, transition guards, recovery, and identity fencing |
 
 ## Problem And Boundary
