@@ -1,6 +1,6 @@
 # Iteration I173: Todo Module Decomposition
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: decompose `talos-session/src/todo.rs` into private responsibility modules without changing Todo behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing Todo domain types, SQLite repository logic, display formatting, and nine AgentTool adapters into private submodules behind the current `todo` facade; preserve every public path, schema, SQL/query order, idempotency/dependency rule, tool name, contribution, permission facet, and output string. |
@@ -18,8 +18,8 @@
 | Source Issue | None |
 | Governance Claim PR | #148 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | #149 |
+| Authorization Evidence | No independent reviewer was available; exact-head CI `31143057387`, both governance validators, merge-time CAS, and no blocking review feedback passed before merge. |
+| Implementation PR | #149 (merged as `506311dcb6db18a2cbe1602c8dae69f780f4416d`) |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Claim merge precedes implementation branch; release if public-path, SQL, serialization, permission, or output equivalence cannot be proven. |
 
@@ -78,7 +78,7 @@ No Active or Review iteration overlaps this work. I172/R02 is Complete with Comp
 |---|---|---|
 | 2026-08-07 | Activation | Claim PR #148 passed exact-head CI run `31140533666`; merge-time CAS confirmed head `9700e196` against base `cc743601`, and the claim merged at `e9836ddf`. The implementation branch starts from that effective claim. |
 | 2026-08-07 | Implementation | Moved the existing Todo model, SQLite repository, formatted output, nine tool adapters, and unit tests into private responsibility modules behind the unchanged `todo` facade. Added source-layout and compile-path regression coverage. |
-| 2026-08-07 | Review | Draft implementation PR #149 opened from implementation commit `e4818e34`; exact-head CI and merge-time CAS remain required. |
+| 2026-08-07 | Review | Implementation PR #149 passed exact-head CI `31143057387`, merge-time CAS, and governance checks; merged as `506311dcb6db18a2cbe1602c8dae69f780f4416d`. |
 
 ## Verification Evidence
 
@@ -87,13 +87,13 @@ No Active or Review iteration overlaps this work. I172/R02 is Complete with Comp
 - `cargo test --workspace --locked --no-fail-fast`: passed outside the workspace sandbox; the sandboxed attempt failed only where local listeners, `sandbox-exec`, or restricted filesystem operations were denied.
 - `./scripts/release_preflight.sh`: passed outside the workspace sandbox.
 - `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, and `git diff --check`: passed.
-- Exact-head implementation CI and rebuilt CLI smoke remain pending the implementation PR.
+- Exact-head CI `31143057387` passed all Unix/Windows checks, governance validation, and rebuilt CLI smoke.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned/Review until implementation evidence exists.
+- Completion Commit: `e4818e34c1e047c41d41abc1f7859c7984008e83`
 
 ## Residuals
 
 - New Todo behavior remains a separate product story.
-- R04 and R05–R11 remain separately owned and independently claimable after I173 closes.
+- R04 remains Refinement pending independent security review; R05–R11 remain Ready and separately claimable.
