@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F05 |
-| Status | Ready |
+| Status | Active |
 | Priority | P2 |
-| Selected Iteration | I174 (Planned; Claim PR #151) |
+| Selected Iteration | I174 (Active; implementation branch `refactor/i174-tui-app-coordinator`) |
 | Preserved behavior | Rendering, input, stream ordering, approvals, scrollback, and terminal restore |
 
 ## Collaboration Claim
@@ -34,7 +34,7 @@ remains the correct public coordinator; its private concerns need source boundar
 
 ## Scope
 
-- Extract private input, stream/output, and frame coordination helpers while retaining `App`.
+- Extract private input, stream/output, and frame coordination helpers while retaining `Tui`.
 - Preserve terminal lifecycle, select priorities, state fields, and render order.
 
 ## Exclusions
