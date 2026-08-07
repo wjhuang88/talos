@@ -1,6 +1,6 @@
 # Iteration I174: TUI App Coordinator Decomposition
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose `talos-tui/src/app.rs` into private input, stream/output, and frame-coordination modules without changing TUI behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #151 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #152 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Claim merge precedes implementation branch; release if the split requires any public API, lifecycle, select-order, rendering, input, output, or terminal behavior change. |
 
@@ -96,10 +96,20 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | Governance-only claim PR #151 prepared after confirming no Active, Review, or Planned iteration and no overlapping claim or implementation PR; the claim is ineffective until merge. |
+| 2026-08-07 | Activation | Claim PR #151 exact-head CI `31147027316` passed; merge-time CAS confirmed head `0ffb5400` against base `58fa3683`, and the claim merged as `49ff4e24`. Implementation starts from that effective claim. |
+| 2026-08-07 | Implementation | Moved existing private input, stream/UI-output, and frame-coordination methods into three private `app` submodules. `Tui`, every public method, `Tui::run`, terminal lifecycle, and all method bodies remain mechanically equivalent apart from required `pub(super)` visibility. Added source-layout and public-root-path regression coverage. |
+| 2026-08-07 | Review | Implementation PR #152 opened from implementation commit `e4248bfe`; exact-head CI and merge-time CAS remain required. |
 
 ## Verification Evidence
 
-- Finalized claim exact-head CI remains pending on PR #151.
+- Claim exact-head CI `31147027316` passed Unix/Windows workspace, governance, and rebuilt CLI smoke checks.
+- `cargo test -p talos-tui --locked --no-fail-fast`: passed (487 unit tests, 2 I174 integration tests, and 2 doc tests).
+- `cargo fmt --all -- --check`, `cargo check --workspace --locked`, and `cargo clippy --workspace --all-targets --locked -- -D warnings`: passed.
+- `cargo test --workspace --locked --no-fail-fast`: passed, including all integration and doc tests.
+- `./scripts/release_preflight.sh`: passed.
+- `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, and `git diff --check`: passed.
+- Mechanical `diff -uBw` comparison of all moved input, output, and frame method ranges against the claim baseline: no differences after removing required `pub(super)` visibility.
+- Exact-head implementation CI and rebuilt CLI smoke remain pending on PR #152.
 
 ## Completion Evidence
 

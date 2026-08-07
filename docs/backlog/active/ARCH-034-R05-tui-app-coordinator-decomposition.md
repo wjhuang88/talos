@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F05 |
-| Status | Ready |
+| Status | Review |
 | Priority | P2 |
-| Selected Iteration | I174 (Planned; Claim PR #151) |
+| Selected Iteration | I174 (Review; Implementation PR #152) |
 | Preserved behavior | Rendering, input, stream ordering, approvals, scrollback, and terminal restore |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #151 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #152 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any public API, lifecycle, select-order, rendering, input, output, or terminal behavior change. |
 
@@ -34,7 +34,7 @@ remains the correct public coordinator; its private concerns need source boundar
 
 ## Scope
 
-- Extract private input, stream/output, and frame coordination helpers while retaining `App`.
+- Extract private input, stream/output, and frame coordination helpers while retaining `Tui`.
 - Preserve terminal lifecycle, select priorities, state fields, and render order.
 
 ## Exclusions
