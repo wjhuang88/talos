@@ -19,7 +19,7 @@
 | Governance Claim PR | #167 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Pending |
+| Implementation PR | #168 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if exact public-path/API/serialization/trait/registry/authorization/protocol equivalence cannot be proven; any API redesign or semver change requires a separate story, ADR, and migration plan. |
 
@@ -101,7 +101,7 @@ correct, dependency-free public facade.
 | 2026-08-07 | Planning | I179 selected after inventorying non-terminal work, confirming I178/R09 closure, and finding no overlapping effective claim or implementation PR. |
 | 2026-08-07 | Claim submission | Draft governance claim PR #167 opened; the exact finalized `Claimed` record is submitted for claim-only CI and merge-time CAS. No implementation authority exists until #167 merges to `main`. |
 | 2026-08-07 | Activation | Claim PR #167 finalized head `168d96b0ea9aedb9d3850c800f0cedddb09e76ef` passed exact-head CI `31183822345`; merge-time CAS confirmed no overlapping claim, implementation PR, or blocking feedback, and the claim merged as `9a5419e496db4f059ed841917d8ee9f099d377f6`. Implementation started from that effective claim. |
-| 2026-08-07 | Implementation | The 1,731-line `tool.rs` was reduced to a 26-line stable facade over private result/presentation, authorization, `AgentTool`, registry, protocol, and test modules. Downstream public-path and private source-layout probes were added; implementation PR creation remains pending. |
+| 2026-08-07 | Review submission | The 1,731-line `tool.rs` was reduced to a 26-line stable facade over private result/presentation, authorization, `AgentTool`, registry, protocol, and test modules in source implementation commit `63d494c5`. Downstream public-path and private source-layout probes were added, and Draft implementation PR #168 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 
@@ -114,7 +114,7 @@ correct, dependency-free public facade.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Review until the implementation PR merges and closeout records reachable evidence.
+- Completion Commit: not assigned; retain Review until implementation PR #168 merges and closeout records reachable evidence.
 
 ## Variance And Residuals
 
