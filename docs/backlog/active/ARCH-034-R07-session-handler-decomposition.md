@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F23 |
-| Status | Ready |
+| Status | Review |
 | Priority | P2 |
-| Selected Iteration | I176 (Planned; Claim PR #158) |
+| Selected Iteration | I176 (Review; Implementation PR #159) |
 | Preserved behavior | Session lifecycle ordering, rollback, model activation, and UI diagnostics |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #158 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #159 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any handler path/signature, transition/UI ownership, CLI syntax, persistence, model identity, ordering, diagnostic, cleanup recovery, dependency, or behavior change. |
 

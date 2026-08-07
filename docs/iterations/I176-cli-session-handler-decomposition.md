@@ -1,6 +1,6 @@
 # Iteration I176: CLI Session Handler Decomposition
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose private provider/model and session-lifecycle responsibilities from `talos-cli/src/session_handlers.rs` without changing CLI or Session behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #158 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #159 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any handler path/signature, transition/UI ownership, CLI syntax, persistence, model identity, ordering, diagnostic, cleanup recovery, dependency, or behavior change. |
 
@@ -101,14 +101,19 @@ the completed R01-R03, R05, and R06 seams are prerequisites/context only. Open r
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | I176 selected after inventorying blocked/paused work, confirming I175/R06 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #158 proposes ownership; the claim remains ineffective until merged. |
+| 2026-08-07 | Activation | Claim PR #158 exact-head CI `31156407297` passed; merge-time CAS confirmed finalized head `4aa8f44982c2010dcff57cb2db4ffc84d6a1c7ae`, no overlapping PR or blocking feedback, and the claim merged as `97c252a1493e66cfb8ccbe5ff64d0643a92255d7`. Implementation started from that effective claim. |
+| 2026-08-07 | Review submission | Behavior-preserving source decomposition was committed as `1de3243d`; Draft implementation PR #159 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 
-- Claim validation and implementation evidence will be appended after the claim and implementation phases.
+- Claim exact-head CI `31156407297` passed Unix/Windows workspace, governance, and rebuilt CLI smoke checks.
+- Merge-time CAS confirmed finalized claim head `4aa8f44982c2010dcff57cb2db4ffc84d6a1c7ae`, no overlapping claim/implementation PR, no blocking reviews/comments, and both governance validators passed before merge.
+- Local implementation validation passed the planned locked CLI/workspace tests, format, check, Clippy, release-preflight, governance-validator, collaboration-validator, and diff-check commands.
+- Reassembling the facade, provider/model, and lifecycle production functions in their original order produced an empty line-by-line diff against claim merge `97c252a1493e66cfb8ccbe5ff64d0643a92255d7` after normalizing only the required `pub(super)` helper visibility.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned until the claim and implementation evidence exist.
+- Completion Commit: not assigned; retain Review until exact-head CI, merge-time CAS, implementation merge, and closeout complete.
 
 ## Variance And Residuals
 
