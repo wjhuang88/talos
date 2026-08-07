@@ -2,7 +2,8 @@
 
 **Repository baseline**: `main@685d3b4f4088a172551f8c844a89f5dee9469430`
 **Closeout PR**: #137
-**Remote scope**: all 28 open GitHub Issues after Issue #119 completion and Issue #136 registration
+**Remote scope**: all 31 open GitHub Issues after Issue #119 completion, Issue #136 registration,
+and intake registration of Issues #141–#143
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
@@ -48,6 +49,9 @@
 | [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement Epic | Architecture/decomposition owner only; no child is selected. |
 | [#134](https://github.com/wjhuang88/talos/issues/134) | native text selection and copy | [TUI-046](../backlog/active/TUI-046-native-text-selection-copy.md) | Refinement | Mouse-capture policy, ADR-054 impact and real-terminal matrix remain unclaimed. |
 | [#136](https://github.com/wjhuang88/talos/issues/136) | executable recovery commands in delete cleanup failure | [TUI-047](../backlog/active/TUI-047-delete-cleanup-recovery-diagnostics.md) | Ready | Independent non-blocking correction; preserve accepted ADR-056 cleanup semantics. |
+| [#141](https://github.com/wjhuang88/talos/issues/141) | storage topology and runtime ownership | [DATA-002](../backlog/active/DATA-002-storage-topology-and-runtime-ownership.md) | Intake | P0 architecture intake; ADR and owner/handoff refinement required before implementation. |
+| [#142](https://github.com/wjhuang88/talos/issues/142) | serve/connect protocol adapter architecture | [SERVER-001](../backlog/active/SERVER-001-serve-connect-protocol-adapters.md) | Intake | P1 architecture intake; dependency and single-runtime boundary refinement required. |
+| [#143](https://github.com/wjhuang88/talos/issues/143) | RTK-derived semantic shell output filters | [TOOL-025](../backlog/active/TOOL-025-rtk-derived-semantic-output-filters.md) | Intake | P1 source/provenance and behavior-boundary refinement required before extraction. |
 
 ## Closed In This Reconciliation
 
