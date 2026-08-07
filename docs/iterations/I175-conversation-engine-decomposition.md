@@ -1,6 +1,6 @@
 # Iteration I175: Conversation Engine Decomposition
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-07
 > Planned objective: decompose private command and projection responsibilities from `talos-conversation/src/engine.rs` without changing conversation behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -98,10 +98,12 @@ the completed R02, R03, and R05 seams are prerequisites/context only.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-07 | Planning | I175 selected after inventorying blocked/paused work, confirming I174/R05 completion, and finding no overlapping claim or implementation PR. Governance-only claim PR #154 proposes ownership; the claim remains ineffective until merge. |
+| 2026-08-07 | Activation | Claim PR #154 exact-head CI `31150975042` passed; merge-time CAS confirmed head `6d07a9b6` against base `ed1ea8e7`, no overlap or blocking review, and the claim merged as `69c345f0`. Implementation starts from that effective claim. |
 
 ## Verification Evidence
 
-- Claim validation and implementation evidence will be appended after the claim and implementation phases.
+- Claim exact-head CI `31150975042` passed Unix/Windows workspace, governance, and rebuilt CLI smoke checks.
+- Merge-time CAS confirmed finalized claim head `6d07a9b6ecee08f0d94e2150168096ddaba81428`, base `ed1ea8e71fc741d3f7780ddd676ba0721a8407e5`, no overlapping claim/implementation PR, and no blocking reviews/comments.
 
 ## Completion Evidence
 

@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F22 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I175 (Planned; Claim PR #154) |
+| Selected Iteration | I175 (Active; Claim PR #154) |
 | Preserved behavior | ConversationEngine API, output ordering, commands, steering, and transcripts |
 
 ## Collaboration Claim

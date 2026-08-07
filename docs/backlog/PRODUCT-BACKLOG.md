@@ -77,7 +77,7 @@ Required reads:
 | I158 / ARCH-034-R01 | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and final architecture/extension/finding documentation accepted. |
 | ARCH-034-R02 / I172 | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | ARCH-034-R05 / I174 | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
-| ARCH-034-R06 / I175 | Planned / claim PR #154 | ConversationEngine command/projection seam; claim must be effective before implementation. R04 remains Refinement pending independent security review. |
+| ARCH-034-R06 / I175 | Active | Claim PR #154 merged at `69c345f0`; behavior-preserving ConversationEngine command/projection source decomposition is in progress. R04 remains Refinement pending independent security review. |
 | ARCH-034-R06..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
