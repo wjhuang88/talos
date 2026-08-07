@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F20 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I179 (Planned; claim PR #167) |
+| Selected Iteration | I179 (Review; Implementation PR #168) |
 
 ## Collaboration Claim
 
@@ -21,7 +21,7 @@
 | Governance Claim PR | #167 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #168 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if exact public-path/API/serialization/trait/registry/authorization/protocol equivalence cannot be proven; any API redesign or semver change requires a separate story, ADR, and migration plan. |
 | Preserved behavior | Every `talos_core::tool` public path and registry/protocol semantic |
@@ -46,6 +46,13 @@ correct; private source ownership is broad.
 - `talos-core` remains dependency-free and every existing downstream import compiles unchanged.
 - Registry, contribution, presentation, authorization, and serialization tests pass unchanged.
 - Locked workspace, API probes, governance, and diff checks pass.
+
+## Execution Evidence
+
+- Claim PR #167 finalized head `168d96b0ea9aedb9d3850c800f0cedddb09e76ef` passed CI run `31183822345` and merged as `9a5419e496db4f059ed841917d8ee9f099d377f6` after merge-time CAS.
+- `tool.rs` is now a 26-line stable facade over six private responsibility modules; the original public paths remain available through private-module re-exports.
+- Focused `talos-core` tests, locked workspace check/Clippy/tests, release preflight, source-literal/name equivalence, public-path probes, and private-module layout probes pass.
+- Source implementation commit `63d494c5` is submitted in Draft PR #168. Delivery remains In Progress/Review until that PR merges and a separate closeout records its existing merge SHA.
 
 ## Rollback / Residual
 

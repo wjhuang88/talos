@@ -1,6 +1,6 @@
 # Iteration I179: Core Tool Facade Decomposition
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose private result/presentation, authorization, tool-trait, contribution/registry, and protocol responsibilities from `talos-core/src/tool.rs` without changing public paths or behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #167 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #168 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if exact public-path/API/serialization/trait/registry/authorization/protocol equivalence cannot be proven; any API redesign or semver change requires a separate story, ADR, and migration plan. |
 
@@ -100,19 +100,27 @@ correct, dependency-free public facade.
 |---|---|---|
 | 2026-08-07 | Planning | I179 selected after inventorying non-terminal work, confirming I178/R09 closure, and finding no overlapping effective claim or implementation PR. |
 | 2026-08-07 | Claim submission | Draft governance claim PR #167 opened; the exact finalized `Claimed` record is submitted for claim-only CI and merge-time CAS. No implementation authority exists until #167 merges to `main`. |
+| 2026-08-07 | Activation | Claim PR #167 finalized head `168d96b0ea9aedb9d3850c800f0cedddb09e76ef` passed exact-head CI `31183822345`; merge-time CAS confirmed no overlapping claim, implementation PR, or blocking feedback, and the claim merged as `9a5419e496db4f059ed841917d8ee9f099d377f6`. Implementation started from that effective claim. |
+| 2026-08-07 | Review submission | The 1,731-line `tool.rs` was reduced to a 26-line stable facade over private result/presentation, authorization, `AgentTool`, registry, protocol, and test modules in source implementation commit `63d494c5`. Downstream public-path and private source-layout probes were added, and Draft implementation PR #168 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 
-- Claim-only preflight and current `tool.rs` public/downstream surface inventory are recorded in the session; local governance validators pass and implementation evidence is intentionally absent until the claim becomes effective.
+- Claim exact-head CI `31183822345` passed after a same-head rerun resolved a non-deterministic Windows timeout in three unrelated five-second async session tests; the accepted head did not change.
+- `cargo test -p talos-core --locked --no-fail-fast`: passed the existing 62 core tests plus four I179 source-layout/public-path acceptance probes and doctests.
+- `cargo clippy -p talos-core --all-targets --locked -- -D warnings`: passed.
+- `cargo check --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked --no-fail-fast`: passed.
+- `./scripts/release_preflight.sh`: passed locked workspace format, check, Clippy, tests, doctests, governance, collaboration-claim, site, installer, and release gates.
+- The sorted string-literal multiset, public struct/enum/trait names, public inherent method names, and `AgentTool` trait method names match effective claim merge `9a5419e4` across the facade plus private modules.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned until claim and implementation evidence exist.
+- Completion Commit: not assigned; retain Review until implementation PR #168 merges and closeout records reachable evidence.
 
 ## Variance And Residuals
 
 - R04 remains Refinement pending independent security review.
 - R11 remains separately owned and independently claimable after I179 closes.
+- This iteration is library-only private source organization. It changes no user-facing behavior, so binary runtime acceptance and user-facing documentation changes are not applicable; compile-time downstream probes and locked workspace behavior tests own acceptance.
 
 ## Retrospective
 

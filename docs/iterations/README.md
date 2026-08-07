@@ -46,7 +46,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I176 | CLI Session Handler Decomposition | Complete | Completion Commit `1de3243d`; PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea`; exact-head CI `31160309818` passed. R04 remains Refinement; R08-R11 stay Ready/unclaimed. |
 | I177 | Agent Session Custody Decomposition | Complete | Completion Commit `f505eea8` (squash merge of implementation `786aa571`); PR #162; exact-head CI `31166594367` passed. |
 | I178 | Pending Submission Store Decomposition | Complete | Completion Commit `f92634803560dc50e0b15ca8d7d511e9928c983f` (squash merge of source implementation `c662a7e6`); PR #165; exact-head CI `31180591881` passed. |
-| I179 | Core Tool Facade Decomposition | Planned | Governance-only claim PR #167 proposes `ARCH-034-R10` ownership; implementation is not authorized until the finalized claim merges. |
+| I179 | Core Tool Facade Decomposition | Review | Implementation PR #168 contains source commit `63d494c5`; claim PR #167 merged as `9a5419e4` after exact-head CI `31183822345`, and local behavior-preserving acceptance passes. |
 
 ## Completed This Closeout
 
