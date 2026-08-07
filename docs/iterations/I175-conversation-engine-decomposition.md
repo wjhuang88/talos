@@ -1,6 +1,6 @@
 # Iteration I175: Conversation Engine Decomposition
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-07
 > Planned objective: decompose private command and projection responsibilities from `talos-conversation/src/engine.rs` without changing conversation behavior or public paths.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #154 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #156 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any public API, state-ownership, command/output, transcript, extension snapshot, plugin/skill, dependency, or behavior change. |
 
@@ -99,15 +99,18 @@ the completed R02, R03, and R05 seams are prerequisites/context only.
 |---|---|---|
 | 2026-08-07 | Planning | I175 selected after inventorying blocked/paused work, confirming I174/R05 completion, and finding no overlapping claim or implementation PR. Governance-only claim PR #154 proposes ownership; the claim remains ineffective until merge. |
 | 2026-08-07 | Activation | Claim PR #154 exact-head CI `31150975042` passed; merge-time CAS confirmed head `6d07a9b6` against base `ed1ea8e7`, no overlap or blocking review, and the claim merged as `69c345f0`. Implementation starts from that effective claim. |
+| 2026-08-07 | Review submission | Behavior-preserving source decomposition was committed as `5c45322245788e12316dffbe1f9cfacef390eff8`; implementation PR #156 was opened for exact-head CI and merge review. |
 
 ## Verification Evidence
 
 - Claim exact-head CI `31150975042` passed Unix/Windows workspace, governance, and rebuilt CLI smoke checks.
 - Merge-time CAS confirmed finalized claim head `6d07a9b6ecee08f0d94e2150168096ddaba81428`, base `ed1ea8e71fc741d3f7780ddd676ba0721a8407e5`, no overlapping claim/implementation PR, and no blocking reviews/comments.
+- Local implementation validation passed the planned locked conversation/workspace test, format, check, Clippy, release-preflight, governance-validator, collaboration-validator, and diff-check commands.
+- Moved todo parsing, command registry/handlers/completion, transcript projection, and extension builders were whitespace-insensitive equivalent to claim merge `69c345f05c988e2d220349756693fb64824b1d35`.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Planned until the claim and implementation evidence exist.
+- Completion Commit: `5c45322245788e12316dffbe1f9cfacef390eff8` (existing implementation evidence; completion remains pending accepted exact-head CI, merge, and closeout).
 
 ## Variance And Residuals
 
