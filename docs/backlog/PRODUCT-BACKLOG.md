@@ -75,7 +75,7 @@ Required reads:
 | ID | State | Required Disposition |
 |---|---|---|
 | I158 / ARCH-034-R01 | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and final architecture/extension/finding documentation accepted. |
-| ARCH-034-R02 | Ready / claim pending | I172 claim-only PR proposes one private legacy projection seam; implementation starts only after claim merge. |
+| ARCH-034-R02 / I172 | In Progress / Active | Claim #140 effective at `46f72750`; private legacy projection extraction only, with no behavior or protocol change. |
 | ARCH-034-R03 / R05..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |

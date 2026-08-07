@@ -1,6 +1,6 @@
 # Iteration I172: CLI/TUI Bridge Legacy Projection Decomposition
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-06
 > Planned objective: extract one private legacy event/projection responsibility from `tui_bridge.rs` without changing bridge behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -83,6 +83,7 @@ finalized record is merged into `main`.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-06 | Planning | Claim-only preflight from `origin/main@56f419f7`; I158/I171 Complete, I159-I162 blocked, no overlapping implementation branch. |
+| 2026-08-07 | Activation | Claim PR #140 passed exact-head CI run `31094244893`, merge-time CAS confirmed head `93f9a934` against base `56f419f7`, and merged at `46f72750`. Implementation branch starts from that effective claim; I172 is the sole Active iteration. |
 
 ## Verification Evidence
 
