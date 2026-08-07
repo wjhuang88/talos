@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F25 |
-| Status | Ready |
+| Status | In Progress |
 | Priority | P2 |
-| Selected Iteration | I178 (Planned; claim PR #164) |
+| Selected Iteration | I178 (Review; Implementation PR #165) |
 
 ## Collaboration Claim
 
@@ -21,7 +21,7 @@
 | Governance Claim PR | #164 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #165 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if schema, transaction, state, recovery, identity, or public API equivalence cannot be proven; any schema evolution requires a separate migration story. |
 | Preserved behavior | SQLite schema, transactions, transition guards, recovery, and identity fencing |
