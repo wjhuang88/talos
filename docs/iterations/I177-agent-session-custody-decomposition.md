@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
+| Work Slice | Extract private durable custody/reconciliation, admission/rejection/receipt projection, pending-shutdown release, structured-turn finish, and pause/cancel helpers from `talos-agent/src/session.rs` while keeping `AppServerSession` as the sole actor and mutable state owner; preserve actor ordering, generation fences, receipts, recovery, pause/cancel, archive, diagnostics, event order, persistence protocol, and public API. |
+| Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #161 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | None |
+| Handoff / Release Condition | Release if custody equivalence requires actor redesign, state ownership changes, persistence/event/diagnostic changes, or an ADR. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized `Claimed` record is merged into `main`.
@@ -99,7 +99,7 @@ remain immutable archival evidence and do not authorize implementation.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. A governance-only Draft claim PR will be opened; ownership remains ineffective until its finalized claim merges. |
+| 2026-08-07 | Planning | I177 selected after inventorying blocked/paused work, confirming I176/R07 completion, and finding no overlapping effective claim or implementation PR. Governance-only claim PR #161 proposes ownership; the claim remains ineffective until its finalized head merges. |
 
 ## Verification Evidence
 
