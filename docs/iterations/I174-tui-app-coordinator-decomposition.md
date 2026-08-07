@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Move existing TUI input dispatch, stream/UI-output handling, and frame construction helpers into private modules behind the current `app` facade; preserve `Tui` fields and public paths, `Tui::run` lifecycle and `tokio::select!` priority, render order, key/mouse/approval behavior, scrollback anchoring, cursor placement, output strings, and terminal restoration. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #151 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
@@ -95,11 +95,11 @@ Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-07 | Planning | Governance-only claim proposal prepared after confirming no Active, Review, or Planned iteration and no overlapping claim or implementation PR. |
+| 2026-08-07 | Planning | Governance-only claim PR #151 prepared after confirming no Active, Review, or Planned iteration and no overlapping claim or implementation PR; the claim is ineffective until merge. |
 
 ## Verification Evidence
 
-- Claim proposal validation remains pending exact-head claim CI.
+- Finalized claim exact-head CI remains pending on PR #151.
 
 ## Completion Evidence
 

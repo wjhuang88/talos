@@ -6,20 +6,20 @@
 | Finding | ARCH-034-F05 |
 | Status | Ready |
 | Priority | P2 |
-| Selected Iteration | I174 (Planned; claim PR pending) |
+| Selected Iteration | I174 (Planned; Claim PR #151) |
 | Preserved behavior | Rendering, input, stream ordering, approvals, scrollback, and terminal restore |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Private input, stream/UI-output, and frame-coordination source decomposition behind the current `app` facade with exact `Tui` public paths, lifecycle/select priority, rendering, key/mouse/approval, scrollback, cursor, output, and terminal-restoration preservation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-07 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #151 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | Not started |
