@@ -41,7 +41,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
 | I172 | CLI/TUI Bridge Legacy Projection Decomposition | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | I173 | Todo Module Decomposition | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
-| I174 | TUI App Coordinator Decomposition | Active | Claim PR #151 merged as `49ff4e24`; implementation branch `refactor/i174-tui-app-coordinator` is active. |
+| I174 | TUI App Coordinator Decomposition | Review | Implementation commit `e4248bfe` is in PR #152; exact-head CI and post-merge owner closure remain required. |
 
 ## Completed This Closeout
 

@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F05 |
-| Status | Active |
+| Status | Review |
 | Priority | P2 |
-| Selected Iteration | I174 (Active; implementation branch `refactor/i174-tui-app-coordinator`) |
+| Selected Iteration | I174 (Review; Implementation PR #152) |
 | Preserved behavior | Rendering, input, stream ordering, approvals, scrollback, and terminal restore |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Governance Claim PR | #151 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
-| Implementation PR | Not started |
+| Implementation PR | #152 |
 | Last Updated | 2026-08-07 |
 | Handoff / Release Condition | Release if the split requires any public API, lifecycle, select-order, rendering, input, output, or terminal behavior change. |
 

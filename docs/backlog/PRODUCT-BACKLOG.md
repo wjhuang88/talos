@@ -76,7 +76,7 @@ Required reads:
 |---|---|---|
 | I158 / ARCH-034-R01 | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and final architecture/extension/finding documentation accepted. |
 | ARCH-034-R02 / I172 | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
-| ARCH-034-R05 / I174 | Active | Claim PR #151 merged as `49ff4e24`; implementation branch `refactor/i174-tui-app-coordinator` is active. |
+| ARCH-034-R05 / I174 | Review / PR #152 | Implementation commit `e4248bfe` splits private TUI input, stream/output, and frame ownership; exact-head CI and post-merge completion evidence remain required. |
 | ARCH-034-R06..R11 | Ready | Separately claim one coherent behavior-preserving seam at a time after I171 evidence and dependency checks. |
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 | Refinement | Requires independent security review before native/unsafe implementation work. |
