@@ -44,6 +44,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I174 | TUI App Coordinator Decomposition | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
 | I175 | Conversation Engine Decomposition | Complete | Completion Commit `5c45322245788e12316dffbe1f9cfacef390eff8`; PR #156 merged at `73898bdba0d072886c79023c048250190a3b5e04`; exact-head CI `31152972959` passed. R04 remains blocked; R07-R11 stay Ready/unclaimed. |
 | I176 | CLI Session Handler Decomposition | Complete | Completion Commit `1de3243d`; PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea`; exact-head CI `31160309818` passed. R04 remains Refinement; R08-R11 stay Ready/unclaimed. |
+| I177 | Agent Session Custody Decomposition | Planned | ARCH-034-R08 selected after I176 closeout; governance-only claim PR pending. No implementation authority exists until the finalized claim merges to `main`. |
 
 ## Completed This Closeout
 

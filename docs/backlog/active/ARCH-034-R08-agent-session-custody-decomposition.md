@@ -6,8 +6,25 @@
 | Finding | ARCH-034-F24 |
 | Status | Ready |
 | Priority | P2 |
-| Selected Iteration | Not selected |
+| Selected Iteration | I177 (Planned; Claim PR pending) |
 | Preserved behavior | Actor ordering, generation fences, receipts, recovery, pause/cancel, and archive |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-07 |
+| Handoff / Release Condition | None |
 
 ## Problem And Boundary
 
