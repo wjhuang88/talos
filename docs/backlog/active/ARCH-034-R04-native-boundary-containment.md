@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Findings | ARCH-034-F13, ARCH-034-F19 |
-| Status | Review - I181 content disposition accepted; claim merge pending |
+| Status | Partial - I181 review Complete; accepted gaps require child owners/claims |
 | Priority | P1 |
-| Selected Iteration | I181 (Review; claim merge pending) |
+| Selected Iteration | I181 (Complete; review evidence `aea26ad0`) |
 | Preserved behavior | Permission gates, native error mapping, process limits, storage format, and fallback policy |
 
 ## Collaboration Claim
@@ -22,9 +22,9 @@
 | Governance Claim PR | #174 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed `24694b88` and approved the review-only plan subject to mandatory corrections. Maintainer clarification [comment `5225938556`](https://github.com/wjhuang88/talos/pull/174#issuecomment-5225938556) attests that a different natural person performed the review through the shared @wjhuang88 credential, accepts the content as independent-review evidence, and preserves GitHub's actual `COMMENTED` state. Commit `f263f221` incorporates the required corrections; exact-head CI `31253291503` passed. |
-| Implementation PR | Not started |
+| Implementation PR | None - review-only claim merged; protected implementations require child owners |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Merge the review-only claim only after refreshed governance validation and merge-time CAS. Do not begin protected implementation on this branch; create one bounded owner/claim per accepted implementation slice after claim merge. |
+| Handoff / Release Condition | Parent claim coordinates creation of non-overlapping child owners only. I181 review completed at `aea26ad011af04396ab8588c9326d309538f31a2`; do not implement any accepted gap under this review-only claim. |
 
 ## Problem And Boundary
 
@@ -119,5 +119,15 @@ implementation on this branch.
 
 ## Rollback / Residual
 
-If merge-time validation or CAS fails, keep the claim unmerged and do not edit protected code.
-New native dependencies require a separate ADR.
+I181 review evidence is merged at `aea26ad011af04396ab8588c9326d309538f31a2`. AG-1 through
+AG-7 require separate bounded owners/claims; other subprocess and five-crate SQLite containment
+remain evidence work until classified. New native dependencies require a separate ADR.
+
+## Review Completion Evidence
+
+- Review-only Completion Commit: `aea26ad011af04396ab8588c9326d309538f31a2`
+- PR #174 exact head `12963970ab5ce8e316a9a649503bc220d48dff89` passed CI
+  `31255683335`, both governance validators, architecture audit, scale assessment, and merge-time
+  CAS before squash merge.
+- This evidence completes the disposition phase only. R04 remains Partial until accepted child
+  gaps are implemented or explicitly dispositioned with their own completion evidence.

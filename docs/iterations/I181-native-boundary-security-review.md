@@ -1,6 +1,6 @@
 # Iteration I181: Native And Panic-Boundary Security Review
 
-> Document status: Review - content disposition accepted; claim merge pending
+> Document status: Complete
 > Published plan date: 2026-08-08
 > Planned objective: independently review every recorded native, panic-capable, and subprocess boundary in ARCH-034-R04, reconcile governing ADR facts, and convert only proven gaps into bounded follow-up owners without changing production behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Independently review the ARCH-034-R04 native/panic boundary matrix covering ADR-007 libc and process hardening, subprocess families, arborium/tree-sitter, `gix`, and bundled SQLite; classify gaps and create bounded follow-up owners only; preserve all runtime/API/dependency/permission/sandbox/process-hardening/unsafe/storage behavior. |
@@ -20,13 +20,13 @@
 | Governance Claim PR | #174 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed `24694b88` and approved the review-only plan subject to mandatory corrections. Maintainer clarification [comment `5225938556`](https://github.com/wjhuang88/talos/pull/174#issuecomment-5225938556) attests that a different natural person performed the review through the shared @wjhuang88 credential, accepts the content as independent-review evidence, and preserves GitHub's actual `COMMENTED` state. Commit `f263f221` incorporates the required corrections; exact-head CI `31253291503` passed. |
-| Implementation PR | Not started |
+| Implementation PR | None - review-only deliverable merged through claim PR #174 |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Merge the review-only claim only after refreshed governance validation and merge-time CAS; then close I181 with the existing merge/evidence SHA and create separate bounded owners/claims for accepted gaps. |
+| Handoff / Release Condition | Closed after PR #174 merged as `aea26ad011af04396ab8588c9326d309538f31a2`; every accepted gap remains separately claimable and no protected implementation inherits this claim. |
 
-Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. Maintainer comment `5225938556`
-accepts the independently produced review content while preserving GitHub's actual `COMMENTED`
-state. A proposed `Claimed` record still has no effect until merged into `main`.
+The finalized claim became effective on `main` at squash merge
+`aea26ad011af04396ab8588c9326d309538f31a2`. Maintainer comment `5225938556` accepts the
+independently produced review content while preserving GitHub's actual `COMMENTED` state.
 
 ## Closure Ledger
 
@@ -132,6 +132,7 @@ hard security gate prohibits implementation before independent review.
 | 2026-08-08 | Planning | I181 selected after I180/PR #171 and owner-truth PR #173 closure, non-terminal iteration inventory, open-PR overlap check, and read-only native/panic call-site tracing. Claim and independent approval remain pending. |
 | 2026-08-08 | Review follow-up | Review `PRR_kwDOSrj_LM8AAAABI2KjFw` recommended approval analytically but GitHub rejected self-approval and stored it as `COMMENTED`. F-A (unused public parent-mutation API), F-B (post-timeout pipe wait can be unbounded), F-C (symlink-cycle stack overflow and uncapped file reads), and stale ADR-007 site-5 facts were independently reproduced and added to R04. The authorization gate remained open at this point. |
 | 2026-08-08 | Maintainer disposition | Comment `5225938556` attests that a different natural person performed the review through the shared GitHub credential and accepts the review content as authorization for this review-only claim. GitHub's `COMMENTED` state remains explicit; no AG-1..AG-7 implementation is authorized on this branch. |
+| 2026-08-08 | Completion | PR #174 squash-merged as `aea26ad011af04396ab8588c9326d309538f31a2` from exact head `12963970ab5ce8e316a9a649503bc220d48dff89` after CI `31255683335`, both governance validators, architecture audit, scale assessment, and merge-time CAS passed. |
 
 ## Verification Evidence
 
@@ -142,14 +143,18 @@ hard security gate prohibits implementation before independent review.
   warnings), `python3 scripts/audit_architecture.py .` (21 crates, 0 cycles, 5 unsafe lexical
   candidates), and `scripts/assess_project_scale.sh .` (high-risk / release-managed / on-demand)
   passed on 2026-08-08.
-- Corrected exact-head CI run `31253291503` passed; refreshed validation and merge-time CAS remain
-  pending after this owner-truth update.
+- Final exact-head CI `31255683335` passed all four jobs for `12963970`; merge-time CAS comment
+  `5225994995` recorded base `46c65805`, no overlap, no unresolved threads, and clean owner truth.
 - Runtime evidence is intentionally not applicable before accepted implementation slices exist.
 
 ## Completion Evidence
 
-- Not applicable while I181 is in Review. A future Complete status requires an already-existing
-  independently reviewed evidence commit; this planning record does not claim completion.
+- Completion Commit: `aea26ad011af04396ab8588c9326d309538f31a2`
+- PR #174 squash-merged at the Completion Commit from exact head
+  `12963970ab5ce8e316a9a649503bc220d48dff89`; no Rust, test, Cargo, dependency, permission,
+  sandbox, process-hardening, `unsafe`, storage, API, runtime, or ADR semantic change was included.
+- Exact-head CI `31255683335`, review `PRR_kwDOSrj_LM8AAAABI2KjFw`, maintainer authorization
+  comment `5225938556`, and CAS comment `5225994995` establish the review-only completion evidence.
 
 ## Variance And Residuals
 
@@ -159,7 +164,9 @@ hard security gate prohibits implementation before independent review.
 
 ## Retrospective
 
-- Outcome: mandatory factual review corrections incorporated and content disposition accepted;
-  claim merge and post-merge closure remain pending.
-- Documentation: owner-first synchronization pending claim PR.
-- Lessons: pending; promote a rule only if the review exposes a recurring governance failure.
+- Outcome: native/panic boundary dispositions are content-reviewed and merged without changing
+  production behavior or pre-authorizing remediation.
+- Documentation: I181, R04, architecture audit/register, indexes, Board, and manifest are
+  synchronized; AG-1..AG-7 remain explicit residuals.
+- Lessons: credential identity and natural-person review identity must be recorded separately when
+  a shared submission credential prevents GitHub from representing the human review relationship.
