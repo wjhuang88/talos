@@ -127,17 +127,24 @@ responsibility/behavior regression, not a line-count increase alone.
 The machine register reconciles all 20 July findings. In summary: F01 remains as R01 documentation
 closure; F02, F03, F07, F09, F10, and F19 are superseded/closed or folded into the security owner;
 F04 and F08 are closed by locked Clippy; F11/F12/F14/F15/F16/F17/F18 are closed boundary facts;
-F05/F06/F13/F19 remain represented by R05/R03/R04. New F20-F26 capture the current source
-organization and documentation drift that the July/v0.4 baseline could not see.
+F05/F06 were remediated by R05/R03; F13/F19 remain represented by security-gated R04. New F20-F26
+capture the current source organization and documentation drift that the July/v0.4 baseline could
+not see; F20-F26 are complete except for the ADR-007/R0 semantic portion retained by R04.
 
 ### Remediation Status (2026-08-08)
 
+- I172-I179 completed the behavior-preserving R02/R03/R05-R10 source-boundary remediation using
+  the implementation commits and exact-head CI recorded in each owner. The finding register now
+  records those completion dispositions without rewriting the original audit-time proof or
+  counterevidence.
 - I180 completed the F26 current-state workspace, CLI composition, tool contribution, storage,
   plugin, and MCP documentation reconciliation in implementation merge
   `10cceec6aeb9089fe9c830355992c8fc60430d63`; exact-head CI `31238721507` passed. The original
   finding proof above remains an audit-time observation rather than being rewritten.
 - ADR-007/R0 security meaning, native-boundary containment, and process-hardening conclusions remain
   outside I180 and owned by ARCH-034-R04 pending independent security review.
+- I171/ARCH-034-D and I172/R02 owner/claim terminal state was repaired from their already-existing
+  PR #139/#147 closeout evidence; no production or security behavior changed.
 
 ## Validation Evidence
 

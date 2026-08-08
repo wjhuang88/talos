@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Type | Architecture Epic |
-| Status | Rebaseline Complete — remediation separately gated |
+| Status | Remediation Partial — ARCH-034-R04 and ARCH-034-C remain gated |
 | Priority | P1 |
-| Selected Iteration | I144 historical audit (Complete); I171 current-state rebaseline (Active) |
+| Selected Iteration | I144 historical audit and I171 current-state rebaseline Complete; R02/R03/R05-R11 remediation Complete; R04/C pending |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
@@ -28,21 +28,31 @@ fitness checks that prevent uncontrolled code accumulation.
 
 ## Child Stories And Gates
 
-1. [ARCH-034-A](ARCH-034-A-evidence-and-boundary-audit.md) — Ready audit and
+1. [ARCH-034-A](ARCH-034-A-evidence-and-boundary-audit.md) — Complete historical audit and
    report; no production refactor.
-2. [ARCH-034-B](ARCH-034-B-finding-remediation-program.md) — Refinement,
-   blocked on accepted A findings; one behavior-preserving story per root/seam.
-3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement,
-   introduces only evidence-backed prevention checks after A/B.
+2. [ARCH-034-B](ARCH-034-B-finding-remediation-program.md) — Partial; R02/R03/R05-R11 are
+   Complete, while R04 remains security-gated.
+3. [ARCH-034-C](ARCH-034-C-architecture-fitness-gates.md) — Refinement; introduces only
+   evidence-backed prevention checks after A/B and the R04 disposition.
 4. [ARCH-034-R01](ARCH-034-R01-tool-registration-composition.md) — Complete,
    with implementation, explicit scheduler/status exceptions, and documentation closeout evidenced
    by `c88c1d1a`.
 5. [ARCH-034-D](ARCH-034-D-current-state-architecture-rebaseline.md) — Complete current-state
    v0.7.0 rebaseline. Claim #138 is effective on `main`; no production refactor was authorized by
    I171.
-6. [ARCH-034-R02](ARCH-034-R02-cli-tui-bridge-decomposition.md) through
-   [ARCH-034-R11](ARCH-034-R11-architecture-documentation-truth.md) — bounded current-state
-   owners created from the August register; each remains unselected until separately claimed.
+6. [ARCH-034-R02](ARCH-034-R02-cli-tui-bridge-decomposition.md),
+   [R03](ARCH-034-R03-todo-module-decomposition.md), and R05 through
+   [R11](ARCH-034-R11-architecture-documentation-truth.md) are Complete through their recorded
+   implementation and closeout evidence. [R04](ARCH-034-R04-native-boundary-containment.md)
+   remains Refinement pending independent security review.
+
+## Current Remediation State
+
+- Completed behavior-preserving remediation: R01-R03 and R05-R11.
+- Remaining accepted architecture finding: R04 for F13/F19 native, panic, and `unsafe` boundary
+  containment; no protected implementation is authorized before independent security review.
+- Remaining program gate: ARCH-034-C low-noise fitness checks after the R04/B disposition.
+- The parent is not Complete while either R04 or C remains non-terminal.
 
 ## Audit Dimensions
 

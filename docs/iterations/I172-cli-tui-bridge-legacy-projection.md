@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-06 |
 | Work Slice | Private extraction of legacy `TurnEvent` and structured-legacy compatibility projection handlers only. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #144 (merged at `c1dc67ae`) |
 | Last Updated | 2026-08-07 |
-| Handoff / Release Condition | Complete after implementation commit `4084138d` and exact-head CI run `31137882248`. |
+| Handoff / Release Condition | Closed after implementation PR #144 and closeout PR #147 merged; any remaining bridge responsibility requires a separately bounded owner and claim. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is effective only after the
 finalized record is merged into `main`.
@@ -85,6 +85,7 @@ finalized record is merged into `main`.
 | 2026-08-06 | Planning | Claim-only preflight from `origin/main@56f419f7`; I158/I171 Complete, I159-I162 blocked, no overlapping implementation branch. |
 | 2026-08-07 | Activation | Claim PR #140 passed exact-head CI run `31094244893`, merge-time CAS confirmed head `93f9a934` against base `56f419f7`, and merged at `46f72750`. Implementation branch starts from that effective claim; I172 is the sole Active iteration. |
 | 2026-08-07 | Completion | Implementation commit `4084138dc0652d3200045847d42518d9ecb66231` merged through PR #144 at `c1dc67ae8e3a117dd39ede91143c5f6bcd2d17c4`; exact-head CI `31137882248` passed all four checks. |
+| 2026-08-08 | Claim closure repair | The already-complete owner claim is reconciled to Closed using closeout PR #147 merge `cc74360147753ab75685f76f9abaeed6b990fa52`, accepted head `19fa33262daa5ed78aa30db5c00818495bff5b82`, and exact-head CI `31138811524`; no implementation or baseline scope changed. |
 
 ## Verification Evidence
 
@@ -97,6 +98,8 @@ finalized record is merged into `main`.
 
 - Completion Commit: `4084138dc0652d3200045847d42518d9ecb66231`.
 - Merge: PR #144 at `c1dc67ae8e3a117dd39ede91143c5f6bcd2d17c4`.
+- Closeout PR #147 merge: `cc74360147753ab75685f76f9abaeed6b990fa52`; exact-head CI
+  `31138811524`.
 - Behavior-preservation boundary and residual responsibilities remain explicit in the R02 owner.
 
 ## Variance And Residuals

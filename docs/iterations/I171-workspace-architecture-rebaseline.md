@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 active architecture session 2026-08-06 |
 | Work Slice | Current v0.7.0 whole-workspace architecture rebaseline, test/audit-harness-only baseline repair, finding reconciliation, and bounded remediation owner creation; no production refactor. |
@@ -25,9 +25,9 @@
 | Governance Claim PR | #138 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested a complete governance-based whole-project architecture audit and behavior-preserving remediation on 2026-08-06. No independent reviewer is currently available for this audit-only claim; Single-maintainer merge requires exact-head CI, both governance validators, merge-time CAS, and no unresolved blocking feedback. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-06 |
-| Handoff / Release Condition | Release if the rebaseline cannot be reproduced or if scope requires a production, public-API, permission, sandbox, or process-hardening change. |
+| Implementation PR | #139 (merged as `56f419f7`) |
+| Last Updated | 2026-08-08 |
+| Handoff / Release Condition | Closed after PR #139 merged the reproducible audit/report/register and bounded owners; production remediation remains separately owned, and protected security work remains review-gated. |
 
 ## Closure Ledger
 
@@ -117,6 +117,7 @@ reproducible from current source; a narrow passing check cannot substitute for t
 | 2026-08-06 | Planning | Preliminary read-only evidence: current main is v0.7.0; governance/claim/scale/fmt/check/all-target Clippy pass; workspace test repeatedly exposes a provider-discovery unreachable-endpoint fixture timeout; no production edit made. |
 | 2026-08-06 | Activation | Claim PR #138 passed exact-head Linux/Windows CI and merge-time CAS, then merged at `349d0cd1`; implementation branch created from that effective claim. |
 | 2026-08-06 | Evidence | Added deterministic architecture inventory harness and loopback network-failure fixture in `5ab3b0f2`; produced the August report/register and R02-R11 owners without production edits. |
+| 2026-08-06 | Completion | Closeout PR #139 merged accepted head `9b69267d506bdb3a0675722ac2094247d4a84f9d` as `56f419f7b3dd09584fde2651b6eab02800e16a15` after exact-head CI `31092987184`; source audit/report/register evidence remains `c88c1d1a428b156db0e167310d8a8b1cc4d63795`. |
 
 ## Verification Evidence
 
@@ -135,6 +136,8 @@ reproducible from current source; a narrow passing check cannot substitute for t
 
 - Completion Commit: `c88c1d1a` (existing audit/report/register and owner-synchronization evidence;
   this status update does not cite itself as completion evidence).
+- Closeout PR #139 merge: `56f419f7b3dd09584fde2651b6eab02800e16a15`; accepted head
+  `9b69267d506bdb3a0675722ac2094247d4a84f9d`; exact-head CI `31092987184`.
 
 ## Variance And Residuals
 
