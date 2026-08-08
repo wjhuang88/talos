@@ -23,7 +23,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, scale assessment, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #171 |
-| Last Updated | 2026-08-07 |
+| Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Release if a claimed current fact lacks source evidence or requires decision/security interpretation; any ADR-007/R0 semantic or process-hardening change remains blocked on independent R04 security review. |
 
 ## Problem And Boundary
@@ -62,6 +62,6 @@ Revert inaccurate prose. Any decision change belongs to a new ADR or R04 securit
   hardening files changed.
 - ADR-007/R0 semantics were not edited; security interpretation remains the R04 residual.
 - Standard release preflight, both governance validators, scale assessment, architecture audit
-  harness, stale-claim search, scope check, and `git diff --check` passed locally on 2026-08-07.
+  harness, stale-claim search, scope check, and `git diff --check` passed locally on 2026-08-08.
 - Source implementation commit `fd8ac75d` is submitted in PR #171; exact-head CI and merge review
   remain required before any Complete/Closed status.

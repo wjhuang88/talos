@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, scale assessment, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #171 |
-| Last Updated | 2026-08-07 |
+| Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Release if a claimed current fact lacks source evidence or requires decision/security interpretation; any ADR-007/R0 semantic or process-hardening change remains blocked on independent R04 security review. |
 
 The finalized `Claimed` record became effective on `main` at merge commit
@@ -113,7 +113,7 @@ is the final Ready non-security child in the August architecture register.
 | 2026-08-07 | Claim submission | Draft governance claim PR #170 opened; the exact finalized `Claimed` record is submitted for claim-only CI, scale validation, and merge-time CAS. No documentation implementation authority exists until #170 merges to `main`. |
 | 2026-08-07 | Claim activation | PR #170 squash-merged to `main` as `1ca03fdf8d262eba4d1de2374e43f2c1a94882dd` after exact-head CAS, CI `31193474992`, both governance validators, scale assessment, and `git diff --check` passed. Implementation branch `docs/i180-architecture-documentation-truth` starts from that commit. |
 | 2026-08-07 | Implementation | Current-state architecture documentation reconciliation is implemented on this branch; production/runtime behavior and ADR-007/R0 semantics remain unchanged. |
-| 2026-08-07 | Review submission | Source implementation commit `fd8ac75d` pushed and draft implementation PR #171 opened. Owner/derived status moves to Review; exact-head CI and merge evidence remain pending. |
+| 2026-08-08 | Review submission | Source implementation commit `fd8ac75d` pushed and draft implementation PR #171 opened. Owner/derived status moves to Review; exact-head CI and merge evidence remain pending. |
 
 ## Verification Evidence
 
@@ -133,7 +133,7 @@ is the final Ready non-security child in the August architecture register.
 The claim-only exact-head CI evidence remains recorded above; implementation PR #171 exact-head CI
 is pending the review gate.
 
-### Local Implementation Validation (2026-08-07)
+### Local Implementation Validation (2026-08-08)
 
 - `./scripts/release_preflight.sh`: PASS for site/installer validation, governance, locked workspace
   check, Clippy, tests, and doctests.
