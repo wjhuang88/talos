@@ -1,6 +1,6 @@
 # Iteration I182: Symbol Traversal Containment
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-08
 > Planned objective: prevent symbol-tool symlink recursion and unbounded directory-mode parser admission while preserving user-supplied root symlink resolution, normal-tree symbol results, and all unrelated parser/runtime behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation PR | Not started |
+| Implementation PR | Not started; implementation branch to be created from `main@b7e8edde` |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Create implementation work from that merge or later `main`; the implementation PR requires its own independent review. |
+| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Implementation branch starts from `main@b7e8edde`; the implementation PR requires its own independent review. |
 
 ## Closure Ledger
 
@@ -129,16 +129,17 @@ open PRs at selection were archival recovery PRs #120/#121.
 |---|---|---|
 | 2026-08-08 | Planning | Selected AG-4 after I181/PR #174 and closeout PR #175 merged; inventoried I159-I162 as unchanged Blocked, found no Active/Review/Planned competitor, and found no overlapping branch/PR/owner. |
 | 2026-08-08 | Claim submission | Draft governance-only PR #176 opened; this finalized exact-head record proposes `Claimed` ownership but has no effect until independently reviewed and merged to `main`. |
-| 2026-08-08 | Review follow-up | Independent review comment `5226241652` returned NEEDS CHANGES on head `eb0ab6f1`: stale evidence SHA, parser/file-symlink/counter/notice ambiguity, root-symlink preservation, direct-file/output residuals, and four missing tests are corrected in the owner baseline; corrected exact-head re-review remains mandatory. |
+| 2026-08-08 | Review follow-up | Independent review comment `5226241652` returned NEEDS CHANGES on head `eb0ab6f1`; corrected exact-head re-review `5226341754` approved `0d4bd088`, and governance claim PR #176 merged at `36980ecc`. |
+| 2026-08-08 | Activation | Owner-first status synchronization records I182 Active after claim merge; implementation starts from `main@b7e8edde` and remains bounded to AG-4. |
 
 ## Verification Evidence
 
-- Claim validation pending finalized PR number and independent security review.
-- Runtime evidence is not applicable before claim activation and implementation.
+- Claim validation passed on effective merge `36980ecc`; implementation review remains required.
+- Runtime evidence is pending the authorized implementation branch.
 
 ## Completion Evidence
 
-- Not applicable while I182 is Planned. Any terminal delivery state requires an already-existing
+- Not applicable while I182 is Active. Any terminal delivery state requires an already-existing
   implementation merge/evidence SHA; claim or status commits cannot self-certify it.
 
 ## Variance And Residuals
@@ -148,6 +149,6 @@ open PRs at selection were archival recovery PRs #120/#121.
 
 ## Retrospective
 
-- Outcome: pending claim review.
-- Documentation: owner-first synchronization proposed in the claim PR.
-- Lessons: pending implementation evidence.
+- Outcome: activated after independent claim review and merge; implementation pending.
+- Documentation: owner-first status synchronization completed on `main@b7e8edde`.
+- Lessons: implementation must preserve reviewed bounds, strict regular-file admission, and notice schema.

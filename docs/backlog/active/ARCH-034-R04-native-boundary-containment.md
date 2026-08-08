@@ -40,9 +40,9 @@ coverage must be proven per call family rather than assumed.
 
 ## Child Owners
 
-- [ARCH-034-R04-AG4](ARCH-034-R04-AG4-symbol-traversal-containment.md) / I182: Ready with a
-  governance claim proposed for symlink/depth/count/byte traversal containment only. The claim is
-  not effective and no implementation is authorized until independent security review and merge.
+- [ARCH-034-R04-AG4](ARCH-034-R04-AG4-symbol-traversal-containment.md) / I182: claim effective
+  on `main` at merge `36980ecc`; implementation is authorized only for the reviewed
+  symlink/depth/count/byte traversal Work Slice and requires its own independent review.
 - AG-1 through AG-3 and AG-5 through AG-7 remain unowned slices under this parent.
 
 ## Pre-Review Boundary Matrix
