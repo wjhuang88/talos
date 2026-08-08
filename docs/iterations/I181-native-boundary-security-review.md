@@ -68,7 +68,8 @@ hard security gate prohibits implementation before independent review.
 
 - Verify the R04 call-site/failure-mode/containment/test matrix against current `main`.
 - Review escape vectors and failure modes for parent hardening, Unix `pre_exec`, direct exec,
-  other subprocess families, arborium/tree-sitter, `gix`, SQLite, and existing panic adapters.
+  other subprocess families, both arborium/tree-sitter consumers, both `gix` consumers, SQLite,
+  and existing panic adapters.
 - Reconcile factual drift in ADR-007 and ADR-008 through a proposed decision update only when the
   independent reviewer accepts the change; ADR semantics are not changed by the claim PR.
 - Record each row as Accepted gap, Rejected gap, Adequately contained, or Needs evidence.
