@@ -19,6 +19,7 @@
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
+| Implementation Commit | `82684a2b51e0a4fcb5a8617c5927d80503d00bb0` (local checkpoint; not completion evidence) |
 | Implementation PR | Not started; local implementation is on `feat/i182-symbol-traversal-containment`, based on `main@0ca33d41` |
 | Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Local implementation is based on `main@0ca33d41`; the implementation PR requires its own independent review. |
@@ -133,6 +134,7 @@ open PRs at selection were archival recovery PRs #120/#121.
 | 2026-08-08 | Activation | Owner-first status synchronization records I182 Active after claim merge; implementation starts from `main@b7e8edde` and remains bounded to AG-4. |
 | 2026-08-08 | Implementation | Added non-following descendant classification, strict regular-file admission, shared depth/file/byte accounting, cap-plus-one reads, deterministic bounded-traversal notices, and focused compatibility/security fixtures in `symbol.rs`. Direct-file paths and AG-5 parser containment remain unchanged. |
 | 2026-08-08 | Local validation | Focused tests, locked check/Clippy, architecture audit, scale assessment, both governance validators, and the full release preflight passed. The first preflight attempts exposed local disk exhaustion and sandbox denial of loopback test binds; after cleaning build artifacts, disabling debug/incremental build storage, and rerunning the unchanged suite outside that network sandbox, the preflight exited 0. |
+| 2026-08-08 | Local checkpoint | Implementation and contemporaneous Active-state evidence committed as `82684a2b51e0a4fcb5a8617c5927d80503d00bb0`; this SHA is eligible for implementation review but is not merge/completion evidence. |
 
 ## Verification Evidence
 
@@ -157,7 +159,8 @@ open PRs at selection were archival recovery PRs #120/#121.
 ## Completion Evidence
 
 - Not applicable while I182 is Active. Any terminal delivery state requires an already-existing
-  implementation merge/evidence SHA; claim or status commits cannot self-certify it.
+  implementation merge/evidence SHA; local checkpoint `82684a2b51e0a4fcb5a8617c5927d80503d00bb0`
+  is review input only, and claim or status commits cannot self-certify completion.
 
 ## Variance And Residuals
 
@@ -166,8 +169,8 @@ open PRs at selection were archival recovery PRs #120/#121.
 
 ## Retrospective
 
-- Outcome: implementation and local validation are complete; commit, implementation PR, exact-head
-  CI, independent security review, merge, and completion evidence remain pending.
+- Outcome: implementation and local validation are committed; implementation PR, exact-head CI,
+  independent security review, merge, and completion evidence remain pending.
 - Documentation: owner-first Active state is preserved; execution evidence is recorded without
   prematurely promoting I182 to Review or Complete.
 - Lessons: cap-plus-one admission and strict non-following entry classification make the omission
