@@ -13,14 +13,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Independently review the recorded native/panic boundary matrix, classify each gap as accepted, rejected, or requiring more evidence, reconcile ADR-007/ADR-008/ADR-020 facts, and define separately claimable implementation slices; no production, test, dependency, permission, sandbox, process-hardening, `unsafe`, or policy change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review required |
+| Governance Claim PR | #174 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Pending independent reviewer approval of the finalized exact-head claim PR. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |

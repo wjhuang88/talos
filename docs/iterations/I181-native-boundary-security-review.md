@@ -11,14 +11,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Independently review the ARCH-034-R04 native/panic boundary matrix covering ADR-007 libc and process hardening, subprocess families, arborium/tree-sitter, `gix`, and bundled SQLite; classify gaps and create bounded follow-up owners only; preserve all runtime/API/dependency/permission/sandbox/process-hardening/unsafe/storage behavior. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review required |
+| Governance Claim PR | #174 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Pending independent reviewer approval of the finalized exact-head claim PR. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
