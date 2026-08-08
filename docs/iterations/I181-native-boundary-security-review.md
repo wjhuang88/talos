@@ -1,6 +1,6 @@
 # Iteration I181: Native And Panic-Boundary Security Review
 
-> Document status: Planned - independent security review claim pending
+> Document status: Planned - corrected exact-head independent approval pending
 > Published plan date: 2026-08-08
 > Planned objective: independently review every recorded native, panic-capable, and subprocess boundary in ARCH-034-R04, reconcile governing ADR facts, and convert only proven gaps into bounded follow-up owners without changing production behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Source Issue | None |
 | Governance Claim PR | #174 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending independent reviewer approval of the finalized exact-head claim PR. |
+| Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` analyzed commit `24694b88` but was submitted as `COMMENTED` through @wjhuang88 and explicitly disclaims authorization; a different GitHub identity must approve the corrected exact head. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Remain Planned and unmerged until an independent security reviewer approves the exact claim; rejected gaps are recorded and released, while accepted gaps receive separate bounded implementation owners/claims. |
@@ -37,7 +37,7 @@ approved and merged into `main`.
 | Existing assets to preserve | ADR-007/008/020 text and semantics, current runtime/public behavior, permission gates, process limits, storage formats, I159-I162 blockers, and recovery PRs #120/#121. |
 | State/status owners | ARCH-034-R04 and I181 first; ARCH-034 parent and derived indexes/views second. |
 | Validation required | Source/call-site trace, both governance validators, architecture audit, scale assessment, `git diff --check`, claim-only diff review, and exact-head CI. |
-| Evidence and uncertainty | Locations and visible containment are confirmed facts; exploitability, severity, accepted gaps, and remedies remain unknown pending independent review. |
+| Evidence and uncertainty | Source and failure-mode facts now include the non-authorizing review's independently reproduced F-A/F-B/F-C evidence; its dispositions remain provisional because GitHub records the submission under the PR author's identity. |
 | Residual-work destination | One new bounded owner/claim per independently accepted implementation gap; ARCH-034-C remains after R04 disposition. |
 
 ## Non-Terminal Inventory At Selection
@@ -130,10 +130,17 @@ hard security gate prohibits implementation before independent review.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-08 | Planning | I181 selected after I180/PR #171 and owner-truth PR #173 closure, non-terminal iteration inventory, open-PR overlap check, and read-only native/panic call-site tracing. Claim and independent approval remain pending. |
+| 2026-08-08 | Review follow-up | Review `PRR_kwDOSrj_LM8AAAABI2KjFw` recommended approval analytically but GitHub rejected self-approval and stored it as `COMMENTED`. F-A (unused public parent-mutation API), F-B (post-timeout pipe wait can be unbounded), F-C (symlink-cycle stack overflow and uncapped file reads), and stale ADR-007 site-5 facts were independently reproduced and added to R04. The authorization gate remains open. |
 
 ## Verification Evidence
 
-- Pending claim-only validation and independent security review.
+- Review `PRR_kwDOSrj_LM8AAAABI2KjFw`: useful analytical evidence, but not authorization because its
+  GitHub author is @wjhuang88 and its state is `COMMENTED` rather than `APPROVED`.
+- Corrected local review-follow-up diff: `git diff --check`, both governance validators (0
+  warnings), `python3 scripts/audit_architecture.py .` (21 crates, 0 cycles, 5 unsafe lexical
+  candidates), and `scripts/assess_project_scale.sh .` (high-risk / release-managed / on-demand)
+  passed on 2026-08-08.
+- Corrected exact-head CI and approval by a different GitHub identity remain pending.
 - Runtime evidence is intentionally not applicable before accepted implementation slices exist.
 
 ## Completion Evidence
@@ -149,6 +156,6 @@ hard security gate prohibits implementation before independent review.
 
 ## Retrospective
 
-- Outcome: pending independent review.
+- Outcome: mandatory factual review corrections incorporated; independent approval still pending.
 - Documentation: owner-first synchronization pending claim PR.
 - Lessons: pending; promote a rule only if the review exposes a recurring governance failure.
