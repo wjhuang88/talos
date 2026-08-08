@@ -5,7 +5,7 @@
 | Type | Architecture Epic |
 | Status | Remediation Partial — ARCH-034-R04 and ARCH-034-C remain gated |
 | Priority | P1 |
-| Selected Iteration | I144 historical audit and I171 current-state rebaseline Complete; R02/R03/R05-R11 remediation Complete; I181 R04 content disposition accepted and claim merge pending; C pending |
+| Selected Iteration | I144 historical audit, I171 current-state rebaseline, R02/R03/R05-R11 remediation, and review-only I181 Complete; R04 child remediation and C pending |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
@@ -43,16 +43,16 @@ fitness checks that prevent uncontrolled code accumulation.
 6. [ARCH-034-R02](ARCH-034-R02-cli-tui-bridge-decomposition.md),
    [R03](ARCH-034-R03-todo-module-decomposition.md), and R05 through
    [R11](ARCH-034-R11-architecture-documentation-truth.md) are Complete through their recorded
-   implementation and closeout evidence. [R04](ARCH-034-R04-native-boundary-containment.md)
-   is in review-only I181 with its content disposition accepted; claim merge and all separately
-   governed protected implementation remain pending.
+   implementation and closeout evidence. Review-only I181 completed at `aea26ad0` for
+   [R04](ARCH-034-R04-native-boundary-containment.md); all separately governed protected
+   implementation remains pending.
 
 ## Current Remediation State
 
 - Completed behavior-preserving remediation: R01-R03 and R05-R11.
 - Remaining accepted architecture finding: R04 for F13/F19 native, panic, and `unsafe` boundary
-  containment. I181's matrix disposition is content-reviewed; no protected implementation is
-  authorized until its own post-claim bounded owner and authorization exist.
+  containment. I181's matrix disposition is Complete; no protected implementation is authorized
+  until a bounded child owner and claim exist.
 - Remaining program gate: ARCH-034-C low-noise fitness checks after the R04/B disposition.
 - The parent is not Complete while either R04 or C remains non-terminal.
 
