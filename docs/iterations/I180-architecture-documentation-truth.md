@@ -1,6 +1,6 @@
 # Iteration I180: Architecture Documentation Truth
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-07
 > Planned objective: reconcile current architecture, crate/composition, extension, and historical-status documentation with source evidence without changing runtime behavior or decision semantics.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Reconcile `docs/reference/ARCHITECTURE.md` current-state workspace, crate, CLI, tool-contribution, extension, and composition descriptions against root `Cargo.toml` and current source; explicitly distinguish historical iteration-era snapshots from current facts; update directly affected architecture indexes/registers with non-semantic factual status only; preserve every runtime/API/dependency/decision/security behavior and route any ADR-007/R0 semantic or process-hardening conclusion to ARCH-034-R04. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, scale assessment, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #171 |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Release if a claimed current fact lacks source evidence or requires decision/security interpretation; any ADR-007/R0 semantic or process-hardening change remains blocked on independent R04 security review. |
+| Handoff / Release Condition | Closed after implementation PR #171 merged; any later architecture fact correction needs its own bounded owner, while ADR-007/R0 semantic or process-hardening changes remain blocked on independent R04 security review. |
 
 The finalized `Claimed` record became effective on `main` at merge commit
 `1ca03fdf8d262eba4d1de2374e43f2c1a94882dd`; the implementation branch starts from that commit.
@@ -114,6 +114,7 @@ is the final Ready non-security child in the August architecture register.
 | 2026-08-07 | Claim activation | PR #170 squash-merged to `main` as `1ca03fdf8d262eba4d1de2374e43f2c1a94882dd` after exact-head CAS, CI `31193474992`, both governance validators, scale assessment, and `git diff --check` passed. Implementation branch `docs/i180-architecture-documentation-truth` starts from that commit. |
 | 2026-08-07 | Implementation | Current-state architecture documentation reconciliation is implemented on this branch; production/runtime behavior and ADR-007/R0 semantics remain unchanged. |
 | 2026-08-08 | Review submission | Source implementation commit `fd8ac75d` pushed and draft implementation PR #171 opened. Owner/derived status moves to Review; exact-head CI and merge evidence remain pending. |
+| 2026-08-08 | Completion | PR #171 squash-merged at `10cceec6aeb9089fe9c830355992c8fc60430d63` from accepted exact Head `b9f4716862940d6e125854ed3a70a7742f922f61` after exact-head CI `31238721507`; merge-time CAS, both governance validators, remote owner reconciliation, rebuilt CLI smoke, installer fixture, and whitespace checks passed. |
 
 ## Verification Evidence
 
@@ -130,8 +131,8 @@ is the final Ready non-security child in the August architecture register.
 | Storage/file boundaries | `crates/talos-session/Cargo.toml`, `crates/talos-evolution/Cargo.toml`, `crates/talos-memory/Cargo.toml`, `crates/talos-exploration/Cargo.toml`, and `crates/talos-cli/src/storage.rs` | Storage Architecture |
 | Historical versus current labels | August architecture audit and finding register | Current-state note and historical storage phases |
 
-The claim-only exact-head CI evidence remains recorded above; implementation PR #171 exact-head CI
-is pending the review gate.
+The claim-only exact-head CI evidence remains recorded above. Implementation PR #171 exact-head CI
+`31238721507` passed against `b9f4716862940d6e125854ed3a70a7742f922f61` before merge.
 
 ### Local Implementation Validation (2026-08-08)
 
@@ -146,8 +147,11 @@ is pending the review gate.
 
 ## Completion Evidence
 
-- Completion Commit: not assigned; retain Review until PR #171 merges and an existing merge SHA can
-  be cited by a separate closeout change.
+- Completion Commit: `10cceec6aeb9089fe9c830355992c8fc60430d63`
+- PR #171 squash-merged at the Completion Commit from source implementation `fd8ac75d` and accepted
+  exact Head `b9f4716862940d6e125854ed3a70a7742f922f61`.
+- Exact-head CI `31238721507` and the recorded merge-time CAS establish the implementation review
+  evidence; this separate closeout records the already-existing implementation commit.
 
 ## Variance And Residuals
 
@@ -156,6 +160,9 @@ is pending the review gate.
 
 ## Retrospective
 
-- Outcome: pending.
-- Documentation: pending implementation result.
-- Lessons: none recorded.
+- Outcome: current architecture facts and historical labels now match the traced source evidence
+  without changing runtime, API, dependency, decision, or security semantics.
+- Documentation: architecture reference, August audit/register, owner records, indexes, Board, and
+  manifest are synchronized.
+- Lessons: documentation truth can close independently from security interpretation only when the
+  residual owner and unchanged semantic boundary remain explicit.

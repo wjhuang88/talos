@@ -333,7 +333,7 @@
     "counterevidence": "Historical sections intentionally preserve prior decisions and must not be rewritten as if they were current facts.",
     "preserved_behavior": "Documentation-only changes do not alter runtime behavior or public APIs.",
     "recommended_action": "Update current-state sections and add explicit historical labels; reconcile ADR/R0 status through the security-gated owner where semantics are implicated.",
-    "disposition": "Still valid; documentation closure",
+    "disposition": "Completed by I180 at implementation merge 10cceec6aeb9089fe9c830355992c8fc60430d63; ADR-007/R0 semantic reconciliation remains with ARCH-034-R04",
     "owner": "ARCH-034-R11",
     "verification_path": "DOC-CHECK, governance validators, and source-to-doc trace review"
   }

@@ -130,11 +130,12 @@ F04 and F08 are closed by locked Clippy; F11/F12/F14/F15/F16/F17/F18 are closed 
 F05/F06/F13/F19 remain represented by R05/R03/R04. New F20-F26 capture the current source
 organization and documentation drift that the July/v0.4 baseline could not see.
 
-### Remediation Status (2026-08-07)
+### Remediation Status (2026-08-08)
 
-- I180 reconciles the F26 current-state workspace, CLI composition, tool contribution, storage,
-  plugin, and MCP documentation against source evidence. The original finding proof above remains
-  an audit-time observation rather than being rewritten.
+- I180 completed the F26 current-state workspace, CLI composition, tool contribution, storage,
+  plugin, and MCP documentation reconciliation in implementation merge
+  `10cceec6aeb9089fe9c830355992c8fc60430d63`; exact-head CI `31238721507` passed. The original
+  finding proof above remains an audit-time observation rather than being rewritten.
 - ADR-007/R0 security meaning, native-boundary containment, and process-hardening conclusions remain
   outside I180 and owned by ARCH-034-R04 pending independent security review.
 
