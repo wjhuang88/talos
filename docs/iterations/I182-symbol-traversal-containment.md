@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (effective on `main`) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Implement only ARCH-034-R04-AG4 in `crates/talos-tools/src/symbol.rs`: non-following descendant entry classification, skip traversed directory/file symlinks while preserving user-supplied root symlink resolution, depth 64, 10,000 parser-admitted files, 2 MiB cap-plus-one file reads, 50 MiB parser-admitted aggregate bytes, one discriminated final JSON notice on bounded omission, and the focused compatibility/security tests; preserve public inputs, ordinary result objects/order, language/skip behavior, parser fallback, dependencies, permissions, and every AG-5 parser panic/deadline concern. |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation PR | Not started; implementation branch to be created from `main@b7e8edde` |
+| Implementation PR | Not started; local implementation is on `feat/i182-symbol-traversal-containment`, based on `main@0ca33d41` |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Implementation branch starts from `main@b7e8edde`; the implementation PR requires its own independent review. |
+| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Local implementation is based on `main@0ca33d41`; the implementation PR requires its own independent review. |
 
 ## Closure Ledger
 
@@ -131,11 +131,28 @@ open PRs at selection were archival recovery PRs #120/#121.
 | 2026-08-08 | Claim submission | Draft governance-only PR #176 opened; this finalized exact-head record proposes `Claimed` ownership but has no effect until independently reviewed and merged to `main`. |
 | 2026-08-08 | Review follow-up | Independent review comment `5226241652` returned NEEDS CHANGES on head `eb0ab6f1`; corrected exact-head re-review `5226341754` approved `0d4bd088`, and governance claim PR #176 merged at `36980ecc`. |
 | 2026-08-08 | Activation | Owner-first status synchronization records I182 Active after claim merge; implementation starts from `main@b7e8edde` and remains bounded to AG-4. |
+| 2026-08-08 | Implementation | Added non-following descendant classification, strict regular-file admission, shared depth/file/byte accounting, cap-plus-one reads, deterministic bounded-traversal notices, and focused compatibility/security fixtures in `symbol.rs`. Direct-file paths and AG-5 parser containment remain unchanged. |
+| 2026-08-08 | Local validation | Focused tests, locked check/Clippy, architecture audit, scale assessment, both governance validators, and the full release preflight passed. The first preflight attempts exposed local disk exhaustion and sandbox denial of loopback test binds; after cleaning build artifacts, disabling debug/incremental build storage, and rerunning the unchanged suite outside that network sandbox, the preflight exited 0. |
 
 ## Verification Evidence
 
 - Claim validation passed on effective merge `36980ecc`; implementation review remains required.
-- Runtime evidence is pending the authorized implementation branch.
+- `cargo test -p talos-tools --locked symbol`: 11 passed, 0 failed.
+- `cargo check -p talos-tools --locked` and
+  `cargo clippy -p talos-tools --all-targets --locked -- -D warnings`: passed.
+- `python3 scripts/audit_architecture.py .`: passed with 21 crates and no dependency cycles;
+  `symbol.rs` reports 940 production lines and retains its trailing test boundary at line 941.
+- `scripts/validate_project_governance.sh .` and
+  `bash scripts/validate_collaboration_claims.sh .`: passed with zero claim warnings.
+- `scripts/assess_project_scale.sh .`: high-risk, release-managed, on-demand-worktree profile;
+  no profile or workflow change was introduced by this slice.
+- `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+  ./scripts/release_preflight.sh`: passed outside the restricted network sandbox, including locked
+  workspace check, Clippy, all tests, and doctests. The environment overrides only reduced local
+  build-artifact storage after two disk-exhaustion attempts; the test logic and repository inputs
+  were unchanged.
+- Exact-head Unix/Windows CI and independent implementation security review remain pending until an
+  implementation commit and PR exist.
 
 ## Completion Evidence
 
@@ -149,6 +166,10 @@ open PRs at selection were archival recovery PRs #120/#121.
 
 ## Retrospective
 
-- Outcome: activated after independent claim review and merge; implementation pending.
-- Documentation: owner-first status synchronization completed on `main@b7e8edde`.
-- Lessons: implementation must preserve reviewed bounds, strict regular-file admission, and notice schema.
+- Outcome: implementation and local validation are complete; commit, implementation PR, exact-head
+  CI, independent security review, merge, and completion evidence remain pending.
+- Documentation: owner-first Active state is preserved; execution evidence is recorded without
+  prematurely promoting I182 to Review or Complete.
+- Lessons: cap-plus-one admission and strict non-following entry classification make the omission
+  counters mechanically testable; build-storage and sandbox failures must be separated from code
+  failures and recorded rather than hidden.

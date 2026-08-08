@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | I181 AG-4 / Arborium traversal boundary |
-| Status | Ready - governance claim merged; implementation authorized |
+| Status | Active - implementation validated locally; PR/review pending |
 | Priority | P1 |
-| Selected Iteration | I182 (Planned; claim effective on `main`) |
+| Selected Iteration | I182 (Active; claim effective on `main`) |
 | Preserved behavior | Symbol tool inputs, user-supplied root symlink resolution, normal-tree JSON, result ordering, language detection, skip filters, parser fallback, and read-only permission classification |
 
 ## Collaboration Claim
@@ -22,9 +22,18 @@
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation PR | Not started |
+| Implementation PR | Not started; local implementation is on `feat/i182-symbol-traversal-containment`, based on `main@0ca33d41` |
 | Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`; implementation must start from that merge or later `main` and requires its own independent review. |
+
+## Execution Evidence
+
+- Local implementation is confined to `crates/talos-tools/src/symbol.rs` and preserves the named
+  direct-file and AG-5 residuals.
+- Focused symbol tests passed 11/11; locked `talos-tools` check and warning-denying Clippy passed.
+- Architecture audit, scale assessment, both governance validators, and the full locked release
+  preflight passed on 2026-08-08. Exact-head CI and independent implementation review require an
+  implementation commit and PR and therefore remain pending.
 
 ## Problem And Boundary
 

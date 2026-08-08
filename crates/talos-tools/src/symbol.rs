@@ -4,6 +4,7 @@
 //! locate references, list functions/classes, and extract imports.
 
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
@@ -14,6 +15,128 @@ use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
 use arborium::tree_sitter; // arborium re-exports tree-sitter
+
+const MAX_DEPTH: usize = 64;
+const MAX_FILES: usize = 10_000;
+const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_TOTAL_BYTES: usize = 50 * 1024 * 1024;
+
+#[derive(Debug, Serialize)]
+struct TraversalNotice {
+    talos_notice: &'static str,
+    reasons: Vec<&'static str>,
+    counts: TraversalNoticeCounts,
+    admitted_files: usize,
+    admitted_bytes: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct TraversalNoticeCounts {
+    symlink_skipped: usize,
+    oversized_file: usize,
+    depth_limit: usize,
+    file_limit: usize,
+    aggregate_byte_limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum TraversalOutput<T> {
+    Result(T),
+    Notice(TraversalNotice),
+}
+
+#[derive(Default)]
+struct TraversalState {
+    depth_limit: usize,
+    file_limit: usize,
+    aggregate_byte_limit: usize,
+    symlink_skipped: usize,
+    oversized_file: usize,
+    depth_limit_hits: usize,
+    file_limit_hits: usize,
+    aggregate_byte_limit_hits: usize,
+    admitted_files: usize,
+    admitted_bytes: usize,
+    exhausted: bool,
+}
+
+impl TraversalState {
+    fn new() -> Self {
+        Self {
+            depth_limit: MAX_DEPTH,
+            file_limit: MAX_FILES,
+            aggregate_byte_limit: MAX_TOTAL_BYTES,
+            ..Self::default()
+        }
+    }
+
+    fn notice(&self) -> Option<TraversalNotice> {
+        let mut reasons = Vec::new();
+        for (key, value) in [
+            ("symlink_skipped", self.symlink_skipped),
+            ("oversized_file", self.oversized_file),
+            ("depth_limit", self.depth_limit_hits),
+            ("file_limit", self.file_limit_hits),
+            ("aggregate_byte_limit", self.aggregate_byte_limit_hits),
+        ] {
+            if value != 0 {
+                reasons.push(key);
+            }
+        }
+        (!reasons.is_empty()).then_some(TraversalNotice {
+            talos_notice: "bounded_traversal",
+            reasons,
+            counts: TraversalNoticeCounts {
+                symlink_skipped: self.symlink_skipped,
+                oversized_file: self.oversized_file,
+                depth_limit: self.depth_limit_hits,
+                file_limit: self.file_limit_hits,
+                aggregate_byte_limit: self.aggregate_byte_limit_hits,
+            },
+            admitted_files: self.admitted_files,
+            admitted_bytes: self.admitted_bytes,
+        })
+    }
+}
+
+enum FileAdmission {
+    Admitted {
+        language: &'static str,
+        code: String,
+    },
+    Unsupported,
+    Omitted,
+}
+
+fn admit_file(path: &Path, state: &mut TraversalState) -> Result<FileAdmission, String> {
+    let Some(language) = detect_language(path) else {
+        return Ok(FileAdmission::Unsupported);
+    };
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    file.take((MAX_FILE_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_FILE_BYTES {
+        state.oversized_file += 1;
+        return Ok(FileAdmission::Omitted);
+    }
+    let code = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+    if state.admitted_files >= state.file_limit {
+        state.file_limit_hits += 1;
+        state.exhausted = true;
+        return Ok(FileAdmission::Omitted);
+    }
+    if state.admitted_bytes.saturating_add(code.len()) > state.aggregate_byte_limit {
+        state.aggregate_byte_limit_hits += 1;
+        state.exhausted = true;
+        return Ok(FileAdmission::Omitted);
+    }
+    state.admitted_files += 1;
+    state.admitted_bytes += code.len();
+    Ok(FileAdmission::Admitted { language, code })
+}
 
 /// Maps file extensions to arborium language names.
 fn detect_language(path: &Path) -> Option<&'static str> {
@@ -274,9 +397,13 @@ async fn execute_list_imports(tool: &ListImportsTool, input: Value) -> ToolResul
     }
 }
 
-fn scan_workspace(root: &Path, name: &str) -> Result<Vec<SymbolResult>, String> {
+fn scan_workspace(root: &Path, name: &str) -> Result<Vec<TraversalOutput<SymbolResult>>, String> {
     let mut results = Vec::new();
-    scan_dir(root, root, name, &mut results)?;
+    let mut state = TraversalState::new();
+    scan_dir(root, root, name, &mut results, &mut state, 0)?;
+    if let Some(notice) = state.notice() {
+        results.push(TraversalOutput::Notice(notice));
+    }
     Ok(results)
 }
 
@@ -284,20 +411,36 @@ fn scan_dir(
     root: &Path,
     dir: &Path,
     name: &str,
-    results: &mut Vec<SymbolResult>,
+    results: &mut Vec<TraversalOutput<SymbolResult>>,
+    state: &mut TraversalState,
+    depth: usize,
 ) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        if state.exhausted {
+            break;
+        }
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        if path.is_dir() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            state.symlink_skipped += 1;
+            continue;
+        }
+        if file_type.is_dir() {
             if should_skip_dir(&path) {
                 continue;
             }
-            scan_dir(root, &path, name, results)?;
-        } else if path.is_file()
-            && let Some(result) = find_symbol_in_file(&path, root, name)
+            if depth >= state.depth_limit {
+                state.depth_limit_hits += 1;
+                continue;
+            }
+            scan_dir(root, &path, name, results, state, depth + 1)?;
+        } else if file_type.is_file()
+            && let Some(result) = find_symbol_in_file(&path, root, name, state)
         {
-            results.push(result);
+            results.push(TraversalOutput::Result(result));
         }
     }
     Ok(())
@@ -308,11 +451,19 @@ fn should_skip_dir(path: &Path) -> bool {
     name == "target" || name == "node_modules" || name == ".git" || name.starts_with('.')
 }
 
-fn find_symbol_in_file(path: &Path, root: &Path, name: &str) -> Option<SymbolResult> {
-    let lang = detect_language(path)?;
-    let code = fs::read_to_string(path).ok()?;
+fn find_symbol_in_file(
+    path: &Path,
+    root: &Path,
+    name: &str,
+    state: &mut TraversalState,
+) -> Option<SymbolResult> {
+    let FileAdmission::Admitted { language, code } = admit_file(path, state).ok()? else {
+        return None;
+    };
     let mut parser = arborium::tree_sitter::Parser::new();
-    parser.set_language(&arborium::get_language(lang)?).ok()?;
+    parser
+        .set_language(&arborium::get_language(language)?)
+        .ok()?;
     let tree = parser.parse(&code, None)?;
 
     let root_node = tree.root_node();
@@ -496,12 +647,21 @@ fn find_all_identifiers(
     }
 }
 
-fn list_symbols_in_path(path: &Path, kind_filter: Option<&str>) -> Result<Vec<SymbolInfo>, String> {
+fn list_symbols_in_path(
+    path: &Path,
+    kind_filter: Option<&str>,
+) -> Result<Vec<TraversalOutput<SymbolInfo>>, String> {
     let mut results = Vec::new();
     if path.is_dir() {
-        list_dir_symbols(path, path, kind_filter, &mut results)?;
+        let mut state = TraversalState::new();
+        list_dir_symbols(path, path, kind_filter, &mut results, &mut state, 0)?;
+        if let Some(notice) = state.notice() {
+            results.push(TraversalOutput::Notice(notice));
+        }
     } else if path.is_file() {
-        list_file_symbols(path, path, kind_filter, &mut results)?;
+        let mut direct_results = Vec::new();
+        list_file_symbols(path, path, kind_filter, &mut direct_results)?;
+        results.extend(direct_results.into_iter().map(TraversalOutput::Result));
     }
     Ok(results)
 }
@@ -510,20 +670,52 @@ fn list_dir_symbols(
     root: &Path,
     dir: &Path,
     kind_filter: Option<&str>,
-    results: &mut Vec<SymbolInfo>,
+    results: &mut Vec<TraversalOutput<SymbolInfo>>,
+    state: &mut TraversalState,
+    depth: usize,
 ) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        if state.exhausted {
+            break;
+        }
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        if path.is_dir() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            state.symlink_skipped += 1;
+            continue;
+        }
+        if file_type.is_dir() {
             if should_skip_dir(&path) {
                 continue;
             }
-            list_dir_symbols(root, &path, kind_filter, results)?;
-        } else if path.is_file() {
-            list_file_symbols(root, &path, kind_filter, results)?;
+            if depth >= state.depth_limit {
+                state.depth_limit_hits += 1;
+                continue;
+            }
+            list_dir_symbols(root, &path, kind_filter, results, state, depth + 1)?;
+        } else if file_type.is_file() {
+            list_file_symbols_bounded(root, &path, kind_filter, results, state)?;
         }
     }
+    Ok(())
+}
+
+fn list_file_symbols_bounded(
+    root: &Path,
+    path: &Path,
+    kind_filter: Option<&str>,
+    results: &mut Vec<TraversalOutput<SymbolInfo>>,
+    state: &mut TraversalState,
+) -> Result<(), String> {
+    let FileAdmission::Admitted { language, code } = admit_file(path, state)? else {
+        return Ok(());
+    };
+    let mut file_results = Vec::new();
+    collect_file_symbols(root, path, kind_filter, language, &code, &mut file_results)?;
+    results.extend(file_results.into_iter().map(TraversalOutput::Result));
     Ok(())
 }
 
@@ -533,16 +725,28 @@ fn list_file_symbols(
     kind_filter: Option<&str>,
     results: &mut Vec<SymbolInfo>,
 ) -> Result<(), String> {
-    let lang = match detect_language(path) {
+    let language = match detect_language(path) {
         Some(l) => l,
         None => return Ok(()),
     };
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    collect_file_symbols(root, path, kind_filter, language, &code, results)
+}
+
+fn collect_file_symbols(
+    root: &Path,
+    path: &Path,
+    kind_filter: Option<&str>,
+    language: &str,
+    code: &str,
+    results: &mut Vec<SymbolInfo>,
+) -> Result<(), String> {
     let mut parser = arborium::tree_sitter::Parser::new();
-    let lang_ref = arborium::get_language(lang).ok_or_else(|| "language not loaded".to_string())?;
+    let lang_ref =
+        arborium::get_language(language).ok_or_else(|| "language not loaded".to_string())?;
     parser.set_language(&lang_ref).map_err(|e| e.to_string())?;
     let tree = parser
-        .parse(&code, None)
+        .parse(code, None)
         .ok_or_else(|| "parse failed".to_string())?;
 
     let root_node = tree.root_node();
@@ -731,5 +935,351 @@ fn collect_imports(
         if let Some(child) = node.child(i as u32) {
             collect_imports(&child, source, path, results);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_rust(path: &Path, source: &str) {
+        fs::write(path, source).expect("Rust fixture should be writable");
+    }
+
+    fn notice_value<T: Serialize>(results: &[TraversalOutput<T>]) -> Value {
+        serde_json::to_value(results.last().expect("notice should be present"))
+            .expect("notice should serialize")
+    }
+
+    #[test]
+    fn symbol_traversal_production_limits_match_reviewed_contract() {
+        assert_eq!(MAX_DEPTH, 64);
+        assert_eq!(MAX_FILES, 10_000);
+        assert_eq!(MAX_FILE_BYTES, 2 * 1024 * 1024);
+        assert_eq!(MAX_TOTAL_BYTES, 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn symbol_traversal_preserves_normal_tree_json() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        write_rust(&workspace.path().join("sample.rs"), "fn needle() {}\n");
+
+        let found = scan_workspace(workspace.path(), "needle").expect("scan should succeed");
+        let found_json = serde_json::to_string_pretty(&found).expect("result should serialize");
+        assert_eq!(
+            found_json,
+            r#"[
+  {
+    "name": "needle",
+    "kind": "function_item",
+    "definition": {
+      "file": "sample.rs",
+      "line": 1,
+      "column": 0
+    },
+    "references": []
+  }
+]"#
+        );
+
+        let listed = list_symbols_in_path(workspace.path(), None).expect("listing should succeed");
+        let listed_json = serde_json::to_string_pretty(&listed).expect("result should serialize");
+        assert_eq!(
+            listed_json,
+            r#"[
+  {
+    "name": "needle",
+    "kind": "function_item",
+    "file": "sample.rs",
+    "line": 1
+  }
+]"#
+        );
+        assert!(!found_json.contains("talos_notice"));
+        assert!(!listed_json.contains("talos_notice"));
+    }
+
+    #[test]
+    fn symbol_traversal_reports_oversized_file_as_notice_only() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        fs::write(
+            workspace.path().join("oversized.rs"),
+            vec![b' '; MAX_FILE_BYTES + 1],
+        )
+        .expect("oversized fixture should be writable");
+
+        let listed = list_symbols_in_path(workspace.path(), None).expect("listing should succeed");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(
+            notice_value(&listed),
+            serde_json::json!({
+                "talos_notice": "bounded_traversal",
+                "reasons": ["oversized_file"],
+                "counts": {
+                    "symlink_skipped": 0,
+                    "oversized_file": 1,
+                    "depth_limit": 0,
+                    "file_limit": 0,
+                    "aggregate_byte_limit": 0
+                },
+                "admitted_files": 0,
+                "admitted_bytes": 0
+            })
+        );
+
+        let found = scan_workspace(workspace.path(), "needle").expect("scan should succeed");
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            notice_value(&found)["counts"]["oversized_file"],
+            serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn symbol_traversal_stops_at_file_limit_after_bounded_read() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        write_rust(&workspace.path().join("sample.rs"), "fn needle() {}\n");
+        write_rust(&workspace.path().join("second.rs"), "fn needle() {}\n");
+        let mut state = TraversalState {
+            file_limit: 1,
+            ..TraversalState::new()
+        };
+        let mut results = Vec::new();
+
+        list_dir_symbols(
+            workspace.path(),
+            workspace.path(),
+            None,
+            &mut results,
+            &mut state,
+            0,
+        )
+        .expect("listing should succeed");
+
+        assert_eq!(results.len(), 1);
+        assert!(state.exhausted);
+        assert_eq!(state.file_limit_hits, 1);
+        assert_eq!(state.aggregate_byte_limit_hits, 0);
+        assert_eq!(state.admitted_files, 1);
+        assert_eq!(state.admitted_bytes, "fn needle() {}\n".len());
+
+        let mut scan_state = TraversalState {
+            file_limit: 1,
+            ..TraversalState::new()
+        };
+        let mut scan_results = Vec::new();
+        scan_dir(
+            workspace.path(),
+            workspace.path(),
+            "needle",
+            &mut scan_results,
+            &mut scan_state,
+            0,
+        )
+        .expect("scan should succeed");
+        assert_eq!(scan_results.len(), 1);
+        assert!(scan_state.exhausted);
+        assert_eq!(scan_state.file_limit_hits, 1);
+        assert_eq!(scan_state.admitted_files, 1);
+    }
+
+    #[test]
+    fn symbol_traversal_stops_at_aggregate_byte_limit() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        let source = "fn needle() {}\n";
+        write_rust(&workspace.path().join("sample.rs"), source);
+        write_rust(&workspace.path().join("second.rs"), source);
+        let mut state = TraversalState {
+            aggregate_byte_limit: source.len(),
+            ..TraversalState::new()
+        };
+        let mut results = Vec::new();
+
+        list_dir_symbols(
+            workspace.path(),
+            workspace.path(),
+            None,
+            &mut results,
+            &mut state,
+            0,
+        )
+        .expect("listing should succeed");
+
+        assert_eq!(results.len(), 1);
+        assert!(state.exhausted);
+        assert_eq!(state.file_limit_hits, 0);
+        assert_eq!(state.aggregate_byte_limit_hits, 1);
+        assert_eq!(state.admitted_files, 1);
+        assert_eq!(state.admitted_bytes, source.len());
+
+        let mut scan_state = TraversalState {
+            aggregate_byte_limit: source.len(),
+            ..TraversalState::new()
+        };
+        let mut scan_results = Vec::new();
+        scan_dir(
+            workspace.path(),
+            workspace.path(),
+            "needle",
+            &mut scan_results,
+            &mut scan_state,
+            0,
+        )
+        .expect("scan should succeed");
+        assert_eq!(scan_results.len(), 1);
+        assert!(scan_state.exhausted);
+        assert_eq!(scan_state.aggregate_byte_limit_hits, 1);
+        assert_eq!(scan_state.admitted_bytes, source.len());
+    }
+
+    #[test]
+    fn symbol_traversal_counts_refused_depth() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        fs::create_dir(workspace.path().join("child")).expect("child directory should be created");
+        let mut state = TraversalState {
+            depth_limit: 0,
+            file_limit: MAX_FILES,
+            aggregate_byte_limit: MAX_TOTAL_BYTES,
+            ..TraversalState::default()
+        };
+        let mut results = Vec::new();
+
+        list_dir_symbols(
+            workspace.path(),
+            workspace.path(),
+            None,
+            &mut results,
+            &mut state,
+            0,
+        )
+        .expect("listing should succeed");
+
+        assert!(results.is_empty());
+        assert_eq!(state.depth_limit_hits, 1);
+        assert!(!state.exhausted);
+
+        let mut scan_state = TraversalState {
+            depth_limit: 0,
+            file_limit: MAX_FILES,
+            aggregate_byte_limit: MAX_TOTAL_BYTES,
+            ..TraversalState::default()
+        };
+        let mut scan_results = Vec::new();
+        scan_dir(
+            workspace.path(),
+            workspace.path(),
+            "needle",
+            &mut scan_results,
+            &mut scan_state,
+            0,
+        )
+        .expect("scan should succeed");
+        assert!(scan_results.is_empty());
+        assert_eq!(scan_state.depth_limit_hits, 1);
+    }
+
+    #[test]
+    fn symbol_traversal_refuses_production_depth_65() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        let mut deepest = workspace.path().to_path_buf();
+        for _ in 0..=MAX_DEPTH {
+            deepest.push("d");
+            fs::create_dir(&deepest).expect("nested directory should be created");
+        }
+
+        let listed = list_symbols_in_path(workspace.path(), None).expect("listing should succeed");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(
+            notice_value(&listed)["counts"]["depth_limit"],
+            serde_json::json!(1)
+        );
+
+        let found = scan_workspace(workspace.path(), "needle").expect("scan should succeed");
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            notice_value(&found)["counts"]["depth_limit"],
+            serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn symbol_traversal_reason_order_is_stable() {
+        let state = TraversalState {
+            symlink_skipped: 2,
+            oversized_file: 3,
+            depth_limit_hits: 4,
+            file_limit_hits: 1,
+            aggregate_byte_limit_hits: 1,
+            admitted_files: 7,
+            admitted_bytes: 2048,
+            ..TraversalState::new()
+        };
+        let notice = state.notice().expect("notice should be present");
+
+        assert_eq!(
+            notice.reasons,
+            [
+                "symlink_skipped",
+                "oversized_file",
+                "depth_limit",
+                "file_limit",
+                "aggregate_byte_limit"
+            ]
+        );
+        assert_eq!(notice.admitted_files, 7);
+        assert_eq!(notice.admitted_bytes, 2048);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symbol_traversal_follows_root_symlink_but_skips_descendant_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        let outside = tempfile::tempdir().expect("outside tempdir should be created");
+        let real_root = workspace.path().join("real");
+        fs::create_dir(&real_root).expect("real root should be created");
+        write_rust(&real_root.join("sample.rs"), "fn needle() {}\n");
+        symlink(&real_root, real_root.join("cycle")).expect("cycle symlink should be created");
+        let oversized_target = outside.path().join("oversized.rs");
+        fs::write(&oversized_target, vec![b' '; MAX_FILE_BYTES + 1])
+            .expect("oversized target should be writable");
+        symlink(&oversized_target, real_root.join("sample-link.rs"))
+            .expect("file symlink should be created");
+        let root_link = workspace.path().join("root-link");
+        symlink(&real_root, &root_link).expect("root symlink should be created");
+
+        let listed = list_symbols_in_path(&root_link, None).expect("listing should succeed");
+        assert_eq!(listed.len(), 2);
+        assert!(matches!(listed[0], TraversalOutput::Result(_)));
+        assert_eq!(
+            notice_value(&listed)["counts"]["symlink_skipped"],
+            serde_json::json!(2)
+        );
+
+        let found = scan_workspace(&root_link, "needle").expect("scan should succeed");
+        assert_eq!(found.len(), 2);
+        assert!(matches!(found[0], TraversalOutput::Result(_)));
+        assert_eq!(
+            notice_value(&found)["counts"]["symlink_skipped"],
+            serde_json::json!(2)
+        );
+    }
+
+    #[test]
+    fn direct_file_symbol_listing_retains_unbounded_read_contract() {
+        let workspace = tempfile::tempdir().expect("tempdir should be created");
+        let path = workspace.path().join("large.rs");
+        let mut source = String::from("fn needle() {}\n");
+        source.push_str(&" ".repeat(MAX_FILE_BYTES));
+        fs::write(&path, source).expect("large direct-file fixture should be writable");
+
+        let listed = list_symbols_in_path(&path, None).expect("direct listing should succeed");
+        assert!(!listed.is_empty());
+        assert!(
+            listed
+                .iter()
+                .all(|item| matches!(item, TraversalOutput::Result(_)))
+        );
     }
 }
