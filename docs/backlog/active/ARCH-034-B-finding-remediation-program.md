@@ -4,7 +4,7 @@
 |---|---|
 | Type | Technical Epic child |
 | Parent Epic | ARCH-034 |
-| Status | Partial — R02/R03/R05-R11 Complete; R04 independent security review pending |
+| Status | Partial — R02/R03/R05-R11 Complete; R04 content disposition accepted and claim merge pending |
 | Priority | P1 after accepted findings |
 
 ## Execution Contract

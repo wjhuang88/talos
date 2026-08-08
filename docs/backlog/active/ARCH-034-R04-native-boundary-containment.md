@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034 |
 | Findings | ARCH-034-F13, ARCH-034-F19 |
-| Status | Planned - I181 corrected exact-head independent approval pending |
+| Status | Review - I181 content disposition accepted; claim merge pending |
 | Priority | P1 |
-| Selected Iteration | I181 (Planned; claim pending) |
+| Selected Iteration | I181 (Review; claim merge pending) |
 | Preserved behavior | Permission gates, native error mapping, process limits, storage format, and fallback policy |
 
 ## Collaboration Claim
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #174 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed commit `24694b88` but was submitted as `COMMENTED` through @wjhuang88 and explicitly does not satisfy independent approval; a different GitHub identity must approve the corrected exact head. |
+| Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed `24694b88` and approved the review-only plan subject to mandatory corrections. Maintainer clarification [comment `5225938556`](https://github.com/wjhuang88/talos/pull/174#issuecomment-5225938556) attests that a different natural person performed the review through the shared @wjhuang88 credential, accepts the content as independent-review evidence, and preserves GitHub's actual `COMMENTED` state. Commit `f263f221` incorporates the required corrections; exact-head CI `31253291503` passed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Do not merge the claim or begin protected implementation without independent approval; after review, release rejected gaps and create one bounded owner/claim per accepted implementation slice. |
+| Handoff / Release Condition | Merge the review-only claim only after refreshed governance validation and merge-time CAS. Do not begin protected implementation on this branch; create one bounded owner/claim per accepted implementation slice after claim merge. |
 
 ## Problem And Boundary
 
@@ -36,13 +36,13 @@ coverage must be proven per call family rather than assumed.
 
 - Produce a call-site/failure-mode/containment/test matrix for every native or panic-capable boundary.
 - Reconcile ADR-007 and R0 status facts without weakening their restrictions.
-- After independent review, add only the narrow containment/tests required by proven gaps.
+- Route each accepted gap to a separate bounded owner/claim before adding narrow containment/tests.
 
 ## Pre-Review Boundary Matrix
 
 This matrix is read-only review input, not a security verdict or implementation authorization.
 Locations and current behavior are confirmed from `main` at `46c65805`; risk classifications and
-remedies remain pending independent review.
+candidate remedies were reviewed through PR #174, with the resulting disposition recorded below.
 
 | Boundary family | Confirmed call sites | Current containment | Review question / candidate gap | Required evidence before disposition |
 |---|---|---|---|---|
@@ -64,10 +64,11 @@ remedies remain pending independent review.
   symlinks without cycle/depth guards and reads files without a byte cap; symbol and in-process
   `gix` paths have no enforceable deadline adapter; five crates enable bundled SQLite while ADR-008
   names two; ADR-007 still describes the shipped `pre_exec` site as planned.
-- **Analytical evidence, not authorization:** PR #174 review
-  `PRR_kwDOSrj_LM8AAAABI2KjFw` independently reproduced these facts and proposed dispositions, but
-  GitHub records it as `COMMENTED` by @wjhuang88. Its own identity-limitation notice explicitly
-  says the review does not satisfy the independent approval gate.
+- **Content authorization:** PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently reproduced
+  these facts and proposed the dispositions below. GitHub records it as `COMMENTED` by the shared
+  @wjhuang88 credential; maintainer comment `5225938556` attests that a different natural person
+  performed the review and accepts its content as independent-review evidence without representing
+  the event as a native GitHub `APPROVED` review.
 - **Prohibited conclusion:** I181 must not mark R04 remediated or authorize production changes. It
   may only produce an independently approved disposition and bounded follow-up owners.
 
@@ -85,13 +86,13 @@ remedies remain pending independent review.
   those focused tests into proof for untested panic, deadline, native-return, or five-crate SQLite
   families.
 
-### Provisional Review Disposition
+### Review Disposition
 
-These dispositions preserve the non-authorizing review's analysis for the next independent
-reviewer. They are not final and do not authorize implementation until a different GitHub identity
-approves the corrected exact head.
+These content-reviewed dispositions are final for I181's review-only scope. They authorize claim
+merge and creation of separately governed follow-up owners only; they do not authorize protected
+implementation on this branch.
 
-| Boundary family | Provisional disposition | Candidate follow-up boundary |
+| Boundary family | Disposition | Candidate follow-up boundary |
 |---|---|---|
 | ADR-007 parent hardening | Accepted gap, latent public-API risk | AG-2: fence or narrow the unused parent-mutation API, correct its safety comment, retain `dangerous_env_var_names()`, and require sandbox/API review. |
 | Bash Unix `pre_exec` | Accepted gap | AG-1: remove post-fork environment mutation where possible, fail closed on native errors, correct ADR-007, add Unix failure fixtures, and require unsafe/security review. |
@@ -104,17 +105,19 @@ approves the corrected exact head.
 
 ## Exclusions
 
-- No sandbox, permission, process-hardening, `unsafe`, dependency, or policy edit before security review.
+- No sandbox, permission, process-hardening, `unsafe`, dependency, or policy edit in I181; each
+  accepted implementation gap requires its own bounded claim and applicable security review.
 - No catch-all panic swallowing, silent fallback, or replacement of ADR-recorded dependencies.
 
 ## Readiness And Acceptance
 
-- Independent reviewer records escape-vector and failure-mode analysis.
+- Independent review content and maintainer attestation record escape-vector and failure-mode
+  analysis without overstating the GitHub review state.
 - Each accepted gap has one bounded implementation slice and explicit safe fallback.
 - Process, permission, git, symbol, SQLite, and crash tests cover the reviewed boundary.
 - Locked workspace, platform, security, governance, and ADR checks pass.
 
 ## Rollback / Residual
 
-If independent review is unavailable, remain Refinement and do not edit protected code. New native
-dependencies require a separate ADR.
+If merge-time validation or CAS fails, keep the claim unmerged and do not edit protected code.
+New native dependencies require a separate ADR.

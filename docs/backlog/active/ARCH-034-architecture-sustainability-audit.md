@@ -5,7 +5,7 @@
 | Type | Architecture Epic |
 | Status | Remediation Partial — ARCH-034-R04 and ARCH-034-C remain gated |
 | Priority | P1 |
-| Selected Iteration | I144 historical audit and I171 current-state rebaseline Complete; R02/R03/R05-R11 remediation Complete; I181 R04 independent review claim pending; C pending |
+| Selected Iteration | I144 historical audit and I171 current-state rebaseline Complete; R02/R03/R05-R11 remediation Complete; I181 R04 content disposition accepted and claim merge pending; C pending |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
@@ -44,15 +44,15 @@ fitness checks that prevent uncontrolled code accumulation.
    [R03](ARCH-034-R03-todo-module-decomposition.md), and R05 through
    [R11](ARCH-034-R11-architecture-documentation-truth.md) are Complete through their recorded
    implementation and closeout evidence. [R04](ARCH-034-R04-native-boundary-containment.md)
-   is selected into planned review-only I181; the independent claim and all protected
-   implementation remain pending.
+   is in review-only I181 with its content disposition accepted; claim merge and all separately
+   governed protected implementation remain pending.
 
 ## Current Remediation State
 
 - Completed behavior-preserving remediation: R01-R03 and R05-R11.
 - Remaining accepted architecture finding: R04 for F13/F19 native, panic, and `unsafe` boundary
-  containment. I181 plans the independent matrix review only; no protected implementation is
-  authorized before approval and reviewed gap disposition.
+  containment. I181's matrix disposition is content-reviewed; no protected implementation is
+  authorized until its own post-claim bounded owner and authorization exist.
 - Remaining program gate: ARCH-034-C low-noise fitness checks after the R04/B disposition.
 - The parent is not Complete while either R04 or C remains non-terminal.
 

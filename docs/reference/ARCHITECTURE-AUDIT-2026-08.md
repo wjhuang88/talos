@@ -142,7 +142,8 @@ not see; F20-F26 are complete except for the ADR-007/R0 semantic portion retaine
   `10cceec6aeb9089fe9c830355992c8fc60430d63`; exact-head CI `31238721507` passed. The original
   finding proof above remains an audit-time observation rather than being rewritten.
 - ADR-007/R0 security meaning, native-boundary containment, and process-hardening conclusions remain
-  outside I180 and owned by ARCH-034-R04 pending independent security review.
+  outside I180 and owned by ARCH-034-R04; I181's content-reviewed disposition is pending claim
+  merge and separately governed implementation slices.
 - I171/ARCH-034-D and I172/R02 owner/claim terminal state was repaired from their already-existing
   PR #139/#147 closeout evidence; no production or security behavior changed.
 
@@ -170,7 +171,7 @@ remediation slices. No production refactor is claimed by I171 itself.
 | ARCH-034-R01 | Tool contribution exception and extension docs | Existing I158 Review evidence |
 | ARCH-034-R02 | CLI/TUI bridge private seam extraction | I169 bridge tests |
 | ARCH-034-R03 | Todo source organization | Session API/repository tests |
-| ARCH-034-R04 | Native/panic/unsafe boundary containment | I181 independent review claim pending; no protected implementation; I161 remains separate/blocked |
+| ARCH-034-R04 | Native/panic/unsafe boundary containment | I181 content disposition accepted and claim merge pending; no protected implementation; I161 remains separate/blocked |
 | ARCH-034-R05 | TUI App coordinator seams | TUI snapshots and event tests |
 | ARCH-034-R06 | Conversation command/projection seams | Conversation API/output tests |
 | ARCH-034-R07 | CLI session workflow seams | Session/model lifecycle tests |

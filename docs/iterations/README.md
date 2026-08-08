@@ -48,7 +48,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I178 | Pending Submission Store Decomposition | Complete | Completion Commit `f92634803560dc50e0b15ca8d7d511e9928c983f` (squash merge of source implementation `c662a7e6`); PR #165; exact-head CI `31180591881` passed. |
 | I179 | Core Tool Facade Decomposition | Complete | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed. |
 | I180 | Architecture Documentation Truth | Complete | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed. R04 remains excluded. |
-| I181 | Native And Panic-Boundary Security Review | Planned - claim pending | Requires independent approval of the claim-only PR; review/matrix disposition only, with no protected implementation. |
+| I181 | Native And Panic-Boundary Security Review | Review - content disposition accepted; claim merge pending | Review/matrix disposition only; merge PR #174 after refreshed validation and CAS, with no protected implementation on the claim branch. |
 
 ## Completed This Closeout
 
