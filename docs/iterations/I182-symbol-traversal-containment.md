@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Claimed (effective on `main`) |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Implement only ARCH-034-R04-AG4 in `crates/talos-tools/src/symbol.rs`: non-following descendant entry classification, skip traversed directory/file symlinks while preserving user-supplied root symlink resolution, depth 64, 10,000 parser-admitted files, 2 MiB cap-plus-one file reads, 50 MiB parser-admitted aggregate bytes, one discriminated final JSON notice on bounded omission, and the focused compatibility/security tests; preserve public inputs, ordinary result objects/order, language/skip behavior, parser fallback, dependencies, permissions, and every AG-5 parser panic/deadline concern. |
@@ -18,10 +18,10 @@
 | Source Issue | None |
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent review comment `5226241652` reviewed PR #176 head `eb0ab6f1af71ddebb6c1ccea26f979de9964f624` and returned NEEDS CHANGES. Independent security re-review must approve the finalized corrected head of governance PR #176; the approved SHA is recorded in the PR/CAS record rather than self-referenced here. |
+| Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Do not activate or create implementation work until the finalized governance-only claim is independently reviewed, passes exact-head CI/CAS, and is merged to `main`. |
+| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`. Create implementation work from that merge or later `main`; the implementation PR requires its own independent review. |
 
 ## Closure Ledger
 

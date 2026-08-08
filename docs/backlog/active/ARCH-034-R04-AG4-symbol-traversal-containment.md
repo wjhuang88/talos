@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | I181 AG-4 / Arborium traversal boundary |
-| Status | Ready - governance claim proposed |
+| Status | Ready - governance claim merged; implementation authorized |
 | Priority | P1 |
-| Selected Iteration | I182 (Planned; claim not effective) |
+| Selected Iteration | I182 (Planned; claim effective on `main`) |
 | Preserved behavior | Symbol tool inputs, user-supplied root symlink resolution, normal-tree JSON, result ordering, language detection, skip filters, parser fallback, and read-only permission classification |
 
 ## Collaboration Claim
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent review comment `5226241652` reviewed PR #176 head `eb0ab6f1af71ddebb6c1ccea26f979de9964f624` and returned NEEDS CHANGES. Independent security re-review must approve the finalized corrected head of governance PR #176; the approved SHA is recorded in the PR/CAS record rather than self-referenced here. |
+| Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Claim is ineffective until the finalized governance-only PR is independently reviewed and merged to `main`; implementation must start from that merge or later `main`. |
+| Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`; implementation must start from that merge or later `main` and requires its own independent review. |
 
 ## Problem And Boundary
 
