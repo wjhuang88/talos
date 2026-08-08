@@ -54,7 +54,9 @@ wall-clock bound on a pathological admitted parse; AG-5 retains that residual.
 ## Scope
 
 - Use `DirEntry::file_type()` (or equivalent non-following `symlink_metadata`) for descent and
-  admission classification; do not use `Path::is_dir()`, following `fs::metadata`, or
+  admission classification; admission requires strict `file_type().is_file()` (never
+  `!file_type().is_dir()`), preserving regular-file semantics and excluding FIFOs, sockets, and
+  device nodes; do not use `Path::is_dir()`, following `fs::metadata`, or
   `canonicalize` for entries reached during traversal.
 - Never descend through a directory symlink and never admit a file symlink encountered during
   traversal. Preserve the existing behavior that the user-supplied root passed to
