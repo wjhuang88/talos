@@ -8,7 +8,7 @@
     "counterevidence": "The remaining registrations are product composition or runtime-injected capabilities, not duplicate tool implementation ownership.",
     "preserved_behavior": "Tool names, profile membership, scheduler injection, and plugin wrapping remain unchanged.",
     "recommended_action": "Close the implementation residual with an explicit exception table and extension documentation; do not migrate StatusTool or scheduler capabilities without a separate design decision.",
-    "disposition": "Current architecture documentation corrected by I180; ADR-007/R0 semantic reconciliation remains with ARCH-034-R04",
+    "disposition": "Completed by I158/ARCH-034-R01 at c88c1d1a; current architecture exceptions documented by I180; ADR-007/R0 semantic reconciliation remains with ARCH-034-R04",
     "owner": "ARCH-034-R01",
     "verification_path": "Registry composition tests, source-layout test, and updated ARCHITECTURE.md extension table"
   },
@@ -60,7 +60,7 @@
     "counterevidence": "The type is the intentional TUI coordinator and already delegates rendering components to scrollback/panel modules.",
     "preserved_behavior": "Event ordering, input handling, rendering output, and approval flow must remain identical.",
     "recommended_action": "Extract private coordinator seams for input/stream/frame responsibilities while preserving App and module paths.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I174/ARCH-034-R05 at e4248bfedd17c91aebb24c80c60580fcbcebec62",
     "owner": "ARCH-034-R05",
     "verification_path": "TUI snapshot/unit tests, exact output event tests, and unchanged public App API"
   },
@@ -73,7 +73,7 @@
     "counterevidence": "All adapters intentionally target the same repository and permission source; the public re-exports already define a stable boundary.",
     "preserved_behavior": "Todo schemas, SQL behavior, idempotency, dependency validation, tool names, and permission profiles remain unchanged.",
     "recommended_action": "Split private source files into model/repository/tools/format modules behind the existing facade and re-exports.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I173/ARCH-034-R03 at e4818e34c1e047c41d41abc1f7859c7984008e83",
     "owner": "ARCH-034-R03",
     "verification_path": "Todo repository/tool test suite and public re-export compile checks"
   },
@@ -255,7 +255,7 @@
     "counterevidence": "The module is a deliberate public facade and has no dependency leakage; changing public paths would be a semver risk.",
     "preserved_behavior": "All talos_core::tool paths and registry semantics remain stable.",
     "recommended_action": "If approved, split internal source files behind re-exports with compile-time API snapshots; no public path change.",
-    "disposition": "Still valid; low-risk source organization",
+    "disposition": "Completed by I179/ARCH-034-R10 at dafc9be08736aee91e0f9cdd92e5226930808061",
     "owner": "ARCH-034-R10",
     "verification_path": "Public API compile checks and registry/contribution tests"
   },
@@ -268,7 +268,7 @@
     "counterevidence": "The bridge is intentionally the CLI/TUI boundary and already centralizes ordering-sensitive lifecycle behavior.",
     "preserved_behavior": "Event ordering, receipt custody, cancellation, and TUI projection must remain identical.",
     "recommended_action": "Extract private projection and event-family modules behind the existing bridge API; preserve all lifecycle ordering tests.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I172/ARCH-034-R02 at 4084138dc0652d3200045847d42518d9ecb66231",
     "owner": "ARCH-034-R02",
     "verification_path": "I169 bridge integration tests, TUI smoke, and exact event ordering assertions"
   },
@@ -281,7 +281,7 @@
     "counterevidence": "All operations are part of the conversation state machine and the type is a stable public API.",
     "preserved_behavior": "Slash command output, steering queue transitions, transcript formatting, and extension diagnostics remain unchanged.",
     "recommended_action": "Extract private command and projection helpers without changing ConversationEngine methods or output sequences.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I175/ARCH-034-R06 at 5c45322245788e12316dffbe1f9cfacef390eff8",
     "owner": "ARCH-034-R06",
     "verification_path": "Conversation unit tests, transcript export tests, and public API compile checks"
   },
@@ -294,7 +294,7 @@
     "counterevidence": "These commands share transition and UI channels, so a CLI-level coordinator is expected.",
     "preserved_behavior": "Session identity publication, rollback ordering, model activation markers, and cleanup diagnostics remain unchanged.",
     "recommended_action": "Split private workflow modules by lifecycle family behind the existing handler functions.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I176/ARCH-034-R07 at 1de3243d",
     "owner": "ARCH-034-R07",
     "verification_path": "Session handler tests, model lifecycle tests, and CLI parser/e2e tests"
   },
@@ -307,7 +307,7 @@
     "counterevidence": "Custody and turn execution share one actor and generation fence, so extraction must remain private.",
     "preserved_behavior": "Generation fencing, queue ordering, receipts, pause/cancel semantics, and durable recovery remain unchanged.",
     "recommended_action": "Extract private custody/reconciliation helpers while keeping AppServerSession as the actor boundary.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I177/ARCH-034-R08 at f505eea8b658248dc25c2ad85d0fed93507adc84",
     "owner": "ARCH-034-R08",
     "verification_path": "Agent session and structured submission integration tests"
   },
@@ -320,7 +320,7 @@
     "counterevidence": "The store is one transactional durability boundary and must preserve atomicity.",
     "preserved_behavior": "SQLite schema, transition guards, recovery outcomes, and runtime identity fencing remain unchanged.",
     "recommended_action": "Split schema/query helpers from transition orchestration behind PendingSubmissionStore.",
-    "disposition": "Still valid; bounded refactor",
+    "disposition": "Completed by I178/ARCH-034-R09 at f92634803560dc50e0b15ca8d7d511e9928c983f",
     "owner": "ARCH-034-R09",
     "verification_path": "Pending submission tests, SQLite integration tests, and restart/recovery scenarios"
   },

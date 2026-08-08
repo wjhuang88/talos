@@ -1,12 +1,14 @@
 # ARCH-034-D: Current-State Workspace Architecture Rebaseline
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Type | Architecture Spike / Validation Repair |
 | Parent Epic | ARCH-034 |
-| Status | In Progress |
+| Status | Complete |
 | Priority | P1 |
-| Selected Iteration | I171 (Active; Claim PR #138 effective on `main@349d0cd1`) |
+| Selected Iteration | I171 (Complete; claim PR #138, closeout PR #139) |
 | Preserved behavior | All product/runtime/public API behavior |
 
 ## Problem
@@ -109,3 +111,13 @@ and creates one bounded remediation story for each accepted actionable issue.
 Production remediation belongs to separately claimed `ARCH-034-Rxx` stories and later iteration
 IDs. Security-sensitive permission, sandbox, or process-hardening findings additionally require the
 independent review path before implementation.
+
+## Completion Evidence
+
+- Completion Commit: `c88c1d1a428b156db0e167310d8a8b1cc4d63795` (source audit/report/register
+  and bounded-owner evidence).
+- Closeout PR #139 merged accepted head `9b69267d506bdb3a0675722ac2094247d4a84f9d` as
+  `56f419f7b3dd09584fde2651b6eab02800e16a15`; exact-head CI `31092987184` passed Unix,
+  Windows, governance, remote owner reconciliation, and installer checks.
+- Current-state owner truth is repaired on 2026-08-08 without changing the published I171
+  baseline, audit proof, runtime behavior, or security dispositions.
