@@ -1,19 +1,21 @@
 # ARCH-034-R11: Architecture Documentation Truth
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Parent | ARCH-034 |
 | Finding | ARCH-034-F26 |
-| Status | Review |
+| Status | Complete |
 | Priority | P1 |
-| Selected Iteration | I180 (Review; implementation PR #171) |
+| Selected Iteration | I180 (Complete; implementation PR #171) |
 | Preserved behavior | Documentation-only; historical evidence remains immutable |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-07 |
 | Work Slice | Reconcile `docs/reference/ARCHITECTURE.md` current-state workspace, crate, CLI, tool-contribution, extension, and composition descriptions against root `Cargo.toml` and current source; explicitly distinguish historical iteration-era snapshots from current facts; update directly affected architecture indexes/registers with non-semantic factual status only; preserve every runtime/API/dependency/decision/security behavior and route any ADR-007/R0 semantic or process-hardening conclusion to ARCH-034-R04. |
@@ -24,7 +26,7 @@
 | Authorization Evidence | No independent reviewer is currently available; exact-head CI, both governance validators, scale assessment, merge-time CAS, and no blocking review feedback are required. |
 | Implementation PR | #171 |
 | Last Updated | 2026-08-08 |
-| Handoff / Release Condition | Release if a claimed current fact lacks source evidence or requires decision/security interpretation; any ADR-007/R0 semantic or process-hardening change remains blocked on independent R04 security review. |
+| Handoff / Release Condition | Closed after implementation PR #171 merged; any later architecture fact correction needs its own bounded owner, while ADR-007/R0 semantic or process-hardening changes remain blocked on independent R04 security review. |
 
 ## Problem And Boundary
 
@@ -63,5 +65,17 @@ Revert inaccurate prose. Any decision change belongs to a new ADR or R04 securit
 - ADR-007/R0 semantics were not edited; security interpretation remains the R04 residual.
 - Standard release preflight, both governance validators, scale assessment, architecture audit
   harness, stale-claim search, scope check, and `git diff --check` passed locally on 2026-08-08.
-- Source implementation commit `fd8ac75d` is submitted in PR #171; exact-head CI and merge review
-  remain required before any Complete/Closed status.
+- Source implementation commit `fd8ac75d` was submitted in PR #171 before the accepted exact head
+  and squash merge recorded below.
+
+## Completion Evidence
+
+- Completion Commit: `10cceec6aeb9089fe9c830355992c8fc60430d63`
+- Implementation PR #171 squash-merged at `10cceec6aeb9089fe9c830355992c8fc60430d63`
+  from source implementation `fd8ac75d` and accepted exact Head
+  `b9f4716862940d6e125854ed3a70a7742f922f61`.
+- Exact-head CI `31238721507` passed Unix release preflight, Windows workspace and focused checks,
+  governance, remote owner reconciliation, rebuilt CLI smoke, and installer fixture jobs.
+- Merge-time CAS confirmed base `1ca03fdf8d262eba4d1de2374e43f2c1a94882dd`, exact head
+  `b9f4716862940d6e125854ed3a70a7742f922f61`, no blocking feedback or overlapping claim or
+  implementation PR, and unchanged recovery PR #120/#121 heads.
