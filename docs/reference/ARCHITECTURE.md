@@ -4,6 +4,11 @@ Talos is a safety-first agent runtime built in Rust. It prioritizes minimal core
 
 ## Design Principle: Simple Core, Flexible Extensions
 
+> **Current-state note (2026-08-07).** The workspace and composition statements in this
+> reference were checked against the root `Cargo.toml` and the current source tree for I180.
+> Iteration labels in the tables below record when a capability first entered the plan; they are
+> provenance, not a claim that the capability is still in that iteration's implementation shape.
+
 Talos follows the Pi-inspired principle of building the simplest possible core and extending it incrementally:
 
 1. **Core is minimal**: Turn loop + tools + provider. Nothing else.
@@ -17,38 +22,40 @@ The system operates as a stateful turn loop. It processes user input by orchestr
 
 ## Cargo Workspace Structure
 
-Talos crates are introduced progressively across iterations (see Implementation Roadmap for schedule).
+The root `Cargo.toml` is the source of truth for workspace membership. It currently contains 21
+members. The tables describe each member's current responsibility; the origin column preserves the
+historical iteration or decision that introduced the boundary.
 
-### Core Crates (I001, always present)
+### Foundation And Product Composition Crates
 
-| Crate | Responsibility |
-|-------|----------------|
-| `talos-core` | Foundation types, core traits, and error definitions. No internal dependencies. |
-| `talos-config` | Configuration schema, validation, and environment substitution. |
-| `talos-provider` | LLM client abstractions and provider-specific implementations. |
-| `talos-agent` | Core orchestration logic and the agent turn loop. |
-| `talos-cli` | Primary command-line interface and terminal user experience. |
+| Crate | Origin | Current responsibility |
+|-------|--------|----------------------|
+| `talos-core` | I001 | Dependency-free protocol types, tool/provider/session contracts, and core errors. |
+| `talos-config` | I001 | Configuration schema, validation, credential loading, and environment substitution. |
+| `talos-provider` | I001 | LLM client abstractions and provider-specific implementations. |
+| `talos-agent` | I001 | Agent orchestration, turn loop, session actor, and runtime scheduler. |
+| `talos-cli` | I001 | Product composition root, command-line modes, permission wrappers, and terminal workflows. |
 
-### Extension Crates (introduced as needed)
+### Capability And Extension Crates
 
 | Crate | Iteration | Responsibility |
 |-------|-----------|----------------|
-| `talos-tools` | I003 | Implementations of standard system and developer tools. File tools are split by behavior (`read`, `write/edit`, `delete`, `ls`) behind stable crate re-exports. |
-| `talos-session` | I003 | Persistence layer for message history and session state. |
-| `talos-sandbox` | I004 | Process isolation, filesystem virtualization, and secure execution environments. |
-| `talos-permission` | I004 | Policy engine, capability-based security, and user approval workflows. |
-| `talos-tui` | I005 | Terminal user interface with ratatui + crossterm, evolving progressively. |
-| `talos-skill` | I007 | Management of higher-level agent capabilities and task-specific instructions. |
-| `talos-evolution` | I008 | Runtime self-evolution: observe, accumulate, extract, apply learning loop (ADR-001). |
-| `talos-plugin` | I009 | Plugin runtime for third-party extensions (hook-based first, WASM as option). |
-| `talos-mcp` | I009 | Model Context Protocol implementation for external tool and resource access. |
-| `talos-rpc` | I009 | API layer for remote interaction and frontend integration. |
-| `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. Experimental, product-oriented (ADR-052). |
-| `talos-runtime` | RUNTIME-001 | Embeddable SDK facade for other Rust projects. Wraps `talos-agent` behind safe runtime construction and typed session handles without depending on CLI/TUI. |
-| `talos-memory` | I019 | Layered agent memory (episodic/semantic/procedural) and consolidation over `talos-session` storage. |
+| `talos-tools` | I003 | Built-in shell, file, workspace, network, image, git, and symbol tools plus crate-owned contributions. |
+| `talos-session` | I003 | JSONL transcript source of truth, session indexes, runtime state, and session-bound Todo tools. |
+| `talos-sandbox` | I004 | Process execution abstraction and OS hardening controls. |
+| `talos-permission` | I004 | Permission policy evaluation, resource matching, and approval decisions. |
+| `talos-tui` | I005 | Terminal rendering, input, scrollback, and UI state for the CLI TUI. |
+| `talos-skill` | I007 | SKILL.md discovery, parsing, indexing, and progressive-disclosure loading. |
+| `talos-evolution` | I008 | Hook-driven observation, pattern extraction, storage, and prompt adaptation (ADR-001). |
+| `talos-plugin` | I009 / ADR-027 | Hook registry/handlers, manifest validation, and explicit local WASM tool adapters. Native dynamic loading is not supported. |
+| `talos-mcp` | I009 | MCP transport, DTOs, server dispatch, and client-side remote tool adapters. |
+| `talos-rpc` | I009 | RPC protocol and runtime adapter boundary for remote interaction. |
+| `talos-conversation` | I023 / ADR-052 | Agent/TUI conversation projection and typed `UiOutput` events; experimental product-oriented crate. |
+| `talos-runtime` | RUNTIME-001 | Embeddable SDK facade with safe runtime construction and typed session handles; no CLI/TUI dependency. |
+| `talos-memory` | I019 | SQLite-backed episodic/semantic/procedural memory and consolidation. |
 | `talos-exploration` | I054 | Research-library ingestion and SQLite/FTS-backed search over local sources. |
-| `talos-dashboard` | WEB-001 | Product-only loopback control/dashboard surface (ADR-031); not wired into the SDK. |
-| `talos-models` | (quarantined) | Non-runtime SQLite catalog store (historical/foundation only); runtime uses packaged `models.toml`. Quarantined by MC-002; must not be wired into any CLI/TUI/runtime path. |
+| `talos-dashboard` | WEB-001 / ADR-031 | Product-only loopback control/dashboard library; not wired into the SDK. |
+| `talos-models` | MC-002 (quarantined) | Historical/non-runtime SQLite catalog crate; runtime uses packaged `models.toml` and must not wire this member into CLI/TUI/runtime paths. |
 
 ### Crate Distribution Boundary (ADR-052)
 
@@ -102,20 +109,24 @@ provides the parsed and indexed skill data while explicit Level 1/2 activation r
 
 ### CLI Runtime Boundary
 
-`talos-cli` keeps argument parsing and top-level mode dispatch in `main.rs`. `mode_runners.rs`
-coordinates shared startup and delegates mode-specific execution to focused modules; TUI runtime
-construction, session lifecycle workflows, and model activation have separate owners.
+`talos-cli` is the product composition root. It keeps argument parsing and top-level dispatch in
+`main.rs`, while mode runners assemble Agent/session/provider/tool state from explicit runtime
+inputs. There is no shared composition crate: `talos-runtime` is a separate SDK facade with its own
+construction boundary.
 
 | Module | Responsibility |
 |--------|----------------|
 | `main.rs` | `Cli`, `Mode`, logging setup, mode selection, and hook registry construction. |
-| `mode_runners.rs` | Shared startup and dispatch for print, TUI, inline/legacy interactive, RPC, and MCP modes. |
+| `mode_runners.rs` | Shared orchestration for TUI, legacy interactive, RPC, and MCP modes; re-exports print and inline entrypoints. |
 | `mode_print.rs` / `mode_inline.rs` / `mode_interactive.rs` | Mode-specific execution bodies. |
-| `registry.rs` | Explicit tool profile composition, collision checks, and permission-aware wrappers. |
+| `registry.rs` | Explicit print/TUI/MCP/interactive tool profiles, contribution collision checks, plugin loading, and permission-aware wrappers. |
+| `mode_runtime.rs` | Shared session metadata, model/runtime identity, prompt context, memory, and Todo prompt setup. |
+| `tui_runtime_builder.rs` | Single TUI Agent/session construction boundary, including provider, MCP, scheduler, plugins, skills, and prompt policy. |
 | `session_setup.rs` | Workspace/session resolution and session utility modes (`--search`, `--list`, `--learned`). |
 | `provider_setup.rs` | Provider parsing and provider/client config construction. |
 | `mcp_runtime.rs` | Session-scoped MCP startup, cached discovery results, child-process lifetime, and status projection. |
-| `session_handlers.rs` / `model_lifecycle.rs` | Session command workflows and transactional model activation. |
+| `session_handlers.rs` / `model_lifecycle.rs` / `session_transition.rs` | Session command workflows, model activation transactions, and generation-fenced runtime replacement. |
+| `runtime_adapter.rs` | RPC adapter over the canonical session SQ/EQ protocol. |
 | `tui_bridge.rs` / `event_loop.rs` | TUI and legacy interactive event-loop bridges. |
 
 ### MCP Session Boundary
@@ -130,27 +141,34 @@ dependency failures bounded.
 
 ## Dependency Graph
 
-The architecture follows a strict hierarchy to prevent circular dependencies.
+The graph is acyclic, but it is not a single chain and not every workspace member directly depends
+on `talos-core`. The following is the current composition shape derived from crate manifests:
 
 ```text
-[ talos-cli / talos-rpc ]
-          |
-          v
-    [ talos-agent ]
-    /     |     \
-   v      v      v
-[tools][session][provider][permission][skill][plugin][mcp]
-   \      |      /           |           |      /     /
-    \     v     /            v           v     /     /
-     [ talos-core ] <-------------------------------'
+talos-cli (product root)
+├── talos-agent ──┬── talos-core
+│                 ├── talos-tools ── talos-core + talos-sandbox
+│                 ├── talos-permission ── talos-core
+│                 ├── talos-sandbox ── talos-core
+│                 ├── talos-skill
+│                 ├── talos-plugin ── talos-core + talos-permission
+│                 ├── talos-memory
+│                 └── talos-session ── talos-core
+├── talos-provider ── talos-config ── talos-core
+├── talos-conversation ── talos-core + talos-plugin
+├── talos-tui ── talos-core + talos-permission + talos-conversation
+├── talos-mcp ── talos-core + talos-plugin + talos-permission
+└── talos-rpc ── talos-core + talos-plugin
 
-Information flow for TUI:
-  Agent → ConversationEngine → (mpsc::UiOutput) → Tui
-                                      ↑
-                              UserInput (mpsc)
+talos-runtime (independent SDK root) composes agent/provider/tools/session/permission/
+sandbox/skill/plugin without depending on talos-cli or talos-tui.
+talos-dashboard, talos-exploration, talos-memory, and talos-skill have no internal workspace
+dependencies, although product/orchestrator crates consume them; `talos-models` is quarantined and
+has no runtime consumer.
 ```
 
-Every crate depends on `talos-core`. Intermediate crates like `talos-agent` aggregate functionality from specialized modules. `talos-conversation` bridges the agent and TUI layers, owning conversation state and emitting typed events via async channels.
+The TUI information flow remains `AppServerSession → ConversationEngine → UiOutput → Tui`, with
+user input returning over the corresponding command channel.
 
 ## Core Data Flow
 
@@ -177,9 +195,13 @@ Talos uses traits to decouple logic and allow for alternative implementations.
 *   `AgentTool`: Interface for defining tool behavior, metadata, and input schemas.
 *   `LanguageModel`: Abstraction for LLM providers to handle completion and streaming.
 *   `SandboxProvider`: Defines how to spawn and manage isolated execution environments.
-*   `PermissionEngine`: Logic for checking tool calls against active policies.
-*   `SkillProvider`: Interface for loading and injecting domain-specific knowledge.
-*   `PluginHost`: Manages the lifecycle and hooks for WASM-based extensions.
+*   `HookHandler`: Interface for lifecycle hook handlers managed by `talos-plugin::HookRegistry`.
+*   `Runtime`: RPC runtime contract implemented by the CLI adapter.
+
+`PermissionEngine` is a concrete policy evaluator rather than a trait. Skill loading is provided
+by concrete `talos-skill` loaders/managers, and plugin execution is exposed through explicit
+`HookRegistry` and WASM adapter types; there are no `SkillProvider` or `PluginHost` traits in the
+current source.
 
 ## Tool Presentation
 
@@ -207,7 +229,8 @@ tool crates.
 | `talos-cli` | Print/TUI/MCP/interactive profile selection and permission wrappers | Expected outer composition root |
 | `talos-agent` scheduler | Runtime-created tools passed into print/TUI construction | Explicit runtime-injection exception; no static contribution can own the live scheduler handle |
 | CLI MCP `status` | Product-local diagnostic tool | Explicit CLI product exception; not a reusable capability crate |
-| Plugins/MCP adapters | Explicit contribution wrappers with source identity | Runtime extension path; duplicate names fail deterministically |
+| Explicit WASM plugins | `ToolContribution` wrappers sourced as `plugin:<name>@<version>` | Local package selection is explicit; checked registration rejects duplicate names with both sources |
+| MCP adapters | Session-discovered `AgentTool` values registered by the CLI's MCP profile | Process-isolated runtime extension; current adapter path preserves legacy unchecked registration and stable-per-session discovery |
 
 Adding a reusable built-in starts in its implementing crate's contribution module, then adds an
 explicit capability/profile selection at the applicable composition root. Do not duplicate the
@@ -469,8 +492,11 @@ To handle long conversations, Talos uses a progressive compaction strategy. Laye
 
 ## Storage Architecture
 
-Talos uses a progressive storage strategy (ADR-002). Storage complexity is introduced incrementally
-as each iteration requires it.
+Talos uses a progressive storage strategy (ADR-002). The phase headings below are a **historical
+rollout record**, retained to preserve the original iteration evidence; they are not an exhaustive
+current inventory. The current boundary is JSONL for transcript source-of-truth data, SQLite
+indexes/structured stores where queryability requires them, and TOML/JSON/Markdown for user-editable
+configuration and instructions.
 
 ### Phase 1: Pure Files (I001–I005)
 
@@ -501,18 +527,24 @@ Evolution engine requires structured queries for observations and patterns:
 *   Patterns include cognitive feedback fields: confidence, evidence counts, time decay (ADR-001).
 *   Evolution storage is implemented directly with rusqlite calls under the same ADR-008 exception.
 
-### File-Based Domains (All Phases)
+### Current File-Based Boundaries
 
-These domains remain file-based permanently because they must be human-editable:
+These user-editable domains currently remain file-based:
 
-*   **Configuration**: TOML files (layered: global → project).
-*   **Skills**: Markdown files with YAML frontmatter (`.talos/skills/**/SKILL.md`).
-*   **Permission rules**: TOML/DSL files (`.talos/rules/*.rules`).
+*   **Configuration**: `~/.talos/config.toml`, with environment substitution and the separate
+    `~/.talos/credentials.toml` snapshot merged when present.
+*   **Skills**: Markdown files with YAML frontmatter under workspace/global `.talos/skills/` roots
+    and the optional shared `~/.agents/skills/` root.
+*   **Permission rules**: JSON configuration files (`.talos/permissions.json` in the project and
+    `~/.talos/permissions.json` when present).
 *   **Agent context**: Markdown files (`AGENTS.md` at project root and `~/.talos/AGENTS.md`).
 
-### Storage Implementation (Phases 2-3)
+### Current SQLite Boundaries
 
-SQLite is used directly via rusqlite calls. No trait abstraction until a concrete second implementation exists (YAGNI — trait extraction happens when Turso or another engine is production-ready and we have real migration needs).
+SQLite is used directly via `rusqlite/bundled` in `talos-session`, `talos-evolution`,
+`talos-memory`, and `talos-exploration`; `talos-models` also contains a non-runtime catalog store.
+No trait abstraction exists until a concrete second implementation is production-ready (YAGNI —
+trait extraction happens when a real migration need exists).
 
 `rusqlite/bundled` is an explicit ADR-008 exception to the general no-C/C++-bindings rule. SQLite is
 compiled into the Talos binary, so users do not need a system SQLite installation. The final binary
@@ -521,15 +553,21 @@ not "fully static binary".
 
 ## Plugin System
 
-Extensions in Talos follow a layered approach, starting simple and adding sandboxing when needed:
+The current extension boundary is explicit and layered, as constrained by ADR-027:
 
-1. **Hook system** (I009, first): Function hooks at key lifecycle points (before_tool_call, after_tool_call, message_transform, etc.). Plugins register handlers. Simplest to implement and debug.
+1. **Hooks**: `talos-plugin` provides `HookRegistry`, `HookHandler`, and built-in handlers for
+   lifecycle events. This is an in-process product capability, not a dynamic library loader.
+2. **WASM packages**: the CLI loads local packages selected by explicit paths, validates a
+   `PluginManifest` whose executable carrier is currently `wasm`, and adapts read-only WASM tools
+   through the existing `AgentTool`/`ToolRegistry` and permission path. Traps, timeouts, malformed
+   modules, and bounded-output failures are reported as tool/plugin errors.
+3. **MCP**: process-isolated external tools and resources use the separate `talos-mcp` client/server
+   boundary and session-scoped startup described above.
 
-2. **Native plugins** (future): Dynamic library loading (`.so`/`.dylib`) for Rust plugins. Direct access to Talos APIs, zero serialization overhead.
-
-3. **WASM sandboxing** (future, optional): For untrusted third-party plugins. Adds sandboxing at the cost of complexity and API restrictions.
-
-The hook system is the foundation — WASM and native plugins are alternative hosting mechanisms for the same hook interface. This matches Pi's ExtensionAPI pattern: `registerTool`, `registerCommand`, `on(event)`.
+Native `.so`, `.dll`, or `.dylib` loading, remote package installation, automatic plugin discovery,
+and alternative carriers such as Lua are not current capabilities. Plugin manifests may describe
+skills, tools, and hooks, but executable registration remains explicit at the product composition
+root.
 
 ## Channel Topology Audit (ARCH-032, 2026-07-09)
 

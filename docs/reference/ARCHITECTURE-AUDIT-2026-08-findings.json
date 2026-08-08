@@ -8,7 +8,7 @@
     "counterevidence": "The remaining registrations are product composition or runtime-injected capabilities, not duplicate tool implementation ownership.",
     "preserved_behavior": "Tool names, profile membership, scheduler injection, and plugin wrapping remain unchanged.",
     "recommended_action": "Close the implementation residual with an explicit exception table and extension documentation; do not migrate StatusTool or scheduler capabilities without a separate design decision.",
-    "disposition": "Still valid; documentation closure",
+    "disposition": "Current architecture documentation corrected by I180; ADR-007/R0 semantic reconciliation remains with ARCH-034-R04",
     "owner": "ARCH-034-R01",
     "verification_path": "Registry composition tests, source-layout test, and updated ARCHITECTURE.md extension table"
   },
