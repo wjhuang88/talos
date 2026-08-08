@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Implement only ARCH-034-R04-AG4 in `crates/talos-tools/src/symbol.rs`: non-following directory traversal, reviewed depth/file/per-file/aggregate byte budgets, one final JSON notice on bounded omission, and focused compatibility/security tests; preserve public inputs, ordinary result objects/order, language/skip behavior, parser fallback, dependencies, permissions, and every AG-5 parser panic/deadline concern. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review required |
-| Authorization Evidence | Pending independent security review of the finalized exact-head claim. |
+| Governance Claim PR | #176 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending independent security review of exact head `396d7a10`; no implementation authority until review and merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Do not activate or create implementation work until the finalized governance-only claim is independently reviewed, passes exact-head CI/CAS, and is merged to `main`. |
@@ -117,6 +117,7 @@ open PRs at selection were archival recovery PRs #120/#121.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-08 | Planning | Selected AG-4 after I181/PR #174 and closeout PR #175 merged; inventoried I159-I162 as unchanged Blocked, found no Active/Review/Planned competitor, and found no overlapping branch/PR/owner. |
+| 2026-08-08 | Claim submission | Draft governance-only PR #176 opened; this finalized exact-head record proposes `Claimed` ownership but has no effect until independently reviewed and merged to `main`. |
 
 ## Verification Evidence
 

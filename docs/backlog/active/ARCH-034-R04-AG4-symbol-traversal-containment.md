@@ -13,15 +13,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Bound only the two directory traversals in `crates/talos-tools/src/symbol.rs`: do not follow directory symlinks; enforce reviewed depth, candidate-file, per-file-byte, and aggregate-byte budgets before parser admission; preserve normal-tree result order and object shapes; append one explicit final JSON notice object only when a budget skips or truncates work; add symlink-cycle, oversized-file, depth/count/byte-budget, and normal-tree compatibility tests. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review required |
-| Authorization Evidence | Pending independent security review of the finalized exact-head claim. |
+| Governance Claim PR | #176 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending independent security review of exact head `396d7a10`; no implementation authority until review and merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-08 |
 | Handoff / Release Condition | Claim is ineffective until the finalized governance-only PR is independently reviewed and merged to `main`; implementation must start from that merge or later `main`. |
