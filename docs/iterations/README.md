@@ -49,6 +49,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I179 | Core Tool Facade Decomposition | Complete | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed. |
 | I180 | Architecture Documentation Truth | Complete | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed. R04 remains excluded. |
 | I181 | Native And Panic-Boundary Security Review | Complete | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; review/matrix disposition only, with no protected implementation. R04 child owners remain pending. |
+| I182 | Symbol Traversal Containment | Planned - claim proposed | ARCH-034-R04-AG4 only; independent security review and an effective governance claim are required before activation or implementation. |
 
 ## Completed This Closeout
 

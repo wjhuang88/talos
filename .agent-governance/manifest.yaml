@@ -73,4 +73,4 @@ migration:
     - "Resolve I158 Review independently and keep I159-I162 blocked under their recorded gates"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
-    - "Keep ARCH-034-R04 Partial after review-only I181 completion; create separate bounded owners and claims for accepted gaps before protected implementation"
+    - "Keep ARCH-034-R04 Partial after review-only I181 completion; review and merge the governance-only I182/AG-4 symbol traversal claim before any implementation, and keep every other accepted gap separately owned"

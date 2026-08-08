@@ -38,6 +38,13 @@ coverage must be proven per call family rather than assumed.
 - Reconcile ADR-007 and R0 status facts without weakening their restrictions.
 - Route each accepted gap to a separate bounded owner/claim before adding narrow containment/tests.
 
+## Child Owners
+
+- [ARCH-034-R04-AG4](ARCH-034-R04-AG4-symbol-traversal-containment.md) / I182: Ready with a
+  governance claim proposed for symlink/depth/count/byte traversal containment only. The claim is
+  not effective and no implementation is authorized until independent security review and merge.
+- AG-1 through AG-3 and AG-5 through AG-7 remain unowned slices under this parent.
+
 ## Pre-Review Boundary Matrix
 
 This matrix is read-only review input, not a security verdict or implementation authorization.
