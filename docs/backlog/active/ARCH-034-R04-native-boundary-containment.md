@@ -131,7 +131,12 @@ AG-7 require separate bounded owners/claims; other subprocess and five-crate SQL
 remain evidence work until classified. Within the symbol family, direct-file `read_to_string` plus
 parse paths (`list_symbols` direct-file mode, `find_references`, and `list_imports`) remain
 unbounded, and symbol-result serialization has no output-byte cap; AG-4 does not close those
-residuals. New native dependencies require a separate ADR.
+residuals. Independent implementation review `5230395611` additionally registered
+[AG-8 workspace-path containment](ARCH-034-R04-AG8-symbol-workspace-path-containment.md),
+[AG-9 decoding consistency](ARCH-034-R04-AG9-symbol-decoding-consistency.md), and
+[AG-10 notice admissibility](ARCH-034-R04-AG10-symbol-notice-admissibility.md).
+They are unclaimed and receive no implementation authority from I182. New native
+dependencies require a separate ADR.
 
 ## Review Completion Evidence
 

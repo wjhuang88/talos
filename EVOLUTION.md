@@ -56,8 +56,28 @@ repeating known mistakes.
 | 44 | TUI | display-only 历史前缀必须与逻辑 Transcript 共享连续导航坐标，否则滚轮边界会跳变且无法返回前缀 | I156/TUI-035 |
 | 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |
 | 46 | Provider / Runtime | transport EOF 不是成功；已知协议终止值必须有独立 policy，不能冒充 unknown；每个消费者都必须投影明确 outcome | I168/RUNTIME-003 |
+| 47 | Governance / Review | 共享 GitHub 账号下的独立评审必须显式声明自然人隔离，并区分人工 attestation 与机器可验证身份 | PR #177 / GOV-004 |
 
 ## Lessons
+
+## 2026-08-09 - Shared-account review needs explicit human attestation
+
+- Trigger: PR #177's independent security reviewer used the repository's shared
+  `@wjhuang88` account to approve a Codex-authored exact head.
+- Symptom: the content review is independent under the current SOP, but GitHub
+  account identity and native review state cannot mechanically prove that a
+  distinct natural person performed it.
+- Root cause: `AGENT-COLLABORATION.md` defines an independent
+  maintainer/reviewer but does not specify evidence fields for shared-account
+  operation.
+- Fix: record exact SHA, reviewer/implementer natural-person separation,
+  content-based method, verdict, findings and the shared-account caveat in the
+  PR comment and owner `Authorization Evidence`.
+- Prevention: never infer natural-person independence from a login or represent
+  a top-level comment as GitHub `APPROVED`; require explicit attestation and keep
+  validator claims limited to presence/consistency rather than identity proof.
+- Promoted to rule/check: `GOV-004-shared-account-review-attestation.md` owns the
+  SOP and validator follow-up.
 
 ## 2026-07-30 - Provider transport exhaustion is not completion
 
