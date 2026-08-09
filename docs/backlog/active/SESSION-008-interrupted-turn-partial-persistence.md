@@ -5,11 +5,11 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Refinement — ADR, persistence shape, and iteration selection required |
+| Status | Refinement — current partial coverage inventoried; ADR and durable implementation remain |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
-| Blocks | None |
+| Blocks | RUNTIME-005 bounded graceful shutdown |
 
 ## Identity / Goal / Value
 
@@ -62,6 +62,32 @@ transcript must identify that the turn did not complete normally.
 - The requested API shape (`commit_partial_turn`, status-bearing commit, or an
   expanded abort operation) is not preselected. The ADR must choose one owner
   and state transition.
+
+## Current Implementation Baseline (2026-08-09)
+
+- The legacy `Session` error path already persists policy-filtered partial
+  messages after a provider error; focused tests prove that an admitted tool
+  result and user message survive while a trailing incomplete assistant
+  fragment does not.
+- Durable embedded sessions still call `abort_turn` on non-success and the
+  regression fixture explicitly requires an empty durable transcript after a
+  failed turn. This is a remaining gap, not completion evidence.
+- Cancellation currently persists a hidden terminal outcome but returns no
+  partial messages. It does not yet prove that a completed display-safe tool
+  result survives interruption.
+- I169 added terminal-outcome evidence and transactional pending-work custody,
+  but did not claim or complete SESSION-008.
+
+## Executable Split
+
+| ID | Deliverable | Status | Depends On |
+|---|---|---|---|
+| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Ready, not selected | Existing ADR-039/ADR-042 and current-path inventory |
+| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Blocked | SESSION-008-A Accepted |
+
+Only one child may be selected at a time. The parent becomes Complete only
+after both children have existing completion evidence and the Issue #45
+acceptance matrix is reconciled.
 
 ## Uncertainty And Validation Path
 
@@ -137,5 +163,7 @@ scripts/validate_project_governance.sh .
 
 ## Residuals
 
-- This Story remains Refinement until the lifecycle owner, durable entry shape,
-  and compatibility strategy are decided. It is not authorized by I164.
+- This Story remains Refinement until SESSION-008-A selects the lifecycle owner,
+  durable entry shape and compatibility strategy. Existing legacy error-path
+  coverage is retained as a compatibility fixture; it does not authorize or
+  substitute for SESSION-008-B.
