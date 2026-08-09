@@ -21,9 +21,9 @@
 | Source Issue | None |
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-08 |
+| Authorization Evidence | Independent re-review comment `5226341754` approved claim head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Implementation/security review comment `5230395611` independently approved implementation head `4b96882307173ded8264aa1c45cce129707ff65f` with no blocking findings after focused tests, both governance validators and exact-head CI `31266112256`. The review was posted through the shared `@wjhuang88` account but explicitly attests a distinct natural-person reviewer from the Codex implementer; the disclosure is the compensating audit control pending GOV-004. |
+| Implementation PR | #177 |
+| Last Updated | 2026-08-09 |
 | Handoff / Release Condition | Claim is effective on `main` at merge `36980ecc5a238e17db38ddef99c66235851fcd48`; implementation must start from that merge or later `main` and requires its own independent review. |
 
 ## Problem And Boundary
@@ -145,3 +145,26 @@ owner for parser panic/deadline containment; AG-1 through AG-3 and AG-6/AG-7 rem
 children and receive no authority from this claim. AG-4 provides no wall-clock bound for an
 admitted pathological parse. Direct-file unbounded reads and unbounded symbol-output serialization
 remain explicit R04 residuals and cannot be closed by this child.
+
+## Independent Review Residuals (2026-08-09)
+
+Review comment `5230395611` approved the exact implementation head and classified
+the following as non-blocking, out-of-slice follow-ups. None may be silently
+changed in I182:
+
+1. `symlink_skipped` is counted before name/extension exclusion, so unsupported
+   or already-skipped symlinks can produce a bounded-traversal notice without
+   omitting otherwise admissible work. This matches the reviewed counter wording
+   but conflicts with the broader "only when work is omitted" statement.
+   [AG-10](ARCH-034-R04-AG10-symbol-notice-admissibility.md) owns CHANGE-CONTROL
+   refinement of that observable contract.
+2. Invalid UTF-8 in a supported file fails directory `list_symbols` but is
+   skipped by `find_symbol`. The reviewer reproduced the same behavior on
+   `main`, so it is not an I182 regression.
+   [AG-9](ARCH-034-R04-AG9-symbol-decoding-consistency.md) owns any future parity
+   decision and compatibility tests.
+3. Absolute and parent-relative `path` values can escape `workspace_root`; root
+   symlink containment also requires an explicit policy. This predates I182 and
+   is outside its public-input Non-Goals.
+   [AG-8](ARCH-034-R04-AG8-symbol-workspace-path-containment.md) is the separate
+   security owner and requires an effective claim before implementation.

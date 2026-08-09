@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (effective on `main`) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Implement only ARCH-034-R04-AG4 in `crates/talos-tools/src/symbol.rs`: non-following descendant entry classification, skip traversed directory/file symlinks while preserving user-supplied root symlink resolution, depth 64, 10,000 parser-admitted files, 2 MiB cap-plus-one file reads, 50 MiB parser-admitted aggregate bytes, one discriminated final JSON notice on bounded omission, and the focused compatibility/security tests; preserve public inputs, ordinary result objects/order, language/skip behavior, parser fallback, dependencies, permissions, and every AG-5 parser panic/deadline concern. |
