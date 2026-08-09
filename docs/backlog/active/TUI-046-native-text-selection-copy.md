@@ -5,10 +5,11 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P1 |
-| Status | Refinement — interaction policy, terminal matrix and ADR-054 impact require iteration selection |
+| Status | Refinement — causal baseline confirmed; decision and implementation children unselected |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
 | Selected Iteration | None |
-| Depends On | ADR-054 alternate-screen renderer; Issue #79 mouse-history scrolling; existing `/copy` command |
+| Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
+| Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
 ## Collaboration Claim
 
@@ -56,6 +57,33 @@ Restore a documented, predictable way to select and copy arbitrary visible text 
 ## Uncertainty And Validation Path
 
 Refine whether mouse capture is disabled by default, made explicit/configurable, combined with a cross-terminal gesture, or replaced by a bounded application-owned selection path. Validate the chosen contract on the maintainer's primary terminal and at least one materially different platform terminal before implementation acceptance.
+
+## Current Implementation Baseline (2026-08-09)
+
+- `TerminalSession` unconditionally enables mouse capture after entering
+  Alternate Screen and tracks/restores it transactionally.
+- The application consumes only mouse-wheel events; drag/down/up events do not
+  implement an application-owned selection model.
+- ADR-054 requires captured wheel events for application-owned history but does
+  not define a native-selection gesture or opt-out. `/copy last` and `/copy all`
+  are whole-message/transcript commands and do not satisfy arbitrary visible
+  range selection.
+- Therefore the verified causal gap is the missing product contract between
+  default mouse capture and terminal-native drag selection. Alternate Screen by
+  itself is not recorded as the cause.
+
+## Executable Split
+
+| ID | Deliverable | Status | Depends On |
+|---|---|---|---|
+| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Ready, not selected | Current lifecycle/input inventory; coordinate with TUI-042 without absorbing it |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Blocked | TUI-046-A decision Accepted |
+
+TUI-046-B must preserve keyboard history navigation and may not claim acceptance
+from unit tests alone. The parent closes only after both terminal environments
+prove the documented default gesture against the exact implementation head.
+TUI-042/#79 retains ownership of no-op wheel-scroll layout shifts and is not a
+completion prerequisite for this independent native-selection bug.
 
 ## State / Status Owners
 

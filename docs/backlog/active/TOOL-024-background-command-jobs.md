@@ -7,7 +7,7 @@
 long-running `bash`, Windows PowerShell, and `exec` work must not block an interactive conversation;
 bounded completion output must remain model-readable through supervised job controls.
 **Depends on**: TOOL-023-C for Windows PowerShell identity; TOOL-024-A decision output; RUNTIME-005
-for bounded resource finalization; PERM-006-C before the final cross-surface permission integration.
+for bounded resource finalization; PERM-006-C before any background process may spawn.
 
 ## Outcome
 
@@ -26,6 +26,8 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   unattended execution are out of scope; those belong to `TASK-001`.
 - The initial result delivery must not automatically initiate another model turn. Whether a later
   explicit "resume the model on completion" policy is desired is a separate product decision.
+- A model can inspect and control existing jobs through one bounded `process` tool contract; the
+  terminal result is not smuggled into a later provider request as an unsolicited tool result.
 
 ## Required Invariants
 
@@ -42,6 +44,8 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   discarding the fact that output was truncated.
 - User cancellation, `/quit`, Ctrl+C/Esc semantics, terminal restore, process-tree cleanup, and
   unexpected supervisor failure must have defined behavior before implementation.
+- `process` read/status/list/cancel operations use stable job identity, ordered cursor-based output
+  reads and explicit truncation/expiry semantics. They do not accept arbitrary shell syntax.
 - Windows support follows TOOL-023-C's PowerShell boundary; Unix support preserves the existing
   shell hardening boundary. No `unsafe`, Job Object implementation, or new dependency is authorized
   by this Epic.
@@ -51,8 +55,9 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Ready | None | ADR and implementation-ready contract for ownership, approval, cancellation, result delivery, and persistence. |
-| TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete | Supervisor, typed tool input/result, bounded capture, and exact-once terminal events. |
-| TOOL-024-C | Interactive Job Projection And Control | Product/TUI Story | Blocked | TOOL-024-B Complete | Non-blocking TUI state, transcript projection, job status and cancellation controls. |
+| TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Session-owned supervisor, explicit background input, bounded capture, process-tree cleanup, and exact-once terminal state. |
+| TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
+| TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete | Non-blocking TUI projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
 ## Major Risks
 
@@ -79,8 +84,22 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 - `crates/talos-conversation/src/`
 - `crates/talos-session/src/`
 
+## Current Implementation Baseline (2026-08-09)
+
+- `ExecInput` and `BashInput` expose bounded foreground timeouts but no explicit
+  background flag or job identity. The exec tool documentation explicitly says
+  that background jobs are not performed.
+- No `ProcessJobManager`, model-readable `process` tool, ordered output cursor or
+  background cancellation/reap lifecycle exists in the workspace.
+- Existing direct-child timeout behavior and Windows shell identity are inputs;
+  neither proves descendant supervision or background ownership.
+- TOOL-023-C and I182 are Complete. TOOL-024-A is no longer blocked by the
+  historical I157 activation note, but remains unselected until a fresh
+  non-terminal inventory, effective claim and dedicated iteration authorize it.
+
 ## Completion Condition
 
-All children are Complete with existing implementation commit evidence, the lifecycle ADR is
+All children A-D are Complete with existing implementation commit evidence, the lifecycle ADR is
 Accepted, focused and workspace validation pass, and real Unix/Windows interactive walkthroughs
-prove that background work does not block the conversation and returns exactly one bounded result.
+prove that background work does not block the conversation, every job is reaped, and the model can
+retrieve exactly one bounded terminal result through the documented `process` contract.

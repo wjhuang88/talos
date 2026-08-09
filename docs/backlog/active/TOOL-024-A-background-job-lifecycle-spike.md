@@ -4,7 +4,7 @@
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
-**Depends on**: None technically; may not activate while I157/MODEL-010 is Active.
+**Depends on**: None technically; must respect the repository's one-active-iteration rule.
 
 ## Goal / Value
 
@@ -25,6 +25,8 @@ result to that conversation safely.
 - Decide the result routing contract: append a user-visible identified tool result to the current
   conversation, persist only the completed result through existing session semantics if selected,
   and do not auto-submit it to the model in the first implementation.
+- Define the model-readable `process` read/status/list/cancel tool contract, including stable job
+  identity, ordered output cursors, bounded retention and terminal-result idempotency.
 - Define cancellation and shutdown behavior, including known Unix/Windows process-tree residuals
   and whether a safe first slice must reject commands likely to spawn unmanaged descendants.
 - Produce an implementation split with affected crates, test seams, migration impact, and manual
@@ -54,6 +56,8 @@ The ADR must answer all of the following before TOOL-024-B becomes Ready:
    jobs are running.
 6. The first-slice Unix/Windows child/process-tree cleanup guarantee and any explicit residual.
 7. How terminal results enter the transcript without automatically triggering a provider request.
+8. How the `process` tool exposes ordered incremental and terminal output without duplicating,
+   losing or leaking output across sessions.
 
 ## Affected Areas
 
@@ -78,8 +82,8 @@ The ADR must answer all of the following before TOOL-024-B becomes Ready:
   the first implementation surfaces it to the conversation without an automatic model request.
 - A new ADR is Proposed and cross-linked by TOOL-024 and this Spike; no production code changes are
   made by the Spike.
-- The parent/child backlog statuses and Board/program disposition remain synchronized; I157 stays
-  Active and no new iteration is activated by this requirement intake.
+- The parent/child backlog statuses and Board/program disposition remain synchronized; no new
+  iteration is activated while another governed iteration is Active or Review.
 
 ## Validation
 
@@ -97,5 +101,5 @@ git diff --check
 
 ## User-Facing Documentation
 
-The Spike itself changes no runtime behavior. TOOL-024-B/C must update README EN/zh-CN, help/tool
+The Spike itself changes no runtime behavior. TOOL-024-B/C/D must update README EN/zh-CN, help/tool
 schema documentation, and the user-visible cancellation/status guidance if implementation proceeds.

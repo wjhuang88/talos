@@ -8,7 +8,7 @@
 | Status | Refinement — shutdown policy and finalization order require ADR review |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
-| Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API; TOOL-024 resource shutdown |
+| Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
 
 ## Collaboration Claim
 
@@ -38,6 +38,17 @@ Provide embedding hosts one idempotent, deadline-bounded shutdown contract that 
 - Ordered durable reconciliation and bounded resource finalizers.
 - Backward-compatible default `shutdown()` wrapper where feasible.
 
+## Current Implementation Baseline (2026-08-09)
+
+- `RuntimeHandle::shutdown(self)` sends `SessionOp::Shutdown` and waits for the
+  actor task without a caller deadline or structured result.
+- The actor cancels the active token, releases/pauses pending submissions and
+  exits through its existing state machine. New admission, concurrent callers,
+  an explicit active-turn policy, ordered generic finalizers and deadline
+  exhaustion are not represented by one shared shutdown state.
+- No background-job finalizer exists. TOOL-024 is a future consumer of this
+  Story's generic finalizer contract, not a prerequisite for it.
+
 ## Exclusions
 
 - No process signal ownership, SIGKILL guarantees, side-effect replay, or desktop UI.
@@ -45,7 +56,20 @@ Provide embedding hosts one idempotent, deadline-bounded shutdown contract that 
 
 ## Dependencies
 
-SESSION-008 partial persistence; RUNTIME-001 embedded API; TOOL-024 resource shutdown
+SESSION-008 partial persistence; RUNTIME-001 embedded API. TOOL-024 consumes the
+completed shutdown/finalizer boundary and must not be a dependency of this Story.
+
+## Executable Split
+
+| ID | Deliverable | Status | Depends On |
+|---|---|---|---|
+| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Ready, not selected | SESSION-008-A decision output; RUNTIME-001 Complete |
+| RUNTIME-005-B | Shared admission fence, bounded active-turn policy and structured report | Blocked | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
+
+The finalizer registry must be proven with runtime-owned test finalizers. A
+specific TOOL-024 implementation registers as a later consumer and cannot hold
+#49 in a dependency cycle.
 
 ## Decision Links And Constraints
 
@@ -76,6 +100,8 @@ Do not present this Story as shipped while it remains Refinement.
 - docs/backlog/active/TOOL-024-background-command-jobs.md
 - docs/decisions/039-session-integrity-and-lifecycle-semantics.md
 - crates/talos-runtime/src/
+- crates/talos-agent/src/session.rs
+- crates/talos-agent/src/session/turn.rs
 
 ## Acceptance For Behavior / Technical Work
 

@@ -15,8 +15,9 @@ That snapshot is historical evidence, not current activation authority.
 | 0 | Internal validation service | Validation must become an internal callable, language-neutral service; governance must not depend on shell scripts and project adapters must be detected before guidance is injected. | `docs/backlog/active/VALIDATION-001-internal-validation-service.md`; `docs/backlog/active/GOV-003-builtin-project-governance.md`; `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md` |
 | 0 | Permission pipeline convergence | PERM-006 remains Refinement. Select and review A→E children sequentially; no child may broaden PERM-004/PERM-005 policy implicitly. | `docs/backlog/active/PERM-006-permission-pipeline-convergence.md`; PERM-006-A/B/C/D/E |
 | 0 | Memory admission safety | MEM-010 is Ready but unselected. A bounded correction iteration must prove only user-authored episodes enter new global memory. | `docs/backlog/active/MEM-010-user-origin-memory-admission.md`; Issue #114 |
-| 1 | TUI regression intake | TUI-043 is Ready; TUI-041, TUI-042, TUI-045 and TUI-046 remain Refinement and require bounded layout/state-transition or terminal-interaction evidence before selection. | `docs/backlog/active/TUI-041-thinking-preview-wrap-and-height.md`; `docs/backlog/active/TUI-042-noop-history-scroll-stability.md`; `docs/backlog/active/TUI-043-tool-placeholder-suppression.md`; `docs/backlog/active/TUI-045-permission-prompt-layout-anchor.md`; `docs/backlog/active/TUI-046-native-text-selection-copy.md` |
-| 1 | Runtime session and protocol foundations | SESSION-009 and RUNTIME-005 remain Refinement; ACP-001 remains Blocked until session attachment, controller ownership and shutdown/finalization boundaries are accepted. | `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/ACP-001-agent-client-protocol-server.md` |
+| 1 | TUI regression intake | TUI-043 is Ready; TUI-041, TUI-042 and TUI-045 remain Refinement. TUI-046-A must first select the native-selection/mouse-capture contract, then TUI-046-B must pass an exact-head two-terminal acceptance matrix before Issue #134 closes. | `docs/backlog/active/TUI-041-thinking-preview-wrap-and-height.md`; `docs/backlog/active/TUI-042-noop-history-scroll-stability.md`; `docs/backlog/active/TUI-043-tool-placeholder-suppression.md`; `docs/backlog/active/TUI-045-permission-prompt-layout-anchor.md`; `docs/backlog/active/TUI-046-native-text-selection-copy.md` |
+| 1 | Runtime session and protocol foundations | SESSION-008-A/B must close the durable partial-turn gap before RUNTIME-005-A/B/C can complete bounded shutdown. SESSION-009 remains Refinement; ACP-001 remains Blocked until session attachment, controller ownership and shutdown/finalization boundaries are accepted. | `docs/backlog/active/SESSION-008-interrupted-turn-partial-persistence.md`; `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/ACP-001-agent-client-protocol-server.md` |
+| 1 | Supervised background command jobs | TOOL-024-A is the first selectable decision slice. Production work is gated by RUNTIME-005, PERM-006-C and TOOL-023-C; B/C/D then deliver supervisor, model-readable `process` controls and cross-platform interactive acceptance before Issue #59 closes. | `docs/backlog/active/TOOL-024-background-command-jobs.md`; `docs/backlog/active/TOOL-024-A-background-job-lifecycle-spike.md`; `docs/backlog/active/RUNTIME-005-bounded-graceful-shutdown.md`; `docs/backlog/active/PERM-006-C-agent-owned-permission-pipeline.md` |
 | 1 | Memory scope architecture | MEM-011 remains Refinement. Accept schema/migration and legacy-fixture decisions before implementation. | `docs/backlog/active/MEM-011-extensible-memory-scopes.md`; Issue #116 |
 | 1 | Provider/runtime reliability follow-ups | Preserve explicit terminal outcomes, usage accounting and bounded request/stream behavior before dependent status/cost UX. | `docs/backlog/active/PROVIDER-001-openai-streaming-usage.md`; `docs/backlog/active/PROVIDER-002-response-reliability-timeout-retry.md`; `docs/backlog/active/PROVIDER-004-text-tool-call-id-collision.md` |
 | 1 | `/delete` cleanup-failure actionability | Issue #136 is Open and independently owns executable recovery-command wording. It must preserve the accepted transcript-last, retryable, no-false-success behavior from I169. | `docs/backlog/active/TUI-044-transactional-batched-steering-turn.md`; ADR-056; Issue #136 |
@@ -106,7 +107,9 @@ Key chains include:
 - PERM-006-A → B → C → D → E;
 - SESSION-009 → ACP-001;
 - I158 disposition → TUI-037 disposition → I159 → I160 → I161 → I162;
-- RUNTIME-005 and PERM-006-C before background-job completion claims;
+- SESSION-008-A → SESSION-008-B → RUNTIME-005-A → B → C;
+- PERM-006-A → B → C and RUNTIME-005 Complete before TOOL-024-B may spawn a background process;
+- TOOL-024-A decision → TOOL-024-B supervisor → TOOL-024-C `process` tool → TOOL-024-D cross-platform acceptance;
 - ADR/migration acceptance before MEM-011;
 - PROVIDER-003-A before B/C, then one bounded D-G provider/acquisition child at a time;
 - TUI-046 interaction policy and ADR-054 disposition before any native-selection implementation;
@@ -142,5 +145,8 @@ Issue #119 is completed and closed by the I169 post-merge governance closeout. I
 open under its own diagnostic scope and does not block or reopen I169.
 Issue #132 remains open under the PROVIDER-003 Refinement Epic; no child implementation is authorized
 until PROVIDER-003-A and a separately claimed child owner establish the required boundary.
-Issue #134 remains open under TUI-046 Refinement; terminal interaction policy, ADR-054 impact,
-iteration selection and a real-terminal validation matrix are still required.
+Issue #49 remains open under RUNTIME-005 Refinement; SESSION-008 durable partial persistence and
+RUNTIME-005-A/B/C are the non-circular closure chain. Issue #59 remains open under TOOL-024;
+TOOL-024 consumes completed RUNTIME-005 finalization instead of blocking it, and production spawn
+also waits for PERM-006-C. Issue #134 remains open under TUI-046 Refinement; TUI-046-A must settle
+the ADR-054 mouse-capture contract before TUI-046-B implementation and real-terminal acceptance.
