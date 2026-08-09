@@ -40,10 +40,26 @@ coverage must be proven per call family rather than assumed.
 
 ## Child Owners
 
-- [ARCH-034-R04-AG4](ARCH-034-R04-AG4-symbol-traversal-containment.md) / I182: claim effective
-  on `main` at merge `36980ecc`; implementation is authorized only for the reviewed
-  symlink/depth/count/byte traversal Work Slice and requires its own independent review.
-- AG-1 through AG-3 and AG-5 through AG-7 remain unowned slices under this parent.
+- [ARCH-034-R04-AG1](ARCH-034-R04-AG1-bash-pre-exec-hardening.md): Unix Bash
+  `pre_exec` fail-closed/ADR correction; Refinement and unclaimed.
+- [ARCH-034-R04-AG2](ARCH-034-R04-AG2-parent-hardening-api.md): latent public
+  parent-mutation API safety fence; Refinement and unclaimed.
+- [ARCH-034-R04-AG3](ARCH-034-R04-AG3-exec-timeout-pipe-containment.md): direct
+  exec inherited-pipe operation-deadline correction; Ready and unclaimed.
+- [ARCH-034-R04-AG4](ARCH-034-R04-AG4-symbol-traversal-containment.md) / I182:
+  Complete at `ae31242bdac4807599146bfb4847bcac52712bbf` from exact independently
+  reviewed source head `4b96882307173ded8264aa1c45cce129707ff65f`.
+- [ARCH-034-R04-AG5](ARCH-034-R04-AG5-parser-panic-deadline.md): parser
+  panic/enforceable-deadline adapter; Refinement and unclaimed.
+- [ARCH-034-R04-AG6](ARCH-034-R04-AG6-git-operation-containment.md): `gix` and
+  host-git caller/authority/deadline boundary; Refinement and unclaimed.
+- [ARCH-034-R04-AG7](ARCH-034-R04-AG7-sqlite-adr-reconciliation.md): ADR-008
+  five-consumer reconciliation and future-consumer validator; Ready and unclaimed.
+
+These owner files materialize the independently accepted I181 dispositions.
+Except for completed AG-4, they do not create claims or authorize implementation.
+I182 is terminal; select at most one remaining child only after the normal
+collaboration protocol establishes a fresh effective claim.
 
 ## Pre-Review Boundary Matrix
 
@@ -127,7 +143,7 @@ implementation on this branch.
 ## Rollback / Residual
 
 I181 review evidence is merged at `aea26ad011af04396ab8588c9326d309538f31a2`. AG-1 through
-AG-7 require separate bounded owners/claims; other subprocess and five-crate SQLite containment
+AG-7 now have bounded owner records but still require separate effective claims; other subprocess and five-crate SQLite containment
 remain evidence work until classified. Within the symbol family, direct-file `read_to_string` plus
 parse paths (`list_symbols` direct-file mode, `find_references`, and `list_imports`) remain
 unbounded, and symbol-result serialization has no output-byte cap; AG-4 does not close those
