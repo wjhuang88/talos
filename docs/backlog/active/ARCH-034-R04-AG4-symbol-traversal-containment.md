@@ -1,19 +1,21 @@
 # ARCH-034-R04-AG4: Symbol Traversal Containment
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | I181 AG-4 / Arborium traversal boundary |
-| Status | Review - implementation PR #177 opened; exact-head CI and independent review pending |
+| Status | Complete |
 | Priority | P1 |
-| Selected Iteration | I182 (Review; claim effective on `main`) |
+| Selected Iteration | I182 (Complete) |
 | Preserved behavior | Symbol tool inputs, user-supplied root symlink resolution, normal-tree JSON, result ordering, language detection, skip filters, parser fallback, and read-only permission classification |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Bound only the two directory traversals in `crates/talos-tools/src/symbol.rs`: use non-following entry types for descent, skip directory-entry symlinks including file symlinks, preserve following of the user-supplied root path, enforce reviewed depth plus admitted-file/per-file/aggregate-byte budgets with a cap-plus-one bounded read before parser admission, preserve normal-tree result order and object shapes, append at most one discriminated final JSON notice only when work is omitted, and add the focused compatibility/security tests below. |
@@ -21,11 +23,12 @@
 | Source Issue | None |
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation Commit | `82684a2b51e0a4fcb5a8617c5927d80503d00bb0` (local checkpoint; not completion evidence) |
-| Implementation PR | #177 (draft opened from `feat/i182-symbol-traversal-containment`; owner-first Review sync precedes Ready-for-Review transition) |
+| Authorization Evidence | Claim re-review `5226341754` approved exact claim head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; claim PR #176 merged as `36980ecc5a238e17db38ddef99c66235851fcd48`. Independent implementation/security review `5230395611` approved exact source head `4b96882307173ded8264aa1c45cce129707ff65f` with no blockers after focused tests, both governance validators, and CI `31266112256`. A distinct natural-person reviewer used the shared `@wjhuang88` account and explicitly disclosed that limitation; this is the compensating audit control pending GOV-004. Merge-time CAS against `main@4427e323` confirmed the same Work Slice, no conflicting implementation claimant, zero-warning target validators, exact-head green CI, and `MERGEABLE/CLEAN`. |
+| Implementation Commit | `4b96882307173ded8264aa1c45cce129707ff65f` (reviewed source head) |
+| Completion Commit | `ae31242bdac4807599146bfb4847bcac52712bbf` |
+| Implementation PR | #177 (squash-merged 2026-08-09) |
 | Last Updated | 2026-08-09 |
-| Handoff / Release Condition | PR #177 must pass exact-head Unix/Windows CI and receive independent security approval; repeat merge-time CAS before merge, then record the existing merge SHA before any Complete state. |
+| Handoff / Release Condition | Closed. AG-8, AG-9, AG-10, AG-5, direct-file reads, output bounds, and every other R04 gap remain separately owned and receive no authority from this completion. |
 
 ## Execution Evidence
 
@@ -33,8 +36,19 @@
   `crates/talos-tools/src/symbol.rs` and preserves the named direct-file and AG-5 residuals.
 - Focused symbol tests passed 11/11; locked `talos-tools` check and warning-denying Clippy passed.
 - Architecture audit, scale assessment, both governance validators, and the full locked release
-  preflight passed on 2026-08-08. PR #177 exact-head CI and independent implementation review remain
-  pending.
+  preflight passed on 2026-08-08. Exact-head CI `31266112256` passed all four jobs; independent
+  implementation/security review `5230395611` approved source head `4b96882307173ded8264aa1c45cce129707ff65f`
+  with no blockers.
+- Merge-time CAS passed against `main@4427e323`; PR #177 was `MERGEABLE/CLEAN` and squash-merged as
+  Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`.
+
+## Completion Evidence
+
+Completion Commit: `ae31242bdac4807599146bfb4847bcac52712bbf`
+
+This is the already-existing PR #177 squash merge of exact reviewed source head
+`4b96882307173ded8264aa1c45cce129707ff65f`. The post-merge documentation commit only mirrors that
+evidence and does not self-certify completion. ARCH-034-R04 remains `Partial`.
 
 ## Problem And Boundary
 

@@ -49,7 +49,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I179 | Core Tool Facade Decomposition | Complete | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed. |
 | I180 | Architecture Documentation Truth | Complete | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed. R04 remains excluded. |
 | I181 | Native And Panic-Boundary Security Review | Complete | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; review/matrix disposition only, with no protected implementation. R04 child owners remain pending. |
-| I182 | Symbol Traversal Containment | Review | PR #177 contains implementation checkpoint `82684a2b`; exact-head Unix/Windows CI, independent security review, merge-time CAS, and merge evidence remain pending. |
+| I182 | Symbol Traversal Containment | Complete | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; exact source head `4b968823`, CI `31266112256`, independent review `5230395611`, and merge-time CAS passed. R04 remains Partial. |
 
 ## Completed This Closeout
 
@@ -63,6 +63,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I179 | Core Tool Facade Decomposition | **Complete (2026-08-07)** | Completion Commit `dafc9be08736aee91e0f9cdd92e5226930808061` (squash merge of source implementation `63d494c5`); PR #168; exact-head CI `31189425069` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke. |
 | I180 | Architecture Documentation Truth | **Complete (2026-08-08)** | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke. R04 remains excluded. |
 | I181 | Native And Panic-Boundary Security Review | **Complete (2026-08-08)** | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; PR #174 exact head `12963970` passed CI `31255683335`, governance validation, and merge-time CAS. Review-only disposition; R04 implementation remains Partial. |
+| I182 | Symbol Traversal Containment | **Complete (2026-08-09)** | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; PR #177 exact source head `4b96882307173ded8264aa1c45cce129707ff65f` passed CI `31266112256`, independent review `5230395611`, and merge-time CAS. R04 remains Partial. |
 
 I169's accepted residuals remain explicit:
 

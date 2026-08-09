@@ -171,7 +171,7 @@ remediation slices. No production refactor is claimed by I171 itself.
 | ARCH-034-R01 | Tool contribution exception and extension docs | Existing I158 Review evidence |
 | ARCH-034-R02 | CLI/TUI bridge private seam extraction | I169 bridge tests |
 | ARCH-034-R03 | Todo source organization | Session API/repository tests |
-| ARCH-034-R04 | Native/panic/unsafe boundary containment | I181 review Complete at `aea26ad0`; AG-4/I182 exact head `4b968823` independently approved; AG-8/9/10 own its non-blocking path/decoding/notice residuals; parent remains Partial and I161 remains separate/blocked |
+| ARCH-034-R04 | Native/panic/unsafe boundary containment | I181 review Complete at `aea26ad0`; AG-4/I182 completed at `ae31242b` from independently approved exact head `4b968823`; AG-8/9/10 own its non-blocking path/decoding/notice residuals; parent remains Partial and I161 remains separate/blocked |
 | ARCH-034-R05 | TUI App coordinator seams | TUI snapshots and event tests |
 | ARCH-034-R06 | Conversation command/projection seams | Conversation API/output tests |
 | ARCH-034-R07 | CLI session workflow seams | Session/model lifecycle tests |
