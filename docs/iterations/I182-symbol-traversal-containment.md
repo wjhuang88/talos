@@ -1,6 +1,6 @@
 # Iteration I182: Symbol Traversal Containment
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-08
 > Planned objective: prevent symbol-tool symlink recursion and unbounded directory-mode parser admission while preserving user-supplied root symlink resolution, normal-tree symbol results, and all unrelated parser/runtime behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 architecture session 2026-08-08 |
 | Work Slice | Implement only ARCH-034-R04-AG4 in `crates/talos-tools/src/symbol.rs`: non-following descendant entry classification, skip traversed directory/file symlinks while preserving user-supplied root symlink resolution, depth 64, 10,000 parser-admitted files, 2 MiB cap-plus-one file reads, 50 MiB parser-admitted aggregate bytes, one discriminated final JSON notice on bounded omission, and the focused compatibility/security tests; preserve public inputs, ordinary result objects/order, language/skip behavior, parser fallback, dependencies, permissions, and every AG-5 parser panic/deadline concern. |
@@ -18,11 +18,12 @@
 | Source Issue | None |
 | Governance Claim PR | #176 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent re-review comment `5226341754` approved exact head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; PR #176 merged by squash as `36980ecc5a238e17db38ddef99c66235851fcd48` after merge-time CAS. Prior NEEDS CHANGES review `5226241652` covered `eb0ab6f1af71ddebb6c1ccea26f979de9964f624`. Exact-head CI `31259164396` passed. |
-| Implementation Commit | `82684a2b51e0a4fcb5a8617c5927d80503d00bb0` (local checkpoint; not completion evidence) |
-| Implementation PR | #177 (draft opened from `feat/i182-symbol-traversal-containment`; owner-first Review sync precedes Ready-for-Review transition) |
+| Authorization Evidence | Claim re-review `5226341754` approved exact claim head `0d4bd0882c45fccd0bc02e9868bcefaae751f3f1`; claim PR #176 merged as `36980ecc5a238e17db38ddef99c66235851fcd48`. Independent implementation/security review `5230395611` approved exact source head `4b96882307173ded8264aa1c45cce129707ff65f` with no blockers and explicitly attested a distinct natural-person reviewer operating through the shared `@wjhuang88` account. Exact-head CI `31266112256` passed all four jobs. Merge-time CAS against `main@4427e323` confirmed the same Work Slice, no conflicting implementation claimant, zero-warning target validators, exact-head green CI, and `MERGEABLE/CLEAN`. |
+| Implementation Commit | `4b96882307173ded8264aa1c45cce129707ff65f` (reviewed source head) |
+| Completion Commit | `ae31242bdac4807599146bfb4847bcac52712bbf` |
+| Implementation PR | #177 (squash-merged 2026-08-09) |
 | Last Updated | 2026-08-09 |
-| Handoff / Release Condition | PR #177 must pass exact-head Unix/Windows CI and receive independent security approval; repeat merge-time CAS before merge, then record the existing merge SHA before any Complete state. |
+| Handoff / Release Condition | Closed. Continue only through separately claimed residual owners; I182 grants no authority to AG-5, AG-8, AG-9, AG-10, direct-file reads, output bounds, or other R04 gaps. |
 
 ## Closure Ledger
 
@@ -154,25 +155,29 @@ open PRs at selection were archival recovery PRs #120/#121.
   workspace check, Clippy, all tests, and doctests. The environment overrides only reduced local
   build-artifact storage after two disk-exhaustion attempts; the test logic and repository inputs
   were unchanged.
-- PR #177 exact-head Unix/Windows CI and independent implementation security review remain pending.
+- PR #177 exact-head CI `31266112256` passed all four jobs; independent implementation/security
+  review `5230395611` approved exact source head `4b96882307173ded8264aa1c45cce129707ff65f`
+  with no blockers; merge-time CAS passed against `main@4427e323`.
 
 ## Completion Evidence
 
-- Not applicable while I182 is Review. Any terminal delivery state requires an already-existing
-  implementation merge/evidence SHA; local checkpoint `82684a2b51e0a4fcb5a8617c5927d80503d00bb0`
-  is review input only, and claim or status commits cannot self-certify completion.
+- Completion Commit: `ae31242bdac4807599146bfb4847bcac52712bbf` (PR #177 squash merge of
+  exact reviewed source head `4b96882307173ded8264aa1c45cce129707ff65f`).
+- The post-merge status synchronization commit is not completion evidence.
 
 ## Variance And Residuals
 
 - AG-5 parser panic/deadline and wall-clock containment, direct-file unbounded reads, unbounded
   symbol-output serialization, and all other R04 accepted gaps remain separate.
+- AG-8 owns workspace path containment, AG-9 owns invalid-text parity, and AG-10 owns bounded-notice
+  admissibility semantics. All three remain unclaimed and did not expand I182.
 
 ## Retrospective
 
-- Outcome: implementation and local validation are committed and PR #177 is opened; exact-head CI,
-  independent security review, merge, and completion evidence remain pending.
-- Documentation: owner-first Review state is synchronized before the PR Ready-for-Review transition;
-  no Complete state is claimed.
+- Outcome: the bounded traversal implementation passed exact-head Unix/Windows CI and independent
+  security review, then squash-merged as `ae31242bdac4807599146bfb4847bcac52712bbf` after merge-time CAS.
+- Documentation: owner-first completion evidence is recorded here before derived indexes and Board;
+  ARCH-034-R04 remains `Partial` and review residuals have dedicated unclaimed owners.
 - Lessons: cap-plus-one admission and strict non-following entry classification make the omission
   counters mechanically testable; build-storage and sandbox failures must be separated from code
   failures and recorded rather than hidden.

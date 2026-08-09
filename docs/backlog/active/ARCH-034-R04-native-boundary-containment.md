@@ -23,7 +23,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed `24694b88` and approved the review-only plan subject to mandatory corrections. Maintainer clarification [comment `5225938556`](https://github.com/wjhuang88/talos/pull/174#issuecomment-5225938556) attests that a different natural person performed the review through the shared @wjhuang88 credential, accepts the content as independent-review evidence, and preserves GitHub's actual `COMMENTED` state. Commit `f263f221` incorporates the required corrections; exact-head CI `31253291503` passed. |
 | Implementation PR | None - review-only claim merged; protected implementations require child owners |
-| Last Updated | 2026-08-08 |
+| Last Updated | 2026-08-09 |
 | Handoff / Release Condition | Parent claim coordinates creation of non-overlapping child owners only. I181 review completed at `aea26ad011af04396ab8588c9326d309538f31a2`; do not implement any accepted gap under this review-only claim. |
 
 ## Problem And Boundary
@@ -135,8 +135,9 @@ residuals. Independent implementation review `5230395611` additionally registere
 [AG-8 workspace-path containment](ARCH-034-R04-AG8-symbol-workspace-path-containment.md),
 [AG-9 decoding consistency](ARCH-034-R04-AG9-symbol-decoding-consistency.md), and
 [AG-10 notice admissibility](ARCH-034-R04-AG10-symbol-notice-admissibility.md).
-They are unclaimed and receive no implementation authority from I182. New native
-dependencies require a separate ADR.
+They are unclaimed and receive no implementation authority from I182. AG-4 itself completed through
+PR #177 at Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; that child completion
+does not change this parent from `Partial`. New native dependencies require a separate ADR.
 
 ## Review Completion Evidence
 
