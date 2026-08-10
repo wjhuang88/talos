@@ -335,6 +335,26 @@ foreach ($Source in $ActiveFiles) {
     }
 }
 
+$SqliteValidator = Join-Path $script:Root "scripts/validate_sqlite_consumers.py"
+if (-not (Test-Path -LiteralPath $SqliteValidator)) {
+    Add-ErrorMessage "missing ADR-008 SQLite consumer validator: scripts/validate_sqlite_consumers.py"
+}
+else {
+    $PythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+    if ($null -eq $PythonCommand) {
+        $PythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $PythonCommand) {
+        Add-ErrorMessage "ADR-008 SQLite consumer validation requires Python 3"
+    }
+    else {
+        & $PythonCommand.Source $SqliteValidator $script:Root --self-test
+        if ($LASTEXITCODE -ne 0) {
+            Add-ErrorMessage "ADR-008 SQLite consumer validation failed"
+        }
+    }
+}
+
 if ($ErrorCount -gt 0) {
     Write-Output "Governance validation failed: $ErrorCount error(s), $WarningCount warning(s)."
     exit 1

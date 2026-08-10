@@ -2,23 +2,27 @@
 
 ## Status
 
-Accepted
+Accepted — amended by I183 to record the exact five-consumer boundary
 
 ## Context
 
-Talos introduced SQLite in I006 for session metadata, FTS5 search, and later I008 evolution
-tables. The current implementation uses `rusqlite` with the `bundled` feature in both
-`talos-session` and `talos-evolution`.
+Talos introduced SQLite in I006 for session metadata and FTS5 search, and later extended the same
+bundled dependency to evolution, exploration, memory, and a quarantined model-catalog crate. The
+current implementation has four runtime consumers (`talos-session`, `talos-evolution`,
+`talos-exploration`, and `talos-memory`) plus non-runtime `talos-models`.
 
 This raised a governance question: AGENTS.md Hard Constraint #1 says "Rust only. No C/C++
 bindings." At the same time, the product needs a local, embedded, crash-resistant database with
 FTS5 and no runtime dependency on a system SQLite installation.
 
-The current dependency graph confirms:
+The current locked dependency graph confirms:
 
-- `talos-session` and `talos-evolution` depend on `rusqlite = { version = "0.40", features =
-  ["bundled"] }`.
+- Exactly those five workspace packages cross directly into the non-workspace graph that reaches
+  `libsqlite3-sys`; `talos-agent`, `talos-cli`, and `talos-runtime` reach it only through workspace
+  layering and are not direct consumers.
 - `rusqlite/bundled` enables `libsqlite3-sys/bundled`, compiling SQLite into the final binary.
+- One `rusqlite 0.40.1` and one `libsqlite3-sys 0.38.1` version are resolved.
+- No workspace package depends directly or transitively on quarantined `talos-models`.
 - On macOS, `otool -L target/debug/talos` shows no `libsqlite3.dylib` dependency. The binary still
   links platform system libraries/frameworks, but not a system SQLite dynamic library.
 
@@ -59,7 +63,10 @@ Pure-Rust alternatives do not currently meet the same requirements with less ris
 
 1. `rusqlite` with `features = ["bundled"]` is an approved exception to AGENTS.md Hard Constraint
    #1 for local storage only.
-2. The exception is limited to `talos-session` and `talos-evolution`.
+2. The exception is limited to this exact allowlist:
+   - runtime: `talos-session`, `talos-evolution`, `talos-exploration`, and `talos-memory`;
+   - quarantined non-runtime: `talos-models`. Accepting its existing store does not authorize a
+     workspace package to depend on it or activate `catalog.db` in CLI/TUI/runtime paths.
 3. SQLite remains an implementation detail for indexes and structured runtime state; JSONL session
    files remain the source of truth.
 4. All crates that use SQLite must use one workspace-wide `rusqlite`/`libsqlite3-sys` version to
@@ -67,6 +74,12 @@ Pure-Rust alternatives do not currently meet the same requirements with less ris
 5. The project must describe this precisely as:
    "SQLite is bundled into the binary; Talos does not require a system SQLite installation. The
    binary is not fully static on macOS/Linux because it may still link platform system libraries."
+6. `scripts/validate_sqlite_consumers.py` enforces the exception from parsed
+   `cargo metadata --locked` output. A workspace package counts only when it has a direct resolved
+   edge to a non-workspace package that transitively reaches `libsqlite3-sys`; workspace-only
+   layering does not count. Normal, build, development, and target-specific edges are all included.
+   The validator also enforces the exact allowlist, bundled features, one resolved
+   `rusqlite`/`libsqlite3-sys` version each, and zero workspace dependents of `talos-models`.
 
 **Rejected alternatives:**
 
@@ -90,8 +103,16 @@ Revisit this decision if:
 ## Related
 
 - [ADR-002: Local Storage Architecture](002-local-storage-architecture.md)
+- [SQLite Consumer Inventory](../reference/SQLITE-CONSUMER-INVENTORY.md)
 - `crates/talos-session/Cargo.toml`
 - `crates/talos-evolution/Cargo.toml`
+- `crates/talos-exploration/Cargo.toml`
+- `crates/talos-memory/Cargo.toml`
+- `crates/talos-models/Cargo.toml`
 - `crates/talos-session/src/sqlite.rs`
 - `crates/talos-evolution/src/store.rs`
+- `crates/talos-exploration/src/lib.rs`
+- `crates/talos-memory/src/store.rs`
+- `crates/talos-models/src/store.rs`
+- `scripts/validate_sqlite_consumers.py`
 - EVOLUTION.md lesson 10: shared SQLite versions across crates

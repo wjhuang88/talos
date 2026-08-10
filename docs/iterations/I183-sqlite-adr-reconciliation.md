@@ -1,6 +1,6 @@
 # Iteration I183: Bundled SQLite ADR Reconciliation
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-09
 > Planned objective: reconcile ADR-008 with all five existing direct workspace consumers of bundled SQLite—four runtime crates plus quarantined non-runtime `talos-models`—and add a repository validator that rejects an unapproved sixth direct consumer, without changing dependencies or runtime behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,12 +18,13 @@
 | Source Issue | None |
 | Governance Claim PR | #183 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. The review independently confirmed the five-consumer 4+1 classification, diff purity, inventory, validators and CI `31316076588`, then requested four non-blocking baseline clarifications. Review `5231992214` bound to amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af` found one blocking consumer-boundary contradiction while reconfirming scope, inventory and governance; this claim adopts its boundary and edge-kind corrections, and the next exact head still requires independent approval before merge. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-09 |
-| Handoff / Release Condition | Proposed claim is ineffective until PR #183 merges after independent exact-head architecture approval and merge-time CAS. Start implementation only from that merge or later `main`. |
+| Authorization Evidence | Review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a`; re-review `5231992214` correctly rejected amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af`; final independent re-review `5232111621` approved exact head `17ca8c9f97b35ff9973639c028fd6b69121846e3` with no remaining findings and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31318602990` passed all four jobs; merge-time CAS passed against `main@20a09a473c10eb077759275eaa395f769cdd1854`; PR #183 merged at `7e61454061a9c9df0f7619935fa78397bfbd6f97`. Implementation review `5235077449` approved PR #184 exact head `4afc86675da522bcb8de88d28de22724330e0fca` with no blockers and disclosed that a distinct natural-person reviewer used the shared account; two evidence-truthfulness corrections amend that head, so its approval does not carry forward and the replacement head requires fresh review. |
+| Implementation PR | #184 |
+| Last Updated | 2026-08-10 |
+| Handoff / Release Condition | Implement only from claim merge `7e61454061a9c9df0f7619935fa78397bfbd6f97` or later `main`; closure requires an existing implementation merge SHA. |
 
-This proposed `Claimed` record has no ownership effect until it is merged to `main`.
+This `Claimed` record became effective on `main` at claim merge
+`7e61454061a9c9df0f7619935fa78397bfbd6f97`.
 
 ## Non-Terminal Inventory At Selection
 
@@ -146,20 +147,37 @@ maintainer documentation.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-09 | Selection | Current `main@20a09a47`; I159-I162 remain Blocked, I164 remains Paused/superseded, no Active/Review implementation iteration exists, and open PRs #120/#121 are immutable archival evidence. PR #183 proposes the only AG-7/I183 claim; it remains ineffective until independently approved and merged. |
+| 2026-08-09 | Activation | Final independent review `5232111621` approved exact claim head `17ca8c9f97b35ff9973639c028fd6b69121846e3`; CI `31318602990` passed; merge-time CAS held against `main@20a09a47`; PR #183 merged at `7e61454061a9c9df0f7619935fa78397bfbd6f97`. Implementation branch `feat/i183-sqlite-adr-reconciliation` starts from that effective claim. |
+| 2026-08-09 | Implementation | Added one parsed locked-metadata validator, a nine-case cross-platform fixture matrix, Unix/PowerShell governance wiring, the exact ADR-008 allowlist, and the five-consumer inventory. No Cargo manifest, lockfile, Rust source, schema, migration, or runtime behavior changed. Uneven containment evidence is registered under unclaimed AG-11. |
+| 2026-08-10 | Validation | `CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh` passed end to end with locked workspace check, Clippy, tests, doctests, both governance validators, and all nine SQLite metadata fixtures. Incremental caching was disabled after the first attempt exhausted the host disk; the first sandboxed test attempt then exposed only a local-socket permission denial, and the same exact tests passed when rerun with local-socket permission. |
+| 2026-08-10 | Submission | Implementation commit `42ccf73b` was pushed and implementation PR #184 opened; owner, iteration index, backlog, Board and manifest now enter Review together. Exact-head CI, independent architecture review and merge-time CAS remain required. |
+| 2026-08-10 | CI correction | Exact head `b90e0dc6b789ffc3931544ebff65592b02b565bc` passed three CI jobs, but Windows governance validation exposed locale-dependent decoding of UTF-8 Cargo metadata. The validator now specifies UTF-8 explicitly; `LC_ALL=C` validation, both governance entrypoints, all nine fixtures and full release preflight pass locally. A new exact-head CI run is required. |
 
 ## Verification Evidence
 
-- Initial draft passed both governance validators and `git diff --check`; finalized exact-head CI
-  and independent architecture review remain pending. No implementation has started.
+- Claim exact-head CI `31318602990`, independent review `5232111621`, and merge-time CAS passed.
+- The implementation validator reports the exact five accepted consumers, three workspace-only
+  layered packages, one `rusqlite 0.40.1`, one `libsqlite3-sys 0.38.1`, and zero
+  `talos-models` dependents; all nine controlled cases pass under both Unix and PowerShell project
+  governance validators.
+- `CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh` passed end to end on 2026-08-10. The final
+  run includes `cargo check --locked --workspace`, Clippy with warnings denied,
+  `cargo test --locked --workspace`, doctests, and both governance validators. The separately
+  rerun `talos-cli` binary target passed 335/335 tests after local-socket permission was granted.
+- PR #184 CI run `31345375199` proved the Windows locale failure before correction: Rust tests
+  passed, then PowerShell governance failed while CP1252 decoded Cargo's UTF-8 JSON. Explicit UTF-8
+  decoding passed replacement exact-head CI run `31346687578` on
+  `4afc86675da522bcb8de88d28de22724330e0fca`, including the Windows governance job.
 
 ## Completion Evidence
 
-- Not applicable while Planned. A later closure must cite an already-existing implementation merge
+- Not applicable while Review. A later closure must cite an already-existing implementation merge
   SHA and must not use its own status-only commit as evidence.
 
 ## Variance And Residuals
 
-- None at publication. Runtime SQLite containment remains outside I183.
+- Runtime SQLite containment remains outside I183 and is registered as unclaimed
+  [AG-11](../backlog/active/ARCH-034-R04-AG11-sqlite-containment-evidence.md).
 
 ## Retrospective
 

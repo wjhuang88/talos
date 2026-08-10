@@ -1,0 +1,38 @@
+{
+  "packages": [
+    {"id": "talos-agent", "name": "talos-agent", "version": "0.7.0"},
+    {"id": "talos-cli", "name": "talos-cli", "version": "0.7.0"},
+    {"id": "talos-runtime", "name": "talos-runtime", "version": "0.7.0"},
+    {"id": "talos-evolution", "name": "talos-evolution", "version": "0.7.0"},
+    {"id": "talos-exploration", "name": "talos-exploration", "version": "0.7.0"},
+    {"id": "talos-memory", "name": "talos-memory", "version": "0.7.0"},
+    {"id": "talos-models", "name": "talos-models", "version": "0.7.0"},
+    {"id": "talos-session", "name": "talos-session", "version": "0.7.0"},
+    {"id": "rusqlite", "name": "rusqlite", "version": "0.40.1"},
+    {"id": "libsqlite3-sys", "name": "libsqlite3-sys", "version": "0.38.1"}
+  ],
+  "workspace_members": [
+    "talos-agent",
+    "talos-cli",
+    "talos-runtime",
+    "talos-evolution",
+    "talos-exploration",
+    "talos-memory",
+    "talos-models",
+    "talos-session"
+  ],
+  "resolve": {
+    "nodes": [
+      {"id": "talos-agent", "deps": [{"name": "talos-evolution", "pkg": "talos-evolution", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-cli", "deps": [{"name": "talos-agent", "pkg": "talos-agent", "dep_kinds": [{"kind": null, "target": null}]}, {"name": "talos-runtime", "pkg": "talos-runtime", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-runtime", "deps": [{"name": "talos-exploration", "pkg": "talos-exploration", "dep_kinds": [{"kind": null, "target": null}]}, {"name": "talos-memory", "pkg": "talos-memory", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-evolution", "deps": [{"name": "rusqlite", "pkg": "rusqlite", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-exploration", "deps": [{"name": "rusqlite", "pkg": "rusqlite", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-memory", "deps": [{"name": "rusqlite", "pkg": "rusqlite", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-models", "deps": [{"name": "rusqlite", "pkg": "rusqlite", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "talos-session", "deps": [{"name": "rusqlite", "pkg": "rusqlite", "dep_kinds": [{"kind": null, "target": null}]}], "features": []},
+      {"id": "rusqlite", "deps": [{"name": "libsqlite3-sys", "pkg": "libsqlite3-sys", "dep_kinds": [{"kind": null, "target": null}]}], "features": ["bundled"]},
+      {"id": "libsqlite3-sys", "deps": [], "features": ["bundled"]}
+    ]
+  }
+}

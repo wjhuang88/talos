@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "name": "valid-layered",
+      "mutation": "none",
+      "expected_consumers": ["talos-evolution", "talos-exploration", "talos-memory", "talos-models", "talos-session"],
+      "expected_layered_packages": ["talos-agent", "talos-cli", "talos-runtime"],
+      "expected_error_substrings": []
+    },
+    {
+      "name": "unexpected-normal",
+      "mutation": "add_consumer",
+      "kind": null,
+      "target": null,
+      "expected_error_substrings": ["unexpected SQLite boundary consumer(s): talos-sixth-unexpected-normal"]
+    },
+    {
+      "name": "unexpected-build",
+      "mutation": "add_consumer",
+      "kind": "build",
+      "target": null,
+      "expected_error_substrings": ["unexpected SQLite boundary consumer(s): talos-sixth-unexpected-build"]
+    },
+    {
+      "name": "unexpected-development",
+      "mutation": "add_consumer",
+      "kind": "dev",
+      "target": null,
+      "expected_error_substrings": ["unexpected SQLite boundary consumer(s): talos-sixth-unexpected-development"]
+    },
+    {
+      "name": "unexpected-target-specific",
+      "mutation": "add_consumer",
+      "kind": null,
+      "target": "cfg(windows)",
+      "expected_error_substrings": ["unexpected SQLite boundary consumer(s): talos-sixth-unexpected-target-specific"]
+    },
+    {
+      "name": "missing-accepted",
+      "mutation": "remove_consumer",
+      "package": "talos-session",
+      "expected_error_substrings": ["missing accepted SQLite boundary consumer(s): talos-session"]
+    },
+    {
+      "name": "duplicate-versions",
+      "mutation": "duplicate_versions",
+      "expected_error_substrings": ["expected one resolved rusqlite version", "expected one resolved libsqlite3-sys version"]
+    },
+    {
+      "name": "talos-models-dependent",
+      "mutation": "add_workspace_dependency",
+      "source": "talos-cli",
+      "target": "talos-models",
+      "expected_error_substrings": ["workspace package(s) depend on quarantined talos-models: talos-cli"]
+    },
+    {
+      "name": "missing-bundled-feature",
+      "mutation": "remove_bundled",
+      "expected_error_substrings": ["resolved libsqlite3-sys does not enable the bundled feature", "resolved rusqlite does not enable the bundled feature"]
+    }
+  ]
+}
