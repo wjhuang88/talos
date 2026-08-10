@@ -54,7 +54,9 @@ coverage must be proven per call family rather than assumed.
 - [ARCH-034-R04-AG6](ARCH-034-R04-AG6-git-operation-containment.md): `gix` and
   host-git caller/authority/deadline boundary; Refinement and unclaimed.
 - [ARCH-034-R04-AG7](ARCH-034-R04-AG7-sqlite-adr-reconciliation.md): ADR-008
-  five-consumer reconciliation and future-consumer validator; Ready and unclaimed.
+  five-consumer reconciliation and future-consumer validator; Active through I183.
+- [ARCH-034-R04-AG11](ARCH-034-R04-AG11-sqlite-containment-evidence.md): five-consumer
+  corrupt/busy/locked/panic/deadline evidence classification; Refinement and unclaimed.
 
 These owner files materialize the independently accepted I181 dispositions.
 Except for completed AG-4, they do not create claims or authorize implementation.
@@ -143,8 +145,10 @@ implementation on this branch.
 ## Rollback / Residual
 
 I181 review evidence is merged at `aea26ad011af04396ab8588c9326d309538f31a2`. AG-1 through
-AG-7 now have bounded owner records but still require separate effective claims; other subprocess and five-crate SQLite containment
-remain evidence work until classified. Within the symbol family, direct-file `read_to_string` plus
+AG-7 now have bounded owner records; AG-7 is active through I183 while the remaining children still
+require separate effective claims. Other subprocess containment remains evidence work until
+classified. Five-crate SQLite containment is owned by unclaimed AG-11 after I183 documented the
+uneven evidence without changing behavior. Within the symbol family, direct-file `read_to_string` plus
 parse paths (`list_symbols` direct-file mode, `find_references`, and `list_imports`) remain
 unbounded, and symbol-result serialization has no output-byte cap; AG-4 does not close those
 residuals. Independent implementation review `5230395611` additionally registered

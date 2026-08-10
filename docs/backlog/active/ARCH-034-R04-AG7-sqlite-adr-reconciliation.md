@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | I181 AG-7 / ADR-008 consumer-scope drift |
-| Status | Ready — claim proposed by I183/PR #183; ineffective until target-branch merge |
+| Status | Active — effective claim merged in PR #183 at `7e61454061a9c9df0f7619935fa78397bfbd6f97` |
 | Priority | P1 |
-| Selected Iteration | I183 (Planned) |
+| Selected Iteration | I183 (Active) |
 | Preserved behavior | SQLite features, schemas, migrations, busy policy, storage paths and all runtime error/fallback behavior |
 
 ## Collaboration Claim
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #183 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. The review independently confirmed the five-consumer 4+1 classification, diff purity, inventory, validators and CI `31316076588`, then requested four non-blocking baseline clarifications. Review `5231992214` bound to amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af` found one blocking consumer-boundary contradiction while reconfirming scope, inventory and governance; this claim adopts its boundary and edge-kind corrections, and the next exact head still requires independent approval before merge. |
+| Authorization Evidence | Review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a`; re-review `5231992214` correctly rejected amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af`; final independent re-review `5232111621` approved exact head `17ca8c9f97b35ff9973639c028fd6b69121846e3` with no remaining findings and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31318602990` passed all four jobs; merge-time CAS passed against `main@20a09a473c10eb077759275eaa395f769cdd1854`; PR #183 merged at `7e61454061a9c9df0f7619935fa78397bfbd6f97`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-09 |
-| Handoff / Release Condition | Proposed claim is ineffective until PR #183 merges after independent exact-head architecture approval and merge-time CAS. Start implementation only from that merge or later `main`; no SQLite production code is authorized by this claim. |
+| Last Updated | 2026-08-10 |
+| Handoff / Release Condition | Implement only from claim merge `7e61454061a9c9df0f7619935fa78397bfbd6f97` or later `main`; no SQLite production code is authorized by this claim. |
 
 ## Confirmed Baseline
 
@@ -61,7 +61,7 @@ explicitly accepted or rejected by the reconciled decision.
 
 No manifest/dependency, schema, migration, timeout, retry, panic handling, storage
 path or runtime code change. Any inconsistent SQLite containment discovered by
-the inventory receives a separate owner and cannot be implemented under AG-7.
+the inventory is owned by unclaimed AG-11 and cannot be implemented under AG-7.
 
 ## Minimum Validation
 

@@ -386,6 +386,15 @@ $active_files
 EOF
 fi
 
+sqlite_validator="$root/scripts/validate_sqlite_consumers.py"
+if [ ! -f "$sqlite_validator" ]; then
+  error "missing ADR-008 SQLite consumer validator: scripts/validate_sqlite_consumers.py"
+elif ! command -v python3 >/dev/null 2>&1; then
+  error "ADR-008 SQLite consumer validation requires Python 3"
+elif ! python3 "$sqlite_validator" "$root" --self-test; then
+  error "ADR-008 SQLite consumer validation failed"
+fi
+
 if [ "$errors" -gt 0 ]; then
   printf 'Governance validation failed: %d error(s), %d warning(s).\n' "$errors" "$warnings"
   exit 1

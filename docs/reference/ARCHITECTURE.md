@@ -543,6 +543,10 @@ These user-editable domains currently remain file-based:
 
 SQLite is used directly via `rusqlite/bundled` in `talos-session`, `talos-evolution`,
 `talos-memory`, and `talos-exploration`; `talos-models` also contains a non-runtime catalog store.
+This exact 4+1 allowlist is governed by ADR-008 and mechanically checked from locked Cargo metadata;
+see the [SQLite consumer inventory](SQLITE-CONSUMER-INVENTORY.md) for ownership, schemas, migration
+and existing failure evidence. Workspace-only transitive reachability is layering, while a new
+workspace-to-non-workspace edge reaching `libsqlite3-sys` requires an ADR update before merge.
 No trait abstraction exists until a concrete second implementation is production-ready (YAGNI —
 trait extraction happens when a real migration need exists).
 
