@@ -50,7 +50,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I180 | Architecture Documentation Truth | Complete | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed. R04 remains excluded. |
 | I181 | Native And Panic-Boundary Security Review | Complete | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; review/matrix disposition only, with no protected implementation. R04 child owners remain pending. |
 | I182 | Symbol Traversal Containment | Complete | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; exact source head `4b968823`, CI `31266112256`, independent review `5230395611`, and merge-time CAS passed. R04 remains Partial. |
-| I183 | Bundled SQLite ADR Reconciliation | Review / PR #184 | AG-7 claim became effective at PR #183 merge `7e614540`; implementation is limited to documentation plus the exact five-consumer validator. Runtime SQLite containment remains separately unclaimed as AG-11. |
+| I183 | Bundled SQLite ADR Reconciliation | Complete | Completion Commit `edf903aa96574043294923ad60b0cefe9730f8c4`; final source `0d9a5a7b`, CI `31349520295`, independent review `5235367999` and merge-time CAS passed. R04 remains Partial; AG-11 and AG-12 are separately unclaimed. |
 
 ## Completed This Closeout
 
