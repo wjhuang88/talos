@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
-| Priority | P1 |
-| Status | Refinement — causal baseline confirmed; decision and implementation children unselected |
+| Priority | P0 |
+| Status | Ready — TUI-046-A selected in planned I184; claim pending |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | None |
+| Selected Iteration | I184 (Planned) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 |
+| Work Slice | Implement only I184/TUI-046-A: establish the native-selection versus mouse-capture contract, validate the causal interaction on the selected terminal matrix, and amend or replace ADR-054 with the explicit TUI-046-B gate; no Rust implementation or TUI-046-B authority. |
+| Claimed At | 2026-08-10 |
 | Source Issue | #134 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #186 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent exact-head review is requested for this PR's final head and is recorded in PR #186; the approved SHA is backfilled at closeout. Shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-03 |
-| Handoff / Release Condition | Refine the selection/mouse-capture contract, select an iteration and establish a claim before implementation. |
+| Last Updated | 2026-08-10 |
+| Handoff / Release Condition | I184 must establish an effective claim before ADR-054 edits or implementation; TUI-046-B remains blocked until A is Accepted. |
 
 ## Identity / Goal / Value
 
@@ -76,7 +76,7 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Ready, not selected | Current lifecycle/input inventory; coordinate with TUI-042 without absorbing it |
+| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Selected in I184; claim pending | Current lifecycle/input inventory; coordinate with TUI-042 without absorbing it |
 | TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Blocked | TUI-046-A decision Accepted |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
