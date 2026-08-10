@@ -54,7 +54,7 @@ coverage must be proven per call family rather than assumed.
 - [ARCH-034-R04-AG6](ARCH-034-R04-AG6-git-operation-containment.md): `gix` and
   host-git caller/authority/deadline boundary; Refinement and unclaimed.
 - [ARCH-034-R04-AG7](ARCH-034-R04-AG7-sqlite-adr-reconciliation.md): ADR-008
-  five-consumer reconciliation and future-consumer validator; Active through I183.
+  five-consumer reconciliation and future-consumer validator; Review through I183/PR #184.
 - [ARCH-034-R04-AG11](ARCH-034-R04-AG11-sqlite-containment-evidence.md): five-consumer
   corrupt/busy/locked/panic/deadline evidence classification; Refinement and unclaimed.
 
@@ -145,7 +145,7 @@ implementation on this branch.
 ## Rollback / Residual
 
 I181 review evidence is merged at `aea26ad011af04396ab8588c9326d309538f31a2`. AG-1 through
-AG-7 now have bounded owner records; AG-7 is active through I183 while the remaining children still
+AG-7 now have bounded owner records; AG-7 is in Review through I183/PR #184 while the remaining children still
 require separate effective claims. Other subprocess containment remains evidence work until
 classified. Five-crate SQLite containment is owned by unclaimed AG-11 after I183 documented the
 uneven evidence without changing behavior. Within the symbol family, direct-file `read_to_string` plus
