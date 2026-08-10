@@ -5,9 +5,9 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Active — TUI-046-A decision execution started from effective claim merge `66d0f932370f679d491cb78f64dff9d84878479d` |
+| Status | Review — TUI-046-A policy is ready for exact-head review; TUI-046-B claim follows acceptance |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I184 (Active) |
+| Selected Iteration | I184 (Review) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -80,14 +80,15 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 - A second terminal observation on `c0fba2e92cace29fde4e2fc33fd26640058eddca`
   (Terminal.app 2.15 on the same macOS host) found that ordinary and Shift+drag both fail while
   reporting is enabled. Disabling reporting restores native selection but transfers scrolling to
-  Terminal.app and repeated resize clears the selection. The published cross-platform environment
-  remains pending and TUI-046-B remains Blocked.
+  Terminal.app and repeated resize clears the selection. Cross-platform validation remains
+  mandatory after implementation, but no longer blocks development start once A is Accepted and a
+  B claim is effective.
 
 ## Executable Split
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Active in I184 | Effective claim `66d0f932`; coordinate with TUI-042 without absorbing it |
+| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Review in I184 | Effective claim `66d0f932`; coordinate with TUI-042 without absorbing it |
 | TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Blocked | TUI-046-A decision Accepted |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance

@@ -51,7 +51,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I181 | Native And Panic-Boundary Security Review | Complete | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; review/matrix disposition only, with no protected implementation. R04 child owners remain pending. |
 | I182 | Symbol Traversal Containment | Complete | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; exact source head `4b968823`, CI `31266112256`, independent review `5230395611`, and merge-time CAS passed. R04 remains Partial. |
 | I183 | Bundled SQLite ADR Reconciliation | Complete | Completion Commit `edf903aa96574043294923ad60b0cefe9730f8c4`; final source `0d9a5a7b`, CI `31349520295`, independent review `5235367999` and merge-time CAS passed. R04 remains Partial; AG-11 and AG-12 are separately unclaimed. |
-| I184 | TUI-046-A Native Selection Policy | Active | Claim PR #186 merged at `66d0f932`; decide the ADR-054 native-selection/mouse-capture contract and record two-terminal causal evidence. TUI-046-B remains Blocked until A is Accepted. |
+| I184 | TUI-046-A Native Selection Policy | Review | Claim PR #186 merged at `66d0f932`; application-owned selection policy awaits exact-head review. B claim follows acceptance; cross-platform testing is deferred to B implementation acceptance. |
 
 ## Completed This Closeout
 

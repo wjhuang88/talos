@@ -179,7 +179,7 @@ implementation scope for the separately claimed B slice is:
 - retain keyboard history navigation and existing `/copy` semantics;
 - keep the selection buffer bounded to visible content and out of transcript persistence;
 - record exact-head results on the maintainer terminal and one materially different platform
-  terminal using the I184 matrix schema.
+  terminal using the I184 matrix schema before the implementation PR is accepted.
 
 An optional mouse-capture mode, terminal-specific modifier contract, application-owned selection or
 restored wheel-history feature requires a separate owner and decision. TUI-042/#79 retains ownership
@@ -189,11 +189,15 @@ of no-op application wheel transitions and is neither absorbed nor completed by 
 
 This proposal becomes an Accepted amendment only after:
 
-- the current captured baseline and override behavior are observed on two materially different
-  terminal/platform environments with exact versions and multiplexer state;
-- the matrix supports mouse reporting, rather than Alternate Screen alone, as the causal boundary;
+- the captured Alacritty and Terminal.app evidence supports mouse reporting, rather than Alternate
+  Screen alone, as the causal boundary and rejects native-only selection as the complete default;
 - independent architecture review approves the policy and the exact TUI-046-B scope;
 - both governance validators, exact-head CI and merge-time CAS pass.
+
+Cross-platform real-terminal execution is a TUI-046-B implementation acceptance gate, not a
+pre-development gate. B may begin after this amendment is Accepted and its own Collaboration Claim
+is effective; its implementation PR may not be accepted until the exact implementation head passes
+the two-environment matrix.
 
 If the causal matrix is inconclusive, this amendment remains Proposed, the earlier accepted
 mouse-capture behavior remains authoritative, and TUI-046-B stays Blocked.

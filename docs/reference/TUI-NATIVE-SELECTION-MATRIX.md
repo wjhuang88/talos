@@ -54,6 +54,6 @@ Populate only after TUI-046-B has an effective claim and exact implementation he
   selection. This independently rejects disabling reporting as the complete product policy.
 - A terminal-specific override is diagnostic evidence only; it is not the default product contract.
 - Passing one terminal does not generalize to another terminal, OS or multiplexer.
-- Both current-baseline terminal rows are now conclusive on macOS; I184's published cross-platform
-  validation and independent-review gates remain open. TUI-046 cannot close until both
-  implementation rows pass on the exact B head.
+- Both current-baseline terminal rows are conclusive on macOS. Cross-platform testing is deferred
+  to TUI-046-B implementation acceptance and does not block development start; TUI-046 cannot close
+  until both implementation rows pass on the exact B head.

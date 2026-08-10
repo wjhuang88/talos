@@ -1,6 +1,6 @@
 # Iteration I184: TUI-046-A Native Selection Policy
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-10
 > Planned objective: decide and document a predictable native text-selection/copy interaction for Issue #134 while preserving ADR-054's Alternate Screen and application-owned transcript boundaries.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -82,23 +82,27 @@ finalized record is merged into `main`.
 | 2026-08-10 | Submission | Proposed ADR-054 amendment and exact observation matrix submitted in draft PR #187. The amendment remains Proposed and the PR remains Draft until both current-baseline rows are observed. |
 | 2026-08-10 | Baseline observation | On `33cc8dab23a38c387063d1265c230dfa0f8922d9`, Alacritty 0.17.0 (94e7c88) on macOS 26.5.2 (25F84), `TMUX=none`: ordinary drag produced no selection; Shift+drag selected and `Command+C`/`pbpaste` matched, but wheel scrolling did not carry the selection with projected content, edge-drag did not autoscroll, and resize cleared the selection. Native-only default is rejected; B recommendation is application-owned visible-cell selection with edge autoscroll. |
 | 2026-08-10 | Second-terminal observation | On `c0fba2e92cace29fde4e2fc33fd26640058eddca`, Terminal.app 2.15 (`TERM=xterm-256color`) on macOS 26.5.2 (25F84), `TMUX=none`: ordinary and Shift+drag both failed while mouse reporting was enabled. Disabling View > Allow Mouse Reporting restored exact native cross-row selection, but wheel and edge-drag scrolled Terminal.app rather than Talos history, and repeated resize cleared the selection. `/quit` restored a clean shell without mouse escape leakage. This fills the second terminal row but not the published cross-platform validation requirement. |
+| 2026-08-10 | Change control | The maintainer directed that cross-platform/manual terminal testing must occur after implementation and must not block development. This is a priority/gate correction, not added behavior: the published cross-platform matrix remains mandatory for TUI-046-B acceptance, but moves from an I184 pre-development dependency to the B implementation-PR merge gate. I184 enters Review with the application-owned selection boundary; B still requires its own effective claim before Rust work. |
 
 ## Verification Evidence
 
 - Claim exact-head CI `31358815361`, independent review `5236470750`, and merge-time CAS passed.
 - Code inventory confirms mouse reporting is enabled during lifecycle setup while no application-owned
   arbitrary selection exists; keyboard history navigation is independent of mouse events.
-- Manual baseline evidence now covers Alacritty and Terminal.app on one macOS version and supports
-  the causal decision. A materially different platform remains pending under the published plan;
-  independent review, exact-head CI and merge-time CAS also remain required before acceptance.
+- Manual baseline evidence covers Alacritty and Terminal.app on one macOS version and supports the
+  causal decision. Per the recorded change-control direction, materially different platform testing
+  is deferred to TUI-046-B implementation acceptance; independent review, exact-head CI and
+  merge-time CAS remain required for I184 acceptance.
 
 ## Completion Evidence
 
-- Not applicable while Planned. A later closure must cite an already-existing decision/implementation evidence SHA.
+- No completion evidence while in Review. A later closure must cite an already-existing decision
+  evidence SHA.
 
 ## Variance And Residuals
 
-- TUI-046-B remains Blocked until TUI-046-A is Accepted.
+- TUI-046-B remains Blocked only until TUI-046-A is Accepted and a B claim becomes effective;
+  cross-platform manual validation is a later B merge gate and does not block development start.
 - Authorization Evidence review-state linkage is an existing validator/auditability gap owned by
   unclaimed GOV-004; I184 does not modify the collaboration validator.
 
