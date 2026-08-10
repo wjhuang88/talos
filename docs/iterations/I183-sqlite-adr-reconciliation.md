@@ -18,7 +18,7 @@
 | Source Issue | None |
 | Governance Claim PR | #183 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a`; re-review `5231992214` correctly rejected amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af`; final independent re-review `5232111621` approved exact head `17ca8c9f97b35ff9973639c028fd6b69121846e3` with no remaining findings and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31318602990` passed all four jobs; merge-time CAS passed against `main@20a09a473c10eb077759275eaa395f769cdd1854`; PR #183 merged at `7e61454061a9c9df0f7619935fa78397bfbd6f97`. |
+| Authorization Evidence | Review `5231879125` approved exact head `360576c9c32f5335c36185368051152432ad6e5a`; re-review `5231992214` correctly rejected amended head `0284f0f334a3f9dd85e251edb9d04e19e05936af`; final independent re-review `5232111621` approved exact head `17ca8c9f97b35ff9973639c028fd6b69121846e3` with no remaining findings and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31318602990` passed all four jobs; merge-time CAS passed against `main@20a09a473c10eb077759275eaa395f769cdd1854`; PR #183 merged at `7e61454061a9c9df0f7619935fa78397bfbd6f97`. Implementation review `5235077449` approved PR #184 exact head `4afc86675da522bcb8de88d28de22724330e0fca` with no blockers and disclosed that a distinct natural-person reviewer used the shared account; two evidence-truthfulness corrections amend that head, so its approval does not carry forward and the replacement head requires fresh review. |
 | Implementation PR | #184 |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Implement only from claim merge `7e61454061a9c9df0f7619935fa78397bfbd6f97` or later `main`; closure requires an existing implementation merge SHA. |
@@ -166,8 +166,8 @@ maintainer documentation.
   rerun `talos-cli` binary target passed 335/335 tests after local-socket permission was granted.
 - PR #184 CI run `31345375199` proved the Windows locale failure before correction: Rust tests
   passed, then PowerShell governance failed while CP1252 decoded Cargo's UTF-8 JSON. Explicit UTF-8
-  decoding is now covered by the same Windows governance job; replacement exact-head evidence is
-  pending.
+  decoding passed replacement exact-head CI run `31346687578` on
+  `4afc86675da522bcb8de88d28de22724330e0fca`, including the Windows governance job.
 
 ## Completion Evidence
 

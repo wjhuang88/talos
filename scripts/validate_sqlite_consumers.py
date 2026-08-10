@@ -334,6 +334,8 @@ def main() -> int:
             for error in report.errors:
                 print(f"ERROR: {error}", file=sys.stderr)
             return 1
+        if args.self_test:
+            run_self_tests(project_root / "scripts/fixtures/sqlite-consumer-metadata")
         print(
             "SQLite consumer validation passed: "
             f"consumers={','.join(sorted(report.consumers))}; "
@@ -342,8 +344,6 @@ def main() -> int:
             f"libsqlite3-sys={','.join(sorted(report.sqlite_sys_versions))}; "
             "talos-models-dependents=0"
         )
-        if args.self_test:
-            run_self_tests(project_root / "scripts/fixtures/sqlite-consumer-metadata")
     except (KeyError, OSError, TypeError, ValueError, RuntimeError) as error:
         print(f"ERROR: SQLite consumer validation could not run: {error}", file=sys.stderr)
         return 1
