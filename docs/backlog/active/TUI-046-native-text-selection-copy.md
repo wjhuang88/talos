@@ -5,9 +5,9 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Ready — TUI-046-A selected in planned I184; claim pending |
+| Status | Review — TUI-046-A policy is ready for exact-head review; TUI-046-B claim follows acceptance |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I184 (Planned) |
+| Selected Iteration | I184 (Review) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -23,10 +23,10 @@
 | Source Issue | #134 |
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent exact-head review is requested for this PR's final head and is recorded in PR #186; the approved SHA is backfilled at closeout. Shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
-| Implementation PR | Not started |
+| Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
+| Implementation PR | #187 (decision/docs only) |
 | Last Updated | 2026-08-10 |
-| Handoff / Release Condition | I184 must establish an effective claim before ADR-054 edits or implementation; TUI-046-B remains blocked until A is Accepted. |
+| Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until the decision is Accepted. |
 
 ## Identity / Goal / Value
 
@@ -53,6 +53,7 @@ Restore a documented, predictable way to select and copy arbitrary visible text 
 - Terminal selection must not trigger Talos input actions or alter logical history/tail-follow state.
 - Keyboard history navigation and terminal restoration contracts remain available.
 - Native-selection causality must be proven across the selected terminal matrix; Alternate Screen alone is not assumed to be the root cause.
+- Exact evidence rows live in `docs/reference/TUI-NATIVE-SELECTION-MATRIX.md`; Pending is not a pass.
 
 ## Uncertainty And Validation Path
 
@@ -71,12 +72,23 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 - Therefore the verified causal gap is the missing product contract between
   default mouse capture and terminal-native drag selection. Alternate Screen by
   itself is not recorded as the cause.
+- Latest baseline observation on `33cc8dab23a38c387063d1265c230dfa0f8922d9` (Alacritty 0.17.0 on
+  macOS 26.5.2, no multiplexer): ordinary drag requires Shift, wheel scrolling does not carry the
+  selection with projected content, edge-drag has no autoscroll, and resize clears selection.
+  Native-only is therefore rejected as the complete default; TUI-046-B should implement bounded
+  application-owned visible-cell selection.
+- A second terminal observation on `c0fba2e92cace29fde4e2fc33fd26640058eddca`
+  (Terminal.app 2.15 on the same macOS host) found that ordinary and Shift+drag both fail while
+  reporting is enabled. Disabling reporting restores native selection but transfers scrolling to
+  Terminal.app and repeated resize clears the selection. Cross-platform validation remains
+  mandatory after implementation, but no longer blocks development start once A is Accepted and a
+  B claim is effective.
 
 ## Executable Split
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Selected in I184; claim pending | Current lifecycle/input inventory; coordinate with TUI-042 without absorbing it |
+| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Review in I184 | Effective claim `66d0f932`; coordinate with TUI-042 without absorbing it |
 | TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Blocked | TUI-046-A decision Accepted |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance

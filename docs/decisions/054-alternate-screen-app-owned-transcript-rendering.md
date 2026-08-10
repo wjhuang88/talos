@@ -5,6 +5,9 @@
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-035
 
+> I184 amendment status: Proposed. The accepted mouse-capture behavior below remains authoritative
+> until the native-selection amendment is independently reviewed and accepted.
+
 > Decision history: the initial implementation was temporarily rejected when
 > its startup sequence printed the logo on Primary Screen and then hid it by
 > entering Alternate Screen. A primary-screen ADR-055 trial restored native
@@ -121,3 +124,85 @@ transcript into primary scrollback during interactive execution.
   selection row exists in the final panel rectangle. Vertical coordinates are
   never clamped onto another semantic row; the panel renderer and cursor target
   use the same title/instruction/input-row convention.
+
+## Proposed I184 Amendment: Application-Owned Selection Owns The Default Pointer Path
+
+### Additional Context
+
+Issue #134 reports that ordinary mouse-drag selection cannot establish an arbitrary visible range
+in the interactive TUI. Code inventory on claim merge `66d0f932` confirms that `TerminalSession`
+unconditionally enables terminal mouse reporting, while Talos consumes only wheel events. Pointer
+down, drag and release events do not implement an application-owned selection model. Alternate
+Screen is therefore not established as the cause; the conflict is the combination of enabled mouse
+reporting and no Talos selection consumer.
+
+The existing `/copy last` and `/copy all` commands copy semantic transcript scopes. They do not
+replace partial-line or cross-component selection of already visible terminal cells. Keyboard
+PageUp/PageDown and Ctrl+Home/Ctrl+End already navigate the application-owned history independently
+of mouse events.
+
+### Proposed Decision
+
+The native-only policy is rejected as a complete default for Issue #134. On the captured Alacritty
+0.17.0/macOS 26.5.2 baseline, ordinary drag requires Shift, wheel scrolling moves the application
+without the selection tracking the projected content, dragging past the viewport has no edge
+autoscroll, and resizing clears the selection. Native clipboard copying itself works, but these
+interaction gaps violate the required default contract.
+
+Terminal.app 2.15 on the same macOS baseline supplies an independent terminal implementation:
+neither ordinary drag nor Shift+drag selects while mouse reporting is enabled. Disabling Terminal's
+Allow Mouse Reporting menu item restores exact visible-text selection, but wheel and edge-drag then
+move terminal scrollback rather than Talos history, and repeated resize clears the selection. This
+confirms that disabling mouse reporting is a diagnostic workaround, not a complete default policy.
+
+TUI-046-B should therefore implement a bounded application-owned selection over visible projected
+cells, including edge autoscroll while dragging and explicit resize behavior. The selection must
+remain isolated from transcript storage, composer, modal, approval and execution state, and copy
+only the visible projected text. This recommendation is a gate for B, not authorization to change
+Rust in I184.
+
+The default application-owned history contract is keyboard navigation: PageUp/PageDown move by a
+viewport and Ctrl+Home/Ctrl+End jump to the beginning/end. Mouse-wheel history navigation is not a
+default Talos guarantee when native selection owns the pointer path. Terminal-specific alternate
+screen wheel translation is recorded as observed behavior, not represented as Talos history input.
+TUI-046-B must verify that the selected environments do not turn an ordinary selection gesture into
+composer, modal, approval, session or execution mutations.
+
+The previously proposed terminal-owned TUI-046-B scope is superseded by the evidence above. The
+implementation scope for the separately claimed B slice is:
+
+- define and render an application-owned visible-cell selection;
+- support ordinary pointer drag without a Shift modifier and autoscroll at viewport edges;
+- preserve or explicitly resolve selection across wheel scrolling and terminal resize;
+- preserve Alternate Screen, raw mode, bracketed paste, keyboard enhancement, cursor and exhaustive
+  restoration behavior, with mouse event routing reviewed for safety;
+- retain keyboard history navigation and existing `/copy` semantics;
+- keep the selection buffer bounded to visible content and out of transcript persistence;
+- record exact-head results on the maintainer terminal and one materially different platform
+  terminal using the I184 matrix schema before the implementation PR is accepted.
+
+An optional mouse-capture mode, terminal-specific modifier contract, application-owned selection or
+restored wheel-history feature requires a separate owner and decision. TUI-042/#79 retains ownership
+of no-op application wheel transitions and is neither absorbed nor completed by this amendment.
+
+### Acceptance Gate
+
+This proposal becomes an Accepted amendment only after:
+
+- the captured Alacritty and Terminal.app evidence supports mouse reporting, rather than Alternate
+  Screen alone, as the causal boundary and rejects native-only selection as the complete default;
+- independent architecture review approves the policy and the exact TUI-046-B scope;
+- both governance validators, exact-head CI and merge-time CAS pass.
+
+Cross-platform real-terminal execution is a TUI-046-B implementation acceptance gate, not a
+pre-development gate. B may begin after this amendment is Accepted and its own Collaboration Claim
+is effective; its implementation PR may not be accepted until the exact implementation head passes
+the two-environment matrix.
+
+PR #187 remains Proposed decision evidence through merge. A governance-only I184 closeout must then
+cite the already-existing #187 merge commit, exact-head review and CI, change this amendment marker
+to Accepted, and mark I184 Complete. Only that closeout's target-branch merge unlocks a TUI-046-B
+claim; the status-changing closeout commit cannot serve as its own completion evidence.
+
+If the causal matrix is inconclusive, this amendment remains Proposed, the earlier accepted
+mouse-capture behavior remains authoritative, and TUI-046-B stays Blocked.
