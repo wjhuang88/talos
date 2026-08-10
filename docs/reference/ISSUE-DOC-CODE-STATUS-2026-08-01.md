@@ -47,7 +47,7 @@
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Intake registered; probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Intake registered; layout ownership and real-terminal acceptance remain unclaimed. |
 | [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement Epic | Architecture/decomposition owner only; PROVIDER-003-A ADR/threat model and a separately claimed bounded child are required before implementation. |
-| [#134](https://github.com/wjhuang88/talos/issues/134) | native text selection and copy | [TUI-046](../backlog/active/TUI-046-native-text-selection-copy.md) | Refinement | Intake registered; mouse-capture policy, ADR-054 impact and real-terminal matrix remain unclaimed. |
+| [#134](https://github.com/wjhuang88/talos/issues/134) | native text selection and copy | [TUI-046](../backlog/active/TUI-046-native-text-selection-copy.md) | Active | I184/TUI-046-A decision is Complete at `f98488277803ee26180100089a48ef850939234b`; TUI-046-B is ready for a separate implementation claim and remains open. |
 
 ## Status Corrections
 
@@ -57,7 +57,7 @@
 - `TOOL-024`: linked explicitly to Issue #59 and to RUNTIME-005/PERM-006 lifecycle and permission prerequisites.
 - `TUI-044`: added for recovered Issue #119; historical TUI-041 steering ownership is not restored because TUI-041 currently belongs to Issue #69.
 - `I170`: completed in merged PR #126; this clears only TUI-044's prerequisite and does not complete or close Issue #119.
-- `MODEL-011`, `TUI-045` and `TUI-046`: registered from Intake Issues #124/#125/#134 as unclaimed Refinement owners only.
+- `MODEL-011` and `TUI-045`: registered from Intake Issues #124/#125 as unclaimed Refinement owners only. TUI-046/#134 is Active after the I184 decision closeout; B implementation remains separately claimable.
 - `PROVIDER-003`: linked to Issue #132 and reclassified as the dynamic-authentication architecture/decomposition Epic. PROVIDER-003-A through G define separate future claim, review, rollback and completion boundaries; none is selected.
 
 ## Closure Rule
