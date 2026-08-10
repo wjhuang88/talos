@@ -5,6 +5,9 @@
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-035
 
+> I184 amendment status: Proposed. The accepted mouse-capture behavior below remains authoritative
+> until the native-selection amendment is independently reviewed and accepted.
+
 > Decision history: the initial implementation was temporarily rejected when
 > its startup sequence printed the logo on Primary Screen and then hid it by
 > entering Alternate Screen. A primary-screen ADR-055 trial restored native
@@ -121,3 +124,63 @@ transcript into primary scrollback during interactive execution.
   selection row exists in the final panel rectangle. Vertical coordinates are
   never clamped onto another semantic row; the panel renderer and cursor target
   use the same title/instruction/input-row convention.
+
+## Proposed I184 Amendment: Native Selection Owns The Default Pointer Path
+
+### Additional Context
+
+Issue #134 reports that ordinary mouse-drag selection cannot establish an arbitrary visible range
+in the interactive TUI. Code inventory on claim merge `66d0f932` confirms that `TerminalSession`
+unconditionally enables terminal mouse reporting, while Talos consumes only wheel events. Pointer
+down, drag and release events do not implement an application-owned selection model. Alternate
+Screen is therefore not established as the cause; the conflict is the combination of enabled mouse
+reporting and no Talos selection consumer.
+
+The existing `/copy last` and `/copy all` commands copy semantic transcript scopes. They do not
+replace partial-line or cross-component selection of already visible terminal cells. Keyboard
+PageUp/PageDown and Ctrl+Home/Ctrl+End already navigate the application-owned history independently
+of mouse events.
+
+### Proposed Decision
+
+Once this amendment is Accepted, the interactive TUI does not request terminal mouse reporting by
+default. The terminal emulator owns ordinary pointer drag selection and its standard clipboard
+action for cells already visible in the Alternate Screen. Talos does not receive, store, log,
+persist or reinterpret the selected text.
+
+The default application-owned history contract is keyboard navigation: PageUp/PageDown move by a
+viewport and Ctrl+Home/Ctrl+End jump to the beginning/end. Mouse-wheel history navigation is not a
+default Talos guarantee when native selection owns the pointer path. Terminal-specific alternate
+screen wheel translation is recorded as observed behavior, not represented as Talos history input.
+TUI-046-B must verify that the selected environments do not turn an ordinary selection gesture into
+composer, modal, approval, session or execution mutations.
+
+TUI-046-B is intentionally narrow:
+
+- stop enabling mouse reporting during normal `TerminalSession` initialization;
+- preserve Alternate Screen, raw mode, bracketed paste, keyboard enhancement, cursor and exhaustive
+  restoration behavior;
+- retain keyboard history navigation and existing `/copy` semantics;
+- add no application-owned selection buffer, clipboard backend, mouse mode toggle or hidden-content
+  projection;
+- test lifecycle setup/rollback after removing the mouse transition and prove selection attempts do
+  not enter Talos input routing;
+- record exact-head results on the maintainer terminal and one materially different platform
+  terminal using the I184 matrix schema.
+
+An optional mouse-capture mode, terminal-specific modifier contract, application-owned selection or
+restored wheel-history feature requires a separate owner and decision. TUI-042/#79 retains ownership
+of no-op application wheel transitions and is neither absorbed nor completed by this amendment.
+
+### Acceptance Gate
+
+This proposal becomes an Accepted amendment only after:
+
+- the current captured baseline and override behavior are observed on two materially different
+  terminal/platform environments with exact versions and multiplexer state;
+- the matrix supports mouse reporting, rather than Alternate Screen alone, as the causal boundary;
+- independent architecture review approves the policy and the exact TUI-046-B scope;
+- both governance validators, exact-head CI and merge-time CAS pass.
+
+If the causal matrix is inconclusive, this amendment remains Proposed, the earlier accepted
+mouse-capture behavior remains authoritative, and TUI-046-B stays Blocked.

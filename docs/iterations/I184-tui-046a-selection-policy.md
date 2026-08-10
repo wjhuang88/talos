@@ -1,6 +1,6 @@
 # Iteration I184: TUI-046-A Native Selection Policy
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-10
 > Planned objective: decide and document a predictable native text-selection/copy interaction for Issue #134 while preserving ADR-054's Alternate Screen and application-owned transcript boundaries.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,10 +18,10 @@
 | Source Issue | #134 |
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent exact-head review is requested for this PR's final head and is recorded in PR #186; the approved SHA is backfilled at closeout. Shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
+| Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Finalize the claim on the target branch before editing ADR-054; TUI-046-B remains blocked until this decision is Accepted. |
+| Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until this decision is Accepted. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized record is merged into `main`.
@@ -63,6 +63,7 @@ finalized record is merged into `main`.
 ### Documentation To Update
 
 - `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md` or a replacement decision.
+- `docs/reference/TUI-NATIVE-SELECTION-MATRIX.md` for exact causal and later implementation evidence.
 - `docs/backlog/active/TUI-046-native-text-selection-copy.md`, `docs/backlog/PRODUCT-BACKLOG.md`, `docs/BOARD.md`, `docs/iterations/README.md`, and `.agent-governance/manifest.yaml`.
 - Issue #134 with the exact decision/claim/validation links.
 
@@ -76,10 +77,14 @@ finalized record is merged into `main`.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-10 | Selection | I183/AG-7 completed at `edf903aa96574043294923ad60b0cefe9730f8c4`; no other active implementation iteration remains. TUI-046-A is selected as the P0 decision slice, pending effective claim. |
+| 2026-08-10 | Activation | Review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf`; CI `31358815361` passed; merge-time CAS held against `main@a403fdba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. This decision branch starts from that effective claim. |
+| 2026-08-10 | Inventory | `TerminalSession` unconditionally enables mouse capture; the input router consumes only wheel events and ignores pointer down/drag/up; PageUp/PageDown/Ctrl+Home/Ctrl+End independently navigate application history. The local environment identifies Alacritty 0.17.0 on macOS 26.5.2 with no multiplexer; mouse and clipboard observations still require a human terminal run. |
 
 ## Verification Evidence
 
-- Pending effective claim and exact-head review.
+- Claim exact-head CI `31358815361`, independent review `5236470750`, and merge-time CAS passed.
+- Code inventory confirms mouse reporting is enabled during lifecycle setup while no application-owned
+  arbitrary selection exists; keyboard history navigation is independent of mouse events.
 
 ## Completion Evidence
 
