@@ -23,7 +23,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #174 review `PRR_kwDOSrj_LM8AAAABI2KjFw` independently analyzed `24694b88` and approved the review-only plan subject to mandatory corrections. Maintainer clarification [comment `5225938556`](https://github.com/wjhuang88/talos/pull/174#issuecomment-5225938556) attests that a different natural person performed the review through the shared @wjhuang88 credential, accepts the content as independent-review evidence, and preserves GitHub's actual `COMMENTED` state. Commit `f263f221` incorporates the required corrections; exact-head CI `31253291503` passed. |
 | Implementation PR | None - review-only claim merged; protected implementations require child owners |
-| Last Updated | 2026-08-09 |
+| Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Parent claim coordinates creation of non-overlapping child owners only. I181 review completed at `aea26ad011af04396ab8588c9326d309538f31a2`; do not implement any accepted gap under this review-only claim. |
 
 ## Problem And Boundary
@@ -54,12 +54,15 @@ coverage must be proven per call family rather than assumed.
 - [ARCH-034-R04-AG6](ARCH-034-R04-AG6-git-operation-containment.md): `gix` and
   host-git caller/authority/deadline boundary; Refinement and unclaimed.
 - [ARCH-034-R04-AG7](ARCH-034-R04-AG7-sqlite-adr-reconciliation.md): ADR-008
-  five-consumer reconciliation and future-consumer validator; Review through I183/PR #184.
+  five-consumer reconciliation and future-consumer validator; Complete through I183/PR #184 at
+  `edf903aa96574043294923ad60b0cefe9730f8c4`.
 - [ARCH-034-R04-AG11](ARCH-034-R04-AG11-sqlite-containment-evidence.md): five-consumer
   corrupt/busy/locked/panic/deadline evidence classification; Refinement and unclaimed.
+- [ARCH-034-R04-AG12](ARCH-034-R04-AG12-sqlite-validator-integrity.md): ADR allowlist linkage,
+  validator host-dependency policy and diagnostic decoding; Refinement and unclaimed.
 
 These owner files materialize the independently accepted I181 dispositions.
-Except for completed AG-4, they do not create claims or authorize implementation.
+Except for completed AG-4 and AG-7, they do not create claims or authorize implementation.
 I182 is terminal; select at most one remaining child only after the normal
 collaboration protocol establishes a fresh effective claim.
 
@@ -145,8 +148,9 @@ implementation on this branch.
 ## Rollback / Residual
 
 I181 review evidence is merged at `aea26ad011af04396ab8588c9326d309538f31a2`. AG-1 through
-AG-7 now have bounded owner records; AG-7 is in Review through I183/PR #184 while the remaining children still
-require separate effective claims. Other subprocess containment remains evidence work until
+AG-7 now have bounded owner records; AG-7 completed through I183/PR #184 at Completion Commit
+`edf903aa96574043294923ad60b0cefe9730f8c4`, while the remaining children still require separate
+effective claims. Other subprocess containment remains evidence work until
 classified. Five-crate SQLite containment is owned by unclaimed AG-11 after I183 documented the
 uneven evidence without changing behavior. Within the symbol family, direct-file `read_to_string` plus
 parse paths (`list_symbols` direct-file mode, `find_references`, and `list_imports`) remain
@@ -157,7 +161,9 @@ residuals. Independent implementation review `5230395611` additionally registere
 [AG-10 notice admissibility](ARCH-034-R04-AG10-symbol-notice-admissibility.md).
 They are unclaimed and receive no implementation authority from I182. AG-4 itself completed through
 PR #177 at Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; that child completion
-does not change this parent from `Partial`. New native dependencies require a separate ADR.
+does not change this parent from `Partial`. PR #184 review residuals are separately owned by
+[AG-12 SQLite validator integrity](ARCH-034-R04-AG12-sqlite-validator-integrity.md). New native
+dependencies require a separate ADR.
 
 ## Review Completion Evidence
 
