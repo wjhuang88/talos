@@ -15,15 +15,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 |
+| Work Slice | Implement only I184/TUI-046-A: establish the native-selection versus mouse-capture contract, validate the causal interaction on the selected terminal matrix, and amend or replace ADR-054 with the explicit TUI-046-B gate; no Rust implementation or TUI-046-B authority. |
+| Claimed At | 2026-08-10 |
 | Source Issue | #134 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #186 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Exact-head independent review requested for claim commit `c03dbf74`; shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | I184 must establish an effective claim before ADR-054 edits or implementation; TUI-046-B remains blocked until A is Accepted. |
