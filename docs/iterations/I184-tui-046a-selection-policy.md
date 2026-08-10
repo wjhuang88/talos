@@ -81,14 +81,16 @@ finalized record is merged into `main`.
 | 2026-08-10 | Inventory | `TerminalSession` unconditionally enables mouse capture; the input router consumes only wheel events and ignores pointer down/drag/up; PageUp/PageDown/Ctrl+Home/Ctrl+End independently navigate application history. The local environment identifies Alacritty 0.17.0 on macOS 26.5.2 with no multiplexer; mouse and clipboard observations still require a human terminal run. |
 | 2026-08-10 | Submission | Proposed ADR-054 amendment and exact observation matrix submitted in draft PR #187. The amendment remains Proposed and the PR remains Draft until both current-baseline rows are observed. |
 | 2026-08-10 | Baseline observation | On `33cc8dab23a38c387063d1265c230dfa0f8922d9`, Alacritty 0.17.0 (94e7c88) on macOS 26.5.2 (25F84), `TMUX=none`: ordinary drag produced no selection; Shift+drag selected and `Command+C`/`pbpaste` matched, but wheel scrolling did not carry the selection with projected content, edge-drag did not autoscroll, and resize cleared the selection. Native-only default is rejected; B recommendation is application-owned visible-cell selection with edge autoscroll. |
+| 2026-08-10 | Second-terminal observation | On `c0fba2e92cace29fde4e2fc33fd26640058eddca`, Terminal.app 2.15 (`TERM=xterm-256color`) on macOS 26.5.2 (25F84), `TMUX=none`: ordinary and Shift+drag both failed while mouse reporting was enabled. Disabling View > Allow Mouse Reporting restored exact native cross-row selection, but wheel and edge-drag scrolled Terminal.app rather than Talos history, and repeated resize cleared the selection. `/quit` restored a clean shell without mouse escape leakage. This fills the second terminal row but not the published cross-platform validation requirement. |
 
 ## Verification Evidence
 
 - Claim exact-head CI `31358815361`, independent review `5236470750`, and merge-time CAS passed.
 - Code inventory confirms mouse reporting is enabled during lifecycle setup while no application-owned
   arbitrary selection exists; keyboard history navigation is independent of mouse events.
-- Manual baseline evidence above is limited to one terminal environment; the second materially
-  different environment remains pending and is required before I184 can be Accepted.
+- Manual baseline evidence now covers Alacritty and Terminal.app on one macOS version and supports
+  the causal decision. A materially different platform remains pending under the published plan;
+  independent review, exact-head CI and merge-time CAS also remain required before acceptance.
 
 ## Completion Evidence
 

@@ -30,7 +30,7 @@ the policy cause and override behavior; they do not accept the future implementa
 | Talos SHA | Terminal / Version | OS / Platform | Multiplexer | Gesture / Modifier | Selection Result | Copied-Text Observation | Wheel Behavior | Redraw / Resize | Restoration | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `33cc8dab23a38c387063d1265c230dfa0f8922d9` | Alacritty 0.17.0 (94e7c88) | macOS 26.5.2 (25F84) | `none` | Ordinary drag | Highlight absent; Shift+drag required, so native-only default is not acceptable | `Command+C` then `pbpaste` matched the highlighted text | Wheel scrolls the app, but the selection does not track the projected content | Drag selection stops at the viewport edge; no edge autoscroll; resize clears selection | Not recorded | Native-only default rejected; application-owned selection required for B |
-| Exact SHA required | Materially different terminal and version | Exact OS/platform required | Exact version or `none` | Ordinary drag plus documented override | Not run | Not run | Not run | Not run | Not run | Pending coordinated environment |
+| `c0fba2e92cace29fde4e2fc33fd26640058eddca` | macOS Terminal 2.15 (`TERM=xterm-256color`) | macOS 26.5.2 (25F84) | `none` | Ordinary drag and Shift+drag with mouse reporting enabled; ordinary drag after disabling View > Allow Mouse Reporting | No highlight while reporting is enabled, including with Shift; disabling reporting allows cross-row native selection | `Command+C` paste matched exactly; status text appears only when included in the visible selection | Terminal-native scroll moves the highlight with its text, but Talos history does not move | Edge drag invokes terminal-native scrolling rather than Talos history; selection initially survives resize but disappears after repeated resizing; TUI reflows normally | `/quit` restored the shell; normal output and mouse input produced no leaked escape sequences | Native-only default rejected; disabling reporting sacrifices Talos history control and resize stability |
 
 ## TUI-046-B Implementation Matrix
 
@@ -48,7 +48,12 @@ Populate only after TUI-046-B has an effective claim and exact implementation he
 - On the captured Alacritty/macOS baseline, the override requires Shift, selection does not follow
   application scrolling, edge-drag does not autoscroll, and resize clears the selection. These are
   direct reasons native-only selection cannot be the complete default contract for Issue #134.
+- On Terminal.app, Shift is not an override while mouse reporting is enabled. Disabling the
+  terminal's Allow Mouse Reporting menu item restores native selection, but wheel and edge-drag
+  then operate on terminal scrollback instead of Talos history, and repeated resize clears the
+  selection. This independently rejects disabling reporting as the complete product policy.
 - A terminal-specific override is diagnostic evidence only; it is not the default product contract.
 - Passing one terminal does not generalize to another terminal, OS or multiplexer.
-- I184 cannot mark the amendment Accepted while either current-baseline row is Pending or
-  inconclusive. TUI-046 cannot close until both implementation rows pass on the exact B head.
+- Both current-baseline terminal rows are now conclusive on macOS; I184's published cross-platform
+  validation and independent-review gates remain open. TUI-046 cannot close until both
+  implementation rows pass on the exact B head.

@@ -149,6 +149,12 @@ without the selection tracking the projected content, dragging past the viewport
 autoscroll, and resizing clears the selection. Native clipboard copying itself works, but these
 interaction gaps violate the required default contract.
 
+Terminal.app 2.15 on the same macOS baseline supplies an independent terminal implementation:
+neither ordinary drag nor Shift+drag selects while mouse reporting is enabled. Disabling Terminal's
+Allow Mouse Reporting menu item restores exact visible-text selection, but wheel and edge-drag then
+move terminal scrollback rather than Talos history, and repeated resize clears the selection. This
+confirms that disabling mouse reporting is a diagnostic workaround, not a complete default policy.
+
 TUI-046-B should therefore implement a bounded application-owned selection over visible projected
 cells, including edge autoscroll while dragging and explicit resize behavior. The selection must
 remain isolated from transcript storage, composer, modal, approval and execution state, and copy

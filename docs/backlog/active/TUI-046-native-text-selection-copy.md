@@ -76,8 +76,12 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
   macOS 26.5.2, no multiplexer): ordinary drag requires Shift, wheel scrolling does not carry the
   selection with projected content, edge-drag has no autoscroll, and resize clears selection.
   Native-only is therefore rejected as the complete default; TUI-046-B should implement bounded
-  application-owned visible-cell selection. The second environment remains pending and B remains
-  Blocked.
+  application-owned visible-cell selection.
+- A second terminal observation on `c0fba2e92cace29fde4e2fc33fd26640058eddca`
+  (Terminal.app 2.15 on the same macOS host) found that ordinary and Shift+drag both fail while
+  reporting is enabled. Disabling reporting restores native selection but transfers scrolling to
+  Terminal.app and repeated resize clears the selection. The published cross-platform environment
+  remains pending and TUI-046-B remains Blocked.
 
 ## Executable Split
 
