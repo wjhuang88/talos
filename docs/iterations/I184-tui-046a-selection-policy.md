@@ -1,6 +1,6 @@
 # Iteration I184: TUI-046-A Native Selection Policy
 
-> Document status: Review
+> Document status: Complete (2026-08-10)
 > Published plan date: 2026-08-10
 > Planned objective: decide and document a predictable native text-selection/copy interaction for Issue #134 while preserving ADR-054's Alternate Screen and application-owned transcript boundaries.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 |
 | Work Slice | Implement only I184/TUI-046-A: establish the native-selection versus mouse-capture contract, validate the causal interaction on the selected terminal matrix, and amend or replace ADR-054 with the explicit TUI-046-B gate; no Rust implementation or TUI-046-B authority. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
 | Implementation PR | #187 (decision/docs only) |
 | Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until this decision is Accepted. |
+| Handoff / Release Condition | I184 is closed by the existing #187 merge evidence; TUI-046-B requires a separate effective claim and remains responsible for implementation and full terminal acceptance. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. The claim is ineffective until the
 finalized record is merged into `main`.
@@ -84,6 +84,7 @@ finalized record is merged into `main`.
 | 2026-08-10 | Second-terminal observation | On `c0fba2e92cace29fde4e2fc33fd26640058eddca`, Terminal.app 2.15 (`TERM=xterm-256color`) on macOS 26.5.2 (25F84), `TMUX=none`: ordinary and Shift+drag both failed while mouse reporting was enabled. Disabling View > Allow Mouse Reporting restored exact native cross-row selection, but wheel and edge-drag scrolled Terminal.app rather than Talos history, and repeated resize cleared the selection. `/quit` restored a clean shell without mouse escape leakage. This fills the second terminal row but not the published cross-platform validation requirement. |
 | 2026-08-10 | Change control | The maintainer directed that cross-platform/manual terminal testing must occur after implementation and must not block development. This is a priority/gate correction, not added behavior: the published cross-platform matrix remains mandatory for TUI-046-B acceptance, but moves from an I184 pre-development dependency to the B implementation-PR merge gate. I184 enters Review with the application-owned selection boundary; B still requires its own effective claim before Rust work. |
 | 2026-08-10 | Review correction | Review `5237634929` found a stale ADR heading, two stale derived `Active` states, and baseline matrix rows that overstated completeness despite missing restoration, fixture and failure-cleanup evidence. The correction keeps those rows as incomplete causal evidence and reserves full matrix acceptance for the exact B implementation head. After #187 merges, an evidence-only closeout must cite its real merge SHA/review/CI, mark the amendment Accepted and I184 Complete, and only then unlock the B claim. |
+| 2026-08-10 | Closeout | PR #187 merged at existing decision evidence commit `f98488277803ee26180100089a48ef850939234b`; exact reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`, review `5237824299`, CI `31370219799` (4/4 green). ADR-054 I184 amendment is Accepted and I184 is Complete. The frozen cross-platform Planned Validation clause is recorded as an explicit deferred variance: it is a mandatory TUI-046-B acceptance gate, not satisfied by I184. Non-blocking follow-ups: matrix index entry, ADR index summary, and full B matrix procedure coverage are assigned to the B closeout/implementation owner. |
 
 ## Verification Evidence
 
@@ -93,20 +94,24 @@ finalized record is merged into `main`.
 - Manual baseline evidence covers Alacritty and Terminal.app on one macOS version and supports the
   causal decision. Per the recorded change-control direction, materially different platform testing
   is deferred to TUI-046-B implementation acceptance; independent review, exact-head CI and
-  merge-time CAS remain required for I184 acceptance.
+  merge-time CAS are recorded in the Completion Evidence below.
 
 ## Completion Evidence
 
-- No completion evidence while in Review. A later closure must cite an already-existing decision
-  evidence SHA.
+- Completion Commit: `f98488277803ee26180100089a48ef850939234b`
+- PR #187 merged the reviewed decision evidence at that existing SHA; exact reviewed head was
+  `24e15db8d9df852c07fe08cc79ccc670fda36d27`, review `5237824299`, CI `31370219799` (4/4 green).
 
 ## Variance And Residuals
 
-- TUI-046-B remains Blocked only until TUI-046-A is Accepted and a B claim becomes effective;
-  cross-platform manual validation is a later B merge gate and does not block development start.
+- TUI-046-B is now unblocked for a separate claim; its implementation PR must complete the
+  cross-platform matrix, fixture coverage, active redraw, and failure-cleanup acceptance before
+  merge.
 - Authorization Evidence review-state linkage is an existing validator/auditability gap owned by
   unclaimed GOV-004; I184 does not modify the collaboration validator.
 
 ## Retrospective
 
-- Pending execution.
+- Terminal-native overrides were useful causal probes but could not supply the required default
+  interaction across Alacritty and Terminal.app. Separating raw observations from policy inference
+  kept the matrix reusable; complete character, redraw and failure-cleanup evidence remains with B.

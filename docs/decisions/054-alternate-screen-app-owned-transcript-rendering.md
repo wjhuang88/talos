@@ -5,8 +5,9 @@
 - Owners: TUI / runtime maintainers
 - Related: TUI-035, I156, ADR-035
 
-> I184 amendment status: Proposed. The accepted mouse-capture behavior below remains authoritative
-> until the native-selection amendment is independently reviewed and accepted.
+> I184 amendment status: Accepted (2026-08-10; #187 decision evidence plus I184 evidence closeout).
+> The application-owned visible-cell selection policy below is now authoritative for TUI-046-B;
+> its implementation and full terminal acceptance remain separately gated.
 
 > Decision history: the initial implementation was temporarily rejected when
 > its startup sequence printed the logo on Primary Screen and then hid it by
@@ -125,7 +126,7 @@ transcript into primary scrollback during interactive execution.
   never clamped onto another semantic row; the panel renderer and cursor target
   use the same title/instruction/input-row convention.
 
-## Proposed I184 Amendment: Application-Owned Selection Owns The Default Pointer Path
+## Accepted I184 Amendment: Application-Owned Selection Owns The Default Pointer Path
 
 ### Additional Context
 
@@ -199,10 +200,12 @@ pre-development gate. B may begin after this amendment is Accepted and its own C
 is effective; its implementation PR may not be accepted until the exact implementation head passes
 the two-environment matrix.
 
-PR #187 remains Proposed decision evidence through merge. A governance-only I184 closeout must then
-cite the already-existing #187 merge commit, exact-head review and CI, change this amendment marker
-to Accepted, and mark I184 Complete. Only that closeout's target-branch merge unlocks a TUI-046-B
-claim; the status-changing closeout commit cannot serve as its own completion evidence.
+PR #187 merged Proposed decision evidence at `f98488277803ee26180100089a48ef850939234b` from reviewed
+head `24e15db8d9df852c07fe08cc79ccc670fda36d27`, review `5237824299`, and CI `31370219799`.
+The governance-only I184 closeout cites that already-existing evidence, marks the amendment Accepted
+and I184 Complete, and unlocks a separate TUI-046-B claim. The status-changing closeout commit does
+not serve as its own completion evidence.
 
-If the causal matrix is inconclusive, this amendment remains Proposed, the earlier accepted
-mouse-capture behavior remains authoritative, and TUI-046-B stays Blocked.
+The acceptance decision treats the recorded pointer/scroll/resize observations plus code inventory
+as sufficient causal evidence. Had that causal evidence remained inconclusive, the amendment would
+have stayed Proposed and the earlier mouse-capture behavior would have remained authoritative.

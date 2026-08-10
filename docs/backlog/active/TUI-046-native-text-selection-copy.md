@@ -5,9 +5,9 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Review — TUI-046-A policy is ready for exact-head review; TUI-046-B claim follows acceptance |
+| Status | Active — TUI-046-A Complete; TUI-046-B implementation is ready for a separate claim |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I184 (Review) |
+| Selected Iteration | I184 (Complete) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 |
 | Work Slice | Implement only I184/TUI-046-A: establish the native-selection versus mouse-capture contract, validate the causal interaction on the selected terminal matrix, and amend or replace ADR-054 with the explicit TUI-046-B gate; no Rust implementation or TUI-046-B authority. |
@@ -26,7 +26,13 @@
 | Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
 | Implementation PR | #187 (decision/docs only) |
 | Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until the decision is Accepted. |
+| Handoff / Release Condition | I184 decision evidence merged at `f98488277803ee26180100089a48ef850939234b`; this closeout releases the A claim on target-branch merge. Establish a separate TUI-046-B claim before Rust implementation. |
+
+### TUI-046-A Completion Evidence
+
+- Completion Commit: `f98488277803ee26180100089a48ef850939234b`
+- This existing squash merge contains the accepted I184 decision evidence. The parent TUI-046
+  Story remains Active because TUI-046-B implementation and acceptance are still outstanding.
 
 ## Identity / Goal / Value
 
@@ -88,8 +94,8 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Review in I184 | Effective claim `66d0f932`; coordinate with TUI-042 without absorbing it |
-| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Blocked | TUI-046-A decision Accepted |
+| TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Complete in I184 | Completion Commit `f98488277803ee26180100089a48ef850939234b`; review `5237824299`; CI `31370219799` |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Ready to claim | ADR-054 I184 amendment Accepted; separate claim required |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
 from unit tests alone. The parent closes only after both terminal environments
