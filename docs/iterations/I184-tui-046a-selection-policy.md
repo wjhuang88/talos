@@ -18,7 +18,7 @@
 | Source Issue | #134 |
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head independent review requested for claim commit `c03dbf74`; shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
+| Authorization Evidence | Independent exact-head review is requested for this PR's final head and is recorded in PR #186; the approved SHA is backfilled at closeout. Shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Finalize the claim on the target branch before editing ADR-054; TUI-046-B remains blocked until this decision is Accepted. |
@@ -57,7 +57,7 @@ finalized record is merged into `main`.
 ### Planned Validation
 
 - Focused code/lifecycle inventory under `crates/talos-tui` and ADR-054 review.
-- Recorded manual matrix on the maintainer's primary terminal and one materially different platform terminal; include Alacritty/Windows Terminal/macOS Terminal or iTerm2/tmux where applicable.
+- Recorded manual matrix on the maintainer's primary terminal and one materially different platform terminal. Every row names the exact terminal and version, OS/platform version, multiplexer and version or `none`, Talos SHA, gesture, wheel behavior, redraw condition, restoration result and copied-text observation; include Alacritty/Windows Terminal/macOS Terminal or iTerm2/tmux where applicable.
 - `git diff --check`, `scripts/validate_project_governance.sh .`, `bash scripts/validate_collaboration_claims.sh .`, exact-head CI and independent architecture review.
 
 ### Documentation To Update
@@ -88,6 +88,8 @@ finalized record is merged into `main`.
 ## Variance And Residuals
 
 - TUI-046-B remains Blocked until TUI-046-A is Accepted.
+- Authorization Evidence review-state linkage is an existing validator/auditability gap owned by
+  unclaimed GOV-004; I184 does not modify the collaboration validator.
 
 ## Retrospective
 

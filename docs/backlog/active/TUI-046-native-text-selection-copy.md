@@ -23,7 +23,7 @@
 | Source Issue | #134 |
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head independent review requested for claim commit `c03dbf74`; shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
+| Authorization Evidence | Independent exact-head review is requested for this PR's final head and is recorded in PR #186; the approved SHA is backfilled at closeout. Shared-account natural-person disclosure required. Claim is proposed and remains ineffective until PR #186 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | I184 must establish an effective claim before ADR-054 edits or implementation; TUI-046-B remains blocked until A is Accepted. |
