@@ -72,6 +72,12 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 - Therefore the verified causal gap is the missing product contract between
   default mouse capture and terminal-native drag selection. Alternate Screen by
   itself is not recorded as the cause.
+- Latest baseline observation on `33cc8dab23a38c387063d1265c230dfa0f8922d9` (Alacritty 0.17.0 on
+  macOS 26.5.2, no multiplexer): ordinary drag requires Shift, wheel scrolling does not carry the
+  selection with projected content, edge-drag has no autoscroll, and resize clears selection.
+  Native-only is therefore rejected as the complete default; TUI-046-B should implement bounded
+  application-owned visible-cell selection. The second environment remains pending and B remains
+  Blocked.
 
 ## Executable Split
 
