@@ -151,6 +151,7 @@ maintainer documentation.
 | 2026-08-09 | Implementation | Added one parsed locked-metadata validator, a nine-case cross-platform fixture matrix, Unix/PowerShell governance wiring, the exact ADR-008 allowlist, and the five-consumer inventory. No Cargo manifest, lockfile, Rust source, schema, migration, or runtime behavior changed. Uneven containment evidence is registered under unclaimed AG-11. |
 | 2026-08-10 | Validation | `CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh` passed end to end with locked workspace check, Clippy, tests, doctests, both governance validators, and all nine SQLite metadata fixtures. Incremental caching was disabled after the first attempt exhausted the host disk; the first sandboxed test attempt then exposed only a local-socket permission denial, and the same exact tests passed when rerun with local-socket permission. |
 | 2026-08-10 | Submission | Implementation commit `42ccf73b` was pushed and implementation PR #184 opened; owner, iteration index, backlog, Board and manifest now enter Review together. Exact-head CI, independent architecture review and merge-time CAS remain required. |
+| 2026-08-10 | CI correction | Exact head `b90e0dc6b789ffc3931544ebff65592b02b565bc` passed three CI jobs, but Windows governance validation exposed locale-dependent decoding of UTF-8 Cargo metadata. The validator now specifies UTF-8 explicitly; `LC_ALL=C` validation, both governance entrypoints, all nine fixtures and full release preflight pass locally. A new exact-head CI run is required. |
 
 ## Verification Evidence
 
@@ -163,6 +164,10 @@ maintainer documentation.
   run includes `cargo check --locked --workspace`, Clippy with warnings denied,
   `cargo test --locked --workspace`, doctests, and both governance validators. The separately
   rerun `talos-cli` binary target passed 335/335 tests after local-socket permission was granted.
+- PR #184 CI run `31345375199` proved the Windows locale failure before correction: Rust tests
+  passed, then PowerShell governance failed while CP1252 decoded Cargo's UTF-8 JSON. Explicit UTF-8
+  decoding is now covered by the same Windows governance job; replacement exact-head evidence is
+  pending.
 
 ## Completion Evidence
 

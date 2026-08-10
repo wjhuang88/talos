@@ -308,7 +308,7 @@ def load_locked_metadata(project_root: Path) -> dict[str, Any]:
         cwd=project_root,
         check=False,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     if result.returncode != 0:
         raise RuntimeError(f"cargo metadata --locked failed:\n{result.stderr.rstrip()}")

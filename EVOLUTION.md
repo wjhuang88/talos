@@ -57,8 +57,22 @@ repeating known mistakes.
 | 45 | Terminal / TUI | 键盘模式属于具体 screen；active-turn 取消不得复用 idle 退出手势状态 | TUI-032/TUI-009 |
 | 46 | Provider / Runtime | transport EOF 不是成功；已知协议终止值必须有独立 policy，不能冒充 unknown；每个消费者都必须投影明确 outcome | I168/RUNTIME-003 |
 | 47 | Governance / Review | 共享 GitHub 账号下的独立评审必须显式声明自然人隔离，并区分人工 attestation 与机器可验证身份 | PR #177 / GOV-004 |
+| 48 | Governance / Windows | 结构化子进程输出必须显式指定协议编码，不能继承 Windows locale | I183 / PR #184 |
 
 ## Lessons
+
+## 2026-08-10 - Structured subprocess output needs an explicit protocol encoding
+
+- Trigger: PR #184 exact-head CI ran the new locked-Cargo-metadata validator on Windows.
+- Symptom: all Windows Rust tests passed, but PowerShell governance validation failed while Python
+  decoded Cargo's JSON output as CP1252 and rejected byte `0x81` before JSON parsing.
+- Root cause: `subprocess.run(text=True)` inherited the host locale even though Cargo metadata is a
+  UTF-8 JSON protocol.
+- Fix: decode the captured `cargo metadata --locked` stdout/stderr explicitly as UTF-8.
+- Prevention: every governance script that captures structured subprocess output must choose the
+  producer's specified encoding; Unix success is not evidence for Windows locale behavior.
+- Promoted to rule/check: `scripts/validate_sqlite_consumers.py` explicit UTF-8 decoding plus the
+  Windows `Validate project governance` CI step.
 
 ## 2026-08-09 - Shared-account review needs explicit human attestation
 
