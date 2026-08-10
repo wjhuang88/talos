@@ -29,7 +29,7 @@ the policy cause and override behavior; they do not accept the future implementa
 
 | Talos SHA | Terminal / Version | OS / Platform | Multiplexer | Gesture / Modifier | Selection Result | Copied-Text Observation | Wheel Behavior | Redraw / Resize | Restoration | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `66d0f932370f679d491cb78f64dff9d84878479d` | Alacritty 0.17.0 | macOS 26.5.2 (25F84) | `none` | Ordinary drag | Not run | Not run | Not run | Not run | Not run | Pending maintainer observation |
+| `33cc8dab23a38c387063d1265c230dfa0f8922d9` | Alacritty 0.17.0 (94e7c88) | macOS 26.5.2 (25F84) | `none` | Ordinary drag | Highlight absent; Shift+drag required, so native-only default is not acceptable | `Command+C` then `pbpaste` matched the highlighted text | Wheel scrolls the app, but the selection does not track the projected content | Drag selection stops at the viewport edge; no edge autoscroll; resize clears selection | Not recorded | Native-only default rejected; application-owned selection required for B |
 | Exact SHA required | Materially different terminal and version | Exact OS/platform required | Exact version or `none` | Ordinary drag plus documented override | Not run | Not run | Not run | Not run | Not run | Pending coordinated environment |
 
 ## TUI-046-B Implementation Matrix
@@ -45,6 +45,9 @@ Populate only after TUI-046-B has an effective claim and exact implementation he
 
 - Ordinary drag blocked while a documented override succeeds under the same captured Talos SHA is
   evidence that mouse reporting, not Alternate Screen alone, owns the conflicting pointer path.
+- On the captured Alacritty/macOS baseline, the override requires Shift, selection does not follow
+  application scrolling, edge-drag does not autoscroll, and resize clears the selection. These are
+  direct reasons native-only selection cannot be the complete default contract for Issue #134.
 - A terminal-specific override is diagnostic evidence only; it is not the default product contract.
 - Passing one terminal does not generalize to another terminal, OS or multiplexer.
 - I184 cannot mark the amendment Accepted while either current-baseline row is Pending or

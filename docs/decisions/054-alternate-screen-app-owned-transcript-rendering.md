@@ -143,10 +143,17 @@ of mouse events.
 
 ### Proposed Decision
 
-Once this amendment is Accepted, the interactive TUI does not request terminal mouse reporting by
-default. The terminal emulator owns ordinary pointer drag selection and its standard clipboard
-action for cells already visible in the Alternate Screen. Talos does not receive, store, log,
-persist or reinterpret the selected text.
+The native-only policy is rejected as a complete default for Issue #134. On the captured Alacritty
+0.17.0/macOS 26.5.2 baseline, ordinary drag requires Shift, wheel scrolling moves the application
+without the selection tracking the projected content, dragging past the viewport has no edge
+autoscroll, and resizing clears the selection. Native clipboard copying itself works, but these
+interaction gaps violate the required default contract.
+
+TUI-046-B should therefore implement a bounded application-owned selection over visible projected
+cells, including edge autoscroll while dragging and explicit resize behavior. The selection must
+remain isolated from transcript storage, composer, modal, approval and execution state, and copy
+only the visible projected text. This recommendation is a gate for B, not authorization to change
+Rust in I184.
 
 The default application-owned history contract is keyboard navigation: PageUp/PageDown move by a
 viewport and Ctrl+Home/Ctrl+End jump to the beginning/end. Mouse-wheel history navigation is not a
@@ -155,16 +162,16 @@ screen wheel translation is recorded as observed behavior, not represented as Ta
 TUI-046-B must verify that the selected environments do not turn an ordinary selection gesture into
 composer, modal, approval, session or execution mutations.
 
-TUI-046-B is intentionally narrow:
+The previously proposed terminal-owned TUI-046-B scope is superseded by the evidence above. The
+implementation scope for the separately claimed B slice is:
 
-- stop enabling mouse reporting during normal `TerminalSession` initialization;
+- define and render an application-owned visible-cell selection;
+- support ordinary pointer drag without a Shift modifier and autoscroll at viewport edges;
+- preserve or explicitly resolve selection across wheel scrolling and terminal resize;
 - preserve Alternate Screen, raw mode, bracketed paste, keyboard enhancement, cursor and exhaustive
-  restoration behavior;
+  restoration behavior, with mouse event routing reviewed for safety;
 - retain keyboard history navigation and existing `/copy` semantics;
-- add no application-owned selection buffer, clipboard backend, mouse mode toggle or hidden-content
-  projection;
-- test lifecycle setup/rollback after removing the mouse transition and prove selection attempts do
-  not enter Talos input routing;
+- keep the selection buffer bounded to visible content and out of transcript persistence;
 - record exact-head results on the maintainer terminal and one materially different platform
   terminal using the I184 matrix schema.
 
