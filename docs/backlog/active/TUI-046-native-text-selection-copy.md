@@ -24,7 +24,7 @@
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
-| Implementation PR | Not started |
+| Implementation PR | #187 (decision/docs only) |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until the decision is Accepted. |
 

@@ -19,7 +19,7 @@
 | Governance Claim PR | #186 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
-| Implementation PR | Not started |
+| Implementation PR | #187 (decision/docs only) |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Execute only TUI-046-A from claim merge `66d0f932370f679d491cb78f64dff9d84878479d` or later `main`; TUI-046-B remains blocked until this decision is Accepted. |
 
@@ -79,6 +79,7 @@ finalized record is merged into `main`.
 | 2026-08-10 | Selection | I183/AG-7 completed at `edf903aa96574043294923ad60b0cefe9730f8c4`; no other active implementation iteration remains. TUI-046-A is selected as the P0 decision slice, pending effective claim. |
 | 2026-08-10 | Activation | Review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf`; CI `31358815361` passed; merge-time CAS held against `main@a403fdba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. This decision branch starts from that effective claim. |
 | 2026-08-10 | Inventory | `TerminalSession` unconditionally enables mouse capture; the input router consumes only wheel events and ignores pointer down/drag/up; PageUp/PageDown/Ctrl+Home/Ctrl+End independently navigate application history. The local environment identifies Alacritty 0.17.0 on macOS 26.5.2 with no multiplexer; mouse and clipboard observations still require a human terminal run. |
+| 2026-08-10 | Submission | Proposed ADR-054 amendment and exact observation matrix submitted in draft PR #187. The amendment remains Proposed and the PR remains Draft until both current-baseline rows are observed. |
 
 ## Verification Evidence
 
