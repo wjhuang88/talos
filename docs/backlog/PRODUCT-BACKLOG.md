@@ -151,5 +151,6 @@ until PROVIDER-003-A and a separately claimed child owner establish the required
 Issue #49 remains open under RUNTIME-005 Refinement; SESSION-008 durable partial persistence and
 RUNTIME-005-A/B/C are the non-circular closure chain. Issue #59 remains open under TOOL-024;
 TOOL-024 consumes completed RUNTIME-005 finalization instead of blocking it, and production spawn
-also waits for PERM-006-C. Issue #134 remains open under P0 TUI-046 Active; TUI-046-A must settle
-the ADR-054 mouse-capture contract before TUI-046-B implementation and real-terminal acceptance.
+also waits for PERM-006-C. Issue #134 remains open under P0 TUI-046 Review; TUI-046-A must complete
+the ADR-054 application-owned selection decision and evidence closeout before the B claim, while
+cross-platform real-terminal testing occurs after implementation and before B acceptance.

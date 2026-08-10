@@ -125,7 +125,7 @@ transcript into primary scrollback during interactive execution.
   never clamped onto another semantic row; the panel renderer and cursor target
   use the same title/instruction/input-row convention.
 
-## Proposed I184 Amendment: Native Selection Owns The Default Pointer Path
+## Proposed I184 Amendment: Application-Owned Selection Owns The Default Pointer Path
 
 ### Additional Context
 
@@ -198,6 +198,11 @@ Cross-platform real-terminal execution is a TUI-046-B implementation acceptance 
 pre-development gate. B may begin after this amendment is Accepted and its own Collaboration Claim
 is effective; its implementation PR may not be accepted until the exact implementation head passes
 the two-environment matrix.
+
+PR #187 remains Proposed decision evidence through merge. A governance-only I184 closeout must then
+cite the already-existing #187 merge commit, exact-head review and CI, change this amendment marker
+to Accepted, and mark I184 Complete. Only that closeout's target-branch merge unlocks a TUI-046-B
+claim; the status-changing closeout commit cannot serve as its own completion evidence.
 
 If the causal matrix is inconclusive, this amendment remains Proposed, the earlier accepted
 mouse-capture behavior remains authoritative, and TUI-046-B stays Blocked.
