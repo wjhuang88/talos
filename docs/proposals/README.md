@@ -65,8 +65,13 @@ docs/proposals/
 - [Talos Crate Distribution Architecture](talos-crate-distribution-architecture.md) — proposal for
   making Talos-owned capabilities independently publishable as crates while keeping
   `talos-runtime` as the SDK facade.
-- [Talos Desktop](talos-desktop.md) — proposal sourced from GitHub issue #29 for a future desktop
-  shell; requires requirement intake and ADR before implementation.
+- [Talos Desktop](talos-desktop.md) — refined entry for the future GPUI Desktop product; points to
+  the goal-oriented workspace baseline and keeps implementation gated behind a separate
+  prerequisite PR plus normal requirement intake/ADR/governance.
+- [Talos Desktop Goal-Oriented Workspace](talos-desktop-goal-oriented-workspace.md) — consolidated
+  design baseline for Mission/Work Graph interaction, Todo evolution, independent Goal/Mission
+  evaluation, artifact review, Delivery, and the exact scope of the future separate Desktop
+  prerequisite implementation PR.
 - [Multi-Agent Architecture](multi-agent-architecture.md) — proposal sourced from GitHub issue #30
   for bounded orchestrator/worker agents under ADR-006 and permission constraints.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
