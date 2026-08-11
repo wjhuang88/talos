@@ -11,6 +11,9 @@ The repository validator includes normal, build, development, and target-specifi
 It is implemented in `scripts/validate_sqlite_consumers.py`, runs from both project-governance
 validators, and rejects consumer-set, resolved-version, bundled-feature, or `talos-models`
 quarantine drift.
+The exact names and runtime/quarantined classifications are maintained in the normative
+[`SQLITE-CONSUMER-POLICY.json`](SQLITE-CONSUMER-POLICY.json) file; this inventory remains the
+human-readable operational explanation.
 
 ## Accepted Consumers
 
@@ -52,7 +55,8 @@ pwsh -NoProfile -File scripts/validate_project_governance.ps1 .
 
 The fixture matrix protects the accepted graph, workspace-only layering, alternate normal/build/dev
 and target-specific boundary edges, missing accepted consumers, duplicate native versions,
-`talos-models` dependents, and removal of bundled features.
+`talos-models` dependents, removal of bundled features, policy schema/drift, invalid metadata
+stdout, and non-UTF-8 Cargo stderr diagnostics (17 focused cases).
 
 Python 3 is a governance-only host dependency here: the frozen I183 scope prohibits Cargo manifest
 and Rust-source changes, while the standard library provides one JSON graph implementation on Unix

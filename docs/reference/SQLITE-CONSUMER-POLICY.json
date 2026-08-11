@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "accepted_consumers": [
+    {
+      "name": "talos-evolution",
+      "classification": "runtime"
+    },
+    {
+      "name": "talos-exploration",
+      "classification": "runtime"
+    },
+    {
+      "name": "talos-memory",
+      "classification": "runtime"
+    },
+    {
+      "name": "talos-models",
+      "classification": "quarantined-non-runtime"
+    },
+    {
+      "name": "talos-session",
+      "classification": "runtime"
+    }
+  ]
+}

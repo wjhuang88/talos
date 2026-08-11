@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "name": "unknown-version",
+      "mutation": "unknown_version",
+      "expected_error_substring": "unsupported SQLite consumer policy schema_version: 2"
+    },
+    {
+      "name": "missing-consumers",
+      "mutation": "remove_consumers",
+      "expected_error_substring": "policy must contain only schema_version and accepted_consumers"
+    },
+    {
+      "name": "malformed-consumer",
+      "mutation": "malformed_consumer",
+      "expected_error_substring": "accepted_consumers[0] must contain only name and classification strings"
+    },
+    {
+      "name": "duplicate-consumer",
+      "mutation": "duplicate_consumer",
+      "expected_error_substring": "duplicate accepted SQLite consumer: talos-evolution"
+    },
+    {
+      "name": "invalid-classification",
+      "mutation": "invalid_classification",
+      "expected_error_substring": "unsupported SQLite consumer classification: other"
+    },
+    {
+      "name": "policy-metadata-drift",
+      "mutation": "add_policy_consumer",
+      "expected_error_substring": "missing accepted SQLite boundary consumer(s): talos-policy-only"
+    }
+  ]
+}

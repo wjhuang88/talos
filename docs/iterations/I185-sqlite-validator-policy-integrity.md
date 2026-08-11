@@ -1,6 +1,6 @@
 # Iteration I185: SQLite Validator Policy Integrity
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-10
 > Planned objective: eliminate the duplicate ADR-008/validator SQLite-consumer policy source and preserve actionable Cargo diagnostics while keeping every runtime, dependency and accepted-consumer behavior unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,10 +18,10 @@
 | Source Issue | None |
 | Governance Claim PR | #190 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head claim review is requested on PR #190; the proposed claim has no ownership effect until the finalized record is merged into `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent approval and CI, repeat merge-time CAS, then start implementation from that claim merge or later `main`. |
+| Authorization Evidence | PR #190 exact-head aggregation `5247748807` and single-maintainer authorization `5247820370` were bound to `11b7dc52`; merge-time CAS produced effective claim commit `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`. |
+| Implementation PR | #191 (head `74199395`) |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Obtain exact-head independent approval and green CI for implementation PR #191; after merge, record its existing implementation SHA as Completion Commit and synchronize derived views. |
 
 ## Closure Ledger
 
@@ -122,11 +122,15 @@ selection. PR #189 is limited to I184 closeout and does not overlap this validat
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-10 | Selection | Inventoried I159-I162 as Blocked, I184 closeout as non-overlapping Review work, R04 as Partial, all sibling children as separately unclaimed, archival PRs #120/#121 as immutable, and no AG-12 overlap. Draft claim submission is pending and has no target-branch effect. |
+| 2026-08-10 | Selection | Inventoried I159-I162 as Blocked, I184 closeout as non-overlapping Review work, R04 as Partial, all sibling children as separately unclaimed, archival PRs #120/#121 as immutable, and no AG-12 overlap. |
+| 2026-08-11 | Implementation | Effective claim merge `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`; implementation commit `74199395`; PR #191 opened at exact head with governance-only diff. |
 
 ## Verification Evidence
 
-- Pending claim validation and implementation evidence.
+- `python3 scripts/validate_sqlite_consumers.py . --self-test`: 17 cases passed; clean metadata reports the existing five consumers, three layered packages, one resolved version each, bundled features, and zero `talos-models` dependents.
+- `scripts/validate_project_governance.sh .`: 0 warnings; `bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
+- `python3 scripts/audit_architecture.py .`: 21 crates, no internal dependency cycles; `scripts/assess_project_scale.sh .`: high-risk / release-managed / required-worktree profile.
+- Implementation PR #191 head `74199395`; exact-head CI and independent review pending.
 
 ## Completion Evidence
 
