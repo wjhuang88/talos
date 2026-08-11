@@ -134,6 +134,7 @@ pub struct Tui {
     history_scroll: HistoryScrollState,
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
+    last_history_area: Option<ratatui::layout::Rect>,
     history_prefix_start: Option<usize>,
     last_frame_history_start: usize,
     last_splash_row_count: usize,
@@ -149,6 +150,27 @@ pub struct Tui {
     session_id: Option<String>,
     last_char_time: Option<Instant>,
     first_message_dispatched: bool,
+    selection: Option<SelectionState>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SelectionState {
+    anchor: (u16, u16),
+    focus: (u16, u16),
+    dragging: bool,
+    edge: i8,
+}
+
+impl SelectionState {
+    fn points(self) -> ((u16, u16), (u16, u16)) {
+        let anchor = (self.anchor.1, self.anchor.0);
+        let focus = (self.focus.1, self.focus.0);
+        if anchor <= focus {
+            (self.anchor, self.focus)
+        } else {
+            (self.focus, self.anchor)
+        }
+    }
 }
 
 impl Tui {
@@ -169,6 +191,7 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            last_history_area: None,
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
@@ -184,6 +207,7 @@ impl Tui {
             session_id: None,
             last_char_time: None,
             first_message_dispatched: false,
+            selection: None,
         })
     }
 
@@ -205,6 +229,7 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            last_history_area: None,
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
@@ -220,6 +245,7 @@ impl Tui {
             session_id: None,
             last_char_time: None,
             first_message_dispatched: false,
+            selection: None,
         }
     }
 

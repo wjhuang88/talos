@@ -1273,6 +1273,65 @@ fn mouse_scroll(kind: MouseEventKind) -> Event {
     })
 }
 
+fn mouse(kind: MouseEventKind, column: u16, row: u16) -> Event {
+    Event::Mouse(MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    })
+}
+
+#[test]
+fn selection_drag_isolated_from_composer_and_survives_resize() {
+    let mut state = TuiState::new();
+    state.input_append_str("draft");
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.last_history_viewport_height = 8;
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 8));
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        9,
+        4,
+    ));
+    tui.handle_input_event(&Event::Resize(8, 4));
+
+    assert_eq!(tui.state.input_buffer, "draft");
+    assert_eq!(tui.state.cursor_byte_pos(), "draft".len());
+    let selection = tui.selection.expect("selection remains active");
+    assert_eq!(selection.anchor, (2, 1));
+    assert_eq!(selection.focus, (7, 3));
+    assert!(selection.dragging);
+}
+
+#[test]
+fn selection_edge_tick_autoscrolls_only_while_dragging() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.selection = Some(super::SelectionState {
+        anchor: (3, 5),
+        focus: (3, 0),
+        dragging: true,
+        edge: -1,
+    });
+
+    tui.advance_processing_frame();
+    assert!(matches!(
+        tui.history_scroll.mode,
+        crate::history_projection::HistoryScrollMode::Anchored { .. }
+    ));
+
+    let anchored = tui.history_scroll.clone();
+    tui.selection.as_mut().expect("selection").dragging = false;
+    tui.advance_processing_frame();
+    assert_eq!(tui.history_scroll, anchored);
+}
+
 #[test]
 fn entry_point_shift_enter_inserts_newline_without_sending() {
     let mut state = TuiState::new();

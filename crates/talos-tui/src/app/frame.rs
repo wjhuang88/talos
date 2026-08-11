@@ -175,6 +175,7 @@ impl Tui {
         );
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
         self.last_history_viewport_height = history_height;
+        self.last_history_area = app_layout.history;
         let history = project_history(
             &self.transcript,
             screen_size.width,
@@ -198,6 +199,7 @@ impl Tui {
         let frame_history_start = self.history_prefix_start.unwrap_or(natural_start);
         self.last_frame_history_start = frame_history_start;
         self.last_splash_row_count = splash_rows;
+        let selection = self.selection.map(SelectionState::points);
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
@@ -232,6 +234,9 @@ impl Tui {
             }
             if let Some(area) = app_layout.status {
                 status_comp.render(frame, area);
+            }
+            if let Some((start, end)) = selection {
+                frame.highlight_selection(start, end);
             }
         })?;
 

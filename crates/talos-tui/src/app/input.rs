@@ -404,16 +404,84 @@ impl Tui {
                     return false;
                 }
                 match mouse.kind {
+                    MouseEventKind::Down(event::MouseButton::Left) => {
+                        self.selection = Some(SelectionState {
+                            anchor: (mouse.column, mouse.row),
+                            focus: (mouse.column, mouse.row),
+                            dragging: true,
+                            edge: 0,
+                        });
+                    }
+                    MouseEventKind::Drag(event::MouseButton::Left) => {
+                        let edge = self.last_history_area.map_or(0, |area| {
+                            if mouse.row == area.y {
+                                -1
+                            } else if mouse.row + 1 == area.bottom() {
+                                1
+                            } else {
+                                0
+                            }
+                        });
+                        if let Some(selection) = self.selection.as_mut() {
+                            selection.focus = (mouse.column, mouse.row);
+                            selection.edge = edge;
+                        }
+                    }
+                    MouseEventKind::Up(event::MouseButton::Left) => {
+                        if let Some(selection) = self.selection.as_mut() {
+                            selection.dragging = false;
+                            selection.edge = 0;
+                            let (start, end) = selection.points();
+                            let text = self.terminal.selected_text(start, end);
+                            if !text.is_empty() {
+                                match crate::clipboard::copy_text(&text) {
+                                    Ok(backend) => {
+                                        self.state.tip = Some(Tip {
+                                            kind: TipKind::Info,
+                                            text: format!(
+                                                "Copied selection to clipboard (via {backend:?})"
+                                            ),
+                                            ttl: Duration::from_secs(3),
+                                            created_at: Instant::now(),
+                                        });
+                                    }
+                                    Err(error) => {
+                                        self.state.tip = Some(Tip {
+                                            kind: TipKind::Error,
+                                            text: format!("Failed to copy selection: {error:?}"),
+                                            ttl: Duration::from_secs(4),
+                                            created_at: Instant::now(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                     MouseEventKind::ScrollUp => {
+                        if self.selection.is_some_and(|selection| selection.dragging) {
+                            return false;
+                        }
                         self.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
                     }
                     MouseEventKind::ScrollDown => {
+                        if self.selection.is_some_and(|selection| selection.dragging) {
+                            return false;
+                        }
                         self.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, height);
                     }
                     _ => {}
                 }
             }
-            Event::Resize(_, _) => {}
+            Event::Resize(width, height) => {
+                if let Some(selection) = self.selection.as_mut() {
+                    let max_x = width.saturating_sub(1);
+                    let max_y = height.saturating_sub(1);
+                    selection.anchor.0 = selection.anchor.0.min(max_x);
+                    selection.anchor.1 = selection.anchor.1.min(max_y);
+                    selection.focus.0 = selection.focus.0.min(max_x);
+                    selection.focus.1 = selection.focus.1.min(max_y);
+                }
+            }
             _ => {}
         }
         false
