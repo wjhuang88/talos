@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Work Slice | Implement only PERM-006-A / I189: add one structured permission request/context/per-facet decision-report evaluator, delegate existing permission entrypoints to it, preserve current Deny/Ask/Allow outcomes and compatibility-visible Deny messages, and add provenance, redaction, fail-closed and order-independence tests. No approval routing, wrapper removal, grant/store, AlwaysApprove, typed-resource, policy, sandbox, PERM-006-B/C/D/E, PERM-007, TOOL-024, ACP or release change. |
+| Claimed At | 2026-08-11 |
 | Source Issue | #53 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent security review; this draft has no ownership effect. |
+| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Finalize and merge the independently reviewed claim before implementation; explicitly disposition current non-terminal iterations before activation. |
+| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #197 before implementation; explicitly disposition current non-terminal iterations before activation. |
 
 ## Published Baseline
 
@@ -97,11 +97,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-11 | Selection | PERM-006-A selected as a Planned additive foundation only. The draft claim is ineffective and no implementation branch is authorized before finalized independent review, validation, CAS and target-branch merge. |
+| 2026-08-11 | Selection | PERM-006-A selected as a Planned additive foundation only. PR #197 proposes the claim but remains ineffective before merge; no implementation branch is authorized before independent review, validation and CAS. |
 
 ## Verification Evidence
 
-- Pending finalized claim head.
+- PR #197 records the finalized proposed claim; exact-head CI, both governance validators, independent security review and merge-time CAS gate merge.
 
 ## Completion Evidence
 

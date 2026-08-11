@@ -5,7 +5,7 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Planned — selected by proposed I189 claim; additive compatibility baseline published |
+| Status | Planned — claim PR #197 pending independent security review |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
 | Selected Iteration | I189 (proposed; no authority before target-branch claim merge) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Work Slice | Implement only PERM-006-A / I189: add one structured permission request/context/per-facet decision-report evaluator, delegate existing permission entrypoints to it, preserve current Deny/Ask/Allow outcomes and compatibility-visible Deny messages, and add provenance, redaction, fail-closed and order-independence tests. No approval routing, wrapper removal, grant/store, AlwaysApprove, typed-resource, policy, sandbox, PERM-006-B/C/D/E, PERM-007, TOOL-024, ACP or release change. |
+| Claimed At | 2026-08-11 |
 | Source Issue | #53 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent security review; this draft has no ownership effect. |
+| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Finalize the claim with the actual PR number, obtain independent security review, pass exact-head CI and merge-time CAS, and merge the claim before implementation. |
+| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #197 before implementation. |
 
 ## Identity / Goal / Value
 

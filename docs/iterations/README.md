@@ -55,7 +55,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I185 | SQLite Validator Policy Integrity | Planned / claim effective | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12 under claim merge `5fe56fa8`; implementation PR #191 is non-overlapping with TUI work. |
  | I186 | TUI Visible-Cell Selection And Copy | Planned / claim pending | [I186](I186-tui-visible-cell-selection.md) selects only TUI-046-B / Issue #134: ordinary application-owned drag selection, edge autoscroll, resize continuity, existing clipboard backend, strict input isolation and post-implementation two-terminal acceptance. No authority before claim merge. |
 | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Planned / claim PR #194 | [I187](I187-session008a-partial-turn-lifecycle.md) selects the lifecycle, durable incomplete-turn and compatibility decision prerequisite for #49. Claim is proposed in PR #194 and has no authority until merge; no SESSION-008-B or RUNTIME-005 implementation authority before ADR acceptance. |
-| I189 | PERM-006-A Structured Permission Decisions | Planned / claim draft pending | [I189](I189-perm006a-structured-permission-decisions.md) proposes only the behavior-preserving structured request/context/report foundation for Issues #52/#53. Independent security review and target-branch claim merge gate all implementation. |
+| I189 | PERM-006-A Structured Permission Decisions | Planned / claim PR #197 | [I189](I189-perm006a-structured-permission-decisions.md) proposes only the behavior-preserving structured request/context/report foundation for Issues #52/#53. Independent security review and target-branch claim merge gate all implementation. |
 
 ## Completed This Closeout
 
