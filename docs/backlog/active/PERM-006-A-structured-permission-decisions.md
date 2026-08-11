@@ -5,9 +5,9 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Refinement — additive API and compatibility shape require design |
+| Status | Planned — selected by proposed I189 claim; additive compatibility baseline published |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
-| Selected Iteration | None |
+| Selected Iteration | I189 (proposed; no authority before target-branch claim merge) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
 
 ## Collaboration Claim
@@ -20,12 +20,12 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #53 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending exact-head independent security review; this draft has no ownership effect. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Finalize the claim with the actual PR number, obtain independent security review, pass exact-head CI and merge-time CAS, and merge the claim before implementation. |
 
 ## Identity / Goal / Value
 

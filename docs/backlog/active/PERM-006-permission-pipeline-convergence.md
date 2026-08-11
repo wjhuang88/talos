@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | Refinement — staged children are unclaimed and unscheduled |
+| Status | Refinement — PERM-006-A selected by proposed I189 claim; B-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | None |
+| Selected Iteration | I189 proposes PERM-006-A only; ineffective until claim merge |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
