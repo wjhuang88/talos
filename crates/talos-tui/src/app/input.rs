@@ -456,7 +456,7 @@ impl Tui {
                     if let Some(selection) = self.selection.as_mut() {
                         selection.focus = (mouse.column, mouse.row);
                         selection.edge = edge;
-                        selection.update_history_focus(history_focus, inside_history);
+                        selection.update_history_focus(history_focus, inside_history || edge != 0);
                     }
                 }
                 MouseEventKind::Up(event::MouseButton::Left) => {
@@ -467,7 +467,10 @@ impl Tui {
                     });
                     if let Some(mut selection) = self.selection {
                         selection.focus = (mouse.column, mouse.row);
-                        selection.update_history_focus(history_focus, inside_history);
+                        selection.update_history_focus(
+                            history_focus,
+                            inside_history || selection.edge != 0,
+                        );
                         if selection.anchor == selection.focus {
                             self.selection = None;
                             return false;

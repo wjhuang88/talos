@@ -1563,6 +1563,28 @@ fn drag_near_history_edge_arms_autoscroll() {
 }
 
 #[test]
+fn drag_below_history_edge_keeps_logical_focus() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 10));
+    tui.last_frame_history_start = 20;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        5,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        2,
+        12,
+    ));
+
+    let selection = tui.selection.expect("selection");
+    assert_eq!(selection.edge, 1);
+    assert!(selection.history_focus.is_some());
+}
+
+#[test]
 fn completed_history_highlight_moves_with_scrolled_content() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
     tui.terminal

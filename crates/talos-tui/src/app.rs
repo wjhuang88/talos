@@ -180,9 +180,9 @@ impl SelectionState {
     fn update_history_focus(
         &mut self,
         history_focus: Option<HistorySelectionPoint>,
-        inside_history: bool,
+        keep_on_missing: bool,
     ) {
-        if self.history_anchor.is_some() && (history_focus.is_some() || !inside_history) {
+        if self.history_anchor.is_some() && (history_focus.is_some() || !keep_on_missing) {
             self.history_focus = history_focus;
         }
     }
