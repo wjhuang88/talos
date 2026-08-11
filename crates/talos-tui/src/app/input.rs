@@ -442,7 +442,9 @@ impl Tui {
                     let edge = self.last_history_area.map_or(0, |area| {
                         if mouse.row <= area.y.saturating_add(1) {
                             -1
-                        } else if mouse.row.saturating_add(2) >= area.bottom() {
+                        } else if mouse.row >= area.bottom().saturating_sub(2)
+                            && mouse.row < area.bottom().saturating_add(2)
+                        {
                             1
                         } else {
                             0
