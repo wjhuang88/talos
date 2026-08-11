@@ -1,6 +1,6 @@
 # Iteration I186: TUI Visible-Cell Selection And Copy
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-11
 > Planned objective: implement the Accepted ADR-054 application-owned visible-cell selection policy so ordinary mouse drag selects and copies arbitrary rendered TUI text without Shift or unrelated Talos state mutation.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
-| Implementation PR | Not started |
+| Implementation PR | #193 (current head `6473d9f6`) |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI on PR #192, repeat merge-time CAS, and merge this governance-only claim before Rust implementation. |
+| Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
 
 ## Closure Ledger
 
@@ -138,10 +138,11 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-11 | Selection | Maintainer priority keeps #134 at P0 and defers real-terminal acceptance until after development. I184 and ADR-054 gates are complete; I185/#191 is non-overlapping; no TUI-046-B claim, implementation PR or remote branch exists. Draft claim remains ineffective until target-branch merge. |
+| 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 opened, then advanced to `6473d9f6` with visible-frame selection, history edge autoscroll extension, resize clamping, clipboard copy and focused tests. |
 
 ## Verification Evidence
 
-- Pending finalized claim validation and implementation evidence.
+- PR #193 head `6473d9f6`: `cargo test -p talos-tui --locked` 491 passed; focused Unicode buffer/selection, resize isolation and edge-tick tests pass; Clippy/check/fmt/diff checks pass. Exact-head CI and real-terminal matrix remain pending.
 
 ## Completion Evidence
 

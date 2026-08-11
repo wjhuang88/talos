@@ -7,7 +7,7 @@
 | Priority | P0 |
 | Status | Active — TUI-046-A Complete; TUI-046-B implementation is ready for a separate claim |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I186 (proposed; claim ineffective until target-branch merge) |
+| Selected Iteration | I186 (Review) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -24,9 +24,16 @@
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. TUI-046-A authorization remains recorded in its completion evidence below. |
-| Implementation PR | Not started |
+| Implementation PR | #193 (current head `6473d9f6`) |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI, repeat merge-time CAS, and merge governance-only PR #192 before Rust implementation; then obtain exact-head implementation review, CI and two-terminal matrix before completion. |
+| Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
+
+### TUI-046-B Execution Evidence
+
+- Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b1` (I186 claim PR #192).
+- Implementation PR: #193, current exact head `6473d9f6`.
+- Focused validation before CI: `cargo test -p talos-tui --locked` (491 passed), `cargo clippy -p talos-tui --locked -- -D warnings`, `cargo check -p talos-tui --locked`, and `git diff --check`.
+- Real-terminal matrix remains intentionally pending and is an acceptance gate, not claimed by unit tests.
 
 ### TUI-046-A Completion Evidence
 
