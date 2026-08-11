@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-11 |
 | Work Slice | Implement only ARCH-034-R04-AG12: introduce one versioned structured SQLite-consumer policy named normatively by ADR-008 and loaded by `scripts/validate_sqlite_consumers.py`; preserve the exact accepted set and all locked graph/bundled/version/isolation semantics; explicitly retain `cargo metadata --locked` with fail-closed host/toolchain/cache failures and no `--frozen`/offline fallback; decode Cargo stdout strictly as UTF-8 while escaping undecodable stderr bytes; add controlled cross-platform fixtures and synchronize evidence. No Rust, Cargo, runtime, SQLite consumer, schema, migration, timeout, retry, network policy, AG-11 or other R04 child change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-11 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review (proposed) |
-| Authorization Evidence | Claim review and exact-head CI pending. The proposal has no ownership effect until the finalized record is merged into `main`. |
+| Governance Claim PR | #190 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Exact-head claim review is requested on PR #190; the proposed claim has no ownership effect until the finalized record is merged into `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent approval and CI, repeat merge-time CAS, then start implementation from that claim merge or later `main`. |

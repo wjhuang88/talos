@@ -4,7 +4,7 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | PR #184 review residuals 3-5 / validator policy linkage and diagnostics |
-| Status | Planned — I185 governance claim pending |
+| Status | Planned — I185 claim under review |
 | Priority | P2 |
 | Selected Iteration | I185 (Planned; claim ineffective until target-branch merge) |
 | Preserved behavior | ADR-008 accepted consumers, locked graph semantics, bundled SQLite behavior and standard governance results |
@@ -13,15 +13,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-11 |
 | Work Slice | Implement only I185/ARCH-034-R04-AG12: replace the validator-local accepted-consumer constant with one versioned structured policy file that ADR-008 names as its exact machine-readable allowlist; preserve the five accepted consumers, workspace-boundary graph rule, bundled-feature/version/isolation checks and `cargo metadata --locked` invocation; document the current Cargo/toolchain/cache dependency as fail-closed without adding `--frozen` or offline fallback; preserve invalid-stdout rejection while rendering non-UTF-8 Cargo stderr with escaped offending bytes; add focused policy-drift and decoding fixtures; synchronize governance evidence only. No Rust, Cargo manifest/lock, SQLite consumer, runtime, schema, migration, timeout, retry, network-policy or AG-11 change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-11 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review (proposed) |
-| Authorization Evidence | PR #184 independent reviews `5235077449` and `5235367999` classified these findings as non-blocking follow-up. Exact-head claim review and CI remain pending; this proposal is ineffective until merged to `main`. |
+| Governance Claim PR | #190 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #184 independent reviews `5235077449` and `5235367999` classified these findings as non-blocking follow-up. Exact-head claim review is requested on PR #190; this claim remains ineffective until the finalized record is merged to `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-10 |
 | Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent review and CI, repeat merge-time CAS, and merge the governance-only claim before implementation. |
