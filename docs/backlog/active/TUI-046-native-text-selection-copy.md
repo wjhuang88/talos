@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
 | Work Slice | Implement only I186/TUI-046-B under the Accepted ADR-054 amendment: bounded application-owned selection over last-rendered visible cells; ordinary primary-button drag without Shift; highlight, history-edge autoscroll, resize clamping and copy via the existing clipboard backend; strict input-state/privacy isolation; focused mixed-width/render/lifecycle tests, docs and exact-head two-terminal acceptance. Preserve Alternate Screen, keyboard history, current non-selection wheel policy, `/copy`, restoration and all non-TUI runtime behavior. Exclude TUI-042, hidden content, transcript/export/persistence, rich persistent selection, dependencies and unrelated product changes. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-11 |
 | Source Issue | #134 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not assigned |
-| Authorization Evidence | Not applicable while Unclaimed; draft I186 claim has no target-branch effect. TUI-046-A authorization remains recorded in its completion evidence below. |
+| Governance Claim PR | #192 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. TUI-046-A authorization remains recorded in its completion evidence below. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Finalize and merge the governance-only I186 claim before Rust implementation; then obtain exact-head implementation review, CI and two-terminal matrix before completion. |
+| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI, repeat merge-time CAS, and merge governance-only PR #192 before Rust implementation; then obtain exact-head implementation review, CI and two-terminal matrix before completion. |
 
 ### TUI-046-A Completion Evidence
 

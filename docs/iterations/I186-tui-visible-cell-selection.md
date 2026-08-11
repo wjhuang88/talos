@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
 | Work Slice | Implement only TUI-046-B / Issue #134 under the Accepted ADR-054 amendment: add bounded application-owned selection over the last rendered visible cells; ordinary primary-button down/drag/up without Shift; selection highlight; history-viewport edge autoscroll during drag; clamped, non-disappearing resize handling; copy completed selection with the existing OSC 52/macOS clipboard backend and truthful status; isolate pointer selection from history/composer/modal/approval/session/execution mutation; preserve keyboard history, existing wheel policy, `/copy`, Alternate Screen and exhaustive terminal restoration; add focused mixed-width/wrapped/panel/state-isolation/lifecycle tests, user docs and exact-head two-terminal acceptance evidence. No transcript/export/persistence/provider/permission/scheduler change, hidden-content access, rich persistent selection, dependency or unrelated TUI-042 work. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-11 |
 | Source Issue | #134 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not assigned |
-| Authorization Evidence | Not applicable while Unclaimed; draft claim has no target-branch effect. |
+| Governance Claim PR | #192 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Finalize the claim PR number and exact head, obtain allowed authorization and CI, repeat merge-time CAS, and merge this governance-only claim before Rust implementation. |
+| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI on PR #192, repeat merge-time CAS, and merge this governance-only claim before Rust implementation. |
 
 ## Closure Ledger
 
