@@ -5,7 +5,7 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Active — TUI-046-A Complete; TUI-046-B implementation is ready for a separate claim |
+| Status | Active — TUI-046-A Complete; TUI-046-B implementation is in Review at PR #193 |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
 | Selected Iteration | I186 (Review) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
@@ -23,7 +23,7 @@
 | Source Issue | #134 |
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. TUI-046-A authorization remains recorded in its completion evidence below. |
+| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. Claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 is the effective review surface. TUI-046-A authorization remains recorded in its completion evidence below. |
 | Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
 | Last Updated | 2026-08-11 |
 | Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
@@ -31,8 +31,8 @@
 ### TUI-046-B Execution Evidence
 
 - Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b1` (I186 claim PR #192).
-- Implementation PR: #193; existing implementation commits include `dabd31e2`, `6473d9f6`, and `cf2e06a3`.
-- Focused validation before CI: `cargo test -p talos-tui --locked` (493 tests after focused additions), `cargo clippy -p talos-tui --locked -- -D warnings`, `cargo check -p talos-tui --locked`, and `git diff --check`.
+- Implementation PR: #193; current exact implementation head is `39639c37`, with implementation commits `dabd31e2`, `6473d9f6`, `cf2e06a3`, `c53652a9`, and `39639c37`.
+- Focused validation at the current head: `cargo test -p talos-tui --locked` (501 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, both governance validators (0 warnings), and `git diff --check`.
 - Real-terminal matrix remains intentionally pending and is an acceptance gate, not claimed by unit tests.
 
 ### TUI-046-A Completion Evidence
@@ -102,7 +102,7 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Complete in I184 | Completion Commit `f98488277803ee26180100089a48ef850939234b`; review `5237824299`; CI `31370219799` |
-| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Ready to claim | ADR-054 I184 amendment Accepted; separate claim required |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Review / PR #193 | ADR-054 I184 amendment Accepted; effective claim merged at `f4faa38e`; exact-head review and terminal matrix remain required |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
 from unit tests alone. The parent closes only after both terminal environments
