@@ -1,7 +1,7 @@
 use super::*;
 
 impl Tui {
-    fn history_selection_point_at_screen(
+    pub(super) fn history_selection_point_at_screen(
         &self,
         column: u16,
         row: u16,
@@ -440,9 +440,9 @@ impl Tui {
                 }
                 MouseEventKind::Drag(event::MouseButton::Left) => {
                     let edge = self.last_history_area.map_or(0, |area| {
-                        if mouse.row == area.y {
+                        if mouse.row <= area.y.saturating_add(1) {
                             -1
-                        } else if mouse.row.saturating_add(1) == area.bottom() {
+                        } else if mouse.row.saturating_add(2) >= area.bottom() {
                             1
                         } else {
                             0
@@ -450,22 +450,24 @@ impl Tui {
                     });
                     let history_focus =
                         self.history_selection_point_at_screen(mouse.column, mouse.row);
+                    let inside_history = self.last_history_area.is_some_and(|area| {
+                        area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
+                    });
                     if let Some(selection) = self.selection.as_mut() {
                         selection.focus = (mouse.column, mouse.row);
                         selection.edge = edge;
-                        if selection.history_anchor.is_some() {
-                            selection.history_focus = history_focus;
-                        }
+                        selection.update_history_focus(history_focus, inside_history);
                     }
                 }
                 MouseEventKind::Up(event::MouseButton::Left) => {
                     let history_focus =
                         self.history_selection_point_at_screen(mouse.column, mouse.row);
+                    let inside_history = self.last_history_area.is_some_and(|area| {
+                        area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
+                    });
                     if let Some(mut selection) = self.selection {
                         selection.focus = (mouse.column, mouse.row);
-                        if selection.history_anchor.is_some() {
-                            selection.history_focus = history_focus;
-                        }
+                        selection.update_history_focus(history_focus, inside_history);
                         if selection.anchor == selection.focus {
                             self.selection = None;
                             return false;

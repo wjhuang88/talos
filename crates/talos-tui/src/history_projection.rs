@@ -141,6 +141,104 @@ impl HistoryProjection {
         lines.join("\n")
     }
 
+    /// Projects a logical selection onto the currently rendered frame.
+    ///
+    /// Logical anchors outlive wrapping and scrolling, so the highlight must
+    /// be derived from the current row projection rather than stale pointer
+    /// coordinates. Rows outside the viewport are clipped while preserving the
+    /// full-row span between the logical endpoints.
+    pub(crate) fn visible_selection(
+        &self,
+        start: HistorySelectionPoint,
+        end: HistorySelectionPoint,
+        frame_start: usize,
+        prefix_rows: usize,
+        area: ratatui::layout::Rect,
+    ) -> Option<((u16, u16), (u16, u16))> {
+        if area.width == 0 || area.height == 0 {
+            return None;
+        }
+
+        let (start, end) = if start.order_key() <= end.order_key() {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        let start_key = (start.anchor.entry_id, start.anchor.logical_line);
+        let end_key = (end.anchor.entry_id, end.anchor.logical_line);
+        let mut selected_rows = Vec::new();
+
+        for (row_index, row) in self.all_rows.iter().enumerate() {
+            let key = (row.start_anchor.entry_id, row.start_anchor.logical_line);
+            if key < start_key || key > end_key {
+                continue;
+            }
+
+            let row_start = row.start_anchor.scalar_offset;
+            let row_end = row.end_anchor.scalar_offset;
+            let selected_start = if key == start_key {
+                start.anchor.scalar_offset
+            } else {
+                row_start
+            };
+            let selected_end = if key == end_key {
+                end.scalar_end
+            } else {
+                row_end
+            };
+            if selected_start >= selected_end {
+                continue;
+            }
+
+            let rendered = row
+                .line
+                .segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>();
+            let start_col = if key == start_key {
+                display_column_for_scalar(&rendered, selected_start)
+            } else {
+                0
+            };
+            let end_col = if key == end_key {
+                display_column_for_scalar(&rendered, selected_end).saturating_sub(1)
+            } else {
+                usize::from(area.width.saturating_sub(1))
+            };
+            selected_rows.push((prefix_rows.saturating_add(row_index), start_col, end_col));
+        }
+
+        let first_selected = selected_rows.first()?.0;
+        let last_selected = selected_rows.last()?.0;
+        let visible_end = frame_start.saturating_add(usize::from(area.height));
+        let visible = selected_rows
+            .into_iter()
+            .filter(|(row, _, _)| *row >= frame_start && *row < visible_end)
+            .collect::<Vec<_>>();
+        let first = visible.first()?;
+        let last = visible.last()?;
+        let start_col = if first.0 == first_selected {
+            first.1
+        } else {
+            0
+        };
+        let end_col = if last.0 == last_selected {
+            last.2
+        } else {
+            usize::from(area.width.saturating_sub(1))
+        };
+        let to_screen = |row: usize, col: usize| {
+            (
+                area.x
+                    .saturating_add(col.min(usize::from(area.width.saturating_sub(1))) as u16),
+                area.y
+                    .saturating_add(row.saturating_sub(frame_start) as u16),
+            )
+        };
+        Some((to_screen(first.0, start_col), to_screen(last.0, end_col)))
+    }
+
     pub(crate) fn first_anchor(&self) -> Option<LogicalContentAnchor> {
         self.all_rows.first().map(|row| row.start_anchor)
     }
@@ -189,6 +287,17 @@ fn scalar_span_at_display_cell(text: &str, target: u16) -> (usize, usize) {
         column = column.saturating_add(width);
     }
     (chars.len(), chars.len())
+}
+
+fn display_column_for_scalar(text: &str, scalar: usize) -> usize {
+    let mut column = 0usize;
+    for (scalar_index, ch) in text.chars().enumerate() {
+        if scalar_index >= scalar {
+            break;
+        }
+        column = column.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0));
+    }
+    column
 }
 
 fn select_scalar_range(text: &str, first: usize, end: usize) -> String {
@@ -830,6 +939,29 @@ mod tests {
 
         let wide = project_history(&transcript, 10, 10, &HistoryScrollState::follow_tail());
         assert_eq!(wide.selected_text(start, end), "bcdefgh");
+    }
+
+    #[test]
+    fn visible_selection_reprojects_after_scroll() {
+        let mut transcript = TranscriptStore::default();
+        for text in ["alpha", "bravo", "charlie"] {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+        }
+        let projection = project_history(&transcript, 20, 3, &HistoryScrollState::follow_tail());
+        let start = projection.selection_point(0, 0).expect("start");
+        let end = projection.selection_point(2, 6).expect("end");
+        let area = ratatui::layout::Rect::new(0, 0, 20, 3);
+
+        assert_eq!(
+            projection.visible_selection(start, end, 1, 1, area),
+            Some(((0, 0), (6, 2)))
+        );
+        assert_eq!(
+            projection.visible_selection(start, end, 2, 1, area),
+            Some(((0, 0), (6, 1)))
+        );
     }
 
     #[test]

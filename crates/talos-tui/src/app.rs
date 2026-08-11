@@ -176,6 +176,16 @@ impl SelectionState {
             (self.focus, self.anchor)
         }
     }
+
+    fn update_history_focus(
+        &mut self,
+        history_focus: Option<HistorySelectionPoint>,
+        inside_history: bool,
+    ) {
+        if self.history_anchor.is_some() && (history_focus.is_some() || !inside_history) {
+            self.history_focus = history_focus;
+        }
+    }
 }
 
 impl Tui {

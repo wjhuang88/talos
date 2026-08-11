@@ -291,26 +291,17 @@ impl Tui {
         let Some(selection) = self.selection else {
             return;
         };
-        if !selection.dragging || selection.edge == 0 || self.last_history_viewport_height == 0 {
+        if !selection.dragging
+            || selection.edge == 0
+            || selection.history_anchor.is_none()
+            || self.last_history_viewport_height == 0
+        {
             return;
         }
         if selection.edge < 0 {
-            if let Some(anchor) = self
-                .last_history_projection
-                .page_up(self.last_history_viewport_height)
-            {
-                self.history_scroll.anchor(anchor, 0);
-            }
-        } else if self
-            .last_history_projection
-            .page_down_reaches_tail(self.last_history_viewport_height)
-        {
-            self.history_scroll.jump_to_end();
-        } else if let Some(anchor) = self
-            .last_history_projection
-            .page_down(self.last_history_viewport_height)
-        {
-            self.history_scroll.anchor(anchor, 0);
+            self.scroll_frame_history_up(1);
+        } else {
+            self.scroll_frame_history_down(1, self.last_history_viewport_height);
         }
     }
 }

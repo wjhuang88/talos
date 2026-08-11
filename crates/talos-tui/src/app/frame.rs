@@ -218,7 +218,22 @@ impl Tui {
         self.last_frame_history_start = frame_history_start;
         self.last_splash_row_count = splash_rows;
         self.last_history_prefix_row_count = splash_rows.saturating_add(startup_spacer_rows);
-        let selection = self.selection.map(SelectionState::points);
+        let selection = self.selection.and_then(|selection| {
+            match (
+                selection.history_anchor,
+                selection.history_focus,
+                app_layout.history,
+            ) {
+                (Some(start), Some(end), Some(area)) => history.visible_selection(
+                    start,
+                    end,
+                    frame_history_start,
+                    self.last_history_prefix_row_count,
+                    area,
+                ),
+                _ => Some(selection.points()),
+            }
+        });
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
