@@ -21,7 +21,7 @@
 | Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
 | Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
+| Handoff / Release Condition | The exact code-head two-terminal matrix is recorded; obtain exact final PR-head review and green CI for PR #193, then perform merge-time CAS and record the real merge SHA before completion. |
 
 ## Closure Ledger
 
@@ -140,10 +140,13 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 | 2026-08-11 | Selection | Maintainer priority keeps #134 at P0 and defers real-terminal acceptance until after development. I184 and ADR-054 gates are complete; I185/#191 is non-overlapping; no TUI-046-B claim, implementation PR or remote branch exists. Draft claim remains ineffective until target-branch merge. |
 | 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 contains existing commits `dabd31e2`, `6473d9f6`, and `cf2e06a3` for visible-frame selection, cross-screen history extension, resize clamping, clipboard copy, combining-cell preservation and focused tests. |
 | 2026-08-11 | Implementation refinement | Code commit `39639c37` adds stable logical selection coordinates across resize/reflow, splash-row mapping, final mouse-up coordinates, no-history-area selection, and preservation of selected trailing spaces; later PR #193 changes only synchronize documentation status. `cargo test -p talos-tui --locked` passes 501 tests plus 2 integration tests and 2 doctests; terminal matrix remains pending. |
+| 2026-08-11 | Manual-defect refinement | Exact-head terminal testing exposed stale screen-coordinate highlights after history movement, missing edge autoscroll/Logo traversal, wrapped-row over-highlighting and a bottom-component block. Commits `52c36ee1`, `86dce04b` and `f62a78a7` replace stale projection with logical-row reprojection, clamp wrapped-row ranges and retain history focus during edge drag. The attempted cross-component refinement `bfb5ae61` worsened the interaction and was explicitly rolled back by `fb2c4abe` at maintainer direction; the restored behavior passed the affected drag and offscreen-copy paths. |
+| 2026-08-11 | Clipboard compatibility | Terminal.app 2.15 on `fb2c4abe` rendered and retained selection but left the previous system clipboard value in place. Code inspection proved OSC 52 write success was incorrectly treated as terminal acceptance, making the existing `pbcopy` fallback unreachable when Terminal.app silently ignored the sequence. Commit `70b51e28` makes the existing macOS backend `pbcopy`-first with OSC 52 fallback, preserves OSC 52-first behavior elsewhere and adds backend-order tests without adding a dependency or expanding clipboard data scope. |
+| 2026-08-11 | Exact-code-head terminal acceptance | Code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` passed the published matrix on Alacritty 0.17.0 (`TERM=alacritty`) and macOS Terminal 2.15 (`TERM=xterm-256color`), both on macOS 26.5.2 (25F84), `TMUX=none`. Ordinary no-Shift drag, partial/wrapped/mixed-width copy, bidirectional edge autoscroll, Logo/offscreen traversal, wheel and PageUp/PageDown projection, resize, active streaming, normal exit and interrupted-output cleanup passed; exact observations live in the reference matrix. |
 
 ## Verification Evidence
 
-- PR #193 code through `39639c37` plus documentation-only status synchronization: 501 talos-tui tests plus 2 integration tests and 2 doctests pass; stable selection/reflow, Unicode buffer/selection, resize isolation, cross-screen history, edge-tick, and redraw-preservation tests pass. Clippy/check/fmt/diff and governance validators pass; exact-head CI and real-terminal matrix remain pending.
+- PR #193 code through `70b51e28`: 511 talos-tui tests plus 2 integration tests and 2 doctests pass; stable selection/reflow, Unicode buffer/selection, resize isolation, cross-screen history, bidirectional edge-tick, redraw preservation and macOS clipboard-backend ordering tests pass. `cargo fmt --all -- --check`, `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked` and `git diff --check` pass. After the evidence update, `./scripts/release_preflight.sh` passes the site/installer checks, locked workspace check, workspace Clippy, full workspace tests/doctests and both governance validators with 0 warnings. The exact code head passed both terminal rows; exact final PR-head CI, independent review and merge-time CAS remain pending.
 
 ## Completion Evidence
 
@@ -151,6 +154,8 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 
 ## Variance And Residuals
 
+- `bfb5ae61` is superseded by the explicit UX rollback `fb2c4abe`; it is retained in history as
+  truthful failed-refinement evidence and supplies no acceptance claim.
 - TUI-042/#79 and all broader terminal interaction work remain separately owned.
 
 ## Retrospective

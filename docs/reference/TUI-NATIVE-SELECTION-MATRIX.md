@@ -38,8 +38,8 @@ Populate only after TUI-046-B has an effective claim and exact implementation he
 
 | Talos SHA | Terminal / Version | OS / Platform | Multiplexer | Default Drag | Copied Text | Keyboard History | Wheel Policy | Content / Streaming / Resize | Restoration | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Exact implementation SHA required | Maintainer primary terminal | Exact version required | Exact version or `none` | Not run | Not run | Not run | Not run | Not run | Not run | Pending B |
-| Exact implementation SHA required | Materially different platform terminal | Exact version required | Exact version or `none` | Not run | Not run | Not run | Not run | Not run | Not run | Pending B |
+| `70b51e2835510c1a23f5bc5cd1521f41acc6805e` | Alacritty 0.17.0 (94e7c88), `TERM=alacritty` | macOS 26.5.2 (25F84) | `none` | Ordinary partial-line, cross-row and adjacent-component drag works without Shift; upward/downward edge drag autoscrolls through history and the Logo prefix; no stale fixed-screen highlight or bottom-component block | Release updates the system clipboard; ASCII, CJK, emoji, combining text, wrapped/long text and offscreen history paste exactly; macOS uses the tested `pbcopy` backend | PageUp/PageDown preserve logical selection and restore its highlight when selected content returns onscreen; composer input is unchanged | Non-drag wheel continues to scroll Talos history; highlight follows selected logical text and copied payload remains stable | Wrapped-row single-cell/short drag, active streaming/redraw and resize all retain a bounded selection without stale highlight; resized and streamed copies match | Normal `/quit` and an interrupted active-output cleanup restore input, cursor and mouse behavior with no escape leakage | Pass |
+| `70b51e2835510c1a23f5bc5cd1521f41acc6805e` | macOS Terminal 2.15, `TERM=xterm-256color` | macOS 26.5.2 (25F84) | `none` | Ordinary partial-line and cross-row drag works with mouse reporting enabled and no Shift; bidirectional history-edge drag autoscrolls and reaches offscreen text | Initial OSC 52-first build left the prior clipboard unchanged because Terminal.app silently ignored the written sequence; exact-head retest after the macOS `pbcopy`-first correction updates the clipboard and pastes ASCII, CJK, emoji, combining and wrapped/long text exactly | PageUp/PageDown and existing keyboard history behavior remain available; selection restores with its logical content | Non-drag wheel scrolls Talos history rather than terminal-native scrollback; selection tracks the application projection | Active streaming/redraw and resize preserve a bounded, correctly projected selection and copied text | Normal `/quit` and an interrupted active-output cleanup restore the shell without mouse escape leakage or input/cursor corruption | Pass |
 
 ## Interpretation
 
@@ -54,8 +54,13 @@ Populate only after TUI-046-B has an effective claim and exact implementation he
   selection. This independently rejects disabling reporting as the complete product policy.
 - A terminal-specific override is diagnostic evidence only; it is not the default product contract.
 - Passing one terminal does not generalize to another terminal, OS or multiplexer.
+- The implementation rows bind to the exact code head `70b51e28`. The Terminal.app failure on the
+  preceding `fb2c4abe` head exposed that a successful stdout write cannot prove OSC 52 was honored;
+  `70b51e28` uses the already-existing `pbcopy` backend first on macOS and retains OSC 52 as its
+  fallback. Alacritty and Terminal.app both passed clipboard and full interaction retests on that
+  code head.
 - Neither current-baseline row is a procedural pass: fixture coverage, active redraw and at least
   one failure-cleanup path remain unrecorded. The observed pointer/scroll/resize contrasts plus code
-  inventory are causal design evidence only. Complete cross-platform execution is deferred to
-  TUI-046-B implementation acceptance and does not block development start; TUI-046 cannot close
-  until both implementation rows pass on the exact B head.
+  inventory are causal design evidence only. TUI-046-B's separate implementation rows now pass on
+  exact code head `70b51e28`; TUI-046 still cannot close until final PR-head review/CI, merge-time
+  CAS and real merge evidence complete the implementation chain.

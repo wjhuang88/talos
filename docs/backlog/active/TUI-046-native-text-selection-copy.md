@@ -26,14 +26,14 @@
 | Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. Claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 is the effective review surface. TUI-046-A authorization remains recorded in its completion evidence below. |
 | Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
+| Handoff / Release Condition | The exact code-head two-terminal matrix is recorded; obtain exact final PR-head review and green CI for PR #193, then perform merge-time CAS and record the real merge SHA before completion. |
 
 ### TUI-046-B Execution Evidence
 
-- Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b1` (I186 claim PR #192).
-- Implementation PR: #193; latest code implementation commit is `39639c37`, followed only by documentation status synchronization. Exact PR head evidence is recorded by CI/review rather than self-referenced here.
-- Focused validation at the current head: `cargo test -p talos-tui --locked` (501 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, both governance validators (0 warnings), and `git diff --check`.
-- Real-terminal matrix remains intentionally pending and is an acceptance gate, not claimed by unit tests.
+- Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b` (I186 claim PR #192).
+- Implementation PR: #193; exact tested code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` includes the user-directed rollback of the worsened `bfb5ae61` interaction and the Terminal.app clipboard compatibility fix. Later evidence-only documentation commits do not replace that runtime evidence.
+- Focused validation at the tested code head: `cargo test -p talos-tui --locked` (511 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, and `git diff --check`. The evidence update also passes `./scripts/release_preflight.sh`, including locked workspace check, workspace Clippy, full workspace tests/doctests and both governance validators with 0 warnings.
+- The exact-code-head Alacritty 0.17.0 and macOS Terminal 2.15 rows pass ordinary no-Shift drag, mixed-width/wrapped copy, logical wheel/keyboard projection, bidirectional edge autoscroll, resize/streaming continuity and normal/interrupted cleanup. Exact final PR-head CI, independent review, merge-time CAS and merge evidence remain outstanding.
 
 ### TUI-046-A Completion Evidence
 
@@ -102,7 +102,7 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Complete in I184 | Completion Commit `f98488277803ee26180100089a48ef850939234b`; review `5237824299`; CI `31370219799` |
-| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Review / PR #193 | ADR-054 I184 amendment Accepted; effective claim merged at `f4faa38e`; exact-head review and terminal matrix remain required |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Review / PR #193 | ADR-054 I184 amendment Accepted; effective claim merged at `f4faa38e`; code-head terminal matrix passed; exact final PR-head CI/review and merge evidence remain required |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
 from unit tests alone. The parent closes only after both terminal environments
