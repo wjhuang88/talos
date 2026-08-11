@@ -19,7 +19,7 @@
 | Governance Claim PR | #194 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer direction authorizes this non-overlapping #49 prerequisite to proceed while I185/I186 review and terminal acceptance are batched for closeout; exact-head governance validation and no-overlap CAS remain required before merge. |
-| Implementation PR | Pending |
+| Implementation PR | #195 |
 | Last Updated | 2026-08-11 |
 | Handoff / Release Condition | Obtain exact-head review of ADR-058 and the current-path matrix; accept the decision before separately claiming SESSION-008-B. |
 
