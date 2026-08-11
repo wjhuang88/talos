@@ -19,7 +19,7 @@
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
-| Implementation PR | #193 (current head `6473d9f6`) |
+| Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
 | Last Updated | 2026-08-11 |
 | Handoff / Release Condition | Obtain exact-head implementation review and green CI for PR #193, then record the two-terminal matrix and merge-time CAS before completion. |
 
@@ -138,11 +138,11 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-11 | Selection | Maintainer priority keeps #134 at P0 and defers real-terminal acceptance until after development. I184 and ADR-054 gates are complete; I185/#191 is non-overlapping; no TUI-046-B claim, implementation PR or remote branch exists. Draft claim remains ineffective until target-branch merge. |
-| 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 opened, then advanced to `6473d9f6` with visible-frame selection, history edge autoscroll extension, resize clamping, clipboard copy and focused tests. |
+| 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 contains existing commits `dabd31e2`, `6473d9f6`, and `cf2e06a3` for visible-frame selection, cross-screen history extension, resize clamping, clipboard copy, combining-cell preservation and focused tests. |
 
 ## Verification Evidence
 
-- PR #193 head `6473d9f6`: `cargo test -p talos-tui --locked` 491 passed; focused Unicode buffer/selection, resize isolation and edge-tick tests pass; Clippy/check/fmt/diff checks pass. Exact-head CI and real-terminal matrix remain pending.
+- PR #193 existing implementation commits through `cf2e06a3`: 493 talos-tui tests after focused additions; Unicode buffer/selection, resize isolation, cross-screen history and edge-tick tests pass; Clippy/check/fmt/diff checks pass. Exact-head CI and real-terminal matrix remain pending.
 
 ## Completion Evidence
 
