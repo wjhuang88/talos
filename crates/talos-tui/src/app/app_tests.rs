@@ -1311,6 +1311,26 @@ fn selection_drag_isolated_from_composer_and_survives_resize() {
 }
 
 #[test]
+fn primary_click_without_drag_does_not_leave_a_selection() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.last_history_viewport_height = 8;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Up(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+
+    assert!(tui.selection.is_none());
+    assert!(tui.state.tip.is_none());
+}
+
+#[test]
 fn selection_edge_tick_autoscrolls_only_while_dragging() {
     let mut tui = tui_with_projected_history(10, 10);
     tui.selection = Some(super::SelectionState {

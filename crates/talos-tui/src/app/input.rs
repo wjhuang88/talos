@@ -453,9 +453,14 @@ impl Tui {
                         }
                     }
                     MouseEventKind::Up(event::MouseButton::Left) => {
-                        if let Some(selection) = self.selection.as_mut() {
+                        if let Some(mut selection) = self.selection {
+                            if selection.anchor == selection.focus {
+                                self.selection = None;
+                                return false;
+                            }
                             selection.dragging = false;
                             selection.edge = 0;
+                            self.selection = Some(selection);
                             let text = match (selection.history_anchor, selection.history_focus) {
                                 (Some(start), Some(end)) => {
                                     self.last_history_projection.selected_text(start, end)
