@@ -31,7 +31,7 @@
 ### TUI-046-B Execution Evidence
 
 - Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b1` (I186 claim PR #192).
-- Implementation PR: #193; current exact implementation head is `39639c37`, with implementation commits `dabd31e2`, `6473d9f6`, `cf2e06a3`, `c53652a9`, and `39639c37`.
+- Implementation PR: #193; latest code implementation commit is `39639c37`, followed only by documentation status synchronization. Exact PR head evidence is recorded by CI/review rather than self-referenced here.
 - Focused validation at the current head: `cargo test -p talos-tui --locked` (501 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, both governance validators (0 warnings), and `git diff --check`.
 - Real-terminal matrix remains intentionally pending and is an acceptance gate, not claimed by unit tests.
 

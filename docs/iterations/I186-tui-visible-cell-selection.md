@@ -139,11 +139,11 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 |---|---|---|
 | 2026-08-11 | Selection | Maintainer priority keeps #134 at P0 and defers real-terminal acceptance until after development. I184 and ADR-054 gates are complete; I185/#191 is non-overlapping; no TUI-046-B claim, implementation PR or remote branch exists. Draft claim remains ineffective until target-branch merge. |
 | 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 contains existing commits `dabd31e2`, `6473d9f6`, and `cf2e06a3` for visible-frame selection, cross-screen history extension, resize clamping, clipboard copy, combining-cell preservation and focused tests. |
-| 2026-08-11 | Implementation refinement | PR #193 exact head `39639c37` adds stable logical selection coordinates across resize/reflow, splash-row mapping, final mouse-up coordinates, no-history-area selection, and preservation of selected trailing spaces. `cargo test -p talos-tui --locked` passes 501 tests plus 2 integration tests and 2 doctests; terminal matrix remains pending. |
+| 2026-08-11 | Implementation refinement | Code commit `39639c37` adds stable logical selection coordinates across resize/reflow, splash-row mapping, final mouse-up coordinates, no-history-area selection, and preservation of selected trailing spaces; later PR #193 changes only synchronize documentation status. `cargo test -p talos-tui --locked` passes 501 tests plus 2 integration tests and 2 doctests; terminal matrix remains pending. |
 
 ## Verification Evidence
 
-- PR #193 current implementation head `39639c37`: 501 talos-tui tests plus 2 integration tests and 2 doctests pass; stable selection/reflow, Unicode buffer/selection, resize isolation, cross-screen history, edge-tick, and redraw-preservation tests pass. Clippy/check/fmt/diff and governance validators pass; exact-head CI and real-terminal matrix remain pending.
+- PR #193 code through `39639c37` plus documentation-only status synchronization: 501 talos-tui tests plus 2 integration tests and 2 doctests pass; stable selection/reflow, Unicode buffer/selection, resize isolation, cross-screen history, edge-tick, and redraw-preservation tests pass. Clippy/check/fmt/diff and governance validators pass; exact-head CI and real-terminal matrix remain pending.
 
 ## Completion Evidence
 
