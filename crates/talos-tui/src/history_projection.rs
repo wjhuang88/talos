@@ -180,12 +180,14 @@ impl HistoryProjection {
                 start.anchor.scalar_offset
             } else {
                 row_start
-            };
+            }
+            .max(row_start);
             let selected_end = if key == end_key {
                 end.scalar_end
             } else {
                 row_end
-            };
+            }
+            .min(row_end);
             if selected_start >= selected_end {
                 continue;
             }
@@ -197,12 +199,13 @@ impl HistoryProjection {
                 .map(|segment| segment.text.as_str())
                 .collect::<String>();
             let start_col = if key == start_key {
-                display_column_for_scalar(&rendered, selected_start)
+                display_column_for_scalar(&rendered, selected_start.saturating_sub(row_start))
             } else {
                 0
             };
             let end_col = if key == end_key {
-                display_column_for_scalar(&rendered, selected_end).saturating_sub(1)
+                display_column_for_scalar(&rendered, selected_end.saturating_sub(row_start))
+                    .saturating_sub(1)
             } else {
                 usize::from(area.width.saturating_sub(1))
             };
@@ -961,6 +964,23 @@ mod tests {
         assert_eq!(
             projection.visible_selection(start, end, 2, 1, area),
             Some(((0, 0), (6, 1)))
+        );
+    }
+
+    #[test]
+    fn visible_selection_limits_a_click_to_its_wrapped_row() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "abcdefghijklmnopqrstuvwxyz",
+            None,
+        )));
+        let projection = project_history(&transcript, 10, 3, &HistoryScrollState::follow_tail());
+        let point = projection.selection_point(1, 3).expect("wrapped point");
+        let area = ratatui::layout::Rect::new(0, 0, 10, 3);
+
+        assert_eq!(
+            projection.visible_selection(point, point, 0, 0, area),
+            Some(((3, 1), (3, 1)))
         );
     }
 
