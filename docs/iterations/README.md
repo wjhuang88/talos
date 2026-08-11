@@ -51,7 +51,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I181 | Native And Panic-Boundary Security Review | Complete | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; review/matrix disposition only, with no protected implementation. R04 child owners remain pending. |
 | I182 | Symbol Traversal Containment | Complete | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; exact source head `4b968823`, CI `31266112256`, independent review `5230395611`, and merge-time CAS passed. R04 remains Partial. |
 | I183 | Bundled SQLite ADR Reconciliation | Complete | Completion Commit `edf903aa96574043294923ad60b0cefe9730f8c4`; final source `0d9a5a7b`, CI `31349520295`, independent review `5235367999` and merge-time CAS passed. R04 remains Partial; AG-11 and AG-12 are separately unclaimed. |
-| I184 | TUI-046-A Native Selection Policy | Complete | Completion Commit `f98488277803ee26180100089a48ef850939234b`; reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`; review `5237824299`; CI `31370219799`. B is separately claimable; cross-platform testing is deferred to B acceptance. |
+ | I184 | TUI-046-A Native Selection Policy | Complete | Completion Commit `f98488277803ee26180100089a48ef850939234b`; reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`; review `5237824299`; CI `31370219799`. B is separately claimable; cross-platform testing is deferred to B acceptance. |
+ | I185 | SQLite Validator Policy Integrity | Planned / claim pending | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12: one structured ADR allowlist, preserved `cargo metadata --locked` fail-closed policy and actionable non-UTF-8 Cargo diagnostics; no Rust/Cargo/runtime change and no authority before claim merge. |
 
 ## Completed This Closeout
 

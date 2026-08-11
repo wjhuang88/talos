@@ -59,10 +59,11 @@ coverage must be proven per call family rather than assumed.
 - [ARCH-034-R04-AG11](ARCH-034-R04-AG11-sqlite-containment-evidence.md): five-consumer
   corrupt/busy/locked/panic/deadline evidence classification; Refinement and unclaimed.
 - [ARCH-034-R04-AG12](ARCH-034-R04-AG12-sqlite-validator-integrity.md): ADR allowlist linkage,
-  validator host-dependency policy and diagnostic decoding; Refinement and unclaimed.
+  validator host-dependency policy and diagnostic decoding; I185 Planned with a governance claim
+  pending and no implementation authority before target-branch merge.
 
 These owner files materialize the independently accepted I181 dispositions.
-Except for completed AG-4 and AG-7, they do not create claims or authorize implementation.
+Except for completed AG-4 and AG-7, they do not create effective claims or authorize implementation.
 I182 is terminal; select at most one remaining child only after the normal
 collaboration protocol establishes a fresh effective claim.
 
