@@ -7,7 +7,7 @@
 | Priority | P0 |
 | Status | Active — TUI-046-A Complete; TUI-046-B implementation is ready for a separate claim |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I184 (Complete) |
+| Selected Iteration | I186 (proposed; claim ineffective until target-branch merge) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Released |
-| Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 architecture session 2026-08-10 |
-| Work Slice | Implement only I184/TUI-046-A: establish the native-selection versus mouse-capture contract, validate the causal interaction on the selected terminal matrix, and amend or replace ADR-054 with the explicit TUI-046-B gate; no Rust implementation or TUI-046-B authority. |
-| Claimed At | 2026-08-10 |
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Implement only I186/TUI-046-B under the Accepted ADR-054 amendment: bounded application-owned selection over last-rendered visible cells; ordinary primary-button drag without Shift; highlight, history-edge autoscroll, resize clamping and copy via the existing clipboard backend; strict input-state/privacy isolation; focused mixed-width/render/lifecycle tests, docs and exact-head two-terminal acceptance. Preserve Alternate Screen, keyboard history, current non-selection wheel policy, `/copy`, restoration and all non-TUI runtime behavior. Exclude TUI-042, hidden content, transcript/export/persistence, rich persistent selection, dependencies and unrelated product changes. |
+| Claimed At | Not applicable |
 | Source Issue | #134 |
-| Governance Claim PR | #186 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Independent review `5236470750` approved exact claim head `00fc49376715fc1fc4e3bfe9e82465aea676b3bf` with no blockers and disclosed that a distinct natural-person reviewer used the shared `@wjhuang88` account. Exact-head CI `31358815361` passed all four jobs; merge-time CAS passed against `main@a403fdbae61372db4f830f2bf0c9adf2173a85ba`; PR #186 merged at `66d0f932370f679d491cb78f64dff9d84878479d`. |
-| Implementation PR | #187 (decision/docs only) |
-| Last Updated | 2026-08-10 |
-| Handoff / Release Condition | I184 decision evidence merged at `f98488277803ee26180100089a48ef850939234b`; this closeout releases the A claim on target-branch merge. Establish a separate TUI-046-B claim before Rust implementation. |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not assigned |
+| Authorization Evidence | Not applicable while Unclaimed; draft I186 claim has no target-branch effect. TUI-046-A authorization remains recorded in its completion evidence below. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Finalize and merge the governance-only I186 claim before Rust implementation; then obtain exact-head implementation review, CI and two-terminal matrix before completion. |
 
 ### TUI-046-A Completion Evidence
 

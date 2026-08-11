@@ -52,7 +52,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I182 | Symbol Traversal Containment | Complete | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; exact source head `4b968823`, CI `31266112256`, independent review `5230395611`, and merge-time CAS passed. R04 remains Partial. |
 | I183 | Bundled SQLite ADR Reconciliation | Complete | Completion Commit `edf903aa96574043294923ad60b0cefe9730f8c4`; final source `0d9a5a7b`, CI `31349520295`, independent review `5235367999` and merge-time CAS passed. R04 remains Partial; AG-11 and AG-12 are separately unclaimed. |
  | I184 | TUI-046-A Native Selection Policy | Complete | Completion Commit `f98488277803ee26180100089a48ef850939234b`; reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`; review `5237824299`; CI `31370219799`. B is separately claimable; cross-platform testing is deferred to B acceptance. |
- | I185 | SQLite Validator Policy Integrity | Planned / claim pending | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12: one structured ADR allowlist, preserved `cargo metadata --locked` fail-closed policy and actionable non-UTF-8 Cargo diagnostics; no Rust/Cargo/runtime change and no authority before claim merge. |
+ | I185 | SQLite Validator Policy Integrity | Planned / claim effective | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12 under claim merge `5fe56fa8`; implementation PR #191 is non-overlapping with TUI work. |
+ | I186 | TUI Visible-Cell Selection And Copy | Planned / claim pending | [I186](I186-tui-visible-cell-selection.md) selects only TUI-046-B / Issue #134: ordinary application-owned drag selection, edge autoscroll, resize continuity, existing clipboard backend, strict input isolation and post-implementation two-terminal acceptance. No authority before claim merge. |
 
 ## Completed This Closeout
 
