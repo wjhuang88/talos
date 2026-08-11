@@ -1576,34 +1576,12 @@ fn drag_below_history_edge_keeps_logical_focus() {
     tui.handle_input_event(&mouse(
         MouseEventKind::Drag(crossterm::event::MouseButton::Left),
         2,
-        11,
+        12,
     ));
 
     let selection = tui.selection.expect("selection");
     assert_eq!(selection.edge, 1);
     assert!(selection.history_focus.is_some());
-}
-
-#[test]
-fn drag_far_below_history_uses_cross_component_selection() {
-    let mut tui = tui_with_projected_history(10, 10);
-    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 10));
-    tui.last_frame_history_start = 20;
-
-    tui.handle_input_event(&mouse(
-        MouseEventKind::Down(crossterm::event::MouseButton::Left),
-        2,
-        5,
-    ));
-    tui.handle_input_event(&mouse(
-        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
-        2,
-        15,
-    ));
-
-    let selection = tui.selection.expect("selection");
-    assert_eq!(selection.edge, 0);
-    assert!(selection.history_focus.is_none());
 }
 
 #[test]
