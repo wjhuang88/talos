@@ -6,11 +6,27 @@ use crate::app_stream::ScrollbackLine;
 use crate::inline_terminal::HistorySegment;
 use crate::transcript::{TranscriptBlock, TranscriptEntryId, TranscriptStore};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct LogicalContentAnchor {
     pub(crate) entry_id: TranscriptEntryId,
     pub(crate) logical_line: usize,
     pub(crate) scalar_offset: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HistorySelectionPoint {
+    anchor: LogicalContentAnchor,
+    scalar_end: usize,
+}
+
+impl HistorySelectionPoint {
+    fn order_key(self) -> (TranscriptEntryId, usize, usize) {
+        (
+            self.anchor.entry_id,
+            self.anchor.logical_line,
+            self.anchor.scalar_offset,
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,34 +74,70 @@ pub(crate) struct HistoryProjection {
     pub(crate) total_rows: usize,
     pub(crate) visible_start: usize,
     all_rows: Vec<RenderedHistoryRow>,
+    logical_lines: Vec<(TranscriptEntryId, usize, String)>,
 }
 
 impl HistoryProjection {
-    pub(crate) fn selected_text(&self, start: (usize, u16), end: (usize, u16)) -> String {
-        let (start, end) = if start <= end {
+    pub(crate) fn selection_point(
+        &self,
+        row_index: usize,
+        column: u16,
+    ) -> Option<HistorySelectionPoint> {
+        let row = self.all_rows.get(row_index)?;
+        let rendered = row
+            .line
+            .segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<String>();
+        let (scalar_start, scalar_end) = scalar_span_at_display_cell(&rendered, column);
+        let semantic_len = row
+            .end_anchor
+            .scalar_offset
+            .saturating_sub(row.start_anchor.scalar_offset);
+        if scalar_start > semantic_len || scalar_end > semantic_len {
+            return None;
+        }
+        Some(HistorySelectionPoint {
+            anchor: LogicalContentAnchor {
+                entry_id: row.start_anchor.entry_id,
+                logical_line: row.start_anchor.logical_line,
+                scalar_offset: row.start_anchor.scalar_offset.saturating_add(scalar_start),
+            },
+            scalar_end: row.start_anchor.scalar_offset.saturating_add(scalar_end),
+        })
+    }
+
+    pub(crate) fn selected_text(
+        &self,
+        start: HistorySelectionPoint,
+        end: HistorySelectionPoint,
+    ) -> String {
+        let (start, end) = if start.order_key() <= end.order_key() {
             (start, end)
         } else {
             (end, start)
         };
         let mut lines = Vec::new();
-        for index in start.0..=end.0 {
-            let Some(row) = self.all_rows.get(index) else {
+        for (entry_id, logical_line, text) in &self.logical_lines {
+            let key = (*entry_id, *logical_line);
+            let start_key = (start.anchor.entry_id, start.anchor.logical_line);
+            let end_key = (end.anchor.entry_id, end.anchor.logical_line);
+            if key < start_key || key > end_key {
                 continue;
-            };
-            let rendered = row
-                .line
-                .segments
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<String>();
-            let first = if index == start.0 { start.1 } else { 0 };
-            let last = if index == end.0 {
-                end.1.saturating_add(1)
+            }
+            let first = if key == start_key {
+                start.anchor.scalar_offset
             } else {
-                u16::MAX
+                0
+            };
+            let last = if key == end_key {
+                end.scalar_end
+            } else {
+                text.chars().count()
             };
             lines.push(
-                select_display_cells(&rendered, first, last)
+                select_scalar_range(text, first, last)
                     .trim_end()
                     .to_string(),
             );
@@ -123,20 +175,30 @@ impl HistoryProjection {
     }
 }
 
-fn select_display_cells(text: &str, first: u16, end: u16) -> String {
+fn scalar_span_at_display_cell(text: &str, target: u16) -> (usize, usize) {
+    let chars = text.chars().collect::<Vec<_>>();
     let mut column = 0u16;
-    let mut previous_selected = false;
-    text.chars()
-        .filter(|ch| {
-            let width = UnicodeWidthChar::width(*ch).unwrap_or(0) as u16;
-            if width == 0 {
-                return previous_selected;
+    for (index, ch) in chars.iter().enumerate() {
+        let width = UnicodeWidthChar::width(*ch).unwrap_or(0) as u16;
+        if width == 0 {
+            continue;
+        }
+        if target < column.saturating_add(width) {
+            let mut end = index + 1;
+            while end < chars.len() && UnicodeWidthChar::width(chars[end]).unwrap_or(0) == 0 {
+                end += 1;
             }
-            let selected = column.saturating_add(width) > first && column < end;
-            column = column.saturating_add(width);
-            previous_selected = selected;
-            selected
-        })
+            return (index, end);
+        }
+        column = column.saturating_add(width);
+    }
+    (chars.len(), chars.len())
+}
+
+fn select_scalar_range(text: &str, first: usize, end: usize) -> String {
+    text.chars()
+        .enumerate()
+        .filter_map(|(index, ch)| (index >= first && index < end).then_some(ch))
         .collect()
 }
 
@@ -152,8 +214,17 @@ pub(crate) fn project_history(
     }
 
     let mut all = Vec::new();
+    let mut projected_logical_lines = Vec::new();
     for entry in transcript.entries() {
         for (logical_line, line) in logical_lines(&entry.block).into_iter().enumerate() {
+            projected_logical_lines.push((
+                entry.id,
+                logical_line,
+                line.segments
+                    .iter()
+                    .map(|segment| segment.text.as_str())
+                    .collect(),
+            ));
             let chunks = project_line_chunks(&line, width);
             let last = chunks.len().saturating_sub(1);
             all.extend(
@@ -201,6 +272,7 @@ pub(crate) fn project_history(
         total_rows,
         visible_start: start,
         all_rows: all,
+        logical_lines: projected_logical_lines,
     }
 }
 
@@ -742,13 +814,40 @@ mod tests {
             )));
         }
         let projection = project_history(&transcript, 20, 1, &HistoryScrollState::follow_tail());
+        let start = projection.selection_point(0, 2).expect("first row point");
+        let end = projection.selection_point(2, 2).expect("last row point");
 
-        assert_eq!(projection.selected_text((0, 2), (2, 2)), "pha\n中文🙂\nome");
+        assert_eq!(projection.selected_text(start, end), "pha\n中文🙂\nome");
+    }
+
+    #[test]
+    fn logical_selection_payload_survives_reflow() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "abcdefghij",
+            None,
+        )));
+        let narrow = project_history(&transcript, 4, 10, &HistoryScrollState::follow_tail());
+        let start = narrow.selection_point(0, 1).expect("b point");
+        let end = narrow.selection_point(1, 3).expect("h point");
+        assert_eq!(narrow.selected_text(start, end), "bcdefgh");
+
+        let wide = project_history(&transcript, 10, 10, &HistoryScrollState::follow_tail());
+        assert_eq!(wide.selected_text(start, end), "bcdefgh");
     }
 
     #[test]
     fn display_cell_selection_keeps_combining_marks_with_their_base() {
-        assert_eq!(select_display_cells("a\u{301}bc", 0, 1), "a\u{301}");
-        assert_eq!(select_display_cells("a\u{301}bc", 1, 2), "b");
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "a\u{301}bc",
+            None,
+        )));
+        let projection = project_history(&transcript, 10, 10, &HistoryScrollState::follow_tail());
+        let first = projection.selection_point(0, 0).expect("combined point");
+        let second = projection.selection_point(0, 1).expect("second point");
+
+        assert_eq!(projection.selected_text(first, first), "a\u{301}");
+        assert_eq!(projection.selected_text(second, second), "b");
     }
 }

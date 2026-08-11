@@ -19,7 +19,9 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
-use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
+use crate::history_projection::{
+    HistoryProjection, HistoryScrollState, HistorySelectionPoint, project_history,
+};
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
@@ -138,6 +140,7 @@ pub struct Tui {
     history_prefix_start: Option<usize>,
     last_frame_history_start: usize,
     last_splash_row_count: usize,
+    last_history_prefix_row_count: usize,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -159,8 +162,8 @@ struct SelectionState {
     focus: (u16, u16),
     dragging: bool,
     edge: i8,
-    history_anchor: Option<(usize, u16)>,
-    history_focus: Option<(usize, u16)>,
+    history_anchor: Option<HistorySelectionPoint>,
+    history_focus: Option<HistorySelectionPoint>,
 }
 
 impl SelectionState {
@@ -197,6 +200,7 @@ impl Tui {
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
+            last_history_prefix_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -235,6 +239,7 @@ impl Tui {
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
+            last_history_prefix_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,

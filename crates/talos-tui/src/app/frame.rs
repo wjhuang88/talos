@@ -195,7 +195,11 @@ impl Tui {
                     .visible_start
                     .saturating_add(history.rows.len().saturating_sub(1))
             };
-            selection.history_focus = Some((row, selection.focus.0.saturating_sub(area.x)));
+            if let Some(point) =
+                history.selection_point(row, selection.focus.0.saturating_sub(area.x))
+            {
+                selection.history_focus = Some(point);
+            }
         }
         if let Some(prefix_start) = self.history_prefix_start.as_mut() {
             *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
@@ -213,6 +217,7 @@ impl Tui {
         let frame_history_start = self.history_prefix_start.unwrap_or(natural_start);
         self.last_frame_history_start = frame_history_start;
         self.last_splash_row_count = splash_rows;
+        self.last_history_prefix_row_count = splash_rows.saturating_add(startup_spacer_rows);
         let selection = self.selection.map(SelectionState::points);
 
         self.terminal.draw(screen_size, |frame| {

@@ -1,6 +1,33 @@
 use super::*;
 
 impl Tui {
+    fn history_selection_point_at_screen(
+        &self,
+        column: u16,
+        row: u16,
+    ) -> Option<HistorySelectionPoint> {
+        let area = self.last_history_area?;
+        if !area.contains(ratatui::layout::Position::new(column, row)) {
+            return None;
+        }
+        let frame_row = self
+            .last_frame_history_start
+            .saturating_add(usize::from(row.saturating_sub(area.y)));
+        let history_row = frame_row.checked_sub(self.last_history_prefix_row_count)?;
+        self.last_history_projection
+            .selection_point(history_row, column.saturating_sub(area.x))
+    }
+
+    pub(super) fn selected_text_for(&self, selection: SelectionState) -> String {
+        match (selection.history_anchor, selection.history_focus) {
+            (Some(start), Some(end)) => self.last_history_projection.selected_text(start, end),
+            _ => {
+                let (start, end) = selection.points();
+                self.terminal.selected_text(start, end)
+            }
+        }
+    }
+
     pub(super) fn dispatch_panel_action(&mut self, action: PanelAction) {
         match action {
             PanelAction::SendMessage(msg) => {
@@ -398,117 +425,100 @@ impl Tui {
             Event::Paste(text) => {
                 self.state.input_paste(text);
             }
-            Event::Mouse(mouse) => {
-                let height = self.last_history_viewport_height;
-                if height == 0 {
-                    return false;
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::Down(event::MouseButton::Left) => {
+                    let history_point =
+                        self.history_selection_point_at_screen(mouse.column, mouse.row);
+                    self.selection = Some(SelectionState {
+                        anchor: (mouse.column, mouse.row),
+                        focus: (mouse.column, mouse.row),
+                        dragging: true,
+                        edge: 0,
+                        history_anchor: history_point,
+                        history_focus: history_point,
+                    });
                 }
-                match mouse.kind {
-                    MouseEventKind::Down(event::MouseButton::Left) => {
-                        let history_point = self.last_history_area.and_then(|area| {
-                            area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
-                                .then(|| {
-                                    (
-                                        self.last_history_projection.visible_start
-                                            + usize::from(mouse.row.saturating_sub(area.y)),
-                                        mouse.column.saturating_sub(area.x),
-                                    )
-                                })
-                        });
-                        self.selection = Some(SelectionState {
-                            anchor: (mouse.column, mouse.row),
-                            focus: (mouse.column, mouse.row),
-                            dragging: true,
-                            edge: 0,
-                            history_anchor: history_point,
-                            history_focus: history_point,
-                        });
-                    }
-                    MouseEventKind::Drag(event::MouseButton::Left) => {
-                        let edge = self.last_history_area.map_or(0, |area| {
-                            if mouse.row == area.y {
-                                -1
-                            } else if mouse.row + 1 == area.bottom() {
-                                1
-                            } else {
-                                0
-                            }
-                        });
-                        let history_focus = self.last_history_area.and_then(|area| {
-                            area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
-                                .then(|| {
-                                    (
-                                        self.last_history_projection.visible_start
-                                            + usize::from(mouse.row.saturating_sub(area.y)),
-                                        mouse.column.saturating_sub(area.x),
-                                    )
-                                })
-                        });
-                        if let Some(selection) = self.selection.as_mut() {
-                            selection.focus = (mouse.column, mouse.row);
-                            selection.edge = edge;
-                            if selection.history_anchor.is_some() {
-                                selection.history_focus = history_focus;
-                            }
+                MouseEventKind::Drag(event::MouseButton::Left) => {
+                    let edge = self.last_history_area.map_or(0, |area| {
+                        if mouse.row == area.y {
+                            -1
+                        } else if mouse.row.saturating_add(1) == area.bottom() {
+                            1
+                        } else {
+                            0
+                        }
+                    });
+                    let history_focus =
+                        self.history_selection_point_at_screen(mouse.column, mouse.row);
+                    if let Some(selection) = self.selection.as_mut() {
+                        selection.focus = (mouse.column, mouse.row);
+                        selection.edge = edge;
+                        if selection.history_anchor.is_some() {
+                            selection.history_focus = history_focus;
                         }
                     }
-                    MouseEventKind::Up(event::MouseButton::Left) => {
-                        if let Some(mut selection) = self.selection {
-                            if selection.anchor == selection.focus {
-                                self.selection = None;
-                                return false;
-                            }
-                            selection.dragging = false;
-                            selection.edge = 0;
-                            self.selection = Some(selection);
-                            let text = match (selection.history_anchor, selection.history_focus) {
-                                (Some(start), Some(end)) => {
-                                    self.last_history_projection.selected_text(start, end)
-                                }
-                                _ => {
-                                    let (start, end) = selection.points();
-                                    self.terminal.selected_text(start, end)
-                                }
-                            };
-                            if !text.is_empty() {
-                                match crate::clipboard::copy_text(&text) {
-                                    Ok(backend) => {
-                                        self.state.tip = Some(Tip {
-                                            kind: TipKind::Info,
-                                            text: format!(
-                                                "Copied selection to clipboard (via {backend:?})"
-                                            ),
-                                            ttl: Duration::from_secs(3),
-                                            created_at: Instant::now(),
-                                        });
-                                    }
-                                    Err(error) => {
-                                        self.state.tip = Some(Tip {
-                                            kind: TipKind::Error,
-                                            text: format!("Failed to copy selection: {error:?}"),
-                                            ttl: Duration::from_secs(4),
-                                            created_at: Instant::now(),
-                                        });
-                                    }
-                                }
-                            }
+                }
+                MouseEventKind::Up(event::MouseButton::Left) => {
+                    let history_focus =
+                        self.history_selection_point_at_screen(mouse.column, mouse.row);
+                    if let Some(mut selection) = self.selection {
+                        selection.focus = (mouse.column, mouse.row);
+                        if selection.history_anchor.is_some() {
+                            selection.history_focus = history_focus;
                         }
-                    }
-                    MouseEventKind::ScrollUp => {
-                        if self.selection.is_some_and(|selection| selection.dragging) {
+                        if selection.anchor == selection.focus {
+                            self.selection = None;
                             return false;
                         }
-                        self.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
-                    }
-                    MouseEventKind::ScrollDown => {
-                        if self.selection.is_some_and(|selection| selection.dragging) {
-                            return false;
+                        selection.dragging = false;
+                        selection.edge = 0;
+                        self.selection = Some(selection);
+                        let text = self.selected_text_for(selection);
+                        if !text.is_empty() {
+                            match crate::clipboard::copy_text(&text) {
+                                Ok(backend) => {
+                                    self.state.tip = Some(Tip {
+                                        kind: TipKind::Info,
+                                        text: format!(
+                                            "Copied selection to clipboard (via {backend:?})"
+                                        ),
+                                        ttl: Duration::from_secs(3),
+                                        created_at: Instant::now(),
+                                    });
+                                }
+                                Err(error) => {
+                                    self.state.tip = Some(Tip {
+                                        kind: TipKind::Error,
+                                        text: format!("Failed to copy selection: {error:?}"),
+                                        ttl: Duration::from_secs(4),
+                                        created_at: Instant::now(),
+                                    });
+                                }
+                            }
                         }
-                        self.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, height);
                     }
-                    _ => {}
                 }
-            }
+                MouseEventKind::ScrollUp => {
+                    if self.selection.is_some_and(|selection| selection.dragging) {
+                        return false;
+                    }
+                    if self.last_history_viewport_height == 0 {
+                        return false;
+                    }
+                    self.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
+                }
+                MouseEventKind::ScrollDown => {
+                    if self.selection.is_some_and(|selection| selection.dragging) {
+                        return false;
+                    }
+                    let height = self.last_history_viewport_height;
+                    if height == 0 {
+                        return false;
+                    }
+                    self.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, height);
+                }
+                _ => {}
+            },
             Event::Resize(width, height) => {
                 if let Some(selection) = self.selection.as_mut() {
                     let max_x = width.saturating_sub(1);
