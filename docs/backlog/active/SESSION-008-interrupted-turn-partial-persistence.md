@@ -8,8 +8,26 @@
 | Status | Refinement — current partial coverage inventoried; ADR and durable implementation remain |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
+| Selected Iteration | I187 (proposed; claim ineffective until target-branch merge) |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | #45 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Establish the I187 claim before implementation; accept its lifecycle ADR and compatibility decision before SESSION-008-B. |
 
 ## Identity / Goal / Value
 

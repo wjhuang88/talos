@@ -54,6 +54,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I184 | TUI-046-A Native Selection Policy | Complete | Completion Commit `f98488277803ee26180100089a48ef850939234b`; reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`; review `5237824299`; CI `31370219799`. B is separately claimable; cross-platform testing is deferred to B acceptance. |
  | I185 | SQLite Validator Policy Integrity | Planned / claim effective | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12 under claim merge `5fe56fa8`; implementation PR #191 is non-overlapping with TUI work. |
  | I186 | TUI Visible-Cell Selection And Copy | Planned / claim pending | [I186](I186-tui-visible-cell-selection.md) selects only TUI-046-B / Issue #134: ordinary application-owned drag selection, edge autoscroll, resize continuity, existing clipboard backend, strict input isolation and post-implementation two-terminal acceptance. No authority before claim merge. |
+ | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Planned / claim pending | [I187](I187-session008a-partial-turn-lifecycle.md) selects the lifecycle, durable incomplete-turn and compatibility decision prerequisite for #49. No SESSION-008-B or RUNTIME-005 implementation authority before claim merge and ADR acceptance. |
 
 ## Completed This Closeout
 
