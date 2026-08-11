@@ -16,18 +16,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Work Slice | Implement only SESSION-008-A / I187: characterize every interrupted/provider-error/cancellation ownership path and produce the lifecycle, durable incomplete-turn, replay/context and TLOG compatibility decision. No SESSION-008-B, RUNTIME-005, TOOL-024, permission, TUI, provider, or successful-turn behavior change. |
+| Claimed At | 2026-08-11 |
 | Source Issue | #45 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #194 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer direction authorizes this non-overlapping #49 prerequisite to proceed while I185/I186 review and terminal acceptance are batched for closeout; exact-head governance validation and no-overlap CAS remain required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Establish the I187 claim before implementation; accept its lifecycle ADR and compatibility decision before SESSION-008-B. |
+| Handoff / Release Condition | Merge #194 to establish ownership, then produce the Proposed ADR and characterization evidence; independent review and ADR acceptance are required before SESSION-008-B. |
 
 ## Identity / Goal / Value
 
@@ -100,7 +100,7 @@ transcript must identify that the turn did not complete normally.
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Ready, not selected | Existing ADR-039/ADR-042 and current-path inventory |
+| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Selected by I187; claim PR #194 ineffective until merge | Existing ADR-039/ADR-042 and current-path inventory |
 | SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Blocked | SESSION-008-A Accepted |
 
 Only one child may be selected at a time. The parent becomes Complete only
