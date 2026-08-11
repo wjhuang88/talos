@@ -136,11 +136,7 @@ impl HistoryProjection {
             } else {
                 text.chars().count()
             };
-            lines.push(
-                select_scalar_range(text, first, last)
-                    .trim_end()
-                    .to_string(),
-            );
+            lines.push(select_scalar_range(text, first, last));
         }
         lines.join("\n")
     }
@@ -834,6 +830,40 @@ mod tests {
 
         let wide = project_history(&transcript, 10, 10, &HistoryScrollState::follow_tail());
         assert_eq!(wide.selected_text(start, end), "bcdefgh");
+    }
+
+    #[test]
+    fn logical_selection_preserves_selected_trailing_spaces() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "alpha  ", None,
+        )));
+        let projection = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
+        let start = projection.selection_point(0, 0).expect("start");
+        let end = projection
+            .selection_point(0, 6)
+            .expect("second trailing space");
+
+        assert_eq!(projection.selected_text(start, end), "alpha  ");
+    }
+
+    #[test]
+    fn logical_selection_payload_survives_appended_redraw_content() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "selected text",
+            None,
+        )));
+        let initial = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
+        let start = initial.selection_point(0, 0).expect("start");
+        let end = initial.selection_point(0, 7).expect("end");
+
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "later stream output",
+            None,
+        )));
+        let redrawn = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
+        assert_eq!(redrawn.selected_text(start, end), "selected");
     }
 
     #[test]
