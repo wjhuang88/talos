@@ -61,6 +61,38 @@ pub(crate) struct HistoryProjection {
 }
 
 impl HistoryProjection {
+    pub(crate) fn selected_text(&self, start: (usize, u16), end: (usize, u16)) -> String {
+        let (start, end) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        let mut lines = Vec::new();
+        for index in start.0..=end.0 {
+            let Some(row) = self.all_rows.get(index) else {
+                continue;
+            };
+            let rendered = row
+                .line
+                .segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>();
+            let first = if index == start.0 { start.1 } else { 0 };
+            let last = if index == end.0 {
+                end.1.saturating_add(1)
+            } else {
+                u16::MAX
+            };
+            lines.push(
+                select_display_cells(&rendered, first, last)
+                    .trim_end()
+                    .to_string(),
+            );
+        }
+        lines.join("\n")
+    }
+
     pub(crate) fn first_anchor(&self) -> Option<LogicalContentAnchor> {
         self.all_rows.first().map(|row| row.start_anchor)
     }
@@ -89,6 +121,18 @@ impl HistoryProjection {
         self.visible_start.saturating_add(page)
             >= self.total_rows.saturating_sub(usize::from(height))
     }
+}
+
+fn select_display_cells(text: &str, first: u16, end: u16) -> String {
+    let mut column = 0u16;
+    text.chars()
+        .filter(|ch| {
+            let width = UnicodeWidthChar::width(*ch).unwrap_or(0).max(1) as u16;
+            let selected = column.saturating_add(width) > first && column < end;
+            column = column.saturating_add(width);
+            selected
+        })
+        .collect()
 }
 
 /// Projects logical transcript lines without changing their stored content.
@@ -682,5 +726,18 @@ mod tests {
             let projection = project_history(&transcript, width, 100, &scroll);
             assert!(row_contains_anchor(&projection.rows[0], anchor));
         }
+    }
+
+    #[test]
+    fn selected_text_spans_rows_outside_the_visible_window() {
+        let mut transcript = TranscriptStore::default();
+        for text in ["alpha", "中文🙂", "omega"] {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+        }
+        let projection = project_history(&transcript, 20, 1, &HistoryScrollState::follow_tail());
+
+        assert_eq!(projection.selected_text((0, 2), (2, 2)), "pha\n中文🙂\nome");
     }
 }

@@ -1318,6 +1318,8 @@ fn selection_edge_tick_autoscrolls_only_while_dragging() {
         focus: (3, 0),
         dragging: true,
         edge: -1,
+        history_anchor: Some((25, 3)),
+        history_focus: Some((20, 3)),
     });
 
     tui.advance_processing_frame();

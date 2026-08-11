@@ -183,6 +183,20 @@ impl Tui {
             &self.history_scroll,
         );
         self.last_history_projection = history.clone();
+        if let (Some(area), Some(selection)) = (app_layout.history, self.selection.as_mut())
+            && selection.dragging
+            && selection.history_anchor.is_some()
+            && selection.edge != 0
+        {
+            let row = if selection.edge < 0 {
+                history.visible_start
+            } else {
+                history
+                    .visible_start
+                    .saturating_add(history.rows.len().saturating_sub(1))
+            };
+            selection.history_focus = Some((row, selection.focus.0.saturating_sub(area.x)));
+        }
         if let Some(prefix_start) = self.history_prefix_start.as_mut() {
             *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
         }

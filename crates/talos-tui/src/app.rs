@@ -159,6 +159,8 @@ struct SelectionState {
     focus: (u16, u16),
     dragging: bool,
     edge: i8,
+    history_anchor: Option<(usize, u16)>,
+    history_focus: Option<(usize, u16)>,
 }
 
 impl SelectionState {

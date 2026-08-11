@@ -405,11 +405,23 @@ impl Tui {
                 }
                 match mouse.kind {
                     MouseEventKind::Down(event::MouseButton::Left) => {
+                        let history_point = self.last_history_area.and_then(|area| {
+                            area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
+                                .then(|| {
+                                    (
+                                        self.last_history_projection.visible_start
+                                            + usize::from(mouse.row.saturating_sub(area.y)),
+                                        mouse.column.saturating_sub(area.x),
+                                    )
+                                })
+                        });
                         self.selection = Some(SelectionState {
                             anchor: (mouse.column, mouse.row),
                             focus: (mouse.column, mouse.row),
                             dragging: true,
                             edge: 0,
+                            history_anchor: history_point,
+                            history_focus: history_point,
                         });
                     }
                     MouseEventKind::Drag(event::MouseButton::Left) => {
@@ -422,17 +434,37 @@ impl Tui {
                                 0
                             }
                         });
+                        let history_focus = self.last_history_area.and_then(|area| {
+                            area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
+                                .then(|| {
+                                    (
+                                        self.last_history_projection.visible_start
+                                            + usize::from(mouse.row.saturating_sub(area.y)),
+                                        mouse.column.saturating_sub(area.x),
+                                    )
+                                })
+                        });
                         if let Some(selection) = self.selection.as_mut() {
                             selection.focus = (mouse.column, mouse.row);
                             selection.edge = edge;
+                            if selection.history_anchor.is_some() {
+                                selection.history_focus = history_focus;
+                            }
                         }
                     }
                     MouseEventKind::Up(event::MouseButton::Left) => {
                         if let Some(selection) = self.selection.as_mut() {
                             selection.dragging = false;
                             selection.edge = 0;
-                            let (start, end) = selection.points();
-                            let text = self.terminal.selected_text(start, end);
+                            let text = match (selection.history_anchor, selection.history_focus) {
+                                (Some(start), Some(end)) => {
+                                    self.last_history_projection.selected_text(start, end)
+                                }
+                                _ => {
+                                    let (start, end) = selection.points();
+                                    self.terminal.selected_text(start, end)
+                                }
+                            };
                             if !text.is_empty() {
                                 match crate::clipboard::copy_text(&text) {
                                     Ok(backend) => {
