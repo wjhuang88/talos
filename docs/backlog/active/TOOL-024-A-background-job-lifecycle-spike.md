@@ -1,10 +1,28 @@
 # TOOL-024-A: Background Job Lifecycle And Permission Contract Spike
 
-**Status**: Ready (2026-07-29; not selected)
+**Status**: Planned (2026-08-11; selected by proposed I188 claim)
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
 **Depends on**: None technically; must respect the repository's one-active-iteration rule.
+**Selected Iteration**: I188 (proposed; no authority before target-branch claim merge)
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | #59 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending exact-head independent security review; this draft has no ownership effect. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Finalize the claim with the actual PR number, obtain independent security review, pass exact-head CI and merge-time CAS, and merge the claim before any Spike implementation. |
 
 ## Goal / Value
 
