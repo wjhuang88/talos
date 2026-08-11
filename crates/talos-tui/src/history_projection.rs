@@ -125,11 +125,16 @@ impl HistoryProjection {
 
 fn select_display_cells(text: &str, first: u16, end: u16) -> String {
     let mut column = 0u16;
+    let mut previous_selected = false;
     text.chars()
         .filter(|ch| {
-            let width = UnicodeWidthChar::width(*ch).unwrap_or(0).max(1) as u16;
+            let width = UnicodeWidthChar::width(*ch).unwrap_or(0) as u16;
+            if width == 0 {
+                return previous_selected;
+            }
             let selected = column.saturating_add(width) > first && column < end;
             column = column.saturating_add(width);
+            previous_selected = selected;
             selected
         })
         .collect()
@@ -739,5 +744,11 @@ mod tests {
         let projection = project_history(&transcript, 20, 1, &HistoryScrollState::follow_tail());
 
         assert_eq!(projection.selected_text((0, 2), (2, 2)), "pha\n中文🙂\nome");
+    }
+
+    #[test]
+    fn display_cell_selection_keeps_combining_marks_with_their_base() {
+        assert_eq!(select_display_cells("a\u{301}bc", 0, 1), "a\u{301}");
+        assert_eq!(select_display_cells("a\u{301}bc", 1, 2), "b");
     }
 }
