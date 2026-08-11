@@ -54,7 +54,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
-| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Planned / I188 claim draft pending | None | ADR and implementation-ready contract for ownership, approval, cancellation, result delivery, and persistence. |
+| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Planned / claim PR #196 pending independent review | None | ADR and implementation-ready contract for ownership, approval, cancellation, result delivery, and persistence. |
 | TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Session-owned supervisor, explicit background input, bounded capture, process-tree cleanup, and exact-once terminal state. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete | Non-blocking TUI projection, lifecycle controls, docs and real Unix/Windows acceptance. |
@@ -93,9 +93,9 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   background cancellation/reap lifecycle exists in the workspace.
 - Existing direct-child timeout behavior and Windows shell identity are inputs;
   neither proves descendant supervision or background ownership.
-- TOOL-023-C and I182 are Complete. I188 proposes the TOOL-024-A decision Spike,
-  but its draft claim has no authority until finalized, independently reviewed,
-  validated and merged to `main`.
+- TOOL-023-C and I182 are Complete. PR #196 proposes I188/TOOL-024-A,
+  but the claim has no authority until independently reviewed, validated and
+  merged to `main`.
 
 ## Completion Condition
 

@@ -55,7 +55,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I185 | SQLite Validator Policy Integrity | Planned / claim effective | [I185](I185-sqlite-validator-policy-integrity.md) selects only AG-12 under claim merge `5fe56fa8`; implementation PR #191 is non-overlapping with TUI work. |
  | I186 | TUI Visible-Cell Selection And Copy | Planned / claim pending | [I186](I186-tui-visible-cell-selection.md) selects only TUI-046-B / Issue #134: ordinary application-owned drag selection, edge autoscroll, resize continuity, existing clipboard backend, strict input isolation and post-implementation two-terminal acceptance. No authority before claim merge. |
 | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Planned / claim PR #194 | [I187](I187-session008a-partial-turn-lifecycle.md) selects the lifecycle, durable incomplete-turn and compatibility decision prerequisite for #49. Claim is proposed in PR #194 and has no authority until merge; no SESSION-008-B or RUNTIME-005 implementation authority before ADR acceptance. |
-| I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / claim draft pending | [I188](I188-tool024a-background-job-contract.md) proposes only the process/permission decision Spike for Issue #59. No ownership or implementation authority before finalized independent review, exact-head validation, CAS and target-branch merge. |
+| I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / claim PR #196 | [I188](I188-tool024a-background-job-contract.md) proposes only the process/permission decision Spike for Issue #59. No ownership or implementation authority before independent review, exact-head validation, CAS and target-branch merge. |
 
 ## Completed This Closeout
 

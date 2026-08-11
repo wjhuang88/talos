@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
+| Claimed At | 2026-08-11 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent security review; this draft has no ownership effect. |
+| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Finalize and merge the independently reviewed claim before implementation; activation also waits until no other governed iteration remains Active or Review. |
+| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #196 before implementation; activation also waits until no other governed iteration remains Active or Review. |
 
 ## Published Baseline
 
@@ -88,11 +88,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-11 | Selection | TOOL-024-A selected as a Planned decision Spike only. The draft claim is ineffective, no implementation branch is authorized, and activation waits for the recorded non-terminal Review disposition. |
+| 2026-08-11 | Selection | TOOL-024-A selected as a Planned decision Spike only. PR #196 proposes the claim but remains ineffective before merge; no implementation branch is authorized, and activation waits for the recorded non-terminal Review disposition. |
 
 ## Verification Evidence
 
-- Pending finalized claim head.
+- PR #196 records the finalized proposed claim; exact-head CI, both governance validators, independent security review and merge-time CAS gate merge.
 
 ## Completion Evidence
 
