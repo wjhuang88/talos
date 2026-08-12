@@ -55,6 +55,8 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I185 | SQLite Validator Policy Integrity | Review / PR #191 | [I185](I185-sqlite-validator-policy-integrity.md) implements only AG-12: one structured ADR allowlist, preserved `cargo metadata --locked` fail-closed policy and actionable non-UTF-8 Cargo diagnostics; no Rust/Cargo/runtime change. |
  | I186 | TUI Visible-Cell Selection And Copy | Review / PR #193 | [I186](I186-tui-visible-cell-selection.md) implements TUI-046-B / Issue #134. Code head `70b51e28` passed exact-head Alacritty and Terminal.app interaction/clipboard acceptance; final PR-head CI/review, merge-time CAS and closeout evidence remain pending. |
  | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Review | [I187](I187-session008a-partial-turn-lifecycle.md) implements Proposed ADR-058 and the current-path characterization under effective claim merge `5bb83f80`; no SESSION-008-B or RUNTIME-005 implementation authority before exact-head review and ADR acceptance. |
+| I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / claim PR #196 | [I188](I188-tool024a-background-job-contract.md) proposes only the process/permission decision Spike for Issue #59. No ownership or implementation authority before independent review, exact-head validation, CAS and target-branch merge. |
+| I189 | PERM-006-A Structured Permission Decisions | Planned / claim PR #197 | [I189](I189-perm006a-structured-permission-decisions.md) proposes only the behavior-preserving structured request/context/report foundation for Issues #52/#53. Independent security review and target-branch claim merge gate all implementation. |
 
 ## Completed This Closeout
 
