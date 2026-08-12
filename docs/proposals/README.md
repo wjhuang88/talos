@@ -70,8 +70,8 @@ docs/proposals/
   prerequisite PR plus normal requirement intake/ADR/governance.
 - [Talos Desktop Goal-Oriented Workspace](talos-desktop-goal-oriented-workspace.md) — consolidated
   design baseline for Mission/Work Graph interaction, Todo evolution, independent Goal/Mission
-  evaluation, artifact review, Delivery, and the exact scope of the future separate Desktop
-  prerequisite implementation PR.
+  evaluation, artifact review, Delivery, visual direction, and initial bilingual Desktop
+  internationalization requirements.
 - [Multi-Agent Architecture](multi-agent-architecture.md) — proposal sourced from GitHub issue #30
   for bounded orchestrator/worker agents under ADR-006 and permission constraints.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
