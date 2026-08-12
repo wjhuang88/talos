@@ -879,3 +879,19 @@ repeating known mistakes.
   Fallback code may degrade to a specific error, never to a stronger success claim.
 - Promoted to rule/check: RUNTIME-003 provider fixtures, terminal-diagnostic TLOG round-trip and
   exclusion tests, and I168 rebuilt-binary acceptance.
+
+## 2026-08-12 - Focused tests do not replace all-target preflight
+
+- Trigger: I191/I192 emergency fixes passed focused tests and package checks before the workspace
+  release preflight.
+- Symptom: The first preflight rejected an unused Unix trait import under `-D warnings`; the second
+  rejected a test-only `chrono` import that the CLI crate does not declare.
+- Root cause: The focused commands did not compile the same complete target set with the same
+  warning policy as the repository preflight.
+- Fix: Removed the redundant import, rewrote the test fixture with `std::time`, and reran the full
+  preflight from the beginning until it passed.
+- Prevention: Treat focused tests as fast feedback only. Before reporting workspace validation,
+  run the standardized preflight and preserve every failed attempt as evidence rather than
+  inferring success from a narrower command.
+- Promoted to rule/check: existing `AGENTS.md` Standard Build And Release Flow and
+  `scripts/release_preflight.sh`.

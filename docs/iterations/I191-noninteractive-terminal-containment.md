@@ -1,6 +1,6 @@
 # Iteration I191: Non-Interactive Terminal Containment
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-12
 > Planned objective: contain command-tool children outside Talos's interactive terminal boundary.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 emergency implementation session 2026-08-12 |
 | Work Slice | TOOL-026 only: default-null stdin and Unix controlling-terminal detachment for foreground bash/exec children, tests and ADR-007 update. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-12 |
 | Source Issue | Maintainer incident report, 2026-08-12 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Direct commit cd304850 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | @wjhuang88 instructed immediate handling after reporting live TUI corruption from interactive scripts and password prompts. |
-| Implementation PR | Not started |
+| Implementation PR | Not opened |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Reconcile an effective claim and derived state within two business days; exact-head independent security review remains mandatory before merge. |
+| Handoff / Release Condition | Open an implementation PR, obtain independent natural-person security review of the exact head, explicitly disclose reviewer identity when sharing @wjhuang88, pass exact-head CI and merge-time CAS. |
 
 ## Emergency Override Record
 
@@ -47,4 +47,7 @@ The frozen scope, exclusions and acceptance are owned by `TOOL-026`.
 
 ## Completion Evidence
 
-- No Completion Commit yet; retain Active until implementation and review evidence exist.
+- Implementation commits: `d6d298a4`, `6bbcb568`.
+- `./scripts/release_preflight.sh`: passed on implementation tree `c597c0bb`; both governance
+  validators reported 0 warnings and classifier fixtures passed 9/9.
+- No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.

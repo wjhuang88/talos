@@ -525,7 +525,12 @@ Talos ships with built-in tools for common coding-agent work:
 - Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Image reading: `read_image` (model-invoked image read for vision-capable models; validates PNG/JPEG/GIF/WebP through shared ingestion; exact-path authorization; returns a safe summary and a one-shot provider continuation artifact per ADR-051; only presented when the active model's catalog metadata confirms `image_input = true`)
-- Process execution: `exec` (argv-only single process, no shell parsing), plus the permission-gated platform shell escape hatch: `bash` through `sh -c` on Unix and `powershell` through `powershell.exe -NoProfile -NonInteractive` on Windows
+- Process execution: `exec` (argv-only single process, no shell parsing), plus the
+  permission-gated platform shell escape hatch: `bash` through `sh -c` on Unix and `powershell`
+  through `powershell.exe -NoProfile -NonInteractive` on Windows. Command tools are
+  non-interactive: stdin is closed unless an `exec` pipe supplies data, and Unix children are
+  detached from the TUI controlling terminal, so password prompts fail instead of reading from
+  the composer.
 - Session planning: `todo_create`, `todo_update_status`, `todo_update`, `todo_delete`,
   `todo_add_dependency`, `todo_remove_dependency`, `todo_query` (session-scoped todo state)
 - Session scheduling: `delay` (schedule a one-shot delayed follow-up message; session-scoped, dies on process exit; Execute/Ask permission), `schedule` (schedule a recurring follow-up at a bounded interval 5–3600s; MissedTickBehavior::Delay, no catch-up burst; Execute/Ask permission), `list_scheduled_tasks` (read-only list of active scheduled tasks; shows task ID, kind, and timing only — does not expose message content; Read/Allow), `cancel_scheduled_task` (cancel a scheduled task by ID; Execute/Ask permission)
@@ -588,7 +593,7 @@ mode.
 | `/copy all` | Copy the full transcript to clipboard |
 | `/export <path>` | Export transcript to a file (permission-gated) |
 | `/new` | Start a fresh session (preserves old session) |
-| `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
+| `/resume` | List other non-empty resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
 | `/model` | Open the model picker — three-level navigation: Level 1 lists Recent (≤5 most-recently-used models, persisted) and providers; selecting a provider enters Level 2 (that provider's models); selecting a model with declared variants enters Level 3 (variant list), while variant-less models switch immediately; `Esc` closes the picker. No-argument only: `/model gpt-4o` shows a correction and opens the picker |

@@ -1,6 +1,6 @@
 # Iteration I192: Session Runtime Recovery Closure
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-12
 > Planned objective: make matching-identity resume idempotent and close normal no-chat Session artifacts.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 emergency implementation session 2026-08-12 |
 | Work Slice | SESSION-010 only: matching-target activation reuse, resume filtering and safe normal-exit cleanup of the current empty Session. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-12 |
 | Source Issue | Maintainer incident report, 2026-08-12 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Direct commit cd304850 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | @wjhuang88 instructed immediate handling after a force-exit resume conflict and proliferation of zero-message Session artifacts. |
-| Implementation PR | Not started |
+| Implementation PR | Not opened |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Reconcile an effective claim and derived state within two business days; exact-head independent review remains mandatory before merge. |
+| Handoff / Release Condition | Open an implementation PR, obtain independent natural-person exact-head review, explicitly disclose reviewer identity when sharing @wjhuang88, pass exact-head CI and merge-time CAS. |
 
 ## Emergency Override Record
 
@@ -51,4 +51,9 @@ The frozen scope, exclusions and acceptance are owned by `SESSION-010`.
 
 ## Completion Evidence
 
-- No Completion Commit yet; retain Active until implementation and review evidence exist.
+- Implementation commits: `ecd615a0`, `c597c0bb`.
+- `./scripts/release_preflight.sh`: passed on implementation tree `c597c0bb`; both governance
+  validators reported 0 warnings, classifier fixtures passed 9/9, and workspace tests passed.
+- Storage inspection found no orphan sidecars; nine empty TLOG/sidecar pairs demonstrate the
+  current no-chat materialization gap. No user artifacts were changed.
+- No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.

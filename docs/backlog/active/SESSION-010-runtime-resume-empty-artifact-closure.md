@@ -5,7 +5,7 @@
 | Story ID | SESSION-010 |
 | Type | Session Runtime Reliability Correction |
 | Priority | P0 Emergency |
-| Status | Active |
+| Status | Review |
 | Source Issue | Maintainer incident report, 2026-08-12 |
 | Responsible Actor | @wjhuang88 |
 | Selected Iteration | I192 |
@@ -39,3 +39,12 @@ the first message, so abandoned no-chat launches remain visible in `/resume`.
 - Picker tests for active/zero-message filtering.
 - Normal no-chat shutdown cleanup plus preservation tests for non-empty/pending Sessions.
 - Locked format, check, Clippy and workspace tests; independent exact-head review before merge.
+
+## Implementation Evidence
+
+- Implementation commit: `ecd615a0`; dependency-free test correction: `c597c0bb`.
+- `./scripts/release_preflight.sh` passed on implementation tree `c597c0bb`.
+- Read-only storage inventory found 25 sidecars, all paired with transcripts; nine pairs had empty
+  TLOG transcripts. This proves premature no-chat materialization, not orphan-sidecar leakage.
+- Existing user files were not modified. Forced-kill and historical empty-file cleanup remain
+  explicit maintenance concerns; merge and independent exact-head review remain pending.
