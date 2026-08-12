@@ -57,7 +57,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Review | [I187](I187-session008a-partial-turn-lifecycle.md) implements Proposed ADR-058 and the current-path characterization under effective claim merge `5bb83f80`; no SESSION-008-B or RUNTIME-005 implementation authority before exact-head review and ADR acceptance. |
 | I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / claim PR #196 | [I188](I188-tool024a-background-job-contract.md) proposes only the process/permission decision Spike for Issue #59. No ownership or implementation authority before independent review, exact-head validation, CAS and target-branch merge. |
 | I189 | PERM-006-A Structured Permission Decisions | Planned / claim PR #197 | [I189](I189-perm006a-structured-permission-decisions.md) proposes only the behavior-preserving structured request/context/report foundation for Issues #52/#53. Independent security review and target-branch claim merge gate all implementation. |
-| I190 | Change-Aware CI Routing | Review / PR #202 | [I190](I190-change-aware-ci-routing.md) implements only GOV-005 under claim merge `bb38c262`: deterministic fail-closed documentation-only classification, stable CI routing and adversarial fixtures. |
+| I190 | Change-Aware CI Routing | Complete | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673` implements trusted-base fail-closed routing; probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48` proves the real reduced path. GOV-006 separately owns the unclaimed case-normalization residual. |
 
 ## Completed This Closeout
 
@@ -72,6 +72,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I180 | Architecture Documentation Truth | **Complete (2026-08-08)** | Completion Commit `10cceec6aeb9089fe9c830355992c8fc60430d63` (squash merge of source implementation `fd8ac75d`); PR #171; exact-head CI `31238721507` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke. R04 remains excluded. |
 | I181 | Native And Panic-Boundary Security Review | **Complete (2026-08-08)** | Completion Commit `aea26ad011af04396ab8588c9326d309538f31a2`; PR #174 exact head `12963970` passed CI `31255683335`, governance validation, and merge-time CAS. Review-only disposition; R04 implementation remains Partial. |
 | I182 | Symbol Traversal Containment | **Complete (2026-08-09)** | Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; PR #177 exact source head `4b96882307173ded8264aa1c45cce129707ff65f` passed CI `31266112256`, independent review `5230395611`, and merge-time CAS. R04 remains Partial. |
+| I190 | Change-Aware CI Routing | Complete (2026-08-12) | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673`; reduced-probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48`; exact implementation CI `31560789644`, independent review `5262374485`, and reduced run `31564461023` passed. |
 
 I169's accepted residuals remain explicit:
 

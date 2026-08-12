@@ -1,6 +1,6 @@
 # Iteration I190: Change-Aware CI Routing
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-12
 > Planned objective: introduce a deterministic fail-closed change classifier so narrowly allowlisted documentation-only pull requests keep documentation/governance gates without running the complete Unix and Windows Rust workspaces.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 implementation session 2026-08-12 |
 | Work Slice | Implement only I190/GOV-005: deterministic fail-closed changed-path classification, stable pull-request CI routing, adversarial fixtures and route documentation. Keep full validation for every code, control-plane, executable, schema, fixture, dependency, binary, ambiguous or mixed change. No product/runtime behavior, release authorization, branch-protection administration, unrelated CI optimization, closeout or I188/I189 activation. |
@@ -18,10 +18,12 @@
 | Source Issue | None |
 | Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer directed immediate CI-routing correction after pure-documentation PRs repeatedly ran full Unix/Windows workspaces and one unrelated Windows timing failure forced an 11-minute rerun. Exact-head CI, both governance validators and merge-time CAS remain required. |
+| Authorization Evidence | PR #202 exact head `13b288ec8670e2536a2d46ccda4e3240fb2b30cf` passed full CI `31560789644`, received independent approval `5262374485`, passed merge-time CAS and merged as `a69ffa30afed16271885d4ef3d11931ab3189673`. Reduced-route probe PR #203 passed run `31564461023` and merged as `01721f683d0c09ad5f5f9e98360da15cd5155c48`. |
 | Implementation PR | #202 |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Claim PR #201 merged as `bb38c262`; implementation must pass full exact-head CI, independent review and merge-time CAS, then prove the reduced path on a real PR. |
+| Handoff / Release Condition | None - implementation and reduced-route probe are merged; GOV-006 separately owns case-normalized SOP exclusion matching. |
+
+Completion Commit: `a69ffa30afed16271885d4ef3d11931ab3189673`, `01721f683d0c09ad5f5f9e98360da15cd5155c48`
 
 ## Published Baseline
 
@@ -61,6 +63,8 @@ The complete frozen contract is owned by
 | 2026-08-12 | Selection | Maintainer promoted pure-documentation CI routing to immediate priority because the current unconditional matrix delays every governance synchronization and exposes unrelated flaky Rust tests. Claim remains ineffective before target-branch merge. |
 | 2026-08-12 | Activation | Claim PR #201 passed exact-head CI and merge-time CAS, then merged to `main` as `bb38c262`. I190 activated without changing its published objective, scope, acceptance or Planned Validation. |
 | 2026-08-12 | Implementation | PR #202 implements the trusted-base classifier, fail-closed full fallback, stable workspace job names, reduced documentation gates and adversarial fixtures. It remains Review pending exact-head full CI, independent review, merge-time CAS and a post-merge reduced-path probe. |
+| 2026-08-12 | Merge | PR #202 exact head `13b288ec` passed full CI `31560789644`, independent approval `5262374485` and merge-time CAS, then merged as `a69ffa30`. |
+| 2026-08-12 | Reduced probe | PR #203 exact head `ecf4ca77` classified one allowlisted reference Markdown path as reduced in run `31564461023`; all retained gates passed, Unix Rust setup/preflight was skipped, Windows allocated no runner and concluded `SKIPPED`, and the PR remained `MERGEABLE/CLEAN` before merge `01721f68`. |
 
 ## Verification Evidence
 
@@ -76,16 +80,30 @@ The complete frozen contract is owned by
   `bash scripts/validate_collaboration_claims.sh .`, public-site and installer validation, workflow
   YAML parsing and `git diff --check` passed. The final implementation-tree
   `./scripts/release_preflight.sh` also exited 0 after the mode-change fixture was added; exact-head
-  CI and independent review remain required.
+  CI and independent review were then satisfied on the exact implementation head.
+- Actions run `31560789644` passed all five full-route jobs for PR #202 exact head `13b288ec`; review
+  comment `5262374485` independently exercised 11 adversarial repositories and approved that head.
+- Probe run `31564461023` logged `CI change classification: reduced (allowlisted documentation only
+  (1 path(s)))`. The reduced validation, remote Issue/owner reconciliation and Windows installer
+  fixture passed; Rust toolchain/cache/release-preflight steps and the Windows Rust workspace were
+  skipped. The stable skipped Windows check was accepted by the current repository protection state,
+  with PR #203 still reported `MERGEABLE/CLEAN`.
 
 ## Completion Evidence
 
-- No completion evidence. A later closeout must cite an already-existing implementation merge SHA.
+- Completion Commit: `a69ffa30afed16271885d4ef3d11931ab3189673` (PR #202 implementation)
+  and `01721f683d0c09ad5f5f9e98360da15cd5155c48` (PR #203 reduced-route probe).
 
 ## Variance And Residuals
 
 - Windows config-lock test reliability and general CI performance work remain separately owned.
+- PR #202 review finding F1 is registered as unclaimed GOV-006: normalize case when matching the
+  `docs/sop/` full-route exclusion and add case-variant fixtures. This does not reopen I190.
 
 ## Retrospective
 
-- Pending execution.
+- Trusted-base classifier execution plus full validation on every push are the central safety
+  controls; the narrow PR allowlist is an optimization layered beneath those controls.
+- The claim and implementation full-route Windows jobs each cost roughly 11 minutes. The real
+  reduced probe completed its Unix validation path in about 40 seconds and allocated no Windows
+  Rust runner, removing that cost from eligible governance closeouts.
