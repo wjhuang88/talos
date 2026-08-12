@@ -689,13 +689,13 @@ fn cleanup_empty_tui_session(
     session_manager: &talos_session::SessionManager,
     session: &talos_session::Session,
 ) -> Result<()> {
-    if session.file_path.exists()
-        && !session
-            .read_entries()
-            .context("failed to inspect the active Session during TUI shutdown")?
-            .is_empty()
-    {
-        return Ok(());
+    if session.file_path.exists() {
+        let transcript_bytes = std::fs::metadata(&session.file_path)
+            .context("failed to inspect the active Session transcript during TUI shutdown")?
+            .len();
+        if transcript_bytes > 0 {
+            return Ok(());
+        }
     }
     let pending = talos_session::PendingSubmissionStore::for_session(session)
         .has_nonterminal_submissions()

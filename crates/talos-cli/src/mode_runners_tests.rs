@@ -1488,3 +1488,46 @@ fn empty_tui_shutdown_preserves_nonempty_or_pending_sessions() {
     assert!(pending.file_path.exists());
     assert!(pending_store.path().exists());
 }
+
+#[test]
+fn empty_tui_shutdown_preserves_nonempty_unparseable_transcripts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+    let cases: [(&str, &[u8]); 2] = [
+        (
+            "truncated",
+            b"{\"type\":\"message\",\"content\":\"interrupted\"",
+        ),
+        (
+            "unknown-schema",
+            b"{\"type\":\"future_user_message\",\"content\":\"my important conversation\"}\n",
+        ),
+    ];
+
+    for (label, payload) in cases {
+        let session = manager
+            .defer_create_session("talos", "/workspace")
+            .expect("deferred session");
+        let pending_store = talos_session::PendingSubmissionStore::for_session(&session);
+        pending_store
+            .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+                "openai", "o3", None,
+            ))
+            .expect("runtime identity");
+        std::fs::write(&session.file_path, payload).expect("write ambiguous transcript");
+        assert!(
+            session.read_entries().expect("read entries").is_empty(),
+            "{label} fixture must have zero recognized entries"
+        );
+
+        cleanup_empty_tui_session(&manager, &session).expect("ambiguous transcript inspection");
+
+        assert!(session.file_path.exists(), "{label} transcript was deleted");
+        assert!(pending_store.path().exists(), "{label} sidecar was deleted");
+        assert_eq!(
+            std::fs::read(&session.file_path).expect("read preserved transcript"),
+            payload,
+            "{label} transcript changed"
+        );
+    }
+}
