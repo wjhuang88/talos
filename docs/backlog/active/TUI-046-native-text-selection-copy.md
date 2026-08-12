@@ -5,9 +5,9 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Active — TUI-046-A Complete; TUI-046-B implementation is ready for a separate claim |
+| Status | Active — TUI-046-A Complete; TUI-046-B implementation is in Review at PR #193 |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I186 (proposed; claim ineffective until target-branch merge) |
+| Selected Iteration | I186 (Review) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -23,10 +23,17 @@
 | Source Issue | #134 |
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. TUI-046-A authorization remains recorded in its completion evidence below. |
-| Implementation PR | Not started |
+| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. Claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 is the effective review surface. TUI-046-A authorization remains recorded in its completion evidence below. |
+| Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI, repeat merge-time CAS, and merge governance-only PR #192 before Rust implementation; then obtain exact-head implementation review, CI and two-terminal matrix before completion. |
+| Handoff / Release Condition | The exact code-head two-terminal matrix is recorded; obtain exact final PR-head review and green CI for PR #193, then perform merge-time CAS and record the real merge SHA before completion. |
+
+### TUI-046-B Execution Evidence
+
+- Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b` (I186 claim PR #192).
+- Implementation PR: #193; exact tested code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` includes the user-directed rollback of the worsened `bfb5ae61` interaction and the Terminal.app clipboard compatibility fix. Later evidence-only documentation commits do not replace that runtime evidence.
+- Focused validation at the tested code head: `cargo test -p talos-tui --locked` (511 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, and `git diff --check`. The evidence update also passes `./scripts/release_preflight.sh`, including locked workspace check, workspace Clippy, full workspace tests/doctests and both governance validators with 0 warnings.
+- The exact-code-head Alacritty 0.17.0 and macOS Terminal 2.15 rows pass ordinary no-Shift drag, mixed-width/wrapped copy, logical wheel/keyboard projection, bidirectional edge autoscroll, resize/streaming continuity and normal/interrupted cleanup. Exact final PR-head CI, independent review, merge-time CAS and merge evidence remain outstanding.
 
 ### TUI-046-A Completion Evidence
 
@@ -95,7 +102,7 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Complete in I184 | Completion Commit `f98488277803ee26180100089a48ef850939234b`; review `5237824299`; CI `31370219799` |
-| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Ready to claim | ADR-054 I184 amendment Accepted; separate claim required |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Review / PR #193 | ADR-054 I184 amendment Accepted; effective claim merged at `f4faa38e`; code-head terminal matrix passed; exact final PR-head CI/review and merge evidence remain required |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
 from unit tests alone. The parent closes only after both terminal environments
