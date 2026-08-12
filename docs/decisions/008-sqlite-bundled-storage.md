@@ -67,6 +67,9 @@ Pure-Rust alternatives do not currently meet the same requirements with less ris
    - runtime: `talos-session`, `talos-evolution`, `talos-exploration`, and `talos-memory`;
    - quarantined non-runtime: `talos-models`. Accepting its existing store does not authorize a
      workspace package to depend on it or activate `catalog.db` in CLI/TUI/runtime paths.
+   `docs/reference/SQLITE-CONSUMER-POLICY.json` is the normative, versioned machine-readable
+   representation of this allowlist. The names and classifications above explain that policy;
+   changes to the accepted boundary must update both through normal ADR change control.
 3. SQLite remains an implementation detail for indexes and structured runtime state; JSONL session
    files remain the source of truth.
 4. All crates that use SQLite must use one workspace-wide `rusqlite`/`libsqlite3-sys` version to
@@ -74,12 +77,18 @@ Pure-Rust alternatives do not currently meet the same requirements with less ris
 5. The project must describe this precisely as:
    "SQLite is bundled into the binary; Talos does not require a system SQLite installation. The
    binary is not fully static on macOS/Linux because it may still link platform system libraries."
-6. `scripts/validate_sqlite_consumers.py` enforces the exception from parsed
+6. `scripts/validate_sqlite_consumers.py` loads and validates the structured policy, then enforces
+   the exception from parsed
    `cargo metadata --locked` output. A workspace package counts only when it has a direct resolved
    edge to a non-workspace package that transitively reaches `libsqlite3-sys`; workspace-only
    layering does not count. Normal, build, development, and target-specific edges are all included.
    The validator also enforces the exact allowlist, bundled features, one resolved
    `rusqlite`/`libsqlite3-sys` version each, and zero workspace dependents of `talos-models`.
+7. Standard governance invokes `cargo metadata --locked --format-version 1` and fails closed when
+   Cargo, its pinned toolchain, dependency resolution, cache, or required network access is
+   unavailable. This decision does not add `--frozen`, an offline fallback, or silent degradation.
+   Cargo JSON stdout is strict UTF-8; on Cargo failure, undecodable stderr bytes are rendered with
+   deterministic `\\xNN` escapes so the originating diagnostic remains inspectable.
 
 **Rejected alternatives:**
 
@@ -104,6 +113,7 @@ Revisit this decision if:
 
 - [ADR-002: Local Storage Architecture](002-local-storage-architecture.md)
 - [SQLite Consumer Inventory](../reference/SQLITE-CONSUMER-INVENTORY.md)
+- [SQLite Consumer Policy](../reference/SQLITE-CONSUMER-POLICY.json)
 - `crates/talos-session/Cargo.toml`
 - `crates/talos-evolution/Cargo.toml`
 - `crates/talos-exploration/Cargo.toml`

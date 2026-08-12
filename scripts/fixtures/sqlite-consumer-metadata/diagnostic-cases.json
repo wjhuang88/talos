@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "name": "invalid-stdout",
+      "returncode": 0,
+      "stdout_hex": "ff",
+      "stderr_hex": "",
+      "expected_error_substring": "cargo metadata stdout is not valid UTF-8"
+    },
+    {
+      "name": "non-utf8-stderr",
+      "returncode": 101,
+      "stdout_hex": "",
+      "stderr_hex": "6572726f723aff0a",
+      "expected_error_substring": "cargo metadata --locked failed:\nerror:\\xff"
+    }
+  ]
+}

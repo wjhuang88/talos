@@ -4,9 +4,9 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | PR #184 review residuals 3-5 / validator policy linkage and diagnostics |
-| Status | Planned — I185 claim under review |
+| Status | Review — implementation PR #191 |
 | Priority | P2 |
-| Selected Iteration | I185 (Planned; claim ineffective until target-branch merge) |
+| Selected Iteration | I185 (Review) |
 | Preserved behavior | ADR-008 accepted consumers, locked graph semantics, bundled SQLite behavior and standard governance results |
 
 ## Collaboration Claim
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #190 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #184 independent reviews `5235077449` and `5235367999` classified these findings as non-blocking follow-up. Exact-head claim review is requested on PR #190; this claim remains ineffective until the finalized record is merged to `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent review and CI, repeat merge-time CAS, and merge the governance-only claim before implementation. |
+| Authorization Evidence | PR #184 independent reviews `5235077449` and `5235367999` classified these findings as non-blocking follow-up. PR #190 exact-head aggregation `5247748807` and single-maintainer authorization `5247820370` were bound to `11b7dc52`; merge-time CAS produced effective claim commit `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`. |
+| Implementation PR | #191 (head `74199395`) |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Obtain exact-head independent review and green CI for implementation PR #191; after merge, record its existing implementation SHA as Completion Commit and synchronize derived views. |
 
 ## Closure Ledger
 
@@ -35,7 +35,7 @@
 | Existing assets to preserve | I183/AG-7 completion evidence, ADR-008's five accepted consumers and boundary semantics, validator clean-run output, Cargo `--locked` behavior, AG-11 ownership and all Rust/Cargo/runtime state. |
 | State/status owners | AG-12 and I185 first; R04 and derived indexes/views second. |
 | Validation required | Controlled policy/metadata/diagnostic fixtures, both governance validators, architecture audit, scale assessment, locked release preflight, exact-head Unix/Windows CI, independent review and merge-time CAS. |
-| Evidence and uncertainty | The duplicate allowlist, unstated host/cache contract and masked localized stderr are confirmed from ADR-008, the validator and reviews `5235077449`/`5235367999`. No runtime defect is inferred from these governance-only findings. |
+| Evidence and uncertainty | The duplicate allowlist, unstated host/cache contract and masked localized stderr are confirmed from ADR-008, the validator and reviews `5235077449`/`5235367999`. Implementation commit `74199395` adds the structured policy, fail-closed policy loading and escaped diagnostics without runtime files. No runtime defect is inferred from these governance-only findings. |
 | Residual-work destination | AG-11 retains runtime SQLite containment evidence; all other R04 children retain their existing behavior/security boundaries. |
 
 ## Confirmed Baseline
