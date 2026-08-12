@@ -288,5 +288,20 @@ impl Tui {
     pub(super) fn advance_processing_frame(&mut self) {
         self.processing_frame =
             next_processing_frame(self.state.status.is_processing, self.processing_frame);
+        let Some(selection) = self.selection else {
+            return;
+        };
+        if !selection.dragging
+            || selection.edge == 0
+            || selection.history_anchor.is_none()
+            || self.last_history_viewport_height == 0
+        {
+            return;
+        }
+        if selection.edge < 0 {
+            self.scroll_frame_history_up(1);
+        } else {
+            self.scroll_frame_history_down(1, self.last_history_viewport_height);
+        }
     }
 }

@@ -18,6 +18,7 @@ use ratatui::{
     layout::{Position, Rect, Size},
     widgets::{StatefulWidget, Widget},
 };
+use unicode_width::UnicodeWidthStr;
 
 pub struct InlineFrame<'a> {
     #[allow(dead_code)]
@@ -48,6 +49,24 @@ impl<'a> InlineFrame<'a> {
         state: &mut W::State,
     ) {
         widget.render(area, self.buffer, state);
+    }
+
+    pub(crate) fn highlight_selection(&mut self, start: (u16, u16), end: (u16, u16)) {
+        let area = self.buffer.area;
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        for y in start.1.min(area.bottom())..=end.1.min(area.bottom().saturating_sub(1)) {
+            let first = if y == start.1 { start.0 } else { area.x };
+            let last = if y == end.1 {
+                end.0
+            } else {
+                area.right().saturating_sub(1)
+            };
+            for x in first.min(area.right())..=last.min(area.right().saturating_sub(1)) {
+                self.buffer[(x, y)].set_bg(ratatui::style::Color::DarkGray);
+            }
+        }
     }
 }
 
@@ -183,6 +202,36 @@ fn keyboard_enhancement_requested(result: io::Result<bool>) -> bool {
 }
 
 impl TerminalSession {
+    pub(crate) fn selected_text(&self, start: (u16, u16), end: (u16, u16)) -> String {
+        let buffer = &self.buffers[1 - self.current];
+        let area = buffer.area;
+        if area.width == 0 || area.height == 0 {
+            return String::new();
+        }
+        let mut lines = Vec::new();
+        for y in start.1.min(area.bottom())..=end.1.min(area.bottom().saturating_sub(1)) {
+            let first = if y == start.1 { start.0 } else { area.x };
+            let last = if y == end.1 {
+                end.0
+            } else {
+                area.right().saturating_sub(1)
+            };
+            let mut line = String::new();
+            let mut x = first.min(area.right());
+            let last = last.min(area.right().saturating_sub(1));
+            while x <= last {
+                let symbol = buffer[(x, y)].symbol();
+                line.push_str(symbol);
+                let step = symbol.width().max(1).min(u16::MAX as usize) as u16;
+                let Some(next) = x.checked_add(step) else {
+                    break;
+                };
+                x = next;
+            }
+            lines.push(line.trim_end().to_string());
+        }
+        lines.join("\n")
+    }
     pub fn new() -> io::Result<Self> {
         let stdout = io::stdout();
         let mut backend = CrosstermBackend::new(stdout);
@@ -990,5 +1039,43 @@ mod tests {
         .expect("mouse restore retry succeeds");
         assert_eq!(retry, vec![TerminalAction::DisableMouseCapture]);
         assert!(!lifecycle.mouse_capture);
+    }
+
+    #[test]
+    fn selected_text_reads_only_visible_buffer_cells() {
+        let mut terminal = TerminalSession::test_instance();
+        terminal
+            .draw(Size::new(12, 3), |frame| {
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new("alpha beta\n中文🙂 ok"),
+                    Rect::new(0, 0, 12, 3),
+                );
+            })
+            .expect("frame renders");
+
+        assert_eq!(terminal.selected_text((6, 0), (9, 0)), "beta");
+        assert_eq!(
+            terminal.selected_text((0, 0), (8, 1)),
+            "alpha beta\n中文🙂 ok"
+        );
+    }
+
+    #[test]
+    fn selection_highlight_is_applied_after_component_rendering() {
+        let mut terminal = TerminalSession::test_instance();
+        terminal
+            .draw(Size::new(8, 2), |frame| {
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new("visible"),
+                    Rect::new(0, 0, 8, 2),
+                );
+                frame.highlight_selection((1, 0), (3, 0));
+            })
+            .expect("frame renders");
+
+        assert_eq!(terminal.test_cell_bg(0, 0), ratatui::style::Color::Reset);
+        assert_eq!(terminal.test_cell_bg(1, 0), ratatui::style::Color::DarkGray);
+        assert_eq!(terminal.test_cell_bg(3, 0), ratatui::style::Color::DarkGray);
+        assert_eq!(terminal.test_cell_bg(4, 0), ratatui::style::Color::Reset);
     }
 }

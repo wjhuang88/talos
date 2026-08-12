@@ -19,7 +19,9 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
-use crate::history_projection::{HistoryProjection, HistoryScrollState, project_history};
+use crate::history_projection::{
+    HistoryProjection, HistoryScrollState, HistorySelectionPoint, project_history,
+};
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
@@ -134,9 +136,11 @@ pub struct Tui {
     history_scroll: HistoryScrollState,
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
+    last_history_area: Option<ratatui::layout::Rect>,
     history_prefix_start: Option<usize>,
     last_frame_history_start: usize,
     last_splash_row_count: usize,
+    last_history_prefix_row_count: usize,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
@@ -149,6 +153,39 @@ pub struct Tui {
     session_id: Option<String>,
     last_char_time: Option<Instant>,
     first_message_dispatched: bool,
+    selection: Option<SelectionState>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SelectionState {
+    anchor: (u16, u16),
+    focus: (u16, u16),
+    dragging: bool,
+    edge: i8,
+    history_anchor: Option<HistorySelectionPoint>,
+    history_focus: Option<HistorySelectionPoint>,
+}
+
+impl SelectionState {
+    fn points(self) -> ((u16, u16), (u16, u16)) {
+        let anchor = (self.anchor.1, self.anchor.0);
+        let focus = (self.focus.1, self.focus.0);
+        if anchor <= focus {
+            (self.anchor, self.focus)
+        } else {
+            (self.focus, self.anchor)
+        }
+    }
+
+    fn update_history_focus(
+        &mut self,
+        history_focus: Option<HistorySelectionPoint>,
+        keep_on_missing: bool,
+    ) {
+        if self.history_anchor.is_some() && (history_focus.is_some() || !keep_on_missing) {
+            self.history_focus = history_focus;
+        }
+    }
 }
 
 impl Tui {
@@ -169,9 +206,11 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            last_history_area: None,
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
+            last_history_prefix_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -184,6 +223,7 @@ impl Tui {
             session_id: None,
             last_char_time: None,
             first_message_dispatched: false,
+            selection: None,
         })
     }
 
@@ -205,9 +245,11 @@ impl Tui {
             history_scroll: HistoryScrollState::follow_tail(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
+            last_history_area: None,
             history_prefix_start: None,
             last_frame_history_start: 0,
             last_splash_row_count: 0,
+            last_history_prefix_row_count: 0,
             queued_outputs: Vec::new(),
             active_stream: None,
             ordered_content_open: false,
@@ -220,6 +262,7 @@ impl Tui {
             session_id: None,
             last_char_time: None,
             first_message_dispatched: false,
+            selection: None,
         }
     }
 
