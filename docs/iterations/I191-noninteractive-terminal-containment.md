@@ -19,7 +19,7 @@
 | Governance Claim PR | Direct commit cd304850 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | @wjhuang88 instructed immediate handling after reporting live TUI corruption from interactive scripts and password prompts. |
-| Implementation PR | Not opened |
+| Implementation PR | #206 |
 | Last Updated | 2026-08-12 |
 | Handoff / Release Condition | Open an implementation PR, obtain independent natural-person security review of the exact head, explicitly disclose reviewer identity when sharing @wjhuang88, pass exact-head CI and merge-time CAS. |
 
