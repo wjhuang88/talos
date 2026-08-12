@@ -5,10 +5,10 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Review — SESSION-008-A ADR-058 and current-path characterization implemented; acceptance review pending |
+| Status | Ready — SESSION-008-A complete; SESSION-008-B unclaimed |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
-| Selected Iteration | I187 (Review; claim effective at `5bb83f80`) |
+| Selected Iteration | None — I187/SESSION-008-A complete; select B separately |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
 
@@ -16,18 +16,20 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
-| Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
-| Work Slice | Implement only SESSION-008-A / I187: characterize every interrupted/provider-error/cancellation ownership path and produce the lifecycle, durable incomplete-turn, replay/context and TLOG compatibility decision. No SESSION-008-B, RUNTIME-005, TOOL-024, permission, TUI, provider, or successful-turn behavior change. |
+| Claim State | Released |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned - completed SESSION-008-A claim released; SESSION-008-B requires a new bounded claim |
 | Claimed At | 2026-08-11 |
 | Source Issue | #45 |
 | Governance Claim PR | #194 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer direction authorizes this non-overlapping #49 prerequisite to proceed while I185/I186 review and terminal acceptance are batched for closeout; exact-head governance validation and no-overlap CAS remain required before merge. |
+| Authorization Evidence | SESSION-008-A claim merge `5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7`; decision merge `e288afb5d97026f7ccb3ce0f519a4a81f99fe104`; final head `46549e82`, CI `31553007431`, independent review `5261130488`. This closes A only and supplies no B implementation authority. |
 | Implementation PR | #195 |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain exact-head review of ADR-058 and the I187 characterization; accept the decision before separately claiming SESSION-008-B. |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | Claim SESSION-008-B separately against Accepted ADR-058; complete B before RUNTIME-005-A/B/C. |
+
+Completion Commit: `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` (SESSION-008-A decision evidence only; parent SESSION-008 remains incomplete until B).
 
 ## Identity / Goal / Value
 
@@ -100,8 +102,8 @@ transcript must identify that the turn did not complete normally.
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Review in I187; ADR-058 Proposed | Existing ADR-039/ADR-042 and current-path inventory |
-| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Blocked | SESSION-008-A Accepted |
+| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Complete in I187; Completion Commit `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` | Existing ADR-039/ADR-042 and current-path inventory |
+| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Ready / Unclaimed | SESSION-008-A Complete; ADR-058 Accepted |
 
 Only one child may be selected at a time. The parent becomes Complete only
 after both children have existing completion evidence and the Issue #45
@@ -120,9 +122,10 @@ migration plan before implementation.
 ## SESSION-008-A Decision Evidence
 
 - Effective claim merge: `5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7` (PR #194).
-- Proposed decision: `docs/decisions/058-partial-turn-durable-finalization.md`.
+- Accepted decision: `docs/decisions/058-partial-turn-durable-finalization.md`.
 - Current-path evidence: `docs/reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md`.
-- ADR-042 remains authoritative until ADR-058 receives exact-head review and is Accepted.
+- ADR-058 acceptance is proposed by the I185-I187 closeout and becomes authoritative only after that
+  exact head receives independent review and reaches `main`.
 
 ## State / Status Owners
 
