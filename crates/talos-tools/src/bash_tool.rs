@@ -132,6 +132,7 @@ impl BashTool {
         cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        crate::process_boundary::isolate_terminal_input(&mut cmd, false);
 
         #[cfg(unix)]
         {
@@ -737,6 +738,24 @@ mod tests {
         assert!(result.content.contains("hello"));
         assert!(result.content.starts_with("$ echo hello\n"));
         assert!(result.content.ends_with("[exit 0]"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn child_stdin_is_closed_and_controlling_terminal_is_detached() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "if IFS= read -r value; then echo inherited; else echo eof; fi; if sh -c 'exec 3</dev/tty' 2>/dev/null; then echo attached; else echo detached; fi"
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        let lines: Vec<_> = result.content.lines().collect();
+        assert!(lines.contains(&"eof"), "{}", result.content);
+        assert!(lines.contains(&"detached"), "{}", result.content);
+        assert!(!lines.contains(&"inherited"));
+        assert!(!lines.contains(&"attached"));
     }
 
     #[tokio::test]

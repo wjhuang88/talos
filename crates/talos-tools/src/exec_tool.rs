@@ -692,9 +692,7 @@ async fn run_step_inner(
         .current_dir(&cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if stdin_data.is_some() {
-        cmd.stdin(Stdio::piped());
-    }
+    crate::process_boundary::isolate_terminal_input(&mut cmd, stdin_data.is_some());
     scrub_and_apply_env(&mut cmd, &step.env);
 
     let mut child = match cmd.spawn() {
@@ -1096,6 +1094,25 @@ mod tests {
         assert!(!result.is_error, "{}", result.content);
         assert!(result.content.contains("exit_code: 0"));
         assert!(result.content.contains("hello"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn default_stdin_is_closed_and_controlling_terminal_is_detached() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "sh",
+                "args": ["-c", "if IFS= read -r value; then echo inherited; else echo eof; fi; if sh -c 'exec 3</dev/tty' 2>/dev/null; then echo attached; else echo detached; fi"]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        let lines: Vec<_> = result.content.lines().map(str::trim).collect();
+        assert!(lines.contains(&"eof"), "{}", result.content);
+        assert!(lines.contains(&"detached"), "{}", result.content);
+        assert!(!lines.contains(&"inherited"));
+        assert!(!lines.contains(&"attached"));
     }
 
     #[cfg(unix)]
