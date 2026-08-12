@@ -1,10 +1,8 @@
 //! Clipboard backend for TUI copy and export workflows.
 //!
 //! Prefers OSC 52 (terminal escape sequence) for cross-platform clipboard
-//! write. When OSC 52 is unavailable or its host terminal does not honour
-//! the sequence, falls back to `pbcopy` on macOS per AGENTS.md dependency
-//! discipline (host utilities are compatibility fallbacks, not primary
-//! dependencies).
+//! writes. On macOS, where Terminal.app can silently ignore OSC 52, it uses
+//! `pbcopy` first and retains OSC 52 as the fallback.
 //!
 //! OSC 52 spec: <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
 //! Format: `ESC ] 52 ; c ; <base64> BEL`.
@@ -124,14 +122,35 @@ pub(crate) fn write_pbcopy(text: &str) -> Result<(), ClipboardError> {
     }
 }
 
-/// Tries OSC 52 first, then `pbcopy` as a macOS fallback. Returns the
-/// backend that successfully completed the write.
-pub(crate) fn copy_text(text: &str) -> Result<ClipboardBackend, ClipboardError> {
-    if write_osc52(text).is_ok() {
+fn copy_text_with<O, P>(
+    text: &str,
+    prefer_pbcopy: bool,
+    mut osc52: O,
+    mut pbcopy: P,
+) -> Result<ClipboardBackend, ClipboardError>
+where
+    O: FnMut(&str) -> Result<(), ClipboardError>,
+    P: FnMut(&str) -> Result<(), ClipboardError>,
+{
+    if prefer_pbcopy {
+        if pbcopy(text).is_ok() {
+            return Ok(ClipboardBackend::Pbcopy);
+        }
+        osc52(text)?;
         return Ok(ClipboardBackend::Osc52);
     }
-    write_pbcopy(text)?;
+
+    if osc52(text).is_ok() {
+        return Ok(ClipboardBackend::Osc52);
+    }
+    pbcopy(text)?;
     Ok(ClipboardBackend::Pbcopy)
+}
+
+/// Uses the reliable platform clipboard command first on macOS and OSC 52
+/// first elsewhere, then falls back to the other existing backend.
+pub(crate) fn copy_text(text: &str) -> Result<ClipboardBackend, ClipboardError> {
+    copy_text_with(text, cfg!(target_os = "macos"), write_osc52, write_pbcopy)
 }
 
 #[cfg(test)]
@@ -180,5 +199,54 @@ mod tests {
         // base64("中文") = "5Lit5paH"
         let payload = ClipboardPayload::new("中文");
         assert_eq!(payload.to_osc52(), "\x1b]52;c;5Lit5paH\x07");
+    }
+
+    #[test]
+    fn macos_policy_prefers_pbcopy_without_emitting_osc52() {
+        let mut osc52_called = false;
+        let backend = copy_text_with(
+            "hello",
+            true,
+            |_| {
+                osc52_called = true;
+                Ok(())
+            },
+            |_| Ok(()),
+        )
+        .expect("pbcopy should succeed");
+
+        assert_eq!(backend, ClipboardBackend::Pbcopy);
+        assert!(!osc52_called);
+    }
+
+    #[test]
+    fn macos_policy_falls_back_to_osc52_when_pbcopy_fails() {
+        let backend = copy_text_with(
+            "hello",
+            true,
+            |_| Ok(()),
+            |_| Err(ClipboardError::PbcopyNotFound),
+        )
+        .expect("OSC 52 fallback should succeed");
+
+        assert_eq!(backend, ClipboardBackend::Osc52);
+    }
+
+    #[test]
+    fn non_macos_policy_keeps_osc52_as_primary() {
+        let mut pbcopy_called = false;
+        let backend = copy_text_with(
+            "hello",
+            false,
+            |_| Ok(()),
+            |_| {
+                pbcopy_called = true;
+                Ok(())
+            },
+        )
+        .expect("OSC 52 should succeed");
+
+        assert_eq!(backend, ClipboardBackend::Osc52);
+        assert!(!pbcopy_called);
     }
 }

@@ -1273,6 +1273,366 @@ fn mouse_scroll(kind: MouseEventKind) -> Event {
     })
 }
 
+fn mouse(kind: MouseEventKind, column: u16, row: u16) -> Event {
+    Event::Mouse(MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    })
+}
+
+#[test]
+fn selection_drag_isolated_from_composer_and_survives_resize() {
+    let mut state = TuiState::new();
+    state.input_append_str("draft");
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.last_history_viewport_height = 8;
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 8));
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        9,
+        4,
+    ));
+    tui.handle_input_event(&Event::Resize(8, 4));
+
+    assert_eq!(tui.state.input_buffer, "draft");
+    assert_eq!(tui.state.cursor_byte_pos(), "draft".len());
+    let selection = tui.selection.expect("selection remains active");
+    assert_eq!(selection.anchor, (2, 1));
+    assert_eq!(selection.focus, (7, 3));
+    assert!(selection.dragging);
+}
+
+#[test]
+fn primary_click_without_drag_does_not_leave_a_selection() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.last_history_viewport_height = 8;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Up(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+
+    assert!(tui.selection.is_none());
+    assert!(tui.state.tip.is_none());
+}
+
+#[test]
+fn selection_works_when_no_history_area_is_rendered() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        3,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        7,
+        3,
+    ));
+
+    let selection = tui.selection.expect("visible-cell selection");
+    assert_eq!(selection.anchor, (2, 3));
+    assert_eq!(selection.focus, (7, 3));
+    assert!(selection.dragging);
+}
+
+#[test]
+fn mouse_up_coordinate_is_the_final_selection_focus() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        1,
+        2,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        3,
+        2,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Up(crossterm::event::MouseButton::Left),
+        6,
+        2,
+    ));
+
+    let selection = tui.selection.expect("completed selection");
+    assert_eq!(selection.focus, (6, 2));
+    assert!(!selection.dragging);
+}
+
+#[test]
+fn splash_rows_are_not_mapped_to_transcript_rows() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for text in ["alpha", "beta"] {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+    }
+    tui.last_history_projection =
+        project_history(&tui.transcript, 20, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_viewport_height = 4;
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 20, 4));
+    tui.last_frame_history_start = 0;
+    tui.last_splash_row_count = 2;
+    tui.last_history_prefix_row_count = 2;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        0,
+        0,
+    ));
+    assert!(
+        tui.selection
+            .expect("splash selection")
+            .history_anchor
+            .is_none()
+    );
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        0,
+        2,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        0,
+        3,
+    ));
+    let selection = tui.selection.expect("history selection");
+    assert_eq!(tui.selected_text_for(selection), "alpha\nb");
+}
+
+#[test]
+fn logo_prefix_keeps_accumulated_history_range() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for text in ["alpha", "beta"] {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+    }
+    tui.last_history_projection =
+        project_history(&tui.transcript, 20, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_viewport_height = 4;
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 20, 4));
+    tui.last_frame_history_start = 0;
+    tui.last_splash_row_count = 2;
+    tui.last_history_prefix_row_count = 2;
+    let history_anchor = tui
+        .last_history_projection
+        .selection_point(1, 0)
+        .expect("beta anchor");
+    let history_focus = tui
+        .last_history_projection
+        .selection_point(0, 0)
+        .expect("alpha focus");
+    tui.selection = Some(super::SelectionState {
+        anchor: (0, 3),
+        focus: (0, 2),
+        dragging: true,
+        edge: -1,
+        history_anchor: Some(history_anchor),
+        history_focus: Some(history_focus),
+    });
+
+    let mut selection = tui.selection.expect("active selection");
+    selection.update_history_focus(None, true);
+    assert_eq!(tui.selected_text_for(selection), "alpha\nb");
+}
+
+#[test]
+fn history_selection_payload_survives_resize_reflow() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.transcript
+        .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "abcdefghij",
+            None,
+        )));
+    tui.last_history_projection =
+        project_history(&tui.transcript, 4, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_viewport_height = 3;
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 4, 3));
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        1,
+        0,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        3,
+        1,
+    ));
+    tui.handle_input_event(&Event::Resize(10, 4));
+    tui.last_history_projection =
+        project_history(&tui.transcript, 10, 10, &HistoryScrollState::follow_tail());
+
+    let selection = tui.selection.expect("selection survives reflow");
+    assert_eq!(tui.selected_text_for(selection), "bcdefgh");
+}
+
+#[test]
+fn selection_edge_tick_autoscrolls_only_while_dragging() {
+    let mut tui = tui_with_projected_history(10, 10);
+    let history_anchor = tui
+        .last_history_projection
+        .selection_point(25, 3)
+        .expect("anchor");
+    let history_focus = tui
+        .last_history_projection
+        .selection_point(20, 3)
+        .expect("focus");
+    tui.selection = Some(super::SelectionState {
+        anchor: (3, 5),
+        focus: (3, 0),
+        dragging: true,
+        edge: -1,
+        history_anchor: Some(history_anchor),
+        history_focus: Some(history_focus),
+    });
+
+    tui.advance_processing_frame();
+    assert!(matches!(
+        tui.history_scroll.mode,
+        crate::history_projection::HistoryScrollMode::Anchored { .. }
+    ));
+
+    let anchored = tui.history_scroll.clone();
+    tui.selection.as_mut().expect("selection").dragging = false;
+    tui.advance_processing_frame();
+    assert_eq!(tui.history_scroll, anchored);
+}
+
+#[test]
+fn selection_edge_tick_enters_logo_prefix_one_row_at_a_time() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.last_splash_row_count = 2;
+    tui.last_frame_history_start = 2;
+    let history_anchor = tui
+        .last_history_projection
+        .selection_point(20, 3)
+        .expect("anchor");
+    tui.selection = Some(super::SelectionState {
+        anchor: (3, 5),
+        focus: (3, 0),
+        dragging: true,
+        edge: -1,
+        history_anchor: Some(history_anchor),
+        history_focus: Some(history_anchor),
+    });
+
+    tui.advance_processing_frame();
+
+    assert_eq!(tui.history_prefix_start, Some(1));
+}
+
+#[test]
+fn drag_near_history_edge_arms_autoscroll() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 10));
+    tui.last_frame_history_start = 20;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        5,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        2,
+        1,
+    ));
+
+    assert_eq!(tui.selection.expect("selection").edge, -1);
+}
+
+#[test]
+fn drag_below_history_edge_keeps_logical_focus() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 80, 10));
+    tui.last_frame_history_start = 20;
+
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        2,
+        5,
+    ));
+    tui.handle_input_event(&mouse(
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        2,
+        12,
+    ));
+
+    let selection = tui.selection.expect("selection");
+    assert_eq!(selection.edge, 1);
+    assert!(selection.history_focus.is_some());
+}
+
+#[test]
+fn completed_history_highlight_moves_with_scrolled_content() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(40, 16));
+    for index in 0..30 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("history row {index:02}"),
+                None,
+            )));
+    }
+    tui.draw_frame().expect("tail frame");
+    let area = tui.last_history_area.expect("history area");
+    let row = area.y.saturating_add(2);
+    let anchor = tui
+        .history_selection_point_at_screen(2, row)
+        .expect("selection anchor");
+    let focus = tui
+        .history_selection_point_at_screen(5, row)
+        .expect("selection focus");
+    tui.selection = Some(super::SelectionState {
+        anchor: (2, row),
+        focus: (5, row),
+        dragging: false,
+        edge: 0,
+        history_anchor: Some(anchor),
+        history_focus: Some(focus),
+    });
+    tui.draw_frame().expect("selected frame");
+    assert_eq!(
+        tui.terminal.test_cell_bg(2, row),
+        ratatui::style::Color::DarkGray
+    );
+
+    tui.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
+    tui.draw_frame().expect("scrolled selected frame");
+
+    assert_eq!(
+        tui.terminal
+            .test_cell_bg(2, row.saturating_add(MOUSE_HISTORY_SCROLL_ROWS as u16)),
+        ratatui::style::Color::DarkGray
+    );
+    assert_ne!(
+        tui.terminal.test_cell_bg(2, row),
+        ratatui::style::Color::DarkGray
+    );
+}
+
 #[test]
 fn entry_point_shift_enter_inserts_newline_without_sending() {
     let mut state = TuiState::new();

@@ -175,6 +175,7 @@ impl Tui {
         );
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
         self.last_history_viewport_height = history_height;
+        self.last_history_area = app_layout.history;
         let history = project_history(
             &self.transcript,
             screen_size.width,
@@ -182,6 +183,24 @@ impl Tui {
             &self.history_scroll,
         );
         self.last_history_projection = history.clone();
+        if let (Some(area), Some(selection)) = (app_layout.history, self.selection.as_mut())
+            && selection.dragging
+            && selection.history_anchor.is_some()
+            && selection.edge != 0
+        {
+            let row = if selection.edge < 0 {
+                history.visible_start
+            } else {
+                history
+                    .visible_start
+                    .saturating_add(history.rows.len().saturating_sub(1))
+            };
+            if let Some(point) =
+                history.selection_point(row, selection.focus.0.saturating_sub(area.x))
+            {
+                selection.history_focus = Some(point);
+            }
+        }
         if let Some(prefix_start) = self.history_prefix_start.as_mut() {
             *prefix_start = (*prefix_start).min(splash_rows.saturating_sub(1));
         }
@@ -198,6 +217,23 @@ impl Tui {
         let frame_history_start = self.history_prefix_start.unwrap_or(natural_start);
         self.last_frame_history_start = frame_history_start;
         self.last_splash_row_count = splash_rows;
+        self.last_history_prefix_row_count = splash_rows.saturating_add(startup_spacer_rows);
+        let selection = self.selection.and_then(|selection| {
+            match (
+                selection.history_anchor,
+                selection.history_focus,
+                app_layout.history,
+            ) {
+                (Some(start), Some(end), Some(area)) => history.visible_selection(
+                    start,
+                    end,
+                    frame_history_start,
+                    self.last_history_prefix_row_count,
+                    area,
+                ),
+                _ => Some(selection.points()),
+            }
+        });
 
         self.terminal.draw(screen_size, |frame| {
             if let Some(area) = app_layout.history {
@@ -232,6 +268,9 @@ impl Tui {
             }
             if let Some(area) = app_layout.status {
                 status_comp.render(frame, area);
+            }
+            if let Some((start, end)) = selection {
+                frame.highlight_selection(start, end);
             }
         })?;
 

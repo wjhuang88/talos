@@ -556,6 +556,19 @@ talos --plugin /path/to/plugin-package
 Repeat `--plugin` for multiple packages. `/plugins` reports the packages that successfully loaded
 and their registered capabilities; with no flag, existing behavior is unchanged.
 
+## TUI Text Selection
+
+In the interactive TUI, drag with the primary mouse button to select any visible cells, including
+partial transcript lines, tool output, panels, composer text, and the status row. Releasing the
+button copies the highlighted text through the same clipboard backends used by `/copy`; no Shift
+modifier is required. Dragging at the top or bottom of the history viewport scrolls history while
+extending the selection. Terminal resize clamps the selection to the resized frame instead of
+clearing it. Selection reads only the rendered frame and never exposes hidden transcript, tool, or
+credential data.
+
+Keyboard PageUp/PageDown and Ctrl+Home/Ctrl+End remain the reliable history-navigation controls.
+`/copy last` and `/copy all` remain available for semantic message/transcript copies.
+
 ## Slash Commands
 
 Type `/` in the TUI to access these commands. The Skill commands are also available in inline
