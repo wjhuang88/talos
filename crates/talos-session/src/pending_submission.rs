@@ -153,6 +153,17 @@ impl PendingSubmissionStore {
         load_runtime_state(&connection)
     }
 
+    /// Returns whether this Session still owns accepted, paused, or running work.
+    pub fn has_nonterminal_submissions(&self) -> Result<bool, PendingSubmissionError> {
+        if !self.path.exists() {
+            return Ok(false);
+        }
+        let _guard = self.guard()?;
+        let connection = self.connection()?;
+        ensure_schema(&connection)?;
+        Ok(count_nonterminal(&connection)? > 0)
+    }
+
     /// Initializes a new/legacy Session with an exact committed runtime identity.
     ///
     /// Repeating the same initialization is idempotent. A contradictory identity

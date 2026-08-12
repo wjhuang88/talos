@@ -1414,3 +1414,77 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
         "session watch must still point to the old session"
     );
 }
+
+#[test]
+fn empty_tui_shutdown_removes_owned_transcript_and_sidecar() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+    let session = manager
+        .defer_create_session("talos", "/workspace")
+        .expect("deferred session");
+    talos_session::PendingSubmissionStore::for_session(&session)
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "openai", "o3", None,
+        ))
+        .expect("runtime identity");
+    let transcript = session.file_path.clone();
+    let sidecar = talos_session::PendingSubmissionStore::for_session(&session)
+        .path()
+        .to_path_buf();
+    assert!(transcript.exists());
+    assert!(sidecar.exists());
+
+    cleanup_empty_tui_session(&manager, &session).expect("empty cleanup");
+
+    assert!(!transcript.exists());
+    assert!(!sidecar.exists());
+}
+
+#[test]
+fn empty_tui_shutdown_preserves_nonempty_or_pending_sessions() {
+    use talos_core::message::Message;
+    use talos_core::submission::{
+        StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionSource,
+    };
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let manager = talos_session::SessionManager::with_dir(dir.path().join("sessions"));
+
+    let nonempty = manager
+        .create_session("talos", "/workspace")
+        .expect("nonempty session");
+    nonempty
+        .append(&Message::User {
+            content: "keep me".to_string(),
+        })
+        .expect("append");
+    cleanup_empty_tui_session(&manager, &nonempty).expect("nonempty inspection");
+    assert!(nonempty.file_path.exists());
+
+    let pending = manager
+        .defer_create_session("talos", "/workspace")
+        .expect("pending session");
+    let pending_store = talos_session::PendingSubmissionStore::for_session(&pending);
+    pending_store
+        .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+            "openai", "o3", None,
+        ))
+        .expect("runtime identity");
+    pending_store
+        .accept(&StructuredSubmission {
+            id: "pending-batch".to_string(),
+            source: SubmissionSource::User,
+            sender_generation: 0,
+            items: vec![SubmissionItem {
+                id: "pending-item".to_string(),
+                enqueue_sequence: 1,
+                kind: SubmissionKind::UserTurn,
+                text: "queued".to_string(),
+                attachments: Vec::new(),
+            }],
+        })
+        .expect("accept pending submission");
+    cleanup_empty_tui_session(&manager, &pending).expect("pending inspection");
+    assert!(pending.file_path.exists());
+    assert!(pending_store.path().exists());
+}
