@@ -1,10 +1,28 @@
 # TOOL-024-A: Background Job Lifecycle And Permission Contract Spike
 
-**Status**: Ready (2026-07-29; not selected)
+**Status**: Planned (2026-08-11; claim PR #196 pending independent review)
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
 **Depends on**: None technically; must respect the repository's one-active-iteration rule.
+**Selected Iteration**: I188 (proposed; no authority before target-branch claim merge)
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
+| Claimed At | 2026-08-11 |
+| Source Issue | #59 |
+| Governance Claim PR | #196 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-11 |
+| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #196 before any Spike implementation. |
 
 ## Goal / Value
 
