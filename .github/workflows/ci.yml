@@ -18,8 +18,56 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  classify-changes:
+    name: Classify CI change scope
+    runs-on: ubuntu-latest
+    outputs:
+      full_validation: ${{ steps.classify.outputs.full_validation }}
+      reason: ${{ steps.classify.outputs.reason }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Classify from trusted target-branch policy
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "full_validation=true" >> "${GITHUB_OUTPUT}"
+            echo "reason=non-pull-request event" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          classifier="$(mktemp)"
+          classifier_output="$(mktemp)"
+          if ! git show "${PR_BASE_SHA}:scripts/classify_ci_changes.py" > "${classifier}"; then
+            echo "full_validation=true" >> "${GITHUB_OUTPUT}"
+            echo "reason=classifier unavailable on trusted base" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if python3 "${classifier}" \
+              --repo . \
+              --base "${PR_BASE_SHA}" \
+              --head "${PR_HEAD_SHA}" \
+              --github-output "${classifier_output}"; then
+            cat "${classifier_output}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "full_validation=true" >> "${GITHUB_OUTPUT}"
+            echo "reason=trusted classifier execution failed" >> "${GITHUB_OUTPUT}"
+          fi
+
   preflight:
     name: Format + Check + Clippy + Test
+    needs: classify-changes
+    if: always()
     runs-on: macos-14
 
     steps:
@@ -73,17 +121,32 @@ jobs:
           fi
           git diff --check "${base_sha}...HEAD"
 
+      - name: Reduced documentation validation
+        if: needs.classify-changes.result == 'success' && needs.classify-changes.outputs.full_validation == 'false'
+        shell: bash
+        run: |
+          ./scripts/validate_public_site.sh
+          ./scripts/validate_installers.sh
+          ./scripts/validate_project_governance.sh .
+          bash ./scripts/validate_collaboration_claims.sh .
+          python3 ./scripts/test_ci_change_classifier.py
+
       - uses: dtolnay/rust-toolchain@master
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         with:
           toolchain: 1.97.0
 
       - uses: Swatinem/rust-cache@v2
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
 
       - name: Release preflight
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: ./scripts/release_preflight.sh
 
   windows-rust:
     name: Windows Rust workspace
+    needs: classify-changes
+    if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
     runs-on: windows-latest
 
     steps:

@@ -5,9 +5,9 @@
 | Story ID | GOV-005 |
 | Type | Governance / CI Reliability Story |
 | Priority | P0 |
-| Status | Planned - claim PR #201 pending target-branch merge |
+| Status | Review - implementation PR #202 |
 | Source | Maintainer priority correction, 2026-08-12 |
-| Selected Iteration | I190 (proposed; ineffective before claim merge) |
+| Selected Iteration | I190 |
 | Depends On | Existing required CI checks and release preflight remain authoritative for non-documentation changes |
 
 ## Collaboration Claim
@@ -23,9 +23,9 @@
 | Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed that pure-documentation CI inefficiency be fixed before remaining closeout work. Finalized exact-head CI, both governance validators and merge-time CAS remain required. |
-| Implementation PR | Not started |
+| Implementation PR | #202 |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Pass exact-head CI and merge-time CAS, then merge claim PR #201 before editing CI workflow or classifier implementation. |
+| Handoff / Release Condition | Claim PR #201 merged as `bb38c262`; implementation must pass full exact-head CI, independent review and merge-time CAS, then prove the reduced route on a separate documentation-only PR. |
 
 ## Goal And Value
 
