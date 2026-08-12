@@ -2,8 +2,8 @@
 
 **Repository baseline**: `main@685d3b4f4088a172551f8c844a89f5dee9469430`
 **Closeout PR**: #137
-**Remote scope**: all 34 open GitHub Issues after Issue #119 completion, Issue #136 registration,
-and intake registration of Issues #141–#143, #146, #155, and #188
+**Remote scope**: all 35 open GitHub Issues after Issue #119 completion, Issue #136 registration,
+and intake registration of Issues #141–#143, #146, #155, #188, and #199
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
@@ -59,6 +59,7 @@ and intake registration of Issues #141–#143, #146, #155, and #188
 | [#146](https://github.com/wjhuang88/talos/issues/146) | optional utility model role and bounded routing | [MODEL-012](../backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md) | Intake | P2 model-role, routing, TUI, compatibility, and evaluation refinement required before implementation. |
 | [#155](https://github.com/wjhuang88/talos/issues/155) | SkillLoader rejects `SKILL.md` without triggers | [SKILL-004](../backlog/active/SKILL-004-optional-skill-triggers-compatibility.md) | Intake | P1 skill-format compatibility intake; contract decision, fixtures, iteration, and claim required before implementation. |
 | [#188](https://github.com/wjhuang88/talos/issues/188) | model-assisted Goal permission decisions | [PERM-007](../backlog/active/PERM-007-model-assisted-goal-permission-decisions.md) | Refinement | Security ADR, threat model, PERM-006 dependencies and bounded child decomposition required before any implementation claim. |
+| [#199](https://github.com/wjhuang88/talos/issues/199) | shared retry and circuit-breaker policy | [NET-001](../backlog/active/NET-001-network-resilience-policy.md) | Intake | Inventory and ADR-backed decomposition required; no implementation or replay authority. |
 
 ## Closed In This Reconciliation
 
