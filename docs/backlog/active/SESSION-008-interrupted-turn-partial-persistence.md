@@ -5,10 +5,10 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Refinement — current partial coverage inventoried; ADR and durable implementation remain |
+| Status | Review — SESSION-008-A ADR-058 and current-path characterization implemented; acceptance review pending |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
-| Selected Iteration | I187 (proposed; claim ineffective until target-branch merge) |
+| Selected Iteration | I187 (Review; claim effective at `5bb83f80`) |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
 
@@ -25,9 +25,9 @@
 | Governance Claim PR | #194 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer direction authorizes this non-overlapping #49 prerequisite to proceed while I185/I186 review and terminal acceptance are batched for closeout; exact-head governance validation and no-overlap CAS remain required before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #195 |
 | Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Merge #194 to establish ownership, then produce the Proposed ADR and characterization evidence; independent review and ADR acceptance are required before SESSION-008-B. |
+| Handoff / Release Condition | Obtain exact-head review of ADR-058 and the I187 characterization; accept the decision before separately claiming SESSION-008-B. |
 
 ## Identity / Goal / Value
 
@@ -100,7 +100,7 @@ transcript must identify that the turn did not complete normally.
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Selected by I187; claim PR #194 ineffective until merge | Existing ADR-039/ADR-042 and current-path inventory |
+| SESSION-008-A | Partial-turn lifecycle and durable-format decision | Review in I187; ADR-058 Proposed | Existing ADR-039/ADR-042 and current-path inventory |
 | SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Blocked | SESSION-008-A Accepted |
 
 Only one child may be selected at a time. The parent becomes Complete only
@@ -116,6 +116,13 @@ admission, and compatibility behavior for existing TLOG data. Prove that the
 chosen operation can be atomic and idempotent without persisting a fabricated
 empty turn. If the public API or durable schema changes, accept an ADR and
 migration plan before implementation.
+
+## SESSION-008-A Decision Evidence
+
+- Effective claim merge: `5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7` (PR #194).
+- Proposed decision: `docs/decisions/058-partial-turn-durable-finalization.md`.
+- Current-path evidence: `docs/reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md`.
+- ADR-042 remains authoritative until ADR-058 receives exact-head review and is Accepted.
 
 ## State / Status Owners
 
@@ -181,7 +188,6 @@ scripts/validate_project_governance.sh .
 
 ## Residuals
 
-- This Story remains Refinement until SESSION-008-A selects the lifecycle owner,
-  durable entry shape and compatibility strategy. Existing legacy error-path
-  coverage is retained as a compatibility fixture; it does not authorize or
-  substitute for SESSION-008-B.
+- This Story remains Review until SESSION-008-A is accepted. Existing legacy
+  error-path coverage is retained as a compatibility fixture; it does not
+  authorize or substitute for SESSION-008-B.
