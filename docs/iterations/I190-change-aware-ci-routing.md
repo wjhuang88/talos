@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-12 |
+| Work Slice | Implement only I190/GOV-005: deterministic fail-closed changed-path classification, stable pull-request CI routing, adversarial fixtures and route documentation. Keep full validation for every code, control-plane, executable, schema, fixture, dependency, binary, ambiguous or mixed change. No product/runtime behavior, release authorization, branch-protection administration, unrelated CI optimization, closeout or I188/I189 activation. |
+| Claimed At | 2026-08-12 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed immediate CI-routing correction after pure-documentation PRs repeatedly ran full Unix/Windows workspaces and one unrelated Windows timing failure forced an 11-minute rerun. Exact-head CI, both governance validators and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Merge the finalized claim to `main`, then implement only GOV-005 and prove the reduced path on a real PR. |
+| Handoff / Release Condition | Pass exact-head CI and merge-time CAS, merge claim PR #201 to `main`, then implement only GOV-005 and prove the reduced path on a real PR. |
 
 ## Published Baseline
 

@@ -5,7 +5,7 @@
 | Story ID | GOV-005 |
 | Type | Governance / CI Reliability Story |
 | Priority | P0 |
-| Status | Planned - claim PR pending |
+| Status | Planned - claim PR #201 pending target-branch merge |
 | Source | Maintainer priority correction, 2026-08-12 |
 | Selected Iteration | I190 (proposed; ineffective before claim merge) |
 | Depends On | Existing required CI checks and release preflight remain authoritative for non-documentation changes |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-12 |
+| Work Slice | Implement only I190/GOV-005: deterministic fail-closed changed-path classification, stable pull-request CI routing, adversarial fixtures and route documentation. Keep full validation for every code, control-plane, executable, schema, fixture, dependency, binary, ambiguous or mixed change. No product/runtime behavior, release authorization, branch-protection administration, unrelated CI optimization, closeout or I188/I189 activation. |
+| Claimed At | 2026-08-12 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed that pure-documentation CI inefficiency be fixed before remaining closeout work. Finalized exact-head CI, both governance validators and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Finalize and merge the claim PR before editing CI workflow or classifier implementation. |
+| Handoff / Release Condition | Pass exact-head CI and merge-time CAS, then merge claim PR #201 before editing CI workflow or classifier implementation. |
 
 ## Goal And Value
 
