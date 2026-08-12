@@ -89,9 +89,27 @@ scripts/validate_project_governance.sh .
 scripts/assess_project_scale.sh .
 ```
 
+## Pull Request CI Routing
+
+Pull requests containing only `README.md`, `README.zh-CN.md`, `CHANGELOG.md`, or Markdown beneath
+`docs/` outside `docs/sop/` use the reduced documentation route. That route keeps whitespace,
+public-site, governance, Collaboration Claim, remote Issue-owner, and Windows installer checks,
+while the Unix and Windows Rust workspace steps are skipped.
+
+Every other path or change type uses full validation. This includes Rust and Cargo files,
+workflows, `AGENTS.md`, SOPs, scripts, schemas, fixtures, generated or binary assets, mixed changes,
+renames, copies, deletions, type changes, and any missing or malformed comparison input. The
+workflow loads `scripts/classify_ci_changes.py` from the pull request base commit so a change cannot
+relax its own route. Reproduce the classifier fixture matrix with:
+
+```bash
+python3 scripts/test_ci_change_classifier.py
+```
+
 ## Rules
 
-- `cargo test --workspace` must exit 0 before any merge.
+- `cargo test --workspace --locked` must exit 0 before merging any full-validation change. A
+  mechanically reduced documentation-only pull request follows the routing contract above.
 - No `#[ignore]` without a tracking issue reference in a comment.
 - No deleting failing tests to "pass". Fix the code or fix the test.
 - New public APIs must have at least one test demonstrating usage.

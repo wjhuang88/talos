@@ -57,7 +57,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Review | [I187](I187-session008a-partial-turn-lifecycle.md) implements Proposed ADR-058 and the current-path characterization under effective claim merge `5bb83f80`; no SESSION-008-B or RUNTIME-005 implementation authority before exact-head review and ADR acceptance. |
 | I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / claim PR #196 | [I188](I188-tool024a-background-job-contract.md) proposes only the process/permission decision Spike for Issue #59. No ownership or implementation authority before independent review, exact-head validation, CAS and target-branch merge. |
 | I189 | PERM-006-A Structured Permission Decisions | Planned / claim PR #197 | [I189](I189-perm006a-structured-permission-decisions.md) proposes only the behavior-preserving structured request/context/report foundation for Issues #52/#53. Independent security review and target-branch claim merge gate all implementation. |
-| I190 | Change-Aware CI Routing | Planned / claim PR #201 | [I190](I190-change-aware-ci-routing.md) selects only GOV-005: deterministic fail-closed documentation-only classification, stable CI routing and adversarial fixtures. No workflow implementation authority before target-branch claim merge. |
+| I190 | Change-Aware CI Routing | Active / claim `bb38c262` | [I190](I190-change-aware-ci-routing.md) implements only GOV-005: deterministic fail-closed documentation-only classification, stable CI routing and adversarial fixtures. |
 
 ## Completed This Closeout
 
