@@ -593,7 +593,7 @@ mode.
 | `/copy all` | Copy the full transcript to clipboard |
 | `/export <path>` | Export transcript to a file (permission-gated) |
 | `/new` | Start a fresh session (preserves old session) |
-| `/resume` | List other non-empty resumable workspace sessions; `/resume <N>` selects by number |
+| `/resume` | List other non-empty resumable workspace sessions; `/resume <N>` selects by number, while `/resume <UUID>` accepts only an entry from the same filtered workspace list |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
 | `/model` | Open the model picker — three-level navigation: Level 1 lists Recent (≤5 most-recently-used models, persisted) and providers; selecting a provider enters Level 2 (that provider's models); selecting a model with declared variants enters Level 3 (variant list), while variant-less models switch immediately; `Esc` closes the picker. No-argument only: `/model gpt-4o` shows a correction and opens the picker |

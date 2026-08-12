@@ -21,7 +21,9 @@ the first message, so abandoned no-chat launches remain visible in `/resume`.
 
 - Resume reuses a committed runtime activation when its target identity exactly matches the
   requested identity and still rejects a genuine identity mismatch.
-- `/resume` excludes the active Session and zero-message Sessions.
+- `/resume` excludes the active Session and zero-message Sessions. Inside the TUI, both ordinal and
+  UUID selection are restricted to that filtered current-workspace list; cross-workspace UUID
+  recovery remains available through the explicit CLI `--session <UUID>` path.
 - A normal no-chat shutdown removes only the artifacts owned by that empty Session after the
   runtime has stopped; non-empty, pending, forked, live or ambiguous data is preserved.
 - Forced-exit residuals remain visible to explicit maintenance rather than being guessed at or
@@ -37,14 +39,21 @@ the first message, so abandoned no-chat launches remain visible in `/resume`.
 
 - Regression tests for matching-target resume and true mismatch rejection.
 - Picker tests for active/zero-message filtering.
-- Normal no-chat shutdown cleanup plus preservation tests for non-empty/pending Sessions.
+- Normal no-chat shutdown cleanup plus preservation tests for non-empty, unparseable and pending
+  Sessions. Only a transcript whose on-disk length is exactly zero authorizes cleanup.
 - Locked format, check, Clippy and workspace tests; independent exact-head review before merge.
 
 ## Implementation Evidence
 
-- Implementation commit: `ecd615a0`; dependency-free test correction: `c597c0bb`.
+- Implementation commits: `ecd615a0`, dependency-free test correction `c597c0bb`, and review
+  data-preservation correction `d98f6d0a`.
 - `./scripts/release_preflight.sh` passed on implementation tree `c597c0bb`.
 - Read-only storage inventory found 25 sidecars, all paired with transcripts; nine pairs had empty
   TLOG transcripts. This proves premature no-chat materialization, not orphan-sidecar leakage.
 - Existing user files were not modified. Forced-kill and historical empty-file cleanup remain
   explicit maintenance concerns; merge and independent exact-head review remain pending.
+- Independent review `5265172266` rejected head `b2376847` because parsed-entry emptiness could
+  delete non-empty truncated or future-schema transcripts. Commit `d98f6d0a` changes deletion
+  authority to strict zero-byte metadata and proves both ambiguous forms remain byte-identical.
+- The independent A2 finding was pre-existing main drift, repaired separately by bounded-maintenance
+  PR #207 at main merge `ac8971a3`; the remote Issue/owner validator now passes for 34 open Issues.

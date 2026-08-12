@@ -50,4 +50,8 @@ The frozen scope, exclusions and acceptance are owned by `TOOL-026`.
 - Implementation commits: `d6d298a4`, `6bbcb568`.
 - `./scripts/release_preflight.sh`: passed on implementation tree `c597c0bb`; both governance
   validators reported 0 warnings and classifier fixtures passed 9/9.
+- Independent review `5265172266` validated the `setsid` security claim in a real PTY, including
+  failed controlling-terminal acquisition and input injection through an explicitly opened slave.
+  It found no new descendant escape regression. The observed Unix `killpg` subtree-reaping
+  opportunity remains a TOOL-024/I188 residual; this emergency work does not activate I188.
 - No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.

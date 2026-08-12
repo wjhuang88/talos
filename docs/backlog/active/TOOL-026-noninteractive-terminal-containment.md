@@ -40,4 +40,9 @@ the TUI for input and inject terminal replies or control bytes into the composer
 - Implementation commits: `d6d298a4` and warning-only correction `6bbcb568`.
 - `./scripts/release_preflight.sh` passed on implementation tree `c597c0bb` after two earlier
   failed attempts exposed and corrected an unused import and a test-only undeclared dependency.
+- Independent review `5265172266` validated the exact `setsid` boundary under a real PTY: `/dev/tty`
+  failed, and explicit slave-device access could neither acquire the controlling terminal nor inject
+  input. The review also confirmed the existing direct-child-only timeout limitation was not
+  regressed. Unix `killpg` subtree cleanup remains separately owned by TOOL-024/I188 and is not
+  activated here.
 - Merge and independent exact-head security review remain pending; this Story is not Complete.

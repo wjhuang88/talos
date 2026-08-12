@@ -51,9 +51,16 @@ The frozen scope, exclusions and acceptance are owned by `SESSION-010`.
 
 ## Completion Evidence
 
-- Implementation commits: `ecd615a0`, `c597c0bb`.
+- Implementation commits: `ecd615a0`, `c597c0bb`, `d98f6d0a`.
 - `./scripts/release_preflight.sh`: passed on implementation tree `c597c0bb`; both governance
   validators reported 0 warnings, classifier fixtures passed 9/9, and workspace tests passed.
 - Storage inspection found no orphan sidecars; nine empty TLOG/sidecar pairs demonstrate the
   current no-chat materialization gap. No user artifacts were changed.
+- Independent review `5265172266` marked exact head `b2376847` NEEDS CHANGES: its parser-based
+  cleanup could delete non-empty ambiguous transcripts. Existing implementation commit `d98f6d0a`
+  now requires strict zero-byte transcript metadata and covers truncated JSONL plus valid
+  future-schema JSON with zero recognized entries. A2's pre-existing #134 matrix drift was repaired
+  outside this PR and merged to main as `ac8971a3` through bounded-maintenance PR #207.
+- Within the TUI, `/resume <UUID>` now intentionally shares the current-workspace, non-empty picker
+  scope; explicit cross-workspace UUID recovery remains the CLI `--session <UUID>` path.
 - No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.

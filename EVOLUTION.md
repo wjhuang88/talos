@@ -895,3 +895,22 @@ repeating known mistakes.
   inferring success from a narrower command.
 - Promoted to rule/check: existing `AGENTS.md` Standard Build And Release Flow and
   `scripts/release_preflight.sh`.
+
+## 2026-08-12 - Loss-tolerant parsing cannot authorize destructive cleanup
+
+- Trigger: Independent review of I192/SESSION-010 exercised shutdown cleanup with truncated JSONL
+  and valid future-schema JSON that contained user content but produced zero recognized entries.
+- Symptom: Both non-empty transcripts and their SQLite sidecars were deleted because cleanup used
+  the parser's empty result as proof that the Session was empty.
+- Root cause: `read_entries_from_path` intentionally skips invalid or unknown lines for crash-safe
+  reading. Reusing that conservative read fallback as a deletion predicate inverted its safety
+  meaning: unrecognized data became authorization to destroy ambiguous data.
+- Fix: Cleanup now requires the transcript's on-disk byte length to be exactly zero. Any non-empty
+  transcript is preserved without interpreting its schema; pending work remains an independent
+  preservation gate.
+- Prevention: Destructive decisions must use positive, lossless evidence of emptiness or ownership.
+  A best-effort parser result, missing projection, or skipped record can only authorize preservation
+  or an explicit diagnostic, never deletion.
+- Promoted to rule/check:
+  `mode_runners::tests::empty_tui_shutdown_preserves_nonempty_unparseable_transcripts` covers both
+  truncated and valid unknown-schema transcripts and asserts their bytes and sidecars are unchanged.
