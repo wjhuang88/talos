@@ -54,7 +54,7 @@ closeout evidence; status synchronization commits do not self-certify completion
  | I184 | TUI-046-A Native Selection Policy | Complete | Completion Commit `f98488277803ee26180100089a48ef850939234b`; reviewed head `24e15db8d9df852c07fe08cc79ccc670fda36d27`; review `5237824299`; CI `31370219799`. B is separately claimable; cross-platform testing is deferred to B acceptance. |
  | I185 | SQLite Validator Policy Integrity | Review / PR #191 | [I185](I185-sqlite-validator-policy-integrity.md) implements only AG-12: one structured ADR allowlist, preserved `cargo metadata --locked` fail-closed policy and actionable non-UTF-8 Cargo diagnostics; no Rust/Cargo/runtime change. |
  | I186 | TUI Visible-Cell Selection And Copy | Review / PR #193 | [I186](I186-tui-visible-cell-selection.md) implements TUI-046-B / Issue #134. Code head `70b51e28` passed exact-head Alacritty and Terminal.app interaction/clipboard acceptance; final PR-head CI/review, merge-time CAS and closeout evidence remain pending. |
- | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Planned / claim PR #194 | [I187](I187-session008a-partial-turn-lifecycle.md) selects the lifecycle, durable incomplete-turn and compatibility decision prerequisite for #49. Claim is proposed in PR #194 and has no authority until merge; no SESSION-008-B or RUNTIME-005 implementation authority before ADR acceptance. |
+ | I187 | SESSION-008-A Partial-Turn Lifecycle Decision | Review | [I187](I187-session008a-partial-turn-lifecycle.md) implements Proposed ADR-058 and the current-path characterization under effective claim merge `5bb83f80`; no SESSION-008-B or RUNTIME-005 implementation authority before exact-head review and ADR acceptance. |
 
 ## Completed This Closeout
 
