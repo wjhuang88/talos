@@ -5,16 +5,18 @@
 | Story ID | GOV-005 |
 | Type | Governance / CI Reliability Story |
 | Priority | P0 |
-| Status | Review - implementation PR #202 |
+| Status | Complete |
 | Source | Maintainer priority correction, 2026-08-12 |
 | Selected Iteration | I190 |
 | Depends On | Existing required CI checks and release preflight remain authoritative for non-documentation changes |
+
+Status: Complete
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 implementation session 2026-08-12 |
 | Work Slice | Implement only I190/GOV-005: deterministic fail-closed changed-path classification, stable pull-request CI routing, adversarial fixtures and route documentation. Keep full validation for every code, control-plane, executable, schema, fixture, dependency, binary, ambiguous or mixed change. No product/runtime behavior, release authorization, branch-protection administration, unrelated CI optimization, closeout or I188/I189 activation. |
@@ -22,10 +24,12 @@
 | Source Issue | None |
 | Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer directed that pure-documentation CI inefficiency be fixed before remaining closeout work. Finalized exact-head CI, both governance validators and merge-time CAS remain required. |
+| Authorization Evidence | PR #202 exact head `13b288ec8670e2536a2d46ccda4e3240fb2b30cf` passed full CI run `31560789644`, received independent approval in review comment `5262374485`, passed merge-time CAS and merged as `a69ffa30afed16271885d4ef3d11931ab3189673`. Probe PR #203 then passed reduced-route run `31564461023` and merged as `01721f683d0c09ad5f5f9e98360da15cd5155c48`. |
 | Implementation PR | #202 |
 | Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Claim PR #201 merged as `bb38c262`; implementation must pass full exact-head CI, independent review and merge-time CAS, then prove the reduced route on a separate documentation-only PR. |
+| Handoff / Release Condition | None - implementation and reduced-route probe are merged; residual case-normalization work is independently owned by GOV-006. |
+
+Completion Commits: `a69ffa30afed16271885d4ef3d11931ab3189673`, `01721f683d0c09ad5f5f9e98360da15cd5155c48`
 
 ## Goal And Value
 
@@ -79,6 +83,20 @@ change must retain the full validation matrix.
 
 ## Residuals
 
+- PR #202 review finding F1 is registered as unclaimed GOV-006: case variants such as `docs/SOP/`
+  currently bypass the lowercase `docs/sop/` exclusion and receive reduced validation. GOV-006 owns
+  case-normalized matching and adversarial fixtures without reopening this completed routing slice.
 - The independent Windows config-lock timeout observed on PR #195 is not fixed by this story; code
   changes continue to exercise it through full CI and any reliability repair needs a separate owner.
 - Further test sharding, caching, runner selection and branch-protection changes remain separate.
+
+## Completion Evidence
+
+- PR #202 exact head `13b288ec8670e2536a2d46ccda4e3240fb2b30cf` passed all five jobs in
+  CI run `31560789644`, received independent APPROVE in comment `5262374485`, passed merge-time CAS
+  and merged as `a69ffa30afed16271885d4ef3d11931ab3189673`.
+- Probe PR #203 exact head `ecf4ca775ae0e188f401042a5890ab9367fe0aec` classified one allowlisted
+  Markdown path as reduced in run `31564461023`; governance, remote-owner and installer gates passed,
+  Unix Rust toolchain/cache/release-preflight steps were skipped, the Windows Rust workspace allocated
+  no runner and concluded `SKIPPED`, and the PR remained `MERGEABLE/CLEAN`. It merged as
+  `01721f683d0c09ad5f5f9e98360da15cd5155c48`.
