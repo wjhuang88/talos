@@ -755,15 +755,16 @@ pub(crate) async fn handle_session_fork(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, Utc};
 
-    fn info(id: uuid::Uuid, message_count: usize, age_minutes: i64) -> talos_session::SessionInfo {
+    fn info(id: uuid::Uuid, message_count: usize, age_minutes: u64) -> talos_session::SessionInfo {
         talos_session::SessionInfo {
             id,
             project: "test".to_string(),
             workspace_root: "/test".to_string(),
             last_message_preview: String::new(),
-            timestamp: Utc::now() - Duration::minutes(age_minutes),
+            timestamp: (std::time::SystemTime::now()
+                - std::time::Duration::from_secs(age_minutes.saturating_mul(60)))
+            .into(),
             message_count,
         }
     }
