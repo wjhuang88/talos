@@ -2,13 +2,13 @@
 
 > Status: Design baseline / proposal refinement — **no implementation authorization**
 >
-> Date: 2026-08-11
+> Date: 2026-08-12
 >
 > Owner direction: `DESKTOP-001`
 >
 > Source discussion: maintainer product/architecture discussion consolidating the Desktop renderer,
-> goal-oriented workflow, Todo evolution, independent evaluation, artifact review, and delivery
-> model.
+> goal-oriented workflow, Todo evolution, independent evaluation, artifact review, delivery model,
+> visual direction, and initial internationalization requirement.
 
 ## 1. Purpose
 
@@ -35,6 +35,11 @@ This document records the design baseline agreed for that direction and defines 
 **future, separate Desktop prerequisite implementation PR**. This document PR itself must not add
 Desktop code, create the prerequisite implementation PR, or imply that implementation has been
 selected or authorized.
+
+The Desktop visual and internationalization baselines are additionally defined in:
+
+- `docs/design/talos-desktop/DESIGN.md`
+- `docs/design/talos-desktop/I18N.md`
 
 ## 2. Product Model: Mission Instead Of Transcript
 
@@ -126,7 +131,43 @@ talos-desktop
     !-> talos-tui
 ```
 
-## 4. Mission Lifecycle
+## 4. Internationalization Is A First-Class Desktop Requirement
+
+The first visible GPUI Desktop implementation must be internationalized from the beginning.
+Internationalization is not deferred polish and must not require later rewriting view code to remove
+hard-coded labels.
+
+Initial supported UI locales are:
+
+- Simplified Chinese (`zh-CN`);
+- English (`en-US`).
+
+Locale is a Desktop client/presentation preference. It must not become part of Mission, Goal,
+WorkUnit, Execution Baseline, Completion Claim, Evaluation, Evidence, Artifact, or Delivery identity.
+Changing the UI language therefore does not create a new work revision or make an evaluation stale.
+
+Product-controlled UI strings are localized through a catalog/key abstraction or equivalent typed
+message interface. User-authored Mission/Goal content, code, paths, commands, raw logs, external
+content, Artifacts, and raw evidence are not silently translated.
+
+The first GPUI visual/interaction slice must validate the same Execution experience in both initial
+languages, including:
+
+- navigation and controls;
+- Current Goal and Current Work hierarchy;
+- Mission path;
+- Recent Activity;
+- change summary;
+- one blocked/error state;
+- one evaluation state;
+- layout/wrapping at normal laptop width;
+- mixed CJK/Latin rendering;
+- Chinese IME in editable controls;
+- system-language negotiation, explicit language selection, persistence, and deterministic fallback.
+
+Detailed localization rules are authoritative in `docs/design/talos-desktop/I18N.md`.
+
+## 5. Mission Lifecycle
 
 The Desktop workflow is modeled as explicit state rather than transcript convention:
 
@@ -168,9 +209,9 @@ EVALUATING
 `CHAT` is intentionally not a lifecycle state. Natural language can be used within each lifecycle
 stage, but Mission, Goal, evaluation, artifact, and delivery facts remain structured state.
 
-## 5. Work Graph: One Canonical Planning And Execution Model
+## 6. Work Graph: One Canonical Planning And Execution Model
 
-### 5.1 Why a graph
+### 6.1 Why a graph
 
 The UI may default to a tree projection because hierarchy is easy to understand, but the canonical
 model should be a DAG-capable **Work Graph**. Real work contains both containment and dependency:
@@ -190,7 +231,7 @@ Goal C depends_on Goal B
 Containment and execution dependency are different facts and must not be represented by one edge
 kind.
 
-### 5.2 Mission
+### 6.2 Mission
 
 A Mission is the durable unit of delegated outcome. It can span multiple runtime/session instances,
 including executor sessions, evaluator sessions, rework sessions, and later reconnects.
@@ -198,7 +239,7 @@ including executor sessions, evaluator sessions, rework sessions, and later reco
 A Mission therefore must not be modeled as a child object whose lifetime is owned by one transcript
 session.
 
-### 5.3 Work nodes
+### 6.3 Work nodes
 
 The first useful node kinds are deliberately small:
 
@@ -223,7 +264,7 @@ objects and may be hidden or collapsed by default in Desktop.
 The distinction is semantic, not a second storage system. Goals and Work Units belong to the same
 Work Graph, repository, identity model, and dependency semantics.
 
-### 5.4 Goal model
+### 6.4 Goal model
 
 A Goal should be able to carry at least:
 
@@ -259,7 +300,7 @@ Cancelled
 
 `Completed` is special: executor code must not be able to set it directly.
 
-### 5.5 Work Unit model
+### 6.5 Work Unit model
 
 Work Units preserve the useful semantics of the existing Todo system:
 
@@ -276,7 +317,7 @@ Work Units preserve the useful semantics of the existing Todo system:
 A Work Unit can be completed by the executor because it represents an execution step, not an
 independent claim that the user outcome is satisfied.
 
-## 6. Acceptance Criteria Are First-Class Goal State
+## 7. Acceptance Criteria Are First-Class Goal State
 
 A Goal is not complete merely because all of its Work Units are complete. Goal completion is judged
 against explicit acceptance criteria.
@@ -310,7 +351,7 @@ Examples:
 The distinction prevents Talos from using an LLM to judge facts that a deterministic validator can
 establish more reliably.
 
-## 7. Execution Baseline And Plan Mutation Policy
+## 8. Execution Baseline And Plan Mutation Policy
 
 After shaping, the user explicitly confirms an **Execution Baseline**. The baseline is a revisioned
 snapshot of the agreed Mission/Goal outcome and acceptance contract.
@@ -343,7 +384,7 @@ Suggested mutation policy:
 A scope-changing mutation should produce a structured `PlanChangeProposed` fact that Desktop can
 present for accept/edit/reject. The accepted change creates a new baseline revision.
 
-## 8. Todo Evolution: Replace The Domain, Preserve The Useful Semantics
+## 9. Todo Evolution: Replace The Domain, Preserve The Useful Semantics
 
 Talos already has a substantial session-scoped Todo implementation. It is not a trivial checklist:
 it includes durable SQLite state, statuses, priority, turn assignment, tags, dependency edges, cycle
@@ -382,29 +423,17 @@ become projections/adapters over the canonical Work Graph rather than a second r
 The future canonical mutation surface should be work-oriented (`work_*` or an equivalent reviewed
 name), not duplicated `todo_*` plus `goal_*` APIs.
 
-## 9. Execution Experience
+## 10. Execution Experience
 
-### 9.1 Default execution view
+### 10.1 Default execution view
 
-The Desktop execution view should emphasize current state, not the raw Agent transcript:
-
-```text
-+----------------+---------------------------+------------------+
-| GOALS          | CURRENT WORK              | CHANGES/ARTIFACTS|
-|                |                           |                  |
-| ✓ Architecture | Goal 4: GPUI interface    | M config.rs      |
-| ✓ UX           |                           | A provider.rs    |
-| ✓ Host API     | Current work:             | A settings.rs    |
-| ● GPUI UI      | Build credential form     |                  |
-| ○ Integration  |                           | +184 / -21       |
-| ○ Verify       | Recent activity:          | [Review Diff]    |
-| ○ Delivery     | validation passed ...     |                  |
-+----------------+---------------------------+------------------+
-```
+The Desktop execution view should emphasize current state, not the raw Agent transcript. The visual
+baseline is light-first, Nord-derived, low-density, and organized around one dominant execution
+narrative. See `docs/design/talos-desktop/DESIGN.md`.
 
 The default UI should not dump every read/search/tool/stdout event into the main view.
 
-### 9.2 Semantic activity stream
+### 10.2 Semantic activity stream
 
 The continuously scrolling execution summary should be derived from structured events such as:
 
@@ -432,7 +461,7 @@ Detailed logs remain available through drill-down and may include tool calls, st
 provider diagnostics, validation records, and raw runtime events subject to existing redaction and
 credential-display rules.
 
-### 9.3 Progress display
+### 10.3 Progress display
 
 Avoid fake precision such as `57%` when the remaining work is inherently uncertain. Prefer:
 
@@ -442,10 +471,10 @@ Avoid fake precision such as `57%` when the remaining work is inherently uncerta
 - critical path/dependency projection where useful;
 - validation/evaluation state.
 
-## 10. Artifact And Change Workspace
+## 11. Artifact And Change Workspace
 
-The right-side Desktop review surface should be broader than a `git diff` panel. The canonical
-concept is **Artifact**, with changed files being one artifact renderer.
+The Desktop review surface should be broader than a `git diff` panel. The canonical concept is
+**Artifact**, with changed files being one artifact renderer.
 
 Potential artifact kinds include:
 
@@ -476,9 +505,9 @@ Artifact and Evidence should remain their own domain objects or references. Do n
 finding, decision, or validation record into a Work Graph node and accidentally create a universal
 knowledge graph.
 
-## 11. Independent Completion Evaluation
+## 12. Independent Completion Evaluation
 
-### 11.1 Core rule
+### 12.1 Core rule
 
 The executor may claim that work is ready for evaluation, but it must not self-certify Goal
 completion.
@@ -493,7 +522,7 @@ There must be no direct authority edge:
 Executor -> Goal::Completed
 ```
 
-### 11.2 Completion Claim
+### 12.2 Completion Claim
 
 When the executor believes a Goal is satisfied, it submits a structured claim such as:
 
@@ -510,7 +539,7 @@ pub struct CompletionClaim {
 
 The executor summary is context/hint only. It is neither independent evidence nor the final verdict.
 
-### 11.3 Evaluator independence
+### 12.3 Evaluator independence
 
 The Evaluator must be independent in ways that are enforceable by runtime/product design rather
 than only prompt wording:
@@ -527,7 +556,7 @@ than only prompt wording:
 5. **Revision binding.** A verdict applies only to the exact Goal/workspace subject that was
    evaluated.
 
-### 11.4 Validator is not Evaluator
+### 12.4 Validator is not Evaluator
 
 Talos already has a shared internal validation service that can produce structured validation
 records for internal checks and host-tool adapters. That service is an **evidence producer**.
@@ -544,7 +573,7 @@ Artifacts/diff/inspection ----/
 Machine-verifiable acceptance should prefer validator evidence. Semantic acceptance uses evaluator
 judgment.
 
-### 11.5 Evaluation report
+### 12.5 Evaluation report
 
 Evaluation should be criterion-granular, not only a single PASS/FAIL string:
 
@@ -554,338 +583,439 @@ pub enum CriterionVerdict {
     Fail,
     Inconclusive,
 }
-
-pub struct CriterionEvaluation {
-    pub criterion_id: AcceptanceCriterionId,
-    pub verdict: CriterionVerdict,
-    pub explanation: String,
-    pub evidence_refs: Vec<EvidenceRef>,
-}
-
-pub struct EvaluationReport {
-    pub subject: EvaluationSubject,
-    pub overall: CriterionVerdict,
-    pub criteria: Vec<CriterionEvaluation>,
-    pub findings: Vec<EvaluationFinding>,
-}
 ```
 
-The Desktop can then show:
+Each criterion result should retain evidence references and findings sufficient for a user or
+executor to understand why it passed, failed, or could not be determined.
+
+### 12.6 Exact-revision binding
+
+Evaluation applies to an explicit subject revision, for example:
 
 ```text
-✓ A1 Provider can be configured
-✓ A2 Credential can be validated
-✗ A3 Secrets never appear in logs
-? A4 Runtime refresh has insufficient evidence
+Mission revision
++ Goal revision
++ workspace/content revision
 ```
 
-### 11.6 Revision binding and stale verdicts
+For Git-backed coding work this may include the exact HEAD plus a dirty-worktree digest or an
+equivalent stable content identity. The concrete scheme requires implementation design.
 
-Evaluation approval must follow exact-subject semantics similar to exact-head review discipline.
-An evaluation is bound to at least:
+If relevant subject state changes after PASS, that verdict becomes stale rather than silently
+continuing to certify the modified work.
 
-- Mission baseline revision;
-- Goal revision;
-- workspace/change-set revision.
+Locale-only presentation changes are explicitly excluded from the evaluation subject. Switching
+`zh-CN`/`en-US` does not stale an otherwise unchanged evaluation.
 
-For Git workspaces, the subject may include HEAD plus a deterministic dirty-tree/change-set digest.
-If the evaluated subject changes after a PASS, the previous evaluation becomes **stale** and cannot
-continue to authorize `Completed` or `Delivered` state.
+### 12.7 Rework
 
-### 11.7 Rework loop
-
-A failing evaluation produces structured findings and transitions the Goal into rework. The
-executor receives the Goal contract plus evaluator findings, performs new work, and submits a new
-Completion Claim for a new exact revision.
-
-### 11.8 Mission-level evaluation
-
-`all(goals.completed)` is not sufficient to prove a Mission is complete. Individually correct
-Goals can fail when integrated.
-
-After all required Goal evaluations pass, the Mission must support a final independent evaluation
-against Mission-level outcomes and cross-Goal integration criteria before delivery.
-
-## 12. Delivery As A Durable Product Object
-
-The end of a Mission should not be an assistant message saying “done.” It should produce a durable
-**Delivery** assembled from evaluated facts:
+A failed Goal evaluation returns structured findings to the executor:
 
 ```text
-Mission baseline
-+ completed Goal Graph
-+ Goal evaluation reports
-+ final Mission evaluation
-+ artifacts/change set
-+ validation evidence
-+ final workspace revision
-= Delivery
+Evaluation FAIL
+      |
+      v
+Rework
+      |
+      v
+Executor changes subject revision
+      |
+      v
+new CompletionClaim
+      |
+      v
+fresh Evaluation
 ```
 
-A coding Delivery can render:
+An evaluator should not fix the work it evaluates by default; otherwise executor/evaluator authority
+collapses back into one role.
 
-- outcome summary;
-- Goal completion and evaluation status;
-- acceptance criteria with evidence;
-- changed files/diff;
-- validation/test/build results;
-- security findings or unresolved warnings;
-- screenshots or runtime proof where applicable;
-- deviations from the baseline;
-- commit/PR actions when the change set is ready.
+## 13. Mission-Level Evaluation
 
-A non-coding Delivery may instead contain research reports, datasets, documents, diagrams, source
-coverage, decisions, or other domain artifacts.
+All child Goals passing does not prove the integrated Mission outcome.
 
-The important invariant is that check marks in Delivery are derived from evaluable state and
-records, not from executor prose.
+After required Goal evaluations pass, a separate Mission-level evaluation should verify the final
+integrated state against Mission-level acceptance and cross-Goal behavior before Delivery.
 
-## 13. Shared Domain Versus Desktop UX
+```text
+all required Goals evaluated PASS
+              |
+              v
+      Mission Evaluation
+              |
+        PASS / FAIL
+          |       |
+          |       +--> Rework
+          v
+       Delivery
+```
 
-The following distinction is architectural:
+Mission evaluation may reuse Goal evidence, but it must be able to add integration-level validation
+and judgment.
 
-### Shared Talos domain
+## 14. Delivery Is A Durable Evaluated Object
 
-- Mission identity/lifecycle;
-- Work Graph;
-- Goal/WorkUnit semantics;
-- acceptance criteria;
-- execution baseline and mutation policy;
-- Completion Claim;
-- evaluation subject/report/finding;
-- exact-revision/staleness rules;
-- artifact/evidence references.
+Completion should not end with an assistant message saying “done.”
 
-### Desktop product UX
+A Delivery is generated from evaluated work state and should summarize:
 
-- Goal tree/graph visual projection;
-- visual shaping and direct manipulation;
-- current-work execution view;
-- semantic activity timeline;
-- artifact/change workspace;
-- evaluation progress and findings UI;
-- Delivery review UI;
-- GPUI window/platform integration.
+- Mission outcome;
+- Goal completion state;
+- acceptance/evaluation results;
+- validation evidence;
+- Artifacts/change set;
+- unresolved warnings or deviations;
+- exact delivered workspace/revision identity.
 
-The Goal-first experience is a Desktop differentiator, but the Work Graph and evaluation semantics
-must not be implemented as GPUI-local state.
+For coding work, Delivery may expose actions such as:
 
-TUI may continue to expose a compact conversation-first projection over the same canonical work
-state, including a compatibility `/todo` view during migration.
+```text
+Review Changes
+Create Commit
+Create PR
+Open Build/Artifact
+```
 
-## 14. Future Separate Desktop Prerequisite Implementation PR
+Those actions remain governed by existing permission and Git workflow policies.
 
-This section records the **future action**. It is intentionally not executed by this documentation
-PR.
+The Delivery summary itself is localized presentation. The delivered Artifact and Evidence facts
+remain canonical and are not rewritten when the UI locale changes.
 
-Before creating the first GPUI Desktop implementation PR, create a **separate prerequisite
-implementation PR** whose purpose is to establish the shared work/evaluation foundation that
-Desktop will consume.
+## 15. Desktop And TUI Do Not Need Feature-Shape Parity
 
-Suggested PR intent/title:
+The shared Work Graph can be projected differently by each product.
+
+Desktop may expose Goal shaping, graph/outline views, drag/reorder, rich Evaluation, Artifact review,
+and Delivery surfaces.
+
+TUI can keep a compact projection such as:
+
+```text
+Mission: Add provider settings
+
+Goals
+✓ Architecture
+● Provider configuration
+○ Verification
+
+Current work
+✓ inspect schema
+● implement form
+○ run tests
+```
+
+This does not require TUI to reproduce Desktop layout or localization behavior. Desktop
+internationalization is not a requirement to retrofit the current TUI in the same implementation
+slice.
+
+## 16. Shared Domain, Desktop-Specific Interaction
+
+Goal-first is a Desktop interaction paradigm, but Work Graph and Evaluation should be shared domain
+capabilities rather than GPUI-only models.
+
+Likewise, locale is a Desktop client presentation concern and must not leak into shared Work Graph or
+Evaluation state.
+
+The target dependency direction is conceptually:
+
+```text
+shared work/runtime domain
+          |
+          v
+UI-neutral projection/controller
+       /             \
+      /               \
+   TUI               Desktop
+                      GPUI
+                       |
+                locale projection
+                zh-CN / en-US
+```
+
+Do not create new shared crates purely to make this diagram exact. Existing `talos-conversation`,
+`talos-runtime`, and `talos-session` responsibilities must be reconciled first.
+
+## 17. Candidate Shared Work Crate
+
+The current Todo implementation is session-owned. Mission/Goal/Evaluation lifetime is expected to
+span executor, evaluator, rework, and later reconnect sessions. A dedicated durable work-domain crate
+such as `talos-work` is therefore a credible candidate.
+
+That name and boundary are **not authorized merely by this proposal**. The future prerequisite PR
+must confirm dependency direction and responsibility before adding the crate.
+
+If created, its responsibility should be narrowly defined around durable work state:
+
+```text
+Mission
+Work Graph
+Goal / WorkUnit
+Acceptance Criteria
+Graph mutation policy
+Completion Claims
+Evaluation models
+Persistence
+```
+
+It should not become a generic workflow engine, generic scheduler, GUI framework, or multi-agent
+framework.
+
+Localization catalogs and Desktop language preferences do **not** belong in this shared work crate.
+
+## 18. Current Repository Reconciliation
+
+This design supersedes the older Tauri-oriented recommendation in `docs/proposals/talos-desktop.md`
+while preserving Issue #29 and `DESKTOP-001` as historical/governance context.
+
+Current architecture must be respected:
+
+- `talos-runtime` is the supported reusable SDK facade;
+- `talos-conversation` already provides UI-independent product projection and must be evaluated
+  before inventing an overlapping presentation layer;
+- durable session/transcript ownership remains in current session/runtime boundaries;
+- SESSION-009 owns future attach/detach/replay/multi-client semantics;
+- client viewport/layout state remains client-owned;
+- existing Validation Service is reusable evidence infrastructure.
+
+The earlier proposed `talos-presentation` crate should therefore **not** be created automatically.
+The Desktop implementation is the second real frontend and may justify extraction of currently
+CLI/TUI-owned orchestration, but only where actual dependency evidence requires it.
+
+Similarly, an earlier `talos-motion` idea should begin as Desktop-local motion semantics unless a
+second consumer demonstrates a need for a shared crate.
+
+Desktop localization is a real first-client requirement, but no shared `talos-i18n` crate should be
+invented without evidence that a second product needs the same abstraction.
+
+## 19. SESSION-009 Dependency Boundary
+
+The first Desktop vertical slice can use a local, embedded, single-client runtime topology. It does
+not need to wait for every future SESSION-009 multi-client/reconnect capability.
+
+SESSION-009 becomes a hard dependency for behavior such as:
+
+- separate daemon/session ownership;
+- attach/detach;
+- reconnect;
+- multi-window concurrent clients;
+- observer/controller fanout;
+- replay after connection loss.
+
+The first Desktop slice must not invent alternate session ownership merely to bypass SESSION-009.
+
+## 20. Future Separate Desktop Prerequisite Implementation PR
+
+This document defines the required **future action**. The documentation PR containing this proposal
+must not create the implementation PR itself.
+
+Before the first GPUI Desktop implementation PR, create a separate governed prerequisite
+implementation PR after normal requirement intake, ADR/migration review, iteration selection, and an
+effective Collaboration Claim.
+
+A suitable conceptual title is:
 
 > `foundation: introduce canonical work graph and independent goal evaluation`
 
-Normal requirement-intake, iteration selection, ADR, Collaboration Claim, and review rules remain
-mandatory before that implementation branch is created.
+The title is illustrative; governance/story IDs and final scope must come from the selected
+iteration.
 
-### 14.1 Required implementation actions
+### 20.1 Required implementation actions
 
-The prerequisite PR should:
+The future prerequisite PR should, subject to the selected iteration and review, establish:
 
-1. **Establish the canonical work domain.**
-   - Prefer a dedicated `crates/talos-work/` if the implementation confirms that Mission lifecycle
-     is no longer session-owned and the crate preserves a single responsibility.
-   - Define Mission, Work Graph, Goal, WorkUnit, containment, dependency, revision, and acceptance
-     criterion types.
-   - Do not create a general workflow/scheduler engine.
+1. **Canonical work domain**
+   - confirm whether `talos-work` is the correct crate boundary;
+   - add Mission, Work Graph, Goal, WorkUnit, containment, dependency, and stable identity;
+   - define revision semantics required by evaluation.
 
-2. **Evolve Todo into Work Graph compatibility.**
-   - Migrate/reuse current Todo persistence and invariants where practical.
-   - Map legacy Todo items to Work Units.
-   - Preserve dependency cycle detection, idempotency, batch mutation, permission checks, and query
-     behavior.
-   - Keep `/todo` and `todo_*` only as explicitly bounded compatibility adapters if needed.
-   - Do not retain a parallel Todo repository as a second source of truth.
+2. **Todo migration/adaptation**
+   - preserve current Todo status/priority/tag/dependency/idempotency/batch semantics as WorkUnit
+     behavior where applicable;
+   - preserve cycle rejection and permission gating;
+   - provide a compatibility projection/adaptor for `/todo` and `todo_*` during migration;
+   - avoid maintaining a second Todo repository beside Work Graph.
 
-3. **Introduce Goal authority rules.**
-   - Executor mutation APIs must not permit direct `Goal -> Completed` transitions.
-   - Work Units remain executor-completable.
-   - Goal completion is coordinator-owned after a current independent PASS.
+3. **Acceptance Criteria**
+   - make acceptance first-class Goal state;
+   - distinguish deterministic validation/artifact/invariant checks from semantic judgment where
+     useful.
 
-4. **Introduce Completion Claims.**
-   - Executor submits an exact-revision evaluation request rather than self-certifying completion.
+4. **Goal authority**
+   - executor cannot directly transition Goal to `Completed`;
+   - executor can complete Work Units;
+   - executor can request Goal evaluation through a Completion Claim.
 
-5. **Introduce independent Evaluation models and orchestration boundary.**
-   - Separate evaluator runtime/session from executor runtime/session.
-   - Fresh evaluator context by default.
-   - Read-only evaluator policy by default.
-   - Criterion-granular PASS/FAIL/INCONCLUSIVE reports and findings.
-   - Rework loop support.
+5. **Completion Claim / Evaluation model**
+   - add structured Completion Claim;
+   - add Evaluation request/subject/report/finding/criterion-verdict models;
+   - bind verdicts to exact subject revisions;
+   - stale verdicts after relevant mutation.
 
-6. **Bind evaluation to exact revisions.**
-   - Define Mission/Goal/workspace subject identity.
-   - Invalidate or mark stale any report whose subject changes.
+6. **Independent evaluator boundary**
+   - separate Agent/runtime instance or equivalent enforced execution boundary;
+   - fresh evaluation context;
+   - read-only by default;
+   - no inheritance of executor reasoning as evaluation truth.
 
-7. **Reuse existing Validation Service as evidence input.**
-   - Do not conflate validation execution with Goal evaluation.
-   - Allow machine-verifiable acceptance criteria to reference structured validation records.
+7. **Validation evidence integration**
+   - consume existing Validation Service records as Evidence;
+   - do not make Validator itself the Goal judgment authority;
+   - deterministic acceptance prefers deterministic evidence.
 
-8. **Reserve Mission-level evaluation.**
-   - A Mission must not become delivery-ready solely because every child Goal is completed.
-   - Support a final cross-Goal/integration evaluation subject and verdict.
+8. **Rework loop**
+   - FAIL/INCONCLUSIVE are representable without pretending Goal completion;
+   - a changed subject requires a new Completion Claim and fresh Evaluation.
 
-9. **Provide runtime/product-neutral projections.**
-   - Expose enough typed state/events for TUI and the future Desktop to consume without depending on
-     GPUI or terminal rendering.
+9. **Mission final-evaluation contract**
+   - define the Mission-level gate so all Goal PASS results do not automatically imply Delivery.
 
-10. **Provide migration and regression tests.**
-    - Todo compatibility/data migration;
-    - graph invariants and cycle rejection;
-    - Goal authority enforcement;
-    - stale evaluation after revision change;
-    - PASS -> Completed transition;
-    - FAIL -> Rework -> new evaluation;
-    - evaluator isolation;
-    - validation-evidence linkage;
-    - Mission-level evaluation gate.
+10. **Projection/API boundary**
+    - expose enough UI-neutral state/events for later Desktop use;
+    - do not introduce GPUI types into shared crates;
+    - reconcile `talos-conversation` and current CLI `tui_bridge` orchestration before creating new
+      presentation abstractions.
 
-### 14.2 Explicit exclusions for the prerequisite PR
+11. **Migration/regression tests**
+    - existing Todo behavior remains usable through the compatibility surface;
+    - cycle/idempotency/batch behavior is preserved;
+    - executor cannot self-certify Goal completion;
+    - evaluation staleness is tested;
+    - locale is not part of this shared work-domain PR.
+
+### 20.2 Required acceptance
+
+The prerequisite PR should not be considered complete unless:
+
+- there is one canonical work-state source of truth;
+- Todo no longer needs to evolve as an independent parallel planning domain;
+- existing Todo data/behavior has a defined migration or compatibility path;
+- Goal and WorkUnit authority differs as documented;
+- Completion Claim -> Evaluation -> verdict -> Goal transition is demonstrable;
+- evaluator context/authority is independent from executor context/authority;
+- evaluation is criterion-granular and revision-bound;
+- Validation Service evidence can be consumed without conflating Validator and Evaluator;
+- rework after FAIL produces a new evaluation subject;
+- Mission-level final evaluation is represented;
+- TUI compatibility does not require depending on Desktop/GPUI;
+- no Desktop UI is claimed as implemented.
+
+### 20.3 Explicit exclusions from the prerequisite PR
 
 The prerequisite PR must **not**:
 
-- create `talos-desktop` or link GPUI;
-- implement Desktop windows, panels, renderer, motion, packaging, or updater;
-- reproduce the TUI in a GUI;
-- create a generic multi-agent framework solely to support one evaluator role;
-- add a general workflow scheduler;
-- make Artifact/Evidence every kind of graph node;
-- weaken permissions, sandboxing, credential display, or durable-session boundaries;
-- claim Desktop is shipped or implementation-ready until its own governed iteration is selected.
+- create `talos-desktop`;
+- add GPUI;
+- implement Desktop windows/panels/components;
+- create Desktop i18n catalogs or locale settings;
+- package/sign/update a Desktop application;
+- implement SESSION-009 remote/multi-client behavior unless separately selected;
+- turn Evaluation into a generic unrestricted multi-agent framework;
+- make evaluator write access the default;
+- make every Artifact/Evidence/Decision a Work Graph node;
+- delete compatibility Todo surfaces without an explicit migration acceptance;
+- weaken permission, sandbox, credential, transcript, or evidence boundaries.
 
-### 14.3 Prerequisite PR acceptance
+### 20.4 Separate first GPUI Desktop implementation
 
-The future prerequisite PR is ready only when:
+Only after the prerequisite work has merged and passed independent review should a separately
+selected/claimed Desktop implementation slice begin.
 
-- there is one canonical durable work-state source of truth;
-- Goal and WorkUnit share the Work Graph while keeping different authority semantics;
-- current Todo behavior has an explicit migration/compatibility path;
-- executor code cannot directly complete a Goal;
-- independent evaluator flow exists with a fresh context boundary;
-- evaluation reports bind to exact subject revisions and become stale after mutation;
-- Validation Service records can be consumed as evidence without being treated as evaluator verdicts;
-- failed evaluation creates a deterministic rework loop;
-- Mission-level final evaluation is represented;
-- TUI/runtime behavior remains compatible through reviewed adapters/projections;
-- required locked tests and governance validation pass.
+That first GPUI slice should establish:
 
-Only after that PR is merged should the first Desktop implementation PR depend on the new canonical
-work/evaluation surface.
+- `talos-desktop` product host and GPUI dependency boundary;
+- the selected Execution-page vertical slice;
+- the visual baseline from `docs/design/talos-desktop/DESIGN.md`;
+- localization infrastructure and complete `zh-CN` / `en-US` coverage for the selected visible
+  slice;
+- system/explicit locale selection and persistence;
+- bilingual layout validation and Chinese IME;
+- mocks where appropriate before full runtime binding;
+- then real runtime/work/evaluation binding through the shared APIs.
 
-## 15. Desktop Implementation Sequence After The Prerequisite
+The first GPUI slice should not ship a hard-coded single-language prototype that must later be
+structurally internationalized.
 
-The Desktop sequence should then proceed independently:
+## 21. Development Phases After The Prerequisite
 
-### D0 — Desktop architecture activation
+Subject to future governed iteration selection, the broad Desktop sequence remains:
 
-- reconcile the GPUI host decision with current repository ADR requirements;
-- select the implementation iteration and effective Collaboration Claim;
-- define Desktop process/runtime topology and packaging boundary;
-- confirm renderer dependency/security review.
+```text
+D0  GPUI dependency/ADR and repository reconciliation
+D1  shared text semantics only where current TUI ownership blocks reuse
+D2  UI-neutral product/controller extraction only where second-consumer evidence requires it
+D3  GPUI execution skeleton + bilingual visual/IME validation
+D4  real Runtime/Work Graph vertical slice
+D5  approvals/permission interaction
+D6  durable Mission/session behavior
+D7  Goal shaping + Evaluation + Artifact/Delivery review
+D8  packaging/release/platform integration
+```
 
-### D1 — GPUI skeleton
+These phases are planning guidance, not selected iterations.
 
-- create the product package/crate;
-- open a native window;
-- establish typed Desktop command/event wiring;
-- no attempt at broad feature parity.
+## 22. Success Criteria For The Product Direction
 
-### D2 — Mission shaping vertical slice
+The Desktop direction is successful when:
 
-- create/open a Mission;
-- display Goal tree projection;
-- edit Goal and acceptance state;
-- create an Execution Baseline.
+- users can state a rough outcome and collaboratively shape a verifiable work plan;
+- the agreed plan becomes revisioned product state rather than transcript-only context;
+- users can understand current execution without reading raw tool logs;
+- Work Graph is the only planning/execution source of truth rather than competing Goal/Todo stores;
+- executor autonomy covers how work is done without silent scope/acceptance mutation;
+- executor cannot self-certify Goal completion;
+- independent evaluation produces criterion-level, evidence-backed, exact-revision verdicts;
+- integrated Mission completion receives its own final evaluation;
+- Artifact/change traceability explains what changed and why;
+- Delivery represents evaluated output rather than an assistant's closing message;
+- TUI remains useful without copying Desktop UX;
+- Desktop remains a GPUI host above existing Talos runtime/security boundaries;
+- the initial Desktop user-visible surface works coherently in both Simplified Chinese and English;
+- changing UI locale never changes canonical work/evaluation identity.
 
-### D3 — Execution vertical slice
+## 23. Non-Goals Of This Proposal
 
-- run one Mission against Talos runtime;
-- display current Goal/Work Unit;
-- semantic activity stream;
-- interrupt/pause and plan-change path;
-- artifact/change panel.
+This proposal does not authorize:
 
-### D4 — Independent evaluation vertical slice
+- production Desktop code;
+- a GPUI dependency before the required implementation governance/ADR path;
+- a new presentation crate by name;
+- a generic workflow engine;
+- a generic multi-agent framework;
+- full SESSION-009 implementation;
+- immediate removal of Todo compatibility surfaces;
+- automatic translation of user-authored/external/code/evidence content;
+- initial Desktop locale coverage beyond `zh-CN` and `en-US`;
+- a claim that any Desktop behavior is currently shipped.
 
-- completion claim;
-- evaluator launch;
-- criterion-by-criterion progress/findings;
-- rework loop;
-- stale-evaluation handling.
+## 24. Required Reads For Future Implementers
 
-### D5 — Delivery vertical slice
+Before the prerequisite implementation PR:
 
-- final Mission evaluation;
-- evaluated Delivery object;
-- coding change review and later commit/PR actions;
-- non-coding artifact rendering where applicable.
+- `docs/backlog/active/DESKTOP-001-desktop-product-direction.md`
+- `docs/backlog/active/TODO-001-session-todo-list.md`
+- `docs/backlog/active/TODO-002-todo-mutation-reliability.md`
+- `docs/backlog/active/VALIDATION-001-internal-validation-service.md`
+- `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`
+- `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`
+- `docs/decisions/042-embedded-durable-runtime-session-boundary.md`
+- `docs/decisions/052-sdk-publication-and-composition-boundary.md`
+- current `talos-session` Todo implementation;
+- current `talos-conversation` projection;
+- current `talos-runtime` facade;
+- current CLI/TUI bridge/orchestration.
 
-Platform features such as tray, notifications, drag/drop, multi-window, updater, signing, and
-packaging follow after the core Mission workflow is proven.
+Before the first GPUI Desktop implementation PR, additionally read:
 
-## 16. Non-Goals Of This Design Baseline
+- `docs/design/talos-desktop/DESIGN.md`
+- `docs/design/talos-desktop/I18N.md`
+- then-current GPUI and Rust localization/platform-text evidence.
 
-This document does not authorize:
+## 25. Governance Note
 
-- implementation of `talos-work`;
-- Todo schema migration;
-- creation of `talos-desktop`;
-- GPUI dependency adoption;
-- a generic multi-agent orchestrator;
-- automatic approval of plan changes;
-- evaluator write access;
-- remote/multi-user Mission collaboration;
-- a universal artifact/knowledge graph;
-- release or packaging changes.
+This is a design/proposal baseline. It does not create an implementation iteration, Collaboration
+Claim, crate, migration, Desktop binary, localization catalog, or PR authorization.
 
-Those changes require their own governed implementation work.
-
-## 17. Open Questions For The Prerequisite/ADR Phase
-
-The following details remain implementation/ADR questions rather than reasons to reopen the product
-model:
-
-- final public naming: `talos-work`, Work Graph types, and `work_*` tools;
-- persistence placement and migration mechanics from `todos.sqlite`;
-- exact WorkspaceRevision representation for Git and non-Git workspaces;
-- whether evaluator provider/model selection is caller-configurable or uses a product policy;
-- exact evaluator read/validation tool profile;
-- whether child-Goal creation inside an Execution Baseline is always approval-gated or can be
-  policy-classified as scope-neutral;
-- how much of the existing `talos-conversation` projection can serve the second renderer before a
-  new presentation/text crate is justified;
-- exact Artifact/Evidence storage model beyond references needed by the first vertical slice.
-
-## 18. Decision Summary
-
-This design baseline records the following direction:
-
-1. Talos Desktop is **not** a graphical TUI clone.
-2. Desktop is a **Goal-first Mission workspace**; TUI remains conversation-first.
-3. GPUI is the selected Desktop renderer direction; Tauri/WebView is not the current route.
-4. The canonical work model is one DAG-capable **Work Graph** with Goal and WorkUnit node semantics.
-5. The existing Todo domain should evolve into WorkUnit compatibility rather than coexist as a
-   second planning source of truth.
-6. Acceptance Criteria are first-class Goal state.
-7. Execution Baselines and Plan Mutation Policy distinguish “how to do it” from “what counts as
-   done.”
-8. Executors may complete Work Units but may only submit **Completion Claims** for Goals.
-9. Goal completion requires an **independent evaluator** with fresh context, read-only defaults,
-   criterion-level verdicts, and exact-revision binding.
-10. Existing Validation Service produces evidence; it does not replace independent evaluation.
-11. A final Mission-level evaluation is required before delivery.
-12. Default execution UX shows Goal/current-work state, semantic activity, and artifact changes;
-    detailed raw logs are drill-down material.
-13. Delivery is a durable evaluated object, not a final assistant message.
-14. The shared Work Graph/evaluation foundation must land in a **future separate prerequisite PR**
-    before GPUI Desktop implementation begins.
+The required next implementation action remains a **future separate prerequisite PR**, created only
+after normal repository governance selects and authorizes that work. Internationalization belongs to
+the later first GPUI Desktop implementation slice, not to the shared Work Graph/evaluation
+prerequisite.
