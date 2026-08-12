@@ -1,6 +1,6 @@
 # Iteration I186: TUI Visible-Cell Selection And Copy
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-11
 > Planned objective: implement the Accepted ADR-054 application-owned visible-cell selection policy so ordinary mouse drag selects and copies arbitrary rendered TUI text without Shift or unrelated Talos state mutation.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
 | Work Slice | Implement only TUI-046-B / Issue #134 under the Accepted ADR-054 amendment: add bounded application-owned selection over the last rendered visible cells; ordinary primary-button down/drag/up without Shift; selection highlight; history-viewport edge autoscroll during drag; clamped, non-disappearing resize handling; copy completed selection with the existing OSC 52/macOS clipboard backend and truthful status; isolate pointer selection from history/composer/modal/approval/session/execution mutation; preserve keyboard history, existing wheel policy, `/copy`, Alternate Screen and exhaustive terminal restoration; add focused mixed-width/wrapped/panel/state-isolation/lifecycle tests, user docs and exact-head two-terminal acceptance evidence. No transcript/export/persistence/provider/permission/scheduler change, hidden-content access, rich persistent selection, dependency or unrelated TUI-042 work. |
@@ -18,10 +18,12 @@
 | Source Issue | #134 |
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
-| Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | The exact code-head two-terminal matrix is recorded; obtain exact final PR-head review and green CI for PR #193, then perform merge-time CAS and record the real merge SHA before completion. |
+| Authorization Evidence | Claim merge `f4faa38e4815302db2ccf1f4888b2862e56493b`; PR #193 final head `313e47e562125eaa8d18679295dfd0f95ef1e9e5` passed CI `31481069023`, received independent review `4905391760`, passed merge-time CAS and merged as `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`. |
+| Implementation PR | #193 |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | None - TUI-046-B is complete; TUI-042/#79 and broader terminal interaction work remain separate. |
+
+Completion Commit: `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`
 
 ## Closure Ledger
 
@@ -143,6 +145,7 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 | 2026-08-11 | Manual-defect refinement | Exact-head terminal testing exposed stale screen-coordinate highlights after history movement, missing edge autoscroll/Logo traversal, wrapped-row over-highlighting and a bottom-component block. Commits `52c36ee1`, `86dce04b` and `f62a78a7` replace stale projection with logical-row reprojection, clamp wrapped-row ranges and retain history focus during edge drag. The attempted cross-component refinement `bfb5ae61` worsened the interaction and was explicitly rolled back by `fb2c4abe` at maintainer direction; the restored behavior passed the affected drag and offscreen-copy paths. |
 | 2026-08-11 | Clipboard compatibility | Terminal.app 2.15 on `fb2c4abe` rendered and retained selection but left the previous system clipboard value in place. Code inspection proved OSC 52 write success was incorrectly treated as terminal acceptance, making the existing `pbcopy` fallback unreachable when Terminal.app silently ignored the sequence. Commit `70b51e28` makes the existing macOS backend `pbcopy`-first with OSC 52 fallback, preserves OSC 52-first behavior elsewhere and adds backend-order tests without adding a dependency or expanding clipboard data scope. |
 | 2026-08-11 | Exact-code-head terminal acceptance | Code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` passed the published matrix on Alacritty 0.17.0 (`TERM=alacritty`) and macOS Terminal 2.15 (`TERM=xterm-256color`), both on macOS 26.5.2 (25F84), `TMUX=none`. Ordinary no-Shift drag, partial/wrapped/mixed-width copy, bidirectional edge autoscroll, Logo/offscreen traversal, wheel and PageUp/PageDown projection, resize, active streaming, normal exit and interrupted-output cleanup passed; exact observations live in the reference matrix. |
+| 2026-08-12 | Merge | PR #193 final head `313e47e5` passed CI `31481069023`, independent production review `4905391760` and merge-time CAS, then merged as `a5115f5c`. |
 
 ## Verification Evidence
 
@@ -150,7 +153,8 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 
 ## Completion Evidence
 
-- No completion evidence while Review. Completion requires an already-existing implementation merge SHA plus exact-head terminal evidence.
+- Completion Commit: `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`; terminal acceptance is
+  bound to runtime code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` and the two recorded matrix rows.
 
 ## Variance And Residuals
 
@@ -160,4 +164,6 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 
 ## Retrospective
 
-- Pending execution.
+- Exact-head unit/integration/doctest, Unix/Windows CI, independent code review and two-terminal
+  clipboard/interaction acceptance converged. The failed `bfb5ae61` refinement remains explicit
+  evidence that real-terminal UX acceptance cannot be replaced by unit tests alone.

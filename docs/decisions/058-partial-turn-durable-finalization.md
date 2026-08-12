@@ -1,8 +1,9 @@
 # ADR-058: Partial-Turn Durable Finalization Boundary
 
-> Status: Proposed
+> Status: Accepted
 > Date: 2026-08-11
 > Owner: SESSION-008-A / I187
+> Decision evidence: PR #195 merge `e288afb5d97026f7ccb3ce0f519a4a81f99fe104`; final proposal head `46549e82436dd7344a37604b5e7d7ce8e44350ca`; CI `31553007431`; proposal review `5261130488`; acceptance requires independent review of the status-changing closeout head.
 
 ## Context
 

@@ -59,11 +59,11 @@ coverage must be proven per call family rather than assumed.
 - [ARCH-034-R04-AG11](ARCH-034-R04-AG11-sqlite-containment-evidence.md): five-consumer
   corrupt/busy/locked/panic/deadline evidence classification; Refinement and unclaimed.
 - [ARCH-034-R04-AG12](ARCH-034-R04-AG12-sqlite-validator-integrity.md): ADR allowlist linkage,
-  validator host-dependency policy and diagnostic decoding; I185 Planned with a governance claim
-  pending and no implementation authority before target-branch merge.
+  validator host-dependency policy and diagnostic decoding; Complete through I185/PR #191 at
+  `af9783229bfc8ee592813440ecfcdb6efc90a3c2` without changing Rust/Cargo/runtime behavior.
 
 These owner files materialize the independently accepted I181 dispositions.
-Except for completed AG-4 and AG-7, they do not create effective claims or authorize implementation.
+Except for completed AG-4, AG-7 and AG-12, they do not create effective claims or authorize implementation.
 I182 is terminal; select at most one remaining child only after the normal
 collaboration protocol establishes a fresh effective claim.
 
@@ -162,8 +162,8 @@ residuals. Independent implementation review `5230395611` additionally registere
 [AG-10 notice admissibility](ARCH-034-R04-AG10-symbol-notice-admissibility.md).
 They are unclaimed and receive no implementation authority from I182. AG-4 itself completed through
 PR #177 at Completion Commit `ae31242bdac4807599146bfb4847bcac52712bbf`; that child completion
-does not change this parent from `Partial`. PR #184 review residuals are separately owned by
-[AG-12 SQLite validator integrity](ARCH-034-R04-AG12-sqlite-validator-integrity.md). New native
+does not change this parent from `Partial`. PR #184 review residual AG-12 completed through I185 at
+`af9783229bfc8ee592813440ecfcdb6efc90a3c2`; AG-11 and the remaining children keep R04 Partial. New native
 dependencies require a separate ADR.
 
 ## Review Completion Evidence

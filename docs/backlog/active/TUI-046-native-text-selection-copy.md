@@ -5,9 +5,9 @@
 | Story ID | TUI-046 |
 | Type | Bug / TUI / Terminal Interaction Story |
 | Priority | P0 |
-| Status | Active — TUI-046-A Complete; TUI-046-B implementation is in Review at PR #193 |
+| Status | Complete — TUI-046-A policy and TUI-046-B implementation delivered |
 | Source | [GitHub Issue #134](https://github.com/wjhuang88/talos/issues/134) |
-| Selected Iteration | I186 (Review) |
+| Selected Iteration | I186 (Complete) |
 | Depends On | ADR-054 alternate-screen renderer; existing `/copy` command |
 | Coordinates With | TUI-042 / Issue #79 mouse-history scrolling |
 
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
 | Work Slice | Implement only I186/TUI-046-B under the Accepted ADR-054 amendment: bounded application-owned selection over last-rendered visible cells; ordinary primary-button drag without Shift; highlight, history-edge autoscroll, resize clamping and copy via the existing clipboard backend; strict input-state/privacy isolation; focused mixed-width/render/lifecycle tests, docs and exact-head two-terminal acceptance. Preserve Alternate Screen, keyboard history, current non-selection wheel policy, `/copy`, restoration and all non-TUI runtime behavior. Exclude TUI-042, hidden content, transcript/export/persistence, rich persistent selection, dependencies and unrelated product changes. |
@@ -23,17 +23,21 @@
 | Source Issue | #134 |
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer explicitly directed immediate Issue #134 implementation with real-terminal testing deferred to post-development acceptance. Claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 is the effective review surface. TUI-046-A authorization remains recorded in its completion evidence below. |
-| Implementation PR | #193 (exact head recorded by PR review/CI evidence) |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | The exact code-head two-terminal matrix is recorded; obtain exact final PR-head review and green CI for PR #193, then perform merge-time CAS and record the real merge SHA before completion. |
+| Authorization Evidence | TUI-046-A completed at `f98488277803ee26180100089a48ef850939234b`. TUI-046-B claim merge `f4faa38e4815302db2ccf1f4888b2862e56493b`; PR #193 final head `313e47e562125eaa8d18679295dfd0f95ef1e9e5` passed CI `31481069023`, independent review `4905391760`, merge-time CAS and merged as `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`. |
+| Implementation PR | #193 |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | None - Issue #134 delivery is complete; TUI-042/#79 and broader terminal interaction work remain separate. |
+
+Status: Complete
+
+Completion Commits: `f98488277803ee26180100089a48ef850939234b`, `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`
 
 ### TUI-046-B Execution Evidence
 
 - Effective claim merge: `f4faa38e4815302db2ccf1f4888b2862e56493b` (I186 claim PR #192).
 - Implementation PR: #193; exact tested code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` includes the user-directed rollback of the worsened `bfb5ae61` interaction and the Terminal.app clipboard compatibility fix. Later evidence-only documentation commits do not replace that runtime evidence.
 - Focused validation at the tested code head: `cargo test -p talos-tui --locked` (511 tests, 2 integration tests, and 2 doctests passed), `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked`, and `git diff --check`. The evidence update also passes `./scripts/release_preflight.sh`, including locked workspace check, workspace Clippy, full workspace tests/doctests and both governance validators with 0 warnings.
-- The exact-code-head Alacritty 0.17.0 and macOS Terminal 2.15 rows pass ordinary no-Shift drag, mixed-width/wrapped copy, logical wheel/keyboard projection, bidirectional edge autoscroll, resize/streaming continuity and normal/interrupted cleanup. Exact final PR-head CI, independent review, merge-time CAS and merge evidence remain outstanding.
+- The exact-code-head Alacritty 0.17.0 and macOS Terminal 2.15 rows pass ordinary no-Shift drag, mixed-width/wrapped copy, logical wheel/keyboard projection, bidirectional edge autoscroll, resize/streaming continuity and normal/interrupted cleanup. Final PR head `313e47e5` passed CI `31481069023`, independent review `4905391760` and merge-time CAS before merge `a5115f5c`.
 
 ### TUI-046-A Completion Evidence
 
@@ -102,7 +106,7 @@ Refine whether mouse capture is disabled by default, made explicit/configurable,
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | TUI-046-A | Native-selection versus mouse-capture contract and ADR-054 amendment | Complete in I184 | Completion Commit `f98488277803ee26180100089a48ef850939234b`; review `5237824299`; CI `31370219799` |
-| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Review / PR #193 | ADR-054 I184 amendment Accepted; effective claim merged at `f4faa38e`; code-head terminal matrix passed; exact final PR-head CI/review and merge evidence remain required |
+| TUI-046-B | Selected interaction implementation, restoration tests, docs and real-terminal matrix | Complete in I186 | Completion Commit `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`; final PR head `313e47e5`; CI `31481069023`; independent review `4905391760`; terminal matrix bound to code head `70b51e28` |
 
 TUI-046-B must preserve keyboard history navigation and may not claim acceptance
 from unit tests alone. The parent closes only after both terminal environments
@@ -130,3 +134,12 @@ completion prerequisite for this independent native-selection bug.
 ## Residual Destination
 
 Broader terminal interaction redesign, persistent application-owned selections, hyperlinking, drag-and-drop or transcript/export expansion require separate owners.
+
+## Completion Evidence
+
+- TUI-046-A Completion Commit `f98488277803ee26180100089a48ef850939234b` accepted the
+  application-owned selection policy in ADR-054.
+- TUI-046-B Completion Commit `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc` delivers the runtime
+  implementation. Final head `313e47e562125eaa8d18679295dfd0f95ef1e9e5` passed CI
+  `31481069023` and independent review `4905391760`; the Alacritty and Terminal.app acceptance rows
+  passed on exact runtime code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e`.
