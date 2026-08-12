@@ -18,8 +18,6 @@ pub(crate) fn isolate_terminal_input(cmd: &mut Command, pipe_stdin: bool) {
 
     #[cfg(unix)]
     {
-        use std::os::unix::process::CommandExt;
-
         // SAFETY: the closure runs after fork and before exec. `setsid(2)` and errno inspection
         // are async-signal-safe, and the closure performs no allocation, locking or formatting.
         // ADR-007 explicitly authorizes this terminal-containment site.
