@@ -6,6 +6,8 @@
 >
 > Related product baseline: `docs/proposals/talos-desktop-goal-oriented-workspace.md`
 >
+> Internationalization baseline: [`I18N.md`](I18N.md)
+>
 > Reference image: [`reference-execution-light.webp`](reference-execution-light.webp)
 
 ## 1. Purpose
@@ -386,6 +388,8 @@ Metadata / timestamp           12–13 px
 
 Line height should be relaxed enough for daily use, generally around 1.4–1.55 for body text.
 
+Typography and layout must be validated in both initial locales (`zh-CN` and `en-US`). Chinese and English may not use identical glyph metrics, wrapping, or label lengths; the hierarchy above must remain intact without per-language page forks. See `I18N.md` for the full localization, CJK, IME, and layout contract.
+
 ## 9. Borders, Dividers, And Shadows
 
 Light interfaces can easily become grids of rectangles. Talos should use borders sparingly.
@@ -426,6 +430,8 @@ Do not fill the page with colored status badges such as `IN PROGRESS`, `COMPLETE
 
 For evaluation-related states, Nord15 is available as a distinct semantic family without creating a new arbitrary product color.
 
+Visible status labels are localized presentation; the underlying domain state remains locale-neutral. Do not use localized status text as enum, protocol, persistence, or command identity.
+
 ## 11. Motion
 
 Motion should express state transition and causality.
@@ -465,6 +471,8 @@ The image is a **directional reference**, not a pixel-perfect specification. It 
 
 Where the image conflicts with this document, **this document is authoritative**. In particular, the final implementation should use the Nord-derived semantic palette defined above rather than treating any illustrative orange accent in a reference mockup as canonical.
 
+The image also represents only one language composition. It must not be treated as evidence that the layout is valid for both initial Desktop locales. The first GPUI visual spike must validate equivalent `zh-CN` and `en-US` layouts.
+
 ## 13. Initial GPUI Design Validation
 
 Before a broad Desktop implementation proceeds, the first GPUI visual spike should validate the Execution page at realistic desktop sizes.
@@ -473,7 +481,10 @@ It should demonstrate:
 
 - light Snow Storm / Polar Night base theme;
 - Nord Frost/Aurora semantic states;
-- text rendering for English and Chinese;
+- full UI localization coverage for the selected slice in Simplified Chinese (`zh-CN`) and English (`en-US`);
+- text rendering, wrapping, and mixed CJK/Latin alignment for English and Chinese;
+- Chinese IME behavior for editable controls in scope;
+- system/explicit locale selection and deterministic fallback behavior;
 - Current Goal and Current Work hierarchy;
 - compact Mission path;
 - recent semantic activity stream;
@@ -490,18 +501,12 @@ The spike should specifically reject regressions toward:
 - nested card stacks;
 - raw transcript/tool-log dominance;
 - fake progress percentages;
-- decorative gradients.
+- decorative gradients;
+- hard-coded single-language view strings;
+- layouts tuned only to Chinese or only to English string widths.
 
 ## 14. Scope Boundary
 
-This document records visual intent only. It does not:
+This document records visual intent only. It does not select a concrete GPUI implementation, theme engine, localization library, font bundle, or packaging mechanism, and it does not authorize Desktop code.
 
-- authorize GPUI dependency adoption;
-- create `talos-desktop`;
-- authorize the Desktop prerequisite implementation PR;
-- define final platform-specific blur APIs;
-- establish a complete component library;
-- claim dark mode is implemented;
-- override existing security, permission, session, evaluation, or runtime architecture.
-
-The future Desktop prerequisite PR remains the implementation foundation described in `docs/proposals/talos-desktop-goal-oriented-workspace.md`. The visual spike and Desktop implementation must follow normal requirement intake, ADR, iteration, Collaboration Claim, review, and validation governance.
+Internationalization requirements for the first Desktop implementation are authoritative in `I18N.md`; this visual document only records the layout and typography consequences.
