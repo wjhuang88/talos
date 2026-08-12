@@ -1,6 +1,6 @@
 # Iteration I190: Change-Aware CI Routing
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-12
 > Planned objective: introduce a deterministic fail-closed change classifier so narrowly allowlisted documentation-only pull requests keep documentation/governance gates without running the complete Unix and Windows Rust workspaces.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #201 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed immediate CI-routing correction after pure-documentation PRs repeatedly ran full Unix/Windows workspaces and one unrelated Windows timing failure forced an 11-minute rerun. Exact-head CI, both governance validators and merge-time CAS remain required. |
-| Implementation PR | Pending |
+| Implementation PR | #202 |
 | Last Updated | 2026-08-12 |
 | Handoff / Release Condition | Claim PR #201 merged as `bb38c262`; implementation must pass full exact-head CI, independent review and merge-time CAS, then prove the reduced path on a real PR. |
 
@@ -60,6 +60,7 @@ The complete frozen contract is owned by
 |---|---|---|
 | 2026-08-12 | Selection | Maintainer promoted pure-documentation CI routing to immediate priority because the current unconditional matrix delays every governance synchronization and exposes unrelated flaky Rust tests. Claim remains ineffective before target-branch merge. |
 | 2026-08-12 | Activation | Claim PR #201 passed exact-head CI and merge-time CAS, then merged to `main` as `bb38c262`. I190 activated without changing its published objective, scope, acceptance or Planned Validation. |
+| 2026-08-12 | Implementation | PR #202 implements the trusted-base classifier, fail-closed full fallback, stable workspace job names, reduced documentation gates and adversarial fixtures. It remains Review pending exact-head full CI, independent review, merge-time CAS and a post-merge reduced-path probe. |
 
 ## Verification Evidence
 
