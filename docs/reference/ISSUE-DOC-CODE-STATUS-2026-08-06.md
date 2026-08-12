@@ -2,13 +2,15 @@
 
 **Repository baseline**: `main@685d3b4f4088a172551f8c844a89f5dee9469430`
 **Closeout PR**: #137
-**Remote scope**: all 35 open GitHub Issues after Issue #119 completion, Issue #136 registration,
-and intake registration of Issues #141–#143, #146, #155, #188, and #199
+**Remote scope**: all 34 open GitHub Issues after Issues #119 and #134 completion, Issue #136
+registration, and intake registration of Issues #141–#143, #146, #155, #188, and #199
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
 
 - Every open Issue has one explicit owner Story/Epic/Spike document.
+- TUI-046/I186 is Complete and Issue #134 is closed after implementation, exact-head two-terminal
+  acceptance, CI, independent review, merge-time CAS and governance closeout.
 - TUI-044/I169 is Complete, ADR-056 is Accepted and Issue #119 is closed as completed after merged
   implementation PR #131 and accepted exact-head evidence.
 - Issue #136 is independently owned by TUI-047 and remains open as a non-blocking Ready diagnostic
@@ -51,7 +53,6 @@ and intake registration of Issues #141–#143, #146, #155, #188, and #199
 | [#124](https://github.com/wjhuang88/talos/issues/124) | custom-model capability probe | [MODEL-011](../backlog/active/MODEL-011-custom-model-capability-probe.md) | Refinement | Probe decision, evidence precedence, cost UX and persistence schema remain unclaimed. |
 | [#125](https://github.com/wjhuang88/talos/issues/125) | permission prompt layout anchor stability | [TUI-045](../backlog/active/TUI-045-permission-prompt-layout-anchor.md) | Refinement | Layout ownership and real-terminal acceptance remain unclaimed. |
 | [#132](https://github.com/wjhuang88/talos/issues/132) | non-API-key provider authentication | [PROVIDER-003](../backlog/active/PROVIDER-003-dynamic-provider-credentials.md) | Refinement Epic | Architecture/decomposition owner only; no child is selected. |
-| [#134](https://github.com/wjhuang88/talos/issues/134) | native text selection and copy | [TUI-046](../backlog/active/TUI-046-native-text-selection-copy.md) | Review | I184/A is Complete; I186/TUI-046-B is in Review at PR #193, with exact-head two-terminal acceptance still required. |
 | [#136](https://github.com/wjhuang88/talos/issues/136) | executable recovery commands in delete cleanup failure | [TUI-047](../backlog/active/TUI-047-delete-cleanup-recovery-diagnostics.md) | Ready | Independent non-blocking correction; preserve accepted ADR-056 cleanup semantics. |
 | [#141](https://github.com/wjhuang88/talos/issues/141) | storage topology and runtime ownership | [DATA-002](../backlog/active/DATA-002-storage-topology-and-runtime-ownership.md) | Intake | P0 architecture intake; ADR and owner/handoff refinement required before implementation. |
 | [#142](https://github.com/wjhuang88/talos/issues/142) | serve/connect protocol adapter architecture | [SERVER-001](../backlog/active/SERVER-001-serve-connect-protocol-adapters.md) | Intake | P1 architecture intake; dependency and single-runtime boundary refinement required. |
@@ -66,6 +67,7 @@ and intake registration of Issues #141–#143, #146, #155, #188, and #199
 | Issue | Owner | Final State | Completion Evidence |
 |---|---|---|---|
 | [#119](https://github.com/wjhuang88/talos/issues/119) | TUI-044 / I169 / ADR-056 | Completed | PR #131 merged exact Head `90165cace4625c0f27616b3e1b9871bcb6a10186` at `685d3b4f4088a172551f8c844a89f5dee9469430`; CI `31010166558` and rebuilt real-terminal acceptance passed. |
+| [#134](https://github.com/wjhuang88/talos/issues/134) | TUI-046 / I184 / I186 | Completed | Completion Commits `f98488277803ee26180100089a48ef850939234b` and `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`; final PR #193 head `313e47e5` passed CI `31481069023`, independent review `4905391760` and merge-time CAS; exact runtime head `70b51e28` passed both terminal acceptance rows. |
 
 ## Closure Rule
 
