@@ -1,6 +1,6 @@
 # Iteration I193: SESSION-008-B Durable Partial-Turn Finalization
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-13
 > Planned objective: implement the Accepted ADR-058 contract as one atomic, idempotent durable
 > Success/Error/Cancelled finalization path with display-safe partial replay.
@@ -150,6 +150,7 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-13 | Claim merge | PR #210 merged as `fb5a1f62aed7d86657473fa766876045724f6419` through the documented Single-maintainer merge path. The claim is effective; I193 remains Planned and no implementation branch has been created. |
+| 2026-08-13 | Activation | Activated from exact `main@f778543c7ceeb2a099eb3863fc8259da68d02195` in independent worktree `/private/tmp/talos-i193` on `feat/session-i193-partial-finalization`. I194 remains separately Planned/Claimed after PR #211; I188/I189 remain Planned/Claimed and unactivated; I159-I162 remain Blocked; I164 remains Paused. Dashboard PR #212 is separate and must refresh its own target-branch base. |
 
 ## Verification Evidence
 

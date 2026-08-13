@@ -5,7 +5,7 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Ready — SESSION-008-A complete; SESSION-008-B unclaimed |
+| Status | In Progress — SESSION-008-A complete; SESSION-008-B active in I193 |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
 | Selected Iteration | I193 Planned; Collaboration Claim effective in main merge `fb5a1f62` |
