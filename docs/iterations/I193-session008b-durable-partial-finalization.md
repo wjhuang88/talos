@@ -26,8 +26,9 @@
 | Last Updated | 2026-08-13 |
 | Handoff / Release Condition | Finalize the claim with its actual PR number, pass exact-head CI and both governance validators, document the unavailable-independent-review reason and technical audit, pass merge-time CAS, and use the Single-maintainer merge path before creating an implementation branch. |
 
-Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. This proposed `Claimed` record is not
-an effective claim until PR #210 is merged into `main`.
+The `Claimed` record became effective when PR #210 merged into `main` as
+`fb5a1f62aed7d86657473fa766876045724f6419`. The iteration remains Planned until explicitly
+activated; implementation work must follow the post-claim branch/worktree rules.
 
 ## Published Baseline
 
@@ -148,11 +149,12 @@ an effective claim until PR #210 is merged into `main`.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-13 | Selection proposal | I193 publishes the SESSION-008-B target in claim PR #210 and proposes an independent-review claim. No implementation branch or production change is authorized before claim merge. |
+| 2026-08-13 | Claim merge | PR #210 merged as `fb5a1f62aed7d86657473fa766876045724f6419` through the documented Single-maintainer merge path. The claim is effective; I193 remains Planned and no implementation branch has been created. |
 
 ## Verification Evidence
 
-- Claim PR #210 pending finalized exact-head validation and independent review.
+- Claim PR #210 exact head `f7199120` passed CI and the documented Single-maintainer merge CAS;
+  claim merge `fb5a1f62` is now on `main`. Implementation validation is pending activation.
 
 ## Completion Evidence
 

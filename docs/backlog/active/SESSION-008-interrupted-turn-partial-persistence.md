@@ -8,7 +8,7 @@
 | Status | Ready — SESSION-008-A complete; SESSION-008-B unclaimed |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
-| Selected Iteration | I193 proposed through claim PR #210; no authority before target-branch merge |
+| Selected Iteration | I193 Planned; Collaboration Claim effective in main merge `fb5a1f62` |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
 
@@ -130,8 +130,9 @@ migration plan before implementation.
 ## SESSION-008-B Claim Proposal
 
 - [I193](../../iterations/I193-session008b-durable-partial-finalization.md) and claim PR #210
-  propose the separately governed B implementation. The claim remains ineffective until its
-  finalized exact head is merged into `main`; no implementation branch is authorized before then.
+  define the separately governed B implementation. The claim is effective in main merge
+  `fb5a1f62`; implementation still requires explicit iteration activation and post-claim branch
+  setup.
 - **SESSION-008-R1 — current-versus-target truth linkage.** Until B reaches `main`, the
   [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md) is
   the truth source for current released behavior and ADR-058 is the target contract only.
