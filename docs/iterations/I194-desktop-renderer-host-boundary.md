@@ -1,6 +1,6 @@
 # Iteration I194: Desktop Renderer, Host, And Repository Boundary
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-13
 > Planned objective: decide the Desktop renderer/dependency/host/repository boundary and produce an independently reviewable ADR/security packet without adding Desktop production code or renderer dependencies.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol Desktop governance session 2026-08-13 |
 | Work Slice | DESKTOP-001-D0 / I194 only: decide and document the Desktop renderer/dependency/host/repository boundary, current GPUI-or-alternative evidence, native/unsafe/security implications, localization selection criteria, and the later mock-only authorization gate. No production UI, dependency, runtime/domain, persistence, session, permission or P0-P4 implementation. |
@@ -22,7 +22,7 @@
 | Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
 | Implementation PR | #215 (decision-only D0 packet; no Desktop implementation) |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Produce and review the Proposed ADR/security packet in the independent worktree; no renderer implementation or dependency authorization is implied. |
+| Handoff / Release Condition | None — I194 decision packet is complete; later visual or renderer work requires a separate governed child. |
 
 ## Published Baseline
 
@@ -30,7 +30,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `DESKTOP-001-D0` | `DESKTOP-001` | Active; claim effective in merge `f778543c` | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
+| `DESKTOP-001-D0` | `DESKTOP-001` | Complete; claim effective in merge `f778543c` | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
 
 ### Start Here
 
@@ -244,7 +244,14 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 
 ## Completion Evidence
 
-No completion evidence. A claim/governance/status commit cannot certify this iteration.
+Completion Commit: `0a47208ce6fad23c706ebede8b3d07111b9303dc`
+
+- PR #215 merged to `main` as `1beaca68b98b56aaff42d952b7dbbc7519304740`.
+- Independent natural-person approval comment `5278769979` binds the exact completion head.
+- Exact-head CI `31687636396` passed all applicable jobs; both governance validators reported 0
+  warnings and `git diff --check` was clean.
+- The packet is decision-only. ADR-059 remains Proposed; renderer dependency, platform execution,
+  panic containment, SBOM and motion benchmark gates remain future implementation requirements.
 
 ## Variance And Residuals
 
@@ -256,4 +263,7 @@ No completion evidence. A claim/governance/status commit cannot certify this ite
 
 ## Retrospective
 
-Pending activation and execution.
+I194 separated renderer direction from implementation authorization and recorded motion as an
+input-first, semantic, cancellable and reduced-motion-equivalent quality boundary. Primary-source
+evidence was pinned without importing dependencies; failed transitive metadata resolution remains
+negative evidence. Later renderer work requires a separate governed child.

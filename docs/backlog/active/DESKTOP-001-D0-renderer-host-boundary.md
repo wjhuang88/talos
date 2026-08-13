@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001-D0 |
 | Type | Architecture / Governance Spike |
 | Priority | P1 |
-| Status | Review — decision-only D0 packet recorded; renderer implementation and dependency authorization remain closed |
+| Status | Complete — decision-only D0 packet accepted; renderer implementation and dependency authorization remain closed |
 | Parent | DESKTOP-001 |
 | Source | GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I194 |
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol Desktop governance session 2026-08-13 |
 | Work Slice | DESKTOP-001-D0 / I194 only: decide and document the Desktop renderer/dependency/host/repository boundary, current GPUI-or-alternative evidence, native/unsafe/security implications, localization selection criteria, and the later mock-only authorization gate. No production UI, dependency, runtime/domain, persistence, session, permission or P0-P4 implementation. |
@@ -26,7 +26,7 @@
 | Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
 | Implementation PR | #215 (decision-only D0 packet; no Desktop implementation) |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Deliver the Proposed ADR/security packet and independent exact-head review; keep renderer implementation and dependency authorization closed until D0 acceptance. |
+| Handoff / Release Condition | None — D0 is complete; any visual or renderer implementation requires a separate governed child, iteration, claim and worktree. |
 
 ## Identity / Goal / Value
 
@@ -231,24 +231,24 @@ GPUI-based UI, bilingual Desktop behavior or Mission/runtime binding as shipped 
 
 ## Acceptance For D0 Governance / Decision Work
 
-- [ ] Current renderer/dependency evidence is recorded from primary sources and is dated to the D0
+- [x] Current renderer/dependency evidence is recorded from primary sources and is dated to the D0
       execution window rather than copied from the earlier product proposal.
-- [ ] The ADR makes an explicit authorize / do-not-authorize decision for the selected renderer and
+- [x] The ADR makes an explicit authorize / do-not-authorize decision for the selected renderer and
       states that the earlier GPUI design direction alone was not implementation authority.
-- [ ] Direct/material transitive native, FFI, build-script, platform, panic and `unsafe` implications
+- [x] Direct/material transitive native, FFI, build-script, platform, panic and `unsafe` implications
       are auditable, with containment/security-review ownership identified.
-- [ ] Repository placement and dependency arrows are explicit and prove no renderer dependency can
+- [x] Repository placement and dependency arrows are explicit and prove no renderer dependency can
       flow into `talos-core`, `talos-runtime` or a second runtime/session/work authority.
-- [ ] Host integration responsibilities cover macOS, Windows and Linux at the boundary needed for a
+- [x] Host integration responsibilities cover macOS, Windows and Linux at the boundary needed for a
       later mock-only slice, including shutdown/failure containment, text/input/Chinese IME,
       accessibility and reduced-motion implications.
-- [ ] Localization mechanism selection criteria cover `zh-CN`, `en-US`, deterministic English
+- [x] Localization mechanism selection criteria cover `zh-CN`, `en-US`, deterministic English
       fallback, stable message identity, interpolation/count behavior and locale-neutral domain
       identity without adding an i18n dependency in D0.
-- [ ] The ADR/security packet names all exclusions and the exact later gate for the mock-only visual
+- [x] The ADR/security packet names all exclusions and the exact later gate for the mock-only visual
       slice and real P0-P4/runtime binding.
-- [ ] No Cargo/workspace/production-code/dependency/fixture/UI implementation change exists in D0.
-- [ ] Exact-head CI, both governance validators, applicable locked checks, independent natural-person
+- [x] No Cargo/workspace/production-code/dependency/fixture/UI implementation change exists in D0.
+- [x] Exact-head CI, both governance validators, applicable locked checks, independent natural-person
       exact-head review and merge-time CAS are recorded before acceptance.
 
 Current evidence status: primary-source snapshots for GPUI and the minimum Iced comparison were
@@ -273,4 +273,13 @@ remains blocked by the relevant P0-P4 shared contracts and APIs.
 
 ## Completion Evidence
 
-No completion evidence. A status-only or governance-only commit cannot certify D0 completion.
+Completion Commit: `0a47208ce6fad23c706ebede8b3d07111b9303dc`
+
+- PR #215 merged to `main` as `1beaca68b98b56aaff42d952b7dbbc7519304740`.
+- Independent natural-person approval comment `5278769979` binds the exact completion head.
+- Exact-head CI `31687636396` passed all applicable jobs; both governance validators reported 0
+  warnings and `git diff --check` was clean.
+- The net D0 change is eight documentation files only, with no Cargo, crate, dependency, native,
+  FFI, `unsafe`, UI or implementation artifact.
+- ADR-059 remains Proposed. Full lock/SBOM closure, platform execution, panic containment and motion
+  measurements remain later renderer-implementation gates and are not authorized by this closeout.
