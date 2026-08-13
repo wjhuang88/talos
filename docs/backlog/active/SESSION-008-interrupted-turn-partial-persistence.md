@@ -8,7 +8,7 @@
 | Status | Ready — SESSION-008-A complete; SESSION-008-B unclaimed |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
-| Selected Iteration | None — I187/SESSION-008-A complete; select B separately |
+| Selected Iteration | I193 proposed through claim PR #210; no authority before target-branch merge |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
 
@@ -124,8 +124,21 @@ migration plan before implementation.
 - Effective claim merge: `5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7` (PR #194).
 - Accepted decision: `docs/decisions/058-partial-turn-durable-finalization.md`.
 - Current-path evidence: `docs/reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md`.
-- ADR-058 acceptance is proposed by the I185-I187 closeout and becomes authoritative only after that
-  exact head receives independent review and reaches `main`.
+- ADR-058 was Accepted by the reviewed I185-I187 closeout merged as `6c7e11cc44fdd8c7b48a2d2bf6d5438db036f432`;
+  it defines the target contract but does not describe current runtime behavior before B lands.
+
+## SESSION-008-B Claim Proposal
+
+- [I193](../../iterations/I193-session008b-durable-partial-finalization.md) and claim PR #210
+  propose the separately governed B implementation. The claim remains ineffective until its
+  finalized exact head is merged into `main`; no implementation branch is authorized before then.
+- **SESSION-008-R1 — current-versus-target truth linkage.** Until B reaches `main`, the
+  [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md) is
+  the truth source for current released behavior and ADR-058 is the target contract only.
+- **SESSION-008-R2 — transient test diagnosis.** This remains conditional diagnostic evidence: if
+  the seven transient `talos-session` failures recur, capture disk bytes, inode availability,
+  temporary paths, complete stderr and the default-parallel result. No concurrency defect or
+  ENOSPC root cause is confirmed.
 
 ## State / Status Owners
 
@@ -191,6 +204,6 @@ scripts/validate_project_governance.sh .
 
 ## Residuals
 
-- This Story remains Review until SESSION-008-A is accepted. Existing legacy
-  error-path coverage is retained as a compatibility fixture; it does not
-  authorize or substitute for SESSION-008-B.
+- This Story remains Ready until SESSION-008-B has existing implementation evidence and its owner
+  closeout is synchronized. Existing legacy error-path coverage remains a compatibility fixture;
+  it does not authorize or substitute for SESSION-008-B.
