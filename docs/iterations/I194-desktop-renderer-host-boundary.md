@@ -1,6 +1,6 @@
 # Iteration I194: Desktop Renderer, Host, And Repository Boundary
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-13
 > Planned objective: decide the Desktop renderer/dependency/host/repository boundary and produce an independently reviewable ADR/security packet without adding Desktop production code or renderer dependencies.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,10 +19,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #211 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head architecture/security review is required on finalized PR #211 before merge; exact-head CI, both governance validators and merge-time CAS remain mandatory. Repository operations use shared GitHub account `wjhuang88`; a reviewer using the same account must explicitly disclose distinct natural-person identity. This proposed `Claimed` record is ineffective until merged to `main`. |
+| Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Merge finalized claim PR #211 to `main` after the required exact-head evidence, then refresh target-branch truth and create a real independent worktree from the claim merge or later compatible `main` before creating `feat/desktop-I194-d0-boundary`. |
+| Handoff / Release Condition | Produce and review the Proposed ADR/security packet in the independent worktree; no renderer implementation or dependency authorization is implied. |
 
 ## Published Baseline
 
@@ -30,7 +30,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `DESKTOP-001-D0` | `DESKTOP-001` | Ready; proposed claim in PR #211 | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
+| `DESKTOP-001-D0` | `DESKTOP-001` | Active; claim effective in merge `f778543c` | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
 
 ### Start Here
 
@@ -107,6 +107,7 @@ Only the decision work defined by `DESKTOP-001-D0` is in scope:
   Delivery, recovery, reconnect or multi-client behavior.
 - No I188/I189/SESSION-008-B activation or boundary change.
 - No SESSION-008, RUNTIME-005 or ARCH-034-R04 boundary/status change.
+- No animation implementation; motion is recorded only as a renderer/host acceptance constraint.
 - No PR #120/#121 or Issues #45/#49/#59 modification/closure.
 
 ## Implementation Slices
@@ -212,20 +213,30 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because PR #210 proposed it for SESSION-008-B. PR #211 now carries the finalized proposed claim, but ownership remains ineffective until target-branch merge. |
+| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because PR #210 proposed it for SESSION-008-B. PR #211 carried the finalized claim and subsequently merged to establish the effective D0 claim. |
 | 2026-08-13 | Baseline refresh | Refreshed against `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7` after PR #210 merged as `fb5a1f62`. I193 is now Planned / Claimed and remains unactivated; derived governance files preserve the Runtime/Session lane alongside the proposed I194 Desktop lane. |
+| 2026-08-13 | Activation | I194 activated from `main@f778543c7ceeb2a099eb3863fc8259da68d02195` in worktree `/private/tmp/talos-i194` on `feat/desktop-I194-d0-boundary`; merge target `main`. D0 remains decision-only. |
 
 ## Verification Evidence
 
-- Governance preparation branch base: `c4bd9606c8bae63cb9bf11becd45846bf0805982`.
+- Implementation/decision worktree base: `f778543c7ceeb2a099eb3863fc8259da68d02195`.
 - Governance claim PR: #211.
-- Current proposed-claim branch state records `Claimed`, but target-branch ownership remains unchanged until merge.
-- Local checkout/worktree evidence is unavailable in the current execution environment because the
-  container cannot resolve GitHub; this claim preparation uses the connected GitHub repository
-  interface. A real independent worktree remains mandatory before any D0 implementation branch is
-  created.
-- Governance validators, exact-head CI, independent natural-person review and merge-time CAS remain
-  pending on the finalized claim head.
+- Target-branch claim is effective through PR #211 merge `f778543c7ceeb2a099eb3863fc8259da68d02195`.
+- Independent worktree evidence: `/private/tmp/talos-i194` on
+  `feat/desktop-I194-d0-boundary`, based on `f778543c7ceeb2a099eb3863fc8259da68d02195`.
+- Governance validators and merge-time CAS for the claim passed before merge; D0 ADR/security review
+  and implementation-slice validation remain pending.
+- `cargo check --locked --workspace`: passed.
+- `cargo clippy --locked --workspace --all-targets -- -D warnings`: passed.
+- `cargo test --locked --workspace`: 325 passed; 16 existing `talos-cli` provider-discovery tests
+  failed with sandbox `PermissionDenied` while creating their local HTTP fixture. No D0 test or
+  source code was involved; rerun with an approved writable test environment remains required.
+- `scripts/validate_project_governance.sh .`: passed with 0 warnings.
+- `bash scripts/validate_collaboration_claims.sh .`: passed with 0 warnings.
+- `git diff --check`: passed.
+- Primary-source renderer retrieval: blocked by the execution environment's unavailable proxy; no
+  upstream compatibility or dependency-safety claim is made. Residual is registered in the D0 owner
+  and `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`.
 
 ## Completion Evidence
 
