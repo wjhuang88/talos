@@ -5,7 +5,7 @@
 | Story ID | TOOL-026 |
 | Type | Tool Process Safety Correction |
 | Priority | P0 Emergency |
-| Status | Review |
+| Status | Complete |
 | Source Issue | Maintainer incident report, 2026-08-12 |
 | Responsible Actor | @wjhuang88 |
 | Selected Iteration | I191 |
@@ -45,4 +45,6 @@ the TUI for input and inject terminal replies or control bytes into the composer
   input. The review also confirmed the existing direct-child-only timeout limitation was not
   regressed. Unix `killpg` subtree cleanup remains separately owned by TOOL-024/I188 and is not
   activated here.
-- Merge and independent exact-head security review remain pending; this Story is not Complete.
+- Final exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed CI run
+  `31587076213`, independent natural-person approval `5274917099` and merge-time CAS.
+- Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`.
