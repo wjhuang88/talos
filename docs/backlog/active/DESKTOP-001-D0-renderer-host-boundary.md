@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001-D0 |
 | Type | Architecture / Governance Spike |
 | Priority | P1 |
-| Status | Ready — governance claim pending; no implementation authorization yet |
+| Status | Ready — proposed claim in PR #211; no implementation authorization until target-branch merge |
 | Parent | DESKTOP-001 |
 | Source | GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I194 |
@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Desktop D0 decision-only renderer/dependency/host/repository-boundary preparation; no production implementation |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | `@wjhuang88` |
+| Executing Agent | ChatGPT / GPT-5.6 Sol Desktop governance session 2026-08-13 |
+| Work Slice | DESKTOP-001-D0 / I194 only: decide and document the Desktop renderer/dependency/host/repository boundary, current GPUI-or-alternative evidence, native/unsafe/security implications, localization selection criteria, and the later mock-only authorization gate. No production UI, dependency, runtime/domain, persistence, session, permission or P0-P4 implementation. |
+| Claimed At | 2026-08-13 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #211 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent natural-person exact-head architecture/security review is required on the finalized PR #211 head before merge. Repository operations use shared GitHub account `wjhuang88`; a reviewer using the same account must explicitly disclose their distinct natural-person identity. Exact-head CI, both governance validators and merge-time CAS remain mandatory. This proposed `Claimed` record is ineffective until merged to `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Finalize this claim with the actual governance PR number, obtain independent natural-person exact-head review, pass exact-head CI and both governance validators, repeat merge-time CAS, and merge the claim to `main` before any D0 implementation branch is created. |
+| Handoff / Release Condition | Merge finalized claim PR #211 to `main` after independent exact-head review, exact-head CI, both governance validators and merge-time CAS; then create a real independent worktree from the claim merge or later compatible `main` before `feat/desktop-I194-d0-boundary`. |
 
 ## Identity / Goal / Value
 
