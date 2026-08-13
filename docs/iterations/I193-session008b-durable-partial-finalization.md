@@ -20,11 +20,11 @@
 | Claimed At | 2026-08-13 |
 | Source Issue | #45 |
 | Governance Claim PR | #210 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Independent exact-head review is required because this slice changes durable session/storage and cancellation behavior. This proposal has no ownership effect before the finalized claim reaches `main`. |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No separate natural-person reviewer is available. The maintainer may use the Single-maintainer merge path only after exact-head CI, both governance validators, dependency/overlap CAS, and a documented non-authorizing technical audit show no unresolved blocking feedback. Role separation (author/executor, technical auditor, merge authority) must be disclosed, but roles do not impersonate distinct natural persons. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Finalize the claim with its actual PR number, pass exact-head CI and both governance validators, obtain independent natural-person approval, pass merge-time CAS and merge the claim before creating an implementation branch. |
+| Handoff / Release Condition | Finalize the claim with its actual PR number, pass exact-head CI and both governance validators, document the unavailable-independent-review reason and technical audit, pass merge-time CAS, and use the Single-maintainer merge path before creating an implementation branch. |
 
 Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. This proposed `Claimed` record is not
 an effective claim until PR #210 is merged into `main`.
