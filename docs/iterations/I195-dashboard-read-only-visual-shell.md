@@ -41,7 +41,7 @@ record reaches `main`; no Dashboard implementation branch or worktree is authori
 ### Target-Branch Baseline At Planning
 
 - Target branch: `main`.
-- Current `main` HEAD observed immediately before this governance branch was created:
+- `main` HEAD observed immediately before this governance branch was created:
   `c4bd9606c8bae63cb9bf11becd45846bf0805982`.
 - Three-track common baseline:
   `23e4174bcfb036602ce2145026b872ec5c517289`.
@@ -51,10 +51,22 @@ record reaches `main`; no Dashboard implementation branch or worktree is authori
 - The eventual implementation base is deliberately **not fixed yet**: it must be the effective I195
   claim merge commit or a later current `main` after re-running baseline/CAS checks.
 
+### Current Synchronized Claim Baseline
+
+- `main` advanced after planning to
+  `0459b8afb1626783f21b54dbaf55a0ef84393cd7` after I193/SESSION-008-B claim merge #210 and its
+  target-branch synchronization commit.
+- #212 was synchronized by pure two-parent merge commit
+  `0af41981cb3bebb8725a0ebd9ba20edf7637ab01` whose parents are the previously reviewed #212 head
+  `556200a2bedd5397a0015d426bdeb0d55d5a2082` and `main@0459b8af...`.
+- The pure merge intentionally took current-main truth for shared indexes; subsequent governance-only
+  commits reapply I195 derived-index rows and refresh this owner on top of the synchronized baseline.
+- I194/Desktop remains an unmerged parallel proposal and is not imported as target-branch truth.
+
 ### Current Non-Terminal Iteration Inventory
 
-The authoritative target-branch owner/index inventory at planning time contains no Active or Review
-iteration. The following non-terminal target-branch iterations remain independent:
+After synchronizing to `main@0459b8af...`, there remains no Active or Review iteration in the
+current operating set. The following non-terminal target-branch iterations remain independent:
 
 | Iteration | State | I195 Disposition |
 |---|---|---|
@@ -65,26 +77,25 @@ iteration. The following non-terminal target-branch iterations remain independen
 | I164 | Paused | Preserve the superseded startup-inline target; do not resume. |
 | I188 | Planned / Claimed | Keep unactivated; TOOL-024-A decision-only process/permission work is independent. |
 | I189 | Planned / Claimed | Keep unactivated; PERM-006-A permission-foundation scope is independent. |
+| I193 | Planned / Claimed | Claim #210 is effective on `main`; keep I193 unactivated and independent. I195 consumes no SESSION-008-B implementation authority. |
 
 No existing target-branch owner authorizes I195 implementation. This table must be refreshed again
 immediately before claim merge, implementation branch creation and implementation merge.
 
-### Parallel Three-Track Coordination At Planning
+### Parallel Three-Track Coordination
 
-Parallel lanes are moving even while target `main` remains at the SHA above. Those proposals are not
-effective target-branch authority yet, but they are collision signals and must be respected:
-
-- Runtime/session lane: Draft PR #210 uses `governance/i193-session008b-claim` and proposes I193 for
-  SESSION-008-B. Dashboard therefore does **not** use I193.
-- Desktop lane: remote branch `docs/desktop-I194-d0-claim` already exists. Dashboard therefore does
-  **not** use I194 even though that owner is not yet on `main`.
-- I195 had no matching remote branch immediately before this governance branch was created and is
-  selected as the next non-colliding candidate.
+- Runtime/session lane: PR #210 / I193 has now merged to `main`; I193 is target-branch truth and
+  remains Planned / Claimed pending its own explicit activation. Dashboard does **not** reuse or
+  implement I193 scope.
+- Desktop lane: PR #211 / proposed I194 remains unmerged as of this synchronization. Dashboard does
+  **not** use I194 and does not import its proposed owner/index state into current-main truth.
+- I195 remains the Dashboard lane owner candidate and is still ineffective until #212 itself reaches
+  `main` after new-head review and merge-time CAS.
 - Archival recovery PRs #120/#121 remain immutable provenance and are not implementation authority.
 
-If any parallel claim, branch or `main` update changes these facts, refresh/rebase the governance
-proposal and repeat validation/review. An earlier clean snapshot never authorizes merging against a
-changed target.
+If any parallel claim, branch or `main` update changes these facts, refresh the governance proposal
+and repeat validation/review. An earlier clean snapshot never authorizes merging against a changed
+target.
 
 ## Scope
 
@@ -92,7 +103,10 @@ changed target.
 - Establish Dashboard-wide information architecture and one shared visual shell.
 - Render the existing five GET-only surfaces through that shell when HTML is explicitly requested.
 - Add `/extensions` HTML presentation while retaining its current JSON representation otherwise.
-- Preserve the existing data/snapshot ownership and all ADR-031 safety boundaries.
+- Preserve ADR-031's loopback/read-only security posture for its approved initial routes; treat the
+  existing `/extensions` GET-only surface as WEB-001/I129/current-implementation provenance rather
+  than attributing it to ADR-031 §5.
+- Preserve the existing data/snapshot ownership, masking, redaction and escaping boundaries.
 - Treat UX as product acceptance:
   - consistent navigation and current-page hierarchy;
   - readable typography/spacing/content surfaces;
@@ -102,9 +116,12 @@ changed target.
   - semantic landmarks/headings;
   - keyboard-operable links/navigation and visible focus;
   - usable 200% zoom behavior;
+  - WCAG 2.1 AA contrast thresholds for text and essential non-text affordances;
+  - unchanged CSP-compatible resource usage;
+  - truthful English `lang` metadata for the intentionally English-only first-slice UI;
   - no hover-only or color-only required information.
 - Update user-facing English and Chinese README documentation to describe the local read-only
-  Dashboard accurately.
+  Dashboard accurately; bilingual docs do not imply in-page Dashboard localization.
 
 ## Non-Goals
 
@@ -116,6 +133,7 @@ changed target.
 - LAN/remote/tunnel access.
 - Browser automation.
 - TUI-037 behavior.
+- Dashboard UI localization/i18n in this slice.
 - New permission/persistence/remote-control models.
 - New shared runtime/domain/session behavior.
 - A second Dashboard-owned data source of truth.
@@ -125,11 +143,18 @@ changed target.
 ## Architecture And Security Invariants
 
 - Listener remains `127.0.0.1` loopback under ADR-031.
+- ADR-031 §5's approved initial route list is `/status`, `/history`, `/governance`, `/config`; I195
+  does not rewrite that historical provenance. `/extensions` is consumed from the current WEB-001/I129
+  GET-only implementation and gains HTML presentation only.
 - No new non-GET business route is registered.
-- Existing output-boundary snapshot redaction remains upstream of rendering.
+- Existing output-boundary snapshot redaction remains upstream of rendering, including extension data.
 - Existing config masking remains authoritative.
 - Every dynamic HTML value remains escaped.
 - Existing JSON/plain-text representations remain available when HTML is not explicitly requested.
+- Existing HTML CSP remains unchanged: `default-src 'none'; style-src 'unsafe-inline'`.
+- Under that CSP, required UX must not depend on executable script, external/web fonts, raster/remote
+  images or `data:` image resources; semantic text, inline CSS and inline SVG markup are the allowed
+  first-slice presentation primitives.
 - Existing runtime/domain/session/permission/config/extension ownership is reused; Dashboard is only
   a presentation layer for this slice.
 - If implementation discovers that a shared API must change, that work is removed from I195 and
@@ -146,6 +171,9 @@ changed target.
 | Zoom | At 200% browser zoom, core navigation and content reading order remain usable. | Manual zoom walkthrough. |
 | Keyboard | All Dashboard navigation is reachable with keyboard focus and focus is visibly identifiable. | Keyboard-only walkthrough. |
 | Semantics | Navigation/main/headings have a logical DOM/reading hierarchy; required state is not communicated only by color/hover. | Markup review plus browser accessibility inspection without automation. |
+| Contrast | Normal text is at least 4.5:1, large text at least 3:1, and essential non-text/focus affordances at least 3:1 against adjacent colors. | Recorded WCAG 2.1 AA contrast measurements for the rendered palette. |
+| CSP resources | Required visuals work under unchanged `default-src 'none'; style-src 'unsafe-inline'` without script, external/web fonts, raster/remote or `data:` images. | Header inspection plus browser walkthrough; inline CSS and inline SVG markup only for non-text presentation. |
+| Language | First-slice Dashboard UI remains English and rendered documents keep truthful `lang="en"`; bilingual README docs do not imply UI i18n. | Markup inspection across root and five rendered pages. |
 | Empty/data states | Empty snapshots remain understandable and populated snapshots remain scannable. | Existing/new fixture-backed tests plus walkthrough. |
 | Security UX | Masked/redacted values are represented consistently and raw hostile HTML is shown only as escaped text. | Adversarial unit/integration fixtures. |
 
@@ -159,6 +187,8 @@ bound to the rebuilt implementation head.
   clear page/content hierarchy.
 - Given `/extensions` with `Accept: text/html`, when it responds, then it is rendered safely through
   the shared shell; given no explicit HTML request, the existing JSON response remains available.
+  This presentation parity consumes WEB-001/I129/current implementation provenance and does not
+  claim ADR-031 §5 originally listed `/extensions`.
 - Given `/status` or `/history`, when HTML is not explicitly accepted, then existing JSON negotiation
   behavior is preserved.
 - Given `/governance` or `/config`, when HTML is not explicitly accepted, then existing plain-text
@@ -171,6 +201,10 @@ bound to the rebuilt implementation head.
   mutation/action endpoint is available under this slice.
 - Given the Dashboard server is started, when its bound socket is inspected, then the listener is
   still on `127.0.0.1`; no LAN/remote/tunnel path is introduced.
+- Given the unchanged CSP, when all rendered pages are inspected, then required typography/icons/
+  decoration do not rely on blocked resources and no JavaScript execution is introduced.
+- Given the first-slice English UI, when root and all five HTML pages are inspected, then `lang="en"`
+  remains truthful and no Desktop/i18n contract is imported into this Dashboard slice.
 - Given existing runtime/session/permission/config/extension state, when implementation is reviewed,
   then I195 reads the existing snapshot/domain sources and adds no alternate durable or policy state.
 
@@ -186,7 +220,8 @@ Expected production/test change is intentionally narrow:
 - Owner/status documentation is synchronized through separate governance updates; no status-only
   commit is implementation completion evidence.
 
-No Cargo/dependency change is planned for the first slice.
+No Cargo/dependency change is planned for the first slice. Presentation assets must remain compatible
+with the current CSP; no script, external font/image asset pipeline or client runtime is planned.
 
 ## Planned Validation
 
@@ -212,6 +247,7 @@ Focused Dashboard regression evidence must cover at least:
 - HTML escaping across all five surfaces;
 - POST/PUT/PATCH/DELETE rejection across the Dashboard surface;
 - `127.0.0.1` binding;
+- unchanged HTML CSP;
 - representative empty states and shell navigation structure.
 
 Manual acceptance on the exact rebuilt implementation head:
@@ -221,6 +257,9 @@ Manual acceptance on the exact rebuilt implementation head:
 - 1440×900 viewport;
 - 200% browser zoom;
 - keyboard-only navigation/focus walkthrough;
+- WCAG 2.1 AA contrast measurements;
+- unchanged-CSP resource walkthrough;
+- truthful English `lang="en"` markup inspection;
 - root plus all five rendered pages;
 - no browser automation.
 
@@ -257,10 +296,15 @@ Manual acceptance on the exact rebuilt implementation head:
   `c4bd9606c8bae63cb9bf11becd45846bf0805982`.
 - Common three-track base:
   `23e4174bcfb036602ce2145026b872ec5c517289`.
-- Runtime-line I193 collision avoided based on Draft PR #210.
-- Desktop-line I194 collision avoided based on remote branch `docs/desktop-I194-d0-claim`.
+- Runtime-line I193 collision was initially avoided based on PR #210; #210 later merged and #212 was
+  synchronized to `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7` by pure merge
+  `0af41981cb3bebb8725a0ebd9ba20edf7637ab01`.
+- Desktop-line I194 remains an unmerged parallel proposal as of this synchronization.
+- Independent review comment `5277157606` on former exact head `556200a2...` returned NEEDS CHANGES
+  solely for main drift/mergeability; its positive content findings do not carry forward as approval
+  of the new head.
 - Governance claim PR: #212.
-- Finalized claim head, validator/CI/review and merge-time CAS evidence: pending.
+- New exact-head validator/CI/review and merge-time CAS evidence: pending.
 
 ## Completion Evidence
 
