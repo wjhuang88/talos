@@ -27,6 +27,12 @@ are not vendored, copied into Talos, or treated as a dependency lock:
 The source review does not prove release stability, transitive license closure, platform coverage,
 or runtime panic behavior. Those remain required gates.
 
+Crates.io metadata queried on 2026-08-13 confirmed `gpui 0.2.2` (Apache-2.0) and `iced 0.14.0`
+(MIT, Rust 1.88) with the default feature families summarized above. A disposable external
+`cargo metadata` probe did not resolve the complete graph because the registry proxy failed while
+fetching transitive index data. No partial graph is treated as an SBOM or authorization input, and
+no probe file or dependency entered the Talos repository.
+
 ## Motion acceptance shape
 
 The later mock-only slice must test immediate input feedback, cancellable state transitions, one

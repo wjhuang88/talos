@@ -20,7 +20,7 @@
 | Governance Claim PR | #211 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
-| Implementation PR | Not started |
+| Implementation PR | #215 (decision-only D0 packet; no Desktop implementation) |
 | Last Updated | 2026-08-13 |
 | Handoff / Release Condition | Produce and review the Proposed ADR/security packet in the independent worktree; no renderer implementation or dependency authorization is implied. |
 
@@ -238,6 +238,9 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
   and pinned by immutable commit in `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`.
   They establish candidate capability/risk facts only; selected-release lock closure, SBOM/license
   review, platform tests, panic containment and motion benchmarks remain open Review residuals.
+- Crates.io metadata confirmed `gpui 0.2.2` and `iced 0.14.0`; disposable full-graph resolution was
+  attempted outside the Talos worktree and stopped when the registry proxy became unavailable. No
+  probe manifest, Cargo change or dependency was added to Talos.
 
 ## Completion Evidence
 

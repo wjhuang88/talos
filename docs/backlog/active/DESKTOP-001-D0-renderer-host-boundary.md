@@ -24,7 +24,7 @@
 | Governance Claim PR | #211 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
-| Implementation PR | Not started |
+| Implementation PR | #215 (decision-only D0 packet; no Desktop implementation) |
 | Last Updated | 2026-08-13 |
 | Handoff / Release Condition | Deliver the Proposed ADR/security packet and independent exact-head review; keep renderer implementation and dependency authorization closed until D0 acceptance. |
 
@@ -255,6 +255,13 @@ Current evidence status: primary-source snapshots for GPUI and the minimum Iced 
 retrieved and pinned by commit on 2026-08-13. They establish candidate capability/risk facts only;
 full selected-release lock closure, SBOM/license review, platform tests, panic containment and motion
 benchmarks remain Review residuals. Renderer/dependency authorization stays closed.
+
+The crates.io metadata refresh confirmed published candidates `gpui 0.2.2` (Apache-2.0; default
+font-kit/Wayland/X11/Windows-manifest features) and `iced 0.14.0` (MIT; Rust 1.88; default
+wgpu/tiny-skia/X11/Wayland features). A disposable `cargo metadata` probe could not complete the
+full graph because the registry proxy became unavailable while resolving transitive packages. This
+is negative evidence for authorization: no lockfile, SBOM, build-script or license-closure claim is
+made from the partial probe.
 
 ## Residual Destination
 
