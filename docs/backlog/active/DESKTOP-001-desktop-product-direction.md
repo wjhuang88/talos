@@ -120,8 +120,8 @@ The first GPUI visual/interaction spike must exercise the same Execution experie
 
 ## Future Governed Prerequisite Chain
 
-Before the first GPUI Desktop implementation PR, an ordered set of separately governed and reviewed
-implementation slices must establish the shared work/evaluation foundation.
+Before Desktop binds real Mission/Work Graph/Evaluation state, an ordered set of separately governed
+and reviewed implementation slices must establish the shared work/evaluation foundation.
 
 The exact action list, acceptance, and exclusions are documented in
 `docs/proposals/talos-desktop-goal-oriented-workspace.md`, section **Future Governed Desktop
@@ -142,10 +142,11 @@ part of this shared chain; it belongs to the later GPUI Desktop implementation b
 
 ## First GPUI Desktop Implementation Boundary
 
-After the full shared prerequisite chain is merged and a Desktop implementation iteration/claim is
-selected, the first GPUI Desktop slice must establish the localization foundation together with the
-selected visible surface. It must not ship a hard-coded single-language prototype that would require
-later view-level rewrites to internationalize.
+After this design baseline lands, a separately selected/claimed D0 dependency/host decision and a
+mock-only GPUI visual/interaction slice may proceed in parallel with the shared prerequisite chain.
+The first visible slice must establish the localization foundation together with the selected
+surface. It must not ship a hard-coded single-language prototype that would require later view-level
+rewrites to internationalize.
 
 At minimum that slice should:
 
@@ -157,6 +158,11 @@ At minimum that slice should:
 - validate Chinese IME for editable controls in scope;
 - verify the selected Execution layout in both languages at normal laptop width;
 - test that locale switching cannot alter canonical Mission/Goal/Evaluation identity or evidence.
+
+The mock-only slice may use fixtures or presentation-local ephemeral state. It must not claim real
+Mission execution, persistence, completion, evaluation, approvals, or Delivery, and it must not
+invent alternate durable Mission/session/permission ownership. Real runtime binding remains blocked
+until the relevant P0-P4 contracts and shared APIs have merged and passed independent review.
 
 ## Exclusions
 
@@ -209,10 +215,10 @@ Resume implementation only through bounded, governed work:
 1. run requirement intake for the shared Work Graph/evaluation prerequisite;
 2. create required ADR(s) and migration plan for public/breaking boundaries;
 3. select an implementation iteration and establish an effective Collaboration Claim;
-4. land and independently review each prerequisite-chain slice in order;
-5. then select the first GPUI Desktop implementation iteration and claim;
-6. in that Desktop slice, validate the localization mechanism, `zh-CN`/`en-US` coverage, Chinese
-   IME, and bilingual layout before broadening the UI surface.
+4. in parallel, select and claim D0 and then a mock-only first GPUI visual/interaction slice;
+5. land and independently review each shared prerequisite-chain slice in order before real binding;
+6. in the first visible Desktop slice, validate the localization mechanism, `zh-CN`/`en-US`
+   coverage, Chinese IME, and bilingual layout before broadening the UI surface.
 
 Recheck current GPUI/native packaging and Rust localization ecosystem constraints at the Desktop
 implementation boundary rather than encoding stale library assumptions in this Deferred Story.
@@ -271,7 +277,7 @@ system-language behavior, fallback, and any restart requirement for changing loc
 
 ## Residual Destination
 
-Implementation must use new governed iterations/claims. The first implementation residual is P0 of
-the Work Graph/evaluation prerequisite chain defined by the refined design baseline; the first GPUI
-Desktop implementation is a later independent slice after the full chain is merged and must include
-the internationalization foundation for its visible UI scope.
+Implementation must use new governed iterations/claims. After this design baseline lands, P0 of the
+shared Work Graph/evaluation chain and Desktop D0/mock-only visual work may proceed in parallel. The
+first visible GPUI slice must include the internationalization foundation for its UI scope; real
+runtime/work/evaluation binding remains gated by the relevant P0-P4 contracts and shared APIs.

@@ -808,10 +808,16 @@ The first Desktop slice must not invent alternate session ownership merely to by
 This document defines the required **future dependency chain**. The documentation PR containing
 this proposal must not create any implementation PR itself.
 
-Before the first GPUI Desktop implementation PR, complete the ordered prerequisite slices below.
-Each slice requires normal requirement intake, its own selected iteration and effective Collaboration
-Claim, an independently reviewable implementation PR, and its own acceptance evidence. A later slice
-must not be folded into an earlier one merely to accelerate Desktop startup.
+Before the first Desktop slice binds real Mission/Work Graph/Evaluation state, complete the ordered
+shared-runtime prerequisite slices below. Each slice requires normal requirement intake, its own
+selected iteration and effective Collaboration Claim, an independently reviewable implementation
+PR, and its own acceptance evidence. A later slice must not be folded into an earlier one merely to
+accelerate runtime binding.
+
+This chain does not block a separately governed D0 dependency/host decision or a mock-only GPUI
+visual and internationalization spike after this design PR lands. Such Desktop work must use
+fixtures or presentation-local ephemeral state, must not claim real Mission execution, and must not
+create an alternate durable Mission, session, evaluation, approval, or permission authority.
 
 ### 20.1 P0 — Decision and migration contract
 
@@ -903,10 +909,11 @@ Every prerequisite slice must **not**:
 - delete compatibility Todo surfaces without an explicit migration acceptance;
 - weaken permission, sandbox, credential, transcript, or evidence boundaries.
 
-### 20.8 Separate first GPUI Desktop implementation
+### 20.8 Parallel first GPUI Desktop boundary
 
-Only after every prerequisite slice has merged and passed independent review should a separately
-selected/claimed Desktop implementation slice begin.
+After this design baseline lands, a separately selected/claimed Desktop slice may begin in parallel
+with the shared-runtime prerequisite chain, but only within the mock-only boundary above. The D0
+dependency/host decision must be accepted before adding GPUI or native renderer dependencies.
 
 That first GPUI slice should establish:
 
@@ -917,13 +924,16 @@ That first GPUI slice should establish:
   slice;
 - system/explicit locale selection and persistence;
 - bilingual layout validation and Chinese IME;
-- mocks where appropriate before full runtime binding;
-- then real runtime/work/evaluation binding through the shared APIs.
+- fixtures or presentation-local ephemeral state for the selected visual flow.
 
 The first GPUI slice should not ship a hard-coded single-language prototype that must later be
-structurally internationalized.
+structurally internationalized. It must not claim real runtime execution, persistence, completion,
+evaluation, approval, or Delivery behavior.
 
-## 21. Desktop Development Phases After The Prerequisite Chain
+Real runtime/work/evaluation binding is a later Desktop slice and remains blocked until the relevant
+P0-P4 contracts and shared APIs have merged and passed independent review.
+
+## 21. Desktop Development Phases And Shared-Chain Gates
 
 Subject to future governed iteration selection, the broad Desktop sequence remains:
 
@@ -940,6 +950,11 @@ D8  packaging/release/platform integration
 ```
 
 These phases are planning guidance, not selected iterations.
+
+D0 and a bounded D3 mock-only visual/i18n spike may proceed after this design baseline lands and
+their own governance gates are satisfied. D4 and any later phase that claims real Mission,
+Evaluation, approval, persistence, or Delivery behavior must wait for the relevant shared-runtime
+P0-P4 slices and security decisions.
 
 ## 22. Success Criteria For The Product Direction
 
@@ -992,7 +1007,7 @@ Before starting the prerequisite chain:
 - current `talos-runtime` facade;
 - current CLI/TUI bridge/orchestration.
 
-Before the first GPUI Desktop implementation PR, additionally read:
+Before the first GPUI Desktop slice, additionally read:
 
 - `docs/design/talos-desktop/DESIGN.md`
 - `docs/design/talos-desktop/I18N.md`
@@ -1003,7 +1018,7 @@ Before the first GPUI Desktop implementation PR, additionally read:
 This is a design/proposal baseline. It does not create an implementation iteration, Collaboration
 Claim, crate, migration, Desktop binary, localization catalog, or PR authorization.
 
-The required next implementation action remains **P0 of a future governed prerequisite chain**,
-created only after normal repository governance selects and authorizes that slice. Internationalization
-belongs to the later first GPUI Desktop implementation slice, not to the shared Work Graph/evaluation
-prerequisite chain.
+The next implementation actions may proceed as two independently governed tracks after this design
+baseline lands: P0 of the shared-runtime prerequisite chain, and D0 followed by a mock-only GPUI
+visual/internationalization slice. Neither is created or authorized by this proposal. Real
+runtime/work/evaluation binding remains gated by the relevant shared-chain contracts and APIs.
