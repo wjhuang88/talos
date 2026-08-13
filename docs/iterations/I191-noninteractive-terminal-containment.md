@@ -1,6 +1,6 @@
 # Iteration I191: Non-Interactive Terminal Containment
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-12
 > Planned objective: contain command-tool children outside Talos's interactive terminal boundary.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 emergency implementation session 2026-08-12 |
 | Work Slice | TOOL-026 only: default-null stdin and Unix controlling-terminal detachment for foreground bash/exec children, tests and ADR-007 update. |
@@ -18,10 +18,12 @@
 | Source Issue | Maintainer incident report, 2026-08-12 |
 | Governance Claim PR | Direct commit cd304850 |
 | Authorization Mode | Emergency override |
-| Authorization Evidence | @wjhuang88 instructed immediate handling after reporting live TUI corruption from interactive scripts and password prompts. |
+| Authorization Evidence | @wjhuang88 instructed immediate handling after reporting live TUI corruption from interactive scripts and password prompts; PR #206 exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed CI `31587076213`, independent natural-person approval `5274917099` and merge-time CAS before merge `512ff32f389167364c02e7058151879b9ce6859a`. |
 | Implementation PR | #206 |
-| Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Open an implementation PR, obtain independent natural-person security review of the exact head, explicitly disclose reviewer identity when sharing @wjhuang88, pass exact-head CI and merge-time CAS. |
+| Last Updated | 2026-08-13 |
+| Handoff / Release Condition | None - I191/TOOL-026 is complete; TOOL-024/I188 remains independently Planned/Claimed and unactivated. |
+
+Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`
 
 ## Emergency Override Record
 
@@ -54,4 +56,6 @@ The frozen scope, exclusions and acceptance are owned by `TOOL-026`.
   failed controlling-terminal acquisition and input injection through an explicitly opened slave.
   It found no new descendant escape regression. The observed Unix `killpg` subtree-reaping
   opportunity remains a TOOL-024/I188 residual; this emergency work does not activate I188.
-- No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.
+- Final exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed all five CI checks
+  in run `31587076213`, independent natural-person approval `5274917099` and merge-time CAS.
+- Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`.

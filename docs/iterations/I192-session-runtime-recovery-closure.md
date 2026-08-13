@@ -1,6 +1,6 @@
 # Iteration I192: Session Runtime Recovery Closure
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-12
 > Planned objective: make matching-identity resume idempotent and close normal no-chat Session artifacts.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 emergency implementation session 2026-08-12 |
 | Work Slice | SESSION-010 only: matching-target activation reuse, resume filtering and safe normal-exit cleanup of the current empty Session. |
@@ -18,10 +18,12 @@
 | Source Issue | Maintainer incident report, 2026-08-12 |
 | Governance Claim PR | Direct commit cd304850 |
 | Authorization Mode | Emergency override |
-| Authorization Evidence | @wjhuang88 instructed immediate handling after a force-exit resume conflict and proliferation of zero-message Session artifacts. |
+| Authorization Evidence | @wjhuang88 instructed immediate handling after a force-exit resume conflict and proliferation of zero-message Session artifacts; PR #206 exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed CI `31587076213`, independent natural-person approval `5274917099` and merge-time CAS before merge `512ff32f389167364c02e7058151879b9ce6859a`. |
 | Implementation PR | #206 |
-| Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Open an implementation PR, obtain independent natural-person exact-head review, explicitly disclose reviewer identity when sharing @wjhuang88, pass exact-head CI and merge-time CAS. |
+| Last Updated | 2026-08-13 |
+| Handoff / Release Condition | None - I192/SESSION-010 is complete; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked on it. |
+
+Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`
 
 ## Emergency Override Record
 
@@ -63,4 +65,7 @@ The frozen scope, exclusions and acceptance are owned by `SESSION-010`.
   outside this PR and merged to main as `ac8971a3` through bounded-maintenance PR #207.
 - Within the TUI, `/resume <UUID>` now intentionally shares the current-workspace, non-empty picker
   scope; explicit cross-workspace UUID recovery remains the CLI `--session <UUID>` path.
-- No Completion Commit yet; retain Review until independent review, exact-head CI and merge exist.
+- Final exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed all five CI checks
+  in run `31587076213`; independent natural-person approval `5274917099` additionally exercised
+  five non-author ambiguous transcripts, and merge-time CAS passed.
+- Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`.

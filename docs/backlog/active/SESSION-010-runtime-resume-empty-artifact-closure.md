@@ -5,7 +5,7 @@
 | Story ID | SESSION-010 |
 | Type | Session Runtime Reliability Correction |
 | Priority | P0 Emergency |
-| Status | Review |
+| Status | Complete |
 | Source Issue | Maintainer incident report, 2026-08-12 |
 | Responsible Actor | @wjhuang88 |
 | Selected Iteration | I192 |
@@ -51,9 +51,14 @@ the first message, so abandoned no-chat launches remain visible in `/resume`.
 - Read-only storage inventory found 25 sidecars, all paired with transcripts; nine pairs had empty
   TLOG transcripts. This proves premature no-chat materialization, not orphan-sidecar leakage.
 - Existing user files were not modified. Forced-kill and historical empty-file cleanup remain
-  explicit maintenance concerns; merge and independent exact-head review remain pending.
+  explicit maintenance concerns outside this completed Story.
 - Independent review `5265172266` rejected head `b2376847` because parsed-entry emptiness could
   delete non-empty truncated or future-schema transcripts. Commit `d98f6d0a` changes deletion
   authority to strict zero-byte metadata and proves both ambiguous forms remain byte-identical.
 - The independent A2 finding was pre-existing main drift, repaired separately by bounded-maintenance
   PR #207 at main merge `ac8971a3`; the remote Issue/owner validator now passes for 34 open Issues.
+- Final exact head `6b2dbdb557f480b623901441025582727e6ba4ff` passed CI run
+  `31587076213`, independent natural-person approval `5274917099` and merge-time CAS. The independent
+  re-review also preserved five additional non-empty ambiguous byte forms while deleting a true
+  zero-byte Session.
+- Completion Commit: `512ff32f389167364c02e7058151879b9ce6859a`.
