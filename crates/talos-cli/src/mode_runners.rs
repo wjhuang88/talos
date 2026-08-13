@@ -678,7 +678,34 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     }
 
-    tui.run().await?;
+    let tui_result = tui.run().await;
+    let active_session = transition.lock().await.shutdown().await;
+    let cleanup_result = cleanup_empty_tui_session(&session_manager, &active_session);
+    tui_result?;
+    cleanup_result
+}
+
+fn cleanup_empty_tui_session(
+    session_manager: &talos_session::SessionManager,
+    session: &talos_session::Session,
+) -> Result<()> {
+    if session.file_path.exists() {
+        let transcript_bytes = std::fs::metadata(&session.file_path)
+            .context("failed to inspect the active Session transcript during TUI shutdown")?
+            .len();
+        if transcript_bytes > 0 {
+            return Ok(());
+        }
+    }
+    let pending = talos_session::PendingSubmissionStore::for_session(session)
+        .has_nonterminal_submissions()
+        .context("failed to inspect pending work during TUI shutdown")?;
+    if pending {
+        return Ok(());
+    }
+    session_manager
+        .rollback_session_artifacts(session)
+        .context("failed to remove empty Session artifacts during TUI shutdown")?;
     Ok(())
 }
 

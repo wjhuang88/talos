@@ -33,6 +33,11 @@ hardening **in the child process** (see [#ARCH-S3](../backlog/PRODUCT-BACKLOG.md
 `unsafe` because its closure runs post-`fork`/pre-`exec`, where only async-signal-safe operations
 are permitted.
 
+I191 adds one further child-side `pre_exec` site in
+`crates/talos-tools/src/process_boundary.rs`. It calls `setsid(2)` before `exec` so non-interactive
+tool children cannot open the Talos TUI's controlling terminal through `/dev/tty`. This is OS ABI
+access under the same hard constraint and post-fork safety boundary.
+
 ## Constraint Decomposition
 
 | Constraint | Type | Source | Can Change? |
@@ -74,6 +79,10 @@ reasoning so the point is not re-litigated.
 5. **`pre_exec` (planned, site 5).** The closure must perform only async-signal-safe work:
    `setrlimit` and `unsetenv`-style operations qualify; allocation, locking, and arbitrary Rust
    must not appear inside it. #ARCH-S3 is bound to this restriction.
+6. **`setsid` terminal containment.** `setsid(2)` is async-signal-safe and receives no pointers.
+   A `-1` result is converted from the child-local `errno` into the spawn error; success creates a
+   new Session without Talos's controlling terminal. The closure performs no allocation, locking,
+   formatting or panic-capable work.
 
 **Binding requirement (this is the security review condition, per Hard Constraint #5):**
 
@@ -97,6 +106,10 @@ reasoning so the point is not re-litigated.
 3. **Child-process `pre_exec` hardening is PRE-AUTHORIZED** (`unsafe`), subject to the
    async-signal-safe restriction, and is to be implemented under
    [#ARCH-S3](../backlog/PRODUCT-BACKLOG.md).
+
+3a. **Child-process terminal detachment via `setsid` is ACCEPTED** for the shared non-interactive
+`bash`/`exec` boundary under I191/TOOL-026. Standard input remains null unless an explicit `exec`
+pipeline supplies bytes; detachment does not authorize interactive PTY support.
 
 4. **Mandatory code annotations (enforced by #ARCH-S1):** every `unsafe` block listed above MUST
    carry a `// SAFETY:` comment that references this ADR (`docs/decisions/007-…`), and the module

@@ -56,6 +56,14 @@ fn resolve_session_delete_target<'a>(
     sessions.iter().find(|session| session.id == session_id)
 }
 
+fn retain_resumable_sessions(
+    sessions: &mut Vec<talos_session::SessionInfo>,
+    active_id: uuid::Uuid,
+) {
+    sessions.retain(|session| session.id != active_id && session.message_count > 0);
+    sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_delete(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
@@ -289,26 +297,27 @@ pub(crate) async fn handle_session_resume(
 
     let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
 
+    let mut sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+        Ok(sessions) => sessions,
+        Err(error) => {
+            let text = format!("[Error] Failed to list sessions: {error}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            return None;
+        }
+    };
+    retain_resumable_sessions(&mut sessions, transition.active_session().id);
+
     let target_session = match &session_id {
         Some(id) => {
             // Try parsing as ordinal (1-based) first, then fall back to UUID.
             if let Ok(n) = id.parse::<usize>() {
-                let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        let text = format!("[Error] Failed to list sessions: {e}\n");
-                        send_stream(ui_tx, MessageSource::Error, text);
-                        return None;
-                    }
-                };
                 if sessions.is_empty() {
-                    let text = "[System] No sessions found for this workspace.\n".to_string();
+                    let text =
+                        "[System] No other non-empty sessions to resume in this workspace.\n"
+                            .to_string();
                     send_stream(ui_tx, MessageSource::System, text);
                     return None;
                 }
-                let mut sessions = sessions;
-                sessions
-                    .sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
                 if n == 0 || n > sessions.len() {
                     let text = format!(
                         "[Error] Invalid session number {n}. Valid range: 1-{}.\n",
@@ -328,8 +337,19 @@ pub(crate) async fn handle_session_resume(
                     }
                 }
             } else {
-                // Fall back to treating it as a UUID (backward compat).
-                match session_manager.resume_session(id) {
+                // Fall back to treating it as a UUID (backward compat), while preserving the
+                // same current/empty filtering used by the picker and ordinal path.
+                let selected_id = uuid::Uuid::parse_str(id)
+                    .ok()
+                    .filter(|candidate| sessions.iter().any(|session| session.id == *candidate));
+                let Some(selected_id) = selected_id else {
+                    let text = format!(
+                        "[Error] Session '{id}' is not a resumable non-empty Session in this workspace.\n"
+                    );
+                    send_stream(ui_tx, MessageSource::Error, text);
+                    return None;
+                };
+                match session_manager.resume_session(&selected_id.to_string()) {
                     Ok(s) => s,
                     Err(e) => {
                         let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
@@ -340,23 +360,12 @@ pub(crate) async fn handle_session_resume(
             }
         }
         None => {
-            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
-                Ok(s) => s,
-                Err(e) => {
-                    let text = format!("[Error] Failed to list sessions: {e}\n");
-                    send_stream(ui_tx, MessageSource::Error, text);
-                    return None;
-                }
-            };
-
             if sessions.is_empty() {
-                let text = "[System] No sessions found for this workspace.\n".to_string();
+                let text = "[System] No other non-empty sessions to resume in this workspace.\n"
+                    .to_string();
                 send_stream(ui_tx, MessageSource::System, text);
                 return None;
             }
-
-            let mut sessions = sessions;
-            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
 
             let items: Vec<SessionPickerItem> = sessions
                 .iter()
@@ -740,5 +749,47 @@ pub(crate) async fn handle_session_fork(
             );
             send_stream(ui_tx, MessageSource::Error, text);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn info(id: uuid::Uuid, message_count: usize, age_minutes: u64) -> talos_session::SessionInfo {
+        talos_session::SessionInfo {
+            id,
+            project: "test".to_string(),
+            workspace_root: "/test".to_string(),
+            last_message_preview: String::new(),
+            timestamp: (std::time::SystemTime::now()
+                - std::time::Duration::from_secs(age_minutes.saturating_mul(60)))
+            .into(),
+            message_count,
+        }
+    }
+
+    #[test]
+    fn resume_candidates_exclude_active_and_empty_sessions_then_sort_newest_first() {
+        let active = uuid::Uuid::new_v4();
+        let empty = uuid::Uuid::new_v4();
+        let older = uuid::Uuid::new_v4();
+        let newer = uuid::Uuid::new_v4();
+        let mut sessions = vec![
+            info(active, 3, 0),
+            info(empty, 0, 1),
+            info(older, 2, 3),
+            info(newer, 1, 2),
+        ];
+
+        retain_resumable_sessions(&mut sessions, active);
+
+        assert_eq!(
+            sessions
+                .iter()
+                .map(|session| session.id)
+                .collect::<Vec<_>>(),
+            vec![newer, older]
+        );
     }
 }

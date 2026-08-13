@@ -58,6 +58,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I188 | TOOL-024-A Background Job Lifecycle Contract | Planned / Claimed | Claim merge `02a35588` establishes the decision-only Spike for Issue #59; no implementation has started and production B remains dependency-gated. |
 | I189 | PERM-006-A Structured Permission Decisions | Planned / Claimed | Claim merge `0df88638` establishes only the behavior-preserving A foundation for Issues #52/#53; no implementation has started and protected-scope review remains mandatory. |
 | I190 | Change-Aware CI Routing | Complete | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673` implements trusted-base fail-closed routing; probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48` proves the real reduced path. GOV-006 separately owns the unclaimed case-normalization residual. |
+| I191 | Non-Interactive Terminal Containment | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; I188 remains Planned/Claimed and unactivated. |
+| I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked. |
 
 ## Completed This Closeout
 

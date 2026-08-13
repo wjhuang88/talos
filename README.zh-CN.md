@@ -405,7 +405,7 @@ TUI 中可用的斜杠命令：
 | `/copy all` | 复制完整对话记录到剪贴板 |
 | `/export <path>` | 导出对话记录到文件（需权限批准） |
 | `/new` | 开始新会话（保留旧会话） |
-| `/resume` | 列出可恢复的工作区会话；`/resume <N>` 按序号选择 |
+| `/resume` | 列出当前工作区内其他非空可恢复会话；`/resume <N>` 按序号选择，`/resume <UUID>` 也仅接受该过滤后列表中的会话 |
 | `/fork` | 分叉当前会话（将历史记录克隆到子会话） |
 | `/delete` | 打开会话选择器（排除当前会话）；选择一行进行删除 |
 | `/todo`、`/todo list`、`/todo show <id>`、`/todo stats`、`/todo export [json|markdown]` | 查看或导出当前会话的待办事项；用户斜杠命令仅支持只读操作 |
