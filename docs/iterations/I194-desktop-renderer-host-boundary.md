@@ -72,7 +72,7 @@ Pre-claim inventory immediately before governance branch creation:
 | I162 | Blocked | Keep blocked; requires I161 Complete and readiness authorization. |
 | I164 | Paused | Keep paused; superseded startup-inline target is not resumed. |
 | I188 | Planned / Claimed | Keep unactivated; TOOL-024-A decision scope remains independent. |
-| I189 | Planned / Claimed | Keep unactivated; PERM-006-A scope remains independent. |
+| I189 | Planned / Claimed | Keep unactivated; PERM-006-A permission-foundation scope is independent. |
 | I193 / PR #210 | Planned / Claimed on target branch through merge `fb5a1f62` | Keep unactivated and unchanged; Desktop intentionally uses I194 to avoid cross-track iteration-ID collision. |
 | PR #120 / #121 | Archival recovery Draft PRs | Do not touch or treat as implementation authority. |
 
@@ -224,20 +224,23 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 - Target-branch claim is effective through PR #211 merge `f778543c7ceeb2a099eb3863fc8259da68d02195`.
 - Independent worktree evidence: `/private/tmp/talos-i194` on
   `feat/desktop-I194-d0-boundary`, based on `f778543c7ceeb2a099eb3863fc8259da68d02195`.
-- Governance validators and merge-time CAS for the claim passed before merge; D0 ADR/security review
-  and implementation-slice validation remain pending.
+- D0 decision packet exact-head review/CI/CAS completed on PR #215 head
+  `0a47208ce6fad23c706ebede8b3d07111b9303dc`; independent natural-person approval `5278769979`
+  explicitly authorized governance closeout using that pre-existing completion head.
 - `cargo check --locked --workspace`: passed.
 - `cargo clippy --locked --workspace --all-targets -- -D warnings`: passed.
 - `cargo test --locked --workspace`: 325 passed; 16 existing `talos-cli` provider-discovery tests
   failed with sandbox `PermissionDenied` while creating their local HTTP fixture. No D0 test or
-  source code was involved; rerun with an approved writable test environment remains required.
+  source code was involved; the independent review accepted this as environment-limited negative
+  evidence for the documentation-only D0 packet, not as renderer/platform authorization evidence.
 - `scripts/validate_project_governance.sh .`: passed with 0 warnings.
 - `bash scripts/validate_collaboration_claims.sh .`: passed with 0 warnings.
 - `git diff --check`: passed.
 - Primary-source snapshots for GPUI and the minimum Iced comparison were retrieved on 2026-08-13
   and pinned by immutable commit in `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`.
-  They establish candidate capability/risk facts only; selected-release lock closure, SBOM/license
-  review, platform tests, panic containment and motion benchmarks remain open Review residuals.
+  They establish the D0 decision boundary only; selected-release lock closure, SBOM/license review,
+  platform execution, panic containment and motion measurements remain later renderer-authorization
+  gates and are not completion requirements for this documentation-only D0 packet.
 - Crates.io metadata confirmed `gpui 0.2.2` and `iced 0.14.0`; disposable full-graph resolution was
   attempted outside the Talos worktree and stopped when the registry proxy became unavailable. No
   probe manifest, Cargo change or dependency was added to Talos.
