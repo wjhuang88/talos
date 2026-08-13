@@ -256,7 +256,8 @@ GPUI-based UI, bilingual Desktop behavior or Mission/runtime binding as shipped 
 Current evidence status: primary-source snapshots for GPUI and the minimum Iced comparison were
 retrieved and pinned by commit on 2026-08-13. They establish candidate capability/risk facts only;
 full selected-release lock closure, SBOM/license review, platform tests, panic containment and motion
-benchmarks remain Review residuals. Renderer/dependency authorization stays closed.
+benchmarks remain later renderer-implementation authorization gates and are not D0 completion
+requirements. Renderer/dependency authorization stays closed.
 
 The crates.io metadata refresh confirmed published candidates `gpui 0.2.2` (Apache-2.0; default
 font-kit/Wayland/X11/Windows-manifest features) and `iced 0.14.0` (MIT; Rust 1.88; default
