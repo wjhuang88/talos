@@ -234,9 +234,10 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 - `scripts/validate_project_governance.sh .`: passed with 0 warnings.
 - `bash scripts/validate_collaboration_claims.sh .`: passed with 0 warnings.
 - `git diff --check`: passed.
-- Primary-source renderer retrieval: blocked by the execution environment's unavailable proxy; no
-  upstream compatibility or dependency-safety claim is made. Residual is registered in the D0 owner
-  and `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`.
+- Primary-source snapshots for GPUI and the minimum Iced comparison were retrieved on 2026-08-13
+  and pinned by immutable commit in `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`.
+  They establish candidate capability/risk facts only; selected-release lock closure, SBOM/license
+  review, platform tests, panic containment and motion benchmarks remain open Review residuals.
 
 ## Completion Evidence
 

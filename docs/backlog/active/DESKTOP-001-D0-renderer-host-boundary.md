@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001-D0 |
 | Type | Architecture / Governance Spike |
 | Priority | P1 |
-| Status | Active — I194 activated from independent worktree; decision-only D0 execution |
+| Status | Review — decision-only D0 packet recorded; renderer implementation and dependency authorization remain closed |
 | Parent | DESKTOP-001 |
 | Source | GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I194 |
@@ -251,10 +251,10 @@ GPUI-based UI, bilingual Desktop behavior or Mission/runtime binding as shipped 
 - [ ] Exact-head CI, both governance validators, applicable locked checks, independent natural-person
       exact-head review and merge-time CAS are recorded before acceptance.
 
-Current evidence gap: primary-source renderer/dependency retrieval was attempted on 2026-08-13,
-but the execution environment could not reach GitHub through its configured proxy. The matrix records
-this as unknown and keeps renderer/dependency authorization closed; it is a Review residual, not a
-positive compatibility claim.
+Current evidence status: primary-source snapshots for GPUI and the minimum Iced comparison were
+retrieved and pinned by commit on 2026-08-13. They establish candidate capability/risk facts only;
+full selected-release lock closure, SBOM/license review, platform tests, panic containment and motion
+benchmarks remain Review residuals. Renderer/dependency authorization stays closed.
 
 ## Residual Destination
 

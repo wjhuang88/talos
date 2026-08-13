@@ -61,7 +61,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I191 | Non-Interactive Terminal Containment | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; I188 remains Planned/Claimed and unactivated. |
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked. |
 | I193 | SESSION-008-B Durable Partial-Turn Finalization | Planned / Claimed | Claim PR #210 merged as `fb5a1f62`; implementation requires explicit activation. R1/R2 are mandatory acceptance inputs; RUNTIME-005 remains blocked by its owner-defined gates. |
-| I194 | Desktop Renderer, Host, And Repository Boundary | Review | Claim PR #211 merged as `f778543c`; decision-only ADR/security packet is drafted in `/private/tmp/talos-i194`, but current upstream renderer evidence remains blocked by the unavailable proxy. Renderer implementation and dependencies remain unauthorized. |
+| I194 | Desktop Renderer, Host, And Repository Boundary | Review | Claim PR #211 merged as `f778543c`; decision-only ADR/security packet and pinned GPUI/Iced source evidence are in `/private/tmp/talos-i194`. Selected-release lock/security/platform/motion gates remain open; renderer implementation and dependencies remain unauthorized. |
 
 ## Completed This Closeout
 

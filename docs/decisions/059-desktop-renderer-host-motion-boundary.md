@@ -1,7 +1,7 @@
 # ADR-059: Desktop Renderer, Host, And Motion Quality Boundary
 
 > Status: Proposed
-> Date: 2026-08-13
+> Date: 2026-08-13 (evidence refresh)
 > Owner: DESKTOP-001-D0 / I194
 
 ## Context
@@ -26,9 +26,33 @@ projections through an explicit host/client boundary. TUI and Desktop remain ind
 No renderer, localization, native, build-script, FFI, or `unsafe` dependency is authorized by this
 proposed ADR.
 
-Renderer selection remains open pending current primary-source evidence covering macOS, Windows,
-Linux, CJK text, Chinese IME, accessibility, reduced motion, native/transitive dependencies,
-build-time behavior, panic containment, and shutdown ownership.
+The current evidence refresh keeps GPUI as the product direction, but does not authorize selecting
+or adding it. The direction is supported by the GPUI source snapshot listed in the companion matrix:
+it exposes an AccessKit dependency, explicit Wayland/X11 features, platform crates for macOS,
+Windows and Linux, and IME/text handling in the host paths. The same snapshot also contains native
+Objective-C/Windows API integration, macOS `bindgen`/`cbindgen` build steps and visible `unsafe`
+platform code. Those facts require a separate dependency/security approval before any Cargo change.
+Iced is retained as the minimum comparison candidate: its source snapshot exposes winit-backed IME
+state and X11/Wayland feature paths, but its wgpu/tiny-skia/rendering and winit dependency closure
+also remains unreviewed for Talos. No renderer is therefore authorized by this ADR.
+
+The host responsibilities below are binding requirements for a later implementation decision:
+
+| Host area | Required boundary before implementation |
+|---|---|
+| macOS | Renderer owns only window/event presentation; Objective-C/CoreText/Metal or equivalent native calls are isolated in the renderer adapter, audited for `unsafe`, and cannot own runtime/session state. |
+| Windows | Win32/D3D or equivalent handles, message dispatch, device-loss and shutdown paths stay in the host adapter; failures become an explicit UI error and do not terminate or fabricate domain completion. |
+| Linux | Wayland/X11 selection, clipboard, text input and compositor shutdown are host concerns; unsupported display backends fail with a recoverable diagnostic. |
+| All hosts | A single host lifecycle owns event-loop startup, cancellation, renderer teardown and process exit. Runtime/session work remains behind an explicit client projection and is never reconstructed in the renderer. |
+| Input and IME | Editable controls must preserve composition text, caret rectangle, commit/cancel ordering and mixed CJK/Latin layout; IME state is presentation state and never durable Mission/session state. |
+| Accessibility | Every interactive state has keyboard focus/order and an accessibility name/role/state path; motion and colour are supplementary, never the only status signal. |
+| Reduced motion | The same state, focus, ordering and completion semantics are reached without non-essential interpolation or looping effects. |
+
+Localization selection is likewise a mechanism criterion, not a dependency authorization. A later
+choice must support stable message keys, named interpolation, plural/count formatting, locale-aware
+date/number formatting, deterministic `en-US` fallback, missing-key diagnostics, and runtime
+`zh-CN`/`en-US` switching without allowing locale into canonical domain identity. User-authored
+Mission text, commands, paths, raw evidence and artifacts remain untranslated facts.
 
 ### Motion quality policy
 
@@ -90,7 +114,9 @@ remains gated by the DESKTOP-001 P0-P4 chain.
 
 ## Evidence status
 
-The local repository and governance boundaries are confirmed. Current upstream renderer/dependency
-primary sources could not be retrieved in the 2026-08-13 execution environment because its configured
-proxy was unavailable. Renderer selection therefore remains open and this ADR remains Proposed.
-The companion matrix records the unknowns and the exact retrieval/security/motion validation gate.
+The local repository and governance boundaries are confirmed. Current primary-source snapshots were
+retrieved on 2026-08-13 and are recorded by immutable commit in the companion matrix. They establish
+candidate capability and risk facts, not Talos compatibility or authorization. Renderer selection,
+locked dependency closure, license/SBOM review, platform test evidence, panic containment and motion
+benchmarks remain open. This ADR therefore remains Proposed and no renderer/localization dependency
+or implementation is authorized.
