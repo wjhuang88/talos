@@ -73,7 +73,7 @@ Pre-claim inventory immediately before governance branch creation:
 | I164 | Paused | Keep paused; superseded startup-inline target is not resumed. |
 | I188 | Planned / Claimed | Keep unactivated; TOOL-024-A decision scope remains independent. |
 | I189 | Planned / Claimed | Keep unactivated; PERM-006-A scope remains independent. |
-| I193 proposal / PR #210 | Draft claim proposal for SESSION-008-B; not effective on target branch | Do not touch; Desktop intentionally uses I194 to avoid cross-track iteration-ID collision. |
+| I193 / PR #210 | Planned / Claimed on target branch through merge `fb5a1f62` | Keep unactivated and unchanged; Desktop intentionally uses I194 to avoid cross-track iteration-ID collision. |
 | PR #120 / #121 | Archival recovery Draft PRs | Do not touch or treat as implementation authority. |
 
 There was no Active or Review iteration on the observed `main`. The three-track baseline explicitly
@@ -212,7 +212,8 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because open Draft PR #210 proposes it for SESSION-008-B. PR #211 now carries the finalized proposed claim, but ownership remains ineffective until target-branch merge. |
+| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because PR #210 proposed it for SESSION-008-B. PR #211 now carries the finalized proposed claim, but ownership remains ineffective until target-branch merge. |
+| 2026-08-13 | Baseline refresh | Refreshed against `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7` after PR #210 merged as `fb5a1f62`. I193 is now Planned / Claimed and remains unactivated; derived governance files preserve the Runtime/Session lane alongside the proposed I194 Desktop lane. |
 
 ## Verification Evidence
 

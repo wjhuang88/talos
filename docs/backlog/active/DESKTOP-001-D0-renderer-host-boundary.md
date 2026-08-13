@@ -128,7 +128,7 @@ Observed non-terminal iteration disposition before creating this governance bran
 | I164 | Paused | Keep paused; do not resume through Desktop. |
 | I188 | Planned / Claimed | Keep unactivated and unchanged. |
 | I189 | Planned / Claimed | Keep unactivated and unchanged. |
-| I193 proposal / PR #210 | Draft claim proposal for SESSION-008-B; not effective on `main` | Do not touch or reuse I193; Desktop uses I194 to avoid cross-track ID collision. |
+| I193 / PR #210 | Planned / Claimed on `main` through merge `fb5a1f62` | Keep unactivated and unchanged; do not touch or reuse I193. Desktop uses I194 to avoid cross-track ID collision. |
 | PR #120 / #121 | Archival recovery Draft PRs | Immutable and excluded. |
 
 There was no Active or Review iteration on the observed target branch. The three-track baseline
@@ -136,6 +136,10 @@ explicitly permits non-overlapping Dashboard, Desktop and mainline-foundation la
 write/merge gate must refresh `main`, current non-terminal owners, open claims/implementation PRs and
 branch overlap. A newer compatible `main` may become the eventual implementation base; the SHA above
 is claim-preparation provenance, not permission to ignore later mainline changes.
+
+Merge-CAS refresh on 2026-08-13 observed `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7`,
+including effective I193 claim merge `fb5a1f62`. The refreshed derived views retain the
+Runtime/Session lane alongside this proposed Desktop lane.
 
 ## Decision Links And Constraints
 

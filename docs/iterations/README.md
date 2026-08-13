@@ -60,6 +60,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I190 | Change-Aware CI Routing | Complete | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673` implements trusted-base fail-closed routing; probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48` proves the real reduced path. GOV-006 separately owns the unclaimed case-normalization residual. |
 | I191 | Non-Interactive Terminal Containment | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; I188 remains Planned/Claimed and unactivated. |
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked. |
+| I193 | SESSION-008-B Durable Partial-Turn Finalization | Planned / Claimed | Claim PR #210 merged as `fb5a1f62`; implementation requires explicit activation. R1/R2 are mandatory acceptance inputs; RUNTIME-005 remains blocked by its owner-defined gates. |
 | I194 | Desktop Renderer, Host, And Repository Boundary | Planned / Claim Pending | PR #211 proposes only the DESKTOP-001-D0 decision claim; no implementation authority exists before the finalized claim reaches `main`. DESKTOP-001 remains Deferred/Unclaimed, GPUI/i18n/native dependencies remain unauthorized, and real Mission/runtime/work/evaluation binding stays P0-P4 gated. |
 
 ## Completed This Closeout
