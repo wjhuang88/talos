@@ -53,6 +53,24 @@ is sent. Conservative content negotiation preserves JSON/plain-text for all othe
 Still not implemented: a live log/SSE view, config editing, approvals, session actions, WebSocket
 control, or remote/LAN access.
 
+## Governed Dashboard Child Proposal
+
+[WEB-001-A](WEB-001-A-dashboard-read-only-visual-shell.md) and
+[I195](../../iterations/I195-dashboard-read-only-visual-shell.md) define the separately governed,
+user-facing Dashboard information-architecture and first read-only visual-shell slice. Claim PR
+#212 proposes that bounded work, but it has no implementation authority until the finalized claim
+reaches `main` after exact-head validation, independent natural-person review, and merge-time CAS.
+
+WEB-001-A does **not** reopen or reuse I129 acceptance as authorization. It consumes the existing
+GET-only loopback snapshot surfaces and adds cohesive navigation, visual hierarchy, responsive
+rendering, accessible keyboard/focus behavior, useful empty states, and HTML presentation parity for
+`/extensions` while preserving JSON/plain-text negotiation, config masking, output redaction, and
+HTML escaping. It explicitly excludes SSE/live logs, config writes, approvals/tool execution,
+session mutation/actions, WebSocket control, LAN/remote/tunnel access, browser automation, TUI-037,
+and any new permission, persistence, or remote-control model.
+
+Until PR #212 reaches `main`, the current implementation description above remains authoritative.
+
 ## Target Model (Not Current Implementation)
 
 ```
@@ -96,6 +114,8 @@ governance state model and data sources.
 
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/proposals/embedded-web-control-surface.md`
+- `docs/backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md`
+- `docs/iterations/I195-dashboard-read-only-visual-shell.md`
 - `docs/backlog/active/EXT-002-oh-my-pi-feature-analysis.md`
 - `crates/talos-rpc/src/` (existing JSON-RPC infrastructure)
 - `docs/backlog/active/REMOTE-001-remote-session-protocol.md`
