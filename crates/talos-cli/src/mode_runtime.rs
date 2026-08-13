@@ -172,7 +172,16 @@ pub(crate) fn ensure_session_runtime_identity(
 ) -> Result<talos_session::SessionRuntimeState> {
     let identity =
         SessionRuntimeIdentity::new(&config.provider, &config.model, config.variant.as_deref());
-    PendingSubmissionStore::for_session(session)
+    let store = PendingSubmissionStore::for_session(session);
+    if let Some(state) = store
+        .runtime_state()
+        .map_err(|error| anyhow!("failed to inspect Session runtime identity: {error}"))?
+        && state.status == SessionRuntimeActivationStatus::Committed
+        && state.activation.target == identity
+    {
+        return Ok(state);
+    }
+    store
         .initialize_runtime_identity(identity)
         .map_err(|error| anyhow!("failed to initialize Session runtime identity: {error}"))
 }
@@ -641,6 +650,56 @@ mod tests {
         assert_eq!(
             provider_reasoning_effort(&later_global).as_deref(),
             Some("high")
+        );
+    }
+
+    #[test]
+    fn resume_reuses_committed_switched_activation_with_matching_target() {
+        let session = activation_test_session("resume-matching-switched-activation");
+        let low = SessionModelIdentity::new("openai", "o3", Some("low-reasoning"));
+        let high = SessionModelIdentity::new("openai", "o3", Some("high-reasoning"));
+        let store = PendingSubmissionStore::for_session(&session);
+        store
+            .initialize_runtime_identity(low.clone())
+            .expect("operation should succeed");
+        let activation = SessionModelActivation::new(1, low, high.clone());
+        store
+            .stage_runtime_activation(0, &activation)
+            .expect("operation should succeed");
+        append_activation(&session, &activation);
+        store
+            .commit_runtime_activation(&activation.activation_id)
+            .expect("operation should succeed");
+
+        let mut resumed = Config::default();
+        resumed
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut resumed, Some("high-reasoning"));
+        let state = ensure_session_runtime_identity(&resumed, &session)
+            .expect("matching committed target must be idempotent");
+
+        assert_eq!(state.activation, activation);
+        assert_eq!(state.activation.target, high);
+    }
+
+    #[test]
+    fn resume_rejects_identity_that_differs_from_committed_target() {
+        let session = activation_test_session("resume-mismatched-activation");
+        let mut initial = Config::default();
+        initial
+            .set_active_model("openai/o3")
+            .expect("builtin openai/o3 model");
+        crate::model_lifecycle::apply_variant_change(&mut initial, Some("high-reasoning"));
+        ensure_session_runtime_identity(&initial, &session).expect("operation should succeed");
+
+        crate::model_lifecycle::apply_variant_change(&mut initial, Some("low-reasoning"));
+        let error = ensure_session_runtime_identity(&initial, &session)
+            .expect_err("a genuine target mismatch must remain fenced");
+
+        assert!(
+            error.to_string().contains("runtime activation conflict"),
+            "{error}"
         );
     }
 

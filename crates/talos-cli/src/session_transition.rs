@@ -209,6 +209,12 @@ impl SessionTransition {
         self.active_target.generation
     }
 
+    /// Returns the logical Session currently owned by this transition boundary.
+    #[must_use]
+    pub fn active_session(&self) -> Session {
+        self.active_session.clone()
+    }
+
     /// Creates the exact generation-bound route published to the Bridge and
     /// Scheduler for the current Actor.
     #[must_use]
@@ -518,6 +524,13 @@ impl SessionTransition {
         } else {
             self.active_target.shutdown_actor().await;
         }
+    }
+
+    /// Stops the active Scheduler and Actor before process-level teardown.
+    pub async fn shutdown(&mut self) -> Session {
+        self.rollback();
+        self.retire_active_runtime().await;
+        self.active_session()
     }
 
     pub fn rollback(&mut self) {

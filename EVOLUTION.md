@@ -879,3 +879,38 @@ repeating known mistakes.
   Fallback code may degrade to a specific error, never to a stronger success claim.
 - Promoted to rule/check: RUNTIME-003 provider fixtures, terminal-diagnostic TLOG round-trip and
   exclusion tests, and I168 rebuilt-binary acceptance.
+
+## 2026-08-12 - Focused tests do not replace all-target preflight
+
+- Trigger: I191/I192 emergency fixes passed focused tests and package checks before the workspace
+  release preflight.
+- Symptom: The first preflight rejected an unused Unix trait import under `-D warnings`; the second
+  rejected a test-only `chrono` import that the CLI crate does not declare.
+- Root cause: The focused commands did not compile the same complete target set with the same
+  warning policy as the repository preflight.
+- Fix: Removed the redundant import, rewrote the test fixture with `std::time`, and reran the full
+  preflight from the beginning until it passed.
+- Prevention: Treat focused tests as fast feedback only. Before reporting workspace validation,
+  run the standardized preflight and preserve every failed attempt as evidence rather than
+  inferring success from a narrower command.
+- Promoted to rule/check: existing `AGENTS.md` Standard Build And Release Flow and
+  `scripts/release_preflight.sh`.
+
+## 2026-08-12 - Loss-tolerant parsing cannot authorize destructive cleanup
+
+- Trigger: Independent review of I192/SESSION-010 exercised shutdown cleanup with truncated JSONL
+  and valid future-schema JSON that contained user content but produced zero recognized entries.
+- Symptom: Both non-empty transcripts and their SQLite sidecars were deleted because cleanup used
+  the parser's empty result as proof that the Session was empty.
+- Root cause: `read_entries_from_path` intentionally skips invalid or unknown lines for crash-safe
+  reading. Reusing that conservative read fallback as a deletion predicate inverted its safety
+  meaning: unrecognized data became authorization to destroy ambiguous data.
+- Fix: Cleanup now requires the transcript's on-disk byte length to be exactly zero. Any non-empty
+  transcript is preserved without interpreting its schema; pending work remains an independent
+  preservation gate.
+- Prevention: Destructive decisions must use positive, lossless evidence of emptiness or ownership.
+  A best-effort parser result, missing projection, or skipped record can only authorize preservation
+  or an explicit diagnostic, never deletion.
+- Promoted to rule/check:
+  `mode_runners::tests::empty_tui_shutdown_preserves_nonempty_unparseable_transcripts` covers both
+  truncated and valid unknown-schema transcripts and asserts their bytes and sidecars are unchanged.
