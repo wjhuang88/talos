@@ -1,6 +1,6 @@
 # WEB-001-A: Dashboard Information Architecture And Read-Only Visual Shell
 
-**Status**: Ready — governance claim pending
+**Status**: Ready — proposed claim in PR #212; ineffective before target-branch merge
 **Priority**: P1
 **Type**: Product Story
 **Parent Epic**: WEB-001
@@ -10,21 +10,22 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Proposed: deliver only Dashboard-wide information architecture and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve current config masking, output redaction, HTML escaping, loopback binding and JSON/plain-text negotiation. No write/control/remote/session-mutation capability. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard governance session 2026-08-13 |
+| Work Slice | Deliver only Dashboard-wide information architecture and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve current config masking, output redaction, HTML escaping, loopback binding and JSON/plain-text negotiation. No write/control/remote/session-mutation capability. |
+| Claimed At | 2026-08-13 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #212 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head review is required before claim merge. If the shared `@wjhuang88` GitHub account is used for review, the reviewer must explicitly disclose their natural-person identity. This proposal has no ownership effect before the finalized claim reaches `main`. |
+| Authorization Evidence | Independent natural-person exact-head review is required before claim merge. If the shared `@wjhuang88` GitHub account is used for review, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record has no ownership effect before PR #212 reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Backfill the actual governance claim PR number, finalize one bounded `Claimed` record, pass exact-head governance/CI validation and merge-time CAS, obtain independent natural-person approval, and merge the claim to `main` before creating any Dashboard implementation branch or worktree. |
+| Handoff / Release Condition | Pass exact-head governance/CI validation, obtain independent natural-person approval, repeat merge-time CAS against current `main` plus all three lanes, and merge PR #212 to `main` before creating any Dashboard implementation branch or worktree. |
 
-`Claim Pending` is not a valid claim state. This owner remains unclaimed until the finalized claim is
-merged to `main`; an open Draft PR does not reserve implementation scope.
+`Claim Pending` is not a valid claim state. The `Claimed` record above is a proposal on PR #212 and
+becomes effective only when that exact governed record is merged to `main`; the open PR itself does
+not reserve implementation scope.
 
 ## Identity / Goal / Value
 
@@ -211,7 +212,7 @@ write-capable control plane.
 - [ ] Before implementation, every current Active, Review, Planned and Blocked iteration is
       re-inventoried and its Dashboard disposition is recorded in I195.
 - [ ] Before the implementation branch exists, one effective `Claimed` record for this exact Work
-      Slice has reached `main` through the governance claim PR.
+      Slice has reached `main` through governance claim PR #212.
 - [ ] The implementation worktree records its exact current-main base SHA after the effective claim.
 - [ ] Implementation branch is `feat/dashboard-I195-read-only-shell` and its PR targets `main`.
 - [ ] `cargo test --locked -p talos-dashboard` passes with HTML negotiation, `/extensions`, masking,
