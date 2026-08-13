@@ -14,18 +14,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Proposed: implement only WEB-001-A / I195 Dashboard-wide IA and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve `127.0.0.1`, current config masking, output redaction, HTML escaping and JSON/plain-text negotiation; introduce no write/control/remote/session-mutation capability or duplicated shared business logic. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard governance session 2026-08-13 |
+| Work Slice | Implement only WEB-001-A / I195 Dashboard-wide IA and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve `127.0.0.1`, current config masking, output redaction, HTML escaping and JSON/plain-text negotiation; introduce no write/control/remote/session-mutation capability or duplicated shared business logic. |
+| Claimed At | 2026-08-13 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #212 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head review is required before claim merge and before implementation merge. If repository operations use the shared `@wjhuang88` account, the reviewer must explicitly disclose their natural-person identity. No ownership effect exists before the finalized claim reaches `main`. |
+| Authorization Evidence | Independent natural-person exact-head review is required before claim merge and before implementation merge. If repository operations use the shared `@wjhuang88` account, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record remains ineffective until PR #212 reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Backfill the actual governance claim PR number, finalize the proposed claim, pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS and merge the claim to `main`; only then create the isolated implementation worktree/branch from the claim merge commit or a later current `main`. |
+| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current `main` and all three lanes, and merge PR #212 to `main`; only then create the isolated implementation worktree/branch from the claim merge commit or a later current `main`. |
+
+The `Claimed` record above is proposed on PR #212. It is not effective ownership until that exact
+record reaches `main`; no Dashboard implementation branch or worktree is authorized beforehand.
 
 ## Published Baseline
 
@@ -33,7 +36,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| WEB-001-A | WEB-001 | Ready / Unclaimed | ADR-031; existing I129 rendered-page baseline; current `talos-dashboard` snapshot | One user-visible, runnable and testable read-only Dashboard shell with coherent IA and UX across the five existing GET-only surfaces |
+| WEB-001-A | WEB-001 | Ready / proposed claim | ADR-031; existing I129 rendered-page baseline; current `talos-dashboard` snapshot | One user-visible, runnable and testable read-only Dashboard shell with coherent IA and UX across the five existing GET-only surfaces |
 
 ### Target-Branch Baseline At Planning
 
@@ -43,6 +46,7 @@
 - Three-track common baseline:
   `23e4174bcfb036602ce2145026b872ec5c517289`.
 - Governance branch: `docs/dashboard-I195-read-only-shell-claim`.
+- Governance claim PR: #212.
 - This governance branch is not an implementation branch and carries no production code.
 - The eventual implementation base is deliberately **not fixed yet**: it must be the effective I195
   claim merge commit or a later current `main` after re-running baseline/CAS checks.
@@ -231,8 +235,9 @@ Manual acceptance on the exact rebuilt implementation head:
 ## Governance And Git Execution Gate
 
 1. Governance-only claim material lands first.
-2. Draft claim PR obtains its actual PR number; `Claim Pending` is never persisted.
-3. Finalized proposed claim uses `Claim State: Claimed` with exact bounded Work Slice and real PR.
+2. Draft claim PR #212 obtained the actual PR number; `Claim Pending` is not persisted.
+3. The finalized proposed claim uses `Claim State: Claimed` with the exact bounded Work Slice and
+   real claim PR #212, but remains ineffective until target-branch merge.
 4. Run both governance validators, `git diff --check`, applicable exact-head CI and independent
    natural-person review; disclose identity if the shared GitHub account is used.
 5. Immediately before merge, re-fetch current `main`, all Active/Review/Planned/Blocked owners, open
@@ -254,7 +259,8 @@ Manual acceptance on the exact rebuilt implementation head:
   `23e4174bcfb036602ce2145026b872ec5c517289`.
 - Runtime-line I193 collision avoided based on Draft PR #210.
 - Desktop-line I194 collision avoided based on remote branch `docs/desktop-I194-d0-claim`.
-- Claim PR number, finalized claim head, validator/CI/review and merge-time CAS evidence: pending.
+- Governance claim PR: #212.
+- Finalized claim head, validator/CI/review and merge-time CAS evidence: pending.
 
 ## Completion Evidence
 
