@@ -160,7 +160,10 @@ an effective claim until PR #210 is merged into `main`.
 
 ## Variance And Residuals
 
-- RUNTIME-005-A/B/C remain blocked until I193 has pre-existing completion evidence.
+- RUNTIME-005 remains Refinement / Unclaimed with no selected iteration. RUNTIME-005-A remains
+  Ready / not selected and depends on SESSION-008-A decision output plus the completed RUNTIME-001
+  API; RUNTIME-005-B remains Blocked on RUNTIME-005-A Accepted plus SESSION-008-B Complete; and
+  RUNTIME-005-C remains Blocked on RUNTIME-005-B Complete.
 - SESSION-008-R1/R2 are mandatory implementation and closeout evidence, not optional notes.
 
 ## Retrospective

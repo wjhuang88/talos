@@ -132,11 +132,13 @@ migration plan before implementation.
 - [I193](../../iterations/I193-session008b-durable-partial-finalization.md) and claim PR #210
   propose the separately governed B implementation. The claim remains ineffective until its
   finalized exact head is merged into `main`; no implementation branch is authorized before then.
-- Until B reaches `main`, the [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md)
-  is the truth source for current released behavior and ADR-058 is the target contract only.
-- SESSION-008-R2 remains conditional diagnostic evidence: if the seven transient
-  `talos-session` failures recur, capture disk bytes, inode availability, temporary paths, complete
-  stderr and the default-parallel result. No concurrency defect or ENOSPC root cause is confirmed.
+- **SESSION-008-R1 — current-versus-target truth linkage.** Until B reaches `main`, the
+  [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md) is
+  the truth source for current released behavior and ADR-058 is the target contract only.
+- **SESSION-008-R2 — transient test diagnosis.** This remains conditional diagnostic evidence: if
+  the seven transient `talos-session` failures recur, capture disk bytes, inode availability,
+  temporary paths, complete stderr and the default-parallel result. No concurrency defect or
+  ENOSPC root cause is confirmed.
 
 ## State / Status Owners
 
