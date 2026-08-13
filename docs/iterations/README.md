@@ -60,6 +60,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I190 | Change-Aware CI Routing | Complete | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673` implements trusted-base fail-closed routing; probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48` proves the real reduced path. GOV-006 separately owns the unclaimed case-normalization residual. |
 | I191 | Non-Interactive Terminal Containment | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; I188 remains Planned/Claimed and unactivated. |
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked. |
+| I195 | Dashboard Read-Only Visual Shell | Planned / proposed Claimed | Governance PR #212 proposes only WEB-001-A's user-facing IA and read-only visual shell. The claim is ineffective before the finalized exact head reaches `main`; no implementation branch/worktree may exist before then. I193 Runtime and I194 Desktop are independent parallel proposals and are not imported as target-branch truth. |
 
 ## Completed This Closeout
 
