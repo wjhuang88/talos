@@ -13,21 +13,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Proposed: implement only SESSION-008-B / I193 under ADR-058: one atomic/idempotent Success/Error/Cancelled finalizer, session-owned closed-prefix handoff, durable outcome projection and restart integration. Preserve successful-turn compatibility and TLOG v1; exclude RUNTIME-005, SESSION-009, TOOL-024, permissions, UI redesign and unrelated session cleanup. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 mainline session 2026-08-13 |
+| Work Slice | Implement only SESSION-008-B / I193 under ADR-058: one atomic/idempotent Success/Error/Cancelled finalizer, session-owned closed-prefix handoff, durable outcome projection and restart integration. Preserve successful-turn compatibility and TLOG v1; exclude RUNTIME-005, SESSION-009, TOOL-024, permissions, UI redesign and unrelated session cleanup. |
+| Claimed At | 2026-08-13 |
 | Source Issue | #45 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #210 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent exact-head review is required because this slice changes durable session/storage and cancellation behavior. This proposal has no ownership effect before the finalized claim reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
 | Handoff / Release Condition | Finalize the claim with its actual PR number, pass exact-head CI and both governance validators, obtain independent natural-person approval, pass merge-time CAS and merge the claim before creating an implementation branch. |
 
-Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. This planned record is not an
-effective claim until a finalized `Claimed` record is merged into `main`.
+Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. This proposed `Claimed` record is not
+an effective claim until PR #210 is merged into `main`.
 
 ## Published Baseline
 
@@ -148,11 +148,11 @@ effective claim until a finalized `Claimed` record is merged into `main`.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-13 | Selection proposal | I193 publishes the SESSION-008-B target and proposes an independent-review claim. No implementation branch or production change is authorized before claim merge. |
+| 2026-08-13 | Selection proposal | I193 publishes the SESSION-008-B target in claim PR #210 and proposes an independent-review claim. No implementation branch or production change is authorized before claim merge. |
 
 ## Verification Evidence
 
-- Pending finalized claim validation and exact-head review.
+- Claim PR #210 pending finalized exact-head validation and independent review.
 
 ## Completion Evidence
 
