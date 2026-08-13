@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Desktop D0 decision-only renderer/dependency/host/repository boundary; no production implementation |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | `@wjhuang88` |
+| Executing Agent | ChatGPT / GPT-5.6 Sol Desktop governance session 2026-08-13 |
+| Work Slice | DESKTOP-001-D0 / I194 only: decide and document the Desktop renderer/dependency/host/repository boundary, current GPUI-or-alternative evidence, native/unsafe/security implications, localization selection criteria, and the later mock-only authorization gate. No production UI, dependency, runtime/domain, persistence, session, permission or P0-P4 implementation. |
+| Claimed At | 2026-08-13 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #211 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent natural-person exact-head architecture/security review is required on finalized PR #211 before merge; exact-head CI, both governance validators and merge-time CAS remain mandatory. Repository operations use shared GitHub account `wjhuang88`; a reviewer using the same account must explicitly disclose distinct natural-person identity. This proposed `Claimed` record is ineffective until merged to `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Finalize the claim with the actual governance PR number, obtain independent natural-person exact-head review, pass exact-head CI and both governance validators, repeat merge-time CAS, merge the claim to `main`, then create a fresh independent worktree and `feat/desktop-I194-d0-boundary` from the claim merge or a later compatible `main`. |
+| Handoff / Release Condition | Merge finalized claim PR #211 to `main` after the required exact-head evidence, then refresh target-branch truth and create a real independent worktree from the claim merge or later compatible `main` before creating `feat/desktop-I194-d0-boundary`. |
 
 ## Published Baseline
 
@@ -30,7 +30,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `DESKTOP-001-D0` | `DESKTOP-001` | Ready; governance claim pending | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
+| `DESKTOP-001-D0` | `DESKTOP-001` | Ready; proposed claim in PR #211 | DESKTOP-001 design baseline; ADR-042; ADR-052; repository hard constraints | Auditable renderer/dependency/host/repository ADR and security-review packet; no renderer implementation |
 
 ### Start Here
 
@@ -212,17 +212,19 @@ README/user docs remain unchanged because D0 adds no shipped behavior.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because open Draft PR #210 proposes it for SESSION-008-B. This record is not activation authority. |
+| 2026-08-13 | Selection | `DESKTOP-001-D0` selected as Planned I194 governance/decision work from `main@c4bd9606c8bae63cb9bf11becd45846bf0805982`. I193 was deliberately not used because open Draft PR #210 proposes it for SESSION-008-B. PR #211 now carries the finalized proposed claim, but ownership remains ineffective until target-branch merge. |
 
 ## Verification Evidence
 
 - Governance preparation branch base: `c4bd9606c8bae63cb9bf11becd45846bf0805982`.
+- Governance claim PR: #211.
+- Current proposed-claim branch state records `Claimed`, but target-branch ownership remains unchanged until merge.
 - Local checkout/worktree evidence is unavailable in the current execution environment because the
   container cannot resolve GitHub; this claim preparation uses the connected GitHub repository
   interface. A real independent worktree remains mandatory before any D0 implementation branch is
   created.
 - Governance validators, exact-head CI, independent natural-person review and merge-time CAS remain
-  pending until the finalized claim head exists.
+  pending on the finalized claim head.
 
 ## Completion Evidence
 
