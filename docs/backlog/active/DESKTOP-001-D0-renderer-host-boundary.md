@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001-D0 |
 | Type | Architecture / Governance Spike |
 | Priority | P1 |
-| Status | Ready — proposed claim in PR #211; no implementation authorization until target-branch merge |
+| Status | Review — decision-only D0 packet recorded; renderer implementation and dependency authorization remain closed |
 | Parent | DESKTOP-001 |
 | Source | GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I194 |
@@ -23,10 +23,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #211 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head architecture/security review is required on the finalized PR #211 head before merge. Repository operations use shared GitHub account `wjhuang88`; a reviewer using the same account must explicitly disclose their distinct natural-person identity. Exact-head CI, both governance validators and merge-time CAS remain mandatory. This proposed `Claimed` record is ineffective until merged to `main`. |
-| Implementation PR | Not started |
+| Authorization Evidence | Independent natural-person exact-head review `5277513378`, exact-head CI `31678604823`, both governance validators and merge-time CAS passed for PR #211 head `fb8a2b67`; claim merged to `main` as `f778543c`. Authorization remains limited to this decision-only D0 slice. |
+| Implementation PR | #215 (decision-only D0 packet; no Desktop implementation) |
 | Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Merge finalized claim PR #211 to `main` after independent exact-head review, exact-head CI, both governance validators and merge-time CAS; then create a real independent worktree from the claim merge or later compatible `main` before `feat/desktop-I194-d0-boundary`. |
+| Handoff / Release Condition | Deliver the Proposed ADR/security packet and independent exact-head review; keep renderer implementation and dependency authorization closed until D0 acceptance. |
 
 ## Identity / Goal / Value
 
@@ -72,6 +72,9 @@ D0 is documentation/decision work only.
   D0 implementation PR.
 - Record explicit reversal triggers, excluded capabilities and the gate from D0 into the first
   mock-only visual/i18n slice.
+- Treat motion as an interaction-quality constraint: state-semantic, interruptible, input-first,
+  reduced-motion aware and performance-budgeted; do not add decorative looping motion or motion that
+  competes with the current Goal/Work state.
 
 ## Exclusions
 
@@ -140,6 +143,10 @@ is claim-preparation provenance, not permission to ignore later mainline changes
 Merge-CAS refresh on 2026-08-13 observed `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7`,
 including effective I193 claim merge `fb5a1f62`. The refreshed derived views retain the
 Runtime/Session lane alongside this proposed Desktop lane.
+
+Implementation base and worktree refresh on 2026-08-13 observed
+`main@f778543c7ceeb2a099eb3863fc8259da68d02195` after PR #211 merge. The implementation branch is
+`feat/desktop-I194-d0-boundary` in `/private/tmp/talos-i194`, with merge target `main`.
 
 ## Decision Links And Constraints
 
@@ -210,6 +217,7 @@ GPUI-based UI, bilingual Desktop behavior or Mission/runtime binding as shipped 
 - `docs/proposals/talos-desktop.md`
 - `docs/design/talos-desktop/DESIGN.md`
 - `docs/design/talos-desktop/I18N.md`
+- `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`
 - `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`
 - `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`
 - `docs/backlog/active/TODO-001-session-todo-list.md`
@@ -242,6 +250,18 @@ GPUI-based UI, bilingual Desktop behavior or Mission/runtime binding as shipped 
 - [ ] No Cargo/workspace/production-code/dependency/fixture/UI implementation change exists in D0.
 - [ ] Exact-head CI, both governance validators, applicable locked checks, independent natural-person
       exact-head review and merge-time CAS are recorded before acceptance.
+
+Current evidence status: primary-source snapshots for GPUI and the minimum Iced comparison were
+retrieved and pinned by commit on 2026-08-13. They establish candidate capability/risk facts only;
+full selected-release lock closure, SBOM/license review, platform tests, panic containment and motion
+benchmarks remain Review residuals. Renderer/dependency authorization stays closed.
+
+The crates.io metadata refresh confirmed published candidates `gpui 0.2.2` (Apache-2.0; default
+font-kit/Wayland/X11/Windows-manifest features) and `iced 0.14.0` (MIT; Rust 1.88; default
+wgpu/tiny-skia/X11/Wayland features). A disposable `cargo metadata` probe could not complete the
+full graph because the registry proxy became unavailable while resolving transitive packages. This
+is negative evidence for authorization: no lockfile, SBOM, build-script or license-closure claim is
+made from the partial probe.
 
 ## Residual Destination
 
