@@ -1,6 +1,6 @@
 # Iteration I186: TUI Visible-Cell Selection And Copy
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-08-11
 > Planned objective: implement the Accepted ADR-054 application-owned visible-cell selection policy so ordinary mouse drag selects and copies arbitrary rendered TUI text without Shift or unrelated Talos state mutation.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
 | Work Slice | Implement only TUI-046-B / Issue #134 under the Accepted ADR-054 amendment: add bounded application-owned selection over the last rendered visible cells; ordinary primary-button down/drag/up without Shift; selection highlight; history-viewport edge autoscroll during drag; clamped, non-disappearing resize handling; copy completed selection with the existing OSC 52/macOS clipboard backend and truthful status; isolate pointer selection from history/composer/modal/approval/session/execution mutation; preserve keyboard history, existing wheel policy, `/copy`, Alternate Screen and exhaustive terminal restoration; add focused mixed-width/wrapped/panel/state-isolation/lifecycle tests, user docs and exact-head two-terminal acceptance evidence. No transcript/export/persistence/provider/permission/scheduler change, hidden-content access, rich persistent selection, dependency or unrelated TUI-042 work. |
@@ -18,10 +18,12 @@
 | Source Issue | #134 |
 | Governance Claim PR | #192 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer explicitly directed that Issue #134 implementation proceed immediately and that real-terminal testing move to post-development acceptance. PR #192 requests exact-head governance review/authorization; this proposed claim has no ownership effect until merged to `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain allowed exact-head authorization and green CI on PR #192, repeat merge-time CAS, and merge this governance-only claim before Rust implementation. |
+| Authorization Evidence | Claim merge `f4faa38e4815302db2ccf1f4888b2862e56493b`; PR #193 final head `313e47e562125eaa8d18679295dfd0f95ef1e9e5` passed CI `31481069023`, received independent review `4905391760`, passed merge-time CAS and merged as `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`. |
+| Implementation PR | #193 |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | None - TUI-046-B is complete; TUI-042/#79 and broader terminal interaction work remain separate. |
+
+Completion Commit: `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`
 
 ## Closure Ledger
 
@@ -138,19 +140,30 @@ No open PR, remote branch or effective claim overlaps TUI-046-B at selection.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-11 | Selection | Maintainer priority keeps #134 at P0 and defers real-terminal acceptance until after development. I184 and ADR-054 gates are complete; I185/#191 is non-overlapping; no TUI-046-B claim, implementation PR or remote branch exists. Draft claim remains ineffective until target-branch merge. |
+| 2026-08-11 | Claim merge | I186 claim PR #192 merged at `f4faa38e4815302db2ccf1f4888b2862e56493b`; implementation PR #193 contains existing commits `dabd31e2`, `6473d9f6`, and `cf2e06a3` for visible-frame selection, cross-screen history extension, resize clamping, clipboard copy, combining-cell preservation and focused tests. |
+| 2026-08-11 | Implementation refinement | Code commit `39639c37` adds stable logical selection coordinates across resize/reflow, splash-row mapping, final mouse-up coordinates, no-history-area selection, and preservation of selected trailing spaces; later PR #193 changes only synchronize documentation status. `cargo test -p talos-tui --locked` passes 501 tests plus 2 integration tests and 2 doctests; terminal matrix remains pending. |
+| 2026-08-11 | Manual-defect refinement | Exact-head terminal testing exposed stale screen-coordinate highlights after history movement, missing edge autoscroll/Logo traversal, wrapped-row over-highlighting and a bottom-component block. Commits `52c36ee1`, `86dce04b` and `f62a78a7` replace stale projection with logical-row reprojection, clamp wrapped-row ranges and retain history focus during edge drag. The attempted cross-component refinement `bfb5ae61` worsened the interaction and was explicitly rolled back by `fb2c4abe` at maintainer direction; the restored behavior passed the affected drag and offscreen-copy paths. |
+| 2026-08-11 | Clipboard compatibility | Terminal.app 2.15 on `fb2c4abe` rendered and retained selection but left the previous system clipboard value in place. Code inspection proved OSC 52 write success was incorrectly treated as terminal acceptance, making the existing `pbcopy` fallback unreachable when Terminal.app silently ignored the sequence. Commit `70b51e28` makes the existing macOS backend `pbcopy`-first with OSC 52 fallback, preserves OSC 52-first behavior elsewhere and adds backend-order tests without adding a dependency or expanding clipboard data scope. |
+| 2026-08-11 | Exact-code-head terminal acceptance | Code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` passed the published matrix on Alacritty 0.17.0 (`TERM=alacritty`) and macOS Terminal 2.15 (`TERM=xterm-256color`), both on macOS 26.5.2 (25F84), `TMUX=none`. Ordinary no-Shift drag, partial/wrapped/mixed-width copy, bidirectional edge autoscroll, Logo/offscreen traversal, wheel and PageUp/PageDown projection, resize, active streaming, normal exit and interrupted-output cleanup passed; exact observations live in the reference matrix. |
+| 2026-08-12 | Merge | PR #193 final head `313e47e5` passed CI `31481069023`, independent production review `4905391760` and merge-time CAS, then merged as `a5115f5c`. |
 
 ## Verification Evidence
 
-- Pending finalized claim validation and implementation evidence.
+- PR #193 code through `70b51e28`: 511 talos-tui tests plus 2 integration tests and 2 doctests pass; stable selection/reflow, Unicode buffer/selection, resize isolation, cross-screen history, bidirectional edge-tick, redraw preservation and macOS clipboard-backend ordering tests pass. `cargo fmt --all -- --check`, `cargo clippy -p talos-tui --locked --all-targets -- -D warnings`, `cargo build -p talos-cli --locked` and `git diff --check` pass. After the evidence update, `./scripts/release_preflight.sh` passes the site/installer checks, locked workspace check, workspace Clippy, full workspace tests/doctests and both governance validators with 0 warnings. The exact code head passed both terminal rows; exact final PR-head CI, independent review and merge-time CAS remain pending.
 
 ## Completion Evidence
 
-- No completion evidence while Planned. Completion requires an already-existing implementation merge SHA plus exact-head terminal evidence.
+- Completion Commit: `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`; terminal acceptance is
+  bound to runtime code head `70b51e2835510c1a23f5bc5cd1521f41acc6805e` and the two recorded matrix rows.
 
 ## Variance And Residuals
 
+- `bfb5ae61` is superseded by the explicit UX rollback `fb2c4abe`; it is retained in history as
+  truthful failed-refinement evidence and supplies no acceptance claim.
 - TUI-042/#79 and all broader terminal interaction work remain separately owned.
 
 ## Retrospective
 
-- Pending execution.
+- Exact-head unit/integration/doctest, Unix/Windows CI, independent code review and two-terminal
+  clipboard/interaction acceptance converged. The failed `bfb5ae61` refinement remains explicit
+  evidence that real-terminal UX acceptance cannot be replaced by unit tests alone.

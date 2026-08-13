@@ -1,6 +1,6 @@
 # Iteration I185: SQLite Validator Policy Integrity
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-08-10
 > Planned objective: eliminate the duplicate ADR-008/validator SQLite-consumer policy source and preserve actionable Cargo diagnostics while keeping every runtime, dependency and accepted-consumer behavior unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 architecture session 2026-08-11 |
 | Work Slice | Implement only ARCH-034-R04-AG12: introduce one versioned structured SQLite-consumer policy named normatively by ADR-008 and loaded by `scripts/validate_sqlite_consumers.py`; preserve the exact accepted set and all locked graph/bundled/version/isolation semantics; explicitly retain `cargo metadata --locked` with fail-closed host/toolchain/cache failures and no `--frozen`/offline fallback; decode Cargo stdout strictly as UTF-8 while escaping undecodable stderr bytes; add controlled cross-platform fixtures and synchronize evidence. No Rust, Cargo, runtime, SQLite consumer, schema, migration, timeout, retry, network policy, AG-11 or other R04 child change. |
@@ -18,10 +18,12 @@
 | Source Issue | None |
 | Governance Claim PR | #190 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head claim review is requested on PR #190; the proposed claim has no ownership effect until the finalized record is merged into `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent approval and CI, repeat merge-time CAS, then start implementation from that claim merge or later `main`. |
+| Authorization Evidence | Claim merge `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`; PR #191 final head `45f70802bf3b593c6228d5a103dfcee351620920` passed CI `31556720252`, received independent approval `5261491057`, passed merge-time CAS and merged as `af9783229bfc8ee592813440ecfcdb6efc90a3c2`. |
+| Implementation PR | #191 |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | None - I185/AG-12 is complete; AG-11 and every other R04 child remain separately owned. |
+
+Completion Commit: `af9783229bfc8ee592813440ecfcdb6efc90a3c2`
 
 ## Closure Ledger
 
@@ -122,15 +124,22 @@ selection. PR #189 is limited to I184 closeout and does not overlap this validat
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-10 | Selection | Inventoried I159-I162 as Blocked, I184 closeout as non-overlapping Review work, R04 as Partial, all sibling children as separately unclaimed, archival PRs #120/#121 as immutable, and no AG-12 overlap. Draft claim submission is pending and has no target-branch effect. |
+| 2026-08-10 | Selection | Inventoried I159-I162 as Blocked, I184 closeout as non-overlapping Review work, R04 as Partial, all sibling children as separately unclaimed, archival PRs #120/#121 as immutable, and no AG-12 overlap. |
+| 2026-08-11 | Implementation | Effective claim merge `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`; implementation commit `74199395`; PR #191 opened at exact head with governance-only diff. |
+| 2026-08-12 | Merge | PR #191 final head `45f70802` passed full exact-head CI `31556720252`, independent review `5261491057` and merge-time CAS, then merged as `af978322`. |
 
 ## Verification Evidence
 
-- Pending claim validation and implementation evidence.
+- `python3 scripts/validate_sqlite_consumers.py . --self-test`: 17 cases passed; clean metadata reports the existing five consumers, three layered packages, one resolved version each, bundled features, and zero `talos-models` dependents.
+- `scripts/validate_project_governance.sh .`: 0 warnings; `bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
+- `python3 scripts/audit_architecture.py .`: 21 crates, no internal dependency cycles; `scripts/assess_project_scale.sh .`: high-risk / release-managed / required-worktree profile.
+- PR #191 final head `45f70802bf3b593c6228d5a103dfcee351620920` passed CI run
+  `31556720252` and independent review `5261491057`; the reviewer independently proved four policy
+  tamper classes fail closed and reran release preflight before merge `af978322`.
 
 ## Completion Evidence
 
-- No completion evidence while Planned. A later closeout must cite an already-existing implementation commit.
+- Completion Commit: `af9783229bfc8ee592813440ecfcdb6efc90a3c2`.
 
 ## Variance And Residuals
 
@@ -138,4 +147,5 @@ selection. PR #189 is limited to I184 closeout and does not overlap this validat
 
 ## Retrospective
 
-- Pending execution.
+- One structured policy now owns the exact ADR-008 consumer boundary without changing Rust, Cargo,
+  consumers or runtime behavior. Strict stdout plus escaped stderr preserves both trust and diagnosis.

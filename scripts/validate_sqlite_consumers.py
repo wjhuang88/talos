@@ -13,16 +13,19 @@ from pathlib import Path
 from typing import Any
 
 
-ACCEPTED_CONSUMERS = {
-    "talos-evolution",
-    "talos-exploration",
-    "talos-memory",
-    "talos-models",
-    "talos-session",
-}
+POLICY_PATH = Path("docs/reference/SQLITE-CONSUMER-POLICY.json")
+POLICY_SCHEMA_VERSION = 1
+CONSUMER_CLASSIFICATIONS = {"runtime", "quarantined-non-runtime"}
 RUSQLITE = "rusqlite"
 SQLITE_SYS = "libsqlite3-sys"
-QUARANTINED = "talos-models"
+
+
+@dataclass(frozen=True)
+class ConsumerPolicy:
+    """Validated machine-readable ADR-008 consumer policy."""
+
+    accepted_consumers: frozenset[str]
+    quarantined_consumers: frozenset[str]
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,69 @@ def _dependency_ids(node: dict[str, Any]) -> list[str]:
     return [dep["pkg"] for dep in node.get("deps", []) if isinstance(dep.get("pkg"), str)]
 
 
-def evaluate(metadata: dict[str, Any]) -> ValidationReport:
+def parse_policy(document: dict[str, Any]) -> ConsumerPolicy:
+    """Validate and parse the versioned ADR-008 consumer policy."""
+
+    if set(document) != {"schema_version", "accepted_consumers"}:
+        raise ValueError("policy must contain only schema_version and accepted_consumers")
+    version = document["schema_version"]
+    if version != POLICY_SCHEMA_VERSION:
+        raise ValueError(f"unsupported SQLite consumer policy schema_version: {version}")
+    entries = document["accepted_consumers"]
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("policy accepted_consumers must be a non-empty array")
+
+    consumers: set[str] = set()
+    quarantined: set[str] = set()
+    for index, entry in enumerate(entries):
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != {"name", "classification"}
+            or not isinstance(entry.get("name"), str)
+            or not isinstance(entry.get("classification"), str)
+        ):
+            raise ValueError(
+                f"accepted_consumers[{index}] must contain only name and classification strings"
+            )
+        name = entry["name"]
+        classification = entry["classification"]
+        if not name:
+            raise ValueError(f"accepted_consumers[{index}].name must not be empty")
+        if classification not in CONSUMER_CLASSIFICATIONS:
+            raise ValueError(f"unsupported SQLite consumer classification: {classification}")
+        if name in consumers:
+            raise ValueError(f"duplicate accepted SQLite consumer: {name}")
+        consumers.add(name)
+        if classification == "quarantined-non-runtime":
+            quarantined.add(name)
+    if quarantined != {"talos-models"}:
+        raise ValueError(
+            "policy must classify exactly talos-models as quarantined-non-runtime"
+        )
+    return ConsumerPolicy(
+        accepted_consumers=frozenset(consumers),
+        quarantined_consumers=frozenset(quarantined),
+    )
+
+
+def load_policy(project_root: Path) -> ConsumerPolicy:
+    """Load the normative ADR-008 policy from the repository."""
+
+    policy_path = project_root / POLICY_PATH
+    try:
+        document = json.loads(policy_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise ValueError(f"missing SQLite consumer policy: {POLICY_PATH}") from error
+    except UnicodeDecodeError as error:
+        raise ValueError(f"SQLite consumer policy is not valid UTF-8: {POLICY_PATH}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"malformed SQLite consumer policy {POLICY_PATH}: {error}") from error
+    if not isinstance(document, dict):
+        raise ValueError("SQLite consumer policy must be a JSON object")
+    return parse_policy(document)
+
+
+def evaluate(metadata: dict[str, Any], policy: ConsumerPolicy) -> ValidationReport:
     """Evaluate one Cargo metadata document against the accepted SQLite policy."""
 
     packages = metadata.get("packages")
@@ -113,7 +178,7 @@ def evaluate(metadata: dict[str, Any]) -> ValidationReport:
     model_ids = {
         package_id
         for package_id in workspace_ids
-        if name_by_id.get(package_id) == QUARANTINED
+        if name_by_id.get(package_id) in policy.quarantined_consumers
     }
     quarantined_dependents = {
         name_by_id[workspace_id]
@@ -139,8 +204,8 @@ def evaluate(metadata: dict[str, Any]) -> ValidationReport:
         return features
 
     errors: list[str] = []
-    unexpected = sorted(consumers - ACCEPTED_CONSUMERS)
-    missing = sorted(ACCEPTED_CONSUMERS - consumers)
+    unexpected = sorted(consumers - policy.accepted_consumers)
+    missing = sorted(policy.accepted_consumers - consumers)
     if unexpected:
         errors.append(f"unexpected SQLite boundary consumer(s): {', '.join(unexpected)}")
     if missing:
@@ -262,7 +327,7 @@ def _apply_fixture_mutation(metadata: dict[str, Any], case: dict[str, Any]) -> N
     raise ValueError(f"unknown fixture mutation: {mutation}")
 
 
-def run_self_tests(fixture_root: Path) -> None:
+def run_self_tests(fixture_root: Path, policy: ConsumerPolicy) -> None:
     """Run the controlled positive and negative metadata matrix."""
 
     base = json.loads((fixture_root / "base.json").read_text(encoding="utf-8"))
@@ -271,7 +336,7 @@ def run_self_tests(fixture_root: Path) -> None:
     for case in cases:
         metadata = copy.deepcopy(base)
         _apply_fixture_mutation(metadata, case)
-        report = evaluate(metadata)
+        report = evaluate(metadata, policy)
         expected = case["expected_error_substrings"]
         actual = "\n".join(report.errors)
         if case.get("expected_consumers") is not None and sorted(report.consumers) != sorted(
@@ -295,9 +360,80 @@ def run_self_tests(fixture_root: Path) -> None:
             failures.append(f"{case['name']}: unexpected errors: {actual}")
         if expected and not report.errors:
             failures.append(f"{case['name']}: expected failure but validation passed")
+    policy_document = json.loads(
+        (fixture_root.parents[2] / POLICY_PATH).read_text(encoding="utf-8")
+    )
+    policy_cases = json.loads((fixture_root / "policy-cases.json").read_text(encoding="utf-8"))[
+        "cases"
+    ]
+    for case in policy_cases:
+        candidate = copy.deepcopy(policy_document)
+        mutation = case["mutation"]
+        if mutation == "unknown_version":
+            candidate["schema_version"] = 2
+        elif mutation == "remove_consumers":
+            del candidate["accepted_consumers"]
+        elif mutation == "malformed_consumer":
+            candidate["accepted_consumers"][0] = {"name": 1, "classification": "runtime"}
+        elif mutation == "duplicate_consumer":
+            candidate["accepted_consumers"].append(candidate["accepted_consumers"][0])
+        elif mutation == "invalid_classification":
+            candidate["accepted_consumers"][0]["classification"] = "other"
+        elif mutation == "add_policy_consumer":
+            candidate["accepted_consumers"].append(
+                {"name": "talos-policy-only", "classification": "runtime"}
+            )
+        else:
+            failures.append(f"{case['name']}: unknown policy fixture mutation: {mutation}")
+            continue
+        try:
+            candidate_policy = parse_policy(candidate)
+            report = evaluate(copy.deepcopy(base), candidate_policy)
+            actual = "\n".join(report.errors)
+        except (KeyError, TypeError, ValueError) as error:
+            actual = str(error)
+        if case["expected_error_substring"] not in actual:
+            failures.append(
+                f"{case['name']}: missing expected error substring: "
+                f"{case['expected_error_substring']}"
+            )
+
+    diagnostic_cases = json.loads(
+        (fixture_root / "diagnostic-cases.json").read_text(encoding="utf-8")
+    )["cases"]
+    for case in diagnostic_cases:
+        try:
+            _parse_cargo_result(
+                case["returncode"],
+                bytes.fromhex(case["stdout_hex"]),
+                bytes.fromhex(case["stderr_hex"]),
+            )
+            actual = ""
+        except (UnicodeDecodeError, ValueError, RuntimeError) as error:
+            actual = str(error)
+        if case["expected_error_substring"] not in actual:
+            failures.append(
+                f"{case['name']}: missing expected error substring: "
+                f"{case['expected_error_substring']}"
+            )
+
     if failures:
         raise ValueError("fixture failures:\n" + "\n".join(failures))
-    print(f"SQLite consumer fixture validation passed: {len(cases)} case(s)")
+    total_cases = len(cases) + len(policy_cases) + len(diagnostic_cases)
+    print(f"SQLite consumer fixture validation passed: {total_cases} case(s)")
+
+
+def _parse_cargo_result(returncode: int, stdout: bytes, stderr: bytes) -> dict[str, Any]:
+    """Parse Cargo output while keeping invalid failure diagnostics inspectable."""
+
+    if returncode != 0:
+        diagnostic = stderr.decode("utf-8", errors="backslashreplace").rstrip()
+        raise RuntimeError(f"cargo metadata --locked failed:\n{diagnostic}")
+    try:
+        decoded = stdout.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise ValueError("cargo metadata stdout is not valid UTF-8") from error
+    return json.loads(decoded)
 
 
 def load_locked_metadata(project_root: Path) -> dict[str, Any]:
@@ -308,11 +444,8 @@ def load_locked_metadata(project_root: Path) -> dict[str, Any]:
         cwd=project_root,
         check=False,
         capture_output=True,
-        encoding="utf-8",
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"cargo metadata --locked failed:\n{result.stderr.rstrip()}")
-    return json.loads(result.stdout)
+    return _parse_cargo_result(result.returncode, result.stdout, result.stderr)
 
 
 def main() -> int:
@@ -324,18 +457,19 @@ def main() -> int:
 
     project_root = Path(args.project_root).resolve()
     try:
+        policy = load_policy(project_root)
         metadata = (
             json.loads(args.metadata.read_text(encoding="utf-8"))
             if args.metadata is not None
             else load_locked_metadata(project_root)
         )
-        report = evaluate(metadata)
+        report = evaluate(metadata, policy)
         if report.errors:
             for error in report.errors:
                 print(f"ERROR: {error}", file=sys.stderr)
             return 1
         if args.self_test:
-            run_self_tests(project_root / "scripts/fixtures/sqlite-consumer-metadata")
+            run_self_tests(project_root / "scripts/fixtures/sqlite-consumer-metadata", policy)
         print(
             "SQLite consumer validation passed: "
             f"consumers={','.join(sorted(report.consumers))}; "

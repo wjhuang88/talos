@@ -4,16 +4,16 @@
 |---|---|
 | Parent | ARCH-034-R04 |
 | Finding | PR #184 review residuals 3-5 / validator policy linkage and diagnostics |
-| Status | Planned — I185 claim under review |
+| Status | Complete |
 | Priority | P2 |
-| Selected Iteration | I185 (Planned; claim ineffective until target-branch merge) |
+| Selected Iteration | I185 (Complete) |
 | Preserved behavior | ADR-008 accepted consumers, locked graph semantics, bundled SQLite behavior and standard governance results |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 architecture session 2026-08-11 |
 | Work Slice | Implement only I185/ARCH-034-R04-AG12: replace the validator-local accepted-consumer constant with one versioned structured policy file that ADR-008 names as its exact machine-readable allowlist; preserve the five accepted consumers, workspace-boundary graph rule, bundled-feature/version/isolation checks and `cargo metadata --locked` invocation; document the current Cargo/toolchain/cache dependency as fail-closed without adding `--frozen` or offline fallback; preserve invalid-stdout rejection while rendering non-UTF-8 Cargo stderr with escaped offending bytes; add focused policy-drift and decoding fixtures; synchronize governance evidence only. No Rust, Cargo manifest/lock, SQLite consumer, runtime, schema, migration, timeout, retry, network-policy or AG-11 change. |
@@ -21,10 +21,14 @@
 | Source Issue | None |
 | Governance Claim PR | #190 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #184 independent reviews `5235077449` and `5235367999` classified these findings as non-blocking follow-up. Exact-head claim review is requested on PR #190; this claim remains ineffective until the finalized record is merged to `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-10 |
-| Handoff / Release Condition | Finalize the actual claim PR number, obtain exact-head independent review and CI, repeat merge-time CAS, and merge the governance-only claim before implementation. |
+| Authorization Evidence | Claim merge `5fe56fa8c0320dbb6a70443f19b16b388339ab5e`; PR #191 final head `45f70802bf3b593c6228d5a103dfcee351620920` passed CI `31556720252`, independent approval `5261491057` and merge-time CAS, then merged as `af9783229bfc8ee592813440ecfcdb6efc90a3c2`. |
+| Implementation PR | #191 |
+| Last Updated | 2026-08-12 |
+| Handoff / Release Condition | None - AG-12 is complete; AG-11 and all other R04 children remain independent. |
+
+Status: Complete
+
+Completion Commit: `af9783229bfc8ee592813440ecfcdb6efc90a3c2`
 
 ## Closure Ledger
 
@@ -35,7 +39,7 @@
 | Existing assets to preserve | I183/AG-7 completion evidence, ADR-008's five accepted consumers and boundary semantics, validator clean-run output, Cargo `--locked` behavior, AG-11 ownership and all Rust/Cargo/runtime state. |
 | State/status owners | AG-12 and I185 first; R04 and derived indexes/views second. |
 | Validation required | Controlled policy/metadata/diagnostic fixtures, both governance validators, architecture audit, scale assessment, locked release preflight, exact-head Unix/Windows CI, independent review and merge-time CAS. |
-| Evidence and uncertainty | The duplicate allowlist, unstated host/cache contract and masked localized stderr are confirmed from ADR-008, the validator and reviews `5235077449`/`5235367999`. No runtime defect is inferred from these governance-only findings. |
+| Evidence and uncertainty | The duplicate allowlist, unstated host/cache contract and masked localized stderr are confirmed from ADR-008, the validator and reviews `5235077449`/`5235367999`. Implementation commit `74199395` adds the structured policy, fail-closed policy loading and escaped diagnostics without runtime files. No runtime defect is inferred from these governance-only findings. |
 | Residual-work destination | AG-11 retains runtime SQLite containment evidence; all other R04 children retain their existing behavior/security boundaries. |
 
 ## Confirmed Baseline
@@ -71,3 +75,11 @@ change. AG-11 remains the separate runtime containment evidence owner.
 
 Focused validator fixtures on Unix and Windows, both governance validators, locked release
 preflight, exact-head CI and independent review.
+
+## Completion Evidence
+
+- PR #191 final head `45f70802bf3b593c6228d5a103dfcee351620920` passed full CI
+  `31556720252`, independent review `5261491057`, local release preflight and merge-time CAS.
+- Merge `af9783229bfc8ee592813440ecfcdb6efc90a3c2` contains the structured policy, strict policy
+  parser, fail-closed metadata handling, escaped Cargo diagnostics and 17 validator fixtures, with no
+  Rust, Cargo manifest/lock, consumer or runtime change.

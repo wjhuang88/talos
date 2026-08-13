@@ -15,6 +15,7 @@ Stable technical facts about the project. Not procedures or status — those liv
 | `RUNTIME-SDK-CONTRACT.md` | talos-runtime pre-1.0 embedding support boundary and caveats |
 | `PROVIDER-TERMINAL-OUTCOMES.md` | Explicit completion, truncation, provider terminal errors, and retained diagnostic behavior |
 | `SQLITE-CONSUMER-INVENTORY.md` | ADR-008 exact allowlist, schemas/migrations, failure evidence, and validator operation |
+| `SQLITE-CONSUMER-POLICY.json` | ADR-008 normative machine-readable SQLite consumer allowlist and classification policy |
 | `TUI-NATIVE-SELECTION-MATRIX.md` | I184 baseline causal observations and TUI-046-B exact-head terminal acceptance schema |
 | `DOCS-SYNC-CHECKLIST.md` | Surfaces that must stay in sync when behavior/install/tools change |
 | `RELEASE-NOTES-DRAFT-2026-07-02.md` | Draft post-v0.2.0 release notes and known gaps |
