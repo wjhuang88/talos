@@ -506,6 +506,12 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 注册的工具默认会经过权限包装。在 headless 嵌入模式下，未解决的 `Ask` 决策会被拒绝，
 除非 embedder 提供更窄的 allow-list 规则。
 
+嵌入方可以把 `RuntimeBuilder` 绑定到 host 指定目录中的 durable Session。每个 turn 会以
+Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具交换之后发生错误或中断，
+重启会精确恢复一次最近的闭合、安全前缀，并明确保留“该 turn 未正常完成”的结果。若取消
+发生在任何可持久化事实之前，则只记录隐藏终态，不伪造可见 turn。未完成的 assistant
+片段、原始 provider 响应、private tool data 与认证材料不会进入 transcript。
+
 这还不是稳定的 1.0 SDK 承诺。当前公开嵌入表面是 `talos-runtime` 以及它从
 `talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
 除非文档另行声明。

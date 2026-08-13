@@ -192,6 +192,21 @@ impl DurableSession {
         messages: &[Message],
         policy: &PersistencePolicy,
     ) -> Result<TurnCommit, SessionError> {
+        self.finalize_turn(turn_id, messages, policy, TurnTranscriptOutcome::Success)
+    }
+
+    /// Atomically finalizes one turn with its admitted display-safe prefix.
+    ///
+    /// The first terminal outcome wins. Retrying the same outcome with the same
+    /// filtered role/content sequence returns the original entry IDs without a
+    /// write. A conflicting outcome or payload is rejected without mutation.
+    pub fn finalize_turn(
+        &self,
+        turn_id: &str,
+        messages: &[Message],
+        policy: &PersistencePolicy,
+        outcome: TurnTranscriptOutcome,
+    ) -> Result<TurnCommit, SessionError> {
         if turn_id.is_empty() {
             return Err(SessionError::DurableTurn(
                 "turn_id must not be empty".into(),
@@ -203,30 +218,56 @@ impl DurableSession {
             .lock()
             .map_err(|_| SessionError::LockPoisoned)?;
         let mut existing = self.session.store.read_entries(&self.session.file_path)?;
-        let prior_ids = existing
+        let prior_entries = existing
             .iter()
             .filter(|entry| {
                 entry.metadata.turn_id.as_deref() == Some(turn_id)
                     && !is_turn_transcript_outcome_content(&entry.content)
             })
+            .collect::<Vec<_>>();
+        let prior_ids = prior_entries
+            .iter()
             .map(|entry| entry.id.clone())
             .collect::<Vec<_>>();
-        let has_success_marker = existing.iter().any(|entry| {
-            decode_turn_transcript_outcome(&entry.content).is_some_and(|record| {
-                record.turn_id == turn_id && record.outcome == TurnTranscriptOutcome::Success
-            })
+        let marker = existing.iter().find_map(|entry| {
+            decode_turn_transcript_outcome(&entry.content)
+                .filter(|record| record.turn_id == turn_id)
         });
-        if !prior_ids.is_empty() || has_success_marker {
-            return Ok(TurnCommit {
-                entry_ids: prior_ids,
-                newly_committed: false,
+
+        let filtered = messages
+            .iter()
+            .map(|message| filtered_message(message, policy))
+            .collect::<Vec<_>>();
+        let requested_parts = filtered.iter().map(message_parts).collect::<Vec<_>>();
+        let prior_parts = prior_entries
+            .iter()
+            .map(|entry| (entry.role.clone(), entry.content.clone()))
+            .collect::<Vec<_>>();
+
+        if let Some(prior) = marker {
+            if prior.outcome == outcome && prior_parts == requested_parts {
+                return Ok(TurnCommit {
+                    entry_ids: prior_ids,
+                    newly_committed: false,
+                });
+            }
+            return Err(SessionError::DurableTurnConflict {
+                turn_id: turn_id.to_string(),
+                existing: format!("{:?}", prior.outcome),
+                requested: format!("{:?}", outcome),
+            });
+        }
+        if !prior_entries.is_empty() {
+            return Err(SessionError::DurableTurnConflict {
+                turn_id: turn_id.to_string(),
+                existing: "ambiguous_unfinalized_entries".into(),
+                requested: format!("{:?}", outcome),
             });
         }
 
         let mut parent_id = existing.last().map(|entry| entry.id.clone());
         let mut entry_ids = Vec::with_capacity(messages.len());
-        for message in messages {
-            let message = filtered_message(message, policy);
+        for message in filtered {
             let (role, content) = message_parts(&message);
             let id = Uuid::new_v4().to_string();
             existing.push(SessionEntry {
@@ -244,7 +285,7 @@ impl DurableSession {
             entry_ids.push(id);
         }
 
-        let marker = TurnTranscriptOutcomeRecord::new(turn_id, TurnTranscriptOutcome::Success);
+        let marker = TurnTranscriptOutcomeRecord::new(turn_id, outcome);
         let marker_content = encode_turn_transcript_outcome(&marker)
             .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
         let marker_id = Uuid::new_v4().to_string();
@@ -723,6 +764,207 @@ mod tests {
                 TurnTranscriptOutcome::Success,
             )]
         );
+    }
+
+    #[test]
+    fn partial_finalization_is_atomic_idempotent_and_reconstructs_on_reopen() {
+        let directory = tempfile::tempdir().expect("temporary host directory");
+        let session = create_or_open(directory.path(), "task:partial").expect("session");
+        let messages = vec![
+            Message::User {
+                content: "read file".into(),
+            },
+            Message::Assistant {
+                content: "tool result follows".into(),
+                tool_calls: vec![],
+                reasoning: None,
+            },
+        ];
+        let first = session
+            .finalize_turn(
+                "turn-cancelled",
+                &messages,
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Cancelled,
+            )
+            .expect("partial finalization");
+        let retry = session
+            .finalize_turn(
+                "turn-cancelled",
+                &messages,
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Cancelled,
+            )
+            .expect("idempotent retry");
+        assert!(first.newly_committed);
+        assert!(!retry.newly_committed);
+        assert_eq!(first.entry_ids, retry.entry_ids);
+        assert_eq!(session.read_messages().expect("messages"), messages);
+        assert_eq!(
+            session
+                .session()
+                .read_turn_transcript_outcomes()
+                .expect("outcome"),
+            vec![TurnTranscriptOutcomeRecord::new(
+                "turn-cancelled",
+                TurnTranscriptOutcome::Cancelled,
+            )]
+        );
+        let reopened = get_by_external_id(directory.path(), "task:partial")
+            .expect("lookup")
+            .expect("reopen");
+        assert_eq!(
+            reopened.read_messages().expect("replayed messages"),
+            messages
+        );
+    }
+
+    #[test]
+    fn partial_finalization_conflicting_retry_preserves_original_state() {
+        let directory = tempfile::tempdir().expect("temporary host directory");
+        let session = create_or_open(directory.path(), "task:conflict").expect("session");
+        let original = [Message::User {
+            content: "original".into(),
+        }];
+        session
+            .finalize_turn(
+                "turn-conflict",
+                &original,
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Error,
+            )
+            .expect("initial finalization");
+        let before = std::fs::read(session.file_path()).expect("snapshot");
+        let conflict = session.finalize_turn(
+            "turn-conflict",
+            &[Message::User {
+                content: "different".into(),
+            }],
+            &PersistencePolicy::default(),
+            TurnTranscriptOutcome::Cancelled,
+        );
+        assert!(matches!(
+            conflict,
+            Err(SessionError::DurableTurnConflict { .. })
+        ));
+        assert_eq!(std::fs::read(session.file_path()).expect("after"), before);
+    }
+
+    #[test]
+    fn partial_finalization_rejects_ambiguous_legacy_entries() {
+        let directory = tempfile::tempdir().expect("temporary host directory");
+        let session = create_or_open(directory.path(), "task:ambiguous").expect("session");
+        session
+            .session()
+            .append_with_metadata(
+                &Message::User {
+                    content: "legacy partial".into(),
+                },
+                SessionMetadata {
+                    turn_id: Some("turn-ambiguous".into()),
+                    ..SessionMetadata::default()
+                },
+            )
+            .expect("legacy entry");
+        let result = session.finalize_turn(
+            "turn-ambiguous",
+            &[],
+            &PersistencePolicy::default(),
+            TurnTranscriptOutcome::Cancelled,
+        );
+        assert!(matches!(
+            result,
+            Err(SessionError::DurableTurnConflict { .. })
+        ));
+        assert!(
+            session
+                .session()
+                .read_turn_transcript_outcomes()
+                .expect("outcomes")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn empty_partial_finalization_writes_only_hidden_cancelled_evidence() {
+        let directory = tempfile::tempdir().expect("temporary host directory");
+        let session = create_or_open(directory.path(), "task:empty-cancel").expect("session");
+
+        let commit = session
+            .finalize_turn(
+                "turn-empty-cancel",
+                &[],
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Cancelled,
+            )
+            .expect("empty cancellation finalization");
+
+        assert!(commit.newly_committed);
+        assert!(commit.entry_ids.is_empty());
+        assert!(session.transcript(None, 10).expect("transcript").is_empty());
+        assert!(session.read_messages().expect("messages").is_empty());
+        assert_eq!(
+            session
+                .session()
+                .read_turn_transcript_outcomes()
+                .expect("outcome"),
+            vec![TurnTranscriptOutcomeRecord::new(
+                "turn-empty-cancel",
+                TurnTranscriptOutcome::Cancelled,
+            )]
+        );
+    }
+
+    #[test]
+    fn partial_finalization_applies_reasoning_secret_and_tool_output_policy() {
+        let directory = tempfile::tempdir().expect("temporary host directory");
+        let session = create_or_open(directory.path(), "task:partial-policy").expect("session");
+        let messages = vec![
+            Message::Assistant {
+                content: "Authorization: Bearer secret".into(),
+                tool_calls: vec![ToolCall {
+                    id: "call-policy".into(),
+                    name: "lookup".into(),
+                    input: serde_json::json!({"api_key": "sk-private", "query": "safe"}),
+                }],
+                reasoning: Some(AssistantReasoning {
+                    provider: "provider".into(),
+                    model: "model".into(),
+                    blocks: vec![ReasoningBlock::Plain {
+                        text: "private reasoning".into(),
+                    }],
+                }),
+            },
+            Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: "call-policy".into(),
+                    content: "raw private output".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        let policy = PersistencePolicy {
+            persist_reasoning: false,
+            persist_raw_tool_output: false,
+        };
+
+        session
+            .finalize_turn(
+                "turn-policy",
+                &messages,
+                &policy,
+                TurnTranscriptOutcome::Error,
+            )
+            .expect("filtered partial finalization");
+
+        let replay = session.read_messages().expect("replay");
+        let serialized = serde_json::to_string(&replay).expect("serialize replay");
+        assert!(!serialized.contains("private reasoning"));
+        assert!(!serialized.contains("raw private output"));
+        assert!(!serialized.contains("sk-private"));
+        assert!(!serialized.contains("Bearer secret"));
+        assert!(serialized.contains("[REDACTED]"));
+        assert!(serialized.contains("[tool output omitted by persistence policy]"));
     }
 
     #[test]

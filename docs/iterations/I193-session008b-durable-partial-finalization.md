@@ -155,7 +155,20 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 ## Verification Evidence
 
 - Claim PR #210 exact head `f7199120` passed CI and the documented Single-maintainer merge CAS;
-  claim merge `fb5a1f62` is now on `main`. Implementation validation is pending activation.
+  claim merge `fb5a1f62` is now on `main`.
+- Implementation worktree validation on 2026-08-13 passed `cargo check --workspace --locked`,
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+  `cargo test --locked -p talos-session`, `cargo test --locked -p talos-agent session`,
+  `cargo test --locked -p talos-runtime`, and `cargo test --workspace --locked`.
+- Real actor/durable-session fixtures cover provider Error and user Cancelled after a completed tool
+  exchange, reopen the Session, and assert the closed prefix plus explicit incomplete outcome.
+- Durable finalizer fixtures cover identical retry, conflicting outcome/payload with byte-identical
+  preservation, ambiguous legacy-entry rejection, empty-prefix marker-only cancellation, and
+  reasoning/secret/tool-output filtering.
+- SESSION-008-R1 remains explicit: I187 describes the pre-I193 released behavior and ADR-058 is the
+  target contract until this implementation reaches `main`. SESSION-008-R2 did not trigger: the
+  seven transient failures did not recur during default-parallel workspace validation, so no
+  concurrency or ENOSPC diagnosis is asserted.
 
 ## Completion Evidence
 
@@ -171,4 +184,6 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 
 ## Retrospective
 
-- Pending claim, activation and execution.
+- Implementation and local validation are complete on the feature branch. Exact-head CI, the
+  documented role-separated technical audit, merge CAS, implementation merge, and owner closeout
+  remain pending; this record therefore does not claim completion.

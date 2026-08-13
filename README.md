@@ -218,10 +218,13 @@ let runtime = RuntimeBuilder::new()
     .build()?;
 ```
 
-Durable runtime turns are committed atomically only after success. Rebuilding with the same
-external ID restores model context automatically. Failed, interrupted, and denied turns are not
-persisted. The transcript excludes raw provider responses and authentication material; host UI
-state, approval audits, artifacts, and provider conversation IDs remain host-owned.
+Durable runtime turns are finalized atomically with a Success, Error, or Cancelled outcome.
+Rebuilding with the same external ID restores model context automatically. When an error or
+interruption follows a completed tool exchange, Talos retains the latest closed, display-safe
+prefix exactly once and records that the turn did not complete normally; cancellation before any
+persistable fact records only hidden outcome evidence. The transcript excludes unfinished
+assistant fragments, raw provider responses, private tool data, and authentication material; host
+UI state, approval audits, artifacts, and provider conversation IDs remain host-owned.
 
 To build all release artifacts locally:
 

@@ -80,6 +80,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let diagnostic_failures = Arc::new(Mutex::new(Vec::<String>::new()));
     let progress_diagnostic_failures = diagnostic_failures.clone();
     let diagnostic_turn_id = turn_id.clone();
+    let (snapshot_tx, mut snapshot_rx) = mpsc::unbounded_channel::<Vec<Message>>();
 
     let forwarder = tokio::spawn(async move {
         let mut response_ordinal = 0_u32;
@@ -135,20 +136,59 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     });
 
-    let mut agent_task =
-        tokio::spawn(async move { agent.run_prepared_session_turn(prepared, event_tx).await });
+    let mut agent_task = tokio::spawn(async move {
+        agent
+            .run_prepared_session_turn(prepared, event_tx, Some(snapshot_tx))
+            .await
+    });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             let _ = forwarder.await;
-            if let Err(message) = persist_terminal_outcome(
-                persistence.as_ref(),
-                durable_persistence.as_ref(),
-                &turn_id,
-                TurnTranscriptOutcome::Cancelled,
-            ) {
+            let mut stable_prefix = Vec::new();
+            while let Ok(snapshot) = snapshot_rx.try_recv() {
+                stable_prefix = snapshot;
+            }
+            let mut cancellation_error = None;
+            if !stable_prefix.is_empty()
+                && let Some(persistence) = &persistence
+                && let Err(error) = persist_turn_messages(
+                    persistence,
+                    &turn_id,
+                    &stable_prefix,
+                    &raw_tool_outputs,
+                    true,
+                )
+            {
+                cancellation_error = Some(error);
+            }
+            if cancellation_error.is_none()
+                && let Some(durable) = &durable_persistence
+                && let Err(error) = durable.session.finalize_turn(
+                    &turn_id,
+                    &stable_prefix,
+                    &durable.policy,
+                    TurnTranscriptOutcome::Cancelled,
+                )
+            {
+                cancellation_error = Some(format!(
+                    "failed to atomically persist cancelled turn: {error}"
+                ));
+            }
+            if cancellation_error.is_none()
+                && durable_persistence.is_none()
+                && let Err(error) = persist_terminal_outcome(
+                    persistence.as_ref(),
+                    None,
+                    &turn_id,
+                    TurnTranscriptOutcome::Cancelled,
+                )
+            {
+                cancellation_error = Some(error);
+            }
+            if let Some(message) = cancellation_error {
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -177,7 +217,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
-                new_messages: Vec::new(),
+                new_messages: stable_prefix,
                 status: TurnRecordStatus::Cancelled,
                 completion,
             });
@@ -376,9 +416,23 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 }
             }
             if transcript_persisted
+                && let Some(durable) = &durable_persistence
+                && let Err(persist_err) = durable.session.finalize_turn(
+                    &turn_id,
+                    &partial_messages,
+                    &durable.policy,
+                    TurnTranscriptOutcome::Error,
+                )
+            {
+                transcript_persisted = false;
+                error_message = format!(
+                    "{error_message}\n[warning: failed to atomically persist durable partial turn: {persist_err}]"
+                );
+            }
+            if transcript_persisted
                 && let Err(persist_err) = persist_terminal_outcome(
                     persistence.as_ref(),
-                    durable_persistence.as_ref(),
+                    None,
                     &turn_id,
                     TurnTranscriptOutcome::Error,
                 )
@@ -468,9 +522,14 @@ fn persist_terminal_outcome(
     turn_id: &str,
     outcome: TurnTranscriptOutcome,
 ) -> Result<(), String> {
-    let session = if let Some(durable) = durable_persistence {
-        durable.session.session()
-    } else if let Some(persistence) = persistence {
+    if let Some(durable) = durable_persistence {
+        return durable
+            .session
+            .finalize_turn(turn_id, &[], &durable.policy, outcome)
+            .map(|_| ())
+            .map_err(|error| format!("failed to persist terminal transcript outcome: {error}"));
+    }
+    let session = if let Some(persistence) = persistence {
         &persistence.session
     } else {
         return Ok(());

@@ -75,4 +75,15 @@ pub enum SessionError {
     /// A durable turn cannot be committed because its persisted state is inconsistent.
     #[error("durable turn error: {0}")]
     DurableTurn(String),
+
+    /// A turn was already finalized with a different outcome or payload.
+    #[error("durable turn conflict for {turn_id}: existing={existing}, requested={requested}")]
+    DurableTurnConflict {
+        /// Turn identity whose terminal record already exists.
+        turn_id: String,
+        /// Previously persisted terminal outcome or ambiguous state.
+        existing: String,
+        /// Requested terminal outcome.
+        requested: String,
+    },
 }
