@@ -86,7 +86,7 @@ The current refinement covers:
 - execution/activity/artifact/Delivery UX model;
 - light-first Nord-derived Desktop visual direction;
 - internationalization architecture and initial `zh-CN` / `en-US` product requirement;
-- definition of a future separate Desktop prerequisite implementation PR.
+- definition of a future governed Desktop prerequisite chain.
 
 ## Internationalization Requirement
 
@@ -118,38 +118,34 @@ The detailed contract is defined in `docs/design/talos-desktop/I18N.md`. Key arc
 The first GPUI visual/interaction spike must exercise the same Execution experience in both
 `zh-CN` and `en-US` so layout and hierarchy regressions are discovered before broad Desktop work.
 
-## Future Separate Prerequisite PR
+## Future Governed Prerequisite Chain
 
-Before the first GPUI Desktop implementation PR, a separate governed implementation PR must
-establish the shared work/evaluation foundation.
+Before the first GPUI Desktop implementation PR, an ordered set of separately governed and reviewed
+implementation slices must establish the shared work/evaluation foundation.
 
 The exact action list, acceptance, and exclusions are documented in
-`docs/proposals/talos-desktop-goal-oriented-workspace.md`, section **Future Separate Desktop
-Prerequisite Implementation PR**.
+`docs/proposals/talos-desktop-goal-oriented-workspace.md`, section **Future Governed Desktop
+Prerequisite Chain**.
 
-That future PR is expected to cover, after normal requirement intake/ADR/iteration/claim selection:
+The chain is deliberately split so no single PR owns all of the following concerns:
 
-- a canonical Mission/Work Graph domain, likely in a dedicated `talos-work` crate if dependency and
-  responsibility analysis confirms that boundary;
-- Goal and WorkUnit semantics with containment/dependency distinction;
-- migration/adaptation of current Todo persistence and tools into the Work Graph;
-- acceptance criteria and Goal authority rules;
-- Completion Claims and independent evaluator models;
-- exact-revision evaluation/staleness rules;
-- reuse of `VALIDATION-001` evidence without conflating validation and evaluation;
-- rework and Mission-level final evaluation gates;
-- runtime/product-neutral projections and regression/migration tests.
+1. P0 — decision and migration contract;
+2. P1 — canonical Work Domain and Todo compatibility;
+3. P2 — Completion Claim and Evaluation state model;
+4. P3 — independent evaluator runtime and validation evidence;
+5. P4 — Mission final gate, UI-neutral projection, and end-to-end closure.
 
-The prerequisite PR must not create `talos-desktop`, add GPUI, implement Desktop windows/panels, or
-claim Desktop shipment. Desktop internationalization is likewise **not** part of that shared
-Work Graph/evaluation prerequisite; it belongs to the later GPUI Desktop implementation boundary.
+Each item requires its own selected iteration, effective Collaboration Claim, implementation PR,
+acceptance evidence, and independent review. None may create `talos-desktop`, add GPUI, implement
+Desktop windows/panels, or claim Desktop shipment. Desktop internationalization is likewise **not**
+part of this shared chain; it belongs to the later GPUI Desktop implementation boundary.
 
 ## First GPUI Desktop Implementation Boundary
 
-After the shared prerequisite is merged and a Desktop implementation iteration/claim is selected,
-the first GPUI Desktop slice must establish the localization foundation together with the selected
-visible surface. It must not ship a hard-coded single-language prototype that would require later
-view-level rewrites to internationalize.
+After the full shared prerequisite chain is merged and a Desktop implementation iteration/claim is
+selected, the first GPUI Desktop slice must establish the localization foundation together with the
+selected visible surface. It must not ship a hard-coded single-language prototype that would require
+later view-level rewrites to internationalize.
 
 At minimum that slice should:
 
@@ -213,7 +209,7 @@ Resume implementation only through bounded, governed work:
 1. run requirement intake for the shared Work Graph/evaluation prerequisite;
 2. create required ADR(s) and migration plan for public/breaking boundaries;
 3. select an implementation iteration and establish an effective Collaboration Claim;
-4. land and independently review the prerequisite implementation PR;
+4. land and independently review each prerequisite-chain slice in order;
 5. then select the first GPUI Desktop implementation iteration and claim;
 6. in that Desktop slice, validate the localization mechanism, `zh-CN`/`en-US` coverage, Chinese
    IME, and bilingual layout before broadening the UI surface.
@@ -269,13 +265,13 @@ system-language behavior, fallback, and any restart requirement for changing loc
 - Internationalization is a first-class Desktop requirement with initial `zh-CN` and `en-US`
   coverage, locale-neutral domain identity, bilingual layout/IME requirements, and deterministic
   fallback documented before implementation.
-- The future prerequisite implementation PR is explicitly defined but not created by this
-  documentation refinement.
+- The future prerequisite implementation chain is explicitly decomposed but no slice is created or
+  authorized by this documentation refinement.
 - No production code or implementation authorization is implied by this Story update.
 
 ## Residual Destination
 
-Implementation must use new governed iterations/claims. The first implementation residual is the
-separate Work Graph/evaluation prerequisite PR defined by the refined design baseline; the first
-GPUI Desktop implementation is a later independent slice after that prerequisite is merged and must
-include the internationalization foundation for its visible UI scope.
+Implementation must use new governed iterations/claims. The first implementation residual is P0 of
+the Work Graph/evaluation prerequisite chain defined by the refined design baseline; the first GPUI
+Desktop implementation is a later independent slice after the full chain is merged and must include
+the internationalization foundation for its visible UI scope.

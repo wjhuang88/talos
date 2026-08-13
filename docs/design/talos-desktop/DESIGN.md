@@ -471,7 +471,11 @@ The image is a **directional reference**, not a pixel-perfect specification. It 
 
 Where the image conflicts with this document, **this document is authoritative**. In particular, the final implementation should use the Nord-derived semantic palette defined above rather than treating any illustrative orange accent in a reference mockup as canonical.
 
-The image also represents only one language composition. It must not be treated as evidence that the layout is valid for both initial Desktop locales. The first GPUI visual spike must validate equivalent `zh-CN` and `en-US` layouts.
+The image uses illustrative mixed Chinese/English copy to show hierarchy. It must not be treated as
+one complete locale, as localization coverage, or as evidence that the layout is valid for both
+initial Desktop locales. The first GPUI visual spike must validate separate, complete `zh-CN` and
+`en-US` layouts. Its sidebar width is also illustrative: implementation must retain the compact or
+collapsible navigation behavior required by section 7.
 
 ## 13. Initial GPUI Design Validation
 

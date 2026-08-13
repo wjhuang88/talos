@@ -32,8 +32,8 @@ A concise product statement is:
 > the delivery.
 
 This document records the design baseline agreed for that direction and defines the scope of a
-**future, separate Desktop prerequisite implementation PR**. This document PR itself must not add
-Desktop code, create the prerequisite implementation PR, or imply that implementation has been
+**future, governed Desktop prerequisite chain**. This document PR itself must not add Desktop code,
+create any prerequisite implementation PR, or imply that implementation has been
 selected or authorized.
 
 The Desktop visual and internationalization baselines are additionally defined in:
@@ -741,8 +741,8 @@ The current Todo implementation is session-owned. Mission/Goal/Evaluation lifeti
 span executor, evaluator, rework, and later reconnect sessions. A dedicated durable work-domain crate
 such as `talos-work` is therefore a credible candidate.
 
-That name and boundary are **not authorized merely by this proposal**. The future prerequisite PR
-must confirm dependency direction and responsibility before adding the crate.
+That name and boundary are **not authorized merely by this proposal**. Prerequisite slice P0 must
+confirm dependency direction and responsibility before a later slice adds the crate.
 
 If created, its responsibility should be narrowly defined around durable work state:
 
@@ -803,88 +803,74 @@ SESSION-009 becomes a hard dependency for behavior such as:
 
 The first Desktop slice must not invent alternate session ownership merely to bypass SESSION-009.
 
-## 20. Future Separate Desktop Prerequisite Implementation PR
+## 20. Future Governed Desktop Prerequisite Chain
 
-This document defines the required **future action**. The documentation PR containing this proposal
-must not create the implementation PR itself.
+This document defines the required **future dependency chain**. The documentation PR containing
+this proposal must not create any implementation PR itself.
 
-Before the first GPUI Desktop implementation PR, create a separate governed prerequisite
-implementation PR after normal requirement intake, ADR/migration review, iteration selection, and an
-effective Collaboration Claim.
+Before the first GPUI Desktop implementation PR, complete the ordered prerequisite slices below.
+Each slice requires normal requirement intake, its own selected iteration and effective Collaboration
+Claim, an independently reviewable implementation PR, and its own acceptance evidence. A later slice
+must not be folded into an earlier one merely to accelerate Desktop startup.
 
-A suitable conceptual title is:
+### 20.1 P0 — Decision and migration contract
 
-> `foundation: introduce canonical work graph and independent goal evaluation`
+Resolve the architecture before changing public or persisted behavior:
 
-The title is illustrative; governance/story IDs and final scope must come from the selected
-iteration.
+- confirm the crate/dependency boundary for canonical work state;
+- inventory current Todo persistence, tools, and compatibility obligations;
+- define stable identity and revision semantics;
+- record any public API, persistence migration, native dependency, or evaluator-isolation decisions
+  in the required ADRs and migration plan.
 
-### 20.1 Required implementation actions
+Acceptance: the selected implementation slices have explicit boundaries, migration/rollback
+expectations, and no unresolved breaking-change decision hidden in code review.
 
-The future prerequisite PR should, subject to the selected iteration and review, establish:
+### 20.2 P1 — Canonical work domain and Todo compatibility
 
-1. **Canonical work domain**
-   - confirm whether `talos-work` is the correct crate boundary;
-   - add Mission, Work Graph, Goal, WorkUnit, containment, dependency, and stable identity;
-   - define revision semantics required by evaluation.
+Establish one shared source of truth for Mission, Work Graph, Goal, WorkUnit, containment,
+dependencies, stable identity, and revision semantics. Adapt the current Todo surface onto that
+domain while preserving status, priority, tags, dependencies, idempotency, batch behavior, cycle
+rejection, and permission gating.
 
-2. **Todo migration/adaptation**
-   - preserve current Todo status/priority/tag/dependency/idempotency/batch semantics as WorkUnit
-     behavior where applicable;
-   - preserve cycle rejection and permission gating;
-   - provide a compatibility projection/adaptor for `/todo` and `todo_*` during migration;
-   - avoid maintaining a second Todo repository beside Work Graph.
+Acceptance: existing Todo behavior remains usable through a tested compatibility surface, and no
+second independently mutable Todo repository exists beside Work Graph.
 
-3. **Acceptance Criteria**
-   - make acceptance first-class Goal state;
-   - distinguish deterministic validation/artifact/invariant checks from semantic judgment where
-     useful.
+### 20.3 P2 — Completion and evaluation state model
 
-4. **Goal authority**
-   - executor cannot directly transition Goal to `Completed`;
-   - executor can complete Work Units;
-   - executor can request Goal evaluation through a Completion Claim.
+Add first-class Acceptance Criteria, Completion Claim, Evaluation subject/report/finding/verdict
+models, exact-revision binding, and staleness rules. Enforce the authority distinction: an executor
+may complete Work Units and request evaluation, but cannot directly certify a Goal as `Completed`.
+Represent FAIL and INCONCLUSIVE without pretending completion.
 
-5. **Completion Claim / Evaluation model**
-   - add structured Completion Claim;
-   - add Evaluation request/subject/report/finding/criterion-verdict models;
-   - bind verdicts to exact subject revisions;
-   - stale verdicts after relevant mutation.
+Acceptance: state-machine tests prove self-certification is rejected, verdicts are criterion-granular
+and revision-bound, relevant mutation stales prior verdicts, and rework requires a new Completion
+Claim.
 
-6. **Independent evaluator boundary**
-   - separate Agent/runtime instance or equivalent enforced execution boundary;
-   - fresh evaluation context;
-   - read-only by default;
-   - no inheritance of executor reasoning as evaluation truth.
+### 20.4 P3 — Independent evaluator runtime and evidence
 
-7. **Validation evidence integration**
-   - consume existing Validation Service records as Evidence;
-   - do not make Validator itself the Goal judgment authority;
-   - deterministic acceptance prefers deterministic evidence.
+Implement a separate Agent/runtime instance or equivalent enforced evaluator boundary with fresh
+context and read-only authority by default. Consume existing Validation Service records as Evidence
+without making Validator the Goal judgment authority or inheriting executor reasoning as truth.
 
-8. **Rework loop**
-   - FAIL/INCONCLUSIVE are representable without pretending Goal completion;
-   - a changed subject requires a new Completion Claim and fresh Evaluation.
+Acceptance: integration tests demonstrate evaluator/executor authority separation, deterministic
+criteria prefer deterministic evidence, and evaluator dependency failures degrade to an explicit
+safe outcome rather than process exit or false PASS.
 
-9. **Mission final-evaluation contract**
-   - define the Mission-level gate so all Goal PASS results do not automatically imply Delivery.
+### 20.5 P4 — Mission gate and UI-neutral projection
 
-10. **Projection/API boundary**
-    - expose enough UI-neutral state/events for later Desktop use;
-    - do not introduce GPUI types into shared crates;
-    - reconcile `talos-conversation` and current CLI `tui_bridge` orchestration before creating new
-      presentation abstractions.
+Implement the Mission-level final-evaluation gate so Goal PASS results do not automatically imply
+Delivery. Expose the minimum UI-neutral state/events required by later Desktop work, reconciling
+`talos-conversation` and current CLI `tui_bridge` ownership before introducing another presentation
+abstraction. GPUI types must not enter shared crates.
 
-11. **Migration/regression tests**
-    - existing Todo behavior remains usable through the compatibility surface;
-    - cycle/idempotency/batch behavior is preserved;
-    - executor cannot self-certify Goal completion;
-    - evaluation staleness is tested;
-    - locale is not part of this shared work-domain PR.
+Acceptance: one end-to-end non-GPUI walkthrough proves WorkUnit completion, Completion Claim,
+independent Evaluation, rework/staleness, Mission final evaluation, and Delivery gating through the
+shared projection while preserving TUI compatibility.
 
-### 20.2 Required acceptance
+### 20.6 Chain-level acceptance
 
-The prerequisite PR should not be considered complete unless:
+The prerequisite chain should not be considered complete unless:
 
 - there is one canonical work-state source of truth;
 - Todo no longer needs to evolve as an independent parallel planning domain;
@@ -899,9 +885,11 @@ The prerequisite PR should not be considered complete unless:
 - TUI compatibility does not require depending on Desktop/GPUI;
 - no Desktop UI is claimed as implemented.
 
-### 20.3 Explicit exclusions from the prerequisite PR
+No individual slice may cite chain-level acceptance as evidence for work that has not yet landed.
 
-The prerequisite PR must **not**:
+### 20.7 Explicit exclusions from every prerequisite slice
+
+Every prerequisite slice must **not**:
 
 - create `talos-desktop`;
 - add GPUI;
@@ -915,9 +903,9 @@ The prerequisite PR must **not**:
 - delete compatibility Todo surfaces without an explicit migration acceptance;
 - weaken permission, sandbox, credential, transcript, or evidence boundaries.
 
-### 20.4 Separate first GPUI Desktop implementation
+### 20.8 Separate first GPUI Desktop implementation
 
-Only after the prerequisite work has merged and passed independent review should a separately
+Only after every prerequisite slice has merged and passed independent review should a separately
 selected/claimed Desktop implementation slice begin.
 
 That first GPUI slice should establish:
@@ -935,7 +923,7 @@ That first GPUI slice should establish:
 The first GPUI slice should not ship a hard-coded single-language prototype that must later be
 structurally internationalized.
 
-## 21. Development Phases After The Prerequisite
+## 21. Desktop Development Phases After The Prerequisite Chain
 
 Subject to future governed iteration selection, the broad Desktop sequence remains:
 
@@ -989,7 +977,7 @@ This proposal does not authorize:
 
 ## 24. Required Reads For Future Implementers
 
-Before the prerequisite implementation PR:
+Before starting the prerequisite chain:
 
 - `docs/backlog/active/DESKTOP-001-desktop-product-direction.md`
 - `docs/backlog/active/TODO-001-session-todo-list.md`
@@ -1015,7 +1003,7 @@ Before the first GPUI Desktop implementation PR, additionally read:
 This is a design/proposal baseline. It does not create an implementation iteration, Collaboration
 Claim, crate, migration, Desktop binary, localization catalog, or PR authorization.
 
-The required next implementation action remains a **future separate prerequisite PR**, created only
-after normal repository governance selects and authorizes that work. Internationalization belongs to
-the later first GPUI Desktop implementation slice, not to the shared Work Graph/evaluation
-prerequisite.
+The required next implementation action remains **P0 of a future governed prerequisite chain**,
+created only after normal repository governance selects and authorizes that slice. Internationalization
+belongs to the later first GPUI Desktop implementation slice, not to the shared Work Graph/evaluation
+prerequisite chain.
