@@ -53,20 +53,27 @@ record reaches `main`; no Dashboard implementation branch or worktree is authori
 
 ### Current Synchronized Claim Baseline
 
-- `main` advanced after planning to
-  `0459b8afb1626783f21b54dbaf55a0ef84393cd7` after I193/SESSION-008-B claim merge #210 and its
-  target-branch synchronization commit.
-- #212 was synchronized by pure two-parent merge commit
-  `0af41981cb3bebb8725a0ebd9ba20edf7637ab01` whose parents are the previously reviewed #212 head
-  `556200a2bedd5397a0015d426bdeb0d55d5a2082` and `main@0459b8af...`.
-- The pure merge intentionally took current-main truth for shared indexes; subsequent governance-only
-  commits reapply I195 derived-index rows and refresh this owner on top of the synchronized baseline.
-- I194/Desktop remains an unmerged parallel proposal and is not imported as target-branch truth.
+- `main` advanced after the prior I193 synchronization to
+  `f778543c7ceeb2a099eb3863fc8259da68d02195` when Desktop claim PR #211 merged.
+- #212 was synchronized again by pure two-parent governance merge commit
+  `bdc9ea8e446dc694976f43ef99ac7323f7960584` whose parents are the prior #212 head
+  `63ad438cfc5cba91508a5e05fdc8bc827085c3d2` and `main@f778543c...`.
+- That merge deliberately takes current-main truth for the shared Board/backlog/iteration indexes and
+  retains only I195-owned claim/owner material from the Dashboard branch. Derived I195 index rows are
+  deferred to truthful post-claim synchronization rather than overriding concurrent Runtime/Desktop
+  rows during the claim PR.
+- I194/Desktop claim #211 is now effective target-branch truth and remains independent of I195.
+- Open PR #215 carries the separately activated, decision-only I194 D0 work in Review; it remains
+  unmerged and its proposed ADR/status/index changes are not imported into #212 as target-branch truth.
+- Open PR #216 carries separately activated I193/SESSION-008-B implementation work; it also remains
+  unmerged and does not grant I195 any Runtime/Session implementation authority.
 
 ### Current Non-Terminal Iteration Inventory
 
-After synchronizing to `main@0459b8af...`, there remains no Active or Review iteration in the
-current operating set. The following non-terminal target-branch iterations remain independent:
+After synchronizing to `main@f778543c...`, target-branch truth still has no Active or Review
+iteration: I193 and I194 are Planned / Claimed on `main`. Separately activated work exists on open
+PR branches #216 and #215 and must be treated as live overlap/CAS inventory without being rewritten
+as target-branch lifecycle truth.
 
 | Iteration | State | I195 Disposition |
 |---|---|---|
@@ -77,20 +84,23 @@ current operating set. The following non-terminal target-branch iterations remai
 | I164 | Paused | Preserve the superseded startup-inline target; do not resume. |
 | I188 | Planned / Claimed | Keep unactivated; TOOL-024-A decision-only process/permission work is independent. |
 | I189 | Planned / Claimed | Keep unactivated; PERM-006-A permission-foundation scope is independent. |
-| I193 | Planned / Claimed | Claim #210 is effective on `main`; keep I193 unactivated and independent. I195 consumes no SESSION-008-B implementation authority. |
+| I193 | Planned / Claimed on `main`; separately activated in open PR #216 | Claim #210 is effective on `main`; PR #216 implements only SESSION-008-B from `main@f778543c...`. Keep it independent; I195 consumes no SESSION-008-B authority. |
+| I194 | Planned / Claimed on `main`; separately activated in open PR #215 | Claim #211 is effective on `main`; PR #215 carries decision-only Desktop D0 Review work. Keep it independent; I195 consumes no Desktop renderer/host/i18n/native authorization. |
 
 No existing target-branch owner authorizes I195 implementation. This table must be refreshed again
 immediately before claim merge, implementation branch creation and implementation merge.
 
 ### Parallel Three-Track Coordination
 
-- Runtime/session lane: PR #210 / I193 has now merged to `main`; I193 is target-branch truth and
-  remains Planned / Claimed pending its own explicit activation. Dashboard does **not** reuse or
-  implement I193 scope.
-- Desktop lane: PR #211 / proposed I194 remains unmerged as of this synchronization. Dashboard does
-  **not** use I194 and does not import its proposed owner/index state into current-main truth.
+- Runtime/session lane: I193 claim PR #210 is effective on `main`; open PR #216 now carries the
+  separately activated SESSION-008-B implementation from `main@f778543c...`. It remains unmerged and
+  non-overlapping with I195; RUNTIME-005, I188 and I189 retain their own gates.
+- Desktop lane: I194 claim PR #211 merged as `f778543c...`; open PR #215 carries the separately
+  activated decision-only D0 work in Review at observed head
+  `0a47208ce6fad23c706ebede8b3d07111b9303dc`. It remains unmerged and non-overlapping with I195;
+  #212 does not import its proposed ADR/status/index state or any renderer/i18n/native authority.
 - I195 remains the Dashboard lane owner candidate and is still ineffective until #212 itself reaches
-  `main` after new-head review and merge-time CAS.
+  `main` after new-head validation, independent natural-person review and merge-time CAS.
 - Archival recovery PRs #120/#121 remain immutable provenance and are not implementation authority.
 
 If any parallel claim, branch or `main` update changes these facts, refresh the governance proposal
@@ -296,14 +306,19 @@ Manual acceptance on the exact rebuilt implementation head:
   `c4bd9606c8bae63cb9bf11becd45846bf0805982`.
 - Common three-track base:
   `23e4174bcfb036602ce2145026b872ec5c517289`.
-- Runtime-line I193 collision was initially avoided based on PR #210; #210 later merged and #212 was
-  synchronized to `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7` by pure merge
+- Prior Runtime-line synchronization after I193 claim merge is retained as historical evidence:
+  #212 was synchronized to `main@0459b8afb1626783f21b54dbaf55a0ef84393cd7` by pure merge
   `0af41981cb3bebb8725a0ebd9ba20edf7637ab01`.
-- Desktop-line I194 remains an unmerged parallel proposal as of this synchronization.
-- Independent review comment `5277157606` on former exact head `556200a2...` returned NEEDS CHANGES
-  solely for main drift/mergeability; its positive content findings do not carry forward as approval
-  of the new head.
+- Current target synchronization after I194 claim merge is pure two-parent commit
+  `bdc9ea8e446dc694976f43ef99ac7323f7960584` with parents prior #212 head `63ad438c...` and
+  `main@f778543c7ceeb2a099eb3863fc8259da68d02195`; shared derived files take current-main truth.
+- Desktop claim #211 is effective at `f778543c...`; open PR #215 decision-only D0 Review work remains
+  unmerged and independent. Runtime open PR #216 likewise remains unmerged and independent.
+- Independent review comment `5277157606` on former exact head `556200a2...` returned NEEDS CHANGES;
+  it does not carry forward to the current head.
 - Governance claim PR: #212.
+- CI run `31689376591` passed on synchronization head `bdc9ea8e...`; it becomes historical evidence
+  after this inventory refresh.
 - New exact-head validator/CI/review and merge-time CAS evidence: pending.
 
 ## Completion Evidence
