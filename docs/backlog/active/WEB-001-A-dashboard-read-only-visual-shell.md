@@ -84,6 +84,8 @@ ADR-031 and I129.
 - A new permission model.
 - A new persistence model.
 - A remote control plane.
+- Dashboard UI localization/i18n in this slice; user-facing README documentation remains bilingual,
+  while the rendered Dashboard copy remains English and keeps truthful `lang="en"` metadata.
 - New shared runtime/domain/session APIs unless separately owned, claimed and landed through the
   mainline foundation lane first.
 - JavaScript framework, Node.js build pipeline or speculative client-side state management unless a
@@ -96,7 +98,11 @@ ADR-031 and I129.
 
 - WEB-001 parent product direction remains Partial; this child does not change or complete its
   separately owned SSE/write/approval/session/remote residuals.
-- ADR-031 is authoritative for the loopback GET-only security boundary.
+- ADR-031 is authoritative for the loopback binding, read-only security posture, and its four
+  approved initial routes `/status`, `/history`, `/governance`, and `/config`; this Story does not
+  claim that ADR-031 §5 originally authorized `/extensions`.
+- `/extensions` read-only provenance comes from WEB-001/I129-era Dashboard evolution and the current
+  GET-only implementation; this child adds HTML presentation parity without expanding route privilege.
 - I129 is prior implementation evidence for the existing rendered `/status`, `/history`,
   `/governance` and `/config` representations; its acceptance is not reused as this Story's
   authorization.
@@ -108,9 +114,13 @@ ADR-031 and I129.
 
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
   - retain `127.0.0.1` loopback binding;
-  - retain GET-only routing for this slice;
+  - retain the GET-only/read-only security posture established there for the approved initial routes;
+  - do not attribute `/extensions` route provenance to ADR-031 §5;
   - retain output-boundary redaction and the existing config masking boundary;
   - do not infer remote or browser-control authorization.
+- `docs/backlog/active/WEB-001-embedded-web-control-surface.md` and I129 implementation history
+  - establish the current `/extensions` GET-only snapshot surface and its JSON-only pre-I195 state;
+  - I195 may add explicit HTML presentation but no write/control semantics.
 - `docs/proposals/web-001-loopback-dashboard-design.md`
   - use the existing read-only loopback presentation as the first product surface;
   - keep later live/write/control concerns independently gated.
@@ -125,6 +135,11 @@ ADR-031 and I129.
 - **Soft constraint**: keep the first slice server-rendered and dependency-light. Validate that
   semantic HTML plus CSP-compatible CSS is sufficient for the required IA, responsive behavior and
   accessibility before considering a client framework.
+- **Current CSP is a hard resource constraint**: existing HTML responses send
+  `default-src 'none'; style-src 'unsafe-inline'`. The first slice must therefore remain compatible
+  with inline CSS and inline SVG markup and must not depend on executable script, external/web fonts,
+  raster/remote images, or `data:` image resources that the current policy blocks. This makes the
+  no-JavaScript first slice mechanically enforceable at runtime rather than only a planning preference.
 - **Assumption**: the existing five snapshots contain enough user-facing information for a coherent
   first shell. Validate during implementation; missing shared data is not filled by duplicating
   domain logic in `talos-dashboard`.
@@ -153,7 +168,7 @@ Implementation acceptance updates:
   rewriting WEB-001's published residual acceptance.
 
 Documentation must call this a local read-only Dashboard or read-only web surface, not a remote or
-write-capable control plane.
+write-capable control plane. Bilingual README updates do not imply Dashboard UI localization in I195.
 
 ## Required Reads
 
@@ -182,7 +197,8 @@ write-capable control plane.
   are all reachable and return read-only rendered content.
 - **Extensions parity** — Given `Accept: text/html` on `/extensions`, when the endpoint responds,
   then it returns the same safe shared HTML shell/presentation model as the other Dashboard pages;
-  given no explicit HTML request, its existing JSON representation remains available.
+  given no explicit HTML request, its existing JSON representation remains available. The route
+  provenance is WEB-001/I129/current implementation, not ADR-031 §5.
 - **Config masking** — Given configuration contains a credential or API key, when `/config` is
   rendered or requested as plain text, then the existing masked representation is preserved and no
   secret value is exposed.
@@ -203,6 +219,17 @@ write-capable control plane.
   traverses the shell, then navigation remains operable, focus is visibly identifiable, headings and
   landmarks preserve reading order, and no required information is available only through hover or
   color.
+- **Contrast UX** — Given normal text, large text, focus indicators, borders/icons or other essential
+  visual affordances, when the rendered shell is evaluated, then text meets WCAG 2.1 AA contrast
+  thresholds (4.5:1 normal text and 3:1 large text) and essential non-text/focus affordances meet a
+  3:1 contrast threshold against adjacent colors.
+- **CSP-compatible resources** — Given the existing HTML CSP `default-src 'none'; style-src
+  'unsafe-inline'`, when all five pages render, then the UX does not depend on scripts, external/web
+  fonts, raster/remote images or `data:` image resources; required visuals work with semantic text,
+  inline CSS and inline SVG markup under the unchanged CSP.
+- **Language metadata** — Given this first slice intentionally ships English Dashboard UI copy,
+  when rendered HTML is inspected, then `lang="en"` remains truthful; README.zh-CN documentation is
+  not treated as authorization or acceptance for Dashboard UI i18n.
 - **Single source of truth** — Given existing runtime/session/config/extension data is displayed,
   when implementation is reviewed, then `talos-dashboard` consumes existing snapshot/domain logic
   and does not introduce duplicate durable state, permission logic or session semantics.
@@ -224,7 +251,8 @@ write-capable control plane.
 - [ ] `bash scripts/validate_collaboration_claims.sh .` passes.
 - [ ] `git diff --check` is clean.
 - [ ] Repeatable manual browser validation records 320×568, 768×1024 and 1440×900 layouts, 200%
-      zoom and keyboard-only navigation without using browser automation.
+      zoom, keyboard-only navigation, WCAG AA contrast checks, unchanged CSP-compatible resource
+      behavior and truthful English `lang` metadata without using browser automation.
 - [ ] Independent natural-person review is bound to the exact implementation head; shared-account
       review explicitly discloses reviewer identity.
 - [ ] Merge-time CAS confirms current `main`, no overlapping effective claim/new PR, exact reviewed
