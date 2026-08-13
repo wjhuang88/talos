@@ -60,8 +60,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I190 | Change-Aware CI Routing | Complete | Completion Commit `a69ffa30afed16271885d4ef3d11931ab3189673` implements trusted-base fail-closed routing; probe Completion Commit `01721f683d0c09ad5f5f9e98360da15cd5155c48` proves the real reduced path. GOV-006 separately owns the unclaimed case-normalization residual. |
 | I191 | Non-Interactive Terminal Containment | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; I188 remains Planned/Claimed and unactivated. |
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; SESSION-008-B remains Ready/Unclaimed and RUNTIME-005 remains blocked. |
-| I193 | SESSION-008-B Durable Partial-Turn Finalization | Active / Claimed | Activated from `main@f778543c` in `feat/session-i193-partial-finalization`; R1/R2 are mandatory acceptance inputs. RUNTIME-005 retains its owner-defined gates. |
-| I194 | Desktop Renderer, Host, And Repository Boundary | Review | Claim PR #211 merged as `f778543c`; decision-only ADR/security packet and pinned GPUI/Iced source evidence are in `/private/tmp/talos-i194`. Selected-release lock/security/platform/motion gates remain open; renderer implementation and dependencies remain unauthorized. |
+| I193 | SESSION-008-B Durable Partial-Turn Finalization | Planned / Claimed | Claim PR #210 merged as `fb5a1f62`; implementation requires explicit activation. R1/R2 are mandatory acceptance inputs; RUNTIME-005 remains blocked by its owner-defined gates. |
+| I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
 
 ## Completed This Closeout
 
