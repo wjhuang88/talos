@@ -79,7 +79,7 @@ inventory.
 |---|---|---|---|---|---|---|
 | V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
-| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Review — implementation PR #240 merged as `97556149`; Completion Commit pending |
+| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Done — Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 as `2d48bd2c` |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
@@ -256,3 +256,21 @@ Recovery or resume instruction: refresh `origin/main`, verify I160 remains in Re
 implementation PR #240 merged as `97556149`, then prepare the owner-first closeout and Completion
 Commit evidence. Do not resume the old implementation worktree or begin I161, release/version/tag,
 or Cargo publication work. Preserve the published baseline and append execution evidence only.
+
+### 2026-08-15 I160 Completion Checkpoint
+
+Completed task items: V080-20 is Complete. Pre-existing implementation commit
+`0524e82fa700892cb77bf378139c47b92a64693c` satisfies the Completion Commit requirement; PR #240
+merged as `97556149` after exact-head CI `31824945312` and independent approval `5296616991`, and
+owner-first closeout/derived synchronization merged as PR #241 `2d48bd2c`.
+
+Current state and artifacts: I160/ARCH-031-B is Complete/Closed. I161 remains blocked until its own
+claim, security review and implementation evidence; I162 and I203 remain blocked in order. No tag,
+GitHub Release or Cargo publication is authorized by this checkpoint.
+
+Next task item: prepare a fresh exact-main inventory and an independent claim for I161. Do not reuse
+I160 authorization or implementation worktree.
+
+Recovery or resume instruction: refresh `origin/main`, verify I160 Completion Commit
+`0524e82f` and merge `2d48bd2c`, then follow I161's owner document and START-ITERATION gates. Keep
+GitHub Release before Cargo publication and preserve the published baselines.

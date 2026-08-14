@@ -6,9 +6,9 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Review / implementation merged — Completion Commit pending |
+| Status | Complete — implementation PR #240 merged as `97556149` |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Review / Claimed) |
+| Selected Iteration | I160 (Complete / Closed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS before merge `71faf8440466668daeef0afd0e779be072978b01` established the claim on `main`. |
 | Implementation PR | #240 |
 | Last Updated | 2026-08-15 |
-| Handoff / Release Condition | Execute only the bounded shared-composition slice from `main@71faf844`; submit exact-head validation and independent review before merge. Release/version/tag/publication remain excluded. |
+| Handoff / Release Condition | None — ARCH-031-B/I160 is complete. I161/I162 and release/version/tag/publication remain separately governed. |
 
 ## Problem
 
@@ -226,8 +226,8 @@ Stop if:
 - The effective claim authorizes only ARCH-031-B/I160. The implementation worktree
   `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that
   exact merge commit; no Rust/Cargo change existed at activation.
-- I160 implementation PR #240 merged as `97556149`; I160 remains in Review until a Completion Commit
-  is recorded. I161-I162 remain blocked, and release/version/tag/publication remain outside this
+- I160 implementation PR #240 merged as `97556149`; Completion Commit `0524e82f` records the
+  pre-existing implementation evidence. I161-I162 remain blocked, and release/version/tag/publication remain outside this
   Work Slice.
 
 ## 2026-08-15 Implementation Baseline
@@ -261,4 +261,12 @@ Stop if:
   through the existing permission adapter.
 - Local evidence: runtime shared-composition tests 22/22 passed; CLI registry tests 29/29 passed;
   default runtime and shared feature locked checks passed; governance validators returned 0
-  warnings. Exact implementation-head CI and independent review remain pending.
+  warnings. Exact implementation-head CI `31824945312` passed all five required jobs and independent
+  approval `5296616991` was recorded.
+
+## 2026-08-15 Completion Evidence
+
+- Completion Commit: `0524e82fa700892cb77bf378139c47b92a64693c` (pre-existing implementation commit;
+  the closeout status commit is not used as its own evidence).
+- Implementation PR #240 merged as `97556149`; derived-view closeout PR #241 merged as `2d48bd2c`.
+- I161/I162 remain blocked and publication/version/tag work remains outside this story.
