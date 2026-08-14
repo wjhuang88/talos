@@ -5,7 +5,7 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Ready — SESSION-008-A complete; SESSION-008-B unclaimed |
+| Status | In Progress — SESSION-008-A complete; SESSION-008-B active in I193 |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
 | Selected Iteration | I193 Planned; Collaboration Claim effective in main merge `fb5a1f62` |
@@ -103,7 +103,7 @@ transcript must identify that the turn did not complete normally.
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | SESSION-008-A | Partial-turn lifecycle and durable-format decision | Complete in I187; Completion Commit `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` | Existing ADR-039/ADR-042 and current-path inventory |
-| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Ready / Unclaimed | SESSION-008-A Complete; ADR-058 Accepted |
+| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | In Progress in I193 / Claimed | SESSION-008-A Complete; ADR-058 Accepted |
 
 Only one child may be selected at a time. The parent becomes Complete only
 after both children have existing completion evidence and the Issue #45
@@ -205,6 +205,7 @@ scripts/validate_project_governance.sh .
 
 ## Residuals
 
-- This Story remains Ready until SESSION-008-B has existing implementation evidence and its owner
-  closeout is synchronized. Existing legacy error-path coverage remains a compatibility fixture;
-  it does not authorize or substitute for SESSION-008-B.
+- This Story remains In Progress until SESSION-008-B has merged implementation evidence and its
+  owner closeout is synchronized. Feature-branch Error/Cancelled restart fixtures and atomicity
+  tests are implementation evidence under review, not completion evidence. Existing legacy
+  error-path coverage remains a compatibility fixture and does not substitute for SESSION-008-B.

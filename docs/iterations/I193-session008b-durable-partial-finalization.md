@@ -1,6 +1,6 @@
 # Iteration I193: SESSION-008-B Durable Partial-Turn Finalization
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-13
 > Planned objective: implement the Accepted ADR-058 contract as one atomic, idempotent durable
 > Success/Error/Cancelled finalization path with display-safe partial replay.
@@ -150,11 +150,25 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-13 | Claim merge | PR #210 merged as `fb5a1f62aed7d86657473fa766876045724f6419` through the documented Single-maintainer merge path. The claim is effective; I193 remains Planned and no implementation branch has been created. |
+| 2026-08-13 | Activation | Activated from exact `main@f778543c7ceeb2a099eb3863fc8259da68d02195` in independent worktree `/private/tmp/talos-i193` on `feat/session-i193-partial-finalization`. I194 remains separately Planned/Claimed after PR #211; I188/I189 remain Planned/Claimed and unactivated; I159-I162 remain Blocked; I164 remains Paused. Dashboard PR #212 is separate and must refresh its own target-branch base. |
 
 ## Verification Evidence
 
 - Claim PR #210 exact head `f7199120` passed CI and the documented Single-maintainer merge CAS;
-  claim merge `fb5a1f62` is now on `main`. Implementation validation is pending activation.
+  claim merge `fb5a1f62` is now on `main`.
+- Implementation worktree validation on 2026-08-13 passed `cargo check --workspace --locked`,
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+  `cargo test --locked -p talos-session`, `cargo test --locked -p talos-agent session`,
+  `cargo test --locked -p talos-runtime`, and `cargo test --workspace --locked`.
+- Real actor/durable-session fixtures cover provider Error and user Cancelled after a completed tool
+  exchange, reopen the Session, and assert the closed prefix plus explicit incomplete outcome.
+- Durable finalizer fixtures cover identical retry, conflicting outcome/payload with byte-identical
+  preservation, ambiguous legacy-entry rejection, empty-prefix marker-only cancellation, and
+  reasoning/secret/tool-output filtering.
+- SESSION-008-R1 remains explicit: I187 describes the pre-I193 released behavior and ADR-058 is the
+  target contract until this implementation reaches `main`. SESSION-008-R2 did not trigger: the
+  seven transient failures did not recur during default-parallel workspace validation, so no
+  concurrency or ENOSPC diagnosis is asserted.
 
 ## Completion Evidence
 
@@ -170,4 +184,6 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 
 ## Retrospective
 
-- Pending claim, activation and execution.
+- Implementation and local validation are complete on the feature branch. Exact-head CI, the
+  documented role-separated technical audit, merge CAS, implementation merge, and owner closeout
+  remain pending; this record therefore does not claim completion.
