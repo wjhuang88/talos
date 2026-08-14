@@ -6,9 +6,9 @@
 | Type | Architecture / Cargo Boundary Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I158 |
-| Status | Ready — TUI-037 disposition complete; feature ownership decisions resolved through the 2026-08-14 dependency correction |
+| Status | In Progress — I159 activated from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7` |
 | Depends on | ADR-052; ADR-053 Accepted; ARCH-034-R01/I158 Complete; TUI-037 disposition |
-| Selected Iteration | I159 (Planned / proposed claim) |
+| Selected Iteration | I159 (Active / Claimed) |
 | User/maintainer value | Embedders can use a lightweight local read-only tool surface without compiling unrelated heavy capability families |
 
 ## Problem

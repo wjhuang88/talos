@@ -77,8 +77,8 @@ inventory.
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Planned |
-| V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Planned |
+| V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
+| V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Active |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Planned |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
@@ -153,3 +153,29 @@ repeat merge-time CAS before it reaches `main`.
 
 Recovery or resume instruction: read this task, ARCH-031-A, I159 and the claim PR exact head; do not
 start code until the claim reaches current `main`.
+
+### 2026-08-14 I159 Activation Checkpoint
+
+Completed task items: V080-00. PR #235 head
+`11619e13ca6c854b4db737a9978767436a19ab9f` passed CI `31789567122`, independent approval
+`5292115807`, both governance validators and merge-time CAS, then merged as
+`fa635b4eaadd4b55939322f89acfda4522489ab7`.
+
+Current state and artifacts: I159/ARCH-031-A is the sole Active iteration and implementation starts
+from the claim merge on `feat/tools-I159-feature-boundary`. I188/I189/I195 remain
+Planned/Claimed, I196 remains on release priority hold, I160-I162/I203 remain Blocked, and I164
+remains Paused. No other open PR owns the I159 slice.
+
+Commands/checks and actual results: post-merge project governance and Collaboration Claim
+validators passed with 0 warnings; `origin/main` and the implementation branch baseline were both
+`fa635b4eaadd4b55939322f89acfda4522489ab7`.
+
+Open risks or deviations: the feature skeleton must be reconciled with the exact dependency graph,
+including shared `scraper` ownership and the pre-existing 0.22/0.27 duplication. Do not treat a
+dependency-version cleanup as implicitly authorized by I159.
+
+Next task item: capture the exact Cargo/module/downstream baseline, create the draft implementation
+PR, then implement the minimum feature gates and run the full build/product-parity matrix.
+
+Recovery or resume instruction: use only `/private/tmp/talos-i159-impl`; do not touch I188,
+Dashboard, I196, recovery branches, stashes, tags or registries.

@@ -1,6 +1,6 @@
 # Iteration I159: `talos-tools` Lightweight Feature Boundary
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-26
 > Planned objective: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,10 +19,10 @@
 | Source Issue | None |
 | Governance Claim PR | #235 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #235 proposes this bounded claim. Exact-head review, CI, governance validation and merge-time CAS are required; the proposed Claimed record remains ineffective until it reaches `main`. |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged to `main` as `fa635b4eaadd4b55939322f89acfda4522489ab7`. |
+| Implementation PR | Pending draft creation from `feat/tools-I159-feature-boundary` |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Merge PR #235 through exact-head independent review/CI and merge-time CAS, then create the I159 implementation branch from that merge or later current `main`. |
+| Handoff / Release Condition | Implement only on `feat/tools-I159-feature-boundary` from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7`; reach Review through the complete feature matrix, product-parity evidence and an implementation commit. |
 
 ## Published Baseline
 
@@ -148,6 +148,7 @@ If a stop condition occurs:
 | 2026-08-14 | Dependency disposition | TUI-037/I202 reached Complete through implementation commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` and PR #230 merge `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`, satisfying the required independent TUI disposition. I159 remains Blocked and unactivated because selected Story ARCH-031-A is still Refinement/Blocked and not Ready; no I159 claim or implementation authority is created. |
 | 2026-08-14 | Priority and readiness change control | The maintainer selected a v0.8.0 GitHub-first/Cargo-second release before I196 implementation. ARCH-031-A resolved its remaining feature-ownership alternatives and moved to Ready. I159 moves from Blocked to Planned and prepares its own claim; the published objective, exclusions and acceptance remain unchanged. I160-I162 stay blocked in order, I203 stays blocked on I162 GO, and no implementation is activated by this planning record. |
 | 2026-08-14 | Dependency-fact review correction | Independent review of PR #235 at `4cd5d6868b42f7efafccf117c78e30173addef01` found that `document_extract` unconditionally compiles existing `scraper 0.27`, so assigning it to default `file-read` contradicted the lightweight-default objective. ARCH-031-A change control now assigns the whole tool to a default-off `document` feature requiring `file-read`, includes it in `coding`, and corrects `tree`, `search_engine`, and `browser_page` source attributions. The published objective, product-parity requirement, exclusions and acceptance remain unchanged; this record still does not activate implementation. |
+| 2026-08-14 | Activation | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed exact-head CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged as `fa635b4eaadd4b55939322f89acfda4522489ab7`. The implementation branch starts exactly there. Pre-activation inventory found no Active or Review iteration; I188/I189/I195 remain Planned/Claimed and unactivated, I196 remains Planned/Claimed on release priority hold, I160-I162/I203 remain Blocked, and superseded I164 remains Paused. Open PRs #233, #228, #227 and archival #120/#121 do not own ARCH-031-A/I159. I159 alone becomes Active; no release, version, tag or publish authority is created. |
 
 ## Verification Evidence
 
