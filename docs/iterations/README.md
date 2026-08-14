@@ -62,6 +62,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; its SESSION-008-B residual was later completed by I193. |
 | I193 | SESSION-008-B Durable Partial-Turn Finalization | Complete | Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`; PR #216 merged as `1b5461cd`; exact-head CI `31691761892`; disclosed role audits `5287961007`/`5287989820`. RUNTIME-005 retains its owner-defined gates. |
 | I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
+| I195 | Dashboard Read-Only Visual Shell | Planned / proposed Claimed | PR #212 proposes WEB-001-A only; claim remains ineffective until exact-head validation, independent natural-person review, merge-time CAS, and merge to `main`. I193 Runtime is Complete and I194 Desktop D0 is Complete target-branch truth; neither scope is imported into I195. |
 
 ## Completed This Closeout
 
