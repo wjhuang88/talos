@@ -228,3 +228,36 @@ Stop if:
   exact merge commit; no Rust/Cargo change existed at activation.
 - I160 is Active. I161-I162 remain blocked, and release/version/tag/publication remain outside this
   Work Slice.
+
+## 2026-08-15 Implementation Baseline
+
+- `talos-tools/src/contributions.rs` already owns typed, source-labelled factories for shell,
+  snapshot-aware/ordinary file, workspace, network, Git, image, and symbol contribution groups.
+- `talos-cli/src/registry.rs` still repeats profile selection and contribution registration for
+  print, TUI, and MCP; `talos-cli/src/mode_interactive.rs` has a fourth interactive selection
+  path. The wrappers and scheduler/todo/plugin injections remain product-specific.
+- `talos-runtime::RuntimeBuilder` currently accepts caller-provided `AgentTool` values through
+  `.tool(...)` and registers them behind its permission adapter; it has no built-in composition
+  path. `RuntimeBuilder::new()` must retain this minimal default.
+- Shared owner decision: add a focused internal composition module to `talos-runtime`, backed by
+  the existing `talos-tools` and `talos-session` contribution factories. CLI will consume the
+  module through an explicitly documented internal bridge; no new crate and no CLI/TUI dependency
+  in the SDK direction.
+- Initial profile boundary: the shared module selects only contribution groups and construction
+  inputs. CLI/runtime wrappers, scheduler/todo/plugin/status additions, presentation policy, and
+  approval behavior remain in their respective adapters.
+
+## 2026-08-15 Implementation Checkpoint
+
+- Added `talos-runtime::composition` behind the opt-in `shared-composition` feature. It owns
+  profile-specific construction and contribution-group selection using existing `talos-tools`
+  factories; no new crate was added.
+- CLI print/TUI/MCP builders now consume the shared groups. Existing wrapper policy is unchanged:
+  `tree` remains unwrapped where required, Git read tools remain unwrapped, MCP keeps ordinary
+  file constructors, and `read_image` remains excluded from MCP.
+- `RuntimeBuilder::shared_tools()` explicitly consumes the runtime profile. `RuntimeBuilder::new()`
+  remains minimal and custom `.tool(...)` additions remain supported. All runtime tools still pass
+  through the existing permission adapter.
+- Local evidence: runtime shared-composition tests 22/22 passed; CLI registry tests 29/29 passed;
+  default runtime and shared feature locked checks passed; governance validators returned 0
+  warnings. Exact implementation-head CI and independent review remain pending.

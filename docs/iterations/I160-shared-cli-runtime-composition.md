@@ -150,13 +150,15 @@ If a stop condition occurs:
 | 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
 | 2026-08-14 | Claim preparation | Finalized claim PR #238 starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; the proposed claim remains ineffective until its `Claimed` record merges to `main`. |
 | 2026-08-15 | Activation | PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS, then merged as `71faf8440466668daeef0afd0e779be072978b01`. The implementation worktree `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that exact claim merge. I160 is the sole Active iteration. I164 remains Paused; I188/I189/I195/I196 remain Planned and unactivated; I161/I162/I203 remain Blocked. Open PRs #120/#121, #227, #228 and #233 do not own this Work Slice. Primary executor is `Codex / GPT-5 mainline session`; no Rust/Cargo change existed at activation. |
+| 2026-08-15 | Baseline and owner selection | Exact source baseline is `main@2b76b4e9`. Existing contribution factories are in `talos-tools/src/contributions.rs`; duplicate profile selection remains in CLI registry builders while `RuntimeBuilder::new()` remains minimal and caller-tool driven. The shared owner is a focused internal module in `talos-runtime`, consumed by CLI through an explicit bridge; no new crate, preset, fallback, permission-default change, or default tool expansion is authorized. |
+| 2026-08-15 | Implementation checkpoint | Added the optional `talos-runtime` `shared-composition` feature and contribution-group owner; CLI print/TUI/MCP adapters now consume the shared groups while retaining existing wrappers and product additions. `RuntimeBuilder::new()` is unchanged; `.shared_tools()` is explicit. No preset, fallback, permission default, or release/publication work was added. |
 
 ## Verification Evidence
 
-- Focused tests: pending
-- Full locked validation: pending
-- Runtime evidence: pending
-- Governance validation: pending
+- Focused tests: `cargo test --locked -p talos-runtime --features shared-composition` (22 passed); `cargo test --locked -p talos-cli registry::tests::` (29 registry tests passed).
+- Full locked validation: local `cargo test --locked --workspace` and `cargo clippy --locked --workspace --all-targets --all-features -- -D warnings` passed; exact implementation-head CI remains pending.
+- Runtime evidence: `tests::shared_composition_runtime_executes_read_tool` builds `RuntimeBuilder::new().shared_tools()` and executes the real shared `read` tool against a workspace fixture; composition inventory and MCP exclusion tests pass.
+- Governance validation: `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .` and `scripts/validate_project_governance.sh .` both passed with 0 warnings; `git diff --check` passed.
 
 ## Completion Evidence
 
