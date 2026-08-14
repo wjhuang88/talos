@@ -35,7 +35,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires the completed I158 baseline and a recorded TUI-037 disposition before activation. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Planned / proposed claim | ARCH-031-A is Ready after TUI-037 closure and feature-ownership resolution. Claim remains ineffective until its finalized PR reaches `main`; no implementation is active. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
@@ -62,9 +62,10 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; its SESSION-008-B residual was later completed by I193. |
 | I193 | SESSION-008-B Durable Partial-Turn Finalization | Complete | Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`; PR #216 merged as `1b5461cd`; exact-head CI `31691761892`; disclosed role audits `5287961007`/`5287989820`. RUNTIME-005 retains its owner-defined gates. |
 | I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
-| I195 | Dashboard Read-Only Visual Shell | Planned / proposed Claimed | PR #212 proposes WEB-001-A only; claim remains ineffective until exact-head validation, independent natural-person review, merge-time CAS, and merge to `main`. I193 Runtime is Complete and I194 Desktop D0 is Complete target-branch truth; neither scope is imported into I195. |
-| I196 | Canonical Work Domain Decision And Migration Contract | Planned / proposed claim PR #226 | WORK-001-A P0 only. The claim is ineffective until independently reviewed and merged to `main`; no implementation branch, Work Graph, Evaluator, persistence or Desktop work is authorized. |
+| I195 | Dashboard Read-Only Visual Shell | Planned / Claimed | PR #212 merged as `f123e534`, establishing WEB-001-A ownership. I195 remains unactivated and independent of release/mainline implementation. |
+| I196 | Canonical Work Domain Decision And Migration Contract | Planned / Claimed / priority hold | PR #226 merged as `453d1fba`; no implementation branch exists. Resume only after v0.8.0 publication closes and a fresh exact-main inventory passes. |
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
+| I203 | v0.8.0 GitHub And Crates.io Publication | Blocked / Unclaimed | Requires I159-I162 Complete and I162 GO. GitHub Release with five assets/checksums must complete before the first real Cargo publish. |
 
 ## Completed This Closeout
 

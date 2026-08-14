@@ -1,11 +1,28 @@
 # Iteration I159: `talos-tools` Lightweight Feature Boundary
 
-> Document status: Blocked
+> Document status: Planned
 > Published plan date: 2026-07-26
 > Planned objective: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Codex / GPT-5 mainline release-governance session 2026-08-14 |
+| Work Slice | ARCH-031-A / I159 only: implement real `talos-tools` Cargo feature boundaries, lightweight file-read/search defaults and explicit CLI `coding` selection while preserving product tool and permission behavior. No shared composition, runtime preset, sandbox policy, version bump, publication, tag or release. |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Exact-head review, CI, governance validation and merge-time CAS are required. This record remains Unclaimed until the Draft PR number is backfilled and the finalized Claimed record reaches `main`. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Finalize the claim with its actual PR number, merge it through independent review/CAS, then create the I159 implementation branch from that merge or later current `main`. |
 
 ## Published Baseline
 
@@ -129,6 +146,7 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency disposition | TUI-037/I202 reached Complete through implementation commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` and PR #230 merge `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`, satisfying the required independent TUI disposition. I159 remains Blocked and unactivated because selected Story ARCH-031-A is still Refinement/Blocked and not Ready; no I159 claim or implementation authority is created. |
+| 2026-08-14 | Priority and readiness change control | The maintainer selected a v0.8.0 GitHub-first/Cargo-second release before I196 implementation. ARCH-031-A resolved its remaining feature-ownership alternatives and moved to Ready. I159 moves from Blocked to Planned and prepares its own claim; the published objective, exclusions and acceptance remain unchanged. I160-I162 stay blocked in order, I203 stays blocked on I162 GO, and no implementation is activated by this planning record. |
 
 ## Verification Evidence
 

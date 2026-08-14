@@ -6,9 +6,9 @@
 | Type | Architecture / Cargo Boundary Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I158 |
-| Status | Refinement — blocked on TUI-037 disposition |
+| Status | Ready — TUI-037 disposition complete; feature ownership decisions resolved |
 | Depends on | ADR-052; ADR-053 Accepted; ARCH-034-R01/I158 Complete; TUI-037 disposition |
-| Selected Iteration | I159 (Planned/Blocked) |
+| Selected Iteration | I159 (Planned / proposed claim) |
 | User/maintainer value | Embedders can use a lightweight local read-only tool surface without compiling unrelated heavy capability families |
 
 ## Problem
@@ -43,26 +43,27 @@ Do not trust this Story's candidate names if current code has changed. Record an
 ## Feature Ownership Matrix
 
 Based on `crates/talos-tools/src/lib.rs` and `crates/talos-tools/Cargo.toml` (verified 2026-07-26).
-Cells marked "Decision required before Ready" must be resolved before this Story can leave
-Refinement. This section documents ownership; it does NOT implement any feature.
+The planning-time ownership alternatives were resolved on 2026-08-14 after the TUI-037 dependency
+closed and the current module/contribution graph was re-read. This section documents ownership; it
+does NOT implement any feature.
 
 | Module / Public Export | Proposed Feature | Optional Dependencies | Default | Notes |
 |---|---|---|---|---|
 | `file_tools` (`read`, `ls`) | `file-read` | (none beyond core) | on | `tree` shares read-only file access; see below |
 | `file_tools` (`write`, `edit`, `delete`) | `file-write` | (none beyond core) | off | mutating; permission-gated |
 | `search_tools` (`glob`, `grep`) | `search` | `grep-searcher`, `grep-regex`, `grep-matcher`, `ignore`, `walkdir`, `regex`, `glob` | on | ripgrep library crates (ADR-025) |
-| `tree` | `search` (or `file-read`) | `walkdir` | on | Decision required before Ready: group with `search` or `file-read` |
-| `diff_stat` (`DiffTool`, `StatTool`) | `git` (or `file-write`) | `similar` | off | Decision required before Ready: diff engine is `similar`; currently grouped with git display but usable without git |
+| `tree` | `search` | `walkdir` | on | Shares traversal weight with the default search family. |
+| `diff_stat` (`DiffTool`, `StatTool`) | `git` | `similar` | off | Keep this non-mutating comparison/stat family out of the lightweight default and in the current coding aggregate; a future standalone `diff` feature requires separate change control. |
 | `bash_tool` | `shell` | `libc` (unix), `talos-sandbox` | off | process/sandbox; security-sensitive |
 | `exec_tool` | `shell` | `talos-sandbox` | off | shares the `shell` feature with `bash_tool` |
 | `git` | `git` | `gix` | off | heavy native-ish dep; write tools route through permission |
 | `fetch_url` | `network` | `reqwest`, `scraper` | off | network + HTML parse |
 | `http_request` | `network` | `reqwest` | off | advanced HTTP; shares `network` with `fetch_url` |
 | `save_url` | `network` (+ `file-write`) | `reqwest` | off | dual network+write; both features required |
-| `web_search` | `network` (or unresolved `web-search` candidate) | `rust-websearch` | off | Decision required before Ready: separate `web-search` feature or fold into `network` |
-| `search_engine` | `network` (or unresolved `web-search` candidate) | (supports web_search) | off | grouped with `web_search` |
-| `browser_page` | `network` (or dedicated) | (lightweight) | off | Decision required before Ready: connector/link model; currently no heavy dep |
-| `document_extract` | `file-read` (or unresolved `document` candidate) | (text/HTML/JSON/CSV/MD/XML only) | off | Decision required before Ready: local text extraction, no native dep; default-on candidate |
+| `web_search` | `network` | `rust-websearch` | off | Network capability; no second web-search feature in this slice. |
+| `search_engine` | `network` | (supports web_search) | off | Grouped with `web_search`. |
+| `browser_page` | `network` | (lightweight) | off | Its connector contract represents network-origin page data even when fixtures are local. |
+| `document_extract` | `file-read` | (text/HTML/JSON/CSV/MD/XML only) | on | Local read-only extraction, no additional native/heavy dependency. |
 | `symbol` | `code-intelligence` | `arborium` (25 langs) | off | heaviest dep; tree-sitter via arborium (ADR-020) |
 | `read_image_tool` | `image` | `image`, `sha2` | off | image decode; capability-gated (ADR-050/051); shares `image` with `image_validation` |
 | `image_validation` | `image` | `image`, `sha2` | off | shared ingestion/validation; same gate as `read_image_tool` |
@@ -79,9 +80,11 @@ below. `network` is a normal capability feature, not an alias.
 Story. Such names may appear only as unresolved alternatives in the ownership matrix above and must
 be resolved before the Story becomes Ready.
 
-Open ownership decisions (block Ready until resolved): `tree`, `diff_stat`, `web_search`/
-`search_engine`, `browser_page`, and `document_extract` grouping. These are recorded here, not
-guessed.
+Resolved ownership decisions: `tree` follows `search`; `diff_stat` follows `git`; `web_search`,
+`search_engine` and `browser_page` follow `network`; `document_extract` follows `file-read`.
+Current code confirms these choices do not require a new third-party dependency, permission change
+or behavior change. The implementation must still prove every cfg combination and product-parity
+claim before completion.
 
 ## Required Feature Model
 
@@ -257,3 +260,12 @@ Stop and record a blocker if:
 - capability changes: separate product Story;
 - runtime preset and sandbox fallback: ARCH-031-C;
 - version bump and publication: ARCH-031-D.
+
+## 2026-08-14 Readiness Checkpoint
+
+- TUI-037/I202 is Complete at implementation commit
+  `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` and merge `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`.
+- I158 and ADR-053 remain Complete/Accepted target-branch truth.
+- The ownership alternatives above are resolved against the current module and contribution graph.
+- ARCH-031-A is Ready for I159 claim review. No implementation is active, and no Rust, Cargo,
+  version, publish guard or release behavior changes in this readiness update.
