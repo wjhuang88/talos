@@ -20,7 +20,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head review is required before claim merge. If the shared `@wjhuang88` GitHub account is used for review, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record has no ownership effect before PR #212 reaches `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-13 |
+| Last Updated | 2026-08-14 |
 | Handoff / Release Condition | Pass exact-head governance/CI validation, obtain independent natural-person approval, repeat merge-time CAS against current `main` plus all three lanes, and merge PR #212 to `main` before creating any Dashboard implementation branch or worktree. |
 
 `Claim Pending` is not a valid claim state. The `Claimed` record above is a proposal on PR #212 and
@@ -156,6 +156,9 @@ ADR-031 and I129.
 - Implementation selection/execution/completion: `docs/iterations/I195-dashboard-read-only-visual-shell.md`.
 - Project derived status: `docs/backlog/PRODUCT-BACKLOG.md`, `docs/iterations/README.md`, and
   `docs/BOARD.md`; owners remain authoritative.
+- Shared derived-status synchronization is union-based: retain every then-current `main` row and
+  add or retain WEB-001-A/I195's bounded row. Never replace a shared derived file wholesale from
+  either the target side or the Dashboard side.
 - TUI logo/link behavior: `docs/backlog/active/TUI-037-dashboard-logo-link.md`, unchanged.
 
 ## User-Facing Documentation
