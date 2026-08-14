@@ -277,8 +277,9 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
   real publication remain open under I162/I203.
 - On the corrected working tree, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration
   validator cover the complete PR diff; it reports 0 warnings, and the base-bound full
-  `release_preflight.sh` completes successfully. This is local follow-up evidence only until the
-  correction is committed and GitHub validates that exact head.
+  `release_preflight.sh` completes successfully. The correction is recorded by commits `34c09b14`
+  and `57bc1585`; this remains local follow-up evidence until GitHub validates the resulting exact
+  head.
 
 ## Required Reads
 

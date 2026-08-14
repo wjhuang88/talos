@@ -151,7 +151,7 @@ If a stop condition occurs:
 | 2026-08-14 | Activation | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed exact-head CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged as `fa635b4eaadd4b55939322f89acfda4522489ab7`. The implementation branch starts exactly there. Pre-activation inventory found no Active or Review iteration; I188/I189/I195 remain Planned/Claimed and unactivated, I196 remains Planned/Claimed on release priority hold, I160-I162/I203 remain Blocked, and superseded I164 remains Paused. Open PRs #233, #228, #227 and archival #120/#121 do not own ARCH-031-A/I159. I159 alone becomes Active; no release, version, tag or publish authority is created. |
 | 2026-08-14 | Pre-commit local validation | Draft PR #236 implements the approved feature model and explicit downstream selections. Local feature, default/coding, workspace, product-inventory, CLI-smoke and external-consumer checks passed before implementation commit `d886917e`. The local collaboration validator was run without `GITHUB_BASE_REF`/`COLLABORATION_VALIDATION_BASE`, so it compared only the final commit and missed the branch-wide active ARCH-031 parent edit; this record does not claim exact-head preflight success. |
 | 2026-08-14 | Exact-head CI/review correction | CI `31794297165` and independent review `5292595210` on `d886917e` found the same blocker: release preflight stopped before Cargo validation because the changed active ARCH-031 Epic lacked a Collaboration Claim block. ARCH-031 now records the established Unclaimed Epic-parent metadata; the corrected head must rerun base-bound validation, full preflight and fresh independent review. |
-| 2026-08-14 | Corrected local validation | With the ARCH-031 Epic-parent metadata present, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration validator inspect the complete branch diff and report 0 warnings. The same base-bound full release preflight completes successfully, and no-feature/default/image/shell/coding checks pass after the cfg simplification. This is working-tree evidence pending commit, push, exact-head CI and fresh independent review. |
+| 2026-08-14 | Corrected local validation | With the ARCH-031 Epic-parent metadata present, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration validator inspect the complete branch diff and report 0 warnings. The same base-bound full release preflight completes successfully, and no-feature/default/image/shell/coding checks pass after the cfg simplification. Commits `34c09b14` and `57bc1585` record the correction; push, exact-head CI and fresh independent review remain pending. |
 
 ## Verification Evidence
 
@@ -181,8 +181,8 @@ If a stop condition occurs:
   claim block.
 - Corrected working-tree validation: `COLLABORATION_VALIDATION_BASE=origin/main` collaboration
   validation reports 0 warnings; project governance reports 0 warnings; base-bound
-  `./scripts/release_preflight.sh` completes successfully. Fresh GitHub exact-head evidence remains
-  pending after the correction is committed and pushed.
+  `./scripts/release_preflight.sh` completes successfully. Commits `34c09b14` and `57bc1585` record
+  the correction; fresh GitHub exact-head evidence remains pending after push.
 
 ## Completion Evidence
 
