@@ -606,13 +606,14 @@ impl Agent {
             Ok(prepared) => prepared,
             Err(error) => return (Err(error), Vec::new()),
         };
-        self.run_prepared_inner(prepared, event_tx).await
+        self.run_prepared_inner(prepared, event_tx, None).await
     }
 
     async fn run_prepared_inner(
         &self,
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let PreparedSessionTurn {
             hook_ctx,
@@ -628,6 +629,10 @@ impl Agent {
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
         let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
         let mut initial_plan = Some(initial_plan);
+
+        if let Some(snapshot_tx) = &snapshot_tx {
+            let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
+        }
 
         let (result, final_status) = 'turn_loop: loop {
             let plan = if let Some(plan) = initial_plan.take() {
@@ -1111,6 +1116,11 @@ impl Agent {
                     },
                 )
                 .await;
+            if let Some(snapshot_tx) = &snapshot_tx {
+                // This is the first safe boundary after a complete tool batch:
+                // the projection excludes private fields and incomplete calls.
+                let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
+            }
         };
 
         self.emit_turn_complete(&hook_ctx, final_status).await;

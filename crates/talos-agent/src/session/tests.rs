@@ -1629,6 +1629,42 @@ struct ToolCallThenErrorModel {
     trailing_fragment: bool,
 }
 
+struct ToolCallThenBlockingModel {
+    call_count: Arc<std::sync::atomic::AtomicU8>,
+}
+
+#[async_trait]
+impl LanguageModel for ToolCallThenBlockingModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let (tx, rx) = mpsc::channel(64);
+        let count = self.call_count.clone();
+        tokio::spawn(async move {
+            if count.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                let _ = tx
+                    .send(AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "call_echo_cancelled".into(),
+                            name: "echo".into(),
+                            input: serde_json::json!({"message": "cancelled"}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    })
+                    .await;
+                let _ = tx
+                    .send(AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: talos_core::message::Usage::default(),
+                    })
+                    .await;
+            } else {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
 impl ToolCallThenErrorModel {
     fn new() -> Self {
         Self {
@@ -1935,7 +1971,7 @@ async fn fixture_persistence_failure_is_observable_in_error() {
 }
 
 #[tokio::test]
-async fn fixture_durable_transcript_empty_after_failed_turn() {
+async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
     use talos_session::{PersistencePolicy, SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().expect("operation should succeed");
@@ -2000,8 +2036,110 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
         .transcript(None, 100)
         .expect("transcript read");
     assert!(
-        transcript.is_empty(),
-        "ADR-042: durable transcript must be empty after failed turn (got {} entries)",
+        !transcript.is_empty(),
+        "ADR-058: durable transcript must retain the admitted closed prefix"
+    );
+    assert!(
+        transcript.iter().all(|entry| entry.turn_id.is_some()),
+        "partial durable entries must bind to the failed turn"
+    );
+    assert_eq!(
+        durable_session
+            .session()
+            .read_turn_transcript_outcomes()
+            .expect("outcomes"),
+        vec![talos_session::TurnTranscriptOutcomeRecord::new(
+            transcript[0].turn_id.as_deref().expect("turn id"),
+            talos_session::TurnTranscriptOutcome::Error,
+        )]
+    );
+}
+
+#[tokio::test]
+async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
+    use talos_session::{PersistencePolicy, SessionManager};
+
+    let temp_dir = tempfile::tempdir().expect("operation should succeed");
+    let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
+    let durable_external_id = "durable-cancelled-check";
+    let durable = manager
+        .create_or_open_session(durable_external_id)
+        .expect("durable session");
+    let mut registry = ToolRegistry::new();
+    registry.register(std::sync::Arc::new(EchoTool));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        std::sync::Arc::new(ToolCallThenBlockingModel {
+            call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }),
+        registry,
+    );
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp_dir.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+    sq_tx
+        .send(SessionOp::Submit {
+            message: "run echo then stop".into(),
+        })
+        .await
+        .expect("submit");
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = eq_rx.recv().await.expect("session event");
+            if matches!(progress_event(&event), Some(AgentEvent::ToolResult { .. })) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("tool result timeout");
+    sq_tx.send(SessionOp::Interrupt).await.expect("interrupt");
+    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+    assert!(events.iter().any(|event| {
+        matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Cancelled)
+        )
+    }));
+    sq_tx.send(SessionOp::Shutdown).await.expect("shutdown");
+    actor_task.await.expect("actor");
+
+    let reopened = manager
+        .get_session_by_external_id(durable_external_id)
+        .expect("lookup")
+        .expect("durable session");
+    let transcript = reopened.transcript(None, 100).expect("transcript");
+    assert!(
+        !transcript.is_empty(),
+        "closed tool exchange must survive cancel"
+    );
+    let turn_id = transcript[0].turn_id.clone().expect("turn id");
+    assert!(
+        transcript
+            .iter()
+            .all(|entry| entry.turn_id.as_deref() == Some(&turn_id))
+    );
+    assert_eq!(
+        reopened.read_messages().expect("replay").len(),
         transcript.len()
+    );
+    assert_eq!(
+        reopened
+            .session()
+            .read_turn_transcript_outcomes()
+            .expect("outcome"),
+        vec![talos_session::TurnTranscriptOutcomeRecord::new(
+            turn_id,
+            talos_session::TurnTranscriptOutcome::Cancelled,
+        )]
     );
 }

@@ -82,8 +82,10 @@ impl Agent {
         &self,
         prepared: PreparedSessionTurn,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
+        snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
     ) -> (AgentResult<String>, Vec<Message>) {
-        self.run_prepared_inner(prepared, Some(event_tx)).await
+        self.run_prepared_inner(prepared, Some(event_tx), snapshot_tx)
+            .await
     }
 
     pub(super) async fn prepare_turn_start(
