@@ -7,6 +7,23 @@
 not only available through `talos-runtime`
 **Depends on**: `RUNTIME-001`; ADR-024; ADR-052; `TOOL-012`; `TOOL-013`; `DIST-001`; `REL-002`
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned — child Stories require separate non-overlapping claims |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | None — Epic parents are not implementation units |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Close each selected child through its own owner, iteration, effective claim, implementation PR, validation evidence, independent exact-head review and merge-time CAS. |
+
 ## Problem
 
 Talos now has a pre-1.0 embeddable SDK facade in `talos-runtime`, but many self-written
@@ -252,9 +269,16 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 - Draft PR #236 implements the `talos-tools` portion of Candidate Slice 4: default
   `file-read + search`, optional write/document/shell/Git/network/image/code-intelligence families,
   and an explicit `coding` aggregate selected by `talos-cli`.
-- Full local feature, product-parity, workspace, governance, and release-preflight gates pass.
-  I159 remains Active until its implementation commit receives exact-head CI and independent review;
-  the parent-wide feature audit and real publication remain open under I162/I203.
+- Local feature, product-parity and workspace commands passed before implementation commit
+  `d886917e`, but exact-head CI `31794297165` correctly rejected this changed active Epic because it
+  lacked the explicit Unclaimed claim metadata now recorded above. The earlier local validator ran
+  without a PR-base binding and did not inspect the complete branch diff. I159 remains Active until
+  the corrected head passes exact-head CI and independent review; the parent-wide feature audit and
+  real publication remain open under I162/I203.
+- On the corrected working tree, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration
+  validator cover the complete PR diff; it reports 0 warnings, and the base-bound full
+  `release_preflight.sh` completes successfully. This is local follow-up evidence only until the
+  correction is committed and GitHub validates that exact head.
 
 ## Required Reads
 

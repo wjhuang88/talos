@@ -232,7 +232,7 @@ Add family-specific combinations for actual dependency seams discovered during b
 
 ### Workspace and runtime
 
-- [x] full locked validation passes.
+- [ ] full locked validation passes on the corrected exact head.
 - [x] real `talos` CLI smoke and exact inventory tests prove the product tool inventory is unchanged.
 - [x] a default-only external/minimal example compiles without heavy capability families.
 - [x] crate docs and migration note are updated.
@@ -313,11 +313,21 @@ Confirmed implementation facts on Draft PR #236 before the final implementation 
 - Downstream selection is explicit: `talos-cli` enables `coding`; the `talos-mcp` handshake fixture
   enables `file-write + shell`; the `talos-runtime` fixture enables `file-write`; the unused
   `talos-agent` dependency was removed after source-wide verification found no `talos_tools` use.
-- The default external consumer at `/private/tmp/talos-i159-default-consumer` imports only
-  `ReadTool` and `GlobTool` from default `talos-tools`; `cargo check --offline` passes.
+- A minimal external Cargo package depending on default `talos-tools` and importing only
+  `talos_tools::{ReadTool, GlobTool}` passes `cargo check --offline`. Its recorded manifest uses a
+  single path dependency with no feature selection, and its `main` constructs both tools from a
+  `PathBuf`; these exact inputs make the check reproducible outside the original temporary path.
 - Product preservation was exercised with locked workspace check/build, the exact sorted registry
   inventory test, and a real `talos-cli --mock --print --no-init --no-context` turn. Final full
   locked validation and exact-head GitHub CI remain required before Review/Complete.
+- Exact-head CI `31794297165` for implementation commit `d886917e` stopped before Cargo validation:
+  the collaboration validator detected that the changed active ARCH-031 Epic lacked an explicit
+  Collaboration Claim block. The code checks reported above remain local/reviewer evidence, not a
+  substitute for a green corrected exact head.
+- The corrected working tree adds the explicit Unclaimed Epic-parent metadata, passes the
+  collaboration validator with `COLLABORATION_VALIDATION_BASE=origin/main`, completes the full
+  base-bound release preflight, and rechecks no-feature/default/image/shell/coding seams. The full
+  locked acceptance remains unchecked until GitHub validates the committed corrected head.
 
 Known release residual: `Cargo.lock` contains pre-existing `scraper 0.22` and `0.27` lines from
 different consumers. I159 changes neither version; I162 owns publication-closure reconciliation.

@@ -58,8 +58,25 @@ repeating known mistakes.
 | 46 | Provider / Runtime | transport EOF 不是成功；已知协议终止值必须有独立 policy，不能冒充 unknown；每个消费者都必须投影明确 outcome | I168/RUNTIME-003 |
 | 47 | Governance / Review | 共享 GitHub 账号下的独立评审必须显式声明自然人隔离，并区分人工 attestation 与机器可验证身份 | PR #177 / GOV-004 |
 | 48 | Governance / Windows | 结构化子进程输出必须显式指定协议编码，不能继承 Windows locale | I183 / PR #184 |
+| 49 | Governance / CI | 分支级 validator 本地复现必须显式绑定 PR base，不能依赖 `HEAD^` 回退 | I159 / PR #236 |
 
 ## Lessons
+
+## 2026-08-14 - Branch-level governance validation must bind the PR base
+
+- Trigger: PR #236 exact-head CI reran the collaboration validator after a local release preflight
+  had been reported green.
+- Symptom: local validation passed, while both macOS and Windows CI rejected a changed active Epic
+  owner without a Collaboration Claim and stopped before Cargo validation.
+- Root cause: the local invocation had no `GITHUB_BASE_REF` or `COLLABORATION_VALIDATION_BASE`, so
+  the validator's fallback compared only `HEAD^`; the active Epic edit lived in the final commit,
+  but the broader failure mode is that any earlier branch commit can be omitted by this fallback.
+- Fix: add explicit Unclaimed Epic-parent claim metadata and rerun the validator with
+  `COLLABORATION_VALIDATION_BASE=origin/main` before the full release preflight.
+- Prevention: PR validation evidence must use the target branch merge-base explicitly; a plain
+  local validator run is only a last-commit check unless HEAD equals the target branch.
+- Promoted to rule/check: existing `COLLABORATION_VALIDATION_BASE` validator input; I159 records the
+  exact-base command as required evidence. A future validator-default improvement remains separate.
 
 ## 2026-08-10 - Structured subprocess output needs an explicit protocol encoding
 

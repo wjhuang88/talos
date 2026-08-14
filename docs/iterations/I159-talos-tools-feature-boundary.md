@@ -149,7 +149,9 @@ If a stop condition occurs:
 | 2026-08-14 | Priority and readiness change control | The maintainer selected a v0.8.0 GitHub-first/Cargo-second release before I196 implementation. ARCH-031-A resolved its remaining feature-ownership alternatives and moved to Ready. I159 moves from Blocked to Planned and prepares its own claim; the published objective, exclusions and acceptance remain unchanged. I160-I162 stay blocked in order, I203 stays blocked on I162 GO, and no implementation is activated by this planning record. |
 | 2026-08-14 | Dependency-fact review correction | Independent review of PR #235 at `4cd5d6868b42f7efafccf117c78e30173addef01` found that `document_extract` unconditionally compiles existing `scraper 0.27`, so assigning it to default `file-read` contradicted the lightweight-default objective. ARCH-031-A change control now assigns the whole tool to a default-off `document` feature requiring `file-read`, includes it in `coding`, and corrects `tree`, `search_engine`, and `browser_page` source attributions. The published objective, product-parity requirement, exclusions and acceptance remain unchanged; this record still does not activate implementation. |
 | 2026-08-14 | Activation | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed exact-head CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged as `fa635b4eaadd4b55939322f89acfda4522489ab7`. The implementation branch starts exactly there. Pre-activation inventory found no Active or Review iteration; I188/I189/I195 remain Planned/Claimed and unactivated, I196 remains Planned/Claimed on release priority hold, I160-I162/I203 remain Blocked, and superseded I164 remains Paused. Open PRs #233, #228, #227 and archival #120/#121 do not own ARCH-031-A/I159. I159 alone becomes Active; no release, version, tag or publish authority is created. |
-| 2026-08-14 | Local implementation validation | Draft PR #236 implements the approved feature model and explicit downstream selections. The complete feature matrix, default/coding tests, workspace build/check, exact product inventory, real CLI smoke, default external consumer, workspace Clippy/tests, both governance validators, `git diff --check`, and release preflight pass. I159 remains Active pending an implementation commit, exact-head GitHub CI, and independent review. |
+| 2026-08-14 | Pre-commit local validation | Draft PR #236 implements the approved feature model and explicit downstream selections. Local feature, default/coding, workspace, product-inventory, CLI-smoke and external-consumer checks passed before implementation commit `d886917e`. The local collaboration validator was run without `GITHUB_BASE_REF`/`COLLABORATION_VALIDATION_BASE`, so it compared only the final commit and missed the branch-wide active ARCH-031 parent edit; this record does not claim exact-head preflight success. |
+| 2026-08-14 | Exact-head CI/review correction | CI `31794297165` and independent review `5292595210` on `d886917e` found the same blocker: release preflight stopped before Cargo validation because the changed active ARCH-031 Epic lacked a Collaboration Claim block. ARCH-031 now records the established Unclaimed Epic-parent metadata; the corrected head must rerun base-bound validation, full preflight and fresh independent review. |
+| 2026-08-14 | Corrected local validation | With the ARCH-031 Epic-parent metadata present, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration validator inspect the complete branch diff and report 0 warnings. The same base-bound full release preflight completes successfully, and no-feature/default/image/shell/coding checks pass after the cfg simplification. This is working-tree evidence pending commit, push, exact-head CI and fresh independent review. |
 
 ## Verification Evidence
 
@@ -167,12 +169,20 @@ If a stop condition occurs:
 - Focused product evidence: exact sorted registry inventory test passed; locked workspace check and
   build passed; real `cargo run -p talos-cli --locked -- --mock --print --no-init --no-context
   "I159 coding feature product smoke"` completed successfully.
-- Minimal consumer: `/private/tmp/talos-i159-default-consumer` depends on default `talos-tools`,
-  imports `ReadTool` and `GlobTool`, and passed `cargo check --offline`.
-- Full locked validation: `cargo fmt --all -- --check`, workspace check/build, `cargo clippy
-  --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked` pass.
-- Governance/release validation: both governance validators report 0 warnings; `git diff --check`
-  and `./scripts/release_preflight.sh` pass with 0 site/installer/governance errors.
+- Minimal consumer: a standalone package with only
+  `talos-tools = { path = "<checkout>/crates/talos-tools" }` imports `ReadTool` and `GlobTool`,
+  constructs both from `PathBuf::from(".")`, and passed `cargo check --offline`. No feature is
+  selected, so this exercises the true default surface without relying on a retained temp path.
+- Local Rust validation before `d886917e`: `cargo fmt --all -- --check`, workspace check/build,
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
+  `cargo test --workspace --locked` passed.
+- Exact-head governance/release validation at `d886917e`: failed. CI `31794297165` stopped in the
+  collaboration validator before Cargo commands because the changed active ARCH-031 Epic lacked a
+  claim block.
+- Corrected working-tree validation: `COLLABORATION_VALIDATION_BASE=origin/main` collaboration
+  validation reports 0 warnings; project governance reports 0 warnings; base-bound
+  `./scripts/release_preflight.sh` completes successfully. Fresh GitHub exact-head evidence remains
+  pending after the correction is committed and pushed.
 
 ## Completion Evidence
 
