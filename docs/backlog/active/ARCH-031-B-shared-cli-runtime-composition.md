@@ -6,9 +6,9 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | In Progress / I160 Active / Claimed — implementation baseline starts at `main@71faf844` |
+| Status | Review / implementation merged — Completion Commit pending |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Active / Claimed) |
+| Selected Iteration | I160 (Review / Claimed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
 
 ## Collaboration Claim
@@ -226,7 +226,8 @@ Stop if:
 - The effective claim authorizes only ARCH-031-B/I160. The implementation worktree
   `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that
   exact merge commit; no Rust/Cargo change existed at activation.
-- I160 is Active. I161-I162 remain blocked, and release/version/tag/publication remain outside this
+- I160 implementation PR #240 merged as `97556149`; I160 remains in Review until a Completion Commit
+  is recorded. I161-I162 remain blocked, and release/version/tag/publication remain outside this
   Work Slice.
 
 ## 2026-08-15 Implementation Baseline
