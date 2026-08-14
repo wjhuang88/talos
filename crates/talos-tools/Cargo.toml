@@ -8,47 +8,109 @@ repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["file-read", "search"]
+file-read = ["dep:sha2", "dep:uuid", "dep:walkdir", "tokio/fs"]
+file-write = ["file-read", "tokio/fs"]
+search = [
+    "dep:glob",
+    "dep:grep-matcher",
+    "dep:grep-regex",
+    "dep:grep-searcher",
+    "dep:ignore",
+    "dep:regex",
+    "dep:walkdir",
+]
+document = ["file-read", "dep:scraper"]
+shell = [
+    "dep:libc",
+    "dep:talos-sandbox",
+    "tokio/io-util",
+    "tokio/macros",
+    "tokio/process",
+    "tokio/rt",
+    "tokio/time",
+]
+git = ["dep:gix", "dep:similar", "tokio/fs", "tokio/process", "tokio/time"]
+network = [
+    "dep:reqwest",
+    "dep:rust-websearch",
+    "dep:scraper",
+    "dep:uuid",
+    "tokio/fs",
+    "tokio/net",
+    "tokio/time",
+]
+image = ["file-read", "dep:image"]
+code-intelligence = ["dep:arborium"]
+coding = [
+    "file-read",
+    "file-write",
+    "search",
+    "document",
+    "shell",
+    "git",
+    "network",
+    "image",
+    "code-intelligence",
+]
+
 [dependencies]
 talos-core = { version = "0.7.0", path = "../talos-core" }
-talos-sandbox = { version = "0.7.0", path = "../talos-sandbox" }
+talos-sandbox = { version = "0.7.0", path = "../talos-sandbox", optional = true }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1.2.1"
 thiserror = "2"
-tokio = { version = "1", features = ["fs", "process", "time"] }
-regex = "1"
-walkdir = "2"
-glob = "0.3"
-grep-searcher = "0.1"
-grep-regex = "0.1"
-grep-matcher = "0.1"
-ignore = "0.4"
-similar = "3"
-gix = { version = "0.85", default-features = false, features = [
+tokio = { version = "1", default-features = false }
+regex = { version = "1", optional = true }
+walkdir = { version = "2", optional = true }
+glob = { version = "0.3", optional = true }
+grep-searcher = { version = "0.1", optional = true }
+grep-regex = { version = "0.1", optional = true }
+grep-matcher = { version = "0.1", optional = true }
+ignore = { version = "0.4", optional = true }
+similar = { version = "3", optional = true }
+gix = { version = "0.85", default-features = false, optional = true, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
-arborium = { version = "2.18", default-features = false, features = [
+arborium = { version = "2.18", default-features = false, optional = true, features = [
     "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
     "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
     "lang-bash", "lang-sql", "lang-powershell", "lang-lua", "lang-dart",
     "lang-html", "lang-css", "lang-json", "lang-toml", "lang-markdown",
     "lang-ruby", "lang-php", "lang-kotlin", "lang-swift"
 ] }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json"] }
-rust-websearch = "0.1"
-scraper = "0.27"
-uuid = { version = "1", features = ["v4"] }
-sha2 = "0.11"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
+rust-websearch = { version = "0.1", optional = true }
+scraper = { version = "0.27", optional = true }
+uuid = { version = "1", optional = true, features = ["v4"] }
+sha2 = { version = "0.11", optional = true }
+image = { version = "0.25", default-features = false, optional = true, features = ["png", "jpeg", "gif", "webp"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = "1.0.0-alpha.3"
+libc = { version = "1.0.0-alpha.3", optional = true }
 
 [dev-dependencies]
 talos-permission = { version = "0.7.0", path = "../talos-permission" }
 tempfile = "3"
-tokio = { version = "1", features = ["fs", "macros", "rt"] }
+tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
+
+[[test]]
+name = "document_boundaries"
+path = "tests/document_boundaries.rs"
+required-features = ["document", "file-write", "network"]
+
+[[test]]
+name = "integration_hardening"
+path = "tests/integration_hardening.rs"
+required-features = ["shell"]
+
+[[test]]
+name = "windows_powershell_acceptance"
+path = "tests/windows_powershell_acceptance.rs"
+required-features = ["shell"]
 
 [lints]
 workspace = true

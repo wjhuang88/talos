@@ -29,7 +29,7 @@ reqwest = { version = "0.13.4", default-features = false, features = ["rustls", 
 [dev-dependencies]
 tempfile = "3"
 # I009-S4 begin
-talos-tools = { version = "0.7.0", path = "../talos-tools" }
+talos-tools = { version = "0.7.0", path = "../talos-tools", default-features = false, features = ["file-write", "shell"] }
 # I009-S4 end
 
 [lints]

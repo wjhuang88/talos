@@ -1,9 +1,15 @@
 use std::collections::{HashMap, VecDeque};
+#[cfg(feature = "file-write")]
 use std::fs::{self, OpenOptions};
+#[cfg(feature = "file-write")]
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "file-write")]
+use std::path::PathBuf;
+#[cfg(feature = "file-write")]
+use std::sync::Weak;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
@@ -21,13 +27,17 @@ const MAX_REGISTRY_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) struct LineSpan {
     pub(crate) content_start: usize,
     pub(crate) content_end: usize,
+    #[cfg(feature = "file-write")]
     pub(crate) full_end: usize,
 }
 
 #[derive(Clone)]
 pub(crate) struct SnapshotRecord {
+    #[cfg(feature = "file-write")]
     pub(crate) path: PathBuf,
+    #[cfg(feature = "file-write")]
     pub(crate) file_revision: [u8; 32],
+    #[cfg(feature = "file-write")]
     pub(crate) line_digests: Vec<[u8; 32]>,
     pub(crate) created_at: Instant,
     accounted_bytes: usize,
@@ -48,6 +58,7 @@ struct RegistryState {
     records: HashMap<String, SnapshotRecord>,
     order: VecDeque<String>,
     accounted_bytes: usize,
+    #[cfg(feature = "file-write")]
     path_locks: HashMap<PathBuf, Weak<Mutex<()>>>,
 }
 
@@ -67,6 +78,7 @@ impl FileSnapshotRegistry {
                 records: HashMap::new(),
                 order: VecDeque::new(),
                 accounted_bytes: 0,
+                #[cfg(feature = "file-write")]
                 path_locks: HashMap::new(),
             })),
             next_id: Arc::new(AtomicU64::new(1)),
@@ -114,8 +126,11 @@ impl FileSnapshotRegistry {
         }
 
         let record = SnapshotRecord {
+            #[cfg(feature = "file-write")]
             path: path.to_path_buf(),
+            #[cfg(feature = "file-write")]
             file_revision: digest(bytes),
+            #[cfg(feature = "file-write")]
             line_digests,
             created_at: Instant::now(),
             accounted_bytes,
@@ -135,6 +150,7 @@ impl FileSnapshotRegistry {
         Ok((id, check_codes))
     }
 
+    #[cfg(feature = "file-write")]
     pub(crate) fn get(&self, id: &str, path: &Path) -> Result<SnapshotRecord, FileToolError> {
         let mut state = self.lock_state()?;
         state.evict_expired();
@@ -148,6 +164,7 @@ impl FileSnapshotRegistry {
         Ok(record.clone())
     }
 
+    #[cfg(feature = "file-write")]
     pub(crate) fn invalidate_path(&self, path: &Path) -> Result<(), FileToolError> {
         let mut state = self.lock_state()?;
         let ids = state
@@ -162,6 +179,7 @@ impl FileSnapshotRegistry {
         Ok(())
     }
 
+    #[cfg(feature = "file-write")]
     pub(crate) fn path_lock(&self, path: &Path) -> Result<Arc<Mutex<()>>, FileToolError> {
         let mut state = self.lock_state()?;
         state.path_locks.retain(|_, lock| lock.strong_count() > 0);
@@ -231,6 +249,7 @@ pub(crate) fn line_spans(bytes: &[u8]) -> Vec<LineSpan> {
                 spans.push(LineSpan {
                     content_start: start,
                     content_end,
+                    #[cfg(feature = "file-write")]
                     full_end: index + 1,
                 });
                 start = index + 1;
@@ -239,6 +258,7 @@ pub(crate) fn line_spans(bytes: &[u8]) -> Vec<LineSpan> {
                 spans.push(LineSpan {
                     content_start: start,
                     content_end: bytes.len(),
+                    #[cfg(feature = "file-write")]
                     full_end: bytes.len(),
                 });
                 break;
@@ -252,6 +272,7 @@ pub(crate) fn digest(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
 
+#[cfg(feature = "file-write")]
 pub(crate) fn atomic_replace(
     path: &Path,
     bytes: &[u8],
@@ -300,6 +321,7 @@ pub(crate) fn atomic_replace(
     })
 }
 
+#[cfg(feature = "file-write")]
 fn verify_path_identity(path: &Path) -> Result<(), FileToolError> {
     if path.canonicalize()? == path {
         Ok(())
@@ -321,7 +343,7 @@ fn to_base36(mut value: u64) -> String {
     output.iter().rev().collect()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "file-write"))]
 mod tests {
     use super::*;
 

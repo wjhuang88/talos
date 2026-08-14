@@ -13,9 +13,10 @@
 
 ## Problem
 
-`talos-tools` currently exposes a broad collection of file, search, shell, Git, network/web, image,
-and code-intelligence capabilities from one crate. Heavy dependencies remain hard dependencies and
-there are no real Cargo feature gates.
+At the published baseline, `talos-tools` exposed a broad collection of file, search, shell, Git,
+network/web, image, and code-intelligence capabilities from one crate. Heavy dependencies were hard
+dependencies and there were no real Cargo feature gates. I159 preserves that baseline here and
+records implementation facts in the execution checkpoint below.
 
 Hiding tool registration is insufficient: a lightweight build must not resolve or compile the
 dependencies, modules, or re-exports for disabled capability families.
@@ -205,13 +206,13 @@ Rules:
 
 ### Structural
 
-- [ ] `talos-tools` has a documented `[features]` section.
-- [ ] default features are exactly the approved lightweight read-only surface.
-- [ ] each heavy family dependency is truly optional where technically attributable.
-- [ ] corresponding modules and re-exports are feature-gated.
-- [ ] `cargo tree` proves disabled heavy dependencies are absent from a default-only build.
-- [ ] `talos-cli` explicitly selects the full product feature set.
-- [ ] no product tool disappears from CLI/TUI/MCP when built with the product feature set.
+- [x] `talos-tools` has a documented `[features]` section.
+- [x] default features are exactly the approved lightweight read-only surface.
+- [x] each heavy family dependency is truly optional where technically attributable.
+- [x] corresponding modules and re-exports are feature-gated.
+- [x] `cargo tree` proves disabled heavy dependencies are absent from a default-only build.
+- [x] `talos-cli` explicitly selects the full product feature set.
+- [x] no product tool disappears from CLI/TUI/MCP when built with the product feature set.
 
 ### Build matrix
 
@@ -231,11 +232,11 @@ Add family-specific combinations for actual dependency seams discovered during b
 
 ### Workspace and runtime
 
-- [ ] full locked validation passes.
-- [ ] real `talos` CLI/TUI smoke proves the product tool inventory is unchanged.
-- [ ] a default-only external/minimal example compiles without heavy capability families.
-- [ ] crate docs and migration note are updated.
-- [ ] Story, I159, ARCH-031, matrix, and Board state are synchronized.
+- [x] full locked validation passes.
+- [x] real `talos` CLI smoke and exact inventory tests prove the product tool inventory is unchanged.
+- [x] a default-only external/minimal example compiles without heavy capability families.
+- [x] crate docs and migration note are updated.
+- [x] Story, I159, ARCH-031, matrix, and Board state are synchronized.
 
 ## Stop And Escalate Conditions
 
@@ -297,3 +298,26 @@ The same source re-read corrected two non-blocking attribution errors: `tree` us
 `search_engine` is the local search implementation and follows `search`, not `network`. With these
 facts and the explicit `document` boundary recorded, all feature-ownership decisions required for
 Ready are resolved; implementation evidence remains pending under I159.
+
+## 2026-08-14 I159 Implementation Checkpoint
+
+Confirmed implementation facts on Draft PR #236 before the final implementation commit:
+
+- `[features]` defaults to `file-read + search`; `coding` aggregates all approved families. Heavy
+  dependencies are optional and their modules, public exports, contributions, and integration tests
+  are cfg-gated.
+- The pre-change direct normal dependency tree contained `arborium`, `gix`, `image`, `libc`,
+  `reqwest`, `rust-websearch`, `scraper`, `similar`, and `talos-sandbox`. The new default direct
+  tree contains none of them. `sha2`/`uuid` remain because the default read snapshot contract uses
+  them; local search dependencies remain because `search` is default.
+- Downstream selection is explicit: `talos-cli` enables `coding`; the `talos-mcp` handshake fixture
+  enables `file-write + shell`; the `talos-runtime` fixture enables `file-write`; the unused
+  `talos-agent` dependency was removed after source-wide verification found no `talos_tools` use.
+- The default external consumer at `/private/tmp/talos-i159-default-consumer` imports only
+  `ReadTool` and `GlobTool` from default `talos-tools`; `cargo check --offline` passes.
+- Product preservation was exercised with locked workspace check/build, the exact sorted registry
+  inventory test, and a real `talos-cli --mock --print --no-init --no-context` turn. Final full
+  locked validation and exact-head GitHub CI remain required before Review/Complete.
+
+Known release residual: `Cargo.lock` contains pre-existing `scraper 0.22` and `0.27` lines from
+different consumers. I159 changes neither version; I162 owns publication-closure reconciliation.

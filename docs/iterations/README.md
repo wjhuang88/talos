@@ -35,7 +35,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Active / Claimed | Claim PR #235 merged as `fa635b4e` after exact-head CI `31789567122`, independent approval `5292115807` and merge-time CAS. Implementation proceeds only on the fresh claim-merge branch; I160-I162 remain blocked in order. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Active / Claimed | Draft PR #236 implements the approved feature boundary and passes full local feature/product/workspace/governance gates. It still requires an implementation commit, exact-head CI, and independent review; I160-I162 remain blocked in order. |
 | I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
 | I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |

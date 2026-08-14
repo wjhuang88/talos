@@ -75,7 +75,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
-| ARCH-031-A / I159 | In Progress / Active / Claimed | Implement only the approved feature-boundary slice from claim merge `fa635b4e`; prove the full feature matrix and product parity before Review. I160-I162 remain blocked in order. |
+| ARCH-031-A / I159 | In Progress / Active / Claimed | Draft PR #236 implements the approved feature boundary; full local feature/product/workspace/governance gates pass. Exact-head CI and independent review remain before Review/Complete; I160-I162 remain blocked in order. |
 | WORK-001-A / I196 | Ready / Planned / Claimed / priority hold | Claim PR #226 merged as `453d1fba`; resume only after v0.8.0 publication closure and a fresh exact-main inventory. |
 | ARCH-034-D / I171 | Complete | Completion Commit `c88c1d1a`; current v0.7.0 audit/register and bounded owner creation validated; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |

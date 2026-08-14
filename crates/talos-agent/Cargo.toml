@@ -10,7 +10,6 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { version = "0.7.0", path = "../talos-core" }
-talos-tools = { version = "0.7.0", path = "../talos-tools" }
 talos-permission = { version = "0.7.0", path = "../talos-permission" }
 talos-sandbox = { version = "0.7.0", path = "../talos-sandbox" }
 talos-skill = { version = "0.7.0", path = "../talos-skill" }

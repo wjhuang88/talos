@@ -120,9 +120,10 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
       pre-1.0 implementation API may change more frequently). The facade contract itself lives in
       `RUNTIME-SDK-CONTRACT.md`.
 - [ ] Heavy optional capabilities have REAL feature gates (optional dependencies + gated
-      modules/re-exports) or a recorded split trigger. (`talos-tools` currently has NO Cargo feature
-      gates and all heavy deps are hard `[dependencies]`; only a recorded direction under ADR-052
-      exists. This item cannot close until the gates are implemented.)
+      modules/re-exports) or a recorded split trigger. (I159 implements this boundary for
+      `talos-tools`: default `file-read + search`, optional heavy families, and explicit CLI
+      `coding`. I162 must still audit the other publication targets before this parent-wide item can
+      close.)
 - [ ] README, README.zh-CN, and architecture docs explain crate distribution when the first
       implementation slice lands.
 - [ ] The publish plan defines and validates the Cargo install path for the CLI binary.
@@ -245,6 +246,15 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 - No crate was published; no tag or GitHub Release was created; ARCH-031 is NOT closed.
 - ARCH-031 remains `In Progress`; the still-open Acceptance items are real feature-gate
   implementation, complete crate metadata, distribution docs, and the Cargo install path.
+
+2026-08-14 I159 implementation checkpoint:
+
+- Draft PR #236 implements the `talos-tools` portion of Candidate Slice 4: default
+  `file-read + search`, optional write/document/shell/Git/network/image/code-intelligence families,
+  and an explicit `coding` aggregate selected by `talos-cli`.
+- Full local feature, product-parity, workspace, governance, and release-preflight gates pass.
+  I159 remains Active until its implementation commit receives exact-head CI and independent review;
+  the parent-wide feature audit and real publication remain open under I162/I203.
 
 ## Required Reads
 

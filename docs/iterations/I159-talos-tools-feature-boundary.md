@@ -149,13 +149,30 @@ If a stop condition occurs:
 | 2026-08-14 | Priority and readiness change control | The maintainer selected a v0.8.0 GitHub-first/Cargo-second release before I196 implementation. ARCH-031-A resolved its remaining feature-ownership alternatives and moved to Ready. I159 moves from Blocked to Planned and prepares its own claim; the published objective, exclusions and acceptance remain unchanged. I160-I162 stay blocked in order, I203 stays blocked on I162 GO, and no implementation is activated by this planning record. |
 | 2026-08-14 | Dependency-fact review correction | Independent review of PR #235 at `4cd5d6868b42f7efafccf117c78e30173addef01` found that `document_extract` unconditionally compiles existing `scraper 0.27`, so assigning it to default `file-read` contradicted the lightweight-default objective. ARCH-031-A change control now assigns the whole tool to a default-off `document` feature requiring `file-read`, includes it in `coding`, and corrects `tree`, `search_engine`, and `browser_page` source attributions. The published objective, product-parity requirement, exclusions and acceptance remain unchanged; this record still does not activate implementation. |
 | 2026-08-14 | Activation | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed exact-head CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged as `fa635b4eaadd4b55939322f89acfda4522489ab7`. The implementation branch starts exactly there. Pre-activation inventory found no Active or Review iteration; I188/I189/I195 remain Planned/Claimed and unactivated, I196 remains Planned/Claimed on release priority hold, I160-I162/I203 remain Blocked, and superseded I164 remains Paused. Open PRs #233, #228, #227 and archival #120/#121 do not own ARCH-031-A/I159. I159 alone becomes Active; no release, version, tag or publish authority is created. |
+| 2026-08-14 | Local implementation validation | Draft PR #236 implements the approved feature model and explicit downstream selections. The complete feature matrix, default/coding tests, workspace build/check, exact product inventory, real CLI smoke, default external consumer, workspace Clippy/tests, both governance validators, `git diff --check`, and release preflight pass. I159 remains Active pending an implementation commit, exact-head GitHub CI, and independent review. |
 
 ## Verification Evidence
 
-- Focused tests: pending
-- Full locked validation: pending
-- Runtime evidence: pending
-- Governance validation: pending
+- Baseline: at claim merge `fa635b4e`, `cargo tree --locked -p talos-tools --depth 1` included
+  `arborium`, `gix`, `image`, `libc`, `reqwest`, `rust-websearch`, `scraper`, `similar`, and
+  `talos-sandbox` as direct normal dependencies.
+- Feature checks passed for no features, the default, every individual family, required
+  combinations, and `coding`; default tests passed 41 tests, while `coding` passed 320 unit tests,
+  15 document-boundary tests, and 3 integration-hardening tests.
+- Default dependency evidence: `cargo tree --locked -p talos-tools --depth 1` excludes every heavy
+  dependency named above. The remaining `sha2`/`uuid` dependencies serve the default read snapshot
+  contract; local search dependencies serve the default `search` family.
+- Downstream selection: CLI=`coding`, MCP handshake fixture=`file-write + shell`, runtime fixture=
+  `file-write`; `talos-agent` had no source consumer and its unused dependency was removed.
+- Focused product evidence: exact sorted registry inventory test passed; locked workspace check and
+  build passed; real `cargo run -p talos-cli --locked -- --mock --print --no-init --no-context
+  "I159 coding feature product smoke"` completed successfully.
+- Minimal consumer: `/private/tmp/talos-i159-default-consumer` depends on default `talos-tools`,
+  imports `ReadTool` and `GlobTool`, and passed `cargo check --offline`.
+- Full locked validation: `cargo fmt --all -- --check`, workspace check/build, `cargo clippy
+  --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked` pass.
+- Governance/release validation: both governance validators report 0 warnings; `git diff --check`
+  and `./scripts/release_preflight.sh` pass with 0 site/installer/governance errors.
 
 ## Completion Evidence
 
@@ -169,6 +186,8 @@ If a stop condition occurs:
   treated `document_extract` as dependency-free relative to `file-read`. ARCH-031-A now records the
   existing `scraper` edge and the separate default-off `document` feature. No implementation
   variance or residual is authorized by this correction.
+- Release residual: the pre-existing `scraper 0.22`/`0.27` duplicate remains unchanged and is owned
+  by I162 publication-closure reconciliation; I159 does not perform dependency upgrades.
 
 ## REL-002 Execution Record
 

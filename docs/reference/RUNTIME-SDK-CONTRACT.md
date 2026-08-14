@@ -246,11 +246,14 @@ let runtime = RuntimeBuilder::new()
 
 ### `talos-tools` default surface
 
-Under ADR-052 the SDK's default tool surface is **local read-only** (file-read + search). Write,
-shell, git, network/web, image, and heavy code-intelligence families are opt-in via explicit
-features or the coding preset. Embedders that need the former broad set must select features or the
-preset explicitly. This changes default transitive dependency/capability behavior and will be listed
-in release notes when it lands.
+Under ADR-052 the `talos-tools` default surface is **local read-only** (`file-read + search`). I159
+implements compile-time opt-in features for file writes, document extraction, shell, Git,
+network/web, image, and heavy code intelligence, plus a `coding` aggregate used explicitly by the
+Talos CLI. These Cargo features make code available but grant no runtime permission.
+
+Direct `talos-tools` consumers that relied on the former broad implicit default must select the
+needed capability features, or `coding` when the full product-oriented set is intentional. The
+future `RuntimePreset::coding()` remains owned by ARCH-031-C/I161 and is not implemented by I159.
 
 ## Pre-1.0 Change Policy
 
