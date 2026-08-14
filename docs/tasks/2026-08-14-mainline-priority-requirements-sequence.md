@@ -174,7 +174,7 @@ deployment, schema/data migration or external destructive action is part of this
 
 | Time | Task Item | Branch / Commit | State And Evidence | Open Risk / Deviation | Next Exact Action / Resume |
 |---|---|---|---|---|---|
-| 2026-08-14 | T0 Draft publication | `docs/mainline-priority-long-task-plan`; initial plan `d45c82242d6aa199638433e97b041d969771a0c3`; Draft PR #227 stacked on PR #226 head `1fffd358742b82e159e18f574764600a2b8c5dbf` | Planning baseline pushed; proposed coordination claim backfilled; repository/skill governance and claim validators reported 0 warnings; diff check passed; no implementation code changed; I197/I198 remain Unclaimed | The #227 coordination claim is ineffective before `main`; #59 production gates are not satisfied | Commit/push this finalized claim record, keep #227 Draft until #226 merges, then reconcile to current `main` and rerun exact-head gates |
+| 2026-08-14 | T0 Draft publication | `docs/mainline-priority-long-task-plan`; plan `d45c82242d6aa199638433e97b041d969771a0c3`; claim backfill `335660d7b9b9ae67f7c56fbbd01a92503f2893b9`; Draft PR #227 stacked on PR #226 head `1fffd358742b82e159e18f574764600a2b8c5dbf` | Planning baseline and proposed coordination claim pushed; repository/skill governance and claim validators reported 0 warnings; diff check passed; no implementation code changed; I197/I198 remain Unclaimed | The #227 coordination claim is ineffective before `main`; #59 production gates are not satisfied | Keep #227 Draft until #226 merges, then reconcile to current `main`, rerun exact-head gates and obtain independent review before merge |
 
 ## Completion Rule
 
