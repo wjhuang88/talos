@@ -103,8 +103,8 @@ and gates.
 
 | Child Story | Owns Candidate Slice | Selected Iteration | Initial State | Activation Gate |
 |---|---|---|---|---|
-| [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Refinement — blocked on I158 | I158 Complete (which requires ADR-053 Accepted) |
-| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Refinement — blocked on ARCH-031-A | I159 Complete |
+| [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Complete — PR #236 merge `f79c1ead` | Closed |
+| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Ready / Planned / Unclaimed | Dedicated effective I160 claim required |
 | [ARCH-031-C](ARCH-031-C-sandbox-fallback-and-coding-preset.md) | (new) `SandboxFallbackPolicy` + `RuntimePreset::coding()` (ADR-052) | I161 | Refinement — blocked on ARCH-031-B + security review | I160 Complete; independent security review scheduled |
 | [ARCH-031-D](ARCH-031-D-v0.6-sdk-publication-readiness.md) | 1/3/5 (matrix, dry-run, docs/release gate) at v0.6 alignment | I162 | Refinement — blocked on ARCH-031-C | I161 Complete; workspace green |
 
@@ -154,6 +154,13 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 - `scripts/validate_project_governance.sh .`
 
 ## Execution Notes
+
+### I159 Closeout Evidence (2026-08-14)
+
+- Completion Commit: `d886917e45d5ca0f110e111b966cd379485e3580` and
+  `34c09b142766c70ac62ef24424ed035f2fa921a5` (child ARCH-031-A/I159 implementation
+  evidence; the parent Epic remains `In Progress` and is not Complete).
+- I159 implementation PR #236 merged at `f79c1ead1cd3a547797dea3666295f510d88a13d`.
 
 2026-06-29:
 
@@ -280,6 +287,9 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
   `release_preflight.sh` completes successfully. The correction is recorded by commits `34c09b14`
   and `57bc1585`; this remains local follow-up evidence until GitHub validates the resulting exact
   head.
+- PR #236 then passed exact-head CI `31801484313` 5/5, independent approval `5293622712` and
+  merge-time CAS, merging as `f79c1ead1cd3a547797dea3666295f510d88a13d`. ARCH-031-A/I159 is
+  Complete; ARCH-031-B/I160 is Ready/Planned/Unclaimed, while ARCH-031 remains In Progress.
 
 ## Required Reads
 

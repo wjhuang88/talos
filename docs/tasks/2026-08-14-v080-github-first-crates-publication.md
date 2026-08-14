@@ -78,7 +78,7 @@ inventory.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
-| V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Active |
+| V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Planned |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
@@ -179,3 +179,29 @@ PR, then implement the minimum feature gates and run the full build/product-pari
 
 Recovery or resume instruction: use only `/private/tmp/talos-i159-impl`; do not touch I188,
 Dashboard, I196, recovery branches, stashes, tags or registries.
+
+### 2026-08-14 I159 Completion Checkpoint
+
+Completed task items: V080-10. Implementation commits
+`d886917e45d5ca0f110e111b966cd379485e3580` and
+`34c09b142766c70ac62ef24424ed035f2fa921a5` deliver the feature boundary. Accepted head
+`33a2c6ffad0e5c473baf41c14e704dfd19fcd0c9` passed CI `31801484313` 5/5 and independent approval
+`5293622712`, then PR #236 merged after CAS as `f79c1ead1cd3a547797dea3666295f510d88a13d`.
+
+Current state and artifacts: ARCH-031-A/I159 is Complete/Closed. ARCH-031-B/I160 is
+Ready/Planned/Unclaimed; I161-I162/I203 remain Blocked, I188/I189/I195 remain Planned/Claimed,
+I196 remains on release priority hold, and I164 remains Paused.
+
+Commands/checks and actual results: exact-head CI completed the full macOS/Windows Rust matrix and
+both governance validators; merge-time CAS reconfirmed unchanged head/base/checks/review. The
+closeout cites pre-existing implementation commits and does not self-certify.
+
+Open risks or deviations: `scraper 0.22`/`0.27` duplication remains owned by I162. The
+collaboration validator's unbound local `HEAD^` fallback remains a separate governance follow-up;
+I159 records the required exact-base invocation.
+
+Next task item: prepare and independently review a dedicated ARCH-031-B/I160 claim from current
+`main`. Do not create an I160 implementation branch before that claim is effective.
+
+Recovery or resume instruction: verify this closeout on current `main`, then use a new isolated I160
+claim worktree. Do not reuse the I159 implementation branch or activate unrelated planned work.

@@ -1,11 +1,28 @@
 # Iteration I160: Shared CLI And Runtime Internal Composition
 
-> Document status: Blocked
+> Document status: Planned
 > Published plan date: 2026-07-26
 > Planned objective: CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | ARCH-031-B / I160 only: shared internal CLI/runtime composition with separate public entrypoints and behavior-equivalence evidence; no preset, fallback, version, tag or publication. |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | I159 prerequisite completed through PR #236 merge `f79c1ead`; no I160 implementation authorization exists until a dedicated claim reaches `main`. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Establish and independently review an effective I160 claim on current `main` before creating an implementation branch or modifying implementation code. |
 
 ## Published Baseline
 
@@ -130,6 +147,7 @@ If a stop condition occurs:
 | Date | Type | Record |
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
 
 ## Verification Evidence
 
