@@ -46,7 +46,6 @@ class ClassifierTests(unittest.TestCase):
             "Cargo.lock",
             ".github/workflows/ci.yml",
             "AGENTS.md",
-            ".agent-governance/manifest.yaml",
             "docs/sop/TESTING.md",
             "scripts/release_preflight.sh",
             "scripts/fixtures/case.json",
@@ -55,6 +54,9 @@ class ClassifierTests(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assert_full(payload(("M", path)))
+
+    def test_plain_text_governance_manifest_is_reduced(self) -> None:
+        self.assert_reduced(("M", ".agent-governance/manifest.yaml"))
 
     def test_mixed_change_is_full(self) -> None:
         self.assert_full(payload(("M", "docs/reference/guide.md"), ("M", "Cargo.toml")))
