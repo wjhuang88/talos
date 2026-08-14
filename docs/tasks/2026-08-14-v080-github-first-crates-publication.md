@@ -211,13 +211,12 @@ claim worktree. Do not reuse the I159 implementation branch or activate unrelate
 Completed task items: V080-10 remains closed; V080-20 claim preparation has started from the
 post-closeout main `1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
 
-Current state and artifacts: ARCH-031-B/I160 remains Planned/Unclaimed while a dedicated governance
-claim PR is prepared. No I160 implementation branch, Rust/Cargo change, version bump, tag or
-publication action exists.
+Current state and artifacts: ARCH-031-B/I160 is Planned/Claimed through governance PR #238, which
+is not effective until merged to `main`. No I160 implementation branch, Rust/Cargo change, version
+bump, tag or publication action exists.
 
-Next task item: open the draft claim PR, backfill its number into the finalized owner records, run
-both governance validators against the exact target base, and obtain independent review before
-merge-time CAS.
+Next task item: obtain independent review for finalized PR #238, then repeat exact-head governance,
+CI and merge-time CAS checks before merging the claim.
 
 Recovery or resume instruction: treat the claim as ineffective until its finalized `Claimed` record
 is merged to current `main`; after merge, create a fresh I160 implementation worktree from the claim

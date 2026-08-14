@@ -87,15 +87,6 @@ The iteration must record the chosen owner before code changes.
 
 ## Responsibility Map
 
-## Claim Preparation Checkpoint (2026-08-14)
-
-- I159/ARCH-031-A is complete on current `main` through PR #236 merge
-  `f79c1ead1cd3a547797dea3666295f510d88a13d`.
-- A dedicated I160 governance claim is being prepared from
-  `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
-- The claim is not effective until its finalized owner record is merged to `main`; no
-  implementation branch or Rust/Cargo change is authorized by this checkpoint.
-
 | Responsibility | Owner after Story |
 |---|---|
 | Generic tool/contribution contracts | `talos-core` per ADR-053 |
@@ -107,6 +98,15 @@ The iteration must record the chosen owner before code changes.
 | Turn loop | `talos-agent` |
 | Sandbox implementation | `talos-sandbox` |
 | Sandbox fallback policy | still future ARCH-031-C |
+
+## Claim Preparation Checkpoint (2026-08-14)
+
+- I159/ARCH-031-A is complete on current `main` through PR #236 merge
+  `f79c1ead1cd3a547797dea3666295f510d88a13d`.
+- A dedicated I160 governance claim is proposed in PR #238 from
+  `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
+- The claim is not effective until its finalized owner record is merged to `main`; no
+  implementation branch or Rust/Cargo change is authorized by this checkpoint.
 
 ## Required Profiles For Equivalence
 

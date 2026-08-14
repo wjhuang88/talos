@@ -30,7 +30,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `ARCH-031-B` | `ARCH-031` | `Ready / Planned / Claimed` | `I159` Complete; claim PR #238 must merge before activation | CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints. |
+| `ARCH-031-B` | `ARCH-031` | `Refinement/Blocked` | `I159` Complete and ARCH-031-B updated to Ready | CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints. |
 
 ### Start Here
 
@@ -148,7 +148,7 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
-| 2026-08-14 | Claim preparation | Draft claim PR #238 starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; the proposed claim remains ineffective until its finalized `Claimed` record merges to `main`. |
+| 2026-08-14 | Claim preparation | Finalized claim PR #238 starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; the proposed claim remains ineffective until its `Claimed` record merges to `main`. |
 
 ## Verification Evidence
 
