@@ -2,8 +2,9 @@
 
 **Repository baseline**: `main@685d3b4f4088a172551f8c844a89f5dee9469430`
 **Closeout PR**: #137
-**Remote scope**: all 34 open GitHub Issues after Issues #119 and #134 completion, Issue #136
-registration, and intake registration of Issues #141–#143, #146, #155, #188, and #199
+**Remote scope**: all 34 open GitHub Issues after Issues #119, #134 and #104 completion, Issue #136
+registration, intake registration of Issues #141–#143, #146, #155, #188, and #199, and
+RUNTIME-006 registration for Issue #234
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Result
@@ -19,6 +20,8 @@ registration, and intake registration of Issues #141–#143, #146, #155, #188, a
   registration does not expand or block I175.
 - Issue #188 is independently owned by PERM-007 as unclaimed Refinement security work; its
   registration does not authorize model-assisted permission decisions or alter PERM-006 ordering.
+- Issue #234 is independently owned by RUNTIME-006 as unclaimed Refinement SDK/API work; its
+  registration does not expand the v0.8.0 publication scope or authorize API implementation.
 - Recovery PRs #120/#121 and their branches remain immutable archival evidence.
 - Deferred, Refinement, Ready, Partial and Blocked remain open states; registration does not imply
   selection or implementation authorization.
@@ -60,6 +63,7 @@ registration, and intake registration of Issues #141–#143, #146, #155, #188, a
 | [#155](https://github.com/wjhuang88/talos/issues/155) | SkillLoader rejects `SKILL.md` without triggers | [SKILL-004](../backlog/active/SKILL-004-optional-skill-triggers-compatibility.md) | Intake | P1 skill-format compatibility intake; contract decision, fixtures, iteration, and claim required before implementation. |
 | [#188](https://github.com/wjhuang88/talos/issues/188) | model-assisted Goal permission decisions | [PERM-007](../backlog/active/PERM-007-model-assisted-goal-permission-decisions.md) | Refinement | Security ADR, threat model, PERM-006 dependencies and bounded child decomposition required before any implementation claim. |
 | [#199](https://github.com/wjhuang88/talos/issues/199) | shared retry and circuit-breaker policy | [NET-001](../backlog/active/NET-001-network-resilience-policy.md) | Intake | Inventory and ADR-backed decomposition required; no implementation or replay authority. |
+| [#234](https://github.com/wjhuang88/talos/issues/234) | single-direct-dependency runtime SDK facade | [RUNTIME-006](../backlog/active/RUNTIME-006-single-dependency-sdk-facade.md) | Refinement | Provider strategy, compatibility treatment, external fixture, iteration and claim required before API implementation. |
 
 ## Closed In This Reconciliation
 

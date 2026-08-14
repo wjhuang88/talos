@@ -1,11 +1,28 @@
 # Iteration I159: `talos-tools` Lightweight Feature Boundary
 
-> Document status: Blocked
+> Document status: Planned
 > Published plan date: 2026-07-26
 > Planned objective: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline release-governance session 2026-08-14 |
+| Work Slice | ARCH-031-A / I159 only: implement real `talos-tools` Cargo feature boundaries, lightweight file-read/search defaults and explicit CLI `coding` selection while preserving product tool and permission behavior. No shared composition, runtime preset, sandbox policy, version bump, publication, tag or release. |
+| Claimed At | 2026-08-14 |
+| Source Issue | None |
+| Governance Claim PR | #235 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #235 proposes this bounded claim. Exact-head review, CI, governance validation and merge-time CAS are required; the proposed Claimed record remains ineffective until it reaches `main`. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Merge PR #235 through exact-head independent review/CI and merge-time CAS, then create the I159 implementation branch from that merge or later current `main`. |
 
 ## Published Baseline
 
@@ -129,6 +146,8 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency disposition | TUI-037/I202 reached Complete through implementation commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` and PR #230 merge `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`, satisfying the required independent TUI disposition. I159 remains Blocked and unactivated because selected Story ARCH-031-A is still Refinement/Blocked and not Ready; no I159 claim or implementation authority is created. |
+| 2026-08-14 | Priority and readiness change control | The maintainer selected a v0.8.0 GitHub-first/Cargo-second release before I196 implementation. ARCH-031-A resolved its remaining feature-ownership alternatives and moved to Ready. I159 moves from Blocked to Planned and prepares its own claim; the published objective, exclusions and acceptance remain unchanged. I160-I162 stay blocked in order, I203 stays blocked on I162 GO, and no implementation is activated by this planning record. |
+| 2026-08-14 | Dependency-fact review correction | Independent review of PR #235 at `4cd5d6868b42f7efafccf117c78e30173addef01` found that `document_extract` unconditionally compiles existing `scraper 0.27`, so assigning it to default `file-read` contradicted the lightweight-default objective. ARCH-031-A change control now assigns the whole tool to a default-off `document` feature requiring `file-read`, includes it in `coding`, and corrects `tree`, `search_engine`, and `browser_page` source attributions. The published objective, product-parity requirement, exclusions and acceptance remain unchanged; this record still does not activate implementation. |
 
 ## Verification Evidence
 
@@ -145,7 +164,10 @@ If a stop condition occurs:
 
 ## Variance And Residuals
 
-- None recorded at planning time.
+- Planning variance resolved before activation: the initial PR #235 readiness decision incorrectly
+  treated `document_extract` as dependency-free relative to `file-read`. ARCH-031-A now records the
+  existing `scraper` edge and the separate default-off `document` feature. No implementation
+  variance or residual is authorized by this correction.
 
 ## REL-002 Execution Record
 
