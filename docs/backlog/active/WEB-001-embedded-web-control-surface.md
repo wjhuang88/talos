@@ -69,6 +69,14 @@ HTML escaping. It explicitly excludes SSE/live logs, config writes, approvals/to
 session mutation/actions, WebSocket control, LAN/remote/tunnel access, browser automation, TUI-037,
 and any new permission, persistence, or remote-control model.
 
+## Opt-In Token Delivery Security Residual
+
+[SEC-002](SEC-002-dashboard-token-delivery-boundary.md) separately owns the pre-existing ADR-031
+gap where `[dashboard] loopback_only = false` generates and enforces a memory-only token but defines
+no compliant operator-delivery channel. SEC-002 is Refinement / Unclaimed / Selected Iteration None;
+it must choose an ADR-backed delivery, authentication-redesign or mode-deprecation contract before
+implementation. It does not alter WEB-001-A/I195 scope or reuse their authorization.
+
 Until PR #212 reaches `main`, the current implementation description above remains authoritative.
 
 ## Target Model (Not Current Implementation)
@@ -115,6 +123,7 @@ governance state model and data sources.
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/proposals/embedded-web-control-surface.md`
 - `docs/backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md`
+- `docs/backlog/active/SEC-002-dashboard-token-delivery-boundary.md`
 - `docs/iterations/I195-dashboard-read-only-visual-shell.md`
 - `docs/backlog/active/EXT-002-oh-my-pi-feature-analysis.md`
 - `crates/talos-rpc/src/` (existing JSON-RPC infrastructure)
