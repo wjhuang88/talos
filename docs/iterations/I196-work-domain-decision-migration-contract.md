@@ -61,11 +61,24 @@ record reaches `main`.
 | I164 | Paused | Preserve superseded history; do not resume. |
 | I188 | Planned / Claimed | Keep unactivated; its TOOL-024-A decision scope remains independent. |
 | I189 | Planned / Claimed | Keep unactivated; its PERM-006-A protected scope remains independent. |
+| I195 | Planned / Claimed | Keep unactivated for this P0; its WEB-001-A read-only Dashboard shell claim is effective on `main` through merge `f123e534`, but its implementation scope remains independent of WORK-001-A. |
 
-There is no Active or Review iteration on the target branch. I195 exists only on open Dashboard
-claim PR #212 and has no target-branch ownership effect. ARCH-034-R04 remains Partial;
+There is no Active or Review iteration on the target branch. I195 is now a target-branch
+`Planned / Claimed` iteration through the merged Dashboard governance claim PR #212 at
+`f123e534`; it has ownership on `main` but no scope overlap or implementation authorization in
+WORK-001-A. ARCH-034-R04 remains Partial;
 RUNTIME-005 remains Refinement/Unclaimed; DESKTOP-001 remains Deferred/Unclaimed; ADR-059 remains
-Proposed. PRs #120/#121 remain archival, and #222/#225 remain unrelated temporary replay PRs.
+Proposed. PRs #120/#121 remain archival, and #222/#225 remain closed historical replay PRs outside
+this owner scope.
+
+### Current Exact-Base Inventory Checkpoint
+
+The original planning baseline above remains historical evidence. At the synchronization checkpoint
+for the current `main@bfb167d81c4fc320c5cc532cde08d81a29d17113`, the complete non-terminal inventory is
+I159/I160/I161/I162 (Blocked), I164 (Paused), I188 (Planned / Claimed), I189 (Planned / Claimed),
+and I195 (Planned / Claimed). No iteration is Active or Review. This checkpoint supersedes the
+earlier statement that I195 existed only on an open PR; it does not activate I195 or import its
+Dashboard implementation scope into I196.
 
 ### Scope
 
