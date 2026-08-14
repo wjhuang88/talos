@@ -11,6 +11,7 @@ That snapshot is historical evidence, not current activation authority.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
+| 0 | Goal-oriented work and evaluation foundation | WORK-001-A / I196 is the proposed P0 decision and migration-contract slice in claim PR #226. The claim remains ineffective until independently reviewed and merged to `main`; P1-P4 remain separate blocked future owners and no Work Graph, Evaluator or Desktop implementation is authorized. | `docs/backlog/active/WORK-001-goal-oriented-work-evaluation-foundation.md`; `docs/backlog/active/WORK-001-A-work-domain-decision-migration-contract.md`; `docs/iterations/I196-work-domain-decision-migration-contract.md`; DESKTOP-001; RUNTIME-001; SESSION-009; TODO-001; TODO-002; VALIDATION-001 |
 | 0 | v0.6 Runtime Productization Program | I158 is Complete with `c88c1d1a`; TUI-037/I202 is Complete with `6d3f85ea`, satisfying its disposition dependency. I159 remains Blocked because ARCH-031-A is not Ready; I160-I162 remain blocked in order. | `docs/tasks/2026-07-28-four-month-v06-execution-package.md`; `docs/iterations/I158-tool-registration-composition.md`; `docs/iterations/I159-talos-tools-feature-boundary.md`; `docs/backlog/active/TUI-037-dashboard-logo-link.md`; ADR-053 |
 | 0 | Internal validation service | Validation must become an internal callable, language-neutral service; governance must not depend on shell scripts and project adapters must be detected before guidance is injected. | `docs/backlog/active/VALIDATION-001-internal-validation-service.md`; `docs/backlog/active/GOV-003-builtin-project-governance.md`; `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md` |
 | 0 | Change-aware CI routing | I190/GOV-005 is Complete at implementation merge `a69ffa30` plus reduced-probe merge `01721f68`. Case-variant SOP exclusion matching remains separately unclaimed as GOV-006. | `docs/backlog/active/GOV-005-change-aware-ci-routing.md`; `docs/iterations/I190-change-aware-ci-routing.md`; `docs/backlog/active/GOV-006-ci-doc-path-case-normalization.md` |
@@ -73,6 +74,7 @@ Required reads:
 
 | ID | State | Selection / Exit Gate |
 |---|---|---|
+| WORK-001-A / I196 | Ready / proposed claim PR #226 | Pass exact-head governance/CI and independent review, repeat merge-time CAS, and merge PR #226 to `main` before creating the P0 decision implementation branch. |
 | ARCH-034-D / I171 | Complete | Completion Commit `c88c1d1a`; current v0.7.0 audit/register and bounded owner creation validated; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
