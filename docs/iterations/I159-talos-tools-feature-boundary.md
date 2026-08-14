@@ -20,9 +20,9 @@
 | Governance Claim PR | #235 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged to `main` as `fa635b4eaadd4b55939322f89acfda4522489ab7`. |
-| Implementation PR | Pending draft creation from `feat/tools-I159-feature-boundary` |
+| Implementation PR | #236 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Implement only on `feat/tools-I159-feature-boundary` from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7`; reach Review through the complete feature matrix, product-parity evidence and an implementation commit. |
+| Handoff / Release Condition | Implement only through Draft PR #236 on `feat/tools-I159-feature-boundary` from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7`; reach Review through the complete feature matrix, product-parity evidence and an implementation commit. |
 
 ## Published Baseline
 

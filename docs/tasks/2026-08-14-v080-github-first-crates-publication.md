@@ -161,8 +161,8 @@ Completed task items: V080-00. PR #235 head
 `5292115807`, both governance validators and merge-time CAS, then merged as
 `fa635b4eaadd4b55939322f89acfda4522489ab7`.
 
-Current state and artifacts: I159/ARCH-031-A is the sole Active iteration and implementation starts
-from the claim merge on `feat/tools-I159-feature-boundary`. I188/I189/I195 remain
+Current state and artifacts: I159/ARCH-031-A is the sole Active iteration and Draft implementation
+PR #236 starts from the claim merge on `feat/tools-I159-feature-boundary`. I188/I189/I195 remain
 Planned/Claimed, I196 remains on release priority hold, I160-I162/I203 remain Blocked, and I164
 remains Paused. No other open PR owns the I159 slice.
 
