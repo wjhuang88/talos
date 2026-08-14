@@ -5,7 +5,7 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | Ready — selected for I202; proposed claim pending target-branch merge |
+| Status | Ready — selected for I202; proposed claim PR #229 pending target-branch merge |
 | Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; Issue #104 |
 | Parent Epic | None |
 | Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 Complete |
@@ -94,18 +94,21 @@ Dashboard startup failure remains a normal error tip and creates no Dashboard Lo
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex — mainline session 2026-08-14 |
 | Work Slice | Implement only TUI-037 / I202: replace successful Dashboard-ready Tips with one display-only Logo-prefix line; render complete token-free plain-text URLs for ordinary and token-required loopback modes, add `authentication required` for the latter, remove token-bearing startup logging, preserve failure Tips, and prove no transcript/session/export/log/primary-screen persistence. No OSC 8, Dashboard route/auth/bind, persistence, conversation protocol, Desktop or I159-I162 behavior change. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #104 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head security review is mandatory before claim merge and implementation merge because the slice removes an existing bearer-token logging path and changes terminal rendering. This proposed ownership remains ineffective until the finalized claim reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Open the governance-only claim PR, backfill its actual number, pass both governance validators and exact-head CI/review/CAS, then merge to `main` before creating an implementation branch. |
+| Handoff / Release Condition | Pass both governance validators and exact-head CI/independent review/CAS on PR #229, then merge it to `main` before creating an implementation branch. |
+
+The `Claimed` record above is proposed by PR #229 and remains ineffective until that exact record
+reaches `main`. No I202 implementation branch or production edit is authorized before then.
 
 ## User-Facing Documentation
 

@@ -14,21 +14,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex — mainline session 2026-08-14 |
 | Work Slice | Implement only TUI-037 / I202: replace successful Dashboard-ready Tips with one display-only Logo-prefix line; render complete token-free plain-text URLs for ordinary and token-required loopback modes, add `authentication required` for the latter, remove token-bearing startup logging, preserve failure Tips, and prove no transcript/session/export/log/primary-screen persistence. No OSC 8, Dashboard route/auth/bind, persistence, conversation protocol, Desktop or I159-I162 behavior change. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #104 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head security review is mandatory before claim merge and implementation merge because the slice removes an existing bearer-token logging path and changes terminal rendering. This proposed ownership remains ineffective until the finalized claim reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Open the governance-only claim PR, backfill its actual number, pass both governance validators and exact-head CI/review/CAS, then merge to `main` before creating an implementation branch. |
+| Handoff / Release Condition | Pass both governance validators and exact-head CI/independent review/CAS on PR #229, then merge it to `main` before creating an implementation branch. |
 
-The claim above is intentionally incomplete until the actual governance PR number replaces
-`Pending`. This branch is governance-only and contains no production implementation.
+The `Claimed` record above is proposed by PR #229 and remains ineffective until that exact record
+reaches `main`. This branch is governance-only and contains no production implementation.
 
 ## Published Baseline
 
@@ -153,7 +153,8 @@ before beginning the proposed long task.
 
 ## Verification Evidence
 
-- Governance validation and exact-head CI/review evidence are pending finalized claim PR head.
+- Governance validation, exact-head CI and independent-review evidence are pending on finalized
+  claim PR #229 head.
 
 ## Completion Evidence
 
