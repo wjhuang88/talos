@@ -79,7 +79,7 @@ inventory.
 |---|---|---|---|---|---|---|
 | V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
-| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Planned |
+| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Active — worktree `feat/runtime-I160-shared-composition` at `71faf844` |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
@@ -221,3 +221,23 @@ CI and merge-time CAS checks before merging the claim.
 Recovery or resume instruction: treat the claim as ineffective until its finalized `Claimed` record
 is merged to current `main`; after merge, create a fresh I160 implementation worktree from the claim
 merge commit.
+
+### 2026-08-15 I160 Activation Checkpoint
+
+Completed task items: V080-10 remains closed; V080-20 is now active after the dedicated claim
+merged. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`,
+independent approval `5295372157`, both governance validators and merge-time CAS, then merged to
+`main` as `71faf8440466668daeef0afd0e779be072978b01`.
+
+Current state and artifacts: ARCH-031-B/I160 is In Progress / Active / Claimed. The implementation
+worktree is `/private/tmp/talos-i160-impl` on `feat/runtime-I160-shared-composition`, based exactly
+on the claim merge; no Rust/Cargo change, version bump, tag or publication action existed at
+activation. I161-I162 remain blocked in order, I203 remains blocked, I188/I189/I195 remain
+Planned/Claimed and unactivated, I196 remains on release priority hold, and I164 remains Paused.
+
+Next task item: capture the exact CLI/runtime composition baseline, then implement only the bounded
+ARCH-031-B acceptance. Do not begin I161, release/version/tag, or Cargo publication work.
+
+Recovery or resume instruction: refresh `origin/main`, verify I160 remains Active and the claim
+merge remains an ancestor, then continue from `/private/tmp/talos-i160-impl`. Preserve the published
+baseline and append execution evidence only.

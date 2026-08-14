@@ -6,9 +6,9 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Ready / Planned / Claimed — I159/ARCH-031-A complete; implementation remains unstarted |
+| Status | In Progress / I160 Active / Claimed — implementation baseline starts at `main@71faf844` |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Planned / Claimed) |
+| Selected Iteration | I160 (Active / Claimed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
 
 ## Collaboration Claim
@@ -23,10 +23,10 @@
 | Source Issue | None |
 | Governance Claim PR | #238 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. I159 completion and current exact base `1b129c95` verified. Claim is effective only after PR #238 merges to `main`. |
+| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS before merge `71faf8440466668daeef0afd0e779be072978b01` established the claim on `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After claim merge, refresh exact `main`, activate I160 with a new implementation worktree; release/version/tag/publication remain excluded. |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | Execute only the bounded shared-composition slice from `main@71faf844`; submit exact-head validation and independent review before merge. Release/version/tag/publication remain excluded. |
 
 ## Problem
 
@@ -217,3 +217,14 @@ Stop if:
 - The published objective, acceptance, exclusions and responsibility map remain unchanged.
 - ARCH-031-B is Ready for a dedicated I160 claim. This checkpoint does not activate I160, create an
   implementation branch or authorize shared-composition code changes.
+
+## 2026-08-15 Activation Checkpoint
+
+- PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`,
+  independent approval `5295372157`, and merge-time CAS, then merged to `main` as
+  `71faf8440466668daeef0afd0e779be072978b01`.
+- The effective claim authorizes only ARCH-031-B/I160. The implementation worktree
+  `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that
+  exact merge commit; no Rust/Cargo change existed at activation.
+- I160 is Active. I161-I162 remain blocked, and release/version/tag/publication remain outside this
+  Work Slice.

@@ -1,6 +1,6 @@
 # Iteration I160: Shared CLI And Runtime Internal Composition
 
-> Document status: Planned
+> Document status: Active (2026-08-15)
 > Published plan date: 2026-07-26
 > Planned objective: CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,10 +19,10 @@
 | Source Issue | None |
 | Governance Claim PR | #238 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. I159 prerequisite completed through PR #236 merge `f79c1ead`; current exact base `1b129c95` verified. Claim is effective only after PR #238 merges to `main`. |
+| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS before merge `71faf8440466668daeef0afd0e779be072978b01` established the claim on `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After PR #238 merges, refresh exact `main` and activate I160 before creating an implementation branch or modifying implementation code. |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | Execute only ARCH-031-B/I160 from `main@71faf844` through an independently reviewed exact-head implementation PR; release/version/tag/publication and I161-I162 remain excluded. |
 
 ## Published Baseline
 
@@ -149,6 +149,7 @@ If a stop condition occurs:
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
 | 2026-08-14 | Claim preparation | Finalized claim PR #238 starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; the proposed claim remains ineffective until its `Claimed` record merges to `main`. |
+| 2026-08-15 | Activation | PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS, then merged as `71faf8440466668daeef0afd0e779be072978b01`. The implementation worktree `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that exact claim merge. I160 is the sole Active iteration. I164 remains Paused; I188/I189/I195/I196 remain Planned and unactivated; I161/I162/I203 remain Blocked. Open PRs #120/#121, #227, #228 and #233 do not own this Work Slice. Primary executor is `Codex / GPT-5 mainline session`; no Rust/Cargo change existed at activation. |
 
 ## Verification Evidence
 

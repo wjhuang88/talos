@@ -104,13 +104,13 @@ and gates.
 | Child Story | Owns Candidate Slice | Selected Iteration | Initial State | Activation Gate |
 |---|---|---|---|---|
 | [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Complete — PR #236 merge `f79c1ead` | Closed |
-| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Ready / Planned / Claimed | Governance claim PR #238 must merge before activation |
+| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | In Progress / Active / Claimed | Claim PR #238 merged as `71faf844`; implementation remains bounded to I160 |
 | [ARCH-031-C](ARCH-031-C-sandbox-fallback-and-coding-preset.md) | (new) `SandboxFallbackPolicy` + `RuntimePreset::coding()` (ADR-052) | I161 | Refinement — blocked on ARCH-031-B + security review | I160 Complete; independent security review scheduled |
 | [ARCH-031-D](ARCH-031-D-v0.6-sdk-publication-readiness.md) | 1/3/5 (matrix, dry-run, docs/release gate) at v0.6 alignment | I162 | Refinement — blocked on ARCH-031-C | I161 Complete; workspace green |
 
 Candidate Slices 2 (Manifest readiness) and 6 (Cargo install path) remain open acceptance items
-under ARCH-031 directly and are not yet satisfied (see Acceptance Criteria). None of the child
-stories is activated by this staging; their gates are sequential and ADR-053-gated.
+under ARCH-031 directly and are not yet satisfied (see Acceptance Criteria). I160 is the only
+active child; later child gates remain sequential and ADR-053-gated.
 
 ## Acceptance Criteria
 
