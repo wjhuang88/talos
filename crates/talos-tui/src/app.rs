@@ -1,4 +1,5 @@
 use std::io;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
@@ -154,6 +155,7 @@ pub struct Tui {
     last_char_time: Option<Instant>,
     first_message_dispatched: bool,
     selection: Option<SelectionState>,
+    dashboard_availability: Option<crate::splash::DashboardAvailability>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -224,6 +226,7 @@ impl Tui {
             last_char_time: None,
             first_message_dispatched: false,
             selection: None,
+            dashboard_availability: None,
         })
     }
 
@@ -263,6 +266,7 @@ impl Tui {
             last_char_time: None,
             first_message_dispatched: false,
             selection: None,
+            dashboard_availability: None,
         }
     }
 
@@ -288,6 +292,21 @@ impl Tui {
 
     pub fn set_session_id(&mut self, id: String) {
         self.session_id = Some(id);
+    }
+
+    /// Adds a successful local Dashboard endpoint to the display-only Logo prefix.
+    ///
+    /// The socket address keeps the rendered target free of userinfo, query values,
+    /// fragments, and bearer credentials. This state never enters the transcript.
+    pub fn set_dashboard_availability(
+        &mut self,
+        address: SocketAddr,
+        authentication_required: bool,
+    ) {
+        self.dashboard_availability = Some(crate::splash::DashboardAvailability::new(
+            address,
+            authentication_required,
+        ));
     }
 
     pub fn hydrate_history(&mut self, history: &[Message]) {

@@ -5,7 +5,7 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | Ready — selected for I202; proposed claim PR #229 pending target-branch merge |
+| Status | Review — implementation PR #230; exact-head gates pending |
 | Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; Issue #104 |
 | Parent Epic | None |
 | Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 Complete |
@@ -102,13 +102,12 @@ Dashboard startup failure remains a normal error tip and creates no Dashboard Lo
 | Source Issue | #104 |
 | Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head security review is mandatory before claim merge and implementation merge because the slice removes an existing bearer-token logging path and changes terminal rendering. This proposed ownership remains ineffective until the finalized claim reaches `main`. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI `31772628731`, independent natural-person review comment `5289857825` with shared-account disclosure, and merge-time CAS comment `5289870196`; PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Independent exact-head security review remains mandatory for the implementation PR. |
+| Implementation PR | #230 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass both governance validators and exact-head CI/independent review/CAS on PR #229, then merge it to `main` before creating an implementation branch. |
+| Handoff / Release Condition | Finalize PR #230, then obtain exact-head CI, real-terminal matrix, independent natural-person security review and merge-time CAS before implementation merge. |
 
-The `Claimed` record above is proposed by PR #229 and remains ineffective until that exact record
-reaches `main`. No I202 implementation branch or production edit is authorized before then.
+The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816f4`.
 
 ## User-Facing Documentation
 
@@ -146,3 +145,7 @@ reaches `main`. No I202 implementation branch or production edit is authorized b
   primitive. Any later attempt needs a separate owner, strict target validation and terminal matrix.
 - No token delivery/navigation mechanism is introduced; token-required mode intentionally remains a
   non-clickable discovery notice.
+- ADR-031 requires the opt-in bearer token to remain memory-only and absent from logs, but defines no
+  supported operator token-delivery channel. I202 restores ADR-031 compliance by removing the
+  violating log and does not invent a replacement; the pre-existing opt-in usability gap requires a
+  separate owner and security decision.
