@@ -56,7 +56,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
-| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Active / I188 | None | Proposed ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence. |
+| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Review / I188 / PR #228 | None | Proposed ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence. |
 | TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit shell/single-exec background input, bounded capture, process-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
@@ -95,8 +95,8 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   background cancellation/reap lifecycle exists in the workspace.
 - Existing direct-child timeout behavior and Windows shell identity are inputs;
   neither proves descendant supervision or background ownership.
-- TOOL-023-C is Complete. Claim PR #196 merged as `02a35588`, so I188/TOOL-024-A is Active on an
-  independently governed decision branch.
+- TOOL-023-C is Complete. Claim PR #196 merged as `02a35588`; I188/TOOL-024-A decision artifacts
+  are under independent exact-head review in PR #228.
 - The current-path matrix proves Unix `setsid` is terminal isolation rather than whole-tree cleanup;
   Windows retains ADR-057's direct-child-only residual. ADR-060 therefore keeps Windows spawn
   fail-closed until D rather than weakening the no-unmanaged-child invariant.

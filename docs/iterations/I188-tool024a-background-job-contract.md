@@ -1,6 +1,6 @@
 # Iteration I188: TOOL-024-A Background Job Lifecycle Contract
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-11
 > Planned objective: decide the ownership, permission, cancellation, bounded-output, terminal-result and cross-platform cleanup contract required before supervised background command jobs can be implemented.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI `31555885775`. The decision implementation still requires fresh independent review on its exact head. |
-| Implementation PR | Not started |
+| Implementation PR | #228 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Publish the decision implementation PR; obtain independent exact-head process/permission security review, green CI and merge-time CAS before merge or ADR acceptance. |
+| Handoff / Release Condition | Obtain independent process/permission security review and green CI on PR #228's final exact head, repeat merge-time CAS, then merge before ADR acceptance. |
 
 ## Published Baseline
 
@@ -96,6 +96,7 @@
 | 2026-08-14 | Claim reconciliation | PR #196 claim merge `02a35588` is an ancestor of current `main`; final claim head `a5e9ffce` passed CI `31555885775`. No overlapping Active/Review iteration or implementation PR was found. |
 | 2026-08-14 | Activation | User directed the mainline session to clear Issue #59 implementation blockers. I188 activated from exact `origin/main` `556b5a43` in isolated branch `feat/runtime-I188-background-job-contract`; no Rust, Cargo, persistence, dependency, unsafe, Desktop, or Dashboard scope is authorized. |
 | 2026-08-14 | Decision | Proposed ADR-060 selects a session-owned bounded supervisor, explicit background permission resource, live-only terminal event and Unix-first process-group slice. Windows remains fail-closed pending D's separate Job Object gate. |
+| 2026-08-14 | Review handoff | Decision implementation commit `245eddeb` pushed and PR #228 opened against `main`; iteration moved to Review. No self-review or ADR acceptance is recorded. |
 
 ## Verification Evidence
 
@@ -103,6 +104,7 @@
 - Claim final head `a5e9ffce241adc2e3646b5925c51f22694bd4a09`; CI run `31555885775` passed.
 - Decision artifacts: `docs/decisions/060-supervised-background-command-jobs.md` and
   `docs/reference/I188-BACKGROUND-JOB-CURRENT-PATH.md`.
+- Implementation commit `245eddeb`; PR #228.
 - Implementation exact-head CI, both governance validators, independent security review and
   merge-time CAS remain pending.
 

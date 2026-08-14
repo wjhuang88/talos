@@ -1,6 +1,6 @@
 # TOOL-024-A: Background Job Lifecycle And Permission Contract Spike
 
-**Status**: Active (2026-08-14; effective claim merge `02a35588`)
+**Status**: Review (2026-08-14; implementation PR #228)
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
@@ -20,9 +20,9 @@
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; its final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI run `31555885775`. The decision implementation still requires fresh independent security review on its own exact head. |
-| Implementation PR | Not started |
+| Implementation PR | #228 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Publish the ADR/matrix implementation PR, obtain independent exact-head process/permission security review, pass CI and merge-time CAS, then merge before accepting ADR-060 or activating production work. |
+| Handoff / Release Condition | Obtain independent process/permission security review and green CI on PR #228's final exact head, repeat merge-time CAS, then merge before accepting ADR-060 or activating production work. |
 
 ## Goal / Value
 
@@ -122,7 +122,7 @@ git diff --check
 The Spike itself changes no runtime behavior. TOOL-024-B/C/D must update README EN/zh-CN, help/tool
 schema documentation, and the user-visible cancellation/status guidance if implementation proceeds.
 
-## Active Decision Output
+## Decision Output Under Review
 
 - [ADR-060](../../decisions/060-supervised-background-command-jobs.md) proposes one session-owned,
   bounded supervisor contract and remains Proposed pending independent exact-head review.
