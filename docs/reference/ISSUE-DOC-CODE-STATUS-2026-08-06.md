@@ -46,7 +46,6 @@ registration, and intake registration of Issues #141–#143, #146, #155, #188, a
 | [#59](https://github.com/wjhuang88/talos/issues/59) | supervised background command jobs | [TOOL-024](../backlog/active/TOOL-024-background-command-jobs.md) | Refinement | A decides; B waits for RUNTIME-005/PERM-006-C; C owns `process` controls; D owns cross-platform acceptance. |
 | [#69](https://github.com/wjhuang88/talos/issues/69) | thinking preview wrapping/height | [TUI-041](../backlog/active/TUI-041-thinking-preview-wrap-and-height.md) | Refinement | Layout and PTY gates required. |
 | [#79](https://github.com/wjhuang88/talos/issues/79) | no-op mouse scroll layout shift | [TUI-042](../backlog/active/TUI-042-noop-history-scroll-stability.md) | Refinement | State-transition regressions required. |
-| [#104](https://github.com/wjhuang88/talos/issues/104) | Dashboard link in Logo region | [TUI-037](../backlog/active/TUI-037-dashboard-logo-link.md) | Refinement P1 | First post-I158 disposition; design gates unresolved. |
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Ready | Bounded fix; iteration/claim required. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
@@ -68,6 +67,7 @@ registration, and intake registration of Issues #141–#143, #146, #155, #188, a
 |---|---|---|---|
 | [#119](https://github.com/wjhuang88/talos/issues/119) | TUI-044 / I169 / ADR-056 | Completed | PR #131 merged exact Head `90165cace4625c0f27616b3e1b9871bcb6a10186` at `685d3b4f4088a172551f8c844a89f5dee9469430`; CI `31010166558` and rebuilt real-terminal acceptance passed. |
 | [#134](https://github.com/wjhuang88/talos/issues/134) | TUI-046 / I184 / I186 | Completed | Completion Commits `f98488277803ee26180100089a48ef850939234b` and `a5115f5ce6484512ceb83867f72fa9b47ab8f5fc`; final PR #193 head `313e47e5` passed CI `31481069023`, independent review `4905391760` and merge-time CAS; exact runtime head `70b51e28` passed both terminal acceptance rows. |
+| [#104](https://github.com/wjhuang88/talos/issues/104) | TUI-037 / I202 | Completed | Implementation Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a475c2e5baceb31f2a125f1e268af7ecf` after exact-head CI `31775126382`, independent approval `5290402214`, terminal acceptance and merge-time CAS; closeout PR #231 merged as `1c4e29292ffcbc9e53a9dfaeed125ab5c5697e9f`. SEC-002 owns the separate token-delivery residual. |
 
 ## Closure Rule
 
