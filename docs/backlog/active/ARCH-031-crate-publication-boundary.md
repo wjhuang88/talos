@@ -291,23 +291,3 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 4. Should post-1.0 crates move to independent versions, or stay lockstep for user simplicity?
 5. Should the CLI Cargo package remain `talos-cli`, or should a later release choose another
    available package name for product branding while still shipping the `talos` binary?
-
-## 2026-08-14 v0.8.0 Priority And Publication Extension
-
-The maintainer selected the existing I159-I162 publication-readiness chain before activating the
-already-claimed I196 P0 work. The published I159-I162 objectives and order are preserved:
-
-1. I159 / ARCH-031-A feature boundaries;
-2. I160 / ARCH-031-B shared composition;
-3. I161 / ARCH-031-C sandbox fallback and coding preset;
-4. I162 / ARCH-031-D external fixtures, exact package closure and publication GO/NO-GO;
-5. new I203 / REL-003 real v0.8.0 release and publication only after I162 GO.
-
-REL-003 fixes the external order as GitHub-first: the annotated tag and completed five-platform
-GitHub Release, including checksums, are a hard predecessor to every real `cargo publish` command.
-The intended Cargo closure contains 20 packages required by `talos-cli` or `talos-runtime` and
-excludes only quarantined `talos-models`; I162 must recompute and dry-run the exact metadata order.
-
-Issue #234 is registered separately as RUNTIME-006. It requires a future facade where consumers
-declare only `talos-runtime` directly. That stronger API outcome does not silently expand I162 or
-block publishing the current documented pre-1.0 SDK contract in v0.8.0.

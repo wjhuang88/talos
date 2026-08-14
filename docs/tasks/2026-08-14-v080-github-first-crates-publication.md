@@ -141,7 +141,8 @@ the intended 20-package closure excluding `talos-models`.
 Open risks or deviations: I159 Story decisions must be finalized and its claim merged before
 implementation. Registry ownership/version availability requires fresh external confirmation.
 
-Next task item: finalize I159 readiness and the governance-only claim PR.
+Next task item: obtain exact-head CI and independent review for finalized I159 claim PR #235, then
+repeat merge-time CAS before it reaches `main`.
 
 Recovery or resume instruction: read this task, ARCH-031-A, I159 and the claim PR exact head; do not
 start code until the claim reaches current `main`.

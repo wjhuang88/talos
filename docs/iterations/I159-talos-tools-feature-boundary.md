@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline release-governance session 2026-08-14 |
 | Work Slice | ARCH-031-A / I159 only: implement real `talos-tools` Cargo feature boundaries, lightweight file-read/search defaults and explicit CLI `coding` selection while preserving product tool and permission behavior. No shared composition, runtime preset, sandbox policy, version bump, publication, tag or release. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-14 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #235 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head review, CI, governance validation and merge-time CAS are required. This record remains Unclaimed until the Draft PR number is backfilled and the finalized Claimed record reaches `main`. |
+| Authorization Evidence | PR #235 proposes this bounded claim. Exact-head review, CI, governance validation and merge-time CAS are required; the proposed Claimed record remains ineffective until it reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Finalize the claim with its actual PR number, merge it through independent review/CAS, then create the I159 implementation branch from that merge or later current `main`. |
+| Handoff / Release Condition | Merge PR #235 through exact-head independent review/CI and merge-time CAS, then create the I159 implementation branch from that merge or later current `main`. |
 
 ## Published Baseline
 
