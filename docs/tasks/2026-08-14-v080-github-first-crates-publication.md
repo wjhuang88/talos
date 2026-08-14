@@ -141,6 +141,13 @@ the intended 20-package closure excluding `talos-models`.
 Open risks or deviations: I159 Story decisions must be finalized and its claim merged before
 implementation. Registry ownership/version availability requires fresh external confirmation.
 
+Review correction: PR #235 review at head `4cd5d6868b42f7efafccf117c78e30173addef01`
+found that the proposed default `file-read` ownership for `document_extract` omitted its
+unconditional existing `scraper 0.27` dependency. ARCH-031-A change control now assigns the whole
+tool to a default-off `document` feature requiring `file-read` and included by `coding`; related
+`tree`, `search_engine`, and `browser_page` dependency attributions were also corrected. This is a
+planning-only correction and does not activate I159 or modify Cargo/Rust code.
+
 Next task item: obtain exact-head CI and independent review for finalized I159 claim PR #235, then
 repeat merge-time CAS before it reaches `main`.
 
