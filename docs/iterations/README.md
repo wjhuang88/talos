@@ -63,6 +63,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I193 | SESSION-008-B Durable Partial-Turn Finalization | Complete | Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`; PR #216 merged as `1b5461cd`; exact-head CI `31691761892`; disclosed role audits `5287961007`/`5287989820`. RUNTIME-005 retains its owner-defined gates. |
 | I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
 | I196 | Canonical Work Domain Decision And Migration Contract | Planned / proposed claim PR #226 | WORK-001-A P0 only. The claim is ineffective until independently reviewed and merged to `main`; no implementation branch, Work Graph, Evaluator, persistence or Desktop work is authorized. |
+| I197 | Permission Prompt Layout Anchor Stability | Planned / Unclaimed | TUI-045 / Issue #125 runnable TUI correction; follows predecessor disposition in the ordered mainline task and requires its own effective claim before implementation. |
+| I198 | Optional Skill Triggers Compatibility | Planned / Unclaimed | SKILL-004 / Issue #155 runnable compatibility slice; requires its own effective claim and a public-contract checkpoint before parser edits. |
 
 ## Completed This Closeout
 
