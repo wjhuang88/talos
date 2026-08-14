@@ -4,7 +4,7 @@
 activated by this record.
 **Published plan date**: 2026-08-14
 **Prerequisite claim**: I196 / WORK-001-A proposed claim PR #226
-**Source requirements**: Issues #59, #125 and #155
+**Source requirements**: Issues #59, #69, #79, #111, #125 and #155
 
 This task is the durable execution and recovery ledger requested for the ordered requirements. It
 coordinates independently governed iterations; it does not combine their scopes, transfer their
@@ -17,12 +17,12 @@ owner authority or make an ineffective child claim executable.
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline planning session 2026-08-14 |
-| Work Slice | Coordination and recovery ledger for the ordered I196 → I188/#59 → I197/#125 → I198/#155 sequence, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
+| Work Slice | Coordination and recovery ledger for I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I198/#155, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #59 |
 | Governance Claim PR | #227 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order and recording them in one long-running task on 2026-08-14. Independent natural-person exact-head review is required before merge; shared-account review must disclose actual identity and role separation. This proposed claim remains ineffective until the finalized record reaches `main`. Planning authorization does not authorize child implementation, merge, release, migration, deployment, spending or destructive action. |
+| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, then explicitly added Issues #69, #79 and #111 to the same long-running task on 2026-08-14. Independent natural-person exact-head review is required before merge; shared-account review must disclose actual identity and role separation. This proposed claim remains ineffective until the finalized record reaches `main`. Planning authorization does not authorize child implementation, merge, release, migration, deployment, spending or destructive action. |
 | Implementation PR | None; child iterations require separate implementation PRs |
 | Last Updated | 2026-08-14 |
 | Handoff / Release Condition | Reconcile PR #227 onto current `main` after prerequisite PR #226 merges; pass exact-head governance/CI and independent review, repeat merge-time CAS, and merge #227 to establish only this coordination claim. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
@@ -157,7 +157,36 @@ deployment, schema/data migration or external destructive action is part of this
 - P1-P4 Work/Evaluation work remains in WORK-001-B through WORK-001-E and outside this requirements
   sequence unless separately added by change control.
 
-## Ordered Task Items
+## Change Control — 2026-08-14 Approved Scope Addition
+
+The maintainer explicitly added Issues #69, #79 and #111 after the original planning baseline was
+published. This is a scope addition under `docs/sop/CHANGE-CONTROL.md`, not an in-scope correction.
+Each requirement has an independently acceptable outcome, so none is folded into I197 or another
+published iteration:
+
+| Added Issue | Owner | New Iteration | Readiness At Change | Disposition |
+|---|---|---|---|---|
+| #69 | TUI-041 | I199 | Refinement / Unclaimed | Refined to a runnable bounded-preview correction; Planned / Unclaimed. |
+| #79 | TUI-042 | I200 | Refinement / Unclaimed | Refined to a runnable scroll-transition correction; Planned / Unclaimed. |
+| #111 | TUI-043 | I201 | Ready / Unclaimed | Selected as a runnable conditional presentation fix; Planned / Unclaimed. |
+
+The revised technical order is I199/#69 → I200/#79 → I197/#125 → I201/#111. I199 runs first
+because its preview-height behavior changes history viewport capacity; I200 then owns the exact
+scroll-bound and obsolete-anchor normalization consumed by I197's permission-prompt anchoring.
+I201 is independent but follows the anchor work to reduce overlapping TUI review churn. A blocked
+predecessor is dispositioned and recorded rather than silently skipped; unrelated later work may
+continue through its own claim gate.
+
+The non-terminal inventory remains unchanged by this planning addition: I159-I162 stay Blocked,
+I164 stays Paused, I188/I189 stay Planned/Claimed and unactivated, and I196-I201 are Planned with
+only I196's and the long task's proposed claims present in open PRs. There is no Active or Review
+iteration on target `main`. ARCH-034-R04 remains Partial, RUNTIME-005 remains Refinement/Unclaimed,
+DESKTOP-001 remains Deferred/Unclaimed, and ADR-059 remains Proposed.
+
+## Original Ordered Task Items — Published Baseline
+
+The original T0-T7 table is preserved as planning history. The revised table below is the current
+execution order after the approved scope addition.
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
@@ -170,11 +199,28 @@ deployment, schema/data migration or external destructive action is part of this
 | T6 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s), only when dependency gates are true | T3 and T5 | Each new owner/iteration/claim independently satisfies the collaboration and security gates | Leave #59 open with exact blocked owners; do not hold T7 | Planned |
 | T7 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T6 terminal dispositions | Every delivered child has pre-existing commit evidence; every residual has an owner and resume gate | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
+## Current Ordered Task Items After Approved Change
+
+| ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
+|---|---|---|---|---|---|---|
+| T0 | Publish the revised planning packet | Long-task change record, I199-I201 plans and synchronized derived views | PR #226 planning head | PR #227 contains finalized scope; exact-head governance/CI checks pass | Keep proposed claim ineffective and report the failed gate | Planned |
+| T1 | Establish and deliver I196 / WORK-001-A | Accepted P0 architecture decision, inventory and migration/rollback contract | T0 and effective PR #226 claim | I196 owner acceptance, implementation PR, exact-head evidence and owner-first closeout | Keep I196 Review/Partial; do not begin P1 behavior work | Planned |
+| T2 | Reconcile, activate and deliver I188 / TOOL-024-A | Accepted background-job lifecycle/security ADR and current-path characterization | T1 disposition | Claim/evidence reconciled; I188 acceptance and independent exact-head security review pass | Keep TOOL-024 children blocked; record #59 residual | Planned |
+| T3 | Decide Issue #59 production readiness | TOOL-024-B/C/D dependency matrix and a new runnable iteration only if every gate holds | T2 | A accepted and RUNTIME-005, PERM-006-C and TOOL-023-C verified | Record blocked residual and continue to T4 | Planned |
+| T4 | Claim and deliver I199 / TUI-041 | Bounded multiline preview layout with buffer/layout and native-terminal evidence | T3 disposition | Effective I199 claim, Issue #69 acceptance and exact-head CI/review/CAS | Preserve one-row behavior; leave Review/Partial if layout safety fails | Planned |
+| T5 | Claim and deliver I200 / TUI-042 | No-op scroll state stability and obsolete-anchor normalization | T4 disposition | Effective I200 claim, Issue #79 acceptance and exact-head CI/review/CAS | Preserve genuine anchor navigation; record I199 interaction residual | Planned |
+| T6 | Claim and deliver I197 / TUI-045 | Permission-prompt anchor correction with focused tests and real-terminal evidence | T5 disposition | Effective I197 claim, Issue #125 acceptance and exact-head CI/review/CAS | Preserve permission visibility/fail-closed behavior; leave Review/Partial | Planned |
+| T7 | Claim and deliver I201 / TUI-043 | Conditional tool-call marker suppression with negative/order fixtures | T6 disposition | Effective I201 claim, Issue #111 acceptance and exact-head CI/review/CAS | Preserve legitimate text; leave Review/Partial if correlation is unsafe | Planned |
+| T8 | Claim and deliver I198 / SKILL-004 | Confirmed optional-trigger contract, fixtures and skill-author docs | T7 disposition | Effective I198 claim, contract checkpoint, acceptance and exact-head CI/review/CAS | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
+| T9 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T8 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners; do not hold T10 | Planned |
+| T10 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T9 terminal dispositions | Delivered children cite pre-existing commit evidence; every residual has an owner/resume gate | Mark task Partial/Blocked with exact recovery instructions | Planned |
+
 ## Checkpoints
 
 | Time | Task Item | Branch / Commit | State And Evidence | Open Risk / Deviation | Next Exact Action / Resume |
 |---|---|---|---|---|---|
 | 2026-08-14 | T0 Draft publication | `docs/mainline-priority-long-task-plan`; plan `d45c82242d6aa199638433e97b041d969771a0c3`; claim backfill `335660d7b9b9ae67f7c56fbbd01a92503f2893b9`; Draft PR #227 stacked on PR #226 head `1fffd358742b82e159e18f574764600a2b8c5dbf` | Planning baseline and proposed coordination claim pushed; repository/skill governance and claim validators reported 0 warnings; diff check passed; no implementation code changed; I197/I198 remain Unclaimed | The #227 coordination claim is ineffective before `main`; #59 production gates are not satisfied | Keep #227 Draft until #226 merges, then reconcile to current `main`, rerun exact-head gates and obtain independent review before merge |
+| 2026-08-14 | Approved scope addition | `docs/mainline-priority-long-task-plan` / Draft PR #227 | Maintainer added Issues #69/#79/#111; I199/I200/I201 owners and runnable plans prepared; original task baseline preserved | Revised exact head still requires validation/CI and independent review; every added child remains Unclaimed | Synchronize derived views, validate, commit/push the revised plan, update #227 body and keep it Draft behind #226 |
 
 ## Completion Rule
 

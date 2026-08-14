@@ -5,9 +5,9 @@
 | Story ID | TUI-043 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Ready — bounded presentation fix; pending iteration selection |
+| Status | Ready — I201 Planned / Unclaimed |
 | Source | [GitHub Issue #111](https://github.com/wjhuang88/talos/issues/111) |
-| Selected Iteration | None |
+| Selected Iteration | I201 — Planned / Unclaimed |
 | Depends On | Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle |
 
 ## Collaboration Claim
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | After the ordered TUI predecessor is dispositioned, establish an effective I201 claim on `main`; implement only from that claim merge or later current `main`. |
 
 ## Identity / Goal / Value
 
@@ -54,7 +54,8 @@ Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle
 
 ## Uncertainty And Validation Path
 
-The issue is implementation-ready as a narrow TUI state transition; selection still requires an iteration and effective claim.
+I201 is the selected runnable iteration. Implementation still requires its own effective claim and
+must keep the pending-marker state local to the TUI-visible ordered-content boundary.
 
 ## State / Status Owners
 

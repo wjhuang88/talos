@@ -65,6 +65,9 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I196 | Canonical Work Domain Decision And Migration Contract | Planned / proposed claim PR #226 | WORK-001-A P0 only. The claim is ineffective until independently reviewed and merged to `main`; no implementation branch, Work Graph, Evaluator, persistence or Desktop work is authorized. |
 | I197 | Permission Prompt Layout Anchor Stability | Planned / Unclaimed | TUI-045 / Issue #125 runnable TUI correction; follows predecessor disposition in the ordered mainline task and requires its own effective claim before implementation. |
 | I198 | Optional Skill Triggers Compatibility | Planned / Unclaimed | SKILL-004 / Issue #155 runnable compatibility slice; requires its own effective claim and a public-contract checkpoint before parser edits. |
+| I199 | Thinking Preview Wrap And Bounded Height | Planned / Unclaimed | TUI-041 / Issue #69 runnable preview-layout correction; ordered before I200 to establish preview-driven viewport capacity and requires its own effective claim. |
+| I200 | No-Op History Scroll State Stability | Planned / Unclaimed | TUI-042 / Issue #79 runnable scroll-transition correction; follows I199 disposition and requires its own effective claim. |
+| I201 | Tool-Call Placeholder Suppression | Planned / Unclaimed | TUI-043 / Issue #111 bounded presentation correction; follows I197 disposition for review ordering and requires its own effective claim. |
 
 ## Completed This Closeout
 

@@ -99,6 +99,13 @@ Completion Commit: Pending. A status-only commit cannot serve as its own evidenc
 Broader ClawHub compatibility, registry integration and trigger-routing changes require separate
 owners and iterations.
 
+## Change Control — 2026-08-14
+
+The maintainer added Issues #69, #79 and #111 to the coordinating long-running task after this
+baseline was published. I198's objective, scope and acceptance remain unchanged. Its activation
+order now follows I201/#111 disposition; this is coordination only and creates no technical
+dependency between the TUI and skill-format slices.
+
 ## Retrospective
 
 Pending execution.

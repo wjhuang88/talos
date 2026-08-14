@@ -98,6 +98,13 @@ Completion Commit: Pending. A status-only commit cannot serve as its own evidenc
 General panel docking, configurable overlays and broad terminal-layout changes require separate
 owners and iterations.
 
+## Change Control — 2026-08-14
+
+The maintainer added Issues #69, #79 and #111 to the coordinating long-running task after this
+baseline was published. I197's objective, scope and acceptance remain unchanged. Its activation
+order now follows I199/#69 and I200/#79 dispositions so permission-prompt anchor work consumes the
+reviewed preview-capacity and scroll-normalization boundaries instead of duplicating them.
+
 ## Retrospective
 
 Pending execution.
