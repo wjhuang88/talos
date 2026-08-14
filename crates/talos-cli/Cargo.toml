@@ -25,7 +25,7 @@ talos-mcp = { version = "0.7.0", path = "../talos-mcp" }
 # I009-S5 begin
 talos-rpc = { version = "0.7.0", path = "../talos-rpc" }
 # I009-S5 end
-talos-tools = { version = "0.7.0", path = "../talos-tools" }
+talos-tools = { version = "0.7.0", path = "../talos-tools", features = ["coding"] }
 talos-session = { version = "0.7.0", path = "../talos-session" }
 talos-memory = { version = "0.7.0", path = "../talos-memory" }
 talos-permission = { version = "0.7.0", path = "../talos-permission" }

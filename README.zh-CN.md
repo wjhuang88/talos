@@ -524,6 +524,11 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 依赖闭包阻塞；详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
 [publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。
 
+直接从源码依赖 `talos-tools` 时，默认只启用本地 `file-read` 和 `search` 能力。写文件、
+文档提取、Shell、Git、网络、图片和代码智能需要显式选择对应 Cargo feature。Talos CLI
+显式启用 `coding`，因此工作区常规 `cargo build` 和 `cargo run -p talos-cli` 的产品工具集合
+保持不变。
+
 ## 安全模型
 
 - 只读工作区工具可以免批准执行。

@@ -717,6 +717,11 @@ manifest-ready but blocked by dependency closure; see
 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) and the
 [publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md).
 
+Direct source consumers of `talos-tools` get local `file-read` and `search` capabilities by
+default. Enable individual Cargo features for write, document, shell, Git, network, image, or code
+intelligence support. The Talos CLI explicitly enables `coding`, so the normal workspace
+`cargo build` and `cargo run -p talos-cli` product tool inventory remains unchanged.
+
 ## Safety Model
 
 - Read-only workspace tools can run without approval.
