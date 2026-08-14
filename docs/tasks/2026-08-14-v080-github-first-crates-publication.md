@@ -79,7 +79,7 @@ inventory.
 |---|---|---|---|---|---|---|
 | V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
-| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Active — worktree `feat/runtime-I160-shared-composition` at `71faf844` |
+| V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Review — implementation PR #240 merged as `97556149`; Completion Commit pending |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
@@ -238,6 +238,7 @@ Planned/Claimed and unactivated, I196 remains on release priority hold, and I164
 Next task item: capture the exact CLI/runtime composition baseline, then implement only the bounded
 ARCH-031-B acceptance. Do not begin I161, release/version/tag, or Cargo publication work.
 
-Recovery or resume instruction: refresh `origin/main`, verify I160 remains Active and the claim
-merge remains an ancestor, then continue from `/private/tmp/talos-i160-impl`. Preserve the published
-baseline and append execution evidence only.
+Recovery or resume instruction: refresh `origin/main`, verify I160 remains in Review with
+implementation PR #240 merged as `97556149`, then prepare the owner-first closeout and Completion
+Commit evidence. Do not resume the old implementation worktree or begin I161, release/version/tag,
+or Cargo publication work. Preserve the published baseline and append execution evidence only.

@@ -1,6 +1,6 @@
 # Iteration I160: Shared CLI And Runtime Internal Composition
 
-> Document status: Active (2026-08-15)
+> Document status: Review (implementation merged; Completion Commit pending) (2026-08-15)
 > Published plan date: 2026-07-26
 > Planned objective: CLI and runtime adapters share one internal composition implementation with equivalent product behavior and separate public entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -163,6 +163,7 @@ If a stop condition occurs:
 ## Completion Evidence
 
 - Completion Commit: pending
+- Implementation PR #240 merged as `97556149e38e5bd52e1722792ad0662bbe95eda4` after exact-head CI `31824945312` and independent approval `5296616991`.
 - Do not cite a status-only documentation commit as implementation completion.
 - Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
 
