@@ -5,11 +5,13 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | Review — implementation PR #230; exact-head gates pending |
+| Status | Complete — I202; implementation PR #230 merged as `e0cc782a` |
 | Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; Issue #104 |
 | Parent Epic | None |
 | Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 Complete |
-| Blocks | I159 activation until I202 reaches a terminal disposition |
+| Blocks | None — the I202 disposition gate is satisfied; I159 remains Blocked under its own ARCH-031-A readiness gate |
+
+**Status**: Complete
 
 ## Identity / Goal / Value
 
@@ -94,7 +96,7 @@ Dashboard startup failure remains a normal error tip and creates no Dashboard Lo
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex — mainline session 2026-08-14 |
 | Work Slice | Implement only TUI-037 / I202: replace successful Dashboard-ready Tips with one display-only Logo-prefix line; render complete token-free plain-text URLs for ordinary and token-required loopback modes, add `authentication required` for the latter, remove token-bearing startup logging, preserve failure Tips, and prove no transcript/session/export/log/primary-screen persistence. No OSC 8, Dashboard route/auth/bind, persistence, conversation protocol, Desktop or I159-I162 behavior change. |
@@ -102,12 +104,18 @@ Dashboard startup failure remains a normal error tip and creates no Dashboard Lo
 | Source Issue | #104 |
 | Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI `31772628731`, independent natural-person review comment `5289857825` with shared-account disclosure, and merge-time CAS comment `5289870196`; PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Independent exact-head security review remains mandatory for the implementation PR. |
+| Authorization Evidence | Claim PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Implementation head `8546da4b0ce974182e37d4dabc7935e4280028cd` passed CI `31775126382`, independent natural-person security approval comment `5290402214` with shared-account disclosure, real-terminal acceptance, and merge-time CAS comment `5290414997`; PR #230 merged as `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`. |
 | Implementation PR | #230 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Finalize PR #230, then obtain exact-head CI, real-terminal matrix, independent natural-person security review and merge-time CAS before implementation merge. |
+| Handoff / Release Condition | None — implementation and closeout acceptance are complete; future hyperlink or token-delivery work requires its own owner and claim. |
 
 The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816f4`.
+
+Completion Commit: `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` (pre-existing implementation
+commit; the closeout status commit is not completion evidence).
+
+Implementation merge: PR #230 merge commit
+`e0cc782a475c2e5baceb31f2a125f1e268af7ecf`.
 
 ## User-Facing Documentation
 
@@ -147,5 +155,19 @@ The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816
   non-clickable discovery notice.
 - ADR-031 requires the opt-in bearer token to remain memory-only and absent from logs, but defines no
   supported operator token-delivery channel. I202 restores ADR-031 compliance by removing the
-  violating log and does not invent a replacement; the pre-existing opt-in usability gap requires a
-  separate owner and security decision.
+  violating log and does not invent a replacement; the pre-existing opt-in usability gap is owned by
+  `SEC-002` and requires a separate security decision and Collaboration Claim.
+
+## Completion Evidence
+
+- Completion Commit: `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`.
+- PR #230 merged as `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`; exact implementation head
+  `8546da4b0ce974182e37d4dabc7935e4280028cd` passed CI `31775126382`.
+- Independent natural-person security approval: comment `5290402214`; merge-time CAS: comment
+  `5290414997`.
+- Alacritty 0.17.0 and Terminal.app 2.15 ordinary-loopback rendering passed. Terminal.app
+  token-required wide/narrow rendering passed; the maintainer confirmed copy, first-message/scroll,
+  and double-Ctrl+C restoration. tmux was unavailable and is recorded as N/A.
+- `SocketAddr` plus the `log_dashboard_started(&str, bool)` signature structurally prevents a
+  bearer token from entering the TUI projection or startup log; the tracing-byte regression covers
+  both authentication modes. The literal `secret-token` assertions are supplemental only.

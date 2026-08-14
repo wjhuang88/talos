@@ -44,14 +44,15 @@ Currently shipped:
 
 - TUI, inline, and print execution modes.
 - Read-only loopback dashboard in TUI mode; successful startup shows the complete local URL as a
-  copyable plain-text line in the display-only TUI Logo region. Startup failures remain transient
-  error notices. When a browser
+  copyable plain-text entry in the display-only TUI Logo region. It occupies one row at ordinary
+  widths and wraps without truncation at narrow widths. Startup failures remain transient error
+  notices. When a browser
   navigates to `/status`, `/history`, `/governance`, or `/config`, the server renders accessible
   HTML pages with navigation and deterministic empty states. Requests without an explicit
   `Accept: text/html` header receive the original JSON/plain-text API. All dynamic content is
   HTML-escaped and secrets are redacted before serialization. It binds to `127.0.0.1`; the
   per-process bearer token is off by default. Set `[dashboard] loopback_only = false` to
-  require the token; the Logo line then shows the token-free base URL plus
+  require the token; the Logo entry then shows the token-free base URL plus
   `authentication required` and never displays or logs the credential. The current TUI emits no
   terminal hyperlink escape sequence.
 - Local provider configuration with masked secrets.
