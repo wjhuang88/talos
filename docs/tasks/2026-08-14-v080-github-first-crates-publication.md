@@ -238,6 +238,20 @@ Planned/Claimed and unactivated, I196 remains on release priority hold, and I164
 Next task item: capture the exact CLI/runtime composition baseline, then implement only the bounded
 ARCH-031-B acceptance. Do not begin I161, release/version/tag, or Cargo publication work.
 
+Recovery or resume instruction: refresh `origin/main`, verify I160 remains Active and the claim
+merge remains an ancestor, then continue from `/private/tmp/talos-i160-impl`. Preserve the published
+baseline and append execution evidence only.
+
+### 2026-08-15 I160 Implementation Merge Checkpoint
+
+Completed task items: V080-20 implementation PR #240 merged as `97556149` after exact-head CI
+`31824945312` and independent approval `5296616991`; the implementation is now in Review and its
+Completion Commit remains pending.
+
+Current state and artifacts: owner documents and derived views record I160 as Review; I161-I162 and
+I203 remain blocked in order. No release, tag, GitHub Release, or Cargo publication action is
+authorized by this checkpoint.
+
 Recovery or resume instruction: refresh `origin/main`, verify I160 remains in Review with
 implementation PR #240 merged as `97556149`, then prepare the owner-first closeout and Completion
 Commit evidence. Do not resume the old implementation worktree or begin I161, release/version/tag,
