@@ -18,13 +18,8 @@ use talos_core::tool::{
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
+use talos_runtime::composition::{SharedToolProfile, contribution_groups};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
-use talos_tools::{
-    git_mutation_tool_contributions, git_read_tool_contributions, network_tool_contributions,
-    ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
-    snapshot_aware_file_tool_contributions, symbol_tool_contributions,
-    workspace_tool_contributions,
-};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -761,10 +756,10 @@ fn map_workspace_contribution(
 
 fn register_symbol_tool_contributions(
     registry: &mut ToolRegistry,
-    workspace_root: PathBuf,
+    contributions: Vec<ToolContribution>,
     wrap: impl Fn(Arc<dyn AgentTool>) -> Arc<dyn AgentTool>,
 ) {
-    for contribution in symbol_tool_contributions(workspace_root) {
+    for contribution in contributions {
         let contribution = contribution.map_tool(|tool| wrap(tool));
         registry
             .register_contribution(contribution)
@@ -792,7 +787,8 @@ fn build_print_tool_registry_with_todo_contributions(
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
 
     let mut registry = ToolRegistry::new();
-    for contribution in shell_tool_contributions(PathBuf::from(".")) {
+    let shared = contribution_groups(SharedToolProfile::Product, PathBuf::from("."));
+    for contribution in shared.shell {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -804,7 +800,7 @@ fn build_print_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in snapshot_aware_file_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.files {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -816,17 +812,20 @@ fn build_print_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    let read_image = read_image_tool_contribution(PathBuf::from(".")).map_tool(|tool| {
-        Arc::new(PermissionAwareTool {
-            inner: tool,
-            approval: approval.clone(),
-            print_mode: true,
-        })
-    });
+    let read_image = shared
+        .image
+        .expect("product profile must include read_image")
+        .map_tool(|tool| {
+            Arc::new(PermissionAwareTool {
+                inner: tool,
+                approval: approval.clone(),
+                print_mode: true,
+            })
+        });
     registry
         .register_contribution(read_image)
         .unwrap_or_else(|error| panic!("{error}"));
-    for contribution in workspace_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.workspace {
         let contribution = map_workspace_contribution(contribution, |tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -838,7 +837,7 @@ fn build_print_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in network_tool_contributions() {
+    for contribution in shared.network {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -850,13 +849,13 @@ fn build_print_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    register_symbol_tool_contributions(&mut registry, PathBuf::from("."), |tool| tool);
-    for contribution in git_read_tool_contributions(PathBuf::from(".")) {
+    register_symbol_tool_contributions(&mut registry, shared.symbols, |tool| tool);
+    for contribution in shared.git_read {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in git_mutation_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.git_mutation {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(PermissionAwareTool {
                 inner: tool,
@@ -912,7 +911,8 @@ fn build_tui_tool_registry_with_todo_contributions(
     todo_contributions: Vec<ToolContribution>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    for contribution in shell_tool_contributions(workspace_root.clone()) {
+    let shared = contribution_groups(SharedToolProfile::Product, workspace_root);
+    for contribution in shared.shell {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -923,7 +923,7 @@ fn build_tui_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in snapshot_aware_file_tool_contributions(workspace_root.clone()) {
+    for contribution in shared.files {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -934,16 +934,19 @@ fn build_tui_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    let read_image = read_image_tool_contribution(workspace_root.clone()).map_tool(|tool| {
-        Arc::new(TuiPermissionAwareTool {
-            inner: tool,
-            approval: approval_handler.clone(),
-        })
-    });
+    let read_image = shared
+        .image
+        .expect("product profile must include read_image")
+        .map_tool(|tool| {
+            Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: approval_handler.clone(),
+            })
+        });
     registry
         .register_contribution(read_image)
         .unwrap_or_else(|error| panic!("{error}"));
-    for contribution in workspace_tool_contributions(workspace_root.clone()) {
+    for contribution in shared.workspace {
         let contribution = map_workspace_contribution(contribution, |tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -954,7 +957,7 @@ fn build_tui_tool_registry_with_todo_contributions(
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in network_tool_contributions() {
+    for contribution in shared.network {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -967,7 +970,7 @@ fn build_tui_tool_registry_with_todo_contributions(
     }
     register_symbol_tool_contributions(
         &mut registry,
-        workspace_root.clone(),
+        shared.symbols,
         |tool| -> Arc<dyn AgentTool> {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -975,12 +978,12 @@ fn build_tui_tool_registry_with_todo_contributions(
             })
         },
     );
-    for contribution in git_read_tool_contributions(workspace_root.clone()) {
+    for contribution in shared.git_read {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in git_mutation_tool_contributions(workspace_root) {
+    for contribution in shared.git_mutation {
         let contribution = contribution.map_tool(|tool| {
             Arc::new(TuiPermissionAwareTool {
                 inner: tool,
@@ -1013,34 +1016,35 @@ fn build_tui_tool_registry_with_todo_contributions(
 
 pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    for contribution in shell_tool_contributions(PathBuf::from(".")) {
+    let shared = contribution_groups(SharedToolProfile::Mcp, PathBuf::from("."));
+    for contribution in shared.shell {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in ordinary_file_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.files {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in workspace_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.workspace {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in network_tool_contributions() {
+    for contribution in shared.network {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
     registry.register(Arc::new(StatusTool));
-    register_symbol_tool_contributions(&mut registry, PathBuf::from("."), |tool| tool);
-    for contribution in git_read_tool_contributions(PathBuf::from(".")) {
+    register_symbol_tool_contributions(&mut registry, shared.symbols, |tool| tool);
+    for contribution in shared.git_read {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    for contribution in git_mutation_tool_contributions(PathBuf::from(".")) {
+    for contribution in shared.git_mutation {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
@@ -1477,7 +1481,8 @@ mod tests {
 
     #[test]
     fn workspace_wrapper_policy_preserves_tree_exception() {
-        let mut contributions = workspace_tool_contributions(PathBuf::from("."));
+        let mut contributions =
+            contribution_groups(SharedToolProfile::Product, PathBuf::from(".")).workspace;
         let tree = contributions
             .pop()
             .expect("workspace factory must end with tree");
@@ -1598,14 +1603,18 @@ mod tests {
     #[test]
     fn print_tui_and_mcp_registries_preserve_symbol_inventory_and_source() {
         let mut print_registry = ToolRegistry::new();
-        register_symbol_tool_contributions(&mut print_registry, PathBuf::from("."), |tool| tool);
+        register_symbol_tool_contributions(
+            &mut print_registry,
+            contribution_groups(SharedToolProfile::Product, PathBuf::from(".")).symbols,
+            |tool| tool,
+        );
 
         let (tx, _rx) = mpsc::unbounded_channel();
         let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
         let mut tui_registry = ToolRegistry::new();
         register_symbol_tool_contributions(
             &mut tui_registry,
-            PathBuf::from("."),
+            contribution_groups(SharedToolProfile::Product, PathBuf::from(".")).symbols,
             |tool| -> Arc<dyn AgentTool> {
                 Arc::new(TuiPermissionAwareTool {
                     inner: tool,
@@ -1615,7 +1624,11 @@ mod tests {
         );
 
         let mut mcp_registry = ToolRegistry::new();
-        register_symbol_tool_contributions(&mut mcp_registry, PathBuf::from("."), |tool| tool);
+        register_symbol_tool_contributions(
+            &mut mcp_registry,
+            contribution_groups(SharedToolProfile::Mcp, PathBuf::from(".")).symbols,
+            |tool| tool,
+        );
 
         let names = [
             "find_symbol",

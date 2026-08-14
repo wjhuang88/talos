@@ -30,6 +30,10 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
+#[cfg(feature = "shared-composition")]
+#[doc(hidden)]
+pub mod composition;
+
 pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 pub use talos_core::provider::{ProviderError, ToolDefinition};
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
@@ -143,6 +147,22 @@ impl RuntimeBuilder {
     #[must_use]
     pub fn tool(mut self, tool: Arc<dyn AgentTool>) -> Self {
         self.tools.push(tool);
+        self
+    }
+
+    /// Adds the explicit shared Talos tool composition to this runtime.
+    ///
+    /// This method is available only with the `shared-composition` feature. It
+    /// does not change `RuntimeBuilder::new()` and does not grant permission:
+    /// every added tool still passes through the runtime permission adapter.
+    #[cfg(feature = "shared-composition")]
+    #[must_use]
+    pub fn shared_tools(mut self) -> Self {
+        self.tools.extend(
+            composition::runtime_tool_contributions(self.workspace_root.clone())
+                .into_iter()
+                .map(|contribution| contribution.tool().clone()),
+        );
         self
     }
 
@@ -767,6 +787,31 @@ mod tests {
                 });
             self.choice.clone()
         }
+    }
+
+    #[cfg(feature = "shared-composition")]
+    #[test]
+    fn shared_tools_are_explicit_and_keep_a_unique_inventory() {
+        let builder = RuntimeBuilder::new()
+            .workspace_root("workspace")
+            .shared_tools();
+        let mut names = builder
+            .tools
+            .iter()
+            .map(|tool| tool.name().to_string())
+            .collect::<Vec<_>>();
+        names.sort();
+        names.dedup();
+
+        assert_eq!(names.len(), builder.tools.len());
+        assert!(names.iter().any(|name| name == "read"));
+        assert!(
+            names
+                .iter()
+                .any(|name| name == "bash" || name == "powershell")
+        );
+        assert!(names.iter().any(|name| name == "document_extract"));
+        assert!(names.iter().any(|name| name == "read_image"));
     }
 
     #[async_trait]
@@ -1446,6 +1491,31 @@ mod tests {
             }
         }
         std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[cfg(feature = "shared-composition")]
+    #[tokio::test]
+    async fn shared_composition_runtime_executes_read_tool() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("note.txt"), "shared runtime\n").expect("fixture");
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("read", serde_json::json!({"path": "note.txt"}))
+                .with_response("read complete"),
+        );
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(workspace.path())
+            .shared_tools()
+            .build()
+            .expect("shared runtime builds");
+
+        runtime.submit("read note").await.expect("submit");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        runtime.shutdown().await.expect("shutdown");
     }
 
     #[tokio::test]

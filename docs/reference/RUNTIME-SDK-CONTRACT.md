@@ -23,6 +23,7 @@ project does not imply it is exported by the runtime facade.
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
 | `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
+| `RuntimeBuilder::shared_tools` | Explicitly opt into the shared Talos built-in tool contribution inventory when the `shared-composition` feature is enabled | I160 pre-1.0 additive API; not selected by `RuntimeBuilder::new()` |
 
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
@@ -136,6 +137,25 @@ let mut handle = RuntimeBuilder::new()
 
 Without an approval handler, `Ask` decisions are **denied** by default. Always provide an
 `ApprovalHandler` for headless embedding unless all registered tools are read-only.
+
+### Pattern 2a: Explicit Shared Built-in Composition
+
+The optional `shared-composition` feature provides the same built-in contribution selection used by
+the Talos CLI. It is explicit and does not alter `RuntimeBuilder::new()` or bypass permission
+evaluation:
+
+```rust,ignore
+let mut handle = RuntimeBuilder::new()
+    .provider(provider)
+    .workspace_root(workspace)
+    .shared_tools()
+    .approval_handler(approval_handler)
+    .build()?;
+```
+
+The feature is not a coding preset: it selects tool instances only. Approval, permission rules,
+sandbox selection, and caller overrides remain runtime concerns. `RuntimePreset::coding()` and
+`SandboxFallbackPolicy` remain separate ARCH-031-C/I161 work.
 
 For the Talos snapshot-aware file-tool set, construct one shared registry-backed group and register
 all four tools so writes and deletes invalidate read snapshots consistently:

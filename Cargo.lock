@@ -5662,6 +5662,7 @@ dependencies = [
  "talos-plugin",
  "talos-provider",
  "talos-rpc",
+ "talos-runtime",
  "talos-session",
  "talos-skill",
  "talos-tools",
