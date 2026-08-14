@@ -3,7 +3,7 @@
 > Status: Planned
 > Created: 2026-08-14
 > Candidate release: v0.8.0
-> Current base: `main@453d1fba97470639835468664c58397770db384c`
+> Current base: `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`
 
 ## Collaboration Claim
 
@@ -205,3 +205,19 @@ Next task item: prepare and independently review a dedicated ARCH-031-B/I160 cla
 
 Recovery or resume instruction: verify this closeout on current `main`, then use a new isolated I160
 claim worktree. Do not reuse the I159 implementation branch or activate unrelated planned work.
+
+### 2026-08-14 I160 Claim Preparation Checkpoint
+
+Completed task items: V080-10 remains closed; V080-20 claim preparation has started from the
+post-closeout main `1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
+
+Current state and artifacts: ARCH-031-B/I160 is Planned/Claimed through governance PR #238, which
+is not effective until merged to `main`. No I160 implementation branch, Rust/Cargo change, version
+bump, tag or publication action exists.
+
+Next task item: obtain independent review for finalized PR #238, then repeat exact-head governance,
+CI and merge-time CAS checks before merging the claim.
+
+Recovery or resume instruction: treat the claim as ineffective until its finalized `Claimed` record
+is merged to current `main`; after merge, create a fresh I160 implementation worktree from the claim
+merge commit.

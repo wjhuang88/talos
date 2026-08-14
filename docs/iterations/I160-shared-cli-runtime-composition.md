@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline session` |
 | Work Slice | ARCH-031-B / I160 only: shared internal CLI/runtime composition with separate public entrypoints and behavior-equivalence evidence; no preset, fallback, version, tag or publication. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-14 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | I159 prerequisite completed through PR #236 merge `f79c1ead`; no I160 implementation authorization exists until a dedicated claim reaches `main`. |
+| Governance Claim PR | #238 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. I159 prerequisite completed through PR #236 merge `f79c1ead`; current exact base `1b129c95` verified. Claim is effective only after PR #238 merges to `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Establish and independently review an effective I160 claim on current `main` before creating an implementation branch or modifying implementation code. |
+| Handoff / Release Condition | After PR #238 merges, refresh exact `main` and activate I160 before creating an implementation branch or modifying implementation code. |
 
 ## Published Baseline
 
@@ -148,6 +148,7 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
+| 2026-08-14 | Claim preparation | Finalized claim PR #238 starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; the proposed claim remains ineffective until its `Claimed` record merges to `main`. |
 
 ## Verification Evidence
 

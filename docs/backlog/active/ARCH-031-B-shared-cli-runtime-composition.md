@@ -6,10 +6,27 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Ready — I159/ARCH-031-A complete; claim required before implementation |
+| Status | Ready / Planned / Claimed — I159/ARCH-031-A complete; implementation remains unstarted |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Planned / Unclaimed) |
+| Selected Iteration | I160 (Planned / Claimed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline session` |
+| Work Slice | `ARCH-031-B / I160` only: shared internal CLI/runtime composition with separate public entrypoints and behavior-equivalence evidence; no preset, fallback, version, tag or publication. |
+| Claimed At | 2026-08-14 |
+| Source Issue | None |
+| Governance Claim PR | #238 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. I159 completion and current exact base `1b129c95` verified. Claim is effective only after PR #238 merges to `main`. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | After claim merge, refresh exact `main`, activate I160 with a new implementation worktree; release/version/tag/publication remain excluded. |
 
 ## Problem
 
@@ -81,6 +98,15 @@ The iteration must record the chosen owner before code changes.
 | Turn loop | `talos-agent` |
 | Sandbox implementation | `talos-sandbox` |
 | Sandbox fallback policy | still future ARCH-031-C |
+
+## Claim Preparation Checkpoint (2026-08-14)
+
+- I159/ARCH-031-A is complete on current `main` through PR #236 merge
+  `f79c1ead1cd3a547797dea3666295f510d88a13d`.
+- A dedicated I160 governance claim is proposed in PR #238 from
+  `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
+- The claim is not effective until its finalized owner record is merged to `main`; no
+  implementation branch or Rust/Cargo change is authorized by this checkpoint.
 
 ## Required Profiles For Equivalence
 
