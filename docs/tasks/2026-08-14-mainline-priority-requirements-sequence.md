@@ -1,6 +1,7 @@
 # Mainline Priority Requirements — Ordered Long-Running Task
 
-**Status**: Planned / Unclaimed. Planning only; no child iteration is activated by this record.
+**Status**: Planned / proposed coordination claim PR #227. Planning only; no child iteration is
+activated by this record.
 **Published plan date**: 2026-08-14
 **Prerequisite claim**: I196 / WORK-001-A proposed claim PR #226
 **Source requirements**: Issues #59, #125 and #155
@@ -13,18 +14,18 @@ owner authority or make an ineffective child claim executable.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session 2026-08-14 |
+| Work Slice | Coordination and recovery ledger for the ordered I196 → I188/#59 → I197/#125 → I198/#155 sequence, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
+| Claimed At | 2026-08-14 |
 | Source Issue | #59 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order and recording them in one long-running task on 2026-08-14. This planning authorization does not authorize implementation, merge, release, migration, deployment, spending or destructive action. |
+| Governance Claim PR | #227 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order and recording them in one long-running task on 2026-08-14. Independent natural-person exact-head review is required before merge; shared-account review must disclose actual identity and role separation. This proposed claim remains ineffective until the finalized record reaches `main`. Planning authorization does not authorize child implementation, merge, release, migration, deployment, spending or destructive action. |
 | Implementation PR | None; child iterations require separate implementation PRs |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Before this task becomes In Progress, establish its coordination claim on `main`; before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
+| Handoff / Release Condition | Reconcile PR #227 onto current `main` after prerequisite PR #226 merges; pass exact-head governance/CI and independent review, repeat merge-time CAS, and merge #227 to establish only this coordination claim. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
 
 ## Startup Contract
 
@@ -173,7 +174,7 @@ deployment, schema/data migration or external destructive action is part of this
 
 | Time | Task Item | Branch / Commit | State And Evidence | Open Risk / Deviation | Next Exact Action / Resume |
 |---|---|---|---|---|---|
-| 2026-08-14 | Authoring | `docs/mainline-priority-long-task-plan` stacked on PR #226 head `1fffd358742b82e159e18f574764600a2b8c5dbf` | Planning authorized; no implementation code changed; task and I197/I198 claims remain Unclaimed | Stacked plan is not target-branch authority; #59 production gates are not satisfied | Validate the planning diff, publish a Draft stacked PR, backfill its number in this task only, and keep child claims Unclaimed |
+| 2026-08-14 | T0 Draft publication | `docs/mainline-priority-long-task-plan`; initial plan `d45c82242d6aa199638433e97b041d969771a0c3`; Draft PR #227 stacked on PR #226 head `1fffd358742b82e159e18f574764600a2b8c5dbf` | Planning baseline pushed; proposed coordination claim backfilled; repository/skill governance and claim validators reported 0 warnings; diff check passed; no implementation code changed; I197/I198 remain Unclaimed | The #227 coordination claim is ineffective before `main`; #59 production gates are not satisfied | Commit/push this finalized claim record, keep #227 Draft until #226 merges, then reconcile to current `main` and rerun exact-head gates |
 
 ## Completion Rule
 
