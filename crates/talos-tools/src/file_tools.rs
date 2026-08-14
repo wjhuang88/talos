@@ -10,7 +10,7 @@ mod delete_tool;
 mod ls_tool;
 #[cfg(feature = "file-read")]
 mod read_tool;
-#[cfg(any(feature = "file-read", feature = "image"))]
+#[cfg(feature = "file-read")]
 mod snapshot;
 #[cfg(feature = "file-write")]
 mod write_edit_tools;
@@ -21,7 +21,7 @@ pub use delete_tool::{DeleteInput, DeleteTool};
 pub use ls_tool::{LsInput, LsTool};
 #[cfg(feature = "file-read")]
 pub use read_tool::{ReadInput, ReadTool};
-#[cfg(any(feature = "file-read", feature = "image"))]
+#[cfg(feature = "file-read")]
 pub use snapshot::FileSnapshotRegistry;
 #[cfg(feature = "file-write")]
 pub use write_edit_tools::{EditInput, EditTool, WriteInput, WriteTool};

@@ -119,7 +119,7 @@ pub use document_extract::{DocumentExtractError, DocumentExtractInput, DocumentE
 pub use exec_tool::{ExecError, ExecInput, ExecTool};
 #[cfg(feature = "network")]
 pub use fetch_url::{FetchUrlError, FetchUrlInput, FetchUrlTool};
-#[cfg(any(feature = "file-read", feature = "image"))]
+#[cfg(feature = "file-read")]
 pub use file_tools::FileSnapshotRegistry;
 #[cfg(all(feature = "file-read", feature = "file-write"))]
 pub use file_tools::snapshot_aware_file_tools;
