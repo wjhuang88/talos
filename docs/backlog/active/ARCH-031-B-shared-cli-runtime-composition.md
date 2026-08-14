@@ -24,7 +24,7 @@
 | Governance Claim PR | #238 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS before merge `71faf8440466668daeef0afd0e779be072978b01` established the claim on `main`. |
-| Implementation PR | Not started |
+| Implementation PR | #240 |
 | Last Updated | 2026-08-15 |
 | Handoff / Release Condition | Execute only the bounded shared-composition slice from `main@71faf844`; submit exact-head validation and independent review before merge. Release/version/tag/publication remain excluded. |
 
