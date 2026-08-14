@@ -87,3 +87,11 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 Implementation slices must be selected after ADR acceptance; ACP remains blocked until then.
+
+## Downstream Work-Domain Dependency
+
+WORK-001 defines the separately governed shared work/evaluation chain. WORK-001-A / I196 records
+only the P0 canonical work-domain, identity/revision and migration contract. It must preserve this
+Story's ownership of attach/detach, reconnect, replay and multi-client semantics, must not select or
+implement SESSION-009, and must leave later shared-domain APIs compatible with a future
+session-owned attachment model.
