@@ -1,11 +1,11 @@
 # TOOL-024-A: Background Job Lifecycle And Permission Contract Spike
 
-**Status**: Planned (2026-08-11; claim PR #196 pending independent review)
+**Status**: Active (2026-08-14; effective claim merge `02a35588`)
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
 **Depends on**: None technically; must respect the repository's one-active-iteration rule.
-**Selected Iteration**: I188 (proposed; no authority before target-branch claim merge)
+**Selected Iteration**: I188
 
 ## Collaboration Claim
 
@@ -13,16 +13,16 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Executing Agent | Codex / GPT-5 mainline implementation session 2026-08-14 |
 | Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
 | Claimed At | 2026-08-11 |
 | Source Issue | #59 |
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
+| Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; its final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI run `31555885775`. The decision implementation still requires fresh independent security review on its own exact head. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #196 before any Spike implementation. |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Publish the ADR/matrix implementation PR, obtain independent exact-head process/permission security review, pass CI and merge-time CAS, then merge before accepting ADR-060 or activating production work. |
 
 ## Goal / Value
 
@@ -121,3 +121,14 @@ git diff --check
 
 The Spike itself changes no runtime behavior. TOOL-024-B/C/D must update README EN/zh-CN, help/tool
 schema documentation, and the user-visible cancellation/status guidance if implementation proceeds.
+
+## Active Decision Output
+
+- [ADR-060](../../decisions/060-supervised-background-command-jobs.md) proposes one session-owned,
+  bounded supervisor contract and remains Proposed pending independent exact-head review.
+- [Current-path characterization](../../reference/I188-BACKGROUND-JOB-CURRENT-PATH.md) records the
+  foreground ownership, output, permission, cancellation, persistence, and shutdown evidence at
+  baseline `556b5a43`.
+- TOOL-024-B is narrowed to an implementation-ready Unix slice after A acceptance plus RUNTIME-005
+  and PERM-006-C completion. Windows background spawn remains fail-closed until TOOL-024-D accepts
+  and implements a Job Object/OS-ABI boundary.
