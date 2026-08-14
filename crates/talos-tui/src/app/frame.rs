@@ -60,7 +60,10 @@ impl Tui {
         let screen_size = self.terminal.size()?;
         let width = screen_size.width;
         let is_startup = self.is_startup_mode();
-        let splash = crate::splash::viewport_splash_lines(width);
+        let splash = crate::splash::viewport_splash_lines_with_dashboard(
+            width,
+            self.dashboard_availability.as_ref(),
+        );
         let splash_rows = splash.len();
         let startup_spacer_rows: usize = if is_startup { 1 } else { 0 };
         let follows_tail = matches!(
@@ -101,9 +104,8 @@ impl Tui {
         } else {
             preview.height_hint(width)
         };
-        // Tips remain visible during startup so transient service notices (for
-        // example the loopback Dashboard address) have a stable, copyable
-        // location before the first message is submitted.
+        // Tips remain visible during startup for failures and other transient
+        // notices. Successful Dashboard availability belongs to the Logo prefix.
         let tips_h = tips.height_hint(width);
 
         let input_natural = crate::scrollback::InputComponent {

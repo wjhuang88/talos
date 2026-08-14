@@ -2313,22 +2313,69 @@ fn startup_layout_places_composer_one_row_below_logo() {
 }
 
 #[test]
-fn startup_tips_surface_shows_dashboard_address() {
+fn dashboard_availability_is_a_display_only_logo_prefix() {
     let mut tui = startup_tui_at(80, 24);
-    tui.state.tip = Some(crate::state::Tip {
-        text: "Dashboard ready: http://127.0.0.1:61205/ (loopback-only)".into(),
-        kind: TipKind::Info,
-        ttl: std::time::Duration::from_secs(8),
-        created_at: std::time::Instant::now(),
-    });
+    tui.set_dashboard_availability("127.0.0.1:61205".parse().expect("loopback address"), false);
 
     tui.draw_frame().expect("startup frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("Dashboard: http://127.0.0.1:61205/"));
+    assert!(!rendered.contains("Dashboard ready:"));
+    assert!(!rendered.contains('\u{1b}'));
+    assert!(tui.state.tip.is_none());
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn authenticated_dashboard_logo_prefix_never_contains_a_token() {
+    let mut tui = startup_tui_at(40, 24);
+    tui.set_dashboard_availability("127.0.0.1:61205".parse().expect("loopback address"), true);
+
+    tui.draw_frame().expect("startup frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("http://127.0.0.1:61205/"));
+    assert!(
+        rendered.contains("authentication required"),
+        "authenticated Dashboard notice must remain visible: {rendered:?}"
+    );
+    assert!(!rendered.contains("secret-token"));
+    assert!(!rendered.contains('\u{1b}'));
+    assert!(tui.transcript.entries().is_empty());
+}
+
+#[test]
+fn dashboard_logo_row_scrolls_with_prefix_and_never_enters_transcript() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.set_dashboard_availability("127.0.0.1:61205".parse().expect("loopback address"), false);
+    for index in 0..30 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("dashboard isolation row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("tail frame");
+    assert!(!tui.terminal.test_rendered_text().contains("Dashboard:"));
+
+    for _ in 0..30 {
+        tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+        tui.draw_frame().expect("history scroll frame");
+    }
+
     assert!(
         tui.terminal
             .test_rendered_text()
-            .contains("Dashboard ready: http://127.0.0.1:61205/"),
-        "startup tips must retain the dashboard's copyable address"
+            .contains("Dashboard: http://127.0.0.1:61205/")
     );
+    assert!(tui.transcript.entries().iter().all(|entry| {
+        !matches!(
+            &entry.block,
+            crate::transcript::TranscriptBlock::StyledLine(line)
+                if line.text.contains("Dashboard:")
+        )
+    }));
 }
 
 #[test]
