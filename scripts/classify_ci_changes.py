@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 
 SHA_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
 ROOT_DOCUMENTS = {"CHANGELOG.md", "README.md", "README.zh-CN.md"}
+TEXT_GOVERNANCE_FILES = {".agent-governance/manifest.yaml"}
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ def _is_allowlisted_document(path: str) -> bool:
     if parsed.is_absolute() or any(part in {"", ".", ".."} for part in parsed.parts):
         return False
     if path in ROOT_DOCUMENTS:
+        return True
+    if path in TEXT_GOVERNANCE_FILES:
         return True
     return path.startswith("docs/") and not path.startswith("docs/sop/") and path.endswith(".md")
 
