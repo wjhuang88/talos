@@ -70,7 +70,7 @@ migration:
     - "Track Issue #136 independently as a non-blocking direct /delete diagnostic-actionability correction; do not reopen TUI-044/I169 or ADR-056 semantics"
     - "Keep recovery PRs #120/#121 and their branches immutable and archival; never merge, rebase, or continue development on them"
     - "Keep I170 completion evidence bound to PR #126, exact implementation Head 8cfe8edb2dbda581244f583fb809591391a54298, CI run 30705366763, walkthrough artifact 8820174164, and merge commit 592254d73a98166df48da0139a02df67e9cd2cd6"
-    - "Keep I159 completion bound to implementation `d886917e`/`34c09b14`, exact head `33a2c6ff`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`; prepare a dedicated I160 claim while keeping I161-I162 blocked"
+- "Keep I159 completion bound to implementation `d886917e`/`34c09b14`, exact head `33a2c6ff`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`; I160/ARCH-031-B claim PR #238 is proposed from exact base `1b129c95` and remains unactivated until merge; keep I161-I162 blocked"
     - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
     - "Keep ARCH-034-R04 Partial after I182/AG-4 completion at `ae31242bdac4807599146bfb4847bcac52712bbf`; keep exact source `4b96882307173ded8264aa1c45cce129707ff65f`, CI `31266112256`, review `5230395611`, and merge-time CAS as evidence, and keep every other accepted gap separately owned"
