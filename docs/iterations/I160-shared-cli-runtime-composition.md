@@ -148,6 +148,7 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-14 | Dependency readiness | I159/ARCH-031-A is Complete through existing implementation evidence `d886917e`/`34c09b14`, CI `31801484313`, approval `5293622712` and merge `f79c1ead`. I160 moves from Blocked to Planned/Unclaimed; no activation or implementation authority is created. |
+| 2026-08-14 | Claim preparation | Draft claim worktree starts from `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`; owner remains Unclaimed until a finalized claim PR is merged. |
 
 ## Verification Evidence
 
