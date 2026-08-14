@@ -1,6 +1,6 @@
 # Iteration I202: Dashboard Availability In The Logo Prefix
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-14
 > Planned objective: move successful local Dashboard availability from the transient tips row into
 > exactly one display-only Logo-prefix line while eliminating token disclosure and preserving the
@@ -22,13 +22,12 @@
 | Source Issue | #104 |
 | Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head security review is mandatory before claim merge and implementation merge because the slice removes an existing bearer-token logging path and changes terminal rendering. This proposed ownership remains ineffective until the finalized claim reaches `main`. |
+| Authorization Evidence | Claim head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI `31772628731`, independent natural-person review comment `5289857825` with shared-account disclosure, and merge-time CAS comment `5289870196`; PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Independent exact-head security review remains mandatory for the implementation PR. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass both governance validators and exact-head CI/independent review/CAS on PR #229, then merge it to `main` before creating an implementation branch. |
+| Handoff / Release Condition | Implement and validate only I202, then obtain independent natural-person exact-head security review and merge-time CAS before implementation merge. |
 
-The `Claimed` record above is proposed by PR #229 and remains ineffective until that exact record
-reaches `main`. This branch is governance-only and contains no production implementation.
+The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816f4`.
 
 ## Published Baseline
 
@@ -150,11 +149,25 @@ before beginning the proposed long task.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-14 | Selection | Maintainer selected #104 for complete implementation and closure before the mainline long task. Claim remains ineffective until finalized governance PR merge; no implementation branch exists. |
+| 2026-08-14 | Activation | PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4` after exact-head CI `31772628731`, independent review comment `5289857825` and merge-time CAS comment `5289870196`. Implementation branch `feat/tui-I202-dashboard-logo-availability` starts exactly at that merge. I188 remains Review; I189/I195 remain Planned/Claimed; I196-I201 remain proposals outside `main`; I159-I162 remain Blocked and I164 Paused. |
 
 ## Verification Evidence
 
-- Governance validation, exact-head CI and independent-review evidence are pending on finalized
-  claim PR #229 head.
+- Claim governance: PR #229 head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI
+  `31772628731`, independent review comment `5289857825` and merge-time CAS comment `5289870196`,
+  then merged as `d801c8d1f0ce37727baf49258be780baa41816f4`.
+- Local implementation validation on 2026-08-14 passed `cargo fmt --all -- --check`,
+  `cargo check --locked --workspace`, `cargo clippy --locked --workspace -- -D warnings`, a second
+  complete `cargo test --locked --workspace` run, both governance validators with zero warnings,
+  and `git diff --check`. The first workspace-test run had one unrelated transient SQLite disk-I/O
+  failure in `mcp_client_e2e`; its isolated rerun and the subsequent full workspace rerun passed.
+- Focused CLI/TUI tests cover token-free tracing, failure Tip behavior, wide/narrow Logo rendering,
+  authenticated wording, scroll-prefix ownership and transcript isolation.
+- An isolated rebuilt-binary PTY smoke showed the successful plain-text Dashboard row in the Logo
+  prefix and normal terminal restoration; the sandbox-denied listener run separately exercised the
+  failure Tip. This is supplemental evidence, not the required real-terminal matrix.
+- Finalized implementation-PR exact-head CI, independent security review, and the Alacritty /
+  Terminal.app / tmux matrix remain pending.
 
 ## Completion Evidence
 
@@ -164,6 +177,10 @@ before beginning the proposed long task.
 
 - Clickable OSC 8 output is explicitly excluded under the current unsafe renderer capability. Any
   future hyperlink work requires a separate owner and claim.
+- ADR-031 requires the opt-in bearer token to remain memory-only and absent from logs, but defines no
+  supported operator token-delivery channel. I202 restores compliance by removing the violating log;
+  a replacement delivery boundary is pre-existing residual work requiring a separate owner and
+  security decision.
 
 ## Retrospective
 

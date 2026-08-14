@@ -603,7 +603,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         .with_workspace_root(workspace_root.clone());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
-    let ui_output_tx_for_dashboard = ui_output_tx.clone();
+    let ui_output_tx_for_dashboard_failure = ui_output_tx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
             engine,
@@ -659,21 +659,17 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             snapshot,
             config.dashboard.loopback_only,
         );
-        let token = server.token().to_string();
         match server.serve().await {
             Ok((addr, _)) => {
                 let url = format!("http://{addr}/");
-                if config.dashboard.loopback_only {
-                    tracing::info!(dashboard_url = %url, "dashboard started (loopback-only)");
-                    let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, true));
-                } else {
-                    tracing::info!(dashboard_url = %url, dashboard_token = %token, "dashboard started");
-                    let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, false));
-                }
+                let authentication_required = !config.dashboard.loopback_only;
+                log_dashboard_started(&url, authentication_required);
+                tui.set_dashboard_availability(addr, authentication_required);
             }
             Err(e) => {
                 tracing::warn!(error = %e, "dashboard failed to start");
-                let _ = ui_output_tx_for_dashboard.send(dashboard_failure_tip(&e.to_string()));
+                let _ =
+                    ui_output_tx_for_dashboard_failure.send(dashboard_failure_tip(&e.to_string()));
             }
         }
     }
@@ -709,16 +705,12 @@ fn cleanup_empty_tui_session(
     Ok(())
 }
 
-pub(crate) fn dashboard_available_tip(url: &str, loopback_only: bool) -> UiOutput {
-    let detail = if loopback_only {
-        "loopback-only"
-    } else {
-        "token required, see terminal output"
-    };
-    UiOutput::Tip {
-        text: format!("Dashboard ready: {url} ({detail})"),
-        kind: TipKind::Info,
-    }
+pub(crate) fn log_dashboard_started(url: &str, authentication_required: bool) {
+    tracing::info!(
+        dashboard_url = %url,
+        authentication_required,
+        "dashboard started"
+    );
 }
 
 pub(crate) fn dashboard_failure_tip(message: &str) -> UiOutput {
