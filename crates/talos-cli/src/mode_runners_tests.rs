@@ -1,8 +1,38 @@
 use crate::mode_runners::session_handlers::handle_session_model;
 use crate::session_transition::SessionTransition;
 use crate::test_support::HOME_ENV_MUTEX;
+use std::io;
+use std::sync::{Arc, Mutex as StdMutex};
 use talos_config::ProviderConfig;
 use talos_plugin::HookRegistry;
+use tracing_subscriber::fmt::MakeWriter;
+
+#[derive(Clone, Default)]
+struct DashboardLogBuffer(Arc<StdMutex<Vec<u8>>>);
+
+impl<'a> MakeWriter<'a> for DashboardLogBuffer {
+    type Writer = DashboardLogWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        DashboardLogWriter(self.0.clone())
+    }
+}
+
+struct DashboardLogWriter(Arc<StdMutex<Vec<u8>>>);
+
+impl io::Write for DashboardLogWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0
+            .lock()
+            .expect("dashboard log buffer lock")
+            .extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 /// Runs `f` with `HOME` redirected to a fresh temp directory, restoring
 /// the original `HOME` afterward. Must be called under `HOME_ENV_MUTEX`
@@ -323,25 +353,31 @@ fn parse_dashboard_board_section_extracts_items() {
 }
 
 #[test]
-fn dashboard_notifications_are_transient_and_never_include_tokens() {
-    let loopback = dashboard_available_tip("http://127.0.0.1:61205/", true);
-    assert!(matches!(
-        loopback,
-        UiOutput::Tip {
-            kind: TipKind::Info,
-            ref text
-        } if text == "Dashboard ready: http://127.0.0.1:61205/ (loopback-only)"
-    ));
+fn dashboard_startup_tracing_is_adr031_compliant_and_token_free() {
+    let buffer = DashboardLogBuffer::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(buffer.clone())
+        .without_time()
+        .with_ansi(false)
+        .finish();
 
-    let restricted = dashboard_available_tip("http://127.0.0.1:61205/", false);
-    assert!(matches!(
-        restricted,
-        UiOutput::Tip {
-            kind: TipKind::Info,
-            ref text
-        } if text.contains("token required, see terminal output") && !text.contains("secret-token")
-    ));
+    tracing::subscriber::with_default(subscriber, || {
+        log_dashboard_started("http://127.0.0.1:61205/", true);
+        log_dashboard_started("http://127.0.0.1:61206/", false);
+    });
 
+    let logs = String::from_utf8(buffer.0.lock().expect("dashboard log buffer lock").clone())
+        .expect("dashboard logs are utf8");
+    assert!(logs.contains("http://127.0.0.1:61205/"));
+    assert!(logs.contains("http://127.0.0.1:61206/"));
+    assert!(logs.contains("authentication_required=true"));
+    assert!(!logs.contains("dashboard_token"));
+    assert!(!logs.contains("Bearer"));
+    assert!(!logs.contains("secret-token"));
+}
+
+#[test]
+fn dashboard_failure_remains_an_error_tip() {
     assert!(matches!(
         dashboard_failure_tip("address in use"),
         UiOutput::Tip {

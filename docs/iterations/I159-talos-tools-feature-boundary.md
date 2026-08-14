@@ -128,6 +128,7 @@ If a stop condition occurs:
 | Date | Type | Record |
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-08-14 | Dependency disposition | TUI-037/I202 reached Complete through implementation commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` and PR #230 merge `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`, satisfying the required independent TUI disposition. I159 remains Blocked and unactivated because selected Story ARCH-031-A is still Refinement/Blocked and not Ready; no I159 claim or implementation authority is created. |
 
 ## Verification Evidence
 

@@ -38,8 +38,12 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 当前已发布/已实现：
 
 - TUI、inline 和 print 运行模式。
-- TUI 模式下默认启动只读 loopback dashboard，并在启动时提示本地 URL。默认仅依赖
-  `127.0.0.1` 绑定；如需恢复 bearer token，请设置 `[dashboard] loopback_only = false`。
+- TUI 模式下默认启动只读 loopback dashboard；成功后会在仅用于显示的 TUI Logo 区域给出
+  完整、可复制的纯文本本地 URL。普通宽度占一行，窄宽度会完整换行而不截断；启动失败仍
+  显示临时错误提示。默认仅依赖 `127.0.0.1` 绑定；设置
+  `[dashboard] loopback_only = false` 后要求 bearer token，Logo 条目只显示不含 token 的
+  基础 URL 和 `authentication required`，凭据不会显示或写入日志。当前 TUI 不发送终端
+  超链接转义序列。
 - 本地模型配置，密钥显示自动脱敏。
 - 无参数的提供商/模型选择器、自定义兼容提供商向导、受限模型发现和结构化会话切换。
 - 面向目录确认支持视觉输入模型的显式本地图片附件，采用精确路径授权和安全历史摘要。Anthropic 兼容 wire 行为已有 fixture 覆盖；真实 Provider 验证取决于操作者凭据。

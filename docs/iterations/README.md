@@ -69,12 +69,14 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I199 | Thinking Preview Wrap And Bounded Height | Planned / Unclaimed | TUI-041 / Issue #69 runnable preview-layout correction; ordered before I200 to establish preview-driven viewport capacity and requires its own effective claim. |
 | I200 | No-Op History Scroll State Stability | Planned / Unclaimed | TUI-042 / Issue #79 runnable scroll-transition correction; follows I199 disposition and requires its own effective claim. |
 | I201 | Tool-Call Placeholder Suppression | Planned / Unclaimed | TUI-043 / Issue #111 bounded presentation correction; follows I197 disposition for review ordering and requires its own effective claim. |
+| I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
 
 ## Completed This Closeout
 
 | ID | Codename | Final State | Completion Evidence |
 |---|---|---|---|
 | I169 | Transactional Batched Steering Turn | **Complete (2026-08-06)** | PR #131 merged at `685d3b4f4088a172551f8c844a89f5dee9469430`; exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`; CI run `31010166558`; rebuilt real-terminal acceptance passed; TUI-044 Complete; ADR-056 Accepted; Issue #119 completed. Issue #136 remains independent and non-blocking. |
+| I202 | Dashboard Availability In The Logo Prefix | **Complete (2026-08-14)** | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a475c2e5baceb31f2a125f1e268af7ecf`; CI `31775126382`, approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the unclaimed token-delivery residual. |
 | I170 | Windows Workspace Validation Unblocker | Complete (2026-08-01) | PR #126 squash-merged at `592254d73a98166df48da0139a02df67e9cd2cd6`; exact implementation Head `8cfe8edb2dbda581244f583fb809591391a54298`; CI run `30705366763`; walkthrough artifact `8820174164`; TOOL-023-A/C Complete; ADR-057 Accepted. |
 | I176 | CLI Session Handler Decomposition | **Complete (2026-08-07)** | Completion Commit `1de3243d`; PR #159 merged at `37c557271b906664022476bd2775c5cd77f2b8ea`; exact-head CI `31160309818` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke. |
 | I177 | Agent Session Custody Decomposition | **Complete (2026-08-07)** | Completion Commit `f505eea8` (squash merge of implementation `786aa571`); PR #162; exact-head CI `31166594367` passed Unix/Windows workspace, governance, remote owner reconciliation, installer fixture, and rebuilt CLI smoke. |

@@ -1,5 +1,7 @@
 //! Splash content for the first alternate-screen application frame.
 
+use std::net::SocketAddr;
+
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -9,6 +11,21 @@ use crate::theme::semantic;
 
 /// Left margin applied to every splash row for a consistent left-aligned layout.
 const INDENT: &str = "  ";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DashboardAvailability {
+    address: SocketAddr,
+    authentication_required: bool,
+}
+
+impl DashboardAvailability {
+    pub(crate) const fn new(address: SocketAddr, authentication_required: bool) -> Self {
+        Self {
+            address,
+            authentication_required,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LogoRenderMode {
@@ -84,7 +101,15 @@ fn badges() -> [(Color, &'static str); 3] {
 
 /// Builds the one authoritative splash representation used by the first
 /// alternate-screen frame. It is display-only and never enters TranscriptStore.
+#[cfg(test)]
 pub(crate) fn viewport_splash_lines(width: u16) -> Vec<Line<'static>> {
+    viewport_splash_lines_with_dashboard(width, None)
+}
+
+pub(crate) fn viewport_splash_lines_with_dashboard(
+    width: u16,
+    dashboard: Option<&DashboardAvailability>,
+) -> Vec<Line<'static>> {
     let mode = select_render_mode(width);
     let wordmark = match mode {
         LogoRenderMode::Canvas => talos_wordmark(),
@@ -137,8 +162,41 @@ pub(crate) fn viewport_splash_lines(width: u16) -> Vec<Line<'static>> {
         ));
     }
     lines.push(Line::from(badge_spans));
+    if let Some(dashboard) = dashboard {
+        lines.extend(dashboard_lines(width, dashboard));
+    }
     lines.push(Line::default());
     lines
+}
+
+fn dashboard_lines(width: u16, dashboard: &DashboardAvailability) -> Vec<Line<'static>> {
+    let base = format!("{INDENT}Dashboard: http://{}/", dashboard.address);
+    let max_width = usize::from(width);
+    let rows = if dashboard.authentication_required
+        && unicode_width::UnicodeWidthStr::width(
+            format!("{base} — authentication required").as_str(),
+        ) <= max_width
+    {
+        vec![format!("{base} — authentication required")]
+    } else {
+        let mut rows = crate::scrollback::wrap_to_display_width(&base, max_width);
+        if dashboard.authentication_required {
+            rows.extend(crate::scrollback::wrap_to_display_width(
+                "authentication required",
+                max_width,
+            ));
+        }
+        rows
+    };
+
+    rows.into_iter()
+        .map(|line| {
+            Line::from(Span::styled(
+                line,
+                Style::default().fg(semantic::LOGO_BADGE_1),
+            ))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -308,5 +366,40 @@ mod tests {
 
         assert!(rendered.contains("_____"));
         assert!(!rendered.contains("████████"));
+    }
+
+    #[test]
+    fn ordinary_dashboard_availability_is_one_plain_text_logo_line() {
+        let availability =
+            DashboardAvailability::new("127.0.0.1:61205".parse().expect("loopback address"), false);
+        let rendered = viewport_splash_lines_with_dashboard(80, Some(&availability));
+        let dashboard = rendered
+            .iter()
+            .map(line_text)
+            .filter(|line| line.contains("Dashboard:"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(dashboard, vec!["  Dashboard: http://127.0.0.1:61205/"]);
+        assert!(!dashboard[0].contains('\u{1b}'));
+    }
+
+    #[test]
+    fn authenticated_dashboard_is_token_free_and_wraps_without_truncation() {
+        let availability =
+            DashboardAvailability::new("127.0.0.1:61205".parse().expect("loopback address"), true);
+        let lines = dashboard_lines(24, &availability);
+        let joined = lines.iter().map(line_text).collect::<String>();
+
+        assert_eq!(
+            joined,
+            "  Dashboard: http://127.0.0.1:61205/authentication required"
+        );
+        assert!(
+            lines.iter().all(|line| {
+                unicode_width::UnicodeWidthStr::width(line_text(line).as_str()) <= 24
+            })
+        );
+        assert!(!joined.contains("token"));
+        assert!(!joined.contains('\u{1b}'));
     }
 }
