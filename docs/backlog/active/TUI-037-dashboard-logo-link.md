@@ -5,7 +5,7 @@
 | Story ID | TUI-037 |
 | Type | Product / rendering story |
 | Priority | P1 |
-| Status | In Progress — I202 claim merge `d801c8d1`; implementation active |
+| Status | Review — implementation PR #230; exact-head gates pending |
 | Source | Maintainer request 2026-07-27; reprioritized 2026-07-31; Issue #104 |
 | Parent Epic | None |
 | Depends On | TUI-005, TUI-028, TUI-035, ADR-031, ADR-054; I158 Complete |
@@ -103,9 +103,9 @@ Dashboard startup failure remains a normal error tip and creates no Dashboard Lo
 | Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI `31772628731`, independent natural-person review comment `5289857825` with shared-account disclosure, and merge-time CAS comment `5289870196`; PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Independent exact-head security review remains mandatory for the implementation PR. |
-| Implementation PR | Not started |
+| Implementation PR | #230 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Implement and validate only I202, then obtain independent natural-person exact-head security review and merge-time CAS before implementation merge. |
+| Handoff / Release Condition | Finalize PR #230, then obtain exact-head CI, real-terminal matrix, independent natural-person security review and merge-time CAS before implementation merge. |
 
 The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816f4`.
 

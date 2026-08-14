@@ -1,6 +1,6 @@
 # Iteration I202: Dashboard Availability In The Logo Prefix
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-14
 > Planned objective: move successful local Dashboard availability from the transient tips row into
 > exactly one display-only Logo-prefix line while eliminating token disclosure and preserving the
@@ -23,9 +23,9 @@
 | Governance Claim PR | #229 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim head `9c17711c47e1db1631a80eb615d772d8eba6c4fc` passed CI `31772628731`, independent natural-person review comment `5289857825` with shared-account disclosure, and merge-time CAS comment `5289870196`; PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4`. Independent exact-head security review remains mandatory for the implementation PR. |
-| Implementation PR | Not started |
+| Implementation PR | #230 |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Implement and validate only I202, then obtain independent natural-person exact-head security review and merge-time CAS before implementation merge. |
+| Handoff / Release Condition | Finalize PR #230, then obtain exact-head CI, real-terminal matrix, independent natural-person security review and merge-time CAS before implementation merge. |
 
 The claim became effective through merge `d801c8d1f0ce37727baf49258be780baa41816f4`.
 
@@ -150,6 +150,7 @@ before beginning the proposed long task.
 |---|---|---|
 | 2026-08-14 | Selection | Maintainer selected #104 for complete implementation and closure before the mainline long task. Claim remains ineffective until finalized governance PR merge; no implementation branch exists. |
 | 2026-08-14 | Activation | PR #229 merged as `d801c8d1f0ce37727baf49258be780baa41816f4` after exact-head CI `31772628731`, independent review comment `5289857825` and merge-time CAS comment `5289870196`. Implementation branch `feat/tui-I202-dashboard-logo-availability` starts exactly at that merge. I188 remains Review; I189/I195 remain Planned/Claimed; I196-I201 remain proposals outside `main`; I159-I162 remain Blocked and I164 Paused. |
+| 2026-08-14 | Review submission | Implementation commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772` opened draft PR #230. Owner and derived views moved to Review; PR-number backfill finalizes the review head before CI, terminal-matrix review and merge-time CAS. |
 
 ## Verification Evidence
 
