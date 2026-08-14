@@ -5,7 +5,7 @@
 | Story ID | WORK-001-A |
 | Type | Architecture / Migration Spike |
 | Priority | P0 |
-| Status | Ready — I196 planned; proposed claim is not yet effective |
+| Status | Ready — I196 planned; PR #226 proposes the claim but is not yet effective |
 | Parent Epic | WORK-001 |
 | Source | DESKTOP-001 P0 prerequisite; GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I196 Planned |
@@ -15,21 +15,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned — proposed P0 scope is defined below |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-14 |
+| Work Slice | WORK-001-A / I196 P0 only: inventory current Todo/runtime/session/projection obligations; decide the canonical work-state ownership and dependency boundary; define stable identity/revision plus migration, compatibility, rollback and P1-P4 contracts. No Work Graph, Evaluation, Evaluator, persistence, public API, Rust/Cargo, Desktop, Dashboard, TUI product or later-child implementation. |
+| Claimed At | 2026-08-14 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable until the Draft claim PR is finalized |
-| Authorization Evidence | Not applicable until the Draft claim PR is finalized |
+| Governance Claim PR | #226 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent natural-person exact-head architecture review is required before claim merge and again before P0 decision acceptance. If the shared `@wjhuang88` account is used, the reviewer must disclose the actual natural-person identity and role separation. This proposed Claimed record remains ineffective until PR #226 reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Finalize the proposed claim with its actual PR number, pass exact-head governance/CI checks and independent review, repeat merge-time CAS, and merge it to main before creating any P0 implementation branch. |
+| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current main and all lanes, and merge PR #226 to main; only then create the P0 implementation branch from the claim merge or later current main. |
 
-No ownership is effective from this branch or an open PR. The implementation branch must start
-from the claim merge commit or a later current `main` commit.
+The `Claimed` record above is proposed on PR #226 and has no target-branch ownership effect. The
+implementation branch must start from the claim merge commit or a later current `main` commit.
 
 ## Identity / Goal / Value
 

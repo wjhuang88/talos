@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned — proposed WORK-001-A / I196 P0 scope is defined below |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-14 |
+| Work Slice | WORK-001-A / I196 P0 only: inventory current Todo/runtime/session/projection obligations; decide the canonical work-state ownership and dependency boundary; define stable identity/revision plus migration, compatibility, rollback and P1-P4 contracts. No Work Graph, Evaluation, Evaluator, persistence, public API, Rust/Cargo, Desktop, Dashboard, TUI product or later-child implementation. |
+| Claimed At | 2026-08-14 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable until the Draft claim PR is finalized |
-| Authorization Evidence | Not applicable until the Draft claim PR is finalized |
+| Governance Claim PR | #226 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent natural-person exact-head architecture review is required before claim merge and again before P0 decision acceptance. If the shared `@wjhuang88` account is used, the reviewer must disclose the actual natural-person identity and role separation. This proposed Claimed record remains ineffective until PR #226 reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Finalize the proposed claim with its actual PR number, pass exact-head governance/CI checks and independent review, repeat merge-time CAS, and merge it to main before creating the P0 implementation branch. |
+| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current main and all lanes, and merge PR #226 to main; only then create the P0 implementation branch from the claim merge or later current main. |
 
 This governance branch is not an implementation branch. No claim is effective until the finalized
 record reaches `main`.
@@ -45,7 +45,7 @@ record reaches `main`.
 - Exact `main` and `origin/main` at governance-branch creation:
   `556b5a4319085bf5250bccf4920e0dec0c6646c8`.
 - Governance branch: `docs/mainline-I196-work-domain-p0-claim`.
-- Governance claim PR: Pending.
+- Governance claim PR: #226 (proposed claim; ineffective before target-branch merge).
 - I195 is reserved by Dashboard PR #212; that proposed claim remains ineffective until merged.
 - The eventual P0 implementation base is the effective I196 claim merge or a later current `main`,
   after a fresh dependency/overlap inventory and merge-time CAS.
