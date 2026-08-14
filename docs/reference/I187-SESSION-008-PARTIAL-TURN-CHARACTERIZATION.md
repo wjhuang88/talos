@@ -4,6 +4,11 @@
 > Source baseline: `main@5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7`
 > Scope: read-only characterization for ADR-058; no behavior claim
 
+> Historical boundary: I193 / SESSION-008-B merged on 2026-08-14 as
+> `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`. This document remains the authoritative
+> pre-I193 characterization referenced by SESSION-008-R1; it is not a statement of current
+> post-merge behavior. ADR-058 and the I193 owner now define the implemented contract.
+
 ## Current Ownership Map
 
 | Stage | Current owner | Current fact |

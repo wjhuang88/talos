@@ -5,10 +5,10 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | In Progress — SESSION-008-A complete; SESSION-008-B active in I193 |
+| Status | Complete — SESSION-008-A and SESSION-008-B complete |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
-| Selected Iteration | I193 Planned; Collaboration Claim effective in main merge `fb5a1f62` |
+| Selected Iteration | I193 Complete; implementation merged in `1b5461cd` |
 | Depends On | SESSION-002, SESSION-006, ADR-039, ADR-042 |
 | Blocks | RUNTIME-005 bounded graceful shutdown |
 
@@ -19,17 +19,18 @@
 | Claim State | Released |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Not assigned - completed SESSION-008-A claim released; SESSION-008-B requires a new bounded claim |
+| Work Slice | Not assigned - completed SESSION-008-A and SESSION-008-B claims released |
 | Claimed At | 2026-08-11 |
 | Source Issue | #45 |
 | Governance Claim PR | #194 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | SESSION-008-A claim merge `5bb83f80b7dd7216ed83ee69fd4de0ef954c32f7`; decision merge `e288afb5d97026f7ccb3ce0f519a4a81f99fe104`; final head `46549e82`, CI `31553007431`, independent review `5261130488`. This closes A only and supplies no B implementation authority. |
-| Implementation PR | #195 |
-| Last Updated | 2026-08-12 |
-| Handoff / Release Condition | Claim SESSION-008-B separately against Accepted ADR-058; complete B before RUNTIME-005-A/B/C. |
+| Authorization Evidence | A: claim `5bb83f80`, decision `e288afb5`, review `5261130488`. B: claim `fb5a1f62`, implementation PR #216, exact-head CI `31691761892`, disclosed role audits `5287961007`/`5287989820`, merge `1b5461cd`. |
+| Implementation PR | #195 (A); #216 (B) |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Complete; RUNTIME-005 retains its independently owned A/B/C gates. |
 
-Completion Commit: `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` (SESSION-008-A decision evidence only; parent SESSION-008 remains incomplete until B).
+Completion Commit: `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` (A decision),
+`404d7a4bf5b9c7dedeae479fe91fa5400b42d411` (B implementation).
 
 ## Identity / Goal / Value
 
@@ -83,18 +84,14 @@ transcript must identify that the turn did not complete normally.
   expanded abort operation) is not preselected. The ADR must choose one owner
   and state transition.
 
-## Current Implementation Baseline (2026-08-09)
+## Current Implementation Baseline (2026-08-09, superseded by I193 on 2026-08-14)
 
 - The legacy `Session` error path already persists policy-filtered partial
   messages after a provider error; focused tests prove that an admitted tool
   result and user message survive while a trailing incomplete assistant
   fragment does not.
-- Durable embedded sessions still call `abort_turn` on non-success and the
-  regression fixture explicitly requires an empty durable transcript after a
-  failed turn. This is a remaining gap, not completion evidence.
-- Cancellation currently persists a hidden terminal outcome but returns no
-  partial messages. It does not yet prove that a completed display-safe tool
-  result survives interruption.
+- Before I193, durable embedded sessions called `abort_turn` on non-success and cancellation
+  returned no partial messages; those facts remain the historical pre-implementation baseline.
 - I169 added terminal-outcome evidence and transactional pending-work custody,
   but did not claim or complete SESSION-008.
 
@@ -103,7 +100,7 @@ transcript must identify that the turn did not complete normally.
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | SESSION-008-A | Partial-turn lifecycle and durable-format decision | Complete in I187; Completion Commit `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` | Existing ADR-039/ADR-042 and current-path inventory |
-| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | In Progress in I193 / Claimed | SESSION-008-A Complete; ADR-058 Accepted |
+| SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Complete in I193; Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` | SESSION-008-A Complete; ADR-058 Accepted |
 
 Only one child may be selected at a time. The parent becomes Complete only
 after both children have existing completion evidence and the Issue #45
@@ -129,13 +126,13 @@ migration plan before implementation.
 
 ## SESSION-008-B Claim Proposal
 
-- [I193](../../iterations/I193-session008b-durable-partial-finalization.md) and claim PR #210
-  define the separately governed B implementation. The claim is effective in main merge
-  `fb5a1f62`; implementation still requires explicit iteration activation and post-claim branch
-  setup.
-- **SESSION-008-R1 — current-versus-target truth linkage.** Until B reaches `main`, the
-  [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md) is
-  the truth source for current released behavior and ADR-058 is the target contract only.
+- [I193](../../iterations/I193-session008b-durable-partial-finalization.md) and PR #216 delivered
+  the separately governed B implementation. The claim became effective in `fb5a1f62`; the source
+  implementation is `404d7a4b` and the merge is `1b5461cd`.
+- **SESSION-008-R1 — current-versus-target truth linkage.** Before B reached `main`, the
+  [I187 characterization](../../reference/I187-SESSION-008-PARTIAL-TURN-CHARACTERIZATION.md) was
+  the released-behavior truth source and ADR-058 was target-only; after the I193 merge, I187 is
+  retained as historical baseline and ADR-058 is implemented behavior on `main`.
 - **SESSION-008-R2 — transient test diagnosis.** This remains conditional diagnostic evidence: if
   the seven transient `talos-session` failures recur, capture disk bytes, inode availability,
   temporary paths, complete stderr and the default-parallel result. No concurrency defect or
@@ -203,9 +200,14 @@ cargo test --workspace --locked
 scripts/validate_project_governance.sh .
 ```
 
+## Completion Evidence
+
+- Completion Commit: `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` (SESSION-008-B implementation).
+- PR #216 merged as `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`; exact-head CI `31691761892` passed.
+- I193 owner records the full acceptance, R1/R2, role disclosure and validator evidence.
+
 ## Residuals
 
-- This Story remains In Progress until SESSION-008-B has merged implementation evidence and its
-  owner closeout is synchronized. Feature-branch Error/Cancelled restart fixtures and atomicity
-  tests are implementation evidence under review, not completion evidence. Existing legacy
-  error-path coverage remains a compatibility fixture and does not substitute for SESSION-008-B.
+- RUNTIME-005 remains Refinement / Unclaimed with A Ready/not selected, B Blocked until its other
+  gate (RUNTIME-005-A Accepted) is satisfied, and C blocked on B. I188/I189 remain Planned/Claimed
+  and unactivated; Issues #45/#49/#59 remain open.
