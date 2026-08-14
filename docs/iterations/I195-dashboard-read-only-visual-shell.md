@@ -24,7 +24,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent natural-person exact-head review is required before claim merge and before implementation merge. If repository operations use the shared `@wjhuang88` account, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record remains ineffective until PR #212 reaches `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-13 |
+| Last Updated | 2026-08-14 |
 | Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current `main` and all three lanes, and merge PR #212 to `main`; only then create the isolated implementation worktree/branch from the claim merge commit or a later current `main`. |
 
 The `Claimed` record above is proposed on PR #212. It is not effective ownership until that exact
@@ -53,28 +53,31 @@ record reaches `main`; no Dashboard implementation branch or worktree is authori
 
 ### Current Synchronized Claim Baseline
 
-- `main` is now `bd5a755e383028c4e29969f0df4370ffe8031be7` after the Desktop D0 decision,
-  closeout and bounded post-closeout wording corrections completed.
+- `main` is `556b5a4319085bf5250bccf4920e0dec0c6646c8`. That target includes I193/SESSION-008-B
+  implementation merge `1b5461cdcb03c7a896b814ccad2d93aa44010fc6` and the subsequent I193 closeout that records
+  Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`.
 - #212 was synchronized to that target by pure two-parent governance merge commit
-  `b65a8b44f02c75c24abe7e8ef545b9f88e0b1c80` whose parents are the prior Dashboard head
-  `eb52cc7e4ac73e380a3f775e4de4d34a651c458f` and `main@bd5a755e...`.
-- That merge deliberately takes current-main truth for shared Board/backlog/iteration indexes and
-  retains only I195-owned claim/owner material from the Dashboard branch. Derived I195 index rows are
-  deferred to truthful post-claim synchronization rather than overriding concurrent Runtime/Desktop
-  rows during this claim PR.
-- I194/DESKTOP-001-D0 is now terminal `Complete`. Decision head `0a47208ce6fad23c706ebede8b3d07111b9303dc`
-  merged through PR #215 as `1beaca68...`; closeout #219 and bounded consistency fixes #220/#221
-  subsequently established the current target truth. ADR-059 remains Proposed, and no Desktop crate,
-  renderer dependency, production UI, mock-only visual slice or runtime/session binding is authorized.
-- Open PR #216 carries separately activated I193/SESSION-008-B implementation work. It remains
-  unmerged and independent; its current technical-audit blockers do not grant I195 any Runtime/Session
-  implementation authority.
+  `2656dc43730383353a8a4825896718760abc440e`, whose parents are prior Dashboard head
+  `d8beefb32a6605465a867cb2229d5495c2f95bee` and `main@556b5a4319085bf5250bccf4920e0dec0c6646c8`.
+- **Shared derived-file synchronization uses union semantics.** For `docs/BOARD.md`,
+  `docs/backlog/PRODUCT-BACKLOG.md`, and `docs/iterations/README.md`, every synchronization starts
+  from then-current `main`, preserves every existing target-branch row, and reapplies I195's own
+  bounded derived row. A shared derived file must never be resolved by taking either branch wholesale;
+  current-main truth and the lane-local I195 addition must both survive.
+- After that synchronization, the three shared derived views each contain one I195/WEB-001-A row
+  while retaining the target-branch I193 Complete and I194 Complete rows unchanged.
+- I193/SESSION-008 is terminal `Complete`: B implementation is
+  `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`, PR #216 merged as
+  `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`, and exact-head CI was `31691761892`. I187 remains
+  pre-I193 history. RUNTIME-005, I188 and I189 retain their separately governed gates.
+- I194/DESKTOP-001-D0 is terminal `Complete`. Decision head `0a47208ce6fad23c706ebede8b3d07111b9303dc`
+  merged through PR #215; ADR-059 remains Proposed, and no Desktop crate, renderer dependency,
+  production UI, mock-only visual slice or runtime/session binding is authorized by I195.
 
 ### Current Non-Terminal Iteration Inventory
 
-After synchronizing to `main@bd5a755e...`, I194 is terminal Complete and is therefore no longer part
-of the non-terminal inventory. I193 remains Planned / Claimed on target-branch truth while its
-separately activated implementation remains open in PR #216.
+After synchronizing to `main@556b5a4319085bf5250bccf4920e0dec0c6646c8`, I193 and I194 are terminal
+Complete and therefore excluded from this non-terminal inventory.
 
 | Iteration | State | I195 Disposition |
 |---|---|---|
@@ -85,17 +88,16 @@ separately activated implementation remains open in PR #216.
 | I164 | Paused | Preserve the superseded startup-inline target; do not resume. |
 | I188 | Planned / Claimed | Keep unactivated; TOOL-024-A decision-only process/permission work is independent. |
 | I189 | Planned / Claimed | Keep unactivated; PERM-006-A permission-foundation scope is independent. |
-| I193 | Planned / Claimed on `main`; separately activated in open PR #216 | Claim #210 is effective on `main`; PR #216 implements only SESSION-008-B. Keep it independent; I195 consumes no SESSION-008-B authority. |
 
 No existing target-branch owner authorizes I195 implementation. This table must be refreshed again
 immediately before claim merge, implementation branch creation and implementation merge.
 
 ### Parallel Three-Track Coordination
 
-- Runtime/session lane: I193 claim PR #210 is effective on `main`; open PR #216 carries separately
-  activated SESSION-008-B implementation at observed exact head
-  `c4fc1e1df96c24fd74254bc82420f88247a24a33`. It remains unmerged and independently gated;
-  RUNTIME-005, I188 and I189 retain their own owner-defined gates.
+- Runtime/session lane: I193/SESSION-008 is Complete on `main`; implementation
+  `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` reached `main` through PR #216 merge `1b5461cd...`.
+  RUNTIME-005, I188 and I189 retain their own owner-defined gates. I195 imports no Runtime/Session
+  implementation authority from that completed lane.
 - Desktop lane: I194/DESKTOP-001-D0 is Complete. The accepted decision packet remains decision-only;
   ADR-059 stays Proposed and all renderer/dependency/platform/mock-only implementation authority is
   reserved for a separately governed later child. #212 imports none of that authority.
@@ -105,7 +107,8 @@ immediately before claim merge, implementation branch creation and implementatio
 
 If any parallel claim, branch or `main` update changes these facts, refresh the governance proposal
 and repeat validation/review. An earlier clean snapshot never authorizes merging against a changed
-target.
+target. Any later synchronization of the three shared derived files must preserve the union invariant
+above; current-main-only replacement or Dashboard-only replacement is invalid.
 
 ## Scope
 
@@ -290,7 +293,10 @@ Manual acceptance on the exact rebuilt implementation head:
 4. Run both governance validators, `git diff --check`, applicable exact-head CI and independent
    natural-person review; disclose identity if the shared GitHub account is used.
 5. Immediately before merge, re-fetch current `main`, all Active/Review/Planned/Blocked owners, open
-   overlapping PRs and lane branches; repeat merge-time CAS.
+   overlapping PRs and lane branches; repeat merge-time CAS. If target synchronization touches
+   `docs/BOARD.md`, `docs/backlog/PRODUCT-BACKLOG.md`, or `docs/iterations/README.md`, preserve the
+   union of every then-current target row plus I195's bounded derived row; replacing a shared file
+   wholesale from either side is invalid.
 6. Merge claim to `main` through the authorized review path.
 7. Refresh `main`; record the exact effective claim merge-or-later SHA as implementation base.
 8. Only then create a dedicated implementation worktree and branch:
@@ -315,16 +321,22 @@ Manual acceptance on the exact rebuilt implementation head:
 - Prior synchronization after Desktop D0 decision merge is historical evidence:
   `81e7b6433e5ef7918051e273427570c51de076ed` synchronized #212 to `main@1beaca68...`, followed by
   exact-head `eb52cc7e4ac73e380a3f775e4de4d34a651c458f` and successful CI `31690077339`.
-- Current synchronization after I194 completion/closeout cleanup is pure two-parent commit
-  `b65a8b44f02c75c24abe7e8ef545b9f88e0b1c80` with parents prior Dashboard head `eb52cc7e...` and
-  `main@bd5a755e383028c4e29969f0df4370ffe8031be7`; shared derived files take current-main truth.
-- I194/DESKTOP-001-D0 is Complete; its completion chain remains decision-only and ADR-059 remains
-  Proposed. Runtime PR #216 remains open, separately governed and outside I195 authority.
-- Independent review comment `5277157606` on former exact head `556200a2...` returned NEEDS CHANGES;
-  it does not carry forward to the current head.
+- Prior synchronization after I194 completion/closeout cleanup is historical evidence:
+  `b65a8b44f02c75c24abe7e8ef545b9f88e0b1c80` synchronized #212 to `main@bd5a755e...`.
+- Current synchronization after I193 implementation and closeout is pure two-parent commit
+  `2656dc43730383353a8a4825896718760abc440e` with parents prior reviewed Dashboard head
+  `d8beefb32a6605465a867cb2229d5495c2f95bee` and
+  `main@556b5a4319085bf5250bccf4920e0dec0c6646c8`.
+- Shared derived views are union-preserved after that sync: `docs/BOARD.md`,
+  `docs/backlog/PRODUCT-BACKLOG.md`, and `docs/iterations/README.md` retain current-main rows and add
+  one bounded I195 row each.
+- I193/SESSION-008 is Complete at implementation `404d7a4b...`; PR #216 merged as `1b5461cd...` and
+  CI `31691761892` passed. I194/DESKTOP-001-D0 is Complete; ADR-059 remains Proposed.
+- Independent review comment `5288964884` returned REQUEST CHANGES on former exact head
+  `d8beefb32a6605465a867cb2229d5495c2f95bee`; that result does not carry forward after these fixes.
+- Earlier review comments and CI runs remain historical only and do not substitute for validation or
+  independent review on the new exact head.
 - Governance claim PR: #212.
-- All CI runs on earlier heads, including `31690077339` on `eb52cc7e...`, are historical evidence only
-  after this inventory refresh.
 - New exact-head validator/CI/review and merge-time CAS evidence: pending.
 
 ## Completion Evidence
