@@ -6,9 +6,9 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Refinement — blocked on ARCH-031-A |
+| Status | Ready — I159/ARCH-031-A complete; claim required before implementation |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Planned/Blocked) |
+| Selected Iteration | I160 (Planned / Unclaimed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
 
 ## Problem
@@ -183,3 +183,11 @@ Stop if:
 - public preset and sandbox fallback: ARCH-031-C;
 - publication/versioning: ARCH-031-D;
 - need for a dedicated composition crate: new evidence-backed ADR.
+
+## 2026-08-14 Readiness Checkpoint
+
+- I159/ARCH-031-A completed through implementation commits `d886917e` and `34c09b14`, exact-head
+  CI `31801484313`, independent approval `5293622712` and PR #236 merge `f79c1ead`.
+- The published objective, acceptance, exclusions and responsibility map remain unchanged.
+- ARCH-031-B is Ready for a dedicated I160 claim. This checkpoint does not activate I160, create an
+  implementation branch or authorize shared-composition code changes.

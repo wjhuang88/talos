@@ -6,9 +6,9 @@
 | Type | Architecture / Cargo Boundary Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I158 |
-| Status | In Progress — I159 activated from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7` |
+| Status | Complete — I159 implementation merged through PR #236 |
 | Depends on | ADR-052; ADR-053 Accepted; ARCH-034-R01/I158 Complete; TUI-037 disposition |
-| Selected Iteration | I159 (Active / Claimed) |
+| Selected Iteration | I159 (Complete / Closed) |
 | User/maintainer value | Embedders can use a lightweight local read-only tool surface without compiling unrelated heavy capability families |
 
 ## Problem
@@ -232,7 +232,7 @@ Add family-specific combinations for actual dependency seams discovered during b
 
 ### Workspace and runtime
 
-- [ ] full locked validation passes on the corrected exact head.
+- [x] full locked validation passes on the corrected exact head.
 - [x] real `talos` CLI smoke and exact inventory tests prove the product tool inventory is unchanged.
 - [x] a default-only external/minimal example compiles without heavy capability families.
 - [x] crate docs and migration note are updated.
@@ -331,3 +331,15 @@ Confirmed implementation facts on Draft PR #236 before the final implementation 
 
 Known release residual: `Cargo.lock` contains pre-existing `scraper 0.22` and `0.27` lines from
 different consumers. I159 changes neither version; I162 owns publication-closure reconciliation.
+
+## 2026-08-14 Completion Evidence
+
+- Completion Commit: `d886917e45d5ca0f110e111b966cd379485e3580`, with reviewer-requested
+  cfg-equivalent follow-up `34c09b142766c70ac62ef24424ed035f2fa921a5`.
+- Exact accepted head: `33a2c6ffad0e5c473baf41c14e704dfd19fcd0c9`.
+- CI `31801484313` completed 5/5 successfully, including full macOS and Windows Rust workspace
+  validation.
+- Independent natural-person exact-head approval: comment `5293622712`, with shared-account role
+  separation disclosed.
+- PR #236 merged to `main` as `f79c1ead1cd3a547797dea3666295f510d88a13d` after merge-time CAS.
+- No version, tag, GitHub Release or crates.io publication was authorized or performed by I159.

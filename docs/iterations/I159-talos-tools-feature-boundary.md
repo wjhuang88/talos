@@ -1,6 +1,6 @@
 # Iteration I159: `talos-tools` Lightweight Feature Boundary
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-26
 > Planned objective: `talos-tools` defaults to local read/search and heavy families are true opt-in Cargo features while CLI behavior remains unchanged.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline release-governance session 2026-08-14 |
 | Work Slice | ARCH-031-A / I159 only: implement real `talos-tools` Cargo feature boundaries, lightweight file-read/search defaults and explicit CLI `coding` selection while preserving product tool and permission behavior. No shared composition, runtime preset, sandbox policy, version bump, publication, tag or release. |
@@ -20,9 +20,9 @@
 | Governance Claim PR | #235 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #235 head `11619e13ca6c854b4db737a9978767436a19ab9f` passed CI `31789567122`, independent natural-person approval `5292115807`, both governance validators and merge-time CAS, then merged to `main` as `fa635b4eaadd4b55939322f89acfda4522489ab7`. |
-| Implementation PR | #236 |
+| Implementation PR | #236 (merged as `f79c1ead1cd3a547797dea3666295f510d88a13d`) |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Implement only through Draft PR #236 on `feat/tools-I159-feature-boundary` from claim merge `fa635b4eaadd4b55939322f89acfda4522489ab7`; reach Review through the complete feature matrix, product-parity evidence and an implementation commit. |
+| Handoff / Release Condition | Closed after exact-head CI `31801484313`, independent approval `5293622712`, merge-time CAS and PR #236 merge `f79c1ead`; I160 requires its own effective claim before implementation. |
 
 ## Published Baseline
 
@@ -152,6 +152,7 @@ If a stop condition occurs:
 | 2026-08-14 | Pre-commit local validation | Draft PR #236 implements the approved feature model and explicit downstream selections. Local feature, default/coding, workspace, product-inventory, CLI-smoke and external-consumer checks passed before implementation commit `d886917e`. The local collaboration validator was run without `GITHUB_BASE_REF`/`COLLABORATION_VALIDATION_BASE`, so it compared only the final commit and missed the branch-wide active ARCH-031 parent edit; this record does not claim exact-head preflight success. |
 | 2026-08-14 | Exact-head CI/review correction | CI `31794297165` and independent review `5292595210` on `d886917e` found the same blocker: release preflight stopped before Cargo validation because the changed active ARCH-031 Epic lacked a Collaboration Claim block. ARCH-031 now records the established Unclaimed Epic-parent metadata; the corrected head must rerun base-bound validation, full preflight and fresh independent review. |
 | 2026-08-14 | Corrected local validation | With the ARCH-031 Epic-parent metadata present, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration validator inspect the complete branch diff and report 0 warnings. The same base-bound full release preflight completes successfully, and no-feature/default/image/shell/coding checks pass after the cfg simplification. Commits `34c09b14` and `57bc1585` record the correction; push, exact-head CI and fresh independent review remain pending. |
+| 2026-08-14 | Merge and completion | Corrected exact head `33a2c6ffad0e5c473baf41c14e704dfd19fcd0c9` passed CI `31801484313` 5/5 and independent natural-person review `5293622712`; merge-time CAS confirmed unchanged head/base/checks/review and PR #236 merged as `f79c1ead1cd3a547797dea3666295f510d88a13d`. Completion cites the pre-existing implementation commits below; this closeout does not self-certify. |
 
 ## Verification Evidence
 
@@ -182,13 +183,19 @@ If a stop condition occurs:
 - Corrected working-tree validation: `COLLABORATION_VALIDATION_BASE=origin/main` collaboration
   validation reports 0 warnings; project governance reports 0 warnings; base-bound
   `./scripts/release_preflight.sh` completes successfully. Commits `34c09b14` and `57bc1585` record
-  the correction; fresh GitHub exact-head evidence remains pending after push.
+  the correction.
+- Exact-head CI: run `31801484313` at `33a2c6ff` completed 5/5 successfully, including
+  `Format + Check + Clippy + Test` and `Windows Rust workspace`.
+- Independent review: approval comment `5293622712` rechecked the complete base-to-head diff,
+  feature seams, dependency tree, governance truth and status boundaries.
 
 ## Completion Evidence
 
-- Completion Commit: pending
-- Do not cite a status-only documentation commit as implementation completion.
-- Keep `Review`, `Partial`, or `Blocked` if implementation, runtime evidence, CI, or human acceptance is pending.
+- Completion Commit: `d886917e45d5ca0f110e111b966cd379485e3580`,
+  `34c09b142766c70ac62ef24424ed035f2fa921a5`.
+- Accepted implementation head: `33a2c6ffad0e5c473baf41c14e704dfd19fcd0c9`.
+- Implementation PR #236 merge: `f79c1ead1cd3a547797dea3666295f510d88a13d`.
+- This status-only closeout commit is not completion evidence.
 
 ## Variance And Residuals
 
@@ -201,13 +208,20 @@ If a stop condition occurs:
 
 ## REL-002 Execution Record
 
-- Primary executor/runtime: pending
-- External assistance: pending
-- Planning/editing/testing/docs/commit/push ownership: pending
-- Qualification verdict: pending; do not assume qualification.
+- Primary executor/runtime: Codex / GPT-5 mainline release-governance session.
+- External assistance: independent natural-person exact-head review through shared account
+  `@wjhuang88`, with role separation disclosed in comment `5293622712`.
+- Planning/editing/testing/docs/commit/push ownership: executing Agent prepared the claim,
+  implementation, evidence correction and push; the independent reviewer performed detached
+  source/CI/runtime-boundary verification; merge-time CAS was executed separately after approval.
+- Qualification verdict: I159 qualifies only its bounded feature-boundary deliverable; REL-002
+  self-bootstrap qualification remains NO-GO.
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: pending
+- Outcome: lightweight `file-read + search` defaults and real opt-in heavy capability gates landed
+  without changing the CLI product tool inventory.
+- Documentation: crate docs, EN/zh-CN README migration notes, SDK contract, publication matrix,
+  Story, iteration, parent and derived views were synchronized.
+- Lessons: branch-level governance validation must bind the target branch merge-base; recorded as
+  EVOLUTION lesson 49. The pre-existing `scraper` duplication remains explicitly owned by I162.
