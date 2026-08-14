@@ -1,6 +1,6 @@
 # Iteration I193: SESSION-008-B Durable Partial-Turn Finalization
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-08-13
 > Planned objective: implement the Accepted ADR-058 contract as one atomic, idempotent durable
 > Success/Error/Cancelled finalization path with display-safe partial replay.
@@ -22,13 +22,13 @@
 | Governance Claim PR | #210 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | No separate natural-person reviewer is available. The maintainer may use the Single-maintainer merge path only after exact-head CI, both governance validators, dependency/overlap CAS, and a documented non-authorizing technical audit show no unresolved blocking feedback. Role separation (author/executor, technical auditor, merge authority) must be disclosed, but roles do not impersonate distinct natural persons. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-13 |
-| Handoff / Release Condition | Finalize the claim with its actual PR number, pass exact-head CI and both governance validators, document the unavailable-independent-review reason and technical audit, pass merge-time CAS, and use the Single-maintainer merge path before creating an implementation branch. |
+| Implementation PR | #216 |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Merged through the disclosed Single-maintainer path; retain RUNTIME-005 and I188/I189 boundaries. |
 
 The `Claimed` record became effective when PR #210 merged into `main` as
-`fb5a1f62aed7d86657473fa766876045724f6419`. The iteration remains Planned until explicitly
-activated; implementation work must follow the post-claim branch/worktree rules.
+`fb5a1f62aed7d86657473fa766876045724f6419`. I193 was activated from `main@f778543c` and its
+implementation merged through PR #216 as `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`.
 
 ## Published Baseline
 
@@ -36,7 +36,7 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| SESSION-008-B | SESSION-008 / Issue #45 | Ready / Unclaimed | SESSION-008-A Complete at `e288afb5`; ADR-058 Accepted | One durable finalization and replay path for admitted Success/Error/Cancelled turns |
+| SESSION-008-B | SESSION-008 / Issue #45 | Complete | SESSION-008-A Complete at `e288afb5`; ADR-058 Accepted | One durable finalization and replay path for admitted Success/Error/Cancelled turns |
 
 ### Scope
 
@@ -141,8 +141,8 @@ activated; implementation work must follow the post-claim branch/worktree rules.
   claimable.
 - Dashboard and Desktop lanes remain independently governed; this shared contract lands only
   through `main` and no product lane may copy it.
-- SESSION-008 remains Ready / Released and B remains unclaimed until this claim reaches `main`;
-  RUNTIME-005 remains blocked on B.
+- SESSION-008 and B are complete with the implementation evidence below; RUNTIME-005 retains its
+  owner-defined A/B/C gates and only its B dependency on SESSION-008-B is now satisfied.
 - Issues #45, #49 and #59 remain open. Archival PRs #120/#121 remain immutable.
 
 ## Actual Activation And Execution
@@ -151,6 +151,7 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 |---|---|---|
 | 2026-08-13 | Claim merge | PR #210 merged as `fb5a1f62aed7d86657473fa766876045724f6419` through the documented Single-maintainer merge path. The claim is effective; I193 remains Planned and no implementation branch has been created. |
 | 2026-08-13 | Activation | Activated from exact `main@f778543c7ceeb2a099eb3863fc8259da68d02195` in independent worktree `/private/tmp/talos-i193` on `feat/session-i193-partial-finalization`. I194 remains separately Planned/Claimed after PR #211; I188/I189 remain Planned/Claimed and unactivated; I159-I162 remain Blocked; I164 remains Paused. Dashboard PR #212 is separate and must refresh its own target-branch base. |
+| 2026-08-14 | Implementation merge | PR #216 merged at `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`; source implementation commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` pre-existed this status record. |
 
 ## Verification Evidence
 
@@ -169,10 +170,16 @@ activated; implementation work must follow the post-claim branch/worktree rules.
   target contract until this implementation reaches `main`. SESSION-008-R2 did not trigger: the
   seven transient failures did not recur during default-parallel workspace validation, so no
   concurrency or ENOSPC diagnosis is asserted.
+- Final exact-head CI run `31691761892` passed all five checks, including Windows workspace;
+  role-separated non-authorizing technical audits are PR comments `5287961007` and `5287989820`.
+  R1 now preserves I187 as the pre-I193 baseline and recognizes ADR-058 as implemented on `main`.
 
 ## Completion Evidence
 
-- No completion evidence. A status-only commit cannot certify this iteration.
+- Completion Commit: `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` (pre-existing implementation source
+  commit; the status commit is not used as its own evidence).
+- Merge evidence: PR #216 squash merge `1b5461cdcb03c7a896b814ccad2d93aa44010fc6`, exact final
+  head `c8bc33ab5c6a4a72a14a0a4f402488fa386a5b67`, CI `31691761892`.
 
 ## Variance And Residuals
 
@@ -184,6 +191,5 @@ activated; implementation work must follow the post-claim branch/worktree rules.
 
 ## Retrospective
 
-- Implementation and local validation are complete on the feature branch. Exact-head CI, the
-  documented role-separated technical audit, merge CAS, implementation merge, and owner closeout
-  remain pending; this record therefore does not claim completion.
+- I193 closed the ADR-058 durable finalization gap without changing TLOG v1, activating I188/I189,
+  or advancing unrelated runtime/permission/product lanes. I187 remains historical evidence.
