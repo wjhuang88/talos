@@ -237,6 +237,12 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Sets the sandbox fallback policy using the SDK contract name.
+    #[must_use]
+    pub fn sandbox_fallback(self, policy: SandboxFallbackPolicy) -> Self {
+        self.sandbox_fallback_policy(policy)
+    }
+
     /// Selects an explicit runtime capability preset.
     #[must_use]
     pub fn preset(mut self, preset: RuntimePreset) -> Self {
