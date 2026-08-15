@@ -6,9 +6,9 @@
 | Type | Release Readiness / SDK Validation Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I161 |
-| Status | Ready — I162 planned/claimed |
+| Status | In Progress — I162 Active/Claimed |
 | Depends on | I159-I161 Complete; workspace green; maintainer versioning review |
-| Selected Iteration | I162 (Planned/Claimed) |
+| Selected Iteration | I162 (Active/Claimed) |
 | Value | Prove that the documented SDK and dependency closure work outside the workspace before any publication decision |
 
 ## Collaboration Claim
@@ -23,7 +23,7 @@
 | Source Issue | None |
 | Governance Claim PR | #253 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I161 closeout is effective at `main@2301434a`; this claim is bounded to readiness evidence only and requires independent exact-head review plus merge-time CAS before becoming effective. |
+| Authorization Evidence | I161 closeout is effective at `main@2301434a`; claim PR #253 exact head `913a3318` passed CI `31886470911`, independent approval `5302451715`, governance validators, and merge-time CAS, then became effective on `main` as `38127228`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-15 |
 | Handoff / Release Condition | I162 must produce the external fixture, metadata-derived closure, package/dry-run evidence, and explicit GO/NO-GO packet; no version bump, tag, GitHub Release, or real Cargo publication is authorized by this claim. |
@@ -188,3 +188,12 @@ Stop if:
 ## Residual Destination
 
 Every failed gate receives a named Story. Do not solve unrelated blockers inside I162.
+
+## Activation Checkpoint 2026-08-15
+
+I162/ARCH-031-D is Active/In Progress after claim PR #253 merged as `381272289eb3d87204f022a562be847bc649cd97`.
+The active Work Slice remains readiness-only: external SDK fixture, metadata-derived closure,
+per-crate package and `cargo publish --dry-run` evidence, and a candidate v0.8.0 GO/NO-GO packet.
+No version bump, runtime behavior change, tag, GitHub Release, or real Cargo publication is
+authorized. Registry metadata access is an explicit external validation gate; a registry failure
+must remain a named blocker rather than being inferred away.
