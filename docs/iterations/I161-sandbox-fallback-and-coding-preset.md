@@ -22,7 +22,7 @@
 | Authorization Evidence | No independent reviewer is currently available. This PR changes governance records only; exact-head CI and both governance validators are required, and independent security review remains a hard gate before any I161 implementation merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-15 |
-| Handoff / Release Condition | Claim must merge to `main`; then activate only after ARCH-031-C is Ready, the security reviewer is assigned, and a fresh exact-main inventory passes. |
+| Handoff / Release Condition | Claim is effective on `main` at `b570ac27`; activate only after ARCH-031-C is Ready, an independent security reviewer is assigned through issue `#245`, and a fresh exact-main inventory passes. |
 
 ## Published Baseline
 
@@ -147,6 +147,7 @@ If a stop condition occurs:
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
 | 2026-08-15 | Claim preparation | I160/ARCH-031-B is Complete through Completion Commit `0524e82f`; I161 remains unactivated and no Rust/Cargo or release change is authorized. This proposed claim is ineffective until its finalized Claimed record merges to `main`. |
+| 2026-08-15 | Security review gate | Claim PR #244 merged as `b570ac27`; I161 remains Blocked because no independent security reviewer is available. Issue #245 requests assignment against the exact main baseline and records the required matrix. No implementation, release, tag, GitHub Release, or Cargo publication is authorized. |
 
 ## Verification Evidence
 

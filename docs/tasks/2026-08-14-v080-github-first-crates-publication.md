@@ -274,3 +274,21 @@ I160 authorization or implementation worktree.
 Recovery or resume instruction: refresh `origin/main`, verify I160 Completion Commit
 `0524e82f` and merge `2d48bd2c`, then follow I161's owner document and START-ITERATION gates. Keep
 GitHub Release before Cargo publication and preserve the published baselines.
+
+### 2026-08-15 I161 Security Review Gate Checkpoint
+
+Completed task items: I160 remains Complete/Closed. The I161 governance claim is effective through
+PR #244 merge `b570ac27`; no implementation authorization was created.
+
+Current state and artifacts: I161/ARCH-031-C remains Blocked pending an independent security
+reviewer. Issue #245 requests assignment and binds the review to `main@b570ac27` and the owner
+security matrix. I162 and I203 remain blocked in order. No release, tag, GitHub Release, or Cargo
+publication action is authorized.
+
+Next task item: obtain a real independent security reviewer through issue #245, then run a fresh
+exact-main inventory and activation gate. Do not begin Rust implementation while the reviewer is
+unassigned; do not bypass I161 for release work.
+
+Recovery or resume instruction: refresh `origin/main`, verify `b570ac27`, PR #244, and issue #245;
+preserve all Published Baseline sections and append new execution evidence only. GitHub Release
+must still precede Cargo publication.
