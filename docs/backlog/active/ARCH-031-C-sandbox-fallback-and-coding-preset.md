@@ -141,6 +141,23 @@ Sandbox fallback and permission are orthogonal.
 
 Add path/network/execute variants and adversarial cases.
 
+## Formal Security Review Record
+
+Issue #245 is the formal pre-implementation security review record accepted on 2026-08-15.
+The complete `ARCH-031-C` security chapters and nine-row matrix are normative; the issue summary
+is not a lossy substitute. The review confirms these required invariants: permission `Deny` always
+wins; `AllowUnsandboxed` only permits continuation when required isolation is unavailable and never
+bypasses permission; headless `Ask` fails closed; fallback approval is typed, scoped, distinguishable
+from ordinary approval, and cannot silently create a permanent broad grant; ordinary `AlwaysApprove`
+does not approve fallback; coding composition cannot weaken permission or sandbox constraints; CLI
+behavior changes only on explicit selection; old construction remains minimal by default; and
+policy stays out of `talos-sandbox`. Path, network, and execute variants remain in scope.
+
+The security reviewer and implementation roles are separate, with shared-account identity limits
+disclosed. This is a design/matrix review, not implementation acceptance. The final implementation
+head must receive a fresh independent exact-head security review against the complete matrix before
+merge, and the acceptance checkbox below remains open until that evidence exists.
+
 ## Invariants
 
 - permission `Deny` always wins;

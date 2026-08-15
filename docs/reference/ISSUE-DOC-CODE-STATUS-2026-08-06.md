@@ -81,3 +81,19 @@ RUNTIME-006 registration for Issue #234
 An Issue may be closed only after its owner is Complete with implementation/acceptance evidence and
 no unresolved residual remains inside that owner. A separately owned follow-up does not keep the
 completed source Issue open when the boundary and disposition are explicit.
+
+## 2026-08-15 Current Checkpoint: Issue #245
+
+Issue #245 is now the formal pre-implementation security-review record for I161 / ARCH-031-C,
+accepted by the maintainer on 2026-08-15. The complete ARCH-031-C security chapters and nine-row
+Security Test Matrix are normative. The recorded review requires permission `Deny` precedence,
+fail-closed headless `Ask`, scoped and typed fallback approval that cannot be widened by ordinary
+`AlwaysApprove`, non-bypass behavior for `AllowUnsandboxed`, coding-preset security equivalence,
+policy neutrality in `talos-sandbox`, and path/network/execute variants. The reviewer role is
+separate from implementation, with shared-account identity limits disclosed.
+
+This checkpoint supersedes the earlier reviewer-assignment disposition for current status only;
+the historical matrix and its original dated row remain unchanged. It does not mark I161 complete,
+authorize a merge, or authorize release/tag/GitHub Release/Cargo publication. A finalized I161
+implementation head still requires independent exact-head security approval against the complete
+normative matrix before merge.
