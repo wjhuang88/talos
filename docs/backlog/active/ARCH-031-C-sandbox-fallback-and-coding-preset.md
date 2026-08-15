@@ -15,13 +15,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | `@wjhuang88` |
 | Executing Agent | `Codex / GPT-5 mainline session` |
 | Work Slice | `ARCH-031-C / I161` only: `SandboxFallbackPolicy`, explicit coding preset, typed fallback approval context if required, security matrix tests, runtime evidence, and SDK documentation; no I162 publication or release work. |
 | Claimed At | 2026-08-15 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #244 |
 | Authorization Mode | Single-maintainer merge (claim-only) |
 | Authorization Evidence | No independent reviewer is currently available. This claim PR changes governance records only; exact-head CI and both governance validators are required, and independent security review remains a hard gate before any I161 implementation merge. |
 | Implementation PR | Not started |
