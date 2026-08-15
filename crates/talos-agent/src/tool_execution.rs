@@ -415,6 +415,7 @@ impl Agent {
             ));
         }
 
+        let mut permission_allowed = true;
         if let Some(engine) = self.permission_engine.as_deref() {
             let projected_call = self.project_tool_call(&call);
             self.run_hook(
@@ -462,14 +463,7 @@ impl Agent {
                         Vec::new(),
                     ));
                 }
-                PermissionDecision::Ask => {
-                    return Ok((
-                        ToolExecutionResult::error(
-                            "permission decision remains unresolved".to_owned(),
-                        ),
-                        Vec::new(),
-                    ));
-                }
+                PermissionDecision::Ask => permission_allowed = false,
             }
 
             for diag in evidence_diagnostics {
@@ -521,28 +515,34 @@ impl Agent {
                 } else {
                     let fallback = match self.sandbox_fallback_policy {
                         SandboxFallbackPolicy::Deny => false,
-                        SandboxFallbackPolicy::AllowUnsandboxed => true,
-                        SandboxFallbackPolicy::Ask => match &self.sandbox_fallback_handler {
-                            Some(handler) => {
-                                let context = SandboxFallbackContext {
-                                    tool_name: call.name.clone(),
-                                    arguments: redacted_fallback_arguments(tool, &normalized_input),
-                                    summary_fields: tool
-                                        .summary_fields()
-                                        .iter()
-                                        .map(|field| (*field).to_string())
-                                        .collect(),
-                                };
-                                let decision = handler.request_fallback(context).await;
-                                tracing::debug!(
-                                    tool = %call.name,
-                                    decision = ?decision,
-                                    "sandbox fallback decision"
-                                );
-                                matches!(decision, SandboxFallbackDecision::ApproveOnce)
+                        SandboxFallbackPolicy::AllowUnsandboxed => permission_allowed,
+                        SandboxFallbackPolicy::Ask if permission_allowed => {
+                            match &self.sandbox_fallback_handler {
+                                Some(handler) => {
+                                    let context = SandboxFallbackContext {
+                                        tool_name: call.name.clone(),
+                                        arguments: redacted_fallback_arguments(
+                                            tool,
+                                            &normalized_input,
+                                        ),
+                                        summary_fields: tool
+                                            .summary_fields()
+                                            .iter()
+                                            .map(|field| (*field).to_string())
+                                            .collect(),
+                                    };
+                                    let decision = handler.request_fallback(context).await;
+                                    tracing::debug!(
+                                        tool = %call.name,
+                                        decision = ?decision,
+                                        "sandbox fallback decision"
+                                    );
+                                    matches!(decision, SandboxFallbackDecision::ApproveOnce)
+                                }
+                                None => false,
                             }
-                            None => false,
-                        },
+                        }
+                        SandboxFallbackPolicy::Ask => false,
                     };
                     if fallback {
                         let output = tool.execute_with_output(normalized_input).await;

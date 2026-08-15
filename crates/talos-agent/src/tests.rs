@@ -2539,6 +2539,27 @@ async fn test_permission_ask_defaults_to_deny() {
 }
 
 #[tokio::test]
+async fn unresolved_permission_ask_reaches_wrapped_tool_without_sandbox_fallback() {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let agent = Agent::with_security(
+        Arc::new(MockModel::new(sandbox_fallback_responses("Done"))),
+        bash_registry(log.clone()),
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+    );
+
+    assert_eq!(agent.run("Test".into()).await.unwrap(), "Done");
+    assert!(
+        log.lock()
+            .await
+            .iter()
+            .any(|entry| entry.starts_with("start:bash:")),
+        "unresolved Ask should remain available to the permission-aware wrapper"
+    );
+}
+
+#[tokio::test]
 async fn test_sandbox_execution_for_bash_tool() {
     let sandbox_result = SandboxResult {
         stdout: "sandboxed output".into(),

@@ -384,6 +384,10 @@ impl RuntimeBuilder {
             self.workspace_root.clone(),
             &self.permission_rules,
         )));
+        let agent_engine = Arc::new(build_permission_engine(
+            self.workspace_root.clone(),
+            &self.permission_rules,
+        ));
         let mut registry = ToolRegistry::new();
         for tool in tools {
             registry.register(Arc::new(RuntimePermissionAwareTool {
@@ -402,7 +406,7 @@ impl RuntimeBuilder {
             Agent::with_security_and_hooks_and_sandbox_fallback(
                 provider,
                 registry,
-                None,
+                Some(agent_engine.clone()),
                 self.sandbox,
                 self.workspace_root.clone(),
                 hooks,
@@ -413,7 +417,7 @@ impl RuntimeBuilder {
             Agent::with_security_and_sandbox_fallback(
                 provider,
                 registry,
-                None,
+                Some(agent_engine),
                 self.sandbox,
                 self.workspace_root.clone(),
                 self.sandbox_fallback_policy,
