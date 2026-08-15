@@ -6,10 +6,27 @@
 | Type | Release Readiness / SDK Validation Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I161 |
-| Status | Refinement — blocked on ARCH-031-C |
+| Status | Ready — I162 planned; claim pending |
 | Depends on | I159-I161 Complete; workspace green; maintainer versioning review |
 | Selected Iteration | I162 (Planned/Blocked) |
 | Value | Prove that the documented SDK and dependency closure work outside the workspace before any publication decision |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned until the Draft Claim PR is finalized with its PR number |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | I162 must produce the external fixture, metadata-derived closure, package/dry-run evidence, and explicit GO/NO-GO packet; no version bump, tag, GitHub Release, or real Cargo publication is authorized by this claim. |
 
 ## Problem
 
