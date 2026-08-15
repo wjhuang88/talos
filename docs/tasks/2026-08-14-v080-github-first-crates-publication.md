@@ -293,6 +293,22 @@ Recovery or resume instruction: refresh `origin/main`, verify `b570ac27`, PR #24
 preserve all Published Baseline sections and append new execution evidence only. GitHub Release
 must still precede Cargo publication.
 
+### 2026-08-15 I162 Readiness Execution Checkpoint
+
+I162 implementation worktree `feat/i162-sdk-readiness` started from the effective activation base
+`main@2891105d8a60e18cd5e0963432cea691355d2b63`. The external SDK fixture passed in default and
+`coding` modes. Locked metadata computed the 20-member CLI/runtime closure, excluding
+`talos-models`; four product guards remain `publish = false`. The detailed packet is
+`docs/reference/I162-PUBLICATION-READINESS-2026-08-15.md`.
+
+I162 is currently `NO-GO` for publication: the workspace remains `0.7.0`, the available registry
+index cannot resolve the internal closure, network-enabled package/dry-run evidence is unavailable,
+and the full workspace test command has 16 existing CLI provider-discovery failures with
+`Operation not permitted` in this restricted environment. No version bump, tag, GitHub Release,
+or Cargo publication occurred. I203 remains blocked until I162 has an accepted implementation
+Completion Commit and reviewed GO packet. Resume by rerunning the exact-head package/dry-run and
+full validation checks in a network-enabled clean environment; preserve all Published Baselines.
+
 ### 2026-08-15 I161 Activation Checkpoint
 
 Completed task items: the I161 security-review gate is formally recorded through Issue #245, with

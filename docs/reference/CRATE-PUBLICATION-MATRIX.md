@@ -252,3 +252,17 @@ its absence on gate crates. As of 2026-07-26 the guard covers: product-only/quar
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear
 description, and state its pre-1.0 support boundary.
+
+## I162 Reconciliation — 2026-08-15
+
+At `main@2891105d8a60e18cd5e0963432cea691355d2b63`, locked metadata computed a 20-member normal
+closure for `talos-cli` and `talos-runtime`, excluding `talos-models`. The workspace version is
+`0.7.0`; this is evidence for the planned `v0.8.0` release, not a version change. Sixteen closure
+members are registry-enabled and four (`talos-cli`, `talos-dashboard`, `talos-evolution`,
+`talos-tui`) remain guarded by `publish = false`. No guard was changed.
+
+The exact fixture, package, and dry-run results are recorded in
+`docs/reference/I162-PUBLICATION-READINESS-2026-08-15.md`. The fixture passed in default and
+`coding` modes. Package/dry-run readiness is **NO-GO** until a network-enabled registry check can
+resolve the 0.7.0 closure and the separately governed version-alignment, GitHub Release, and
+install-package gates are complete.
