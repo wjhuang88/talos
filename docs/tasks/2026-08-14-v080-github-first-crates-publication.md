@@ -1,5 +1,8 @@
 # v0.8.0 GitHub-First Crates Publication Long Task
 
+Completion Commit: `077b347dff25f60e6fbd84b22548f58c72163f65` (I162 readiness implementation; long
+task remains open because the reviewed readiness qualification is NO-GO and I203 is blocked)
+
 > Status: In Progress
 > Created: 2026-08-14
 > Candidate release: v0.8.0
@@ -81,7 +84,7 @@ inventory.
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Done — Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 as `2d48bd2c` |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Done — PR #250 merged `d2b4bdd1`; matrix-closure PR #251 merged `da5a43a2`; Completion Commits `74c5502d`/`3ca2ec62` |
-| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Active — I162 claim merged `38127228` |
+| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Complete — I162 Completion Commit `077b347d`, PR #255 merged `16564ba0`; reviewed NO-GO, so V080-50 remains blocked |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
 | V080-60 | Cargo publication | 20 visible crates.io packages in dependency order | V080-50 | Per-package visibility and no omitted closure package | Checkpoint partial state; never overwrite | Planned |
 | V080-70 | External acceptance and closeout | Cargo install, runtime fixture and owner evidence | V080-60 | External tests plus owner-first closeout | Keep Review/Blocked with exact residual | Planned |
@@ -374,3 +377,14 @@ fixture, metadata-derived publishable closure, per-crate package and `cargo publ
 evidence, and an explicit GO/NO-GO packet for candidate v0.8.0. It excludes version bump, runtime
 behavior, tag, GitHub Release, and real Cargo publication. The claim is ineffective until PR #253
 merges; I162 is not Active and no implementation branch or release action is authorized yet.
+
+### 2026-08-15 I162 Closeout Checkpoint
+
+I162/ARCH-031-D is Complete/Closed as a readiness investigation with reviewed `NO-GO`, not a
+publication authorization. Implementation PR #255 merged as `16564ba01fe69ee95297898c8faab1c1701e5bb2`
+from exact head `077b347dff25f60e6fbd84b22548f58c72163f65`; CI `31891263313` passed 5/5 and
+independent approval is comment `5302842269`. The fixture, metadata-derived 20-member closure,
+guard audit, package/dry-run attempts, and blockers are recorded in the I162 packet. V080-50
+GitHub Release and V080-60 Cargo publication remain blocked until a network-enabled reviewed GO
+packet, fresh I203 claim, and release-time authorization exist. No version bump, tag, GitHub Release,
+or Cargo publication occurred.

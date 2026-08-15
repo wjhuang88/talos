@@ -1,21 +1,23 @@
 # ARCH-031-D: v0.6 SDK Fixture And Publication Readiness
 
+> Document status: Complete (2026-08-15; readiness qualification NO-GO)
+
 | Field | Value |
 |---|---|
 | Story ID | ARCH-031-D |
 | Type | Release Readiness / SDK Validation Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I161 |
-| Status | In Progress — I162 Active/Claimed |
+| Status | Complete |
 | Depends on | I159-I161 Complete; workspace green; maintainer versioning review |
-| Selected Iteration | I162 (Active/Claimed) |
+| Selected Iteration | I162 (Complete/Closed) |
 | Value | Prove that the documented SDK and dependency closure work outside the workspace before any publication decision |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release-governance session` |
 | Work Slice | `ARCH-031-D / I162` only: external consumer fixture, metadata-derived publishable closure, per-crate package and `cargo publish --dry-run` evidence, and explicit GO/NO-GO packet for the candidate v0.8.0 release. No runtime behavior, version bump, tag, GitHub Release, or real Cargo publication. |
@@ -24,9 +26,11 @@
 | Governance Claim PR | #253 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I161 closeout is effective at `main@2301434a`; claim PR #253 exact head `913a3318` passed CI `31886470911`, independent approval `5302451715`, governance validators, and merge-time CAS, then became effective on `main` as `38127228`. |
-| Implementation PR | Not started |
+| Implementation PR | #255 |
 | Last Updated | 2026-08-15 |
-| Handoff / Release Condition | I162 must produce the external fixture, metadata-derived closure, package/dry-run evidence, and explicit GO/NO-GO packet; no version bump, tag, GitHub Release, or real Cargo publication is authorized by this claim. |
+| Handoff / Release Condition | Readiness is complete with reviewed `NO-GO`; I203 remains blocked until a separate claim and reviewed GO packet authorize release work. |
+
+Completion Commit: `077b347dff25f60e6fbd84b22548f58c72163f65`
 
 ## Problem
 
@@ -197,3 +201,11 @@ per-crate package and `cargo publish --dry-run` evidence, and a candidate v0.8.0
 No version bump, runtime behavior change, tag, GitHub Release, or real Cargo publication is
 authorized. Registry metadata access is an explicit external validation gate; a registry failure
 must remain a named blocker rather than being inferred away.
+
+## Closeout Checkpoint 2026-08-15
+
+ARCH-031-D/I162 is Complete/Closed with reviewed `NO-GO` publication qualification. Completion
+Commit: `077b347dff25f60e6fbd84b22548f58c72163f65`; implementation PR #255 merged as
+`16564ba01fe69ee95297898c8faab1c1701e5bb2`; exact-head CI `31891263313` passed 5/5; independent
+approval is comment `5302842269`. The 20-member closure and four guarded product crates are in the
+readiness packet. No version, tag, release, or publication action occurred.
