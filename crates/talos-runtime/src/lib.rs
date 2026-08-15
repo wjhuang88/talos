@@ -3,13 +3,15 @@
 //! This crate is the SDK-style entrypoint for Rust projects that want to reuse
 //! Talos's agent turn loop without depending on the Talos CLI or TUI crates.
 
+#[cfg(feature = "shared-composition")]
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_agent::session::AppServerSession;
-use talos_agent::{Agent, AgentError};
+use talos_agent::{Agent, AgentError, SandboxFallbackHandler};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::provider::LanguageModel;
@@ -34,12 +36,28 @@ use tokio::task::JoinHandle;
 #[doc(hidden)]
 pub mod composition;
 
+pub use talos_agent::{SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy};
 pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 pub use talos_core::provider::{ProviderError, ToolDefinition};
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
 pub use talos_core::tool::{ToolNature, ToolProvenance};
 pub use talos_plugin::HookRegistry as RuntimeHookRegistry;
 pub use talos_skill::SkillIndex as RuntimeSkillIndex;
+
+/// Explicit built-in capability preset for embedded runtimes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimePreset {
+    /// The same shared coding capability composition used by the CLI.
+    Coding,
+}
+
+impl RuntimePreset {
+    /// Selects the explicit coding capability composition.
+    #[must_use]
+    pub const fn coding() -> Self {
+        Self::Coding
+    }
+}
 
 /// Errors returned by the embeddable runtime facade.
 #[derive(Debug, Error)]
@@ -59,6 +77,10 @@ pub enum RuntimeError {
     /// The underlying agent returned an error.
     #[error("agent error: {0}")]
     Agent(#[from] AgentError),
+
+    /// The coding preset requires the optional shared-composition feature.
+    #[error("RuntimePreset::coding() requires the `shared-composition` feature")]
+    CodingPresetRequiresFeature,
 
     /// A durable session could not be read or committed.
     #[error("durable session error: {0}")]
@@ -84,6 +106,27 @@ pub trait ApprovalHandler: Send + Sync {
         arguments: &Value,
         summary_fields: &[String],
     ) -> ApprovalChoice;
+
+    /// Requests a one-invocation approval to continue without sandbox
+    /// isolation. This is distinct from normal tool permission approval and
+    /// defaults to denial; `AlwaysApprove` is never accepted for fallback.
+    async fn request_sandbox_fallback(
+        &self,
+        _context: &SandboxFallbackContext,
+    ) -> SandboxFallbackDecision {
+        SandboxFallbackDecision::Deny
+    }
+}
+
+struct RuntimeSandboxFallbackHandler {
+    inner: Arc<dyn ApprovalHandler>,
+}
+
+#[async_trait]
+impl SandboxFallbackHandler for RuntimeSandboxFallbackHandler {
+    async fn request_fallback(&self, context: SandboxFallbackContext) -> SandboxFallbackDecision {
+        self.inner.request_sandbox_fallback(&context).await
+    }
 }
 
 /// Builder for an embeddable Talos runtime.
@@ -97,6 +140,8 @@ pub struct RuntimeBuilder {
     workspace_root: PathBuf,
     permission_rules: Vec<PermissionRule>,
     sandbox: Option<Box<dyn SandboxProvider>>,
+    sandbox_fallback_policy: SandboxFallbackPolicy,
+    preset: Option<RuntimePreset>,
     initial_history: Vec<Message>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
@@ -118,6 +163,8 @@ impl RuntimeBuilder {
             workspace_root: PathBuf::from("."),
             permission_rules: Vec::new(),
             sandbox: None,
+            sandbox_fallback_policy: SandboxFallbackPolicy::Deny,
+            preset: None,
             initial_history: Vec::new(),
             model_context_limit: 128_000,
             approval_handler: None,
@@ -183,6 +230,32 @@ impl RuntimeBuilder {
     pub fn sandbox(mut self, sandbox: Box<dyn SandboxProvider>) -> Self {
         self.sandbox = Some(sandbox);
         self
+    }
+
+    /// Sets the sandbox fallback policy. The default is `Deny`.
+    #[must_use]
+    pub fn sandbox_fallback_policy(mut self, policy: SandboxFallbackPolicy) -> Self {
+        self.sandbox_fallback_policy = policy;
+        self
+    }
+
+    /// Sets the sandbox fallback policy using the SDK contract name.
+    #[must_use]
+    pub fn sandbox_fallback(self, policy: SandboxFallbackPolicy) -> Self {
+        self.sandbox_fallback_policy(policy)
+    }
+
+    /// Selects an explicit runtime capability preset.
+    #[must_use]
+    pub fn preset(mut self, preset: RuntimePreset) -> Self {
+        self.preset = Some(preset);
+        self
+    }
+
+    /// Selects the shared coding capability composition.
+    #[must_use]
+    pub fn coding_preset(self) -> Self {
+        self.preset(RuntimePreset::coding())
     }
 
     /// Seeds the runtime with existing conversation history.
@@ -286,6 +359,27 @@ impl RuntimeBuilder {
     /// [`RuntimeHandle::shutdown`] for orderly shutdown.
     pub fn build(self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
+        #[allow(unused_mut)]
+        let mut tools = self.tools;
+        if matches!(self.preset, Some(RuntimePreset::Coding)) {
+            #[cfg(feature = "shared-composition")]
+            {
+                // Explicit caller tools are authoritative. A preset must not
+                // replace an embedder's hardened implementation by name.
+                let caller_tool_names = tools
+                    .iter()
+                    .map(|tool| tool.name().to_owned())
+                    .collect::<HashSet<_>>();
+                tools.extend(
+                    composition::runtime_tool_contributions(self.workspace_root.clone())
+                        .into_iter()
+                        .filter(|contribution| !caller_tool_names.contains(contribution.name()))
+                        .map(|contribution| contribution.tool().clone()),
+                );
+            }
+            #[cfg(not(feature = "shared-composition"))]
+            return Err(RuntimeError::CodingPresetRequiresFeature);
+        }
         let tool_engine = Arc::new(Mutex::new(build_permission_engine(
             self.workspace_root.clone(),
             &self.permission_rules,
@@ -294,9 +388,8 @@ impl RuntimeBuilder {
             self.workspace_root.clone(),
             &self.permission_rules,
         ));
-
         let mut registry = ToolRegistry::new();
-        for tool in self.tools {
+        for tool in tools {
             registry.register(Arc::new(RuntimePermissionAwareTool {
                 inner: tool,
                 engine: tool_engine.clone(),
@@ -304,22 +397,31 @@ impl RuntimeBuilder {
             }));
         }
 
+        let fallback_handler = self.approval_handler.as_ref().map(|handler| {
+            Arc::new(RuntimeSandboxFallbackHandler {
+                inner: handler.clone(),
+            }) as Arc<dyn SandboxFallbackHandler>
+        });
         let mut agent = if let Some(hooks) = self.hook_registry {
-            Agent::with_security_and_hooks(
+            Agent::with_security_and_hooks_and_sandbox_fallback(
                 provider,
                 registry,
-                Some(agent_engine),
+                Some(agent_engine.clone()),
                 self.sandbox,
                 self.workspace_root.clone(),
                 hooks,
+                self.sandbox_fallback_policy,
+                fallback_handler,
             )
         } else {
-            Agent::with_security(
+            Agent::with_security_and_sandbox_fallback(
                 provider,
                 registry,
                 Some(agent_engine),
                 self.sandbox,
                 self.workspace_root.clone(),
+                self.sandbox_fallback_policy,
+                fallback_handler,
             )
         };
         if let Some(prompt) = self.custom_prompt {
@@ -647,6 +749,11 @@ mod tests {
 
     struct PrivateResultReadTool;
 
+    #[cfg(feature = "shared-composition")]
+    struct PresetOverrideTool {
+        executions: Arc<AtomicUsize>,
+    }
+
     struct SnapshotEditingModel {
         step: AtomicUsize,
         observed_snapshot: Arc<StdMutex<Option<String>>>,
@@ -814,6 +921,73 @@ mod tests {
         assert!(names.iter().any(|name| name == "read_image"));
     }
 
+    #[cfg(feature = "shared-composition")]
+    #[tokio::test]
+    async fn coding_preset_is_explicit_and_builds_shared_inventory() {
+        let builder = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("done")))
+            .workspace_root("workspace")
+            .coding_preset();
+        assert_eq!(builder.preset, Some(RuntimePreset::Coding));
+        assert!(builder.tools.is_empty());
+        let mut runtime = builder.build().expect("coding preset builds");
+        runtime.submit("hello").await.expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[cfg(feature = "shared-composition")]
+    #[tokio::test]
+    async fn coding_preset_preserves_caller_tool_overrides() {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let provider = MockProvider::new()
+            .with_tool_call("bash", serde_json::json!({"command": "echo custom"}))
+            .with_response("done");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(provider))
+            .tool(Arc::new(PresetOverrideTool {
+                executions: executions.clone(),
+            }))
+            .permission_rule(PermissionRule {
+                tool_name: "bash".into(),
+                path_pattern: None,
+                decision: PermissionDecision::Allow,
+                nature: None,
+                resource: None,
+                resource_kind: None,
+            })
+            .coding_preset()
+            .build()
+            .expect("coding preset builds with caller override");
+
+        runtime
+            .submit("run the custom tool")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        assert_eq!(executions.load(Ordering::SeqCst), 1);
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[cfg(not(feature = "shared-composition"))]
+    #[test]
+    fn coding_preset_requires_opt_in_feature() {
+        let result = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .coding_preset()
+            .build();
+        assert!(matches!(
+            result,
+            Err(RuntimeError::CodingPresetRequiresFeature)
+        ));
+    }
+
     #[async_trait]
     impl AgentTool for RecordingWriteTool {
         fn name(&self) -> &str {
@@ -849,6 +1023,35 @@ mod tests {
 
         fn summary_fields(&self) -> &'static [&'static str] {
             &["message"]
+        }
+    }
+
+    #[cfg(feature = "shared-composition")]
+    #[async_trait]
+    impl AgentTool for PresetOverrideTool {
+        fn name(&self) -> &str {
+            "bash"
+        }
+
+        fn description(&self) -> &str {
+            "Test-only caller-provided bash override"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"]
+            })
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            ToolResult::success("custom bash")
+        }
+
+        fn nature(&self) -> ToolNature {
+            ToolNature::Execute
         }
     }
 
