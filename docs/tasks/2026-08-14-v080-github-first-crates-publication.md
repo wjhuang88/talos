@@ -1,6 +1,6 @@
 # v0.8.0 GitHub-First Crates Publication Long Task
 
-> Status: Planned
+> Status: In Progress
 > Created: 2026-08-14
 > Candidate release: v0.8.0
 > Current base: `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`
@@ -80,7 +80,7 @@ inventory.
 | V080-00 | Establish release plan and first claim | Target-branch plan plus effective I159 claim | None | Exact-head governance/CI, independent review and CAS | Keep all implementation blocked | Done — claim merge `fa635b4e` |
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Done — Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 as `2d48bd2c` |
-| V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Planned |
+| V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Done — PR #250 merged `d2b4bdd1`; matrix-closure PR #251 merged `da5a43a2`; Completion Commits `74c5502d`/`3ca2ec62` |
 | V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
 | V080-60 | Cargo publication | 20 visible crates.io packages in dependency order | V080-50 | Per-package visibility and no omitted closure package | Checkpoint partial state; never overwrite | Planned |
@@ -314,3 +314,26 @@ Recovery or resume instruction: refresh `origin/main`, verify `cabb7fa1`, inspec
 ARCH-031-C matrix, and create the implementation worktree only from that exact main. Do not begin
 I162 or any release/publish action until I161 has a pre-existing implementation Completion Commit
 and exact-head security approval.
+
+### 2026-08-15 I161 Completion Checkpoint
+
+Completed task items: V080-30 is Complete. I161/ARCH-031-C is Complete/Closed with Completion
+Commits `74c5502d8860316070182c0cf2366d5adf57ea6c` and
+`3ca2ec62b3e91d88c345f5bba15e986cb31f606c`. PR #250 merged as
+`d2b4bdd12f69f1eaffeade7e05625369a7d4f8aa` after exact-head security approval and CI
+`31873172667`; PR #251 merged as `da5a43a244ee17902fb001b2445b4ec54cbf206c` after exact-head
+security approval and CI `31878744293`. The matrix closure includes all nine rows and
+path/network/execute variants. No release, tag, GitHub Release, or Cargo publication occurred.
+
+Current state and artifacts: I159, I160, and I161 are Complete. I162 and I203 remain blocked in
+order; I188/I189/I195/I196 remain Planned/Claimed and unactivated; I164 remains Paused. Non-blocking
+I161 residuals M1/M4/N4/N5/N6 remain recorded in the I161 owner and are outside this release gate.
+
+Next task item: prepare a fresh exact-main inventory and an independent claim for I162. I162 must
+produce the external fixtures, 20-package dry-runs, metadata closure, and explicit GO/NO-GO packet;
+do not begin GitHub Release or Cargo publication before I162 Completion Commit and GO evidence.
+
+Recovery or resume instruction: refresh `origin/main`, verify `da5a43a2`, the I161 Completion
+Commits, PR #250/#251, CI `31873172667`/`31878744293`, and their exact-head approvals. Inventory all
+non-terminal iterations before creating the I162 claim. Preserve all Published Baseline sections;
+GitHub Release remains a hard predecessor to Cargo publication.
