@@ -22,6 +22,8 @@ RUNTIME-006 registration for Issue #234
   registration does not authorize model-assisted permission decisions or alter PERM-006 ordering.
 - Issue #234 is independently owned by RUNTIME-006 as unclaimed Refinement SDK/API work; its
   registration does not expand the v0.8.0 publication scope or authorize API implementation.
+- Issue #245 is owned by I161/ARCH-031-C as a reviewer-assignment request; it records the
+  independent security-review gate and does not authorize implementation or publication.
 - Recovery PRs #120/#121 and their branches remain immutable archival evidence.
 - Deferred, Refinement, Ready, Partial and Blocked remain open states; registration does not imply
   selection or implementation authorization.
@@ -64,6 +66,7 @@ RUNTIME-006 registration for Issue #234
 | [#188](https://github.com/wjhuang88/talos/issues/188) | model-assisted Goal permission decisions | [PERM-007](../backlog/active/PERM-007-model-assisted-goal-permission-decisions.md) | Refinement | Security ADR, threat model, PERM-006 dependencies and bounded child decomposition required before any implementation claim. |
 | [#199](https://github.com/wjhuang88/talos/issues/199) | shared retry and circuit-breaker policy | [NET-001](../backlog/active/NET-001-network-resilience-policy.md) | Intake | Inventory and ADR-backed decomposition required; no implementation or replay authority. |
 | [#234](https://github.com/wjhuang88/talos/issues/234) | single-direct-dependency runtime SDK facade | [RUNTIME-006](../backlog/active/RUNTIME-006-single-dependency-sdk-facade.md) | Refinement | Provider strategy, compatibility treatment, external fixture, iteration and claim required before API implementation. |
+| [#245](https://github.com/wjhuang88/talos/issues/245) | I161 independent security review: sandbox fallback and coding preset | [I161](../iterations/I161-sandbox-fallback-and-coding-preset.md) | Blocked | ARCH-031-C reviewer-assignment request bound to `main@b570ac27`; no implementation, release, tag, GitHub Release, or Cargo publication authorization. |
 
 ## Closed In This Reconciliation
 

@@ -26,7 +26,7 @@
 | Authorization Evidence | No independent reviewer is currently available. This claim PR changes governance records only; exact-head CI and both governance validators are required, and independent security review remains a hard gate before any I161 implementation merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-15 |
-| Handoff / Release Condition | Claim must merge to `main`; activation requires ARCH-031-C Ready, assigned security reviewer, and a fresh exact-main inventory. |
+| Handoff / Release Condition | Claim is effective on `main` at `b570ac27`; activation remains blocked until ARCH-031-C is Ready, an independent security reviewer is assigned through issue `#245`, and a fresh exact-main inventory passes. |
 
 ## Problem
 
