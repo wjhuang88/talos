@@ -1,0 +1,27 @@
+[package]
+name = "talos-runtime-external-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# This manifest is intentionally an independent Cargo root. The path dependencies are the
+# explicit local-workspace mode used by the fixture; a future registry-mode copy can replace
+# these paths with published versions without relying on parent workspace discovery.
+[workspace]
+
+[features]
+default = []
+coding = ["talos-runtime/shared-composition"]
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+serde_json = "1"
+talos-core = { version = "0.7.0", path = "../../../crates/talos-core" }
+talos-permission = { version = "0.7.0", path = "../../../crates/talos-permission" }
+talos-provider = { version = "0.7.0", path = "../../../crates/talos-provider" }
+talos-runtime = { version = "0.7.0", path = "../../../crates/talos-runtime" }
+talos-sandbox = { version = "0.7.0", path = "../../../crates/talos-sandbox" }
+talos-session = { version = "0.7.0", path = "../../../crates/talos-session" }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
