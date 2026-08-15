@@ -2164,6 +2164,38 @@ struct MockSandboxFallbackHandler {
     requests: Arc<Mutex<Vec<SandboxFallbackContext>>>,
 }
 
+struct ProfiledBashTool {
+    profile: Vec<ToolPermissionFacet>,
+    execution_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl AgentTool for ProfiledBashTool {
+    fn name(&self) -> &str {
+        "bash"
+    }
+
+    fn description(&self) -> &str {
+        "Permission-profile sandbox fallback fixture"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+        self.profile.clone()
+    }
+
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.execution_log
+            .lock()
+            .await
+            .push(format!("profiled-bash:{input}"));
+        ToolExecutionResult::success("direct execution")
+    }
+}
+
 #[async_trait]
 impl SandboxFallbackHandler for MockSandboxFallbackHandler {
     async fn request_fallback(&self, context: SandboxFallbackContext) -> SandboxFallbackDecision {
@@ -2271,6 +2303,73 @@ async fn sandbox_fallback_ask_requires_dedicated_scoped_approval() {
 }
 
 #[tokio::test]
+async fn sandbox_fallback_ask_without_handler_denies() {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let agent = Agent::with_security_and_sandbox_fallback(
+        Arc::new(MockModel::new(sandbox_fallback_responses("Denied"))),
+        bash_registry(log.clone()),
+        None,
+        Some(Box::new(MockSandbox::unavailable())),
+        PathBuf::from("/tmp"),
+        SandboxFallbackPolicy::Ask,
+        None,
+    );
+
+    assert_eq!(agent.run("Test".into()).await.unwrap(), "Denied");
+    assert!(log.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn sandbox_fallback_ask_rejection_denies() {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let handler = Arc::new(MockSandboxFallbackHandler {
+        decision: SandboxFallbackDecision::Deny,
+        requests: requests.clone(),
+    });
+    let agent = Agent::with_security_and_sandbox_fallback(
+        Arc::new(MockModel::new(sandbox_fallback_responses("Denied"))),
+        bash_registry(log.clone()),
+        None,
+        Some(Box::new(MockSandbox::unavailable())),
+        PathBuf::from("/tmp"),
+        SandboxFallbackPolicy::Ask,
+        Some(handler),
+    );
+
+    assert_eq!(agent.run("Test".into()).await.unwrap(), "Denied");
+    assert!(log.lock().await.is_empty());
+    assert_eq!(requests.lock().await.len(), 1);
+}
+
+#[tokio::test]
+async fn ordinary_always_approve_rule_does_not_approve_sandbox_fallback() {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let mut engine = PermissionEngine {
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
+    engine.add_runtime_allow_rule(talos_permission::PermissionRule::new(
+        "bash",
+        None,
+        PermissionDecision::Allow,
+    ));
+    let agent = Agent::with_security_and_sandbox_fallback(
+        Arc::new(MockModel::new(sandbox_fallback_responses("Denied"))),
+        bash_registry(log.clone()),
+        Some(Arc::new(engine)),
+        Some(Box::new(MockSandbox::unavailable())),
+        PathBuf::from("/tmp"),
+        SandboxFallbackPolicy::Ask,
+        None,
+    );
+
+    assert_eq!(agent.run("Test".into()).await.unwrap(), "Denied");
+    assert!(log.lock().await.is_empty());
+}
+
+#[tokio::test]
 async fn sandbox_fallback_allow_unsandboxed_does_not_bypass_permission_deny() {
     let log = Arc::new(Mutex::new(Vec::new()));
     let mut engine = PermissionEngine {
@@ -2335,6 +2434,59 @@ async fn sandbox_fallback_allow_unsandboxed_denies_unresolved_permission() {
         "Permission remains unresolved"
     );
     assert!(log.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn allow_unsandboxed_preserves_path_network_and_execute_denials() {
+    let cases = [
+        ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            "workspace/output.txt",
+            ToolResourceKind::Path,
+        ),
+        ToolPermissionFacet::with_resource(
+            ToolNature::Network,
+            "example.com",
+            ToolResourceKind::Domain,
+        ),
+        ToolPermissionFacet::new(ToolNature::Execute),
+    ];
+
+    for facet in cases {
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(ProfiledBashTool {
+            profile: vec![facet.clone()],
+            execution_log: log.clone(),
+        }));
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+            trusted_workspace: false,
+        };
+        engine.add_rule(talos_permission::PermissionRule::new_nature(
+            facet.nature,
+            None,
+            None,
+            PermissionDecision::Deny("blocked by variant test".into()),
+        ));
+        let agent = Agent::with_security_and_sandbox_fallback(
+            Arc::new(MockModel::new(sandbox_fallback_responses("Denied"))),
+            registry,
+            Some(Arc::new(engine)),
+            Some(Box::new(MockSandbox::unavailable())),
+            PathBuf::from("/tmp"),
+            SandboxFallbackPolicy::AllowUnsandboxed,
+            None,
+        );
+
+        assert_eq!(agent.run("Test".into()).await.unwrap(), "Denied");
+        assert!(
+            log.lock().await.is_empty(),
+            "fallback executed despite {:?} denial",
+            facet.nature
+        );
+    }
 }
 
 #[tokio::test]

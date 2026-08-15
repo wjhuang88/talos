@@ -18,7 +18,7 @@
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Maintainer requested this release before I196 implementation, required CLI and runtime Cargo publication, and fixed GitHub-before-Cargo ordering. Each child still needs its own effective claim. |
-| Implementation PR | #250 (I161 implementation; exact-head security review pending) |
+| Implementation PR | #250 merged; #251 matrix-closure follow-up in review |
 | Last Updated | 2026-08-14 |
 | Handoff / Release Condition | Coordinate only after this record reaches `main`; implementation and irreversible actions remain gated by each child owner and claim. |
 
