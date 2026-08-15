@@ -14,7 +14,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 use crate::{
-    Agent, MemoryProviderCallback, RequestBudgetSpec, TodoSectionProviderCallback, prompt,
+    Agent, MemoryProviderCallback, RequestBudgetSpec, SandboxFallbackHandler,
+    SandboxFallbackPolicy, TodoSectionProviderCallback, prompt,
 };
 
 impl Agent {
@@ -44,6 +45,8 @@ impl Agent {
             tools,
             permission_engine: None,
             sandbox: None,
+            sandbox_fallback_policy: SandboxFallbackPolicy::Deny,
+            sandbox_fallback_handler: None,
             workspace_root: PathBuf::from("."),
             prompt_builder: SystemPromptBuilder::new().with_workspace_info("Workspace root: ."),
             hook_registry: Arc::new(HookRegistry::new()),
@@ -95,6 +98,29 @@ impl Agent {
         )
     }
 
+    /// Creates an agent with an explicit sandbox fallback policy.
+    #[must_use]
+    pub fn with_security_and_sandbox_fallback(
+        provider: Arc<dyn talos_core::provider::LanguageModel>,
+        tools: ToolRegistry,
+        permission_engine: Option<Arc<PermissionEngine>>,
+        sandbox: Option<Box<dyn SandboxProvider>>,
+        workspace_root: PathBuf,
+        sandbox_fallback_policy: SandboxFallbackPolicy,
+        sandbox_fallback_handler: Option<Arc<dyn SandboxFallbackHandler>>,
+    ) -> Self {
+        Self::with_security_and_hooks_and_sandbox_fallback(
+            provider,
+            tools,
+            permission_engine,
+            sandbox,
+            workspace_root,
+            Arc::new(HookRegistry::new()),
+            sandbox_fallback_policy,
+            sandbox_fallback_handler,
+        )
+    }
+
     /// Creates a new agent with security controls and a shared hook registry.
     #[must_use]
     pub fn with_security_and_hooks(
@@ -104,6 +130,31 @@ impl Agent {
         sandbox: Option<Box<dyn SandboxProvider>>,
         workspace_root: PathBuf,
         hook_registry: Arc<HookRegistry>,
+    ) -> Self {
+        Self::with_security_and_hooks_and_sandbox_fallback(
+            provider,
+            tools,
+            permission_engine,
+            sandbox,
+            workspace_root,
+            hook_registry,
+            SandboxFallbackPolicy::Deny,
+            None,
+        )
+    }
+
+    /// Creates an agent with security controls, hooks, and sandbox fallback.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_security_and_hooks_and_sandbox_fallback(
+        provider: Arc<dyn talos_core::provider::LanguageModel>,
+        tools: ToolRegistry,
+        permission_engine: Option<Arc<PermissionEngine>>,
+        sandbox: Option<Box<dyn SandboxProvider>>,
+        workspace_root: PathBuf,
+        hook_registry: Arc<HookRegistry>,
+        sandbox_fallback_policy: SandboxFallbackPolicy,
+        sandbox_fallback_handler: Option<Arc<dyn SandboxFallbackHandler>>,
     ) -> Self {
         let tool_presentation_policy = ToolPresentationPolicy::runtime_default();
         let (descriptions, tool_definitions, presented_tool_names) =
@@ -134,6 +185,8 @@ impl Agent {
             tools,
             permission_engine,
             sandbox: sandbox.map(Arc::from),
+            sandbox_fallback_policy,
+            sandbox_fallback_handler,
             workspace_root,
             prompt_builder,
             hook_registry,

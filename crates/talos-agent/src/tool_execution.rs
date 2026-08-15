@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use futures_util::future::join_all;
@@ -16,7 +17,10 @@ use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 
 use crate::compression::BashOutputCompressor;
-use crate::{Agent, AgentError, AgentResult, MAX_CONCURRENT_READ_ONLY, PendingToolCall};
+use crate::{
+    Agent, AgentError, AgentResult, MAX_CONCURRENT_READ_ONLY, PendingToolCall,
+    SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
+};
 
 impl Agent {
     /// Executes a batch of tool calls, running read-only tools concurrently
@@ -508,8 +512,43 @@ impl Agent {
                         Vec::new(),
                     )
                 } else {
-                    let output = tool.execute_with_output(normalized_input).await;
-                    (output.result, output.next_provider_parts)
+                    let fallback = match self.sandbox_fallback_policy {
+                        SandboxFallbackPolicy::Deny => false,
+                        SandboxFallbackPolicy::AllowUnsandboxed => true,
+                        SandboxFallbackPolicy::Ask => match &self.sandbox_fallback_handler {
+                            Some(handler) => {
+                                let context = SandboxFallbackContext {
+                                    tool_name: call.name.clone(),
+                                    arguments: redacted_fallback_arguments(tool, &normalized_input),
+                                    summary_fields: tool
+                                        .summary_fields()
+                                        .iter()
+                                        .map(|field| (*field).to_string())
+                                        .collect(),
+                                };
+                                let decision = handler.request_fallback(context).await;
+                                tracing::debug!(
+                                    tool = %call.name,
+                                    decision = ?decision,
+                                    "sandbox fallback decision"
+                                );
+                                matches!(decision, SandboxFallbackDecision::ApproveOnce)
+                            }
+                            None => false,
+                        },
+                    };
+                    if fallback {
+                        let output = tool.execute_with_output(normalized_input).await;
+                        (output.result, output.next_provider_parts)
+                    } else {
+                        (
+                            ToolExecutionResult::error(
+                                "sandbox unavailable and unsandboxed fallback was denied"
+                                    .to_owned(),
+                            ),
+                            Vec::new(),
+                        )
+                    }
                 }
             } else {
                 let output = tool.execute_with_output(normalized_input).await;
@@ -674,6 +713,24 @@ impl Agent {
             continuations: Vec::new(),
         }
     }
+}
+
+fn redacted_fallback_arguments(
+    tool: &dyn talos_core::tool::AgentTool,
+    input: &serde_json::Value,
+) -> serde_json::Value {
+    let projected = tool.project_input(input);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    projected.to_string().hash(&mut hasher);
+    let fields = projected
+        .as_object()
+        .map(|object| object.keys().cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    serde_json::json!({
+        "redacted": true,
+        "fingerprint": format!("{:016x}", hasher.finish()),
+        "fields": fields,
+    })
 }
 
 fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> String {
