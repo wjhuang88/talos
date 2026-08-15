@@ -6,24 +6,24 @@
 | Type | Release Readiness / SDK Validation Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I161 |
-| Status | Ready — I162 planned; claim pending |
+| Status | Ready — I162 planned/claimed |
 | Depends on | I159-I161 Complete; workspace green; maintainer versioning review |
-| Selected Iteration | I162 (Planned/Blocked) |
+| Selected Iteration | I162 (Planned/Claimed) |
 | Value | Prove that the documented SDK and dependency closure work outside the workspace before any publication decision |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned until the Draft Claim PR is finalized with its PR number |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline release-governance session` |
+| Work Slice | `ARCH-031-D / I162` only: external consumer fixture, metadata-derived publishable closure, per-crate package and `cargo publish --dry-run` evidence, and explicit GO/NO-GO packet for the candidate v0.8.0 release. No runtime behavior, version bump, tag, GitHub Release, or real Cargo publication. |
+| Claimed At | 2026-08-15 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #253 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | I161 closeout is effective at `main@2301434a`; this claim is bounded to readiness evidence only and requires independent exact-head review plus merge-time CAS before becoming effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-15 |
 | Handoff / Release Condition | I162 must produce the external fixture, metadata-derived closure, package/dry-run evidence, and explicit GO/NO-GO packet; no version bump, tag, GitHub Release, or real Cargo publication is authorized by this claim. |

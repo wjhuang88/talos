@@ -81,7 +81,7 @@ inventory.
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Done — Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 as `2d48bd2c` |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Done — PR #250 merged `d2b4bdd1`; matrix-closure PR #251 merged `da5a43a2`; Completion Commits `74c5502d`/`3ca2ec62` |
-| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned |
+| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Planned / claim PR #253 pending merge |
 | V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
 | V080-60 | Cargo publication | 20 visible crates.io packages in dependency order | V080-50 | Per-package visibility and no omitted closure package | Checkpoint partial state; never overwrite | Planned |
 | V080-70 | External acceptance and closeout | Cargo install, runtime fixture and owner evidence | V080-60 | External tests plus owner-first closeout | Keep Review/Blocked with exact residual | Planned |
@@ -337,3 +337,14 @@ Recovery or resume instruction: refresh `origin/main`, verify `da5a43a2`, the I1
 Commits, PR #250/#251, CI `31873172667`/`31878744293`, and their exact-head approvals. Inventory all
 non-terminal iterations before creating the I162 claim. Preserve all Published Baseline sections;
 GitHub Release remains a hard predecessor to Cargo publication.
+
+### 2026-08-15 I162 Claim Preparation Checkpoint
+
+Fresh exact-main inventory was performed at `main@2301434a` after I161 closeout PR #252 merged.
+I159/I160/I161 are Complete; I162 and I203 were Blocked; I188/I189/I195/I196 remain Planned/Claimed
+and unactivated; I164 remains Paused. ARCH-031-D is now Ready and I162 is Planned in the proposed
+claim branch `docs/i162-claim` / PR #253. The proposed Work Slice is readiness-only: external SDK
+fixture, metadata-derived publishable closure, per-crate package and `cargo publish --dry-run`
+evidence, and an explicit GO/NO-GO packet for candidate v0.8.0. It excludes version bump, runtime
+behavior, tag, GitHub Release, and real Cargo publication. The claim is ineffective until PR #253
+merges; I162 is not Active and no implementation branch or release action is authorized yet.
