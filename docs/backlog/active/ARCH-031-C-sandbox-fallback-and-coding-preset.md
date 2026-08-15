@@ -6,9 +6,9 @@
 | Type | SDK / Security-Sensitive API Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Refinement — blocked on ARCH-031-B and security review |
-| Depends on | ADR-024; ADR-052; I160 Complete; permission/sandbox security review scheduled |
-| Selected Iteration | I161 (Planned/Blocked) |
+| Status | In Progress — I161 Active; security review assigned |
+| Depends on | ADR-024; ADR-052; I160 Complete; independent security review recorded in Issue #245 |
+| Selected Iteration | I161 (Active/Claimed) |
 | Value | Embedders can choose a fail-closed sandbox fallback and opt into Talos coding defaults without copying product internals |
 
 ## Collaboration Claim
@@ -23,10 +23,10 @@
 | Source Issue | None |
 | Governance Claim PR | #244 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | No independent reviewer is currently available. This claim PR changes governance records only; exact-head CI and both governance validators are required, and independent security review remains a hard gate before any I161 implementation merge. |
+| Authorization Evidence | Claim-only PR #244 merged at `b570ac27` through the single-maintainer path. Issue #245 records the formal independent security-review result and assigns the security-review role separately from implementation, with shared-account identity limitations disclosed. The implementation PR must still receive exact-head security review against the complete ARCH-031-C matrix before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-15 |
-| Handoff / Release Condition | Claim is effective on `main` at `b570ac27`; activation remains blocked until ARCH-031-C is Ready, an independent security reviewer is assigned through issue `#245`, and a fresh exact-main inventory passes. |
+| Handoff / Release Condition | I161 is active from `main@cabb7fa1`; implementation must remain bounded to this slice, start from this exact main, and obtain independent exact-head security approval before merge. |
 
 ## Problem
 

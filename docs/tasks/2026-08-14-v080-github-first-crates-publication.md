@@ -292,3 +292,25 @@ unassigned; do not bypass I161 for release work.
 Recovery or resume instruction: refresh `origin/main`, verify `b570ac27`, PR #244, and issue #245;
 preserve all Published Baseline sections and append new execution evidence only. GitHub Release
 must still precede Cargo publication.
+
+### 2026-08-15 I161 Activation Checkpoint
+
+Completed task items: the I161 security-review gate is formally recorded through Issue #245, with
+the complete ARCH-031-C owner matrix treated as normative. I161 is activated from `main@cabb7fa1`;
+the claim remains bounded to ARCH-031-C/I161 and does not authorize release work.
+
+Current state and artifacts: I161 is the sole Active iteration. I159/I160 are Complete, I162 and
+I203 remain blocked in order, I188/I189/I195/I196 remain Planned/Claimed and unactivated, and I164
+remains Paused. The implementation branch must start from `main@cabb7fa1`. The security reviewer
+role is separate from the implementation role with shared-account identity limits disclosed; exact
+implementation-head security approval remains mandatory before merge. No tag, GitHub Release or
+Cargo publication has occurred.
+
+Next task item: establish the I161 implementation baseline, add focused security-matrix tests first,
+then implement the smallest bounded API/runtime change. Keep all permission and sandbox stop
+conditions active and submit the exact implementation head for independent security review.
+
+Recovery or resume instruction: refresh `origin/main`, verify `cabb7fa1`, inspect the I161 owner and
+ARCH-031-C matrix, and create the implementation worktree only from that exact main. Do not begin
+I162 or any release/publish action until I161 has a pre-existing implementation Completion Commit
+and exact-head security approval.

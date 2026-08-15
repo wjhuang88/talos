@@ -37,7 +37,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Complete / Closed | Completion Commit `d886917e45d5ca0f110e111b966cd379485e3580` plus cfg follow-up `34c09b14`; exact head `33a2c6ff` passed CI `31801484313`, approval `5293622712` and CAS, then PR #236 merged as `f79c1ead`. |
 | I160 | Shared CLI And Runtime Internal Composition | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161-I162 remain blocked in order. |
-| I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
+| I161 | Sandbox Fallback And Coding Preset | Active / Claimed | Activated from `main@cabb7fa1`; Issue #245 security-review result recorded; exact-head implementation review remains mandatory. |
 | I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
 | I172 | CLI/TUI Bridge Legacy Projection Decomposition | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | I173 | Todo Module Decomposition | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
