@@ -7,6 +7,23 @@
 > MVP deliverable: Embedders have fail-closed sandbox fallback choices and an explicit coding preset that cannot weaken permission or sandbox constraints.
 > Activation rule: this iteration is not implementation authority until its Selected Story is Ready and the activation gate is recorded.
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline session` |
+| Work Slice | `ARCH-031-C / I161` only: explicit `SandboxFallbackPolicy`, coding preset, typed fallback approval context if required, security matrix tests, runtime evidence, and SDK documentation; no I162 publication or release work. |
+| Claimed At | 2026-08-15 |
+| Source Issue | None |
+| Governance Claim PR | #244 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | No independent reviewer is currently available. This PR changes governance records only; exact-head CI and both governance validators are required, and independent security review remains a hard gate before any I161 implementation merge. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | Claim must merge to `main`; then activate only after ARCH-031-C is Ready, the security reviewer is assigned, and a fresh exact-main inventory passes. |
+
 ## Published Baseline
 
 ### Selected Stories
@@ -129,6 +146,7 @@ If a stop condition occurs:
 | Date | Type | Record |
 |---|---|---|
 | YYYY-MM-DD | Activation | Record dependency inventory, baseline SHA, primary executor/runtime, and activation decision. |
+| 2026-08-15 | Claim preparation | I160/ARCH-031-B is Complete through Completion Commit `0524e82f`; I161 remains unactivated and no Rust/Cargo or release change is authorized. This proposed claim is ineffective until its finalized Claimed record merges to `main`. |
 
 ## Verification Evidence
 
