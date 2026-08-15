@@ -388,3 +388,23 @@ guard audit, package/dry-run attempts, and blockers are recorded in the I162 pac
 GitHub Release and V080-60 Cargo publication remain blocked until a network-enabled reviewed GO
 packet, fresh I203 claim, and release-time authorization exist. No version bump, tag, GitHub Release,
 or Cargo publication occurred.
+
+### 2026-08-16 I204 Claim Preparation Checkpoint
+
+I162's reviewed NO-GO exposed a separate readiness gap: the workspace remains `0.7.0`, while the
+release candidate must be checked as `0.8.0` before I203 can be claimed. ARCH-031-E/I204 is prepared
+from `main@9fc2c7f10ae2f68a85d4b48c8b425066c42b48c8` in isolated worktree `docs/i204-claim`, with
+claim PR #257 proposed and not yet effective.
+
+The I204 slice is candidate-only: synchronize versions in an isolated validation worktree, derive
+the 20-package CLI/runtime closure, run package and `cargo publish --dry-run` checks, verify registry
+visibility, and produce an independently reviewed GO/NO-GO packet. It excludes real publication,
+tags, GitHub Release, runtime/API changes, RUNTIME-006, `talos-models`, and I203 activation.
+
+Network evidence after the user's environment switch: crates.io API and sparse index are reachable;
+`serde` resolves successfully, while `talos-runtime` returns `404 crate does not exist`, which is
+expected before publication. This does not constitute a GO packet or release authorization.
+
+Current state and next action: owner, Board, backlog, iteration index and manifest are synchronized
+for the proposed claim. Run both governance validators and `git diff --check`, then obtain
+independent exact-head review/CI and merge-time CAS before creating the I204 implementation worktree.
