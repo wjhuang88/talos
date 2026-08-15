@@ -462,7 +462,14 @@ impl Agent {
                         Vec::new(),
                     ));
                 }
-                PermissionDecision::Ask => {}
+                PermissionDecision::Ask => {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "permission decision remains unresolved".to_owned(),
+                        ),
+                        Vec::new(),
+                    ));
+                }
             }
 
             for diag in evidence_diagnostics {

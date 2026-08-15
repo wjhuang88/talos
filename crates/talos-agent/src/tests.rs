@@ -2303,6 +2303,41 @@ async fn sandbox_fallback_allow_unsandboxed_does_not_bypass_permission_deny() {
 }
 
 #[tokio::test]
+async fn sandbox_fallback_allow_unsandboxed_denies_unresolved_permission() {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let mut engine = PermissionEngine {
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
+    engine.add_rule(talos_permission::PermissionRule {
+        tool_name: "bash".into(),
+        path_pattern: None,
+        decision: PermissionDecision::Ask,
+        nature: None,
+        resource: None,
+        resource_kind: None,
+    });
+    let agent = Agent::with_security_and_sandbox_fallback(
+        Arc::new(MockModel::new(sandbox_fallback_responses(
+            "Permission remains unresolved",
+        ))),
+        bash_registry(log.clone()),
+        Some(Arc::new(engine)),
+        Some(Box::new(MockSandbox::unavailable())),
+        PathBuf::from("/tmp"),
+        SandboxFallbackPolicy::AllowUnsandboxed,
+        None,
+    );
+
+    assert_eq!(
+        agent.run("Test".into()).await.unwrap(),
+        "Permission remains unresolved"
+    );
+    assert!(log.lock().await.is_empty());
+}
+
+#[tokio::test]
 async fn test_permission_check_blocks_denied_tool() {
     let mut engine = PermissionEngine {
         rules: Vec::new(),

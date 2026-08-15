@@ -3,6 +3,8 @@
 //! This crate is the SDK-style entrypoint for Rust projects that want to reuse
 //! Talos's agent turn loop without depending on the Talos CLI or TUI crates.
 
+#[cfg(feature = "shared-composition")]
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -361,11 +363,20 @@ impl RuntimeBuilder {
         let mut tools = self.tools;
         if matches!(self.preset, Some(RuntimePreset::Coding)) {
             #[cfg(feature = "shared-composition")]
-            tools.extend(
-                composition::runtime_tool_contributions(self.workspace_root.clone())
-                    .into_iter()
-                    .map(|contribution| contribution.tool().clone()),
-            );
+            {
+                // Explicit caller tools are authoritative. A preset must not
+                // replace an embedder's hardened implementation by name.
+                let caller_tool_names = tools
+                    .iter()
+                    .map(|tool| tool.name().to_owned())
+                    .collect::<HashSet<_>>();
+                tools.extend(
+                    composition::runtime_tool_contributions(self.workspace_root.clone())
+                        .into_iter()
+                        .filter(|contribution| !caller_tool_names.contains(contribution.name()))
+                        .map(|contribution| contribution.tool().clone()),
+                );
+            }
             #[cfg(not(feature = "shared-composition"))]
             return Err(RuntimeError::CodingPresetRequiresFeature);
         }
@@ -373,11 +384,6 @@ impl RuntimeBuilder {
             self.workspace_root.clone(),
             &self.permission_rules,
         )));
-        let agent_engine = Arc::new(build_permission_engine(
-            self.workspace_root.clone(),
-            &self.permission_rules,
-        ));
-
         let mut registry = ToolRegistry::new();
         for tool in tools {
             registry.register(Arc::new(RuntimePermissionAwareTool {
@@ -396,7 +402,7 @@ impl RuntimeBuilder {
             Agent::with_security_and_hooks_and_sandbox_fallback(
                 provider,
                 registry,
-                Some(agent_engine),
+                None,
                 self.sandbox,
                 self.workspace_root.clone(),
                 hooks,
@@ -407,7 +413,7 @@ impl RuntimeBuilder {
             Agent::with_security_and_sandbox_fallback(
                 provider,
                 registry,
-                Some(agent_engine),
+                None,
                 self.sandbox,
                 self.workspace_root.clone(),
                 self.sandbox_fallback_policy,
@@ -739,6 +745,11 @@ mod tests {
 
     struct PrivateResultReadTool;
 
+    #[cfg(feature = "shared-composition")]
+    struct PresetOverrideTool {
+        executions: Arc<AtomicUsize>,
+    }
+
     struct SnapshotEditingModel {
         step: AtomicUsize,
         observed_snapshot: Arc<StdMutex<Option<String>>>,
@@ -924,6 +935,42 @@ mod tests {
         runtime.shutdown().await.expect("shutdown succeeds");
     }
 
+    #[cfg(feature = "shared-composition")]
+    #[tokio::test]
+    async fn coding_preset_preserves_caller_tool_overrides() {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let provider = MockProvider::new()
+            .with_tool_call("bash", serde_json::json!({"command": "echo custom"}))
+            .with_response("done");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(provider))
+            .tool(Arc::new(PresetOverrideTool {
+                executions: executions.clone(),
+            }))
+            .permission_rule(PermissionRule {
+                tool_name: "bash".into(),
+                path_pattern: None,
+                decision: PermissionDecision::Allow,
+                nature: None,
+                resource: None,
+                resource_kind: None,
+            })
+            .coding_preset()
+            .build()
+            .expect("coding preset builds with caller override");
+
+        runtime
+            .submit("run the custom tool")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        assert_eq!(executions.load(Ordering::SeqCst), 1);
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
     #[cfg(not(feature = "shared-composition"))]
     #[test]
     fn coding_preset_requires_opt_in_feature() {
@@ -972,6 +1019,35 @@ mod tests {
 
         fn summary_fields(&self) -> &'static [&'static str] {
             &["message"]
+        }
+    }
+
+    #[cfg(feature = "shared-composition")]
+    #[async_trait]
+    impl AgentTool for PresetOverrideTool {
+        fn name(&self) -> &str {
+            "bash"
+        }
+
+        fn description(&self) -> &str {
+            "Test-only caller-provided bash override"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"]
+            })
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            ToolResult::success("custom bash")
+        }
+
+        fn nature(&self) -> ToolNature {
+            ToolNature::Execute
         }
     }
 
