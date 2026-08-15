@@ -20,7 +20,7 @@
 | Governance Claim PR | #244 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim-only PR #244 merged at `b570ac27` through the single-maintainer path. Issue #245 records the formal independent security-review result and assigns the security-review role separately from implementation, with shared-account identity limitations disclosed. The implementation PR must still receive exact-head security review against the complete ARCH-031-C matrix before merge. |
-| Implementation PR | #250 |
+| Implementation PR | #250; matrix-closure follow-up #251 |
 | Last Updated | 2026-08-15 |
 | Handoff / Release Condition | I161 is active from `main@cabb7fa1`; implementation must remain bounded to this slice, start from this exact main, and obtain independent exact-head security approval before merge. |
 
