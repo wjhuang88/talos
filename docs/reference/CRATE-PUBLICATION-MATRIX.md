@@ -266,3 +266,14 @@ The exact fixture, package, and dry-run results are recorded in
 `coding` modes. Package/dry-run readiness is **NO-GO** until a network-enabled registry check can
 resolve the 0.7.0 closure and the separately governed version-alignment, GitHub Release, and
 install-package gates are complete.
+
+## I203 Release Closure — 2026-08-16
+
+The historical I162 reconciliation above records the candidate-time policy and remains unchanged.
+For the v0.8.0 I203 release, exact metadata shows that `talos-cli` depends on
+`talos-dashboard`, `talos-evolution`, and `talos-tui`; keeping any of those four packages guarded
+would make the documented `cargo install talos-cli --bin talos` path impossible. I203 therefore
+removed `publish = false` from `talos-cli`, `talos-dashboard`, `talos-evolution`, and `talos-tui`.
+The only remaining quarantined member is `talos-models`, which stays outside the 20-package
+CLI/runtime closure. `scripts/check_publish_guard.sh` now treats the four release packages as
+gate-before-publish members and continues to require the `talos-models` quarantine.

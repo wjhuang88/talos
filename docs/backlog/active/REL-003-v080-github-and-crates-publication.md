@@ -100,6 +100,7 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 ## Acceptance For Technical/Governance Work
 
 - [ ] `./scripts/release_preflight.sh v0.8.0` passes on the exact release commit.
+- [ ] `bash scripts/check_publish_guard.sh .` passes with only `talos-models` quarantined.
 - [ ] Annotated tag `v0.8.0` is pushed once and the GitHub Release has five archives plus checksum.
 - [ ] No `cargo publish` command runs before GitHub Release success is recorded.
 - [ ] All 20 authorized packages are visible at version 0.8.0 in dependency order.

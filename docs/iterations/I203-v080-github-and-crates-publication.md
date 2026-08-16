@@ -88,6 +88,7 @@ No Active or Review iteration is imported into this release plan. I188 PR #228 a
 ### Planned Validation
 
 - `./scripts/release_preflight.sh v0.8.0`;
+- `bash scripts/check_publish_guard.sh .` (only `talos-models` remains quarantined);
 - I162 package/dry-run matrix for all 20 packages;
 - exact GitHub workflow/artifact/checksum inspection;
 - per-wave crates.io visibility checks;
