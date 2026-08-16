@@ -444,3 +444,11 @@ no Active or Review iteration. Claim PR #262 proposes I203 as Planned/Claimed wi
 Slice covering models refresh, version/release alignment, immutable GitHub-first release, ordered
 Cargo publication, and external CLI/SDK acceptance. The claim is ineffective until independent
 review and merge; no release, tag or real publish is authorized in this preparation checkpoint.
+
+### 2026-08-16 I203 Activation Checkpoint
+
+Claim PR #262 merged as `f6b2d2439a3bad7732f4f0b046569d97f8b9f73e`, making I203 Active/In Progress/
+Claimed. A fresh implementation branch must start from this exact main. The release implementation
+may now include the reviewed `models.toml` refresh, v0.8.0 version/release-surface alignment,
+preflight, GitHub-first Release, ordered Cargo publication and external acceptance. Each irreversible
+step still requires its own exact-head review and CAS; no release or publish has occurred.

@@ -1,6 +1,6 @@
 # Iteration I203: v0.8.0 GitHub And Crates.io Publication
 
-> Document status: Planned / Claimed
+> Document status: Active / In Progress
 > Published plan date: 2026-08-14
 > Planned objective: publish one validated v0.8.0 GitHub Release before publishing the authorized
 > Cargo package closure, then prove external CLI installation and runtime SDK consumption.
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #262 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2` with reviewed conditional GO for preparing this claim; the claim remains ineffective until independent review and merge. |
+| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2`; claim PR #262 merged as `f6b2d243`, and this activation checkpoint records the now-effective claim. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-16 |
-| Handoff / Release Condition | Start from `main@8eaa22a2`, preserve all I204/I162 Published Baselines, and keep irreversible release actions behind a fresh activation/implementation checkpoint. GitHub Release precedes Cargo publication. |
+| Handoff / Release Condition | Start from `main@f6b2d243`, preserve all I204/I162 Published Baselines, and keep irreversible release actions behind this activation plus an independently reviewed implementation PR. GitHub Release precedes Cargo publication. |
 
 ## Published Baseline
 
@@ -124,6 +124,14 @@ preflight, immutable GitHub-first release, dependency-wave Cargo publication, an
 acceptance. It does not authorize implementation, version changes, tags, GitHub Release, or real
 Cargo publication until the claim is effective and the implementation head is independently
 reviewed.
+
+## 2026-08-16 Activation Checkpoint
+
+I203 is `Active / In Progress / Claimed` after claim PR #262 merged as `f6b2d243`. The implementation
+branch must be fresh from this activation head. The release implementation may include the reviewed
+`models.toml` refresh and v0.8.0 alignment, but no irreversible action is authorized until its exact
+head has independent review, green CI, and merge-time CAS. GitHub Release remains a hard predecessor
+to every real Cargo publication.
 
 ## Variance And Residuals
 
