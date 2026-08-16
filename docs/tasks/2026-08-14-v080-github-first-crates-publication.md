@@ -417,3 +417,12 @@ state. A fresh I204 evidence branch may now record candidate-only version alignm
 registry evidence, and the reviewed GO/NO-GO packet. The `models.toml` refresh is reserved for
 the later I203 release implementation and is not part of I204. I203 remains Blocked/Unclaimed;
 no tag, GitHub Release, or real Cargo publication is authorized.
+
+### 2026-08-16 I204 Evidence Checkpoint
+
+I204 activation merged as `dbc84f15` from approved exact head `8110f576`. The readiness packet
+`docs/reference/I204-V080-READINESS-2026-08-16.md` records candidate-only v0.8.0 alignment,
+20-member closure, package/dry-run results, registry visibility, external SDK fixture success,
+and full workspace test success. The result is conditional GO for preparing an I203 claim only;
+I203 remains Blocked/Unclaimed. The `models.toml` refresh is reserved for I203 and no tag, GitHub
+Release, or real Cargo publication is authorized by this checkpoint.

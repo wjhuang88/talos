@@ -75,3 +75,11 @@ I204 is `Active / In Progress` after claim PR #257 became effective on `main@e6c
 Implementation is limited to reproducible readiness evidence in a fresh branch from this head;
 candidate-only version alignment must remain outside main. No tag, GitHub Release, real Cargo
 publication, release-surface update, or I203 activation is authorized by this checkpoint.
+
+## 2026-08-16 Evidence Checkpoint
+
+Readiness evidence is captured in
+`docs/reference/I204-V080-READINESS-2026-08-16.md` at activation `main@dbc84f15`. The reviewed
+decision target is conditional GO for I203 claim preparation only. I203 remains Blocked/Unclaimed
+until an independent exact-head review accepts this packet; release and publication actions remain
+outside I204.
