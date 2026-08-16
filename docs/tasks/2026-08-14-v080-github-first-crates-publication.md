@@ -416,6 +416,10 @@ I204 claim `#257` is effective from `main@e6cab51a`. The isolated candidate work
 without changing `main`. Metadata confirms the intended 20-member CLI/runtime closure, excluding
 `talos-models`; the four product crates remain explicitly guarded with `publish = false`.
 
+The README and bilingual site release surfaces are also aligned to candidate `v0.8.0`, because the
+repository release preflight treats those documents as a required version-consistency gate. This
+is candidate documentation alignment, not a claim that the GitHub Release exists.
+
 All 16 registry-enabled members pass `cargo package --list`. Network-enabled dry-runs pass for
 `talos-core`, `talos-exploration`, `talos-memory`, and `talos-skill`. The other 12 dry-runs stop at
 the expected registry visibility gate because their internal `0.8.0` dependencies have not yet

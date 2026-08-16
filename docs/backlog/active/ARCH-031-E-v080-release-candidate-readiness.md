@@ -90,6 +90,11 @@ Workspace and internal path dependencies are aligned to `0.8.0` only in this iso
 the target branch remains unchanged and no tag, GitHub Release, or real Cargo publication was
 performed.
 
+The 16 current release-surface documents (README and bilingual site pages) are synchronized to
+candidate `v0.8.0` so the repository's release preflight can validate the same candidate that Cargo
+metadata reports. This is documentation/version alignment only; it does not assert that the GitHub
+Release already exists.
+
 The metadata-derived closure contains 20 members: 16 registry-enabled crates plus the four
 intentional `publish = false` product guards (`talos-cli`, `talos-dashboard`, `talos-evolution`,
 and `talos-tui`). `talos-models` remains outside the closure and quarantined. `cargo metadata

@@ -73,6 +73,8 @@ registry/network failure remains a named NO-GO blocker. No real publish or tag i
 
 - Candidate version alignment and the fixture lock are prepared in the isolated I204 worktree;
   no version change has entered `main`.
+- README and bilingual site release surfaces are synchronized to candidate `v0.8.0` for the
+  preflight gate; this does not create or imply a GitHub Release.
 - `cargo metadata --locked` reports the expected 20-member closure, with `talos-models` excluded
   and the four product crates still guarded by `publish = false`.
 - `cargo package --list` passed for all 16 registry-enabled members. Network-enabled dry-run
