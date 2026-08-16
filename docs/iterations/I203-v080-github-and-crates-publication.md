@@ -49,6 +49,9 @@
 
 I162 must recompute the final order. The intended set is every workspace package required by
 `talos-cli` or `talos-runtime`, excluding only quarantined `talos-models`: 20 packages total.
+Because the published `talos-cli` binary depends on `talos-dashboard`, `talos-evolution`, and
+`talos-tui`, all 20 closure members must be registry-enabled for `cargo install talos-cli --bin
+talos` to resolve. `talos-models` remains the only `publish = false` workspace member.
 Current metadata permits these dependency waves:
 
 1. `talos-core`, `talos-skill`, `talos-memory`, `talos-exploration`, `talos-dashboard`;
@@ -137,6 +140,17 @@ to every real Cargo publication.
 
 - Issue #234 / RUNTIME-006 is intentionally excluded and remains Refinement/Unclaimed.
 - REL-002 remains NO-GO and is not a v0.8.0 gate or claimed outcome.
+
+## 2026-08-16 Publication Closure Correction
+
+The I162/I204 readiness packets intentionally preserved four product `publish = false` guards at
+their historical candidate-only boundaries. The I203 implementation rechecked the actual
+`talos-cli` dependency closure and found those guards incompatible with the committed MVP,
+`cargo install talos-cli --bin talos`. The implementation therefore removes the guards from
+`talos-cli`, `talos-dashboard`, `talos-evolution`, and `talos-tui`; this is a release-scope
+correction, not a rewrite of either historical packet. `talos-models` remains quarantined and is
+the only excluded workspace member. The final package count remains 20 and must be recomputed
+from exact-head metadata before publication.
 
 ## Retrospective
 
