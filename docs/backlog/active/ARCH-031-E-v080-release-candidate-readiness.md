@@ -1,6 +1,6 @@
 # ARCH-031-E: v0.8.0 Release-Candidate Registry Readiness
 
-> Document status: Planned
+> Document status: Active / In Progress
 
 | Field | Value |
 |---|---|
@@ -8,9 +8,9 @@
 | Type | Release Readiness / Version Alignment Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I162 |
-| Status | Planned |
+| Status | Active / In Progress |
 | Depends on | I162 Complete/Closed with reviewed NO-GO; current `main` at activation |
-| Selected Iteration | I204 (Planned/Claimed) |
+| Selected Iteration | I204 (Active/Claimed) |
 | Value | Turn the reviewed I162 NO-GO into a network-verified v0.8.0 GO packet without performing an irreversible release or publication |
 
 ## Collaboration Claim
@@ -25,10 +25,10 @@
 | Source Issue | None |
 | Governance Claim PR | #257 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I162 closeout is effective at `main@9fc2c7f1`; this proposed claim remains ineffective until independently reviewed and merged to the target branch. |
+| Authorization Evidence | Claim PR #257 merged to `main` as `e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`; activation is recorded after the claim became effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-16 |
-| Handoff / Release Condition | I204 must start from current `main`, preserve I162 baselines, and produce a reviewed GO before I203 can be claimed. Version edits are candidate-only until I203. |
+| Handoff / Release Condition | I204 starts from `main@e6cab51a`; preserve I162 baselines, produce a reviewed GO/NO-GO packet, and keep I203 Blocked/Unclaimed. Candidate version edits remain isolated and cannot authorize tag, GitHub Release, or Cargo publication. |
 
 ## Problem
 
@@ -82,3 +82,12 @@ or closure scope cannot be verified. Do not convert a failed or unavailable regi
 
 - Completion Commit: pending
 - A status-only closeout cannot certify the candidate packet.
+
+## 2026-08-16 Activation Checkpoint
+
+Claim PR #257 is effective on `main@e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`. I204 is now
+`Active / In Progress` for readiness evidence only. The implementation branch must be recreated
+from this activation head and may record candidate-only version alignment, package metadata,
+registry visibility, dry-run, fixture, and reviewed GO/NO-GO evidence. It must not change the
+published baseline, refresh release surfaces, create a tag or GitHub Release, or perform a real
+Cargo publication. I203 remains `Blocked / Unclaimed` until this packet is independently reviewed.

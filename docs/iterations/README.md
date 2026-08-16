@@ -66,7 +66,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I196 | Canonical Work Domain Decision And Migration Contract | Planned / Claimed / priority hold | PR #226 merged as `453d1fba`; no implementation branch exists. Resume only after v0.8.0 publication closes and a fresh exact-main inventory passes. |
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
 | I203 | v0.8.0 GitHub And Crates.io Publication | Blocked / Unclaimed | Requires I159-I162 Complete and I162 GO. GitHub Release with five assets/checksums must complete before the first real Cargo publish. |
-| I204 | v0.8.0 Release-Candidate Registry Readiness | Planned / Claimed | Claim PR #257 is pending independent review and merge. Candidate-only `0.8.0` package/dry-run and registry evidence must produce a reviewed GO before I203 can be claimed. |
+| I204 | v0.8.0 Release-Candidate Registry Readiness | Active / In Progress / Claimed | Claim PR #257 is effective at `main@e6cab51a`; candidate-only `0.8.0` package/dry-run and registry evidence must produce a reviewed GO before I203 can be claimed. No release or publication is authorized. |
 
 ## Completed This Closeout
 
