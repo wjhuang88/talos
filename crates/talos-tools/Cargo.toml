@@ -56,8 +56,8 @@ coding = [
 ]
 
 [dependencies]
-talos-core = { version = "0.7.0", path = "../talos-core" }
-talos-sandbox = { version = "0.7.0", path = "../talos-sandbox", optional = true }
+talos-core = { version = "0.8.0", path = "../talos-core" }
+talos-sandbox = { version = "0.8.0", path = "../talos-sandbox", optional = true }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -93,7 +93,7 @@ image = { version = "0.25", default-features = false, optional = true, features 
 libc = { version = "1.0.0-alpha.3", optional = true }
 
 [dev-dependencies]
-talos-permission = { version = "0.7.0", path = "../talos-permission" }
+talos-permission = { version = "0.8.0", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
 

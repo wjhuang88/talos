@@ -3993,7 +3993,7 @@ dependencies = [
 
 [[package]]
 name = "talos-agent"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -4013,7 +4013,7 @@ dependencies = [
 
 [[package]]
 name = "talos-config"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "schemars",
  "serde",
@@ -4027,7 +4027,7 @@ dependencies = [
 
 [[package]]
 name = "talos-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "schemars",
@@ -4039,7 +4039,7 @@ dependencies = [
 
 [[package]]
 name = "talos-memory"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "chrono",
  "hex",
@@ -4055,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "talos-permission"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "glob",
  "serde",
@@ -4067,7 +4067,7 @@ dependencies = [
 
 [[package]]
 name = "talos-plugin"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -4083,7 +4083,7 @@ dependencies = [
 
 [[package]]
 name = "talos-provider"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -4103,7 +4103,7 @@ dependencies = [
 
 [[package]]
 name = "talos-runtime"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -4138,7 +4138,7 @@ dependencies = [
 
 [[package]]
 name = "talos-sandbox"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "libc 1.0.0-alpha.4",
@@ -4150,7 +4150,7 @@ dependencies = [
 
 [[package]]
 name = "talos-session"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4168,7 +4168,7 @@ dependencies = [
 
 [[package]]
 name = "talos-skill"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "pulldown-cmark",
  "serde",
@@ -4179,7 +4179,7 @@ dependencies = [
 
 [[package]]
 name = "talos-tools"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "arborium",
  "async-trait",
