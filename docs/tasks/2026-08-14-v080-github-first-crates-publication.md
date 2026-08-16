@@ -408,3 +408,24 @@ expected before publication. This does not constitute a GO packet or release aut
 Current state and next action: owner, Board, backlog, iteration index and manifest are synchronized
 for the proposed claim. Run both governance validators and `git diff --check`, then obtain
 independent exact-head review/CI and merge-time CAS before creating the I204 implementation worktree.
+
+### 2026-08-16 I204 Candidate Execution Checkpoint
+
+I204 claim `#257` is effective from `main@e6cab51a`. The isolated candidate worktree
+`/private/tmp/talos-i204-impl` aligns workspace and internal path dependency versions to `0.8.0`
+without changing `main`. Metadata confirms the intended 20-member CLI/runtime closure, excluding
+`talos-models`; the four product crates remain explicitly guarded with `publish = false`.
+
+All 16 registry-enabled members pass `cargo package --list`. Network-enabled dry-runs pass for
+`talos-core`, `talos-exploration`, `talos-memory`, and `talos-skill`. The other 12 dry-runs stop at
+the expected registry visibility gate because their internal `0.8.0` dependencies have not yet
+been published. This establishes the required dependency-wave order for I203 rather than a source
+failure. The external runtime fixture passes in default and `coding` modes, and the candidate
+passes `TMPDIR=/private/tmp/talos-model-tests cargo test --workspace --locked` when loopback mock
+servers are permitted.
+
+The separate pre-release models.dev refresh is retained as `/private/tmp/talos-model-refresh-v080.patch`.
+It preserves declared variants and the `kimi-for-coding/k2p7` compatibility alias, but is outside
+I204's readiness-only claim and must be reviewed and merged through I203 before the release commit.
+I204 remains unclosed until this checkpoint receives independent exact-head review and its status
+closeout cites a pre-existing implementation commit.

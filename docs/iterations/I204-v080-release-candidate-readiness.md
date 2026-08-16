@@ -68,3 +68,17 @@ registry/network failure remains a named NO-GO blocker. No real publish or tag i
 
 - Completion Commit: pending
 - Keep Review/Blocked if registry, candidate package, fixture or independent review is incomplete.
+
+## 2026-08-16 Execution Checkpoint
+
+- Candidate version alignment and the fixture lock are prepared in the isolated I204 worktree;
+  no version change has entered `main`.
+- `cargo metadata --locked` reports the expected 20-member closure, with `talos-models` excluded
+  and the four product crates still guarded by `publish = false`.
+- `cargo package --list` passed for all 16 registry-enabled members. Network-enabled dry-run
+  passed for `talos-core`, `talos-exploration`, `talos-memory`, and `talos-skill`; the other 12
+  stop on crates.io visibility of unpublished internal `0.8.0` dependencies.
+- The external runtime fixture passed in default and `coding` modes, and full workspace locked
+  tests passed with loopback permission enabled for mock-server tests.
+- This evidence supports a wave-ordered release decision, but does not authorize I203, tagging,
+  GitHub Release, or real Cargo publication. Independent review and closeout remain pending.

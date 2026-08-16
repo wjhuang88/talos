@@ -82,3 +82,37 @@ or closure scope cannot be verified. Do not convert a failed or unavailable regi
 
 - Completion Commit: pending
 - A status-only closeout cannot certify the candidate packet.
+
+## 2026-08-16 Execution Checkpoint
+
+Candidate worktree: `/private/tmp/talos-i204-impl` at `e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`.
+Workspace and internal path dependencies are aligned to `0.8.0` only in this isolated candidate;
+the target branch remains unchanged and no tag, GitHub Release, or real Cargo publication was
+performed.
+
+The metadata-derived closure contains 20 members: 16 registry-enabled crates plus the four
+intentional `publish = false` product guards (`talos-cli`, `talos-dashboard`, `talos-evolution`,
+and `talos-tui`). `talos-models` remains outside the closure and quarantined. `cargo metadata
+--locked` confirms every candidate workspace package reports `0.8.0`; the external fixture lock is
+updated to the same internal versions.
+
+Package-list checks passed for all 16 registry-enabled members. Network-enabled dry-runs passed for
+the dependency-free members `talos-core`, `talos-exploration`, `talos-memory`, and `talos-skill`.
+The remaining 12 dry-runs stop at the expected registry visibility gate because their internal
+`0.8.0` dependencies do not yet exist on crates.io (the index currently exposes only historical
+versions or no package). This is a publish-wave prerequisite, not a candidate source failure.
+
+The independent fixture passed in both local registry-shaped candidate modes:
+
+```text
+cargo check --locked --manifest-path tests/fixtures/runtime-sdk-external/Cargo.toml
+cargo check --locked --manifest-path tests/fixtures/runtime-sdk-external/Cargo.toml --features coding
+cargo run --locked --manifest-path tests/fixtures/runtime-sdk-external/Cargo.toml
+cargo run --locked --manifest-path tests/fixtures/runtime-sdk-external/Cargo.toml --features coding
+talos-runtime external fixture passed
+```
+
+The exact candidate also passed `TMPDIR=/private/tmp/talos-model-tests cargo test --workspace
+--locked` with loopback access enabled for mock-server tests. A separate release-scoped model
+catalog refresh was validated independently and is intentionally excluded from this I204 claim;
+it must enter through the effective I203 release claim.
