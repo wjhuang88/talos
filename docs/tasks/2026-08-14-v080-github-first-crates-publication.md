@@ -408,3 +408,12 @@ expected before publication. This does not constitute a GO packet or release aut
 Current state and next action: owner, Board, backlog, iteration index and manifest are synchronized
 for the proposed claim. Run both governance validators and `git diff --check`, then obtain
 independent exact-head review/CI and merge-time CAS before creating the I204 implementation worktree.
+
+### 2026-08-16 I204 Activation Checkpoint
+
+Claim PR #257 merged and became effective at `main@e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`.
+Owner-first status is now `I204 Active / In Progress / Claimed`; the Board and indexes mirror that
+state. A fresh I204 evidence branch may now record candidate-only version alignment, package and
+registry evidence, and the reviewed GO/NO-GO packet. The `models.toml` refresh is reserved for
+the later I203 release implementation and is not part of I204. I203 remains Blocked/Unclaimed;
+no tag, GitHub Release, or real Cargo publication is authorized.

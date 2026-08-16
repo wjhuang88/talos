@@ -1,6 +1,6 @@
 # Iteration I204: v0.8.0 Release-Candidate Registry Readiness
 
-> Document status: Planned
+> Document status: Active / In Progress
 > Published plan date: 2026-08-16
 > Planned objective: validate a candidate v0.8.0 workspace and produce a reviewed GO/NO-GO packet before I203 release execution.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,10 +19,10 @@
 | Source Issue | None |
 | Governance Claim PR | #257 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I162 closeout is effective at `main@9fc2c7f1`; this claim remains ineffective until independent exact-head review, CI and merge-time CAS. |
+| Authorization Evidence | Claim PR #257 merged to `main` as `e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`; this activation checkpoint is appended after claim effectiveness. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-16 |
-| Handoff / Release Condition | Start from current main, preserve all I162 Published Baselines, and keep I203 Blocked until this iteration produces a reviewed GO. |
+| Handoff / Release Condition | Start from `main@e6cab51a`, preserve all I162 Published Baselines, and keep I203 Blocked/Unclaimed until this iteration produces a reviewed GO/NO-GO packet. |
 
 ## Published Baseline
 
@@ -68,3 +68,10 @@ registry/network failure remains a named NO-GO blocker. No real publish or tag i
 
 - Completion Commit: pending
 - Keep Review/Blocked if registry, candidate package, fixture or independent review is incomplete.
+
+## 2026-08-16 Activation Checkpoint
+
+I204 is `Active / In Progress` after claim PR #257 became effective on `main@e6cab51a`.
+Implementation is limited to reproducible readiness evidence in a fresh branch from this head;
+candidate-only version alignment must remain outside main. No tag, GitHub Release, real Cargo
+publication, release-surface update, or I203 activation is authorized by this checkpoint.
