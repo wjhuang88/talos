@@ -1,6 +1,6 @@
 # REL-003: v0.8.0 GitHub And Crates.io Publication
 
-**Status**: Blocked
+**Status**: Planned / Claimed
 **Type**: Release / Distribution Story
 **Parent Epic**: ARCH-031
 
@@ -8,18 +8,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Execute the validated v0.8.0 GitHub Release first, then publish the authorized 20-package Cargo closure and verify external installation/consumption. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline release-governance session` |
+| Work Slice | `REL-003 / I203` only: synchronize the v0.8.0 release candidate and release surfaces, refresh `models.toml` from the reviewed upstream snapshot, run exact release preflight, create one immutable GitHub tag/Release first, then publish the authorized Cargo closure in dependency waves and verify external CLI/SDK consumption. No Desktop, Dashboard, Work Graph, Evaluator or RUNTIME-006 work. |
+| Claimed At | 2026-08-16 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested a pre-I196 release, including `talos-cli` and `talos-runtime`, and later fixed GitHub-before-Cargo ordering. I203 remains unclaimed until I162 produces a GO packet. |
+| Governance Claim PR | #262 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2` with reviewed conditional GO for preparing I203 claim only; this proposed claim remains ineffective until independently reviewed and merged. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | I159-I162 Complete; I162 GO packet names the exact closure and version; I203 receives its own effective claim and fresh irreversible-action checkpoint. |
+| Last Updated | 2026-08-16 |
+| Handoff / Release Condition | Start from `main@8eaa22a2`; preserve I204/I162 baselines; activation and implementation PR must separately authorize release-surface/version changes. GitHub Release must complete before any real Cargo publish. |
 
 ## Identity / Goal / Value
 
@@ -109,3 +109,17 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 
 RUNTIME-006 owns the stronger one-direct-dependency SDK facade. REL-002 retains stable/v1
 qualification. Any failed or omitted package receives a new release recovery task and patch version.
+
+## 2026-08-16 I203 Claim Preparation Checkpoint
+
+Fresh exact-main inventory at `main@8eaa22a296edd3b657511e3ebe72a2d2b8afa2e2` found no Active or
+Review iteration. I204 is Complete/Closed with Completion Commit `f46094e3`; I164 remains Paused;
+I188, I189, I195 and I196 remain Planned/Claimed and unactivated; I203 is the proposed release
+claim and remains ineffective until PR #262 merges. The claim includes the pre-release
+`models.toml` refresh, workspace version alignment, release surfaces, immutable tag, GitHub-first
+Release, dependency-ordered Cargo publication, `talos-cli --bin talos`, and `talos-runtime`
+external fixture. It excludes `talos-models`, RUNTIME-006, and unrelated product work.
+
+No version, model, tag, GitHub Release, or Cargo publication change is authorized by this claim
+preparation record. Implementation must start from the claim merge head and use a fresh
+irreversible-action checkpoint with merge-time CAS.

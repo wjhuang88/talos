@@ -65,7 +65,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I195 | Dashboard Read-Only Visual Shell | Planned / Claimed | PR #212 merged as `f123e534`, establishing WEB-001-A ownership. I195 remains unactivated and independent of release/mainline implementation. |
 | I196 | Canonical Work Domain Decision And Migration Contract | Planned / Claimed / priority hold | PR #226 merged as `453d1fba`; no implementation branch exists. Resume only after v0.8.0 publication closes and a fresh exact-main inventory passes. |
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
-| I203 | v0.8.0 GitHub And Crates.io Publication | Blocked / Unclaimed | Requires I159-I162 Complete and I162 GO. GitHub Release with five assets/checksums must complete before the first real Cargo publish. |
+| I203 | v0.8.0 GitHub And Crates.io Publication | Planned / Claimed | Claim PR #262 is proposed from `main@8eaa22a2` after I204 reviewed conditional GO; it is ineffective until independently reviewed and merged. GitHub Release with five assets/checksums must complete before the first real Cargo publish. |
 | I204 | v0.8.0 Release-Candidate Registry Readiness | Complete / Closed | Completion Commit `f46094e3`; PR #260 merged as `7c10afe3`; reviewed conditional GO for preparing I203 claim only. Fresh I203 claim remains required; no release or publication was authorized by I204. |
 
 ## Completed This Closeout
