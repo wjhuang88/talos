@@ -426,3 +426,12 @@ I204 activation merged as `dbc84f15` from approved exact head `8110f576`. The re
 and full workspace test success. The result is conditional GO for preparing an I203 claim only;
 I203 remains Blocked/Unclaimed. The `models.toml` refresh is reserved for I203 and no tag, GitHub
 Release, or real Cargo publication is authorized by this checkpoint.
+
+### 2026-08-16 I204 Closeout Checkpoint
+
+I204 readiness is Complete/Closed with conditional GO for preparing I203 claim only. Evidence PR
+#260 merged as `7c10afe3` from exact implementation head `f46094e3`, with independent approval
+comment `5306812045` and CI `31939544209`. Completion evidence names the pre-existing evidence
+commit; this closeout does not self-certify completion. I203 remains Blocked/Unclaimed and must
+receive a fresh independent claim before release work. The `models.toml` refresh remains reserved
+for I203.
