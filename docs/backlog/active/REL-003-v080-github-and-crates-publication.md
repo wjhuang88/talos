@@ -1,6 +1,6 @@
 # REL-003: v0.8.0 GitHub And Crates.io Publication
 
-**Status**: Planned / Claimed
+**Status**: Active / In Progress
 **Type**: Release / Distribution Story
 **Parent Epic**: ARCH-031
 
@@ -16,10 +16,10 @@
 | Source Issue | None |
 | Governance Claim PR | #262 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2` with reviewed conditional GO for preparing I203 claim only; this proposed claim remains ineffective until independently reviewed and merged. |
+| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2` with reviewed conditional GO for preparing I203 claim; I203 claim PR #262 merged as `f6b2d243`, and this activation checkpoint records the now-effective claim. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-16 |
-| Handoff / Release Condition | Start from `main@8eaa22a2`; preserve I204/I162 baselines; activation and implementation PR must separately authorize release-surface/version changes. GitHub Release must complete before any real Cargo publish. |
+| Handoff / Release Condition | I203 claim is effective at `main@f6b2d243`; this activation checkpoint precedes a fresh implementation branch. Preserve I204/I162 baselines; implementation PR must separately authorize release-surface/version changes. GitHub Release must complete before any real Cargo publish. |
 
 ## Identity / Goal / Value
 
@@ -48,7 +48,7 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 ## Dependencies
 
 - I159, I160, I161 and I162 Complete in order.
-- I162 publication packet says GO for v0.8.0 and the exact 20-package closure.
+- I204 readiness packet gives a reviewed conditional GO for the exact v0.8.0 candidate and 20-package closure; I162 remains the reviewed historical NO-GO predecessor.
 - GitHub Release success is a hard predecessor to every real `cargo publish` command.
 - Cargo credentials, verified crates.io ownership and rate-limit capacity must be available at the
   publication checkpoint.
@@ -123,3 +123,14 @@ external fixture. It excludes `talos-models`, RUNTIME-006, and unrelated product
 No version, model, tag, GitHub Release, or Cargo publication change is authorized by this claim
 preparation record. Implementation must start from the claim merge head and use a fresh
 irreversible-action checkpoint with merge-time CAS.
+
+## 2026-08-16 I203 Activation Checkpoint
+
+Claim PR #262 merged as `f6b2d2439a3bad7732f4f0b046569d97f8b9f73e`, making the I203 claim
+effective. Owner status is now `Active / In Progress / Claimed`; implementation remains `Not
+started`. A fresh implementation branch must start from this exact activation main. The Work Slice
+may now implement the reviewed release candidate, including `models.toml` refresh, version/release
+surface alignment, release preflight, immutable GitHub-first Release, dependency-ordered Cargo
+publication, and external CLI/SDK acceptance. No implementation commit, tag, GitHub Release, or
+real Cargo publish is authorized by this activation record alone; each requires its own exact-head
+review and merge-time CAS.
