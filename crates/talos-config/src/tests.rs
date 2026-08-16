@@ -1181,7 +1181,7 @@ fn test_resolve_model_limits_provider_aware_for_duplicate_ids() {
         ..Default::default()
     };
     let (ctx2, _) = cortecs.resolve_model_limits();
-    assert_eq!(ctx2, 1_000_000);
+    assert_eq!(ctx2, 1_048_576);
 
     // A wrong provider+model combo must NOT resolve via a different
     // provider's catalog entry — it falls to the conservative default.

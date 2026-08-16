@@ -39,7 +39,9 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 
 ## Exclusions
 
-- `talos-models` remains quarantined and `publish = false`;
+- `talos-models` remains quarantined and `publish = false`; all other 20 members of the
+  `talos-cli`/`talos-runtime` closure must be registry-enabled for the documented CLI install
+  path;
 - no RUNTIME-006 / Issue #234 API implementation;
 - no Desktop, Dashboard, Work Graph or Evaluator work;
 - no tag move or force push;
@@ -98,6 +100,7 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 ## Acceptance For Technical/Governance Work
 
 - [ ] `./scripts/release_preflight.sh v0.8.0` passes on the exact release commit.
+- [ ] `bash scripts/check_publish_guard.sh .` passes with only `talos-models` quarantined.
 - [ ] Annotated tag `v0.8.0` is pushed once and the GitHub Release has five archives plus checksum.
 - [ ] No `cargo publish` command runs before GitHub Release success is recorded.
 - [ ] All 20 authorized packages are visible at version 0.8.0 in dependency order.
@@ -123,6 +126,15 @@ external fixture. It excludes `talos-models`, RUNTIME-006, and unrelated product
 No version, model, tag, GitHub Release, or Cargo publication change is authorized by this claim
 preparation record. Implementation must start from the claim merge head and use a fresh
 irreversible-action checkpoint with merge-time CAS.
+
+## 2026-08-16 Publication Closure Correction
+
+The historical I162/I204 readiness records preserve their four product guards as candidate-time
+facts. Exact dependency inspection for I203 shows that `talos-cli` cannot be published or installed
+while `talos-cli`, `talos-dashboard`, `talos-evolution`, or `talos-tui` remain guarded. The I203
+implementation therefore removes only those four guards; `talos-models` remains quarantined and
+is the sole excluded workspace member. This correction is within the claimed release closure and
+does not alter the historical readiness records.
 
 ## 2026-08-16 I203 Activation Checkpoint
 
