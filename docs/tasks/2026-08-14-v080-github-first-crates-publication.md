@@ -435,3 +435,12 @@ comment `5306812045` and CI `31939544209`. Completion evidence names the pre-exi
 commit; this closeout does not self-certify completion. I203 remains Blocked/Unclaimed and must
 receive a fresh independent claim before release work. The `models.toml` refresh remains reserved
 for I203.
+
+### 2026-08-16 I203 Claim Preparation Checkpoint
+
+I204 is Complete/Closed at `main@8eaa22a2` with reviewed conditional GO for preparing the release
+claim. Fresh inventory found I164 Paused, I188/I189/I195/I196 Planned/Claimed and unactivated, and
+no Active or Review iteration. Claim PR #262 proposes I203 as Planned/Claimed with a narrow Work
+Slice covering models refresh, version/release alignment, immutable GitHub-first release, ordered
+Cargo publication, and external CLI/SDK acceptance. The claim is ineffective until independent
+review and merge; no release, tag or real publish is authorized in this preparation checkpoint.
