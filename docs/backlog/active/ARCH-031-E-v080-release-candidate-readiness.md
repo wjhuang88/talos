@@ -1,6 +1,6 @@
 # ARCH-031-E: v0.8.0 Release-Candidate Registry Readiness
 
-> Document status: Active / In Progress
+> Document status: Complete / Closed (conditional GO recorded 2026-08-16)
 
 | Field | Value |
 |---|---|
@@ -8,9 +8,9 @@
 | Type | Release Readiness / Version Alignment Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 after I162 |
-| Status | Active / In Progress |
+| Status | Complete / Closed |
 | Depends on | I162 Complete/Closed with reviewed NO-GO; current `main` at activation |
-| Selected Iteration | I204 (Active/Claimed) |
+| Selected Iteration | I204 (Complete/Closed) |
 | Value | Turn the reviewed I162 NO-GO into a network-verified v0.8.0 GO packet without performing an irreversible release or publication |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #257 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #257 merged to `main` as `e6cab51a61c3a23a1e0a6792573bcef688a3d6dd`; activation is recorded after the claim became effective. |
-| Implementation PR | Not started |
+| Implementation PR | #260 |
 | Last Updated | 2026-08-16 |
 | Handoff / Release Condition | I204 starts from `main@e6cab51a`; preserve I162 baselines, produce a reviewed GO/NO-GO packet, and keep I203 Blocked/Unclaimed. Candidate version edits remain isolated and cannot authorize tag, GitHub Release, or Cargo publication. |
 
@@ -80,7 +80,7 @@ or closure scope cannot be verified. Do not convert a failed or unavailable regi
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: `f46094e367629ca5534963c59b6ec52ea91c5fd3` (pre-existing evidence implementation commit; status-only closeout does not self-certify)
 - A status-only closeout cannot certify the candidate packet.
 
 ## 2026-08-16 Activation Checkpoint
@@ -100,3 +100,13 @@ the isolated candidate alignment, 20-member closure (16 registry-enabled plus fo
 product crates), package matrix, registry visibility, external fixture, and full workspace test
 results. Its decision is conditional GO only for preparing a fresh I203 claim; it grants no
 version, model refresh, tag, GitHub Release, or Cargo publication authorization.
+
+## 2026-08-16 Closeout Checkpoint
+
+I204 is Complete/Closed as a readiness investigation with a reviewed conditional GO for preparing
+I203 claim only. Implementation PR #260 merged as `7c10afe3` from exact evidence head
+`f46094e3`; independent approval is comment `5306812045`, and CI run `31939544209` passed on that
+head. The completion evidence is the pre-existing evidence commit `f46094e367629ca5534963c59b6ec52ea91c5fd3`,
+not this status-only closeout. I203 remains Blocked/Unclaimed until a fresh claim is independently
+reviewed and merged. No version bump, models refresh, tag, GitHub Release, or Cargo publication
+occurred.
