@@ -1,6 +1,6 @@
 # Iteration I203: v0.8.0 GitHub And Crates.io Publication
 
-> Document status: Active / In Progress
+> Document status: Complete / Closed (2026-08-17)
 > Published plan date: 2026-08-14
 > Planned objective: publish one validated v0.8.0 GitHub Release before publishing the authorized
 > Cargo package closure, then prove external CLI installation and runtime SDK consumption.
@@ -13,7 +13,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release-governance session` |
 | Work Slice | REL-003 only: GitHub v0.8.0 release first, then the reviewed Cargo closure and external install/SDK verification. |
@@ -21,10 +21,10 @@
 | Source Issue | None |
 | Governance Claim PR | #262 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2`; claim PR #262 merged as `f6b2d243`, and this activation checkpoint records the now-effective claim. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-16 |
-| Handoff / Release Condition | Start from `main@f6b2d243`, preserve all I204/I162 Published Baselines, and keep irreversible release actions behind this activation plus an independently reviewed implementation PR. GitHub Release precedes Cargo publication. |
+| Authorization Evidence | Implementation PR #264 exact head `d5de4a65` passed CI `31952144946`, independent approval `5307931428`, and merge-time CAS before merging as `f425e7bc`. |
+| Implementation PR | #264 |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | Closed after GitHub Release `v0.8.0`, all 20 Cargo packages, external CLI installation, and the registry-only runtime fixture passed. RUNTIME-006/#234 and REL-002 remain separate residual owners. |
 
 ## Published Baseline
 
@@ -107,18 +107,27 @@ No Active or Review iteration is imported into this release plan. I188 PR #228 a
 
 ## Verification Evidence
 
-- Release preflight: pending
-- GitHub Release and assets: pending
-- Cargo publication: pending
-- External install/SDK fixtures: pending
-- Governance validation: pending
+- Release preflight: `./scripts/release_preflight.sh v0.8.0` passed on merged release commit
+  `f425e7bc`; main CI `31952994218` also passed.
+- GitHub Release and assets: annotated tag `v0.8.0` points to `f425e7bc`; Release workflow
+  `31953951828` completed successfully with five platform archives and `checksum.sha256`.
+- Cargo publication: all 20 authorized `0.8.0` packages were published in the recorded dependency
+  waves and confirmed visible through the Cargo registry. `talos-models` remains excluded.
+- External install/SDK fixtures: isolated crates.io installation returned `talos 0.8.0`; a
+  registry-only `talos-runtime = "0.8.0"` fixture passed in default and `coding` modes.
+- Governance validation: recorded by the closeout PR after owner-first synchronization.
 
 ## Completion Evidence
 
-- Completion Commit: pending
-- Release/tag/workflow evidence: pending
-- Cargo registry evidence: pending
-- A status-only closeout commit cannot certify implementation or publication.
+- Completion Commit: `b0354ae6b7c349ccbc101a046ded1d8aafdda3ff`,
+  `d8e1aa268d3419ee957b78a46a57c68bad50c3f5`, and
+  `d5de4a6573e8f3b77fbfc80c5dc1504f078f1ee7`.
+- Release/tag/workflow evidence: merge `f425e7bc`, immutable annotated tag `v0.8.0`, GitHub Release
+  workflow `31953951828`, and published Release timestamp `2026-08-16T15:23:21Z`.
+- Cargo registry evidence: all 20 closure packages resolve at `0.8.0`; `talos-cli` exposes binary
+  `talos`, and `talos-runtime` resolves for an independent Cargo root.
+- This closeout cites pre-existing implementation commits and external release evidence; the
+  status-only closeout commit does not certify itself.
 
 ## 2026-08-16 Claim Preparation Checkpoint
 
@@ -155,6 +164,20 @@ from exact-head metadata before publication.
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: pending
+- Outcome: GitHub-first ordering, 20-package publication, CLI installation, and runtime SDK
+  consumption all completed.
+- Documentation: v0.8.0 release notes, README surfaces, Cargo manifests, SDK contract, and owner
+  evidence are synchronized.
+- Lessons: crates.io enforced new-crate rate limits before `talos-runtime` and `talos-cli`; the
+  release honored each retry timestamp and retried only the unpublished package.
+
+## 2026-08-17 Release Closure Checkpoint
+
+Implementation PR #264 merged as `f425e7bc` after exact-head approval and CI. The annotated
+`v0.8.0` tag triggered GitHub Release workflow `31953951828`; the Release completed before the
+first Cargo upload and contains all five platform archives plus `checksum.sha256`. The 20-package
+closure then published in dependency order. Crates.io rate limits temporarily rejected only the
+still-unpublished `talos-runtime` and `talos-cli`; both were retried after their registry-specified
+windows and are now visible at `0.8.0`. An isolated Cargo installation returned `talos 0.8.0`, and
+the registry-only runtime fixture passed in default and `coding` modes. I203 is Complete/Closed;
+RUNTIME-006/#234 and REL-002 remain unchanged.
