@@ -72,6 +72,9 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
 | I203 | v0.8.0 GitHub And Crates.io Publication | Complete / Closed | Completion Commits `b0354ae6`/`d8e1aa26`/`d5de4a65`; PR #264 merged as `f425e7bc`. Workflow `31953951828` completed the GitHub Release before all 20 crates published; external CLI install and registry-only runtime fixture passed. |
 | I204 | v0.8.0 Release-Candidate Registry Readiness | Complete / Closed | Completion Commit `f46094e3`; PR #260 merged as `7c10afe3`; reviewed conditional GO for preparing I203 claim only. Fresh I203 claim remains required; no release or publication was authorized by I204. |
+| I206 | Esc-Cancelled Steering Activation | Planned / Unclaimed | `TUI-048`; accepted steering must become one runnable Session turn after active-turn Esc cancellation. No implementation branch or authorization. |
+| I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
+| I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
 | I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
 
 ## Completed This Closeout
