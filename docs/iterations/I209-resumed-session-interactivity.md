@@ -1,6 +1,6 @@
 # Iteration I209: Resumed Session Interactivity Under Provider Delay
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Claimed (proposed in PR #276; ineffective before merge)
 > Planned date: 2026-08-17
 > Objective: deliver TUI-051 so a resumed large Session remains responsive, exposes bounded
 > provider retry progress and can cancel an active turn promptly.
@@ -9,18 +9,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline session (GPT-5) |
+| Work Slice | I209 only: cache and invalidate unchanged TUI history projection; prove and repair resumed structured-turn Esc cancellation across TUI/bridge/actor/durable boundaries; project existing bounded provider retry facts; verify terminal restoration and update directly affected user documentation. Excludes retry-policy redesign, I200 scrolling, I206 steering, persistence migration, public API, dependency, release and broad renderer work. |
+| Claimed At | 2026-08-17 |
 | Source Issue | #272 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #276 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | After an exact-main reproduction checkpoint, establish an effective claim and branch only from its merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
+| Handoff / Release Condition | This proposed claim is ineffective until PR #276 merges. After merge, activate I209 and create the implementation worktree from that merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
 
 ## Selected Story
 
@@ -111,3 +111,25 @@ Baseline: `main@abf88657b046379cc5216ee211a24568495d2a52`.
 Open PRs #120/#121 remain archival Draft recovery records, #233 remains Dashboard-owned, and this
 planning PR #273 is the only open mainline PR touching TUI-051/I209. None grants implementation
 authority.
+
+## Exact-Main Reproduction Checkpoint — 2026-08-17
+
+Baseline: `main@e885d368bd6a29f1ab06b878a9afab4bb536944f`.
+
+- `cargo test --locked -p talos-tui --lib entry_point_esc`: 7/7 passed, including the active-turn,
+  later-turn, modal-priority and repeated-cancel entry-point cases.
+- `cargo test --locked -p talos-cli conversation_loop_cancel_emits_terminal_cancelled_status`: passed;
+  the bridge test observed `UserInput::Cancel` reaching its legacy `SessionOp::Interrupt` route and
+  a terminal cancelled status.
+- `cargo test --locked -p talos-agent --test i169_targeted_interrupt`: passed; exact generation and
+  turn identity cancellation remains correct at the actor boundary.
+- Source inspection confirms the resumed structured path can reach `StructuredRunning`, but the TUI
+  calls `project_history` twice synchronously per frame before re-entering the input/event select.
+  The projection has no frame-level cache keyed by transcript/viewport/style/selection inputs.
+
+The incident's most supported loss point is therefore before `UserInput::Cancel` is serviced: a
+large unchanged transcript can monopolize the TUI task and starve keyboard polling. The bridge and
+actor cancellation boundaries are not shown to lose the message by these tests. A claim-backed
+implementation must add a resumed structured-turn reproduction that observes the four boundaries
+independently and records CPU/input-latency evidence; this checkpoint grants no implementation
+authorization.

@@ -5,7 +5,7 @@
 | Story ID | TUI-051 |
 | Type | TUI / Runtime Reliability Story |
 | Priority | P0 |
-| Status | Ready / Planned / Unclaimed |
+| Status | Ready / Planned / Claimed (proposed in PR #276; ineffective before merge) |
 | Source | [GitHub Issue #272](https://github.com/wjhuang88/talos/issues/272) |
 | Selected Iteration | I209 |
 | Depends On | PROVIDER-005/#270/#271 Complete on main; existing structured-turn cancellation and history-projection contracts |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline session (GPT-5) |
+| Work Slice | I209 only: cache and invalidate unchanged TUI history projection; prove and repair resumed structured-turn Esc cancellation across TUI/bridge/actor/durable boundaries; project existing bounded provider retry facts; verify terminal restoration and update directly affected user documentation. Excludes retry-policy redesign, I200 scrolling, I206 steering, persistence migration, public API, dependency, release and broad renderer work. |
+| Claimed At | 2026-08-17 |
 | Source Issue | #272 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #276 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Reproduce the resumed-turn cancellation loss at an exact main head, then establish an effective I209 claim before implementation. |
+| Handoff / Release Condition | This proposed claim is ineffective until PR #276 merges. After merge, activate I209 and create the implementation worktree from that merge point or later current main. |
 
 ## Planning Checkpoint — 2026-08-17
 
@@ -103,6 +103,17 @@ incident alone.
 - Update TUI help/troubleshooting text if cancellation or retry status wording changes.
 - Record the supported active-turn interrupt key and timeout-attempt semantics in the applicable
   README/reference surface selected during implementation.
+
+## Exact-Main Reproduction Checkpoint — 2026-08-17
+
+At `main@e885d368bd6a29f1ab06b878a9afab4bb536944f`, the focused TUI Esc entry-point suite (7/7),
+the CLI bridge cancellation status test, and the agent exact targeted-interrupt test all passed.
+The current TUI frame path still performs two synchronous full-history projections before polling
+keyboard events again. This matches the reported 342,988-byte transcript / approximately 100% CPU
+observation and makes TUI input starvation the leading explanation for the apparent Esc loss. It
+does not prove a bridge or actor token loss; implementation work must add an independent resumed
+turn reproduction for `UserInput::Cancel`, `SessionOp::InterruptTurn`, actor token cancellation,
+and durable terminal outcome, plus exact-head CPU/input-latency evidence.
 
 ## Required Reads
 
