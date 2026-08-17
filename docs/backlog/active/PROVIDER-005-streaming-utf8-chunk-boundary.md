@@ -1,22 +1,24 @@
 # PROVIDER-005: Streaming UTF-8 Chunk Boundary Integrity
 
+**Status**: Complete (2026-08-17)
+
 | Field | Value |
 |---|---|
 | Story ID | PROVIDER-005 |
 | Type | Provider / Runtime Reliability Fix |
 | Priority | P0 Emergency |
-| Status | Review — emergency containment implemented in PR #271 |
+| Status | Complete |
 | Source | [GitHub Issue #270](https://github.com/wjhuang88/talos/issues/270) |
 | Selected Iteration | None — Emergency override |
 | Depends On | Existing OpenAI-compatible and Anthropic SSE adapters |
 | Implementation Commit | `1d31847a` |
-| Completion Commit | Pending |
+| Completion Commit | `1d31847a01f482f3d832b6a935e6d4f23fda555d` |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 emergency provider containment session 2026-08-17 |
 | Work Slice | Preserve valid UTF-8 code points split across provider transport chunks in OpenAI-compatible and Anthropic SSE while retaining terminal errors for invalid bytes and incomplete EOF. No retry, protocol, permission, persistence, dependency, release, model configuration or TUI layout change. |
@@ -24,10 +26,10 @@
 | Source Issue | #270 |
 | Governance Claim PR | #271 |
 | Authorization Mode | Emergency override |
-| Authorization Evidence | Maintainer supplied a live TUI failure screenshot and explicitly requested urgent handling on 2026-08-17. Issue #270 records the incident, exact scope, validation and rollback. |
+| Authorization Evidence | Maintainer supplied a live TUI failure screenshot and explicitly requested urgent handling on 2026-08-17. Independent review comment `5313112992` approved exact head `f51051c8495accca5292bc90157908bc16e0d6ff`; merge-time CAS produced merge commit `89523dbc2b667ca83587aaf3d2825e69efa18f58`. |
 | Implementation PR | #271 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Exact-head CI, workspace preflight and independent review must pass before merge; rollback is revert of implementation commit `1d31847a`. |
+| Handoff / Release Condition | None — closed. Rollback remains revert of implementation commit `1d31847a`. |
 
 ## Identity / Goal / Value
 
@@ -57,15 +59,23 @@ invalid UTF-8 error.
 - [x] `cargo test -p talos-provider --locked` passed: 127 unit, 4 integration and 2 doctests.
 - [x] `cargo clippy -p talos-provider --all-targets --locked -- -D warnings` passed.
 - [x] `cargo fmt --all -- --check` and `git diff --check` passed.
-- [ ] Full workspace release preflight and exact-head CI pass.
-- [ ] Independent review confirms both adapters preserve fail-closed behavior.
+- [x] Full workspace release preflight and exact-head CI `32002811484` passed.
+- [x] Independent review comment `5313112992` confirmed both adapters preserve fail-closed behavior
+  at exact head `f51051c8495accca5292bc90157908bc16e0d6ff`.
 
 ## Completion Evidence
 
-Completion Commit: Pending. Implementation commit `1d31847a` predates any future status-only
-closeout, but this Story remains Review until merge and required exact-head evidence complete.
+Completion Commit: `1d31847a01f482f3d832b6a935e6d4f23fda555d`. This pre-existing implementation
+commit contains the shared incremental decoder and both provider integrations; this status-only
+closeout does not cite itself. PR #271 merged as `89523dbc2b667ca83587aaf3d2825e69efa18f58`
+after exact-head CI `32002811484`, independent approval `5313112992`, and merge-time CAS confirmed
+the reviewed head as the merge commit's second parent.
 
 ## Residual Destination
 
 Reproduce and route the Markdown table border/wrapping observation to a TUI owner separately if it
 persists after the provider fix.
+
+Reviewer observations N2 (an additional adapter-level split fixture) and N3 (more specific invalid
+versus incomplete diagnostic wording) are optional maintenance suggestions, not unmet acceptance
+or provider-safety residuals. They do not keep Issue #270 open.
