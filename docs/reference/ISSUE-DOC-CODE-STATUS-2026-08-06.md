@@ -109,13 +109,5 @@ selection, activation or implementation authority.
 | [#267](https://github.com/wjhuang88/talos/issues/267) | Steering follow-up sequence | [TUI-048](../backlog/active/TUI-048-steering-esc-activation.md) | Planned | I206-I208 remain separately Planned/Unclaimed; no implementation authority. |
 | [#268](https://github.com/wjhuang88/talos/issues/268) | Numeric permission approval shortcuts | [TUI-053](../backlog/active/TUI-053-numeric-permission-shortcuts.md) | Intake | Resolve TUI-045 overlap and protected permission-surface claim before selection. |
 | [#269](https://github.com/wjhuang88/talos/issues/269) | Native key-repeat routing | [TUI-054](../backlog/active/TUI-054-native-key-repeat-routing.md) | Intake | Inventory repeat-safe and one-shot actions before selection. |
-| [#272](https://github.com/wjhuang88/talos/issues/272) | Resumed Session interactivity under provider delay | [TUI-051](../backlog/active/TUI-051-resumed-session-interactivity.md) | Planned / Unclaimed | I209 is the runnable plan; reproduce the loss point and establish a separate effective claim before activation or implementation. |
-
-## 2026-08-17 I209 Change-Control Addendum
-
-This current-state addendum preserves the intake row above as historical registration evidence.
-
-| Issue | Summary | Owner | Owner Status | Disposition |
-|---|---|---|---|---|
 | [#272](https://github.com/wjhuang88/talos/issues/272) | Resumed Session interactivity under provider delay | [TUI-051](../backlog/active/TUI-051-resumed-session-interactivity.md) | Review / Claimed | I209 implementation awaits exact-head CI, real-terminal evidence and independent review; truthful retry progress transferred to #278. |
 | [#278](https://github.com/wjhuang88/talos/issues/278) | Bounded provider retry progress contract | [PROVIDER-006](../backlog/active/PROVIDER-006-bounded-retry-progress-contract.md) | Planned / Unclaimed | I210 requires an ADR and separate effective claim; intake grants no public API or implementation authority. |
