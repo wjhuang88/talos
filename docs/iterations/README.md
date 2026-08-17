@@ -75,7 +75,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I206 | Esc-Cancelled Steering Activation | Planned / Unclaimed | `TUI-048`; accepted steering must become one runnable Session turn after active-turn Esc cancellation. No implementation branch or authorization. |
 | I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
-| I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
+| I205 | PR Workflow Throughput Simplification | Planned / Claimed / PR #284 | GOV-007 evidence-only governance Spike; claim merge authorizes only separate activation and audit implementation, while every executable rule change needs a new bounded claim. |
 | I209 | Resumed Session Interactivity Under Provider Delay | Closed | TUI-051 / Issue #272 is Complete at Completion Commit `2eff6285`, with source implementation `7b82fea6`/`7d90def8`, exact-head CI `32025371877`, real-terminal acceptance and independent agent audit `5316533941`. Retry-progress acceptance remains transferred to I210. |
 | I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accept an ADR and establish an effective claim before any public contract or implementation change. |
 

@@ -12,13 +12,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-18 |
 | Work Slice | Execute only GOV-007/I205's evidence-only audit and decision packet: measure recent claim/implementation/closeout/review churn, classify causes, map retained gates to demonstrated failures or Hard constraints, define the ordinary/protected/release/maintenance scenario matrix, migration and rollback, and identify the smallest separately claimable implementation slice. No SOP, validator, CI workflow, branch-protection, product/runtime, release-policy, security-gate or child-activation change. |
 | Claimed At | 2026-08-18 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. No independent reviewer is currently available for this non-executable audit claim. Finalization requires exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback; any later executable rule change requires its own bounded claim and review. |
 | Implementation PR | Not started |
@@ -71,6 +71,7 @@ infrastructure-only governance Spike and claims no product behavior.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-17 | Selection | Maintainer requested PR-flow simplification after observing that commit and review round trips exceeded the underlying code/document changes. I205 is Planned/Unclaimed and makes no rule change. |
+| 2026-08-18 | Claim proposal | Governance PR #284 proposes the bounded evidence-only claim from exact `main@a9cfef02`; the claim is ineffective until merge and does not activate I205. |
 
 ## Claim Preparation Checkpoint - 2026-08-18
 
