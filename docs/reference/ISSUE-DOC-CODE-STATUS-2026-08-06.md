@@ -97,3 +97,17 @@ the historical matrix and its original dated row remain unchanged. It does not m
 authorize a merge, or authorize release/tag/GitHub Release/Cargo publication. A finalized I161
 implementation head still requires independent exact-head security approval against the complete
 normative matrix before merge.
+
+## 2026-08-17 Open Issue Intake Addendum
+
+This append-only addendum registers Issues opened after the published matrix. Registration is not
+selection, activation or implementation authority.
+
+| Issue | Summary | Owner | Owner Status | Disposition |
+|---|---|---|---|---|
+| [#266](https://github.com/wjhuang88/talos/issues/266) | Todo rendering and muted-text readability | [TUI-052](../backlog/active/TUI-052-todo-rendering-muted-readability.md) | Intake | Decompose presentation coalescing and style inventory before selection. |
+| [#267](https://github.com/wjhuang88/talos/issues/267) | Steering follow-up sequence | [TUI-048](../backlog/active/TUI-048-steering-esc-activation.md) | Planned | I206-I208 remain separately Planned/Unclaimed; no implementation authority. |
+| [#268](https://github.com/wjhuang88/talos/issues/268) | Numeric permission approval shortcuts | [TUI-053](../backlog/active/TUI-053-numeric-permission-shortcuts.md) | Intake | Resolve TUI-045 overlap and protected permission-surface claim before selection. |
+| [#269](https://github.com/wjhuang88/talos/issues/269) | Native key-repeat routing | [TUI-054](../backlog/active/TUI-054-native-key-repeat-routing.md) | Intake | Inventory repeat-safe and one-shot actions before selection. |
+| [#270](https://github.com/wjhuang88/talos/issues/270) | Preserve UTF-8 across SSE transport chunks | [PROVIDER-005](../backlog/active/PROVIDER-005-streaming-utf8-chunk-boundary.md) | Review | Emergency fix in PR #271; exact-head CI, independent review and closeout remain required. |
+| [#272](https://github.com/wjhuang88/talos/issues/272) | Resumed Session interactivity under provider delay | [TUI-051](../backlog/active/TUI-051-resumed-session-interactivity.md) | Intake | Wait for #271 terminal disposition, then refine/select independently. |
