@@ -117,8 +117,8 @@ and durable terminal outcome, plus exact-head CPU/input-latency evidence.
 
 ## Activation Checkpoint — 2026-08-17
 
-Claim PR #276 merged as `33b11433bd28f70d1e15e80d902e51ca0ee33e1b`. The activation PR is
-Pending and has no target-branch effect until merge. I209 is the only proposed Active iteration;
+Claim PR #276 merged as `33b11433bd28f70d1e15e80d902e51ca0ee33e1b`. Activation PR #277 has
+no target-branch effect until merge. I209 is the only proposed Active iteration;
 implementation remains bounded by the effective Work Slice and must start from the activation merge
 point or later current main.
 

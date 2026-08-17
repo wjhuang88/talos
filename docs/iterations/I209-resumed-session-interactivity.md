@@ -137,7 +137,7 @@ authorization.
 ## Activation Checkpoint — 2026-08-17
 
 - Effective claim: PR #276 merge `33b11433bd28f70d1e15e80d902e51ca0ee33e1b`.
-- Activation PR: Pending; this branch has no target-branch effect until merged.
+- Activation PR: #277; this branch has no target-branch effect until merged.
 - Non-terminal inventory: I188 remains Review; I189/I195/I196 remain Planned/Claimed and
   unactivated; I197-I201/I205-I208 remain Planned/Unclaimed; I164 remains Paused; no iteration is
   Blocked and no other iteration is Active.
