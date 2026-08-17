@@ -5,9 +5,9 @@
 | Story ID | TUI-045 |
 | Type | Bug / TUI / Permission UX Story |
 | Priority | P1 |
-| Status | Refinement — layout ownership, minimum-reflow and real-terminal acceptance require iteration selection |
+| Status | Ready — I197 Planned / Unclaimed |
 | Source | [GitHub Issue #125](https://github.com/wjhuang88/talos/issues/125) |
-| Selected Iteration | None |
+| Selected Iteration | I197 — Planned / Unclaimed |
 | Depends On | Inline TUI scrollback/composer ownership; permission panel state; ADR-054 renderer |
 
 ## Collaboration Claim
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Refine the layout-anchor state and terminal matrix; establish a claim before implementation. |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Establish an effective I197 claim on `main`, then implement from that claim merge or later current `main`; do not alter permission semantics. |
 
 ## Identity / Goal / Value
 
@@ -53,7 +53,10 @@ When an inline TUI permission request opens, preserve the user's conversation vi
 
 ## Uncertainty And Validation Path
 
-Refine the exact logical anchor representation, compression/minimum-reflow priority, resize behavior and interaction with anchored versus follow-tail scrollback. Select an isolated TUI iteration with buffer/layout tests and real-terminal evidence.
+I197 owns the isolated runnable correction. During implementation it must choose the smallest
+logical-anchor representation consistent with the current ADR-054 renderer, preserve anchored
+versus follow-tail behavior, and prove compression/minimum-reflow plus resize behavior with focused
+layout tests and real-terminal evidence.
 
 ## State / Status Owners
 

@@ -10,7 +10,7 @@ current_execution_note: "v0.8.0 GitHub Release completed with five platform arch
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-23"
+  last_refresh: "2026-08-17"
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -64,6 +64,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
+    - "Run GOV-007/I205 before resuming the ordered mainline implementation sequence: measure PR/review churn, preserve claim-first/protected-review/exact-head/CAS/completion-evidence gates, and claim any SOP or validator implementation separately"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
     - "Keep I177/ARCH-034-R08 completion evidence bound to squash implementation commit `f505eea8`, PR #162 exact-head CI `31166594367`, and closeout PR #163 merge `c4fbd02d`; keep I178/ARCH-034-R09 completion evidence bound to squash implementation commit `f92634803560dc50e0b15ca8d7d511e9928c983f`, source implementation `c662a7e6`, PR #165, and exact-head CI `31180591881`; keep I179/ARCH-034-R10 completion evidence bound to squash implementation commit `dafc9be08736aee91e0f9cdd92e5226930808061`, source implementation `63d494c5`, PR #168, and exact-head CI `31189425069`; keep I180/ARCH-034-R11 completion evidence bound to squash implementation commit `10cceec6aeb9089fe9c830355992c8fc60430d63`, source implementation `fd8ac75d`, PR #171, and exact-head CI `31238721507`; keep review-only I181 completion evidence bound to PR #174 squash merge `aea26ad011af04396ab8588c9326d309538f31a2`, and track R04 remediation through later bounded child owners"
     - "Refine Issue #155 only through unclaimed SKILL-004; decide the optional-triggers compatibility contract before any parser implementation"

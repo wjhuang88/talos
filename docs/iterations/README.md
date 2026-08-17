@@ -64,9 +64,15 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
 | I195 | Dashboard Read-Only Visual Shell | Planned / Claimed | PR #212 merged as `f123e534`, establishing WEB-001-A ownership. I195 remains unactivated and independent of release/mainline implementation. |
 | I196 | Canonical Work Domain Decision And Migration Contract | Planned / Claimed / priority hold | PR #226 merged as `453d1fba`; no implementation branch exists. Resume only after v0.8.0 publication closes and a fresh exact-main inventory passes. |
+| I197 | Permission Prompt Layout Anchor Stability | Planned / Unclaimed | Issue #125 / TUI-045; keep unactivated until its separate claim and predecessor disposition are recorded. |
+| I198 | Optional Skill Triggers Compatibility | Planned / Unclaimed | Issue #155 / SKILL-004; keep unactivated until its separate claim and compatibility decision checkpoint. |
+| I199 | Thinking Preview Wrap And Bounded Height | Planned / Unclaimed | Issue #69 / TUI-041; keep unactivated until its separate claim and ordered predecessor disposition. |
+| I200 | No-Op History Scroll State Stability | Planned / Unclaimed | Issue #79 / TUI-042; follows I199 for overlap control and needs its own claim. |
+| I201 | Tool-Call Placeholder Suppression | Planned / Unclaimed | Issue #111 / TUI-043; keep unactivated and separately claimed after the ordered TUI predecessors. |
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
 | I203 | v0.8.0 GitHub And Crates.io Publication | Complete / Closed | Completion Commits `b0354ae6`/`d8e1aa26`/`d5de4a65`; PR #264 merged as `f425e7bc`. Workflow `31953951828` completed the GitHub Release before all 20 crates published; external CLI install and registry-only runtime fixture passed. |
 | I204 | v0.8.0 Release-Candidate Registry Readiness | Complete / Closed | Completion Commit `f46094e3`; PR #260 merged as `7c10afe3`; reviewed conditional GO for preparing I203 claim only. Fresh I203 claim remains required; no release or publication was authorized by I204. |
+| I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
 
 ## Completed This Closeout
 
