@@ -21,7 +21,7 @@ not only available through `talos-runtime`
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
-| Last Updated | 2026-08-14 |
+| Last Updated | 2026-08-17 |
 | Handoff / Release Condition | Close each selected child through its own owner, iteration, effective claim, implementation PR, validation evidence, independent exact-head review and merge-time CAS. |
 
 ## Problem
@@ -290,6 +290,17 @@ later child gates remain sequential and ADR-053-gated.
 - PR #236 then passed exact-head CI `31801484313` 5/5, independent approval `5293622712` and
   merge-time CAS, merging as `f79c1ead1cd3a547797dea3666295f510d88a13d`. ARCH-031-A/I159 is
   Complete; ARCH-031-B/I160 is Ready/Planned/Unclaimed, while ARCH-031 remains In Progress.
+
+2026-08-17 I203 publication checkpoint:
+
+- I203/REL-003 is Complete/Closed through implementation commits `b0354ae6`, `d8e1aa26`, and
+  `d5de4a65`, merge `f425e7bc`, immutable tag `v0.8.0`, and GitHub Release workflow `31953951828`.
+- The GitHub Release completed with five archives and `checksum.sha256` before the first real Cargo
+  publication. All 20 authorized closure crates are visible at `0.8.0`; only `talos-models`
+  remains quarantined.
+- External crates.io installation returned `talos 0.8.0`, and the registry-only `talos-runtime`
+  fixture passed in default and `coding` modes. ARCH-031 remains In Progress because REL-002 and
+  RUNTIME-006 are separate unresolved child outcomes; the v0.8.0 publication slice is closed.
 
 ## Required Reads
 

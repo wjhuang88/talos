@@ -1,9 +1,10 @@
 # v0.8.0 GitHub-First Crates Publication Long Task
 
-Completion Commit: `077b347dff25f60e6fbd84b22548f58c72163f65` (I162 readiness implementation; long
-task remains open because the reviewed readiness qualification is NO-GO and I203 is blocked)
+Completion Commit: `b0354ae6b7c349ccbc101a046ded1d8aafdda3ff`,
+`d8e1aa268d3419ee957b78a46a57c68bad50c3f5`, and
+`d5de4a6573e8f3b77fbfc80c5dc1504f078f1ee7` (pre-existing I203 release implementation evidence)
 
-> Status: In Progress
+> Status: Complete (2026-08-17)
 > Created: 2026-08-14
 > Candidate release: v0.8.0
 > Current base: `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`
@@ -21,9 +22,9 @@ task remains open because the reviewed readiness qualification is NO-GO and I203
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Maintainer requested this release before I196 implementation, required CLI and runtime Cargo publication, and fixed GitHub-before-Cargo ordering. Each child still needs its own effective claim. |
-| Implementation PR | #250 merged; #251 matrix-closure follow-up in review |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Coordinate only after this record reaches `main`; implementation and irreversible actions remain gated by each child owner and claim. |
+| Implementation PR | Child delivery through #236, #240, #250, #251, #255, and release PR #264 |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | Closed after I203/REL-003 completed GitHub-first release, 20-package publication, and external CLI/SDK acceptance. |
 
 ## Closure Ledger
 
@@ -84,10 +85,10 @@ inventory.
 | V080-10 | Execute I159 | Lightweight `talos-tools` default with product parity | V080-00 | I159 acceptance and Completion Commit | Record blocker; do not skip to I160 | Done — PR #236 merge `f79c1ead` |
 | V080-20 | Execute I160 | One shared internal CLI/runtime composition | V080-10 | I160 acceptance and Completion Commit | Record blocker; do not skip to I161 | Done — Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 as `2d48bd2c` |
 | V080-30 | Execute I161 | Fail-closed fallback and explicit coding preset | V080-20 | Security review, runtime matrix and Completion Commit | Record blocker; do not skip to I162 | Done — PR #250 merged `d2b4bdd1`; matrix-closure PR #251 merged `da5a43a2`; Completion Commits `74c5502d`/`3ca2ec62` |
-| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Complete — I162 Completion Commit `077b347d`, PR #255 merged `16564ba0`; reviewed NO-GO, so V080-50 remains blocked |
-| V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Planned |
-| V080-60 | Cargo publication | 20 visible crates.io packages in dependency order | V080-50 | Per-package visibility and no omitted closure package | Checkpoint partial state; never overwrite | Planned |
-| V080-70 | External acceptance and closeout | Cargo install, runtime fixture and owner evidence | V080-60 | External tests plus owner-first closeout | Keep Review/Blocked with exact residual | Planned |
+| V080-40 | Execute I162 | External fixtures, 20-package dry-runs and GO/NO-GO packet | V080-30 | I162 Completion Commit and explicit GO | Stop before release on NO-GO | Complete — I162 NO-GO preserved at `077b347d`; I204 supplied reviewed conditional GO through evidence `f46094e3` and closeout `8eaa22a2` |
+| V080-50 | GitHub v0.8.0 release | Immutable tag, five assets and checksums | V080-40 | GitHub workflow and Release complete | No Cargo publish; use patch after repair | Done — tag `v0.8.0`, merge `f425e7bc`, workflow `31953951828`, five archives plus checksum |
+| V080-60 | Cargo publication | 20 visible crates.io packages in dependency order | V080-50 | Per-package visibility and no omitted closure package | Checkpoint partial state; never overwrite | Done — all 20 packages visible at `0.8.0`; `talos-models` remains excluded |
+| V080-70 | External acceptance and closeout | Cargo install, runtime fixture and owner evidence | V080-60 | External tests plus owner-first closeout | Keep Review/Blocked with exact residual | Done — isolated install returned `talos 0.8.0`; registry-only runtime fixture passed default and `coding` modes |
 
 ## Branch, Worktree And Checkpoint Plan
 
@@ -452,3 +453,19 @@ Claimed. A fresh implementation branch must start from this exact main. The rele
 may now include the reviewed `models.toml` refresh, v0.8.0 version/release-surface alignment,
 preflight, GitHub-first Release, ordered Cargo publication and external acceptance. Each irreversible
 step still requires its own exact-head review and CAS; no release or publish has occurred.
+
+### 2026-08-17 v0.8.0 Publication Closure Checkpoint
+
+Release implementation PR #264 merged as `f425e7bc` after exact head `d5de4a65` passed CI
+`31952144946`, independent approval `5307931428`, and merge-time CAS. Post-merge
+`./scripts/release_preflight.sh v0.8.0` passed. Annotated tag `v0.8.0` points to the merge commit;
+GitHub Release workflow `31953951828` completed successfully at `2026-08-16T15:23:21Z` with five
+platform archives and `checksum.sha256` before the first Cargo upload.
+
+The metadata-derived 20-package closure then published in six dependency waves. Crates.io rate
+limits rejected only the still-unpublished `talos-runtime` and later `talos-cli`; both retries
+waited until the registry-provided timestamps and then succeeded. All 20 packages are visible at
+`0.8.0`, while `talos-models` remains `publish = false`. An isolated crates.io install returned
+`talos 0.8.0`. A temporary independent Cargo root with only registry versions of the Talos crates
+ran the `talos-runtime = "0.8.0"` fixture successfully in default and `coding` modes. The long task
+is Complete; RUNTIME-006/#234 and REL-002 remain separate residual work.

@@ -1,6 +1,6 @@
 # REL-003: v0.8.0 GitHub And Crates.io Publication
 
-**Status**: Active / In Progress
+**Status**: Complete / Closed (2026-08-17)
 **Type**: Release / Distribution Story
 **Parent Epic**: ARCH-031
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release-governance session` |
 | Work Slice | `REL-003 / I203` only: synchronize the v0.8.0 release candidate and release surfaces, refresh `models.toml` from the reviewed upstream snapshot, run exact release preflight, create one immutable GitHub tag/Release first, then publish the authorized Cargo closure in dependency waves and verify external CLI/SDK consumption. No Desktop, Dashboard, Work Graph, Evaluator or RUNTIME-006 work. |
@@ -16,10 +16,10 @@
 | Source Issue | None |
 | Governance Claim PR | #262 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | I204 closeout is effective at `main@8eaa22a2` with reviewed conditional GO for preparing I203 claim; I203 claim PR #262 merged as `f6b2d243`, and this activation checkpoint records the now-effective claim. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-16 |
-| Handoff / Release Condition | I203 claim is effective at `main@f6b2d243`; this activation checkpoint precedes a fresh implementation branch. Preserve I204/I162 baselines; implementation PR must separately authorize release-surface/version changes. GitHub Release must complete before any real Cargo publish. |
+| Authorization Evidence | Implementation PR #264 exact head `d5de4a65` passed CI `31952144946`, independent approval `5307931428`, and merge-time CAS before merging as `f425e7bc`. |
+| Implementation PR | #264 |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | Closed after the immutable GitHub Release, 20-package Cargo publication, external CLI install, and registry-only runtime fixture all passed. |
 
 ## Identity / Goal / Value
 
@@ -99,14 +99,14 @@ installable with Cargo and publish `talos-runtime` plus every required dependenc
 
 ## Acceptance For Technical/Governance Work
 
-- [ ] `./scripts/release_preflight.sh v0.8.0` passes on the exact release commit.
-- [ ] `bash scripts/check_publish_guard.sh .` passes with only `talos-models` quarantined.
-- [ ] Annotated tag `v0.8.0` is pushed once and the GitHub Release has five archives plus checksum.
-- [ ] No `cargo publish` command runs before GitHub Release success is recorded.
-- [ ] All 20 authorized packages are visible at version 0.8.0 in dependency order.
-- [ ] External Cargo install and runtime SDK fixtures pass without workspace path resolution.
-- [ ] Partial publication, retry and new-patch recovery evidence is recorded truthfully.
-- [ ] Completion cites pre-existing release/publish evidence commits and external run identifiers.
+- [x] `./scripts/release_preflight.sh v0.8.0` passes on the exact release commit.
+- [x] `bash scripts/check_publish_guard.sh .` passes with only `talos-models` quarantined.
+- [x] Annotated tag `v0.8.0` is pushed once and the GitHub Release has five archives plus checksum.
+- [x] No `cargo publish` command runs before GitHub Release success is recorded.
+- [x] All 20 authorized packages are visible at version 0.8.0 in dependency order.
+- [x] External Cargo install and runtime SDK fixtures pass without workspace path resolution.
+- [x] Partial publication, retry and new-patch recovery evidence is recorded truthfully.
+- [x] Completion cites pre-existing release implementation commits and external run identifiers.
 
 ## Residual Destination
 
@@ -146,3 +146,19 @@ surface alignment, release preflight, immutable GitHub-first Release, dependency
 publication, and external CLI/SDK acceptance. No implementation commit, tag, GitHub Release, or
 real Cargo publish is authorized by this activation record alone; each requires its own exact-head
 review and merge-time CAS.
+
+## Completion Evidence
+
+- Completion Commit: `b0354ae6b7c349ccbc101a046ded1d8aafdda3ff`,
+  `d8e1aa268d3419ee957b78a46a57c68bad50c3f5`, and
+  `d5de4a6573e8f3b77fbfc80c5dc1504f078f1ee7`.
+- Implementation PR #264 merged as `f425e7bc`; main CI `31952994218` and merged-head release
+  preflight passed.
+- Annotated tag `v0.8.0` points to `f425e7bc`; GitHub Release workflow `31953951828` succeeded with
+  five platform archives and `checksum.sha256` before any Cargo publication.
+- All 20 authorized crates are visible at `0.8.0`; isolated `cargo install` returned
+  `talos 0.8.0`, and the registry-only runtime fixture passed in default and `coding` modes.
+- Crates.io 429 responses for `talos-runtime` and `talos-cli` were honored until the specified
+  retry windows; only the unpublished package was retried.
+- This status change cites pre-existing implementation and external publication evidence; it does
+  not self-certify completion.
