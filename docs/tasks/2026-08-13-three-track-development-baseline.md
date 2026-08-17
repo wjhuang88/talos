@@ -142,6 +142,16 @@ This lane delivers shared capabilities consumed by both product surfaces.
 - RUNTIME-005 remains blocked on SESSION-008-B.
 - I188/TOOL-024-A and I189/PERM-006-A remain Planned / Claimed and are not activated by this
   baseline.
+
+### 2026-08-14 Issue #59 Decision-Slice Change Control
+
+The maintainer subsequently directed the mainline session to clear Issue #59 implementation
+blockers. Because I188's claim merge `02a35588` is effective and no governed iteration was Active
+or Review, I188/TOOL-024-A may activate for its published decision-only scope from exact
+`origin/main` `556b5a43`. This does not activate I189, TOOL-024-B/C/D, RUNTIME-005, PERM-006,
+Desktop, Dashboard, production spawn, persistence, dependency, or `unsafe` implementation. The
+P0 Desktop prerequisite chain remains separately governed; it cannot activate concurrently while
+I188 is Active/Review.
 - Issues #45, #49, and #59 remain open until their own owner evidence permits closure.
 - Archival PRs #120/#121 remain untouched.
 - The P0-P4 Work Graph/Evaluation chain uses separate governed slices on `main`.

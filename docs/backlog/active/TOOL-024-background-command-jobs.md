@@ -34,7 +34,8 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 - Background execution is opt-in through a typed tool input, never inferred from shell syntax such
   as `&`, `nohup`, or PowerShell jobs.
 - `bash`/PowerShell and `exec` receive one consistent job identity, lifecycle, output-bound, timeout,
-  cancellation, and session-delivery contract.
+  cancellation, and session-delivery contract. Delivery is staged: B enables Unix shell/single-exec
+  only, while Windows remains fail-closed until D's Job Object gate.
 - A background start passes permission evaluation before spawning and must have distinct, visible
   background intent in the approval surface; foreground approval or an existing `always` grant must
   not silently authorize a longer-lived background execution.
@@ -46,18 +47,19 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   unexpected supervisor failure must have defined behavior before implementation.
 - `process` read/status/list/cancel operations use stable job identity, ordered cursor-based output
   reads and explicit truncation/expiry semantics. They do not accept arbitrary shell syntax.
-- Windows support follows TOOL-023-C's PowerShell boundary; Unix support preserves the existing
-  shell hardening boundary. No `unsafe`, Job Object implementation, or new dependency is authorized
-  by this Epic.
+- Windows support follows TOOL-023-C's PowerShell identity but not its direct-child-only cleanup.
+  Unix support preserves the existing shell hardening/`setsid` boundary. ADR-060 proposes the only
+  narrow future Unix group-signal `unsafe` authorization; Windows Job Object code, wider `unsafe`,
+  and new dependencies remain unauthorized until a separately accepted D decision.
 
 ## Children
 
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
-| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Planned / claim PR #196 pending independent review | None | ADR and implementation-ready contract for ownership, approval, cancellation, result delivery, and persistence. |
-| TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Session-owned supervisor, explicit background input, bounded capture, process-tree cleanup, and exact-once terminal state. |
+| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Review / I188 / PR #228 | None | Proposed ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence. |
+| TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit shell/single-exec background input, bounded capture, process-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
-| TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete | Non-blocking TUI projection, lifecycle controls, docs and real Unix/Windows acceptance. |
+| TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
 ## Major Risks
 
@@ -84,7 +86,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 - `crates/talos-conversation/src/`
 - `crates/talos-session/src/`
 
-## Current Implementation Baseline (2026-08-09)
+## Current Implementation Baseline (2026-08-14)
 
 - `ExecInput` and `BashInput` expose bounded foreground timeouts but no explicit
   background flag or job identity. The exec tool documentation explicitly says
@@ -93,9 +95,13 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   background cancellation/reap lifecycle exists in the workspace.
 - Existing direct-child timeout behavior and Windows shell identity are inputs;
   neither proves descendant supervision or background ownership.
-- TOOL-023-C and I182 are Complete. PR #196 proposes I188/TOOL-024-A,
-  but the claim has no authority until independently reviewed, validated and
-  merged to `main`.
+- TOOL-023-C is Complete. Claim PR #196 merged as `02a35588`; I188/TOOL-024-A decision artifacts
+  are under independent exact-head review in PR #228.
+- The current-path matrix proves Unix `setsid` is terminal isolation rather than whole-tree cleanup;
+  Windows retains ADR-057's direct-child-only residual. ADR-060 therefore keeps Windows spawn
+  fail-closed until D rather than weakening the no-unmanaged-child invariant.
+- RUNTIME-005 remains Refinement/Unclaimed. PERM-006-A/I189 is Planned/Claimed but unactivated;
+  both ordered chains still gate production B.
 
 ## Completion Condition
 
@@ -103,3 +109,8 @@ All children A-D are Complete with existing implementation commit evidence, the 
 Accepted, focused and workspace validation pass, and real Unix/Windows interactive walkthroughs
 prove that background work does not block the conversation, every job is reaped, and the model can
 retrieve exactly one bounded terminal result through the documented `process` contract.
+
+## Decision Links
+
+- [ADR-060: Supervised Background Command Job Lifecycle](../../decisions/060-supervised-background-command-jobs.md)
+- [I188 current-path characterization](../../reference/I188-BACKGROUND-JOB-CURRENT-PATH.md)
