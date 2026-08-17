@@ -1,5 +1,7 @@
 //! Width-dependent projection of application-owned transcript facts.
 
+use std::sync::Arc;
+
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app_stream::ScrollbackLine;
@@ -73,8 +75,57 @@ pub(crate) struct HistoryProjection {
     pub(crate) rows: Vec<RenderedHistoryRow>,
     pub(crate) total_rows: usize,
     pub(crate) visible_start: usize,
-    all_rows: Vec<RenderedHistoryRow>,
-    logical_lines: Vec<(TranscriptEntryId, usize, String)>,
+    all_rows: Arc<[RenderedHistoryRow]>,
+    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct HistoryProjectionCache {
+    transcript_revision: Option<u64>,
+    width: u16,
+    all_rows: Arc<[RenderedHistoryRow]>,
+    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+    #[cfg(test)]
+    rebuilds: usize,
+}
+
+impl HistoryProjectionCache {
+    pub(crate) fn project(
+        &mut self,
+        transcript: &TranscriptStore,
+        width: u16,
+        height: u16,
+        scroll: &HistoryScrollState,
+    ) -> HistoryProjection {
+        if width == 0 || height == 0 {
+            return HistoryProjection::default();
+        }
+
+        let revision = transcript.revision();
+        if self.transcript_revision != Some(revision) || self.width != width {
+            let (all_rows, logical_lines) = project_all_history(transcript, width);
+            self.transcript_revision = Some(revision);
+            self.width = width;
+            self.all_rows = all_rows.into();
+            self.logical_lines = logical_lines.into();
+            #[cfg(test)]
+            {
+                self.rebuilds = self.rebuilds.saturating_add(1);
+            }
+        }
+
+        project_viewport(
+            self.all_rows.clone(),
+            self.logical_lines.clone(),
+            height,
+            scroll,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn rebuilds(&self) -> usize {
+        self.rebuilds
+    }
 }
 
 impl HistoryProjection {
@@ -119,7 +170,7 @@ impl HistoryProjection {
             (end, start)
         };
         let mut lines = Vec::new();
-        for (entry_id, logical_line, text) in &self.logical_lines {
+        for (entry_id, logical_line, text) in self.logical_lines.iter() {
             let key = (*entry_id, *logical_line);
             let start_key = (start.anchor.entry_id, start.anchor.logical_line);
             let end_key = (end.anchor.entry_id, end.anchor.logical_line);
@@ -311,16 +362,23 @@ fn select_scalar_range(text: &str, first: usize, end: usize) -> String {
 }
 
 /// Projects logical transcript lines without changing their stored content.
+#[cfg(test)]
 pub(crate) fn project_history(
     transcript: &TranscriptStore,
     width: u16,
     height: u16,
     scroll: &HistoryScrollState,
 ) -> HistoryProjection {
-    if width == 0 || height == 0 {
-        return HistoryProjection::default();
-    }
+    HistoryProjectionCache::default().project(transcript, width, height, scroll)
+}
 
+fn project_all_history(
+    transcript: &TranscriptStore,
+    width: u16,
+) -> (
+    Vec<RenderedHistoryRow>,
+    Vec<(TranscriptEntryId, usize, String)>,
+) {
     let mut all = Vec::new();
     let mut projected_logical_lines = Vec::new();
     for entry in transcript.entries() {
@@ -357,6 +415,15 @@ pub(crate) fn project_history(
             );
         }
     }
+    (all, projected_logical_lines)
+}
+
+fn project_viewport(
+    all: Arc<[RenderedHistoryRow]>,
+    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+    height: u16,
+    scroll: &HistoryScrollState,
+) -> HistoryProjection {
     let total_rows = all.len();
     let start = match scroll.mode {
         HistoryScrollMode::FollowTail => total_rows.saturating_sub(height as usize),
@@ -380,7 +447,7 @@ pub(crate) fn project_history(
         total_rows,
         visible_start: start,
         all_rows: all,
-        logical_lines: projected_logical_lines,
+        logical_lines,
     }
 }
 
@@ -569,6 +636,70 @@ fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option
 mod tests {
     use super::*;
     use crate::inline_terminal::HistoryAttrs;
+
+    #[test]
+    fn cache_reuses_full_projection_for_stable_transcript_and_width() {
+        let mut transcript = TranscriptStore::default();
+        for index in 0..1_000 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("history row {index:04}"),
+                None,
+            )));
+        }
+        let mut cache = HistoryProjectionCache::default();
+        let scroll = HistoryScrollState::follow_tail();
+
+        let first = cache.project(&transcript, 80, 24, &scroll);
+        let second = cache.project(&transcript, 80, 24, &scroll);
+
+        assert_eq!(cache.rebuilds(), 1);
+        assert_eq!(second, first);
+    }
+
+    #[test]
+    fn viewport_changes_do_not_rebuild_full_projection() {
+        let mut transcript = TranscriptStore::default();
+        for index in 0..100 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("history row {index:03}"),
+                None,
+            )));
+        }
+        let mut cache = HistoryProjectionCache::default();
+        let tail = cache.project(&transcript, 80, 10, &HistoryScrollState::follow_tail());
+        let anchor = tail.rows[2].start_anchor;
+        let mut anchored = HistoryScrollState::follow_tail();
+        anchored.anchor(anchor, 2);
+
+        let shorter = cache.project(&transcript, 80, 5, &anchored);
+
+        assert_eq!(cache.rebuilds(), 1);
+        assert_eq!(shorter.rows.len(), 5);
+        assert_eq!(shorter.rows[2].start_anchor, anchor);
+    }
+
+    #[test]
+    fn transcript_append_and_width_change_invalidate_full_projection() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "first history row",
+            None,
+        )));
+        let mut cache = HistoryProjectionCache::default();
+        let scroll = HistoryScrollState::follow_tail();
+
+        cache.project(&transcript, 80, 24, &scroll);
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "second history row",
+            None,
+        )));
+        let appended = cache.project(&transcript, 80, 24, &scroll);
+        let resized = cache.project(&transcript, 40, 24, &scroll);
+
+        assert_eq!(cache.rebuilds(), 3);
+        assert_eq!(appended.total_rows, 2);
+        assert_eq!(resized.total_rows, 2);
+    }
 
     #[test]
     fn repeated_resize_projection_is_reversible() {

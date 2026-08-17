@@ -42,6 +42,10 @@ impl TranscriptStore {
     pub(crate) fn entries(&self) -> &[TranscriptEntry] {
         &self.entries
     }
+
+    pub(crate) const fn revision(&self) -> u64 {
+        self.next_id
+    }
 }
 
 #[cfg(test)]

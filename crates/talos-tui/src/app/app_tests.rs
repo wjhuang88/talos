@@ -1597,6 +1597,7 @@ fn completed_history_highlight_moves_with_scrolled_content() {
             )));
     }
     tui.draw_frame().expect("tail frame");
+    assert_eq!(tui.history_projection_cache.rebuilds(), 1);
     let area = tui.last_history_area.expect("history area");
     let row = area.y.saturating_add(2);
     let anchor = tui
@@ -1614,6 +1615,7 @@ fn completed_history_highlight_moves_with_scrolled_content() {
         history_focus: Some(focus),
     });
     tui.draw_frame().expect("selected frame");
+    assert_eq!(tui.history_projection_cache.rebuilds(), 1);
     assert_eq!(
         tui.terminal.test_cell_bg(2, row),
         ratatui::style::Color::DarkGray
@@ -1621,6 +1623,7 @@ fn completed_history_highlight_moves_with_scrolled_content() {
 
     tui.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
     tui.draw_frame().expect("scrolled selected frame");
+    assert_eq!(tui.history_projection_cache.rebuilds(), 1);
 
     assert_eq!(
         tui.terminal
