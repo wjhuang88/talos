@@ -117,11 +117,12 @@ deployment, schema/data migration or external destructive action is part of this
 
 ## 2026-08-17 Queue Gate: Provider Fix And Session Interactivity
 
-The provider UTF-8 emergency fix (`PROVIDER-005`, Issue #270, PR #271) must reach an explicit
-terminal disposition before this long-running task resumes. Its exact-head independent review,
-CI, merge-time CAS and owner closeout remain separate from this coordination record.
+The provider UTF-8 emergency fix (`PROVIDER-005`, Issue #270, PR #271) reached Complete/Closed:
+implementation `1d31847a`, exact-head CI `32002811484`, independent approval `5313112992`, merge
+`89523dbc`, owner closeout `c15da4cf`, and remote synchronization `abf88657`. Its emergency
+authorization remains separate from this coordination record.
 
-After #271 is Complete, Cancelled or otherwise explicitly dispositioned, the next queued slice is
+With #271 closed, the next queued slice is
 `I209 / TUI-051 / Issue #272` (`docs/iterations/I209-resumed-session-interactivity.md`). I209 owns
 resumed-turn cancellation responsiveness, bounded provider retry status and large-history TUI
 projection invalidation. It is Planned / Unclaimed and has no implementation authorization.

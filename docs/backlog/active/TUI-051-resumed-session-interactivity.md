@@ -8,7 +8,7 @@
 | Status | Ready / Planned / Unclaimed |
 | Source | [GitHub Issue #272](https://github.com/wjhuang88/talos/issues/272) |
 | Selected Iteration | I209 |
-| Depends On | #271 disposition; existing structured-turn cancellation and history-projection contracts |
+| Depends On | PROVIDER-005/#270/#271 Complete on main; existing structured-turn cancellation and history-projection contracts |
 
 ## Collaboration Claim
 
@@ -25,7 +25,17 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Close or disposition #271, reproduce the resumed-turn cancellation loss at an exact main head, then establish an effective I209 claim before implementation. |
+| Handoff / Release Condition | Reproduce the resumed-turn cancellation loss at an exact main head, then establish an effective I209 claim before implementation. |
+
+## Planning Checkpoint — 2026-08-17
+
+- TUI-051 first reached main as `Intake / Unclaimed / Selected Iteration None` in PR #271 merge
+  `89523dbc`; that registration did not select or authorize implementation.
+- PROVIDER-005 is Complete at implementation commit `1d31847a`, its owner-first closeout merged in
+  PR #274 as `c15da4cf`, Issue #270 is closed, and the open-Issue matrix synchronized through PR
+  #275 merge `abf88657`.
+- This planning slice refines TUI-051 to Ready, selects runnable iteration I209, and leaves both
+  owner and iteration Unclaimed. No implementation branch or code change is authorized.
 
 ## Identity / Goal / Value
 
@@ -63,8 +73,7 @@ about 100% CPU in `draw_frame -> history_projection::project_history`.
 
 ## Dependencies And Constraints
 
-- #271 must be closed or explicitly dispositioned first because both slices touch provider stream
-  code, but its emergency authorization does not extend to I209.
+- PROVIDER-005/#270/#271 are closed. Their emergency authorization does not extend to I209.
 - The actor-owned cancellation token and generation-bound `InterruptTurn` identity remain the
   authority; the TUI must not bypass Session custody.
 - NET-001 owns any broader retry/deadline policy redesign. I209 may expose existing bounded retry

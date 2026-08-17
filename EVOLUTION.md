@@ -947,3 +947,17 @@ repeating known mistakes.
   unless restoration is guaranteed or the user explicitly accepts closing/resetting the window.
 - Promoted to rule/check: TUI-051/I209 real-terminal termination acceptance; no executable check
   exists until that iteration is implemented.
+
+## 2026-08-17 - Transport chunks are not UTF-8 character boundaries
+
+- Trigger: A live TUI turn failed while streaming Chinese review output.
+- Symptom: The provider emitted `invalid UTF-8 byte stream` and terminated the active turn even
+  though the response text was valid.
+- Root cause: OpenAI-compatible and Anthropic adapters decoded each arbitrary reqwest transport
+  chunk as a complete UTF-8 string; a multibyte code point split across chunks was misclassified.
+- Fix: One incremental provider decoder now emits each valid prefix and retains only an incomplete
+  suffix until the next chunk, while malformed bytes and incomplete EOF remain terminal errors.
+- Prevention: Streaming byte protocols must test boundaries inside multibyte Chinese and emoji
+  code points; whole-string multilingual fixtures do not exercise transport framing.
+- Promoted to rule/check: `stream_utf8::tests::reassembles_code_points_split_across_transport_chunks`
+  plus invalid-byte and incomplete-EOF regression tests.
