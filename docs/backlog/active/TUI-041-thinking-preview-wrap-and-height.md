@@ -24,7 +24,7 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
+| Last Updated | 2026-08-17 |
 | Handoff / Release Condition | After the ordered-task predecessor is dispositioned, establish an effective I199 claim on `main`; implement only from that claim merge or later current `main`. |
 
 ## Identity / Goal / Value
@@ -88,3 +88,10 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 User-configurable or scrollable preview behavior is a separate follow-up.
+
+## 2026-08-17 Upcoming-Pool Checkpoint
+
+The maintainer explicitly reconfirmed Issue #69 for the upcoming task pool. Its existing owner and
+iteration remain authoritative: TUI-041 is Ready and I199 is Planned / Unclaimed in the ordered
+mainline sequence. This checkpoint does not activate I199, establish a claim, create an
+implementation branch or change the published acceptance target.
