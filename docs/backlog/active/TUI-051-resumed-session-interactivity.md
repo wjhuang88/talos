@@ -5,7 +5,7 @@
 | Story ID | TUI-051 |
 | Type | TUI / Runtime Reliability Story |
 | Priority | P0 |
-| Status | Ready / Planned / Claimed (proposed in PR #276; ineffective before merge) |
+| Status | In Progress / Active / Claimed |
 | Source | [GitHub Issue #272](https://github.com/wjhuang88/talos/issues/272) |
 | Selected Iteration | I209 |
 | Depends On | PROVIDER-005/#270/#271 Complete on main; existing structured-turn cancellation and history-projection contracts |
@@ -25,7 +25,7 @@
 | Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | This proposed claim is ineffective until PR #276 merges. After merge, activate I209 and create the implementation worktree from that merge point or later current main. |
+| Handoff / Release Condition | Claim PR #276 merged as `33b11433`; after the I209 activation record reaches main, create the implementation worktree from that activation merge point or later current main. |
 
 ## Planning Checkpoint — 2026-08-17
 
@@ -114,6 +114,13 @@ observation and makes TUI input starvation the leading explanation for the appar
 does not prove a bridge or actor token loss; implementation work must add an independent resumed
 turn reproduction for `UserInput::Cancel`, `SessionOp::InterruptTurn`, actor token cancellation,
 and durable terminal outcome, plus exact-head CPU/input-latency evidence.
+
+## Activation Checkpoint — 2026-08-17
+
+Claim PR #276 merged as `33b11433bd28f70d1e15e80d902e51ca0ee33e1b`. Activation PR #277 has
+no target-branch effect until merge. I209 is the only proposed Active iteration;
+implementation remains bounded by the effective Work Slice and must start from the activation merge
+point or later current main.
 
 ## Required Reads
 

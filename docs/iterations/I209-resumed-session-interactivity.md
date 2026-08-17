@@ -1,6 +1,6 @@
 # Iteration I209: Resumed Session Interactivity Under Provider Delay
 
-> Document status: Planned / Claimed (proposed in PR #276; ineffective before merge)
+> Document status: Active / Claimed
 > Planned date: 2026-08-17
 > Objective: deliver TUI-051 so a resumed large Session remains responsive, exposes bounded
 > provider retry progress and can cancel an active turn promptly.
@@ -20,7 +20,7 @@
 | Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | This proposed claim is ineffective until PR #276 merges. After merge, activate I209 and create the implementation worktree from that merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
+| Handoff / Release Condition | Claim PR #276 merged as `33b11433`; after this activation record reaches main, create the implementation worktree from that activation merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
 
 ## Selected Story
 
@@ -133,3 +133,15 @@ actor cancellation boundaries are not shown to lose the message by these tests. 
 implementation must add a resumed structured-turn reproduction that observes the four boundaries
 independently and records CPU/input-latency evidence; this checkpoint grants no implementation
 authorization.
+
+## Activation Checkpoint — 2026-08-17
+
+- Effective claim: PR #276 merge `33b11433bd28f70d1e15e80d902e51ca0ee33e1b`.
+- Activation PR: #277; this branch has no target-branch effect until merged.
+- Non-terminal inventory: I188 remains Review; I189/I195/I196 remain Planned/Claimed and
+  unactivated; I197-I201/I205-I208 remain Planned/Unclaimed; I164 remains Paused; no iteration is
+  Blocked and no other iteration is Active.
+- I209 is the only proposed Active iteration. No Rust, Cargo, dependency, persistence, release or
+  product behavior changes are part of this activation record.
+- Implementation starts only from the activation merge point or later current main and remains
+  bounded by the effective Work Slice and the reproduction checkpoint above.

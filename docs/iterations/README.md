@@ -76,7 +76,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
 | I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
-| I209 | Resumed Session Interactivity Under Provider Delay | Planned / Claimed in PR #276 (ineffective before merge) | TUI-051 / Issue #272; exact-main evidence points to input starvation before `UserInput::Cancel`. The bounded claim remains unactivated and grants no implementation authorization before merge. |
+| I209 | Resumed Session Interactivity Under Provider Delay | Active / Claimed | TUI-051 / Issue #272; claim PR #276 merged as `33b11433`. Exact-main evidence points to input starvation before `UserInput::Cancel`; implement only the bounded effective Work Slice. |
 
 ## Completed This Closeout
 
