@@ -20,7 +20,7 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #272 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
@@ -103,6 +103,17 @@ incident alone.
 - Update TUI help/troubleshooting text if cancellation or retry status wording changes.
 - Record the supported active-turn interrupt key and timeout-attempt semantics in the applicable
   README/reference surface selected during implementation.
+
+## Exact-Main Reproduction Checkpoint — 2026-08-17
+
+At `main@e885d368bd6a29f1ab06b878a9afab4bb536944f`, the focused TUI Esc entry-point suite (7/7),
+the CLI bridge cancellation status test, and the agent exact targeted-interrupt test all passed.
+The current TUI frame path still performs two synchronous full-history projections before polling
+keyboard events again. This matches the reported 342,988-byte transcript / approximately 100% CPU
+observation and makes TUI input starvation the leading explanation for the apparent Esc loss. It
+does not prove a bridge or actor token loss; implementation work must add an independent resumed
+turn reproduction for `UserInput::Cancel`, `SessionOp::InterruptTurn`, actor token cancellation,
+and durable terminal outcome, plus exact-head CPU/input-latency evidence.
 
 ## Required Reads
 

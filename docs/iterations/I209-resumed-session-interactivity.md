@@ -15,7 +15,7 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #272 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
@@ -111,3 +111,25 @@ Baseline: `main@abf88657b046379cc5216ee211a24568495d2a52`.
 Open PRs #120/#121 remain archival Draft recovery records, #233 remains Dashboard-owned, and this
 planning PR #273 is the only open mainline PR touching TUI-051/I209. None grants implementation
 authority.
+
+## Exact-Main Reproduction Checkpoint — 2026-08-17
+
+Baseline: `main@e885d368bd6a29f1ab06b878a9afab4bb536944f`.
+
+- `cargo test --locked -p talos-tui --lib entry_point_esc`: 7/7 passed, including the active-turn,
+  later-turn, modal-priority and repeated-cancel entry-point cases.
+- `cargo test --locked -p talos-cli conversation_loop_cancel_emits_terminal_cancelled_status`: passed;
+  the bridge test observed `UserInput::Cancel` reaching its legacy `SessionOp::Interrupt` route and
+  a terminal cancelled status.
+- `cargo test --locked -p talos-agent --test i169_targeted_interrupt`: passed; exact generation and
+  turn identity cancellation remains correct at the actor boundary.
+- Source inspection confirms the resumed structured path can reach `StructuredRunning`, but the TUI
+  calls `project_history` twice synchronously per frame before re-entering the input/event select.
+  The projection has no frame-level cache keyed by transcript/viewport/style/selection inputs.
+
+The incident's most supported loss point is therefore before `UserInput::Cancel` is serviced: a
+large unchanged transcript can monopolize the TUI task and starve keyboard polling. The bridge and
+actor cancellation boundaries are not shown to lose the message by these tests. A claim-backed
+implementation must add a resumed structured-turn reproduction that observes the four boundaries
+independently and records CPU/input-latency evidence; this checkpoint grants no implementation
+authorization.
