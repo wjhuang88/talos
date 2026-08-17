@@ -1,6 +1,6 @@
 # TOOL-024-A: Background Job Lifecycle And Permission Contract Spike
 
-**Status**: Review (2026-08-14; implementation PR #228)
+**Status**: Complete (2026-08-17)
 **Priority**: P1
 **Type**: Technical / Security Spike
 **Parent Epic**: TOOL-024
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-08-14 |
 | Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
@@ -19,10 +19,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; its final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI run `31555885775`. The decision implementation still requires fresh independent security review on its own exact head. |
+| Authorization Evidence | Claim PR #196 merged as `02a3558894a13204a28a48907fa39ca79a420d70`. Decision head `d7d4fe7ae4cc67e452be2ee8ab1c9aab6ef0f803` passed CI `31995198205`, independent security review `5312482823`, and merge-time CAS before PR #228 merged as `1db1211e2fedeab277db366c3c76db0239691732`. |
 | Implementation PR | #228 |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Obtain independent process/permission security review and green CI on PR #228's final exact head, repeat merge-time CAS, then merge before accepting ADR-060 or activating production work. |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | None. TOOL-024-B/C/D retain separate dependency, claim, implementation and security-review gates. |
 
 ## Goal / Value
 
@@ -122,13 +122,23 @@ git diff --check
 The Spike itself changes no runtime behavior. TOOL-024-B/C/D must update README EN/zh-CN, help/tool
 schema documentation, and the user-visible cancellation/status guidance if implementation proceeds.
 
-## Decision Output Under Review
+## Accepted Decision Output
 
-- [ADR-060](../../decisions/060-supervised-background-command-jobs.md) proposes one session-owned,
-  bounded supervisor contract and remains Proposed pending independent exact-head review.
+- [ADR-060](../../decisions/060-supervised-background-command-jobs.md) accepts one session-owned,
+  bounded supervisor contract through exact-head CI `31995198205`, independent security review
+  `5312482823`, and PR #228 merge `1db1211e`.
 - [Current-path characterization](../../reference/I188-BACKGROUND-JOB-CURRENT-PATH.md) records the
   foreground ownership, output, permission, cancellation, persistence, and shutdown evidence at
   baseline `556b5a43`.
 - TOOL-024-B is narrowed to an implementation-ready Unix slice after A acceptance plus RUNTIME-005
   and PERM-006-C completion. Windows background spawn remains fail-closed until TOOL-024-D accepts
   and implements a Job Object/OS-ABI boundary.
+
+## Completion Evidence
+
+- Completion Commit: `245eddebae762d1d0c7ee796baea50d0bb080bd5`.
+- Decision merge: `1db1211e2fedeab277db366c3c76db0239691732` from exact reviewed head
+  `d7d4fe7ae4cc67e452be2ee8ab1c9aab6ef0f803`.
+- Exact-head CI: `31995198205`; independent process/permission security review: `5312482823`.
+- The completion evidence predates this status-only closeout and contains the ADR plus current-path
+  characterization. No production behavior was implemented.

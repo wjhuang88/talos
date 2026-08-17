@@ -1,9 +1,9 @@
 # Mainline Priority Requirements — Ordered Long-Running Task
 
-**Status**: Planned / proposed coordination claim PR #227. Planning only; no child iteration is
-activated by this record.
+**Status**: In Progress / coordination claim effective through PR #227. Child state remains owned
+by each child; this record alone activates none of them.
 **Published plan date**: 2026-08-14
-**Prerequisite claim**: I196 / WORK-001-A proposed claim PR #226
+**Prerequisite claim**: I196 / WORK-001-A claim effective through PR #226 merge `453d1fba`
 **Source requirements**: Issues #59, #69, #79, #111, #125 and #155
 
 This task is the durable execution and recovery ledger requested for the ordered requirements. It
@@ -25,7 +25,7 @@ owner authority or make an ineffective child claim executable.
 | Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, explicitly added Issues #69, #79 and #111, then directed on 2026-08-17 that stale #227/#228 governance residue be digested and PR-flow simplification be scheduled. No independent reviewer is currently available for this planning-only, non-security claim. Single-maintainer merge requires final exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback. Planning authorization does not authorize child implementation, release, migration, deployment, spending or destructive action. |
 | Implementation PR | None; child iterations require separate implementation PRs |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Pass exact-head governance/CI on the current-main reconciliation, repeat merge-time CAS with no unresolved blocking feedback, and merge #227 to establish only this coordination claim. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
+| Handoff / Release Condition | Close only after every ordered child has a terminal disposition and every residual has an explicit owner/resume gate. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
 
 ## Startup Contract
 
@@ -292,3 +292,4 @@ view work and mechanically preventable re-review, not removal of those controls.
 | 2026-08-17 | I209 claim effective and activation preparation | claim merge `33b11433`; activation PR #277 | PR #276 passed exact-head CI `32016873512`, both governance validators and merge-time CAS, then established the effective I209 claim. The activation record proposes I209 as the only Active iteration and changes no implementation surface. | Activation remains ineffective until #277 merges; no implementation worktree exists yet. | Validate and merge #277, then create the implementation worktree from that merge point or later main. |
 | 2026-08-17 | I209 implementation and retry-progress change control | activation merge `c7380332`; implementation `7b82fea6`/`7d90def8`; PR #279; Issues #272/#278 | Cached unchanged history projection and a 2,000-message reopened-Session integration prove the urgent CPU/input and four-boundary cancellation slice. Source inspection established that truthful retry progress requires a semver-bound provider contract excluded by I209; maintainer authorized transfer to Planned/Unclaimed PROVIDER-006/I210. | I209 remains Review pending exact-head CI, real-terminal CPU/input and restoration evidence, independent review and CAS. I210 has no claim or implementation authority. | Finish PR #279 exact-head review gates and close I209 owner-first; do not claim I210 during this slice. |
 | 2026-08-17 | I209 implementation merge and owner-first closeout | Completion Commit `2eff6285`; source implementation `7b82fea6`/`7d90def8`; exact head `6657d14e`; CI `32025371877`; reviews `5316405699`/`5316533941` | A 513,987-byte/2,000-message real-terminal resume remained responsive at approximately 3.6-3.7% idle CPU, input appeared inside 250 ms, supported double-`Ctrl+C` restored terminal modes, and the independent agent audit approved the exact head with the shared-identity limitation disclosed. | Truthful retry progress remains Planned/Unclaimed in PROVIDER-006/I210/#278; I200 and I206 remain separate. No release, provider API or unrelated TUI authority transfers. | After closeout merges and Issue #272 closes, return to GOV-007/I205 only through a fresh inventory, effective claim and separate activation. |
+| 2026-08-17 | T2 I188 decision closeout | Completion Commit `245eddebae762d1d0c7ee796baea50d0bb080bd5`; exact head `d7d4fe7a`; CI `31995198205`; independent security review `5312482823`; PR #228 merge `1db1211e` | I188/TOOL-024-A is Complete/Closed and ADR-060 is Accepted as a decision-only contract. The current-path characterization and decision predate this status closeout; no production background process or permission behavior was implemented. | TOOL-024-B remains blocked until RUNTIME-005 and PERM-006-C are Complete; C remains blocked on B and Windows remains fail-closed pending D. Issue #59 stays open. | Resume T0A at GOV-007/I205 through a fresh exact-main inventory and effective governance-only claim; do not activate I196 or any TOOL-024 production child. |

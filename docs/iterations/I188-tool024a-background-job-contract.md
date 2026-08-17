@@ -1,6 +1,6 @@
 # Iteration I188: TOOL-024-A Background Job Lifecycle Contract
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-11
 > Planned objective: decide the ownership, permission, cancellation, bounded-output, terminal-result and cross-platform cleanup contract required before supervised background command jobs can be implemented.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-08-14 |
 | Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
@@ -18,10 +18,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI `31555885775`. The decision implementation still requires fresh independent review on its exact head. |
+| Authorization Evidence | Claim PR #196 merged as `02a3558894a13204a28a48907fa39ca79a420d70`. Decision head `d7d4fe7ae4cc67e452be2ee8ab1c9aab6ef0f803` passed CI `31995198205`, independent security review `5312482823`, and merge-time CAS before PR #228 merged as `1db1211e2fedeab277db366c3c76db0239691732`. |
 | Implementation PR | #228 |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Obtain independent process/permission security review and green CI on PR #228's final exact head, repeat merge-time CAS, then merge before ADR acceptance. |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | None. Production children remain separately blocked and require their own effective claims. |
 
 ## Published Baseline
 
@@ -97,6 +97,7 @@
 | 2026-08-14 | Activation | User directed the mainline session to clear Issue #59 implementation blockers. I188 activated from exact `origin/main` `556b5a43` in isolated branch `feat/runtime-I188-background-job-contract`; no Rust, Cargo, persistence, dependency, unsafe, Desktop, or Dashboard scope is authorized. |
 | 2026-08-14 | Decision | Proposed ADR-060 selects a session-owned bounded supervisor, explicit background permission resource, live-only terminal event and Unix-first process-group slice. Windows remains fail-closed pending D's separate Job Object gate. |
 | 2026-08-14 | Review handoff | Decision implementation commit `245eddeb` pushed and PR #228 opened against `main`; iteration moved to Review. No self-review or ADR acceptance is recorded. |
+| 2026-08-17 | Independent review and merge | Exact decision head `d7d4fe7a` passed CI `31995198205` and independent process/permission security review `5312482823`; merge-time CAS preserved that head and PR #228 merged as `1db1211e`. ADR-060 is accepted without production implementation. |
 
 ## Verification Evidence
 
@@ -105,12 +106,15 @@
 - Decision artifacts: `docs/decisions/060-supervised-background-command-jobs.md` and
   `docs/reference/I188-BACKGROUND-JOB-CURRENT-PATH.md`.
 - Implementation commit `245eddeb`; PR #228.
-- Implementation exact-head CI, both governance validators, independent security review and
-  merge-time CAS remain pending.
+- Exact decision head `d7d4fe7ae4cc67e452be2ee8ab1c9aab6ef0f803`; CI `31995198205`.
+- Independent process/permission security review `5312482823`; PR #228 merge
+  `1db1211e2fedeab277db366c3c76db0239691732` preserved the reviewed head through merge-time CAS.
 
 ## Completion Evidence
 
-- No completion evidence. A status-only commit cannot certify this iteration.
+- Completion Commit: `245eddebae762d1d0c7ee796baea50d0bb080bd5`.
+- The cited implementation evidence predates this closeout and contains ADR-060 plus the current-path
+  characterization. This status-only closeout does not certify itself.
 
 ## Variance And Residuals
 
@@ -124,3 +128,5 @@
 - The initial issue framing conflated PowerShell availability with descendant ownership. ADR-057
   proves only command identity/direct-child timeout; background Windows execution must remain
   fail-closed until Job Object ownership is independently reviewed.
+- Keeping the decision-only slice separate prevented acceptance of a lifecycle contract from being
+  mistaken for production spawn authority.

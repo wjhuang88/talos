@@ -56,7 +56,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
-| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Review / I188 / PR #228 | None | Proposed ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence. |
+| TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
 | TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit shell/single-exec background input, bounded capture, process-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
@@ -102,6 +102,16 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   fail-closed until D rather than weakening the no-unmanaged-child invariant.
 - RUNTIME-005 remains Refinement/Unclaimed. PERM-006-A/I189 is Planned/Claimed but unactivated;
   both ordered chains still gate production B.
+
+## TOOL-024-A Acceptance Checkpoint (2026-08-17)
+
+- I188/TOOL-024-A is Complete at Completion Commit: `245eddebae762d1d0c7ee796baea50d0bb080bd5`;
+  PR #228 merged as
+  `1db1211e2fedeab277db366c3c76db0239691732` from independently reviewed exact head `d7d4fe7a`.
+- ADR-060 is Accepted as a decision contract only. No production background process, tool/API,
+  permission-policy, persistence, dependency, `unsafe`, Desktop or Dashboard behavior was added.
+- TOOL-024-B remains Blocked until RUNTIME-005 and PERM-006-C are Complete. TOOL-024-C remains
+  blocked on B, and Windows spawn remains fail-closed until D's separate Job Object/OS-ABI gate.
 
 ## Completion Condition
 
