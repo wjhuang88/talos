@@ -21,7 +21,7 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{
-    HistoryProjection, HistoryScrollState, HistorySelectionPoint, project_history,
+    HistoryProjection, HistoryProjectionCache, HistoryScrollState, HistorySelectionPoint,
 };
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
@@ -135,6 +135,7 @@ pub struct Tui {
     pending_transcript: Vec<TranscriptBlock>,
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
+    history_projection_cache: HistoryProjectionCache,
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
     last_history_area: Option<ratatui::layout::Rect>,
@@ -206,6 +207,7 @@ impl Tui {
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
+            history_projection_cache: HistoryProjectionCache::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -246,6 +248,7 @@ impl Tui {
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
+            history_projection_cache: HistoryProjectionCache::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,

@@ -5,7 +5,7 @@
 | Story ID | TUI-051 |
 | Type | TUI / Runtime Reliability Story |
 | Priority | P0 |
-| Status | In Progress / Active / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #272](https://github.com/wjhuang88/talos/issues/272) |
 | Selected Iteration | I209 |
 | Depends On | PROVIDER-005/#270/#271 Complete on main; existing structured-turn cancellation and history-projection contracts |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #276 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
-| Implementation PR | Not started |
+| Implementation PR | #279 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Claim PR #276 merged as `33b11433`; after the I209 activation record reaches main, create the implementation worktree from that activation merge point or later current main. |
+| Handoff / Release Condition | PR #279 requires exact-head CI, real-terminal CPU/input and terminal-restoration evidence, independent review and merge-time CAS before closeout. |
 
 ## Planning Checkpoint — 2026-08-17
 
@@ -163,3 +163,18 @@ point or later current main.
       recovery path for an unavoidable hard kill.
 - [ ] Focused and workspace locked validation, governance validators and `git diff --check` pass.
 - [ ] Owner-first status, Issue #272 and user-facing documentation are synchronized.
+
+## Change-Control And Review Checkpoint — 2026-08-17
+
+The maintainer authorized moving truthful retry attempt/backoff projection to PROVIDER-006 / I210
+after source inspection proved that the required facts are not available through the current
+public provider contract. Issue #278 owns that follow-up and requires an ADR before any API change.
+This preserves the original requirement record while keeping I209 inside its effective exclusion
+of public API changes; no elapsed-time simulation or error-event misuse substitutes for real retry
+facts.
+
+I209 implementation commits `7b82fea6` and `7d90def8` now cache unchanged history projection and
+prove resumed cancellation through TUI input, generation/turn-bound actor interruption,
+provider-future drop and durable terminal outcome against an approximately 320 KB reopened
+Session. TUI-051 is in Review, not Complete. Exact-head CI, real-terminal CPU/input-latency and
+terminal restoration evidence, independent review and merge-time CAS remain open in PR #279.

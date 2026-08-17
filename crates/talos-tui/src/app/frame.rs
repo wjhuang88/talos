@@ -82,13 +82,15 @@ impl Tui {
             && !self.state.slash_menu.is_open
             && matches!(self.state.approval_state, ApprovalState::Hidden)
         {
-            let natural_rows = project_history(
-                &self.transcript,
-                screen_size.width,
-                screen_size.height,
-                &self.history_scroll,
-            )
-            .total_rows;
+            let natural_rows = self
+                .history_projection_cache
+                .project(
+                    &self.transcript,
+                    screen_size.width,
+                    screen_size.height,
+                    &self.history_scroll,
+                )
+                .total_rows;
             Some(
                 splash_rows
                     .saturating_add(natural_rows)
@@ -178,7 +180,7 @@ impl Tui {
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
         self.last_history_viewport_height = history_height;
         self.last_history_area = app_layout.history;
-        let history = project_history(
+        let history = self.history_projection_cache.project(
             &self.transcript,
             screen_size.width,
             history_height,

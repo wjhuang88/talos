@@ -40,6 +40,28 @@ struct RecordingModel {
     order: Arc<Mutex<Vec<String>>>,
 }
 
+struct PendingDispatchModel {
+    entered_tx: mpsc::UnboundedSender<()>,
+    dropped_tx: mpsc::UnboundedSender<()>,
+}
+
+struct DispatchDropGuard(mpsc::UnboundedSender<()>);
+
+impl Drop for DispatchDropGuard {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
+}
+
+#[async_trait]
+impl LanguageModel for PendingDispatchModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let _drop_guard = DispatchDropGuard(self.dropped_tx.clone());
+        let _ = self.entered_tx.send(());
+        std::future::pending().await
+    }
+}
+
 #[async_trait]
 impl LanguageModel for RecordingModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
@@ -278,6 +300,177 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
         .expect("Actor shutdown timeout")
         .expect("Actor task");
     assert_eq!(provider_calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn resumed_structured_turn_cancel_crosses_bridge_actor_and_durable_boundaries() {
+    let temp = tempfile::tempdir().expect("operation should succeed");
+    let manager = SessionManager::with_dir(temp.path().join("sessions"));
+    let seeded = manager
+        .create_or_open_session("i209-resumed-cancel")
+        .expect("durable session");
+    for index in 0..2_000 {
+        seeded
+            .session()
+            .append(&Message::User {
+                content: format!("persisted history row {index:03} {}", "x".repeat(128)),
+            })
+            .expect("seed persisted history");
+    }
+    let session_id = seeded.id().to_string();
+    drop(seeded);
+
+    let resumed = manager
+        .create_or_open_session("i209-resumed-cancel")
+        .expect("resume durable session");
+    let initial_history = resumed.read_messages().expect("read resumed history");
+    assert_eq!(initial_history.len(), 2_000);
+    let store = PendingSubmissionStore::for_session_file(resumed.file_path(), &session_id);
+    assert_eq!(
+        store
+            .advance_runtime_generation(0)
+            .expect("advance resumed runtime generation"),
+        1
+    );
+
+    let (entered_tx, mut entered_rx) = mpsc::unbounded_channel();
+    let (dropped_tx, mut dropped_rx) = mpsc::unbounded_channel();
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(PendingDispatchModel {
+            entered_tx,
+            dropped_tx,
+        }),
+        ToolRegistry::new(),
+    );
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp.path().to_path_buf(),
+        initial_history,
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(1);
+    actor.set_durable_persistence(resumed, PersistencePolicy::default());
+    let actor_sq_tx = handle.sq_tx.clone();
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    // The proxy preserves Actor custody while making the exact bridge command
+    // observable as an independent cancellation boundary.
+    let (proxy_tx, mut proxy_rx) = mpsc::channel(8);
+    register_generation_bound_sender(&proxy_tx, 1);
+    let (interrupt_seen_tx, mut interrupt_seen_rx) = mpsc::unbounded_channel();
+    let (submission_seen_tx, mut submission_seen_rx) = mpsc::unbounded_channel();
+    let actor_commands = actor_sq_tx.clone();
+    let proxy_task = tokio::spawn(async move {
+        while let Some(operation) = proxy_rx.recv().await {
+            if let SessionOp::SubmitStructured { submission } = &operation {
+                let _ = submission_seen_tx.send(submission.id.clone());
+            }
+            if let SessionOp::InterruptTurn {
+                session_generation,
+                turn_id,
+            } = &operation
+            {
+                let _ = interrupt_seen_tx.send((*session_generation, turn_id.clone()));
+            }
+            if actor_commands.send(operation).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let (user_tx, user_rx) = mpsc::unbounded_channel();
+    let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+    let (_watch_tx, watch_rx) = tokio::sync::watch::channel(proxy_tx);
+    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(128_000));
+    let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let bridge_task = tokio::spawn(run_conversation_loop(
+        ConversationEngine::new("i209-model".into(), "test-provider".into()),
+        ConversationLoopIo {
+            agent_rx: handle.eq_rx,
+            user_rx,
+            ui_tx,
+            sq_tx_watch: watch_rx,
+            model_info_watch: model_rx,
+            session_tx,
+            runtime_skills: runtime_skills(),
+            permission_engine: None,
+        },
+    ));
+
+    user_tx
+        .send(UserInput::Message("cancel this resumed turn".into()))
+        .expect("submit resumed turn");
+    let submission_id = tokio::time::timeout(Duration::from_secs(2), submission_seen_rx.recv())
+        .await
+        .expect("bridge submits structured turn")
+        .expect("structured submission observation");
+    tokio::time::timeout(Duration::from_secs(5), entered_rx.recv())
+        .await
+        .expect("provider dispatch starts")
+        .expect("provider dispatch signal");
+
+    // This is the message emitted by the TUI Esc entry point.
+    user_tx
+        .send(UserInput::Cancel)
+        .expect("send Esc cancellation message");
+    let (generation, turn_id) =
+        tokio::time::timeout(Duration::from_secs(2), interrupt_seen_rx.recv())
+            .await
+            .expect("bridge emits targeted interrupt promptly")
+            .expect("targeted interrupt observation");
+    assert_eq!(generation, 1);
+    assert!(!turn_id.is_empty());
+    tokio::time::timeout(Duration::from_secs(2), dropped_rx.recv())
+        .await
+        .expect("Actor cancellation drops pending provider dispatch")
+        .expect("provider dispatch drop signal");
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if store
+                .get(&submission_id)
+                .expect("read pending submission")
+                .is_some_and(|record| {
+                    record.state == PendingSubmissionState::TerminalCancelled
+                        && record.turn_id.as_deref() == Some(turn_id.as_str())
+                })
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("durable terminal cancellation");
+
+    let mut saw_terminal_cancelled = false;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while let Some(output) = ui_rx.recv().await {
+            if matches!(
+                output,
+                UiOutput::Status(status)
+                    if !status.is_processing
+                        && status.phase == Some(talos_conversation::TurnPhase::Cancelled)
+            ) {
+                saw_terminal_cancelled = true;
+                break;
+            }
+        }
+    })
+    .await
+    .expect("terminal cancelled status reaches TUI");
+    assert!(saw_terminal_cancelled);
+
+    user_tx.send(UserInput::Exit).expect("exit bridge");
+    bridge_task.await.expect("bridge task");
+    actor_sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown Actor");
+    actor_task.await.expect("Actor task");
+    proxy_task.abort();
 }
 
 #[tokio::test]
