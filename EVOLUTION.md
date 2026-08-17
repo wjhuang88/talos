@@ -932,6 +932,22 @@ repeating known mistakes.
   `mode_runners::tests::empty_tui_shutdown_preserves_nonempty_unparseable_transcripts` covers both
   truncated and valid unknown-schema transcripts and asserts their bytes and sidecars are unchanged.
 
+## 2026-08-17 - Do not terminate a raw-mode TUI without terminal restoration
+
+- Trigger: An emergency diagnosis ended a 100%-CPU `talos -c` process with `SIGTERM` after its
+  active turn had committed.
+- Symptom: The owning shell remained in raw/alternate-screen state; mouse movement and ordinary
+  keypresses emitted visible escape bytes until the user closed the terminal window.
+- Root cause: Direct process termination bypassed Talos terminal cleanup, and the diagnostic path
+  treated durable Session safety as sufficient without separately preserving terminal ownership.
+- Fix: The affected window was closed; Session and pending data remained intact. TUI-051/I209 now
+  owns supported-signal terminal restoration and a bounded recovery path.
+- Prevention: Prefer application-owned cancellation and graceful exit. Before any external signal,
+  identify the owning tty and terminal-mode contract; never use `SIGTERM` as routine TUI recovery
+  unless restoration is guaranteed or the user explicitly accepts closing/resetting the window.
+- Promoted to rule/check: TUI-051/I209 real-terminal termination acceptance; no executable check
+  exists until that iteration is implemented.
+
 ## 2026-08-17 - Transport chunks are not UTF-8 character boundaries
 
 - Trigger: A live TUI turn failed while streaming Chinese review output.

@@ -115,6 +115,23 @@ unless a later target-branch claim explicitly authorizes otherwise.
 None are authorized. No force-push, stash restore/drop, worktree deletion, tag, release, publish,
 deployment, schema/data migration or external destructive action is part of this task.
 
+## 2026-08-17 Queue Gate: Provider Fix And Session Interactivity
+
+The provider UTF-8 emergency fix (`PROVIDER-005`, Issue #270, PR #271) reached Complete/Closed:
+implementation `1d31847a`, exact-head CI `32002811484`, independent approval `5313112992`, merge
+`89523dbc`, owner closeout `c15da4cf`, and remote synchronization `abf88657`. Its emergency
+authorization remains separate from this coordination record.
+
+With #271 closed, the next queued slice is
+`I209 / TUI-051 / Issue #272` (`docs/iterations/I209-resumed-session-interactivity.md`). I209 owns
+resumed-turn cancellation responsiveness, bounded provider retry status and large-history TUI
+projection invalidation. It is Planned / Unclaimed and has no implementation authorization.
+
+Only after I209 reaches its own terminal disposition may this task proceed to `I205 / GOV-007`,
+then the previously published child order `I196 -> I188/#59 -> I199/#69 -> I200/#79 ->
+I197/#125 -> I201/#111 -> I198/#155`. This checkpoint does not expand the existing coordination
+claim, activate any child, or authorize release/publication work.
+
 ### Time, Cost And Resource Limits
 
 - No paid service, real provider credential or monetary spend.
