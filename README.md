@@ -492,7 +492,8 @@ that do not support the protocol.
 
 Press `Esc` during an active turn to request cancellation. `Ctrl+C` clears the
 composer locally; with an empty idle composer, press `Ctrl+C` twice to exit
-Talos.
+Talos. A graceful exit restores terminal input and display modes. If Talos is unavoidably hard
+killed and the shell remains in a raw or mouse-reporting state, run `reset` or open a fresh terminal.
 
 If you type a message while the model is still processing, it queues automatically and is sent
 FIFO after the current turn completes. The TUI shows a compact preview of queued messages
