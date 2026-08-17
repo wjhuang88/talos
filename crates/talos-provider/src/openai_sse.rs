@@ -9,7 +9,7 @@ use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, ToolCall, Usag
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
-use crate::parse_text_tool_calls;
+use crate::{parse_text_tool_calls, stream_utf8::Utf8StreamDecoder};
 
 /// OpenAI stream chunk for SSE response parsing.
 #[derive(Debug, Clone, Deserialize)]
@@ -74,6 +74,7 @@ pub(crate) async fn parse_sse_stream(
     let _ = tx.send(AgentEvent::TurnStart).await;
 
     let mut stream = response.bytes_stream();
+    let mut utf8_decoder = Utf8StreamDecoder::default();
     let mut buffer = String::new();
     let mut input_tokens: u32 = 0;
     let mut output_tokens: u32 = 0;
@@ -114,7 +115,7 @@ pub(crate) async fn parse_sse_stream(
     } {
         saw_first_packet = true;
         let chunk = match chunk_result {
-            Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
+            Ok(bytes) => match utf8_decoder.push(&bytes) {
                 Ok(s) => s,
                 Err(_) => {
                     let _ = tx
@@ -386,6 +387,15 @@ pub(crate) async fn parse_sse_stream(
                 return;
             }
         }
+    }
+
+    if utf8_decoder.finish().is_err() {
+        let _ = tx
+            .send(AgentEvent::Error {
+                message: "provider stream decode error: invalid UTF-8 byte stream".into(),
+            })
+            .await;
+        return;
     }
 
     let _ = tx
@@ -1964,14 +1974,8 @@ mod tests {
 
     #[tokio::test]
     async fn parse_sse_stream_utf8_multibyte_content_round_trips() {
-        // Multi-byte UTF-8 content split across chunks must re-assemble without
-        // mojibake. The parser reads `String::from_utf8(bytes)` per network
-        // chunk, so a chunk boundary inside a multi-byte code point would
-        // historically produce `continue`. This fixture confirms the current
-        // behavior: if a chunk ends mid-code-point, that partial bytes are
-        // dropped (lossy), but complete code points are preserved. We feed
-        // whole-code-point chunks to keep this a regression guard, not a bug
-        // hunt.
+        // The shared incremental decoder separately covers transport boundaries
+        // inside a code point; this fixture guards the complete SSE path.
         let mut server = mockito::Server::new_async().await;
         let stream_body = concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"你好\"},\"finish_reason\":null}]}\n\n",
