@@ -23,13 +23,13 @@
 | Source Issue | #29 |
 | Governance Claim PR | #226 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head architecture review is required before claim merge and again before P0 decision acceptance. If the shared `@wjhuang88` account is used, the reviewer must disclose the actual natural-person identity and role separation. This proposed Claimed record remains ineffective until PR #226 reaches `main`. |
+| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. A separate independent exact-head architecture review is still required for P0 decision acceptance. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current main and all lanes, and merge PR #226 to main; only then create the P0 implementation branch from the claim merge or later current main. |
+| Handoff / Release Condition | Claim is effective. Hold activation until the v0.8.0 GitHub-first/Cargo-second publication task closes; then repeat the full current-main dependency/overlap inventory and create the P0 branch from that current `main`. |
 
-This governance branch is not an implementation branch. No claim is effective until the finalized
-record reaches `main`.
+The claim is effective through PR #226 merge `453d1fba97470639835468664c58397770db384c`.
+It authorizes only the frozen decision/documentation slice and does not by itself activate I196.
 
 ## Published Baseline
 
@@ -147,6 +147,15 @@ evaluator-isolation decision unresolved for P1.
 
 No activation has occurred. Append execution facts only after the finalized claim is effective on
 `main`; do not rewrite the published baseline.
+
+### 2026-08-14 Pre-Activation Priority Hold
+
+PR #226 merged the effective I196 claim at
+`453d1fba97470639835468664c58397770db384c`. Before an implementation branch was created, the
+maintainer selected the v0.8.0 GitHub-first/Cargo-second publication sequence as the next mainline
+work. I196 remains Planned / Claimed and unactivated; its scope and acceptance are unchanged. After
+the release task closes, I196 must refresh to then-current `main`, repeat every dependency and
+overlap check, and obtain independent exact-head review for the P0 decision implementation.
 
 ## Verification Evidence
 

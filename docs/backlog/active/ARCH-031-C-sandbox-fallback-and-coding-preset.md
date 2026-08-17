@@ -1,15 +1,34 @@
 # ARCH-031-C: Explicit Sandbox Fallback Policy And Official Coding Preset
 
+> Document status: Complete (2026-08-15)
+
 | Field | Value |
 |---|---|
 | Story ID | ARCH-031-C |
 | Type | SDK / Security-Sensitive API Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Refinement — blocked on ARCH-031-B and security review |
-| Depends on | ADR-024; ADR-052; I160 Complete; permission/sandbox security review scheduled |
-| Selected Iteration | I161 (Planned/Blocked) |
+| Status | Complete / Closed — I161 |
+| Depends on | ADR-024; ADR-052; I160 Complete; independent security review recorded in Issue #245 |
+| Selected Iteration | I161 (Complete/Closed) |
 | Value | Embedders can choose a fail-closed sandbox fallback and opt into Talos coding defaults without copying product internals |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Closed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline session` |
+| Work Slice | `ARCH-031-C / I161` only: `SandboxFallbackPolicy`, explicit coding preset, typed fallback approval context if required, security matrix tests, runtime evidence, and SDK documentation; no I162 publication or release work. |
+| Claimed At | 2026-08-15 |
+| Source Issue | None |
+| Governance Claim PR | #244 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Claim PR #244 merged as `b570ac27`; implementation PR #250 exact-head APPROVE bound to `74c5502d` and matrix-closure PR #251 exact-head APPROVE bound to `8b3ca5fc`, both with shared-account identity limits disclosed. |
+| Implementation PR | #250; matrix-closure follow-up #251 |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | None — I161 is complete; I162 and publication remain separately governed. |
 
 ## Problem
 
@@ -124,6 +143,23 @@ Sandbox fallback and permission are orthogonal.
 
 Add path/network/execute variants and adversarial cases.
 
+## Formal Security Review Record
+
+Issue #245 is the formal pre-implementation security review record accepted on 2026-08-15.
+The complete `ARCH-031-C` security chapters and nine-row matrix are normative; the issue summary
+is not a lossy substitute. The review confirms these required invariants: permission `Deny` always
+wins; `AllowUnsandboxed` only permits continuation when required isolation is unavailable and never
+bypasses permission; headless `Ask` fails closed; fallback approval is typed, scoped, distinguishable
+from ordinary approval, and cannot silently create a permanent broad grant; ordinary `AlwaysApprove`
+does not approve fallback; coding composition cannot weaken permission or sandbox constraints; CLI
+behavior changes only on explicit selection; old construction remains minimal by default; and
+policy stays out of `talos-sandbox`. Path, network, and execute variants remain in scope.
+
+The security reviewer and implementation roles are separate, with shared-account identity limits
+disclosed. This is a design/matrix review, not implementation acceptance. The final implementation
+head must receive a fresh independent exact-head security review against the complete matrix before
+merge, and the acceptance checkbox below remains open until that evidence exists.
+
 ## Invariants
 
 - permission `Deny` always wins;
@@ -138,37 +174,47 @@ Add path/network/execute variants and adversarial cases.
 
 ### API
 
-- [ ] public API and migration note reviewed before merge.
-- [ ] `SandboxFallbackPolicy` default is `Deny`.
-- [ ] coding preset is explicit.
-- [ ] caller overrides win.
-- [ ] SDK docs accurately show supported types.
+- [x] public API and migration note reviewed before merge.
+- [x] `SandboxFallbackPolicy` default is `Deny`.
+- [x] coding preset is explicit.
+- [x] caller overrides win.
+- [x] SDK docs accurately show supported types.
 
 ### Security
 
-- [ ] independent security review approves the matrix.
-- [ ] all matrix cases have focused tests.
-- [ ] ordinary `AlwaysApprove` cannot substitute for fallback approval.
-- [ ] headless `Ask` denies.
-- [ ] permission/path/network/execute decisions remain enforced.
+- [x] independent security review approves the matrix.
+- [x] all matrix cases have focused tests.
+- [x] ordinary `AlwaysApprove` cannot substitute for fallback approval.
+- [x] headless `Ask` denies.
+- [x] permission/path/network/execute decisions remain enforced.
 
 ### Composition
 
-- [ ] coding preset and CLI use the same shared composition implementation.
-- [ ] registry/capability equivalence test passes.
-- [ ] no new crate or global registry appears.
+- [x] coding preset and CLI use the same shared composition implementation.
+- [x] registry/capability equivalence test passes.
+- [x] no new crate or global registry appears.
 
 ### Runtime evidence
 
-- [ ] embedded fixture proves Deny.
-- [ ] embedded fixture proves headless Ask denies.
-- [ ] embedded fixture proves scoped Ask approval.
-- [ ] embedded fixture proves AllowUnsandboxed still respects permission Deny.
-- [ ] coding preset can complete one read-only turn and one permission-gated tool scenario.
+- [x] embedded fixture proves Deny.
+- [x] embedded fixture proves headless Ask denies.
+- [x] embedded fixture proves scoped Ask approval.
+- [x] embedded fixture proves AllowUnsandboxed still respects permission Deny.
+- [x] coding preset can complete one read-only turn and one permission-gated tool scenario.
 
 ### Validation
 
 Focused tests, full locked validation, docs, Story/Iteration/Board sync.
+
+## Completion Evidence
+
+- Completion Commit: `74c5502d8860316070182c0cf2366d5adf57ea6c` and `3ca2ec62b3e91d88c345f5bba15e986cb31f606c` (pre-existing implementation/test commits).
+- Implementation PR #250 merged as `d2b4bdd12f69f1eaffeade7e05625369a7d4f8aa`; matrix-closure PR #251 merged as `da5a43a244ee17902fb001b2445b4ec54cbf206c`.
+- Exact-head CI: `31873172667` and `31878744293`, both 5/5 SUCCESS; independent approvals bound to both implementation heads.
+
+## Completion Checkpoint 2026-08-15
+
+I161/ARCH-031-C is Complete/Closed. Non-blocking M1/M4/N4/N5/N6 remain residual follow-ups and do not weaken the delivered acceptance boundary.
 
 ## Stop And Escalate Conditions
 

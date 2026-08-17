@@ -35,10 +35,10 @@ closeout evidence; status synchronization commits do not self-certify completion
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
-| I159 | `talos-tools` Lightweight Feature Boundary | Blocked | Requires the completed I158 baseline and a recorded TUI-037 disposition before activation. |
-| I160 | Shared CLI And Runtime Internal Composition | Blocked | Requires I159 Complete. |
-| I161 | Sandbox Fallback And Coding Preset | Blocked | Requires I160 Complete and an independent security-review plan. |
-| I162 | v0.6 SDK Fixture And Publication Readiness | Blocked | Requires I161 Complete and explicit readiness authorization; no real publish/tag/release. |
+| I159 | `talos-tools` Lightweight Feature Boundary | Complete / Closed | Completion Commit `d886917e45d5ca0f110e111b966cd379485e3580` plus cfg follow-up `34c09b14`; exact head `33a2c6ff` passed CI `31801484313`, approval `5293622712` and CAS, then PR #236 merged as `f79c1ead`. |
+| I160 | Shared CLI And Runtime Internal Composition | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161 is Complete and I162 is Planned/Claimed through claim PR #253 pending merge. |
+| I161 | Sandbox Fallback And Coding Preset | Complete / Closed | Completion Commits `74c5502d`/`3ca2ec62`; PRs #250/#251 merged after exact-head independent approvals and CI. I162 is Planned/Claimed through claim PR #253 pending merge. |
+| I162 | v0.6 SDK Fixture And Publication Readiness | Complete / Closed | Completion Commit `077b347d`; PR #255 merged as `16564ba0` after exact-head CI `31891263313` and independent approval `5302842269`; reviewed readiness NO-GO keeps I203 blocked. |
 | I172 | CLI/TUI Bridge Legacy Projection Decomposition | Complete | Completion Commit `4084138dc0652d3200045847d42518d9ecb66231`; PR #144 merged at `c1dc67ae`; exact-head CI `31137882248` passed. |
 | I173 | Todo Module Decomposition | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | I174 | TUI App Coordinator Decomposition | Complete | Completion Commit `e4248bfedd17c91aebb24c80c60580fcbcebec62`; PR #152 merged at `62b09c277713bea8404ed7ef9c7f50354e5a2e17`; exact-head CI `31148908291` passed. |
@@ -62,14 +62,17 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I192 | Session Runtime Recovery Closure | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213`, independent review `5274917099`; its SESSION-008-B residual was later completed by I193. |
 | I193 | SESSION-008-B Durable Partial-Turn Finalization | Complete | Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411`; PR #216 merged as `1b5461cd`; exact-head CI `31691761892`; disclosed role audits `5287961007`/`5287989820`. RUNTIME-005 retains its owner-defined gates. |
 | I194 | Desktop Renderer, Host, And Repository Boundary | Complete | Completion Commit `0a47208ce6fad23c706ebede8b3d07111b9303dc`; PR #215 merged as `1beaca68`; exact-head CI `31687636396`; independent approval `5278769979`. ADR-059 remains Proposed and later renderer gates remain separate. |
-| I195 | Dashboard Read-Only Visual Shell | Planned / proposed Claimed | PR #212 proposes WEB-001-A only; claim remains ineffective until exact-head validation, independent natural-person review, merge-time CAS, and merge to `main`. I193 Runtime is Complete and I194 Desktop D0 is Complete target-branch truth; neither scope is imported into I195. |
-| I196 | Canonical Work Domain Decision And Migration Contract | Planned / proposed claim PR #226 | WORK-001-A P0 only. The claim is ineffective until independently reviewed and merged to `main`; no implementation branch, Work Graph, Evaluator, persistence or Desktop work is authorized. |
-| I197 | Permission Prompt Layout Anchor Stability | Planned / Unclaimed | TUI-045 / Issue #125 runnable TUI correction; follows predecessor disposition in the ordered mainline task and requires its own effective claim before implementation. |
-| I198 | Optional Skill Triggers Compatibility | Planned / Unclaimed | SKILL-004 / Issue #155 runnable compatibility slice; requires its own effective claim and a public-contract checkpoint before parser edits. |
-| I199 | Thinking Preview Wrap And Bounded Height | Planned / Unclaimed | TUI-041 / Issue #69 runnable preview-layout correction; ordered before I200 to establish preview-driven viewport capacity and requires its own effective claim. |
-| I200 | No-Op History Scroll State Stability | Planned / Unclaimed | TUI-042 / Issue #79 runnable scroll-transition correction; follows I199 disposition and requires its own effective claim. |
-| I201 | Tool-Call Placeholder Suppression | Planned / Unclaimed | TUI-043 / Issue #111 bounded presentation correction; follows I197 disposition for review ordering and requires its own effective claim. |
+| I195 | Dashboard Read-Only Visual Shell | Planned / Claimed | PR #212 merged as `f123e534`, establishing WEB-001-A ownership. I195 remains unactivated and independent of release/mainline implementation. |
+| I196 | Canonical Work Domain Decision And Migration Contract | Planned / Claimed / priority hold | PR #226 merged as `453d1fba`; no implementation branch exists. Resume only after v0.8.0 publication closes and a fresh exact-main inventory passes. |
+| I197 | Permission Prompt Layout Anchor Stability | Planned / Unclaimed | Issue #125 / TUI-045; keep unactivated until its separate claim and predecessor disposition are recorded. |
+| I198 | Optional Skill Triggers Compatibility | Planned / Unclaimed | Issue #155 / SKILL-004; keep unactivated until its separate claim and compatibility decision checkpoint. |
+| I199 | Thinking Preview Wrap And Bounded Height | Planned / Unclaimed | Issue #69 / TUI-041; keep unactivated until its separate claim and ordered predecessor disposition. |
+| I200 | No-Op History Scroll State Stability | Planned / Unclaimed | Issue #79 / TUI-042; follows I199 for overlap control and needs its own claim. |
+| I201 | Tool-Call Placeholder Suppression | Planned / Unclaimed | Issue #111 / TUI-043; keep unactivated and separately claimed after the ordered TUI predecessors. |
 | I202 | Dashboard Availability In The Logo Prefix | Complete / Closed | Completion Commit `6d3f85ea9f7e76f617ec9716f17ecdd0f9dd0772`; PR #230 merged as `e0cc782a`; exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997` passed. SEC-002 owns the separate opt-in token-delivery decision. |
+| I203 | v0.8.0 GitHub And Crates.io Publication | Complete / Closed | Completion Commits `b0354ae6`/`d8e1aa26`/`d5de4a65`; PR #264 merged as `f425e7bc`. Workflow `31953951828` completed the GitHub Release before all 20 crates published; external CLI install and registry-only runtime fixture passed. |
+| I204 | v0.8.0 Release-Candidate Registry Readiness | Complete / Closed | Completion Commit `f46094e3`; PR #260 merged as `7c10afe3`; reviewed conditional GO for preparing I203 claim only. Fresh I203 claim remains required; no release or publication was authorized by I204. |
+| I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
 
 ## Completed This Closeout
 

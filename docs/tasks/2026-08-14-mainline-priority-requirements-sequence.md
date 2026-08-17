@@ -17,15 +17,15 @@ owner authority or make an ineffective child claim executable.
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline planning session 2026-08-14 |
-| Work Slice | Coordination and recovery ledger for I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I198/#155, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
+| Work Slice | Coordination and recovery ledger for I205/GOV-007 → I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I198/#155, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #59 |
 | Governance Claim PR | #227 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, then explicitly added Issues #69, #79 and #111 to the same long-running task on 2026-08-14. Independent natural-person exact-head review is required before merge; shared-account review must disclose actual identity and role separation. This proposed claim remains ineffective until the finalized record reaches `main`. Planning authorization does not authorize child implementation, merge, release, migration, deployment, spending or destructive action. |
 | Implementation PR | None; child iterations require separate implementation PRs |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Reconcile PR #227 onto current `main` after prerequisite PR #226 merges; pass exact-head governance/CI and independent review, repeat merge-time CAS, and merge #227 to establish only this coordination claim. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | Pass exact-head governance/CI and independent review on the current-main reconciliation, repeat merge-time CAS, and merge #227 to establish only this coordination claim. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
 
 ## Startup Contract
 
@@ -229,3 +229,44 @@ This task can close only after T0-T7 have terminal evidence, each delivered chil
 already-existing implementation/merge commit, all required exact-head checks and independent reviews
 are recorded, derived views and Issues agree with owners, and every deferred production slice has an
 explicit owner and resume gate. Planning publication alone does not complete any requirement.
+
+## Current Exact-Main Reconciliation — 2026-08-17
+
+This checkpoint supersedes only stale current-state instructions; it does not rewrite the published
+2026-08-14 planning baseline or its historical checkpoints.
+
+- PR #226 merged as `453d1fba`; I196 remains Planned/Claimed and unactivated after the v0.8.0
+  release closure. It needs a fresh exact-main inventory before implementation.
+- Current target `main@f46f45d7` has no Active or Review iteration. I164 remains Paused;
+  I188/I189/I195/I196 remain Planned/Claimed and unactivated.
+- I197-I201 remain Planned/Unclaimed and require independent child claims.
+- I188 decision PR #228 remains unmerged and must be refreshed and independently security-reviewed
+  on its new exact head; no production background-job implementation is authorized.
+- #227 now targets current main directly. Its coordination claim remains ineffective until merge.
+
+## Change Control — 2026-08-17 PR Workflow Simplification
+
+The maintainer added an evidence-based PR workflow simplification Spike after the v0.8.0 delivery
+showed that claim, status, synchronization and re-review round trips could exceed the underlying
+code and documentation changes. This is a new governance outcome, not an in-scope correction to
+I196 or any product child, so GOV-007 / I205 owns it separately.
+
+I205 runs as gate `T0A` before T1 implementation begins. It measures recent delivery chains,
+distinguishes mandatory safety evidence from mechanically preventable churn, and selects a smallest
+separately claimable process change. It does not itself change SOPs, validators, CI, branch
+protection or review requirements.
+
+| ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
+|---|---|---|---|---|---|---|
+| T0A | Claim and deliver I205 / GOV-007 | Reproducible PR/review audit, target-flow decision, scenario matrix, migration/rollback and smallest implementation slice | T0 planning publication | Effective I205 claim, owner acceptance, exact-head validation/review/CAS and owner-first closeout | Keep current workflow unchanged and record measured blockers | Planned |
+
+Hard gates remain effective claim before governed implementation, independent review for protected
+security scope, exact-head evidence after content changes, merge-time CAS, owner-first truth and a
+pre-existing Completion Commit before Complete. The optimization target is duplicate state/derived
+view work and mechanically preventable re-review, not removal of those controls.
+
+## Reconciliation Checkpoint
+
+| Time | Task Item | Branch / Commit | State And Evidence | Open Risk / Deviation | Next Exact Action / Resume |
+|---|---|---|---|---|---|
+| 2026-08-17 | T0 current-main reconciliation and T0A change control | `docs/mainline-priority-long-task-plan`; PR #227 merged with `main@f46f45d7` | Preserved the published baseline, retained I197-I201 planning, added separate GOV-007/I205 ownership, and changed no product code or executable governance rule. | #227 still needs exact-head validation and independent review; I205 and every product child remain unactivated. | Run both governance validators and CI, obtain exact-head review, then merge #227 before claiming I205. |

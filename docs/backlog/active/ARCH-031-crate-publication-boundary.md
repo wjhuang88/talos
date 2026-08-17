@@ -7,6 +7,23 @@
 not only available through `talos-runtime`
 **Depends on**: `RUNTIME-001`; ADR-024; ADR-052; `TOOL-012`; `TOOL-013`; `DIST-001`; `REL-002`
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned — child Stories require separate non-overlapping claims |
+| Claimed At | Not applicable |
+| Source Issue | None |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | None — Epic parents are not implementation units |
+| Last Updated | 2026-08-17 |
+| Handoff / Release Condition | Close each selected child through its own owner, iteration, effective claim, implementation PR, validation evidence, independent exact-head review and merge-time CAS. |
+
 ## Problem
 
 Talos now has a pre-1.0 embeddable SDK facade in `talos-runtime`, but many self-written
@@ -86,14 +103,14 @@ and gates.
 
 | Child Story | Owns Candidate Slice | Selected Iteration | Initial State | Activation Gate |
 |---|---|---|---|---|
-| [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Refinement — blocked on I158 | I158 Complete (which requires ADR-053 Accepted) |
-| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Refinement — blocked on ARCH-031-A | I159 Complete |
-| [ARCH-031-C](ARCH-031-C-sandbox-fallback-and-coding-preset.md) | (new) `SandboxFallbackPolicy` + `RuntimePreset::coding()` (ADR-052) | I161 | Refinement — blocked on ARCH-031-B + security review | I160 Complete; independent security review scheduled |
+| [ARCH-031-A](ARCH-031-A-talos-tools-feature-boundary.md) | 4 (Capability feature gates — `talos-tools`) | I159 | Complete — PR #236 merge `f79c1ead` | Closed |
+| [ARCH-031-B](ARCH-031-B-shared-cli-runtime-composition.md) | (new) Shared CLI/runtime internal composition | I160 | Complete | Completion Commit `0524e82f`; PR #240 merged as `97556149`; I161 remains independently gated |
+| [ARCH-031-C](ARCH-031-C-sandbox-fallback-and-coding-preset.md) | (new) `SandboxFallbackPolicy` + `RuntimePreset::coding()` (ADR-052) | I161 | In Progress / Active | I160 Complete; formal security review recorded in Issue #245; exact-head implementation review remains mandatory |
 | [ARCH-031-D](ARCH-031-D-v0.6-sdk-publication-readiness.md) | 1/3/5 (matrix, dry-run, docs/release gate) at v0.6 alignment | I162 | Refinement — blocked on ARCH-031-C | I161 Complete; workspace green |
 
 Candidate Slices 2 (Manifest readiness) and 6 (Cargo install path) remain open acceptance items
-under ARCH-031 directly and are not yet satisfied (see Acceptance Criteria). None of the child
-stories is activated by this staging; their gates are sequential and ADR-053-gated.
+under ARCH-031 directly and are not yet satisfied (see Acceptance Criteria). I160 is Complete;
+later child gates remain sequential and ADR-053-gated.
 
 ## Acceptance Criteria
 
@@ -120,9 +137,10 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
       pre-1.0 implementation API may change more frequently). The facade contract itself lives in
       `RUNTIME-SDK-CONTRACT.md`.
 - [ ] Heavy optional capabilities have REAL feature gates (optional dependencies + gated
-      modules/re-exports) or a recorded split trigger. (`talos-tools` currently has NO Cargo feature
-      gates and all heavy deps are hard `[dependencies]`; only a recorded direction under ADR-052
-      exists. This item cannot close until the gates are implemented.)
+      modules/re-exports) or a recorded split trigger. (I159 implements this boundary for
+      `talos-tools`: default `file-read + search`, optional heavy families, and explicit CLI
+      `coding`. I162 must still audit the other publication targets before this parent-wide item can
+      close.)
 - [ ] README, README.zh-CN, and architecture docs explain crate distribution when the first
       implementation slice lands.
 - [ ] The publish plan defines and validates the Cargo install path for the CLI binary.
@@ -136,6 +154,13 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 - `scripts/validate_project_governance.sh .`
 
 ## Execution Notes
+
+### I159 Closeout Evidence (2026-08-14)
+
+- Completion Commit: `d886917e45d5ca0f110e111b966cd379485e3580` and
+  `34c09b142766c70ac62ef24424ed035f2fa921a5` (child ARCH-031-A/I159 implementation
+  evidence; the parent Epic remains `In Progress` and is not Complete).
+- I159 implementation PR #236 merged at `f79c1ead1cd3a547797dea3666295f510d88a13d`.
 
 2026-06-29:
 
@@ -245,6 +270,37 @@ stories is activated by this staging; their gates are sequential and ADR-053-gat
 - No crate was published; no tag or GitHub Release was created; ARCH-031 is NOT closed.
 - ARCH-031 remains `In Progress`; the still-open Acceptance items are real feature-gate
   implementation, complete crate metadata, distribution docs, and the Cargo install path.
+
+2026-08-14 I159 implementation checkpoint:
+
+- Draft PR #236 implements the `talos-tools` portion of Candidate Slice 4: default
+  `file-read + search`, optional write/document/shell/Git/network/image/code-intelligence families,
+  and an explicit `coding` aggregate selected by `talos-cli`.
+- Local feature, product-parity and workspace commands passed before implementation commit
+  `d886917e`, but exact-head CI `31794297165` correctly rejected this changed active Epic because it
+  lacked the explicit Unclaimed claim metadata now recorded above. The earlier local validator ran
+  without a PR-base binding and did not inspect the complete branch diff. I159 remains Active until
+  the corrected head passes exact-head CI and independent review; the parent-wide feature audit and
+  real publication remain open under I162/I203.
+- On the corrected working tree, `COLLABORATION_VALIDATION_BASE=origin/main` makes the collaboration
+  validator cover the complete PR diff; it reports 0 warnings, and the base-bound full
+  `release_preflight.sh` completes successfully. The correction is recorded by commits `34c09b14`
+  and `57bc1585`; this remains local follow-up evidence until GitHub validates the resulting exact
+  head.
+- PR #236 then passed exact-head CI `31801484313` 5/5, independent approval `5293622712` and
+  merge-time CAS, merging as `f79c1ead1cd3a547797dea3666295f510d88a13d`. ARCH-031-A/I159 is
+  Complete; ARCH-031-B/I160 is Ready/Planned/Unclaimed, while ARCH-031 remains In Progress.
+
+2026-08-17 I203 publication checkpoint:
+
+- I203/REL-003 is Complete/Closed through implementation commits `b0354ae6`, `d8e1aa26`, and
+  `d5de4a65`, merge `f425e7bc`, immutable tag `v0.8.0`, and GitHub Release workflow `31953951828`.
+- The GitHub Release completed with five archives and `checksum.sha256` before the first real Cargo
+  publication. All 20 authorized closure crates are visible at `0.8.0`; only `talos-models`
+  remains quarantined.
+- External crates.io installation returned `talos 0.8.0`, and the registry-only `talos-runtime`
+  fixture passed in default and `coding` modes. ARCH-031 remains In Progress because REL-002 and
+  RUNTIME-006 are separate unresolved child outcomes; the v0.8.0 publication slice is closed.
 
 ## Required Reads
 

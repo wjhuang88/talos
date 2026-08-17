@@ -1,8 +1,7 @@
 #!/bin/sh
-# Check that product-only crates cannot be accidentally published.
-# Product-only crates must carry publish = false in their Cargo.toml.
-# Gate-before-publish crates must NOT carry publish = false (they are manifest-ready,
-# gated by review, not hard-blocked).
+# Check that quarantined crates cannot be accidentally published and that every
+# release-enabled crate is manifest-ready. Product-only status is a policy decision;
+# a crate in the release closure is gated by review, not hard-blocked by its manifest.
 #
 # Usage: scripts/check_publish_guard.sh [workspace-root]
 # Exit 0 = all guards pass; exit 1 = a guard violation was found.
@@ -14,11 +13,11 @@ root="${1:-.}"
 errors=0
 
 # Product-only / quarantined crates that MUST have publish = false.
-product_only_crates="talos-cli talos-tui talos-evolution talos-dashboard talos-models"
+product_only_crates="talos-models"
 
 # Gate-before-publish crates that must NOT have publish = false
 # (they are manifest-ready; the gate is the review process, not a manifest flag).
-gate_crates="talos-sandbox talos-tools talos-agent talos-runtime talos-mcp"
+gate_crates="talos-cli talos-tui talos-evolution talos-dashboard talos-sandbox talos-tools talos-agent talos-runtime talos-mcp"
 
 check_publish_false() {
   crate="$1"

@@ -4,20 +4,31 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+#[cfg(feature = "file-write")]
 mod delete_tool;
+#[cfg(feature = "file-read")]
 mod ls_tool;
+#[cfg(feature = "file-read")]
 mod read_tool;
+#[cfg(feature = "file-read")]
 mod snapshot;
+#[cfg(feature = "file-write")]
 mod write_edit_tools;
 
+#[cfg(feature = "file-write")]
 pub use delete_tool::{DeleteInput, DeleteTool};
+#[cfg(feature = "file-read")]
 pub use ls_tool::{LsInput, LsTool};
+#[cfg(feature = "file-read")]
 pub use read_tool::{ReadInput, ReadTool};
+#[cfg(feature = "file-read")]
 pub use snapshot::FileSnapshotRegistry;
+#[cfg(feature = "file-write")]
 pub use write_edit_tools::{EditInput, EditTool, WriteInput, WriteTool};
 
 /// Creates the four core file tools with one shared model-private snapshot registry.
 #[must_use]
+#[cfg(all(feature = "file-read", feature = "file-write"))]
 pub fn snapshot_aware_file_tools(
     workspace_root: PathBuf,
 ) -> (ReadTool, WriteTool, EditTool, DeleteTool) {
@@ -31,6 +42,7 @@ pub fn snapshot_aware_file_tools(
 }
 
 /// Size threshold for binary file detection (8KB).
+#[cfg(any(feature = "file-read", feature = "search"))]
 const BINARY_CHECK_SIZE: usize = 8 * 1024;
 
 /// Errors that can occur during file tool operations.
@@ -149,6 +161,7 @@ pub(crate) fn resolve_workspace_path(
 /// - Symlink resolution: the path is canonicalized if it exists.
 /// - Path traversal: `..` components that escape to root are rejected.
 /// - Delete-root protection: refuses to resolve `/` as a target.
+#[cfg(any(feature = "file-read", feature = "search", feature = "git"))]
 pub(crate) fn resolve_authorized_path(
     workspace_root: &Path,
     relative: &str,
@@ -174,6 +187,7 @@ pub(crate) fn resolve_authorized_path(
 
 /// Checks if a file appears to be binary by looking for null bytes
 /// in the first 8KB of content.
+#[cfg(any(feature = "file-read", feature = "search"))]
 pub(crate) fn is_binary_file(path: &Path) -> Result<bool, FileToolError> {
     let bytes = std::fs::read(path)?;
     let check_bytes = &bytes[..bytes.len().min(BINARY_CHECK_SIZE)];
@@ -185,6 +199,6 @@ pub fn is_skip_dir(name: &str) -> bool {
     name.starts_with('.') || name == "target" || name == "node_modules"
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "file-write"))]
 #[allow(warnings)]
 mod tests;
