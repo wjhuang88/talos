@@ -2,11 +2,13 @@
 
 ## Status
 
-Proposed (I188 / TOOL-024-A, 2026-08-14)
+Accepted (I188 / TOOL-024-A, 2026-08-17)
 
-This decision is not an implementation authorization until the exact decision head receives
-independent process/permission security review and merges to `main`. It introduces no production
-background process, dependency, `unsafe` block, persistence migration, or user-visible behavior.
+Acceptance is bound to decision head `d7d4fe7ae4cc67e452be2ee8ab1c9aab6ef0f803`, exact-head CI
+`31995198205`, independent process/permission security review `5312482823`, and PR #228 merge
+`1db1211e2fedeab277db366c3c76db0239691732`. This decision introduces no production background
+process, dependency, `unsafe` block, persistence migration, or user-visible behavior. Every
+production child retains its own dependency, claim, implementation and review gates.
 
 ## Context
 
