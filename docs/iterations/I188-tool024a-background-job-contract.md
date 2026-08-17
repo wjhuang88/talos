@@ -1,6 +1,6 @@
 # Iteration I188: TOOL-024-A Background Job Lifecycle Contract
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-08-11
 > Planned objective: decide the ownership, permission, cancellation, bounded-output, terminal-result and cross-platform cleanup contract required before supervised background command jobs can be implemented.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -12,16 +12,16 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Executing Agent | Codex / GPT-5 mainline implementation session 2026-08-14 |
 | Work Slice | Implement only TOOL-024-A / I188: characterize current command execution ownership and produce the background-job lifecycle, permission, bounded-output, cancellation/shutdown, result-routing, process-control and cross-platform cleanup decision plus an implementation split. No production spawn, tool/API, permission-policy, TUI, persistence, runtime, dependency, unsafe, Job Object, PTY or TOOL-024-B/C/D change. |
 | Claimed At | 2026-08-11 |
 | Source Issue | #59 |
 | Governance Claim PR | #196 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #196 before implementation; activation also waits until no other governed iteration remains Active or Review. |
+| Authorization Evidence | Claim PR #196 merged to `main` as `02a3558894a13204a28a48907fa39ca79a420d70`; final claim head `a5e9ffce241adc2e3646b5925c51f22694bd4a09` passed CI `31555885775`. The decision implementation still requires fresh independent review on its exact head. |
+| Implementation PR | #228 |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | Obtain independent process/permission security review and green CI on PR #228's final exact head, repeat merge-time CAS, then merge before ADR acceptance. |
 
 ## Published Baseline
 
@@ -82,17 +82,31 @@
 - I186/TUI-046-B remains separately owned by its claim/implementation chain and PR #193.
 - I187/SESSION-008-A remains Review in PR #195; I188 must not activate while that Review remains open.
 - I159-I162 remain Blocked under their existing gates; I164 remains Paused; none overlaps this decision-only Work Slice.
-- This claim may be prepared for batched review, but security-sensitive process and permission design requires independent review before claim merge and before ADR acceptance.
+- I189/PERM-006-A remains Planned/Claimed and is not activated by I188.
+- The I185-I187 bullets above preserve the 2026-08-11 selection baseline. At 2026-08-14
+  activation, I185-I187 and I193 were Complete and no governed iteration was Active or Review.
+- Security-sensitive process and permission design requires independent exact-head review before
+  ADR acceptance and implementation merge.
 
 ## Actual Activation And Execution
 
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-11 | Selection | TOOL-024-A selected as a Planned decision Spike only. PR #196 proposes the claim but remains ineffective before merge; no implementation branch is authorized, and activation waits for the recorded non-terminal Review disposition. |
+| 2026-08-14 | Claim reconciliation | PR #196 claim merge `02a35588` is an ancestor of current `main`; final claim head `a5e9ffce` passed CI `31555885775`. No overlapping Active/Review iteration or implementation PR was found. |
+| 2026-08-14 | Activation | User directed the mainline session to clear Issue #59 implementation blockers. I188 activated from exact `origin/main` `556b5a43` in isolated branch `feat/runtime-I188-background-job-contract`; no Rust, Cargo, persistence, dependency, unsafe, Desktop, or Dashboard scope is authorized. |
+| 2026-08-14 | Decision | Proposed ADR-060 selects a session-owned bounded supervisor, explicit background permission resource, live-only terminal event and Unix-first process-group slice. Windows remains fail-closed pending D's separate Job Object gate. |
+| 2026-08-14 | Review handoff | Decision implementation commit `245eddeb` pushed and PR #228 opened against `main`; iteration moved to Review. No self-review or ADR acceptance is recorded. |
 
 ## Verification Evidence
 
-- PR #196 records the finalized proposed claim; exact-head CI, both governance validators, independent security review and merge-time CAS gate merge.
+- Effective claim merge: `02a3558894a13204a28a48907fa39ca79a420d70`.
+- Claim final head `a5e9ffce241adc2e3646b5925c51f22694bd4a09`; CI run `31555885775` passed.
+- Decision artifacts: `docs/decisions/060-supervised-background-command-jobs.md` and
+  `docs/reference/I188-BACKGROUND-JOB-CURRENT-PATH.md`.
+- Implementation commit `245eddeb`; PR #228.
+- Implementation exact-head CI, both governance validators, independent security review and
+  merge-time CAS remain pending.
 
 ## Completion Evidence
 
@@ -100,9 +114,13 @@
 
 ## Variance And Residuals
 
-- TOOL-024-B remains blocked by accepted TOOL-024-A, completed RUNTIME-005, completed PERM-006-C and completed TOOL-023-C.
+- TOOL-024-B remains blocked by accepted TOOL-024-A, completed RUNTIME-005, completed PERM-006-C and completed TOOL-023-C. Its first production scope is Unix-only.
+- Windows spawn remains blocked until TOOL-024-D owns and accepts a separate Job Object/OS-ABI
+  decision; direct-child cleanup cannot satisfy the Epic invariant.
 - TOOL-024-C/D and Issue #59 remain open after this Spike.
 
 ## Retrospective
 
-- Pending activation and execution.
+- The initial issue framing conflated PowerShell availability with descendant ownership. ADR-057
+  proves only command identity/direct-child timeout; background Windows execution must remain
+  fail-closed until Job Object ownership is independently reviewed.
