@@ -13,17 +13,17 @@
 | Field | Value |
 |---|---|
 | Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-18 |
+| Work Slice | Execute only GOV-007/I205's evidence-only audit and decision packet: measure recent claim/implementation/closeout/review churn, classify causes, map retained gates to demonstrated failures or Hard constraints, define the ordinary/protected/release/maintenance scenario matrix, migration and rollback, and identify the smallest separately claimable implementation slice. No SOP, validator, CI workflow, branch-protection, product/runtime, release-policy, security-gate or child-activation change. |
+| Claimed At | 2026-08-18 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. No independent reviewer is currently available for this non-executable audit claim. Finalization requires exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback; any later executable rule change requires its own bounded claim and review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Establish an effective claim from current main before audit implementation or process-rule edits. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
 
 ## Published Baseline
 
@@ -71,6 +71,24 @@ infrastructure-only governance Spike and claims no product behavior.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-17 | Selection | Maintainer requested PR-flow simplification after observing that commit and review round trips exceeded the underlying code/document changes. I205 is Planned/Unclaimed and makes no rule change. |
+
+## Claim Preparation Checkpoint - 2026-08-18
+
+Exact target baseline: `main@a9cfef02e31027d19e297482eda0d77fffd6ce3c`.
+
+| State | Iterations | Disposition |
+|---|---|---|
+| Active | None | No active work blocks the audit-only claim. |
+| Review | None | I188 closed through PR #283 before this selection resumed. |
+| Planned / Claimed | I189, I195, I196 | Preserve each existing owner/claim and keep unactivated; Dashboard #233 remains independently owned. |
+| Planned / Unclaimed | I197-I201, I205-I208, I210 | Claim only I205's audit slice. Preserve every product/runtime child and its published dependency order. |
+| Blocked | None at iteration level | Backlog/Epic blockers remain authoritative and are not bypassed. |
+| Paused | I164 | Preserve its superseded state; do not resume. |
+
+Open PRs #120/#121 remain archival Drafts and #233 remains Dashboard-owned. No open PR or effective
+claim overlaps the I205 evidence-only workflow audit. The Draft claim is ineffective until its
+finalized `Claimed` record merges to `main`; no audit implementation or executable process-rule
+change is authorized by this checkpoint.
 
 ## Verification Evidence
 

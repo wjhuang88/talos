@@ -15,17 +15,17 @@
 | Field | Value |
 |---|---|
 | Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-18 |
+| Work Slice | Execute only GOV-007/I205's evidence-only audit and decision packet: measure recent claim/implementation/closeout/review churn, classify causes, map retained gates to demonstrated failures or Hard constraints, define the ordinary/protected/release/maintenance scenario matrix, migration and rollback, and identify the smallest separately claimable implementation slice. No SOP, validator, CI workflow, branch-protection, product/runtime, release-policy, security-gate or child-activation change. |
+| Claimed At | 2026-08-18 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. No independent reviewer is currently available for this non-executable audit claim. Finalization requires exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback; any later executable rule change requires its own bounded claim and review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Establish a separate effective I205 claim before changing SOPs, validators, workflows or branch protection. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
 
 ## Goal
 
