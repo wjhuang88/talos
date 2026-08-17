@@ -5,9 +5,9 @@
 | Story ID | GOV-007 |
 | Type | Governance / Delivery Throughput Spike |
 | Priority | P0 |
-| Status | Ready - I205 Planned / Claimed |
+| Status | In Progress - I205 Active / Claimed |
 | Source | Maintainer direction on 2026-08-17 after the v0.8.0 delivery retrospective |
-| Selected Iteration | I205 - Planned / Claimed |
+| Selected Iteration | I205 - Active / Claimed |
 | Depends On | Current collaboration, Git, DOC-CHECK and change-aware CI contracts |
 
 ## Collaboration Claim
@@ -22,7 +22,7 @@
 | Source Issue | None |
 | Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. No independent reviewer is currently available for this non-executable audit claim. Finalization requires exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback; any later executable rule change requires its own bounded claim and review. |
+| Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
