@@ -23,6 +23,7 @@ project does not imply it is exported by the runtime facade.
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
 | `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
+| `RuntimeBuilder::shared_tools` | Explicitly opt into the shared Talos built-in tool contribution inventory when the `shared-composition` feature is enabled | I160 pre-1.0 additive API; not selected by `RuntimeBuilder::new()` |
 
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
@@ -137,6 +138,25 @@ let mut handle = RuntimeBuilder::new()
 Without an approval handler, `Ask` decisions are **denied** by default. Always provide an
 `ApprovalHandler` for headless embedding unless all registered tools are read-only.
 
+### Pattern 2a: Explicit Shared Built-in Composition
+
+The optional `shared-composition` feature provides the same built-in contribution selection used by
+the Talos CLI. It is explicit and does not alter `RuntimeBuilder::new()` or bypass permission
+evaluation:
+
+```rust,ignore
+let mut handle = RuntimeBuilder::new()
+    .provider(provider)
+    .workspace_root(workspace)
+    .shared_tools()
+    .approval_handler(approval_handler)
+    .build()?;
+```
+
+The feature is not a coding preset: it selects tool instances only. Approval, permission rules,
+sandbox selection, and caller overrides remain runtime concerns. `RuntimePreset::coding()` and
+`SandboxFallbackPolicy` remain separate ARCH-031-C/I161 work.
+
 For the Talos snapshot-aware file-tool set, construct one shared registry-backed group and register
 all four tools so writes and deletes invalidate read snapshots consistently:
 
@@ -246,11 +266,14 @@ let runtime = RuntimeBuilder::new()
 
 ### `talos-tools` default surface
 
-Under ADR-052 the SDK's default tool surface is **local read-only** (file-read + search). Write,
-shell, git, network/web, image, and heavy code-intelligence families are opt-in via explicit
-features or the coding preset. Embedders that need the former broad set must select features or the
-preset explicitly. This changes default transitive dependency/capability behavior and will be listed
-in release notes when it lands.
+Under ADR-052 the `talos-tools` default surface is **local read-only** (`file-read + search`). I159
+implements compile-time opt-in features for file writes, document extraction, shell, Git,
+network/web, image, and heavy code intelligence, plus a `coding` aggregate used explicitly by the
+Talos CLI. These Cargo features make code available but grant no runtime permission.
+
+Direct `talos-tools` consumers that relied on the former broad implicit default must select the
+needed capability features, or `coding` when the full product-oriented set is intentional. The
+future `RuntimePreset::coding()` remains owned by ARCH-031-C/I161 and is not implemented by I159.
 
 ## Pre-1.0 Change Policy
 

@@ -91,8 +91,9 @@ scripts/assess_project_scale.sh .
 
 ## Pull Request CI Routing
 
-Pull requests containing only `README.md`, `README.zh-CN.md`, `CHANGELOG.md`, or Markdown beneath
-`docs/` outside `docs/sop/` use the reduced documentation route. That route keeps whitespace,
+Pull requests containing only `README.md`, `README.zh-CN.md`, `CHANGELOG.md`, Markdown beneath
+`docs/` outside `docs/sop/`, or the plain-text `.agent-governance/manifest.yaml` use the reduced
+documentation route. That route keeps whitespace,
 public-site, governance, Collaboration Claim, remote Issue-owner, and Windows installer checks,
 while the Unix and Windows Rust workspace steps are skipped.
 

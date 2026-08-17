@@ -188,3 +188,11 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
    future `REMOTE-001` command/event protocol?
 3. Which existing `talos-agent` configuration mutators should remain public after the facade lands?
 4. How much of Skill, memory, and hook configuration should be first-class in v1 versus adapter-only?
+
+## Downstream Work-Domain Dependency
+
+WORK-001 defines the separately governed P0-P4 shared work/evaluation chain. Its P0 child,
+WORK-001-A / I196, may inventory this completed pre-1.0 facade and decide the allowed dependency
+direction, public/transitional surface and migration constraints, but it must not change runtime
+behavior or reopen this Story's completion evidence. Any later public facade change requires its
+own child owner, accepted ADR/migration guidance and compatibility validation.

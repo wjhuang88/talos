@@ -175,6 +175,47 @@ pub enum AgentError {
 /// Result alias for agent operations.
 pub type AgentResult<T> = Result<T, AgentError>;
 
+/// Controls what happens when a configured sandbox is unavailable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SandboxFallbackPolicy {
+    /// Reject the invocation when isolation is unavailable.
+    #[default]
+    Deny,
+    /// Ask a dedicated fallback handler for a one-invocation approval.
+    Ask,
+    /// Continue without isolation after permission has already allowed the tool.
+    AllowUnsandboxed,
+}
+
+/// A redacted, typed request for a sandbox fallback decision.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SandboxFallbackContext {
+    /// The tool requiring the fallback.
+    pub tool_name: String,
+    /// Observer-safe tool input for the approval surface.
+    pub arguments: serde_json::Value,
+    /// Stable summary fields for display or audit projection.
+    pub summary_fields: Vec<String>,
+}
+
+/// A dedicated sandbox fallback decision. It intentionally has no permanent
+/// or reusable approval variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SandboxFallbackDecision {
+    /// Approve only the current invocation.
+    ApproveOnce,
+    /// Reject the fallback.
+    Deny,
+}
+
+/// Resolves typed sandbox fallback requests independently of normal tool
+/// permission approval.
+#[async_trait::async_trait]
+pub trait SandboxFallbackHandler: Send + Sync {
+    /// Decides whether this one fallback invocation may proceed.
+    async fn request_fallback(&self, context: SandboxFallbackContext) -> SandboxFallbackDecision;
+}
+
 // Callback type for memory prompt injection.
 type MemoryProviderCallback = dyn Fn(&str) -> Option<String> + Send + Sync;
 // Callback type for bounded session todo prompt injection.
@@ -191,8 +232,9 @@ type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 /// The `Ask` decision defaults to `Deny` at the agent level.
 ///
 /// When a sandbox is configured, bash tool calls are executed within the
-/// sandbox environment. If the sandbox is unavailable, execution falls back
-/// to direct invocation.
+/// sandbox environment. If the sandbox is unavailable, the configured
+/// [`SandboxFallbackPolicy`] decides whether the invocation is denied or may
+/// continue through an explicitly approved unsandboxed path.
 ///
 /// # Example
 ///
@@ -221,6 +263,10 @@ pub struct Agent {
     permission_engine: Option<Arc<PermissionEngine>>,
     /// Optional sandbox provider for bash tool execution.
     sandbox: Option<Arc<dyn SandboxProvider>>,
+    /// Policy used only when a configured sandbox reports unavailable.
+    sandbox_fallback_policy: SandboxFallbackPolicy,
+    /// Dedicated handler for one-shot sandbox fallback approval.
+    sandbox_fallback_handler: Option<Arc<dyn SandboxFallbackHandler>>,
     /// Workspace root directory, used for sandbox configuration.
     workspace_root: PathBuf,
     /// Builder for assembling the system prompt.

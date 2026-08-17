@@ -67,8 +67,9 @@ boundary is:
 - `talos-agent` — implementation dependency; published only to satisfy the runtime closure, NOT a
   supported SDK entrypoint.
 - `talos-conversation` — experimental, product-oriented; published but NOT a general-purpose UI SDK.
-- `talos-cli` and `talos-runtime` — share internal composition direction (single Agent/session/tool
-  assembly), but this shared layer is NOT yet extracted; no new composition crate is authorized.
+- `talos-cli` and `talos-runtime` — share the internal contribution selection module in
+  `talos-runtime` behind the explicit `shared-composition` feature; public CLI and SDK entrypoints
+  remain separate, and no new composition crate was added.
 - Product-only (`talos-cli`, `talos-tui`, `talos-evolution`, `talos-dashboard`) and quarantined
   (`talos-models`) crates carry `publish = false`.
 
@@ -109,10 +110,11 @@ provides the parsed and indexed skill data while explicit Level 1/2 activation r
 
 ### CLI Runtime Boundary
 
-`talos-cli` is the product composition root. It keeps argument parsing and top-level dispatch in
-`main.rs`, while mode runners assemble Agent/session/provider/tool state from explicit runtime
-inputs. There is no shared composition crate: `talos-runtime` is a separate SDK facade with its own
-construction boundary.
+`talos-cli` remains the product composition root. It keeps argument parsing and top-level dispatch
+in `main.rs`, while mode runners assemble Agent/session/provider/tool state from explicit runtime
+inputs. Shared built-in contribution selection is supplied by the internal
+`talos-runtime::composition` bridge; CLI-specific wrappers, scheduler/todo/plugin/status additions,
+and lifecycle behavior remain in the CLI.
 
 | Module | Responsibility |
 |--------|----------------|
@@ -161,7 +163,9 @@ talos-cli (product root)
 └── talos-rpc ── talos-core + talos-plugin
 
 talos-runtime (independent SDK root) composes agent/provider/tools/session/permission/
-sandbox/skill/plugin without depending on talos-cli or talos-tui.
+sandbox/skill/plugin without depending on talos-cli or talos-tui. Its optional
+`shared-composition` feature provides the same explicit built-in contribution selection used by
+the CLI; `RuntimeBuilder::new()` remains minimal unless `.shared_tools()` is selected.
 talos-dashboard, talos-exploration, talos-memory, and talos-skill have no internal workspace
 dependencies, although product/orchestrator crates consume them; `talos-models` is quarantined and
 has no runtime consumer.
@@ -226,7 +230,8 @@ tool crates.
 |---|---|---|
 | `talos-tools` | Shell, file, workspace, network, image, git, and symbol contribution functions | Authoritative built-in declarations |
 | `talos-session` | Session-bound Todo contributions | Authoritative session-tool declarations |
-| `talos-cli` | Print/TUI/MCP/interactive profile selection and permission wrappers | Expected outer composition root |
+| `talos-runtime::composition` | Shared shell/file/workspace/network/image/symbol/Git contribution-group selection | Internal shared owner; no wrappers or product lifecycle policy |
+| `talos-cli` | Print/TUI/MCP/interactive profile adapters, permission wrappers, and product additions | Outer product composition root |
 | `talos-agent` scheduler | Runtime-created tools passed into print/TUI construction | Explicit runtime-injection exception; no static contribution can own the live scheduler handle |
 | CLI MCP `status` | Product-local diagnostic tool | Explicit CLI product exception; not a reusable capability crate |
 | Explicit WASM plugins | `ToolContribution` wrappers sourced as `plugin:<name>@<version>` | Local package selection is explicit; checked registration rejects duplicate names with both sources |

@@ -6,10 +6,27 @@
 | Type | Architecture / Runtime Composition Story |
 | Parent Epic | ARCH-031 |
 | Priority | P1 |
-| Status | Refinement — blocked on ARCH-031-A |
+| Status | Complete — implementation PR #240 merged as `97556149` |
 | Depends on | ADR-052; ADR-053 Accepted; I158 Complete; I159 Complete |
-| Selected Iteration | I160 (Planned/Blocked) |
+| Selected Iteration | I160 (Complete / Closed) |
 | Value | CLI and SDK use one tested internal composition path without merging their public entrypoints |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `Codex / GPT-5 mainline session` |
+| Work Slice | `ARCH-031-B / I160` only: shared internal CLI/runtime composition with separate public entrypoints and behavior-equivalence evidence; no preset, fallback, version, tag or publication. |
+| Claimed At | 2026-08-14 |
+| Source Issue | None |
+| Governance Claim PR | #238 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed release prerequisite; `@wjhuang88` is the shared GitHub account and natural-person separation is limited. PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`, independent approval `5295372157`, and merge-time CAS before merge `71faf8440466668daeef0afd0e779be072978b01` established the claim on `main`. |
+| Implementation PR | #240 |
+| Last Updated | 2026-08-15 |
+| Handoff / Release Condition | None — ARCH-031-B/I160 is complete. I161/I162 and release/version/tag/publication remain separately governed. |
 
 ## Problem
 
@@ -81,6 +98,15 @@ The iteration must record the chosen owner before code changes.
 | Turn loop | `talos-agent` |
 | Sandbox implementation | `talos-sandbox` |
 | Sandbox fallback policy | still future ARCH-031-C |
+
+## Claim Preparation Checkpoint (2026-08-14)
+
+- I159/ARCH-031-A is complete on current `main` through PR #236 merge
+  `f79c1ead1cd3a547797dea3666295f510d88a13d`.
+- A dedicated I160 governance claim is proposed in PR #238 from
+  `main@1b129c951df22a7de63e14735e02b1e8a79a9cd7`.
+- The claim is not effective until its finalized owner record is merged to `main`; no
+  implementation branch or Rust/Cargo change is authorized by this checkpoint.
 
 ## Required Profiles For Equivalence
 
@@ -183,3 +209,64 @@ Stop if:
 - public preset and sandbox fallback: ARCH-031-C;
 - publication/versioning: ARCH-031-D;
 - need for a dedicated composition crate: new evidence-backed ADR.
+
+## 2026-08-14 Readiness Checkpoint
+
+- I159/ARCH-031-A completed through implementation commits `d886917e` and `34c09b14`, exact-head
+  CI `31801484313`, independent approval `5293622712` and PR #236 merge `f79c1ead`.
+- The published objective, acceptance, exclusions and responsibility map remain unchanged.
+- ARCH-031-B is Ready for a dedicated I160 claim. This checkpoint does not activate I160, create an
+  implementation branch or authorize shared-composition code changes.
+
+## 2026-08-15 Activation Checkpoint
+
+- PR #238 exact head `edcbe47f81798480447962048fe4f50bb69fdba1` passed CI `31815122170`,
+  independent approval `5295372157`, and merge-time CAS, then merged to `main` as
+  `71faf8440466668daeef0afd0e779be072978b01`.
+- The effective claim authorizes only ARCH-031-B/I160. The implementation worktree
+  `/private/tmp/talos-i160-impl` and branch `feat/runtime-I160-shared-composition` start at that
+  exact merge commit; no Rust/Cargo change existed at activation.
+- I160 implementation PR #240 merged as `97556149`; Completion Commit `0524e82f` records the
+  pre-existing implementation evidence. I161-I162 remain blocked, and release/version/tag/publication remain outside this
+  Work Slice.
+
+## 2026-08-15 Implementation Baseline
+
+- `talos-tools/src/contributions.rs` already owns typed, source-labelled factories for shell,
+  snapshot-aware/ordinary file, workspace, network, Git, image, and symbol contribution groups.
+- `talos-cli/src/registry.rs` still repeats profile selection and contribution registration for
+  print, TUI, and MCP; `talos-cli/src/mode_interactive.rs` has a fourth interactive selection
+  path. The wrappers and scheduler/todo/plugin injections remain product-specific.
+- `talos-runtime::RuntimeBuilder` currently accepts caller-provided `AgentTool` values through
+  `.tool(...)` and registers them behind its permission adapter; it has no built-in composition
+  path. `RuntimeBuilder::new()` must retain this minimal default.
+- Shared owner decision: add a focused internal composition module to `talos-runtime`, backed by
+  the existing `talos-tools` and `talos-session` contribution factories. CLI will consume the
+  module through an explicitly documented internal bridge; no new crate and no CLI/TUI dependency
+  in the SDK direction.
+- Initial profile boundary: the shared module selects only contribution groups and construction
+  inputs. CLI/runtime wrappers, scheduler/todo/plugin/status additions, presentation policy, and
+  approval behavior remain in their respective adapters.
+
+## 2026-08-15 Implementation Checkpoint
+
+- Added `talos-runtime::composition` behind the opt-in `shared-composition` feature. It owns
+  profile-specific construction and contribution-group selection using existing `talos-tools`
+  factories; no new crate was added.
+- CLI print/TUI/MCP builders now consume the shared groups. Existing wrapper policy is unchanged:
+  `tree` remains unwrapped where required, Git read tools remain unwrapped, MCP keeps ordinary
+  file constructors, and `read_image` remains excluded from MCP.
+- `RuntimeBuilder::shared_tools()` explicitly consumes the runtime profile. `RuntimeBuilder::new()`
+  remains minimal and custom `.tool(...)` additions remain supported. All runtime tools still pass
+  through the existing permission adapter.
+- Local evidence: runtime shared-composition tests 22/22 passed; CLI registry tests 29/29 passed;
+  default runtime and shared feature locked checks passed; governance validators returned 0
+  warnings. Exact implementation-head CI `31824945312` passed all five required jobs and independent
+  approval `5296616991` was recorded.
+
+## 2026-08-15 Completion Evidence
+
+- Completion Commit: `0524e82fa700892cb77bf378139c47b92a64693c` (pre-existing implementation commit;
+  the closeout status commit is not used as its own evidence).
+- Implementation PR #240 merged as `97556149`; derived-view closeout PR #241 merged as `2d48bd2c`.
+- I161/I162 remain blocked and publication/version/tag work remains outside this story.

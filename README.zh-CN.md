@@ -11,7 +11,7 @@ Talos 是一个 Rust 原生的本地编码 Agent，面向希望在自己机器�
 运行时的开发者。它提供终端 UI、模型提供商适配、会话历史、内置编码工具、显式权限控制、
 运行时 Skills、MCP/RPC 集成和项目治理支持，同时保持默认本地、边界清晰、可审计。
 
-Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.7.0`。它已经可以用于
+Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.8.0`。它已经可以用于
 本地编码工作流，但仍然处于 1.0 之前：API、命令界面和存储格式仍可能随着产品化加固继续演进。
 本 README 只描述已经发布或当前已实现的用户可见能力；只读 loopback dashboard 之外的 Web
 控制面扩展、超出已发布 shared Skills 目录的 dotagents 兼容、更广泛的插件载体和高级文档解析等研究方向请查看[项目状态](#项目状态)。
@@ -32,14 +32,18 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 
 ## 当前 Release 边界
 
-`v0.7.0` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
+`v0.8.0` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
 插件市场、浏览器自动化控制面或自主后台守护进程。
 
 当前已发布/已实现：
 
 - TUI、inline 和 print 运行模式。
-- TUI 模式下默认启动只读 loopback dashboard，并在启动时提示本地 URL。默认仅依赖
-  `127.0.0.1` 绑定；如需恢复 bearer token，请设置 `[dashboard] loopback_only = false`。
+- TUI 模式下默认启动只读 loopback dashboard；成功后会在仅用于显示的 TUI Logo 区域给出
+  完整、可复制的纯文本本地 URL。普通宽度占一行，窄宽度会完整换行而不截断；启动失败仍
+  显示临时错误提示。默认仅依赖 `127.0.0.1` 绑定；设置
+  `[dashboard] loopback_only = false` 后要求 bearer token，Logo 条目只显示不含 token 的
+  基础 URL 和 `authentication required`，凭据不会显示或写入日志。当前 TUI 不发送终端
+  超链接转义序列。
 - 本地模型配置，密钥显示自动脱敏。
 - 无参数的提供商/模型选择器、自定义兼容提供商向导、受限模型发现和结构化会话切换。
 - 面向目录确认支持视觉输入模型的显式本地图片附件，采用精确路径授权和安全历史摘要。Anthropic 兼容 wire 行为已有 fixture 覆盖；真实 Provider 验证取决于操作者凭据。
@@ -80,18 +84,18 @@ iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.7.0 sh
+  | TALOS_VERSION=v0.8.0 sh
 ~/.talos/bin/talos --version
 ```
 
 ```powershell
-$env:TALOS_VERSION = 'v0.7.0'
+$env:TALOS_VERSION = 'v0.8.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 & "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION
 ```
 
-请将 `v0.7.0` 替换为
+请将 `v0.8.0` 替换为
 [GitHub Releases](https://github.com/wjhuang88/talos/releases) 中存在的 tag。安装器会覆盖目标
 安装目录中的 Talos 二进制文件，但不会回退配置或会话数据。Talos 仍处于 pre-1.0；运行旧版本前
 建议备份 `~/.talos`，也可以同时设置 `TALOS_INSTALL_DIR`，在隔离目录中试用旧版本。需要恢复到
@@ -520,6 +524,11 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 依赖闭包阻塞；详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
 [publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。
 
+直接从源码依赖 `talos-tools` 时，默认只启用本地 `file-read` 和 `search` 能力。写文件、
+文档提取、Shell、Git、网络、图片和代码智能需要显式选择对应 Cargo feature。Talos CLI
+显式启用 `coding`，因此工作区常规 `cargo build` 和 `cargo run -p talos-cli` 的产品工具集合
+保持不变。
+
 ## 安全模型
 
 - 只读工作区工具可以免批准执行。
@@ -557,7 +566,7 @@ GitHub Release 工作流由 tag 触发：
 创建 tag 前，请运行与 CI 和 Release workflow 相同的预检：
 
 ```bash
-./scripts/release_preflight.sh v0.7.0
+./scripts/release_preflight.sh v0.8.0
 ```
 
 仓库通过 `rust-toolchain.toml` 固定 Rust/Clippy 工具链；不要使用其他工具链直接发布。
@@ -566,7 +575,7 @@ Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
 
 post-v0.2.0 加固素材集中在
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md)。已发布的
-`v0.7.0` release 公告和下载以 GitHub Releases 为准。
+`v0.8.0` release 公告和下载以 GitHub Releases 为准。
 
 ## 项目状态
 

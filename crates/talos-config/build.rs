@@ -63,8 +63,11 @@ fn refresh_models_toml() -> Result<usize, String> {
         return Err("no models with tool_call=true found in api.json".to_string());
     }
     let count = models.len();
-    let toml_output = generate_toml(providers, models);
     let toml_path = std::path::Path::new("src/models.toml");
+    let previous = std::fs::read_to_string(toml_path)
+        .ok()
+        .and_then(|contents| toml::from_str::<TomlDataset>(&contents).ok());
+    let toml_output = generate_toml(providers, models, previous.as_ref());
     std::fs::write(toml_path, toml_output).map_err(|e| format!("write models.toml: {e}"))?;
     Ok(count)
 }
@@ -217,6 +220,7 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
                 release_date: model.release_date.clone(),
                 pricing,
                 capabilities,
+                variants: Vec::new(),
             });
         }
     }
@@ -227,13 +231,13 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
     Ok((providers, models))
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 struct TomlDataset {
     providers: Vec<TomlProvider>,
     models: Vec<TomlModel>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 struct TomlProvider {
     id: String,
     name: String,
@@ -247,7 +251,7 @@ struct TomlProvider {
     doc_url: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 enum TomlProviderProtocol {
     #[serde(rename = "anthropic-messages")]
     AnthropicMessages,
@@ -276,7 +280,7 @@ fn infer_provider_protocol(
     None
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 struct TomlModel {
     id: String,
     provider: String,
@@ -289,9 +293,11 @@ struct TomlModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pricing: Option<TomlPricing>,
     capabilities: TomlCapabilities,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    variants: Vec<TomlVariant>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 struct TomlPricing {
     #[serde(skip_serializing_if = "Option::is_none")]
     input_per_1m: Option<f64>,
@@ -301,7 +307,7 @@ struct TomlPricing {
     cache_read_per_1m: Option<f64>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 struct TomlCapabilities {
     #[serde(skip_serializing_if = "is_false")]
     tools: bool,
@@ -313,11 +319,47 @@ struct TomlCapabilities {
     image_input: bool,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+struct TomlVariant {
+    id: String,
+    label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_effort: Option<String>,
+}
+
 fn is_false(b: &bool) -> bool {
     !b
 }
 
-fn generate_toml(providers: Vec<TomlProvider>, models: Vec<TomlModel>) -> String {
+fn generate_toml(
+    providers: Vec<TomlProvider>,
+    mut models: Vec<TomlModel>,
+    previous: Option<&TomlDataset>,
+) -> String {
+    if let Some(previous) = previous {
+        for model in &mut models {
+            if let Some(old) = previous
+                .models
+                .iter()
+                .find(|old| old.provider == model.provider && old.id == model.id)
+            {
+                model.variants = old.variants.clone();
+            }
+        }
+
+        // Keep this stable compatibility alias while providers migrate from the
+        // retired K2P7 identifier. It is intentionally not treated as new upstream data.
+        if !models
+            .iter()
+            .any(|model| model.provider == "kimi-for-coding" && model.id == "k2p7")
+            && let Some(legacy) = previous
+                .models
+                .iter()
+                .find(|model| model.provider == "kimi-for-coding" && model.id == "k2p7")
+        {
+            models.push(legacy.clone());
+        }
+    }
     let dataset = TomlDataset { providers, models };
     let body = toml::to_string_pretty(&dataset).unwrap_or_default();
 

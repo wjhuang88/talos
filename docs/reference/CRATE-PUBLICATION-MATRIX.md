@@ -55,7 +55,7 @@ product-oriented** · **Implementation dependency; unsupported as SDK** · **Pro
 | `talos-rpc` | Reusable pre-1.0 crate (local stdio transport only) | Published (0.2.0); 0.5.0 not yet published | 0.2.0 | no |
 | `talos-conversation` | Experimental, product-oriented (published but NOT a general-purpose UI SDK) | Published (0.2.0); 0.5.0 not yet published | 0.2.0 | no |
 | `talos-sandbox` | Reusable pre-1.0 crate (platform-sensitive) | Gate-before-publish; manifest-ready; platform behavior + escape-vector review pending | — | no |
-| `talos-tools` | Reusable pre-1.0 crate (built-in tools) | Gate-before-publish; manifest-ready; **NO feature gates implemented** — heavy deps (`gix`, `arborium`, `reqwest`, `scraper`, `rust-websearch`, `image`) are hard `[dependencies]`; ADR-052 lightweight-default target is unimplemented | — | no |
+| `talos-tools` | Reusable pre-1.0 crate (built-in tools) | Gate-before-publish; manifest-ready; I159 implements real feature gates with `file-read + search` defaults and opt-in heavy families; publication still waits for the remaining permission/boundary review and dry-run gates | — | no |
 | `talos-agent` | Implementation dependency; unsupported as SDK | Gate-before-publish; manifest-ready; turn-loop implementation; not the SDK entrypoint (ADR-024/052) | — | no |
 | `talos-runtime` | Supported SDK facade | Gate-before-publish; manifest-ready; SDK contract in `RUNTIME-SDK-CONTRACT.md`; blocked by unpublished 0.5.0 closure | — | no |
 | `talos-mcp` | Reusable pre-1.0 crate (protocol-sensitive) | Gate-before-publish; manifest-ready; MCP support boundary ADR pending | — | no |
@@ -105,7 +105,7 @@ gate crates; they are hard-blocked from publication in the next section.
 | Crate | Required gate before publish |
 |---|---|
 | `talos-sandbox` | Security review against escape vectors; platform behavior docs; ADR-007/ADR-008/ADR-020 dependency boundary check; targeted sandbox tests. Per ADR-052: route-A step; stays policy-neutral (typed availability/errors); fallback policy owned by the SDK caller. |
-| `talos-tools` | Feature-gate plan for heavy/default tools (NOT yet implemented); permission profile audit; network/write/execute tool boundary docs; dry-run after `talos-sandbox`. Per ADR-052: lightweight read-only defaults target (unimplemented). |
+| `talos-tools` | I159 implements the ADR-052 lightweight default and real heavy-family feature gates. Remaining: permission profile audit; network/write/execute tool boundary docs; dry-run after `talos-sandbox`. |
 | `talos-agent` | Publish only after sandbox/tools dependency gates clear. Per ADR-052: published as an **implementation dependency only**, not a supported SDK; crate docs must carry direct-use caveats. |
 | `talos-runtime` | Publish after the full 0.5.0 dependency closure resolves. Per ADR-052: adds caller-selected `SandboxFallbackPolicy` (planned) and an explicit `RuntimePreset::coding()` (planned). |
 | `talos-mcp` | MCP support boundary ADR or equivalent; server opt-in/conflict policy; transport/auth non-goals; dry-run after `talos-tools`. |
@@ -201,8 +201,10 @@ the time (name absent / no compatible version / `publish = false` / closure gap)
 - **A4 `talos-tools`** (heaviest crate): then-current suggestion
   `default = ["file", "search", "git", "code-intelligence", "network"]` is **SUPERSEDED** by
   ADR-052's read-only default (`file-read + search`) with opt-in write/shell/git/network/image/
-  code-intelligence. That target is NOT yet implemented. Deps included `gix`, `arborium` (25+ langs),
-  `reqwest`, `scraper`. Permission profiles verified TOOL-013 compliant.
+  code-intelligence. I159 implements that target and also keeps document extraction default-off
+  because it owns `scraper`; the Talos CLI explicitly selects the `coding` aggregate. Historical
+  deps included `gix`, `arborium` (25+ langs), `reqwest`, `scraper`. Permission profiles verified
+  TOOL-013 compliant.
 - **A5 `talos-agent`/`talos-runtime`**: decided (ADR-052) to publish via route A in dependency order;
   `talos-agent` is an implementation surface only (embedders use `talos-runtime`).
   - T48 dry-run (2026-07-01): `cargo publish --dry-run -p talos-runtime` failed with
@@ -250,3 +252,28 @@ its absence on gate crates. As of 2026-07-26 the guard covers: product-only/quar
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear
 description, and state its pre-1.0 support boundary.
+
+## I162 Reconciliation — 2026-08-15
+
+At `main@2891105d8a60e18cd5e0963432cea691355d2b63`, locked metadata computed a 20-member normal
+closure for `talos-cli` and `talos-runtime`, excluding `talos-models`. The workspace version is
+`0.7.0`; this is evidence for the planned `v0.8.0` release, not a version change. Sixteen closure
+members are registry-enabled and four (`talos-cli`, `talos-dashboard`, `talos-evolution`,
+`talos-tui`) remain guarded by `publish = false`. No guard was changed.
+
+The exact fixture, package, and dry-run results are recorded in
+`docs/reference/I162-PUBLICATION-READINESS-2026-08-15.md`. The fixture passed in default and
+`coding` modes. Package/dry-run readiness is **NO-GO** until a network-enabled registry check can
+resolve the 0.7.0 closure and the separately governed version-alignment, GitHub Release, and
+install-package gates are complete.
+
+## I203 Release Closure — 2026-08-16
+
+The historical I162 reconciliation above records the candidate-time policy and remains unchanged.
+For the v0.8.0 I203 release, exact metadata shows that `talos-cli` depends on
+`talos-dashboard`, `talos-evolution`, and `talos-tui`; keeping any of those four packages guarded
+would make the documented `cargo install talos-cli --bin talos` path impossible. I203 therefore
+removed `publish = false` from `talos-cli`, `talos-dashboard`, `talos-evolution`, and `talos-tui`.
+The only remaining quarantined member is `talos-models`, which stays outside the 20-package
+CLI/runtime closure. `scripts/check_publish_guard.sh` now treats the four release packages as
+gate-before-publish members and continues to require the `talos-models` quarantine.
