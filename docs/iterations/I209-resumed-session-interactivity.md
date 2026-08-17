@@ -1,6 +1,6 @@
 # Iteration I209: Resumed Session Interactivity Under Provider Delay
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Claimed (proposed in PR #276; ineffective before merge)
 > Planned date: 2026-08-17
 > Objective: deliver TUI-051 so a resumed large Session remains responsive, exposes bounded
 > provider retry progress and can cancel an active turn promptly.
@@ -9,18 +9,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline session (GPT-5) |
+| Work Slice | I209 only: cache and invalidate unchanged TUI history projection; prove and repair resumed structured-turn Esc cancellation across TUI/bridge/actor/durable boundaries; project existing bounded provider retry facts; verify terminal restoration and update directly affected user documentation. Excludes retry-policy redesign, I200 scrolling, I206 steering, persistence migration, public API, dependency, release and broad renderer work. |
+| Claimed At | 2026-08-17 |
 | Source Issue | #272 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #276 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | After an exact-main reproduction checkpoint, establish an effective claim and branch only from its merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
+| Handoff / Release Condition | This proposed claim is ineffective until PR #276 merges. After merge, activate I209 and create the implementation worktree from that merge point or later current main. PROVIDER-005/#270/#271 are already closed. |
 
 ## Selected Story
 
