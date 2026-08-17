@@ -5,9 +5,9 @@
 | Story ID | TUI-042 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Refinement — transition helper and resize normalization require iteration selection |
+| Status | Ready — I200 Planned / Unclaimed |
 | Source | [GitHub Issue #79](https://github.com/wjhuang88/talos/issues/79) |
-| Selected Iteration | None |
+| Selected Iteration | I200 — Planned / Unclaimed |
 | Depends On | TUI-039 completed layout contract; ADR-054; interaction with TUI-041 |
 
 ## Collaboration Claim
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | After I199 is dispositioned in the ordered task, establish an effective I200 claim on `main`; implement only from that claim merge or later current `main`. |
 
 ## Identity / Goal / Value
 
@@ -54,7 +54,10 @@ TUI-039 completed layout contract; ADR-054; interaction with TUI-041
 
 ## Uncertainty And Validation Path
 
-Refine the normalization point and exact scroll-bound helper ownership before selection.
+I200 owns the isolated state-transition correction. It must choose the smallest normalization point
+using the exact projection/layout metrics already used by rendering. I199 is ordered first to reduce
+overlap around preview-driven viewport capacity, but a recorded I199 blocked disposition does not
+erase I200's independently testable no-op scroll outcome.
 
 ## State / Status Owners
 

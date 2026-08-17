@@ -5,9 +5,9 @@
 | Story ID | TUI-041 |
 | Type | TUI / Product Story |
 | Priority | P1 |
-| Status | Refinement — layout compression and real-terminal matrix require iteration selection |
+| Status | Ready — I199 Planned / Unclaimed |
 | Source | [GitHub Issue #69](https://github.com/wjhuang88/talos/issues/69) |
-| Selected Iteration | None |
+| Selected Iteration | I199 — Planned / Unclaimed |
 | Depends On | TUI-039 layout continuity; ADR-034 reasoning boundary; ADR-054 renderer |
 
 ## Collaboration Claim
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-14 |
+| Handoff / Release Condition | After the ordered-task predecessor is dispositioned, establish an effective I199 claim on `main`; implement only from that claim merge or later current `main`. |
 
 ## Identity / Goal / Value
 
@@ -53,7 +53,10 @@ TUI-039 layout continuity; ADR-034 reasoning boundary; ADR-054 renderer
 
 ## Uncertainty And Validation Path
 
-Refine the exact compression priority and terminal matrix, then select a dedicated TUI iteration.
+I199 owns the dedicated runnable correction. It must confirm the exact compression order against
+current `app_layout` behavior before production edits and preserve composer plus required-panel
+priority. A conflict with ADR-054 or the completed TUI-039 contract blocks implementation rather
+than authorizing a renderer redesign.
 
 ## State / Status Owners
 
