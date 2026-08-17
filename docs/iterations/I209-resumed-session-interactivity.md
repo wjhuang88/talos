@@ -18,9 +18,9 @@
 | Governance Claim PR | #276 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
-| Implementation PR | Pending branch publication |
+| Implementation PR | #279 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Publish the implementation branch, backfill its PR, then require exact-head CI, real-terminal CPU/input and terminal-restoration evidence, independent review and merge-time CAS before closeout. |
+| Handoff / Release Condition | PR #279 requires exact-head CI, real-terminal CPU/input and terminal-restoration evidence, independent review and merge-time CAS before closeout. |
 
 ## Selected Story
 
@@ -169,7 +169,7 @@ authorized by this checkpoint.
 ## Implementation Review Checkpoint — 2026-08-17
 
 - Implementation commits `7b82fea6` and `7d90def8` were created from the I209 activation merge
-  `c7380332` and are awaiting publication and independent exact-head review.
+  `c7380332` and published in PR #279 for independent exact-head review.
 - The projection cache is keyed by transcript revision and terminal width; height, scrolling,
   selection and ordinary redraw reuse shared projected rows and logical lines.
 - A real bridge/actor/durable-session test reopens 2,000 persisted messages (approximately 320 KB)

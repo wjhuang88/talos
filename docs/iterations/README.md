@@ -76,7 +76,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
 | I205 | PR Workflow Throughput Simplification | Planned / Unclaimed | GOV-007 evidence-only governance Spike; preserve hard safety gates and establish a separate claim before audit implementation or rule changes. |
-| I209 | Resumed Session Interactivity Under Provider Delay | Review / Claimed | TUI-051 / Issue #272; implementation `7b82fea6`/`7d90def8` awaits exact-head CI, real-terminal evidence and independent review. Retry-progress acceptance transferred to I210. |
+| I209 | Resumed Session Interactivity Under Provider Delay | Review / Claimed / PR #279 | TUI-051 / Issue #272; implementation `7b82fea6`/`7d90def8` awaits exact-head CI, real-terminal evidence and independent review. Retry-progress acceptance transferred to I210. |
 | I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accept an ADR and establish an effective claim before any public contract or implementation change. |
 
 ## Completed This Closeout
