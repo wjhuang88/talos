@@ -19,6 +19,7 @@ pub mod openai;
 mod openai_request;
 mod openai_sse;
 pub mod retry;
+mod stream_utf8;
 
 mod anthropic_request;
 mod anthropic_stream;

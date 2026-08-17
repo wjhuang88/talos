@@ -10,6 +10,8 @@ use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use crate::stream_utf8::Utf8StreamDecoder;
+
 struct ToolUseBlock {
     id: String,
     name: String,
@@ -30,6 +32,7 @@ pub(crate) async fn parse_sse_stream(
     let _ = tx.send(AgentEvent::TurnStart).await;
 
     let mut stream = response.bytes_stream();
+    let mut utf8_decoder = Utf8StreamDecoder::default();
     let mut buffer = String::new();
     let mut input_tokens: u32 = 0;
     let mut output_tokens: u32 = 0;
@@ -72,7 +75,7 @@ pub(crate) async fn parse_sse_stream(
     } {
         saw_first_packet = true;
         let chunk = match chunk_result {
-            Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
+            Ok(bytes) => match utf8_decoder.push(&bytes) {
                 Ok(s) => s,
                 Err(_) => {
                     let _ = tx
@@ -309,6 +312,15 @@ pub(crate) async fn parse_sse_stream(
                 _ => {}
             }
         }
+    }
+
+    if utf8_decoder.finish().is_err() {
+        let _ = tx
+            .send(AgentEvent::Error {
+                message: "provider stream decode error: invalid UTF-8 byte stream".into(),
+            })
+            .await;
+        return;
     }
 
     let _ = tx
