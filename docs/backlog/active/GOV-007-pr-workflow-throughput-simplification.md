@@ -23,7 +23,7 @@
 | Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
-| Implementation PR | Not started |
+| Implementation PR | Pending |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
 

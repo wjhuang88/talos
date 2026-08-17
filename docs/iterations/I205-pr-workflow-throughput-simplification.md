@@ -21,7 +21,7 @@
 | Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
-| Implementation PR | Not started |
+| Implementation PR | Pending |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
 
@@ -73,6 +73,7 @@ infrastructure-only governance Spike and claims no product behavior.
 | 2026-08-17 | Selection | Maintainer requested PR-flow simplification after observing that commit and review round trips exceeded the underlying code/document changes. I205 is Planned/Unclaimed and makes no rule change. |
 | 2026-08-18 | Claim proposal | Governance PR #284 proposes the bounded evidence-only claim from exact `main@a9cfef02`; the claim is ineffective until merge and does not activate I205. |
 | 2026-08-18 | Activation | Claim PR #284 merged as `fd1eaad9` after exact-head CI `32046397520`, both validators and merge-time CAS. I205 activates as the sole Active iteration for the evidence/decision Spike; no executable process-rule or product change is authorized. |
+| 2026-08-18 | Implementation PR preparation | Audit branch `docs/i205-workflow-audit` starts exactly at activation merge `4635ef2b`; no audit artifact or executable governance change exists before the Draft PR number is assigned. |
 
 ## Claim Preparation Checkpoint - 2026-08-18
 
