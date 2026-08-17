@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-15"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "v0.8.0 GitHub Release completed with five platform archives and checksum before Cargo publication. External crates.io installation returned `talos 0.8.0`, and the registry-only talos-runtime fixture passed in default and coding modes. I203 is closed; I196 remains Planned/Claimed and requires a fresh exact-main inventory before activation."
+current_execution_note: "I209/TUI-051 is the next mainline slice after v0.8.0 closure. Claim PR #276 merged as `33b11433`; activation is being established before any implementation worktree or code change. Exact-main evidence points to TUI input starvation before `UserInput::Cancel`; I188 remains Review and I189/I195/I196 remain Planned/Claimed but unactivated."
 
 governance:
   skill_name: "agent-project-governance"
@@ -64,7 +64,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Run GOV-007/I205 before resuming the ordered mainline implementation sequence: measure PR/review churn, preserve claim-first/protected-review/exact-head/CAS/completion-evidence gates, and claim any SOP or validator implementation separately"
+    - "Complete I209/TUI-051 before GOV-007/I205 and the ordered mainline implementation sequence: bound large-history projection work, prove resumed structured-turn cancellation across all four boundaries, expose existing retry facts, and preserve NET-001/I200/I206 exclusions"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
     - "Keep I177/ARCH-034-R08 completion evidence bound to squash implementation commit `f505eea8`, PR #162 exact-head CI `31166594367`, and closeout PR #163 merge `c4fbd02d`; keep I178/ARCH-034-R09 completion evidence bound to squash implementation commit `f92634803560dc50e0b15ca8d7d511e9928c983f`, source implementation `c662a7e6`, PR #165, and exact-head CI `31180591881`; keep I179/ARCH-034-R10 completion evidence bound to squash implementation commit `dafc9be08736aee91e0f9cdd92e5226930808061`, source implementation `63d494c5`, PR #168, and exact-head CI `31189425069`; keep I180/ARCH-034-R11 completion evidence bound to squash implementation commit `10cceec6aeb9089fe9c830355992c8fc60430d63`, source implementation `fd8ac75d`, PR #171, and exact-head CI `31238721507`; keep review-only I181 completion evidence bound to PR #174 squash merge `aea26ad011af04396ab8588c9326d309538f31a2`, and track R04 remediation through later bounded child owners"
     - "Refine Issue #155 only through unclaimed SKILL-004; decide the optional-triggers compatibility contract before any parser implementation"
