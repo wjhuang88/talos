@@ -1,11 +1,13 @@
 # TUI-051: Resumed Session Interactivity Under Provider Delay
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-051 |
 | Type | TUI / Runtime Reliability Story |
 | Priority | P0 |
-| Status | Review / Claimed |
+| Status | Complete |
 | Source | [GitHub Issue #272](https://github.com/wjhuang88/talos/issues/272) |
 | Selected Iteration | I209 |
 | Depends On | PROVIDER-005/#270/#271 Complete on main; existing structured-turn cancellation and history-projection contracts |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline session (GPT-5) |
 | Work Slice | I209 only: cache and invalidate unchanged TUI history projection; prove and repair resumed structured-turn Esc cancellation across TUI/bridge/actor/durable boundaries; project existing bounded provider retry facts; verify terminal restoration and update directly affected user documentation. Excludes retry-policy redesign, I200 scrolling, I206 steering, persistence migration, public API, dependency, release and broad renderer work. |
@@ -22,10 +24,10 @@
 | Source Issue | #272 |
 | Governance Claim PR | #276 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
+| Authorization Evidence | Claim PR #276 merged as `33b11433`; activation PR #277 merged as `c7380332`. Exact implementation head `6657d14e` passed CI `32025371877`, both governance validators, real-terminal acceptance, independent agent technical audit `5316533941` with the shared-identity limitation disclosed, and merge-time CAS before PR #279 merged as `2eff6285`. |
 | Implementation PR | #279 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | PR #279 requires exact-head CI, real-terminal CPU/input and terminal-restoration evidence, independent review and merge-time CAS before closeout. |
+| Handoff / Release Condition | None - TUI-051/I209 is complete. Retry-progress projection remains separately Planned/Unclaimed as PROVIDER-006/I210/#278. |
 
 ## Planning Checkpoint — 2026-08-17
 
@@ -178,3 +180,25 @@ prove resumed cancellation through TUI input, generation/turn-bound actor interr
 provider-future drop and durable terminal outcome against an approximately 320 KB reopened
 Session. TUI-051 is in Review, not Complete. Exact-head CI, real-terminal CPU/input-latency and
 terminal restoration evidence, independent review and merge-time CAS remain open in PR #279.
+
+## Completion Checkpoint - 2026-08-17
+
+- Completion Commit: `2eff6285688a7ecc8842197c09fb81d89678d728` (pre-existing implementation
+  merge commit containing the delivered code; the closeout status commit does not self-certify
+  completion).
+- Source implementation commits: `7b82fea64e6de87b43a0376f82714cbe41ae4989` and
+  `7d90def83314ceaa8e474f39c7ac01f9fe6a2cf6`.
+- Exact head `6657d14eee6337c8dd4788ef374c19996b81c2d5` passed CI `32025371877`, both
+  governance validators, real-terminal acceptance `5316405699`, independent agent technical audit
+  `5316533941` and merge-time CAS; PR #279 merged as `2eff6285`.
+- A 513,987-byte, 2,000-message real-terminal resume remained input-responsive at approximately
+  3.6-3.7% idle CPU, and consecutive `Ctrl+C` restored terminal modes before exit. `reset` or a
+  fresh terminal is the documented recovery after an unavoidable hard stop.
+- Deterministic tests prove projection reuse/invalidation plus resumed cancellation across TUI
+  input, generation/turn-bound actor interruption, provider-future drop and durable terminal state.
+- Truthful retry attempt/backoff projection was transferred by change control to
+  PROVIDER-006/I210/#278 because it requires an ADR-backed public provider contract. That residual
+  remains Planned/Unclaimed and is not claimed as delivered by TUI-051.
+
+TUI-051 and I209 are Complete/Closed. I200 scroll semantics, I206 steering and I210 provider
+progress remain independent owners with no implementation authority imported from this closure.

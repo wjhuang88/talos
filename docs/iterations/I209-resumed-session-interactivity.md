@@ -1,6 +1,6 @@
 # Iteration I209: Resumed Session Interactivity Under Provider Delay
 
-> Document status: Review / Claimed
+> Document status: Complete
 > Planned date: 2026-08-17
 > Objective: deliver TUI-051 so a resumed large Session remains responsive, exposes bounded
 > provider retry progress and can cancel an active turn promptly.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline session (GPT-5) |
 | Work Slice | I209 only: cache and invalidate unchanged TUI history projection; prove and repair resumed structured-turn Esc cancellation across TUI/bridge/actor/durable boundaries; project existing bounded provider retry facts; verify terminal restoration and update directly affected user documentation. Excludes retry-policy redesign, I200 scrolling, I206 steering, persistence migration, public API, dependency, release and broad renderer work. |
@@ -17,10 +17,10 @@
 | Source Issue | #272 |
 | Governance Claim PR | #276 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer directed continued mainline execution. No separate natural-person reviewer is available in the unattended flow; claim merge requires exact-head CI, both governance validators, merge-time dependency/overlap CAS and no unresolved blocking feedback. Executing, technical-audit and merge roles may be separated, but the shared GitHub identity limitation is explicit and no distinct natural person is fabricated. |
+| Authorization Evidence | Claim PR #276 merged as `33b11433`; activation PR #277 merged as `c7380332`. Exact implementation head `6657d14e` passed CI `32025371877`, both governance validators, real-terminal acceptance, independent agent technical audit `5316533941` with the shared-identity limitation disclosed, and merge-time CAS before PR #279 merged as `2eff6285`. |
 | Implementation PR | #279 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | PR #279 requires exact-head CI, real-terminal CPU/input and terminal-restoration evidence, independent review and merge-time CAS before closeout. |
+| Handoff / Release Condition | None - I209 is complete. Truthful retry-progress projection remains separately Planned/Unclaimed as PROVIDER-006/I210/#278. |
 
 ## Selected Story
 
@@ -179,3 +179,41 @@ authorized by this checkpoint.
   passed.
 - I209 is in Review, not Complete. Exact-head CI, real-terminal CPU/input-latency and terminal
   restoration evidence, independent review and merge-time CAS remain required.
+
+## Completion Evidence - 2026-08-17
+
+- Completion Commit: `2eff6285688a7ecc8842197c09fb81d89678d728` (pre-existing implementation
+  merge commit containing the delivered code; this closeout status commit is not used as its own
+  evidence).
+- Source implementation commits: `7b82fea64e6de87b43a0376f82714cbe41ae4989` and
+  `7d90def83314ceaa8e474f39c7ac01f9fe6a2cf6`.
+- Exact implementation head `6657d14eee6337c8dd4788ef374c19996b81c2d5` passed all five CI jobs
+  in run `32025371877`; PR #279 was `MERGEABLE/CLEAN` and merged as
+  `2eff6285688a7ecc8842197c09fb81d89678d728` after merge-time CAS.
+- The cached projection reuses unchanged transcript/width rows while viewport height, scrolling,
+  selection and ordinary redraw recompute only the visible projection. Focused history-projection
+  coverage passed 26 tests without changing transcript, selection or scroll truth.
+- The resumed-session integration reopens 2,000 persisted messages and independently observes
+  `UserInput::Cancel`, generation/turn-bound `SessionOp::InterruptTurn`, provider-future drop,
+  durable `TerminalCancelled`, and cancelled status returning to the TUI.
+- Real-terminal evidence `5316405699` resumed a 513,987-byte/2,000-message transcript, observed
+  approximately 3.6-3.7% idle CPU rather than sustained full-core work, and displayed input inside
+  a 250 ms observation window. Consecutive `Ctrl+C` exited 0 after restoring mouse capture,
+  bracketed paste, keyboard protocol, cursor, wrapping and alternate-screen state.
+- A direct `SIGTERM` is characterized as an unavoidable hard stop, not a supported graceful Talos
+  signal. The documented bounded recovery is `reset` or a fresh terminal.
+- Independent agent technical audit `5316533941` approved the exact head and disclosed that it is
+  not an independent natural-person review. The single-maintainer authorization and shared GitHub
+  identity limitation remain explicit.
+- The original retry-progress acceptance is not claimed by I209. Source inspection proved the
+  current public provider contract cannot expose truthful pre-stream retry/backoff progress;
+  PROVIDER-006/I210/#278 owns that ADR-backed residual and remains Planned/Unclaimed.
+- Existing README help already documented active-turn `Esc` and idle double-`Ctrl+C`; closeout adds
+  only the bounded hard-stop terminal recovery guidance.
+
+## Completion Disposition
+
+I209 and TUI-051 are Complete. The urgent independently runnable behavior is delivered: unchanged
+large-history projection no longer monopolizes the TUI task, resumed cancellation crosses all four
+owned boundaries, and supported graceful exit restores terminal modes. Retry-progress API work,
+I200 scrolling and I206 steering remain separate and receive no authority from this closure.
