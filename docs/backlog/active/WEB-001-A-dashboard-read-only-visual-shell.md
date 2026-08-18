@@ -1,27 +1,27 @@
 # WEB-001-A: Dashboard Information Architecture And Read-Only Visual Shell
 
-**Status**: In Progress — I195 Active through activation PR #288
+**Status**: Complete — I195 closed after PR #233 merge `490503db905bcd2eb2ab5e3b5487b1f542873d63`
 **Priority**: P1
 **Type**: Product Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I195 — Active; #233 must be rebuilt from the activation merge or later current `main` before review
+**Selected Iteration**: I195 — Complete / Closed
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard governance session 2026-08-13 |
 | Work Slice | Deliver only Dashboard-wide information architecture and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve current config masking, output redaction, HTML escaping, loopback binding and JSON/plain-text negotiation. No write/control/remote/session-mutation capability. |
 | Claimed At | 2026-08-13 |
 | Source Issue | None |
 | Governance Claim PR | #212 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making this bounded claim effective. Implementation merge still requires a fresh independent natural-person exact-head review with shared-account identity disclosure. |
-| Implementation PR | #233 — Draft historical candidate; rebuild required after activation reaches `main` |
+| Authorization Mode | Independent claim review; maintainer override for implementation review policy |
+| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making this bounded claim effective. For implementation merge, maintainer override `5326076971` explicitly accepted independent AI exact-head technical review `5323625004` plus human manual browser acceptance `5323801564` for this non-protected read-only slice; exact-head CI `32087223234` succeeded. |
+| Implementation PR | #233 — merged as `490503db905bcd2eb2ab5e3b5487b1f542873d63` from reviewed exact head `1ee4aa3786785473069c735e1985c9d720b82e2f` |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Activation PR #288 must merge after exact-head validation and CAS. Then rebuild #233 from that merge or later current `main`; pass implementation CI/UX acceptance and independent natural-person exact-head review before implementation merge. |
+| Handoff / Release Condition | None — I195 is Complete/Closed; excluded live/write/control/remote work remains separately governed under WEB-001 residual owners. |
 
 `Claim Pending` is not a valid claim state. The bounded `Claimed` record above became effective
 through PR #212 merge `f123e534ce864a89eb3cabfc68f4a1518201c2d0`. Activation PR #288 moves
@@ -40,6 +40,16 @@ heads remain Draft provenance only and must be rebuilt from the activation merge
   remains Paused. No other effective owner or open PR overlaps WEB-001-A.
 - The three shared derived views retain all then-current main rows and change only I195 state plus the
   I205 wording needed to avoid falsely claiming it is the sole Active iteration.
+
+### Completion Record - 2026-08-18
+
+- Activation PR #288 merged as `8f1facc8d2955fb6c9a6e01da32a62be3d7c9d40` before the final #233 rebuild.
+- Reviewed implementation head `1ee4aa3786785473069c735e1985c9d720b82e2f` passed exact-head CI `32087223234`.
+- Independent AI exact-head technical review `5323625004` and human maintainer browser acceptance
+  `5323801564` passed. Maintainer override `5326076971` explicitly accepted that review path for this
+  non-protected read-only slice instead of requiring a separate natural-person technical reviewer.
+- Final merge-time CAS used then-current `main@8127fa579cef03a36e743a30003a682bc5f884b1`; PR #233 merged
+  as `490503db905bcd2eb2ab5e3b5487b1f542873d63`, whose second parent is exactly the reviewed head.
 
 ## Identity / Goal / Value
 
@@ -253,32 +263,50 @@ write-capable control plane. Bilingual README updates do not imply Dashboard UI 
 
 ## Acceptance For Technical / Governance Work
 
-- [ ] Before implementation, every current Active, Review, Planned and Blocked iteration is
-      re-inventoried and its Dashboard disposition is recorded in I195.
-- [ ] Before the implementation branch exists, one effective `Claimed` record for this exact Work
-      Slice has reached `main` through governance claim PR #212.
-- [ ] The implementation worktree records its exact current-main base SHA after the effective claim.
-- [ ] Implementation branch is `feat/dashboard-I195-read-only-shell` and its PR targets `main`.
-- [ ] `cargo test --locked -p talos-dashboard` passes with HTML negotiation, `/extensions`, masking,
+- [x] Before implementation, every current Active, Review, Planned and Blocked iteration was
+      re-inventoried and its Dashboard disposition was recorded in I195.
+- [x] Before the implementation branch existed, one effective `Claimed` record for this exact Work
+      Slice reached `main` through governance claim PR #212; activation was made authoritative via #288
+      before the final implementation rebuild.
+- [x] The implementation worktree recorded its exact current-main base SHA after the effective claim.
+- [x] Implementation branch was `feat/dashboard-I195-read-only-shell` and PR #233 targeted `main`.
+- [x] `cargo test --locked -p talos-dashboard` passed with HTML negotiation, `/extensions`, masking,
       redaction, escaping, GET-only and loopback regressions.
-- [ ] `cargo check --locked --workspace` passes.
-- [ ] `cargo clippy --locked --workspace -- -D warnings` passes.
-- [ ] `cargo test --locked --workspace` passes.
-- [ ] `scripts/validate_project_governance.sh .` passes.
-- [ ] `bash scripts/validate_collaboration_claims.sh .` passes.
-- [ ] `git diff --check` is clean.
-- [ ] Repeatable manual browser validation records 320×568, 768×1024 and 1440×900 layouts, 200%
+- [x] `cargo check --locked --workspace` passed.
+- [x] `cargo clippy --locked --workspace -- -D warnings` passed.
+- [x] `cargo test --locked --workspace` passed.
+- [x] `scripts/validate_project_governance.sh .` passed.
+- [x] `bash scripts/validate_collaboration_claims.sh .` passed.
+- [x] `git diff --check` was clean.
+- [x] Repeatable manual browser validation recorded 320×568, 768×1024 and 1440×900 layouts, 200%
       zoom, keyboard-only navigation, WCAG AA contrast checks, unchanged CSP-compatible resource
-      behavior and truthful English `lang` metadata without using browser automation.
-- [ ] Independent natural-person review is bound to the exact implementation head; shared-account
-      review explicitly discloses reviewer identity.
-- [ ] Merge-time CAS confirms current `main`, no overlapping effective claim/new PR, exact reviewed
+      behavior and truthful English `lang` metadata without using browser automation (`5323801564`).
+- [x] Independent AI exact-head technical review `5323625004` was accepted by explicit maintainer
+      override `5326076971`; the owner-local natural-person technical reviewer requirement was waived
+      for this non-protected read-only slice.
+- [x] Merge-time CAS confirmed current `main`, no overlapping effective claim/new PR, exact reviewed
       head and still-satisfied dependencies before merge.
-- [ ] Governance closure cites a pre-existing implementation/merge SHA in `Completion Commit:`; no
+- [x] Governance closure cites the pre-existing implementation/merge SHA in `Completion Commit:`; no
       status-only commit is used as completion evidence.
+
+## Completion Evidence
+
+Completion Commit: `490503db905bcd2eb2ab5e3b5487b1f542873d63`
+
+- Reviewed implementation head: `1ee4aa3786785473069c735e1985c9d720b82e2f`.
+- Exact-head CI `32087223234`: SUCCESS across Unix/macOS and Windows workspace gates plus both
+  governance validators.
+- Independent AI technical review `5323625004` approved the exact head; human maintainer browser
+  walkthrough `5323801564` passed the viewport, zoom, keyboard, CSP, empty/populated and security
+  presentation matrix.
+- Maintainer review-policy override `5326076971` explicitly accepted that AI technical review for
+  this non-protected I195 slice and waived the owner-local natural-person reviewer requirement.
+- PR #233 merged with first parent `8127fa579cef03a36e743a30003a682bc5f884b1` and second parent
+  exactly `1ee4aa3786785473069c735e1985c9d720b82e2f`, preserving the reviewed implementation tree.
 
 ## Residual Destination
 
 All excluded live/write/control/remote work remains under WEB-001 or a future separately governed
-child/ADR/claim. TUI-037 remains its own owner. Any newly discovered shared runtime/domain/session
-API requirement is routed to the mainline foundation lane rather than absorbed into this Story.
+child/ADR/claim. TUI-037 remains its own owner. SEC-002 remains the separate token-delivery residual.
+Any newly discovered shared runtime/domain/session API requirement is routed to the mainline
+foundation lane rather than absorbed into this Story.
