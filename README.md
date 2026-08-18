@@ -46,12 +46,14 @@ Currently shipped:
 - Read-only loopback dashboard in TUI mode; successful startup shows the complete local URL as a
   copyable plain-text entry in the display-only TUI Logo region. It occupies one row at ordinary
   widths and wraps without truncation at narrow widths. Startup failures remain transient error
-  notices. When a browser
-  navigates to `/status`, `/history`, `/governance`, or `/config`, the server renders accessible
-  HTML pages with navigation and deterministic empty states. Requests without an explicit
-  `Accept: text/html` header receive the original JSON/plain-text API. All dynamic content is
-  HTML-escaped and secrets are redacted before serialization. It binds to `127.0.0.1`; the
-  per-process bearer token is off by default. Set `[dashboard] loopback_only = false` to
+  notices. In a browser, `/`, `/status`, `/history`, `/governance`, `/config`, and `/extensions`
+  share a light, compact Nord-derived read-only shell with keyboard-visible navigation, responsive
+  layouts, and deterministic empty states. Explicit `Accept: text/html` selects the rendered
+  representation for all five data routes; requests without explicit HTML acceptance keep the
+  existing JSON/plain-text API. The first Dashboard UI slice is English-only even though the user
+  documentation is bilingual. Dynamic content is HTML-escaped and redacted before presentation,
+  and configuration remains masked. The server binds to `127.0.0.1` and registers no write/action
+  route; the per-process bearer token is off by default. Set `[dashboard] loopback_only = false` to
   require the token; the Logo entry then shows the token-free base URL plus
   `authentication required` and never displays or logs the credential. The current TUI emits no
   terminal hyperlink escape sequence.
