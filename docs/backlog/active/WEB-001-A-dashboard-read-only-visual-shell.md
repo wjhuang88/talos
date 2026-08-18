@@ -1,10 +1,10 @@
 # WEB-001-A: Dashboard Information Architecture And Read-Only Visual Shell
 
-**Status**: Ready — proposed claim in PR #212; ineffective before target-branch merge
+**Status**: In Progress — I195 Active through activation PR #288
 **Priority**: P1
 **Type**: Product Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I195 proposed; no implementation authority before the finalized claim reaches `main`
+**Selected Iteration**: I195 — Active; #233 must be rebuilt from the activation merge or later current `main` before review
 
 ## Collaboration Claim
 
@@ -18,14 +18,28 @@
 | Source Issue | None |
 | Governance Claim PR | #212 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head review is required before claim merge. If the shared `@wjhuang88` GitHub account is used for review, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record has no ownership effect before PR #212 reaches `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass exact-head governance/CI validation, obtain independent natural-person approval, repeat merge-time CAS against current `main` plus all three lanes, and merge PR #212 to `main` before creating any Dashboard implementation branch or worktree. |
+| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making this bounded claim effective. Implementation merge still requires a fresh independent natural-person exact-head review with shared-account identity disclosure. |
+| Implementation PR | #233 — Draft historical candidate; rebuild required after activation reaches `main` |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | Activation PR #288 must merge after exact-head validation and CAS. Then rebuild #233 from that merge or later current `main`; pass implementation CI/UX acceptance and independent natural-person exact-head review before implementation merge. |
 
-`Claim Pending` is not a valid claim state. The `Claimed` record above is a proposal on PR #212 and
-becomes effective only when that exact governed record is merged to `main`; the open PR itself does
-not reserve implementation scope.
+`Claim Pending` is not a valid claim state. The bounded `Claimed` record above became effective
+through PR #212 merge `f123e534ce864a89eb3cabfc68f4a1518201c2d0`. Activation PR #288 moves
+WEB-001-A/I195 into execution without expanding that scope. The pre-activation #233 implementation
+heads remain Draft provenance only and must be rebuilt from the activation merge or later current
+`main` before review.
+
+### Activation Record - 2026-08-18
+
+- Exact activation source: `main@4635ef2b4cc9c894f03c0bcbce7e7802730e56ab`.
+- Maintainer direction in the current Dashboard session explicitly authorizes continued I195 work in
+  parallel with I205/GOV-007. I205 is an evidence-only governance audit and is non-overlapping.
+- #287 remains I205-owned; #233 remains the I195-owned Draft candidate to rebuild. Recovery PRs
+  #120/#121 remain archival only.
+- I189/I196 remain Planned/Claimed; I197-I201, I206-I208 and I210 remain Planned/Unclaimed; I164
+  remains Paused. No other effective owner or open PR overlaps WEB-001-A.
+- The three shared derived views retain all then-current main rows and change only I195 state plus the
+  I205 wording needed to avoid falsely claiming it is the sole Active iteration.
 
 ## Identity / Goal / Value
 
