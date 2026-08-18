@@ -1,20 +1,22 @@
 # TUI-041: Thinking Preview Wrapping And Dynamic Height
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-041 |
 | Type | TUI / Product Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #69](https://github.com/wjhuang88/talos/issues/69) |
-| Selected Iteration | I199 — Review / Claimed |
+| Selected Iteration | I199 — Complete / Closed |
 | Depends On | TUI-039 layout continuity; ADR-034 reasoning boundary; ADR-054 renderer |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | TUI-041 / I199 only: implement and validate the bounded transient preview layout plan, shared measurement/rendering, display-width wrapping, six-row cap, constrained layout compression and cleanup. Excludes TUI-042/#79, TUI-045/#125, persistence, provider protocol and release work. |
@@ -25,7 +27,7 @@
 | Authorization Evidence | Activation PR #295 exact head `883d5cc1`, CI `32114936912`, independent approval `5325926209`, and claim merge `8127fa57`. |
 | Implementation PR | #297 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Preserve TUI-042/TUI-045 boundaries; close only after PR #297 exact-head CI, maintainer native-terminal acceptance, independent review, merge-time CAS and owner-first closeout. |
+| Handoff / Release Condition | None — TUI-041/I199 is Complete/Closed; TUI-042/#79, TUI-045/#125 and TUI-056/#298 retain separate owners and claims. |
 
 ## Identity / Goal / Value
 
@@ -67,8 +69,9 @@ than authorizing a renderer redesign.
 
 ## User-Facing Documentation
 
-Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Review.
+Update user or SDK documentation only when observable behavior or a public integration contract
+changes. This bounded correction is shipped; TUI-056/#298 remains a separate unshipped interaction
+proposal.
 
 ## Required Reads
 
@@ -88,6 +91,15 @@ Do not present this Story as shipped while it remains Review.
 ## Residual Destination
 
 User-configurable or scrollable preview behavior is a separate follow-up.
+
+## Completion Evidence
+
+Completion Commits: `938c9edb9b3336e81a3b90232a69e0993574bc69`,
+`558b76d39246eef5e1cffd9cf7902e3d6bac4a17`,
+`14bf4e60bb4aaac8c6bd72d9b59565b1a7773b23`,
+`add84074b0d59335f6aff9a4e3fec254e50d360e`, and
+`de24bffd23665657c1ce2d4a1d976a5c38866432`. These implementation commits predate the
+owner-first status closeout; the closeout commit is not completion evidence.
 
 ## 2026-08-17 Upcoming-Pool Checkpoint
 
@@ -137,3 +149,12 @@ rolls the raw displayable thinking tail below it; completed-history presentation
 Native-terminal inspection changed the bounded maximum from six rows to ten. The preview continues
 to yield to composer and required-panel capacity on constrained terminals; this variance does not
 authorize configurable height, keyboard scrolling or a full thinking panel.
+
+## 2026-08-18 Owner-First Closeout
+
+TUI-041 is Complete/Closed through implementation commits `938c9edb`, `558b76d3`, `14bf4e60`,
+`add84074` and `de24bffd`. PR #297 exact head `4434bc83` passed CI `32138003207`, maintainer
+native-terminal acceptance `5328282375`, independent technical approval `5328531254` and
+merge-time CAS, then merged as `5fc814b5`. The accepted maximum is ten displayed rows total: one
+fixed `thinking` title plus nine rolling body rows. Completed-history folding remains unimplemented
+and separately owned by TUI-056/#298.

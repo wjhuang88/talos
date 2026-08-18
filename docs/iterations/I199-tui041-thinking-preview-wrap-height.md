@@ -1,6 +1,6 @@
 # Iteration I199: Thinking Preview Wrap And Bounded Height
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-08-14
 > Planned objective: render live thinking/stream previews from one display-width-aware plan so
 > multiline content wraps, grows to a bounded cap and shrinks without destabilizing composer,
@@ -13,7 +13,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | TUI-041 / I199 only: bounded transient preview layout correction with shared display-width planning, six-row cap, constrained compression, anchor preservation and cleanup. No TUI-042/TUI-045, persistence, provider protocol or release work. |
@@ -24,7 +24,7 @@
 | Authorization Evidence | Activation PR #295 exact head `883d5cc1`, CI `32114936912`, independent approval `5325926209`, and claim merge `8127fa57`. |
 | Implementation PR | #297 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Close only after PR #297 exact-head CI, maintainer native-terminal acceptance, independent review, merge-time CAS and owner-first closeout. |
+| Handoff / Release Condition | None — I199 is Complete/Closed; I200/#79 and TUI-056/#298 remain separately governed. |
 
 ## Published Baseline
 
@@ -92,9 +92,21 @@ in its scroll-bound matrix.
 - Pending: PR #297 exact-head CI completion, maintainer native-terminal acceptance and independent
   exact-head review. Agent-run PTY evidence does not substitute for the maintainer gate.
 
+The pending line above records the implementation-review checkpoint. Final exact-head CI run
+`32138003207` passed 5/5 at `4434bc83adbd9ac57d3772f4b54dbfb372340fa7`, including Linux
+release preflight, Windows workspace validation and remote Issue reconciliation. Maintainer native
+terminal acceptance is comment `5328282375`; independent exact-head technical approval is comment
+`5328531254`, with shared-account and non-natural-person identity limits disclosed. PR #297 merged
+as `5fc814b558e68140bc59e68aaa542a477a66ed61` after merge-time CAS.
+
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `938c9edb9b3336e81a3b90232a69e0993574bc69`,
+`558b76d39246eef5e1cffd9cf7902e3d6bac4a17`,
+`14bf4e60bb4aaac8c6bd72d9b59565b1a7773b23`,
+`add84074b0d59335f6aff9a4e3fec254e50d360e`, and
+`de24bffd23665657c1ce2d4a1d976a5c38866432`. These implementation commits all predate this
+status closeout; the closeout commit is not completion evidence.
 
 ## Variance And Residuals
 
@@ -103,7 +115,9 @@ User-configurable, scrollable or persistent preview behavior requires separate o
 ## Retrospective
 
 The shared plan removed measurement/render divergence while keeping the correction bounded to the
-existing transient preview. Completion remains pending the external terminal and review gates.
+existing transient preview. Native-terminal feedback exposed and closed title, marker-color,
+heading-freeze and useful-height defects before merge; completed-history interaction remains
+separately owned by TUI-056/#298.
 
 ## 2026-08-18 Maintainer Terminal-Acceptance Correction
 
@@ -139,3 +153,12 @@ published six rows to ten rows so the rolling thinking body retains more immedia
 context. This is an explicit, size-S variance within the same bounded-preview objective. Composer,
 required-panel and constrained-terminal compression priorities remain unchanged; the preview still
 shrinks below ten rows when those higher-priority controls need space.
+
+## 2026-08-18 Owner-First Closeout
+
+I199 is Complete/Closed after PR #297 merged as `5fc814b558e68140bc59e68aaa542a477a66ed61`.
+The accepted live projection is one fixed `thinking` title plus up to nine rolling body rows, with
+the clipping marker in the prefix column and no Markdown-title extractor. Exact-head CI
+`32138003207`, maintainer acceptance `5328282375`, independent approval `5328531254` and
+merge-time CAS all bind the merged runtime tree. I200/#79 remains the next ordered, separately
+unclaimed iteration; TUI-056/#298 owns collapsible completed reasoning history.
