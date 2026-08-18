@@ -28,7 +28,7 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
-I158 and I171 completion evidence: closeout `56f419f7` (source implementation/audit
+I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
 
 | ID | Codename | State | Activation / Completion Gate |
