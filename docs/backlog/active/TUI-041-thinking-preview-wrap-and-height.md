@@ -5,27 +5,27 @@
 | Story ID | TUI-041 |
 | Type | TUI / Product Story |
 | Priority | P1 |
-| Status | Ready — I199 Planned / Unclaimed |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #69](https://github.com/wjhuang88/talos/issues/69) |
-| Selected Iteration | I199 — Planned / Unclaimed |
+| Selected Iteration | I199 — Active / Claimed |
 | Depends On | TUI-039 layout continuity; ADR-034 reasoning boundary; ADR-054 renderer |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | TUI-041 / I199 only: implement and validate the bounded transient preview layout plan, shared measurement/rendering, display-width wrapping, six-row cap, constrained layout compression and cleanup. Excludes TUI-042/#79, TUI-045/#125, persistence, provider protocol and release work. |
+| Claimed At | 2026-08-18 |
 | Source Issue | #69 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #295 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Activation PR #295; effective only after merge to `main`, exact-head CI and independent review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | After the ordered-task predecessor is dispositioned, establish an effective I199 claim on `main`; implement only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After claim merge, create the implementation branch from the claim merge or later current `main`; preserve TUI-042/TUI-045 boundaries and obtain exact-head CI, native-terminal evidence and independent review before closeout. |
 
 ## Identity / Goal / Value
 
