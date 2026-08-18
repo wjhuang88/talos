@@ -5,10 +5,10 @@
 | Story ID | WORK-001-A |
 | Type | Architecture / Migration Spike |
 | Priority | P0 |
-| Status | Ready — I196 planned; PR #226 proposes the claim but is not yet effective |
+| Status | Active — I196 P0 decision/migration contract implementation in progress |
 | Parent Epic | WORK-001 |
 | Source | DESKTOP-001 P0 prerequisite; GitHub Issue #29; three-track development baseline |
-| Selected Iteration | I196 Planned |
+| Selected Iteration | I196 Active |
 | Depends On | RUNTIME-001 Complete; TODO-001 Complete; TODO-002 Complete; VALIDATION-001 Complete; current main inventory |
 
 ## Collaboration Claim
@@ -23,13 +23,24 @@
 | Source Issue | #29 |
 | Governance Claim PR | #226 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head architecture review is required before claim merge and again before P0 decision acceptance. If the shared `@wjhuang88` account is used, the reviewer must disclose the actual natural-person identity and role separation. This proposed Claimed record remains ineffective until PR #226 reaches `main`. |
+| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. Independent exact-head architecture review remains required for P0 decision acceptance; shared-account identity limits must be disclosed. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current main and all lanes, and merge PR #226 to main; only then create the P0 implementation branch from the claim merge or later current main. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | P0 branch starts from current `main@b59912e3`; complete only the decision/documentation slice, then obtain independent exact-head architecture review, exact-head CI and owner-first closeout. No P1-P4 or implementation authority is transferred. |
 
-The `Claimed` record above is proposed on PR #226 and has no target-branch ownership effect. The
-implementation branch must start from the claim merge commit or a later current `main` commit.
+The `Claimed` record above became effective when PR #226 merged as `453d1fba`. The P0
+implementation branch starts from the later current `main@b59912e3` activation checkpoint.
+
+## Activation Checkpoint — 2026-08-18
+
+I196 is activated as the mainline P0 decision/documentation slice alongside the separately
+authorized, GET-only/read-only Dashboard I195 lane; the existing non-overlap authorization is
+recorded by Dashboard activation PR #288. The scopes do not overlap: I196 changes only
+WORK-001-A decision and migration evidence, while I195 owns Dashboard presentation artifacts.
+Current `main@b59912e36025088e4e3fa76b7b5b4e2aa7a1396c` inventory: I159/I160/I161/I162/I188
+Complete; I164 Paused; I189 Planned/Claimed; I195 Active/Claimed; no other iteration is Review.
+No Rust, Cargo, persistence, public API, Desktop, Dashboard or TUI implementation authority is
+created by this activation.
 
 ## Identity / Goal / Value
 
