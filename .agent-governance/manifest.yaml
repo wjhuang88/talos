@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-18"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "GOV-007/I205 and WEB-001-A/I195 are concurrently Active under explicit maintainer non-overlap authorization recorded by Dashboard activation PR #288. I205 remains an evidence-only governance audit with no executable rule or product authority; I195 remains a GET-only/read-only Dashboard presentation slice. I188 is Complete/Closed; I189/I196 remain Planned/Claimed and unactivated."
+current_execution_note: "GOV-007/I205 is in Review through audit PR #287 while WEB-001-A/I195 is concurrently Active under explicit maintainer non-overlap authorization recorded by Dashboard activation PR #288. I205 remains an evidence-only governance audit with no executable rule or product authority; I195 remains a GET-only/read-only Dashboard presentation slice. I188 is Complete/Closed; I189/I196 remain Planned/Claimed and unactivated."
 
 governance:
   skill_name: "agent-project-governance"
@@ -64,7 +64,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Continue the active GOV-007/I205 evidence-only audit and the separately authorized WEB-001-A/I195 read-only Dashboard slice in parallel; do not let either lane import the other's authority, and keep I189/I196 plus all other planned children unactivated unless separately authorized"
+    - "Obtain exact-head review and close GOV-007/I205 audit PR #287 owner-first while preserving the separately authorized WEB-001-A/I195 read-only Dashboard slice; do not let either lane import the other's authority, and keep I189/I196 plus all other planned children unactivated unless separately authorized; then create a separate bounded claim/iteration for atomic claim activation before changing SOPs or validators"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
     - "Keep I177/ARCH-034-R08 completion evidence bound to squash implementation commit `f505eea8`, PR #162 exact-head CI `31166594367`, and closeout PR #163 merge `c4fbd02d`; keep I178/ARCH-034-R09 completion evidence bound to squash implementation commit `f92634803560dc50e0b15ca8d7d511e9928c983f`, source implementation `c662a7e6`, PR #165, and exact-head CI `31180591881`; keep I179/ARCH-034-R10 completion evidence bound to squash implementation commit `dafc9be08736aee91e0f9cdd92e5226930808061`, source implementation `63d494c5`, PR #168, and exact-head CI `31189425069`; keep I180/ARCH-034-R11 completion evidence bound to squash implementation commit `10cceec6aeb9089fe9c830355992c8fc60430d63`, source implementation `fd8ac75d`, PR #171, and exact-head CI `31238721507`; keep review-only I181 completion evidence bound to PR #174 squash merge `aea26ad011af04396ab8588c9326d309538f31a2`, and track R04 remediation through later bounded child owners"
     - "Refine Issue #155 only through unclaimed SKILL-004; decide the optional-triggers compatibility contract before any parser implementation"

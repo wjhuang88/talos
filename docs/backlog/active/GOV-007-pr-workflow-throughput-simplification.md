@@ -5,9 +5,9 @@
 | Story ID | GOV-007 |
 | Type | Governance / Delivery Throughput Spike |
 | Priority | P0 |
-| Status | In Progress - I205 Active / Claimed |
+| Status | Review - I205 evidence/decision packet complete; implementation PR #287 |
 | Source | Maintainer direction on 2026-08-17 after the v0.8.0 delivery retrospective |
-| Selected Iteration | I205 - Active / Claimed |
+| Selected Iteration | I205 - Review / Claimed |
 | Depends On | Current collaboration, Git, DOC-CHECK and change-aware CI contracts |
 
 ## Collaboration Claim
@@ -23,9 +23,9 @@
 | Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
-| Implementation PR | Not started |
+| Implementation PR | #287 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
+| Handoff / Release Condition | Audit packet is complete in PR #287. Establish a new bounded claim and iteration before changing SOPs, validators, workflows or branch protection. |
 
 ## Goal
 
@@ -35,7 +35,7 @@ preserving the controls that address real failure modes.
 ## Scope
 
 - Measure claim, implementation, closeout, correction and review round trips for the recent
-  I159-I203 delivery chains.
+  I159-I205-era delivery chains selected by the audit scope.
 - Classify each round trip as required safety evidence, mechanically preventable drift, stale-base
   reconciliation, derived-view duplication or avoidable process ceremony.
 - Define a target workflow with explicit treatment for ordinary, bounded-maintenance, release and
@@ -78,3 +78,23 @@ preserving the controls that address real failure modes.
 ## User-Facing Documentation
 
 Infrastructure-only governance Spike. No runtime or user-facing product behavior is claimed.
+
+## Execution Evidence - 2026-08-18
+
+The evidence-only audit is complete in PR #287. The reproducible snapshot
+`docs/reference/I205-PR-WORKFLOW-EVIDENCE.json` covers 42 explicitly selected PRs across ten
+I159-I205-era chains: 40 merged, 2 closed without merge, 37 explicit review rounds, 11 REQUEST
+CHANGES rounds, 26 approvals and 10 reviewed-head changes. The decision report selects atomic
+claim activation as the smallest separately claimable follow-up and preserves all protected,
+exact-head, CAS, owner-first, Completion Commit and release-order gates.
+
+Validation evidence:
+
+- `python3 -m py_compile scripts/audit_pr_workflow.py` passed.
+- JSON summary assertions for the 42-PR population and zero unbound/unknown review rounds passed.
+- `scripts/validate_project_governance.sh .` passed with 0 warnings.
+- `COLLABORATION_VALIDATION_BASE=4635ef2b4cc9c894f03c0bcbce7e7802730e56ab bash scripts/validate_collaboration_claims.sh .` passed with 0 warnings.
+- `git diff --check` passed.
+
+This is evidence for `Review`, not completion. The selected atomic-activation workflow requires a
+new bounded owner, iteration and effective claim before any SOP or validator changes.

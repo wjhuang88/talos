@@ -1,6 +1,6 @@
 # Iteration I205: PR Workflow Throughput Simplification
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-17
 > Planned objective: measure recent Talos delivery overhead and select a smaller PR/review workflow
 > that preserves evidence-bearing safety gates while eliminating mechanically preventable churn.
@@ -21,9 +21,9 @@
 | Governance Claim PR | #284 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
-| Implementation PR | Not started |
+| Implementation PR | #287 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After this claim merges, activate I205 separately from the claim merge or later main and execute only the evidence/decision Spike. Establish a new bounded claim before changing SOPs, validators, workflows or branch protection. |
+| Handoff / Release Condition | Audit packet is complete in PR #287. Establish a new bounded claim and iteration before changing SOPs, validators, workflows or branch protection. |
 
 ## Published Baseline
 
@@ -61,7 +61,7 @@ infrastructure-only governance Spike and claims no product behavior.
 ## Non-Terminal Coordination Record
 
 - I164 remains Paused.
-- I188, I189, I195 and I196 remain Planned/Claimed and unactivated.
+- I188 is Complete/Closed; I195 is Active/Claimed under Dashboard activation PR #288; I189 and I196 remain Planned/Claimed and unactivated.
 - I197-I201 remain Planned/Unclaimed through the #227 coordination proposal.
 - I205 is scheduled before the long task resumes implementation so accepted simplifications can
   reduce later ceremony; planning does not activate it.
@@ -73,6 +73,9 @@ infrastructure-only governance Spike and claims no product behavior.
 | 2026-08-17 | Selection | Maintainer requested PR-flow simplification after observing that commit and review round trips exceeded the underlying code/document changes. I205 is Planned/Unclaimed and makes no rule change. |
 | 2026-08-18 | Claim proposal | Governance PR #284 proposes the bounded evidence-only claim from exact `main@a9cfef02`; the claim is ineffective until merge and does not activate I205. |
 | 2026-08-18 | Activation | Claim PR #284 merged as `fd1eaad9` after exact-head CI `32046397520`, both validators and merge-time CAS. I205 activates as the sole Active iteration for the evidence/decision Spike; no executable process-rule or product change is authorized. |
+| 2026-08-18 | Implementation PR preparation | Audit branch `docs/i205-workflow-audit` starts exactly at activation merge `4635ef2b`; no audit artifact or executable governance change exists before the Draft PR number is assigned. |
+| 2026-08-18 | Implementation PR opened | Draft PR #287 binds the audit evidence and decision packet to branch `docs/i205-workflow-audit`; the PR remains limited to the evidence-only Work Slice. |
+| 2026-08-18 | Audit evidence and decision | PR #287 contains the reproducible 42-PR snapshot and throughput report. I205 moves to Review; no executable governance or product rule changed. |
 
 ## Claim Preparation Checkpoint - 2026-08-18
 
@@ -94,7 +97,15 @@ change is authorized by this checkpoint.
 
 ## Verification Evidence
 
-- Pending effective claim and execution.
+- `docs/reference/I205-PR-WORKFLOW-EVIDENCE.json` regenerated through GitHub REST from the explicit
+  PR population in `scripts/audit_pr_workflow.py`.
+- `docs/reference/I205-PR-WORKFLOW-THROUGHPUT-AUDIT.md` records the cause classification, retained
+  gates, four-scenario matrix, atomic-activation follow-up, migration and rollback.
+- `python3 -m py_compile scripts/audit_pr_workflow.py`: pass.
+- JSON assertions for 42 PRs, 37 review rounds, and zero unbound/unknown review rounds: pass.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `COLLABORATION_VALIDATION_BASE=4635ef2b4cc9c894f03c0bcbce7e7802730e56ab bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
+- `git diff --check`: pass.
 
 ## Completion Evidence
 
@@ -106,4 +117,6 @@ change is authorized by this checkpoint.
 
 ## Retrospective
 
-- Pending.
+- The sample confirms that independent security and release review found real defects, while
+  repeated claim/activation/derived-state corrections were largely mechanically preventable. The
+  next process change must be separately claimed; I205 does not implement it.
