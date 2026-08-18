@@ -1,5 +1,39 @@
 use super::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FrameHistoryScrollBounds {
+    current_start: usize,
+    max_start: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FrameHistoryScrollOutcome {
+    Noop,
+    Anchored { start: usize },
+    FollowTail,
+}
+
+impl FrameHistoryScrollBounds {
+    fn outcome_for_target(self, target: usize) -> FrameHistoryScrollOutcome {
+        if target == self.current_start {
+            FrameHistoryScrollOutcome::Noop
+        } else if target == self.max_start {
+            FrameHistoryScrollOutcome::FollowTail
+        } else {
+            FrameHistoryScrollOutcome::Anchored { start: target }
+        }
+    }
+
+    fn scroll_up(self, rows: usize) -> FrameHistoryScrollOutcome {
+        self.outcome_for_target(self.current_start.saturating_sub(rows))
+    }
+
+    fn scroll_down(self, rows: usize) -> FrameHistoryScrollOutcome {
+        let target = self.current_start.saturating_add(rows).min(self.max_start);
+        self.outcome_for_target(target)
+    }
+}
+
 impl Tui {
     pub(super) fn is_startup_mode(&self) -> bool {
         self.transcript.entries().is_empty()
@@ -190,6 +224,15 @@ impl Tui {
             history_height,
             &self.history_scroll,
         );
+        if !follows_tail
+            && splash_rows.saturating_add(history.total_rows) <= usize::from(history_height)
+        {
+            self.history_prefix_start = None;
+            self.history_scroll.jump_to_end();
+            // FollowTail restores the natural history cap. Replan this frame once so resize/reflow
+            // cannot leave the composer in the stale anchored layout until another render tick.
+            return self.draw_frame();
+        }
         self.last_history_projection = history.clone();
         if let (Some(area), Some(selection)) = (app_layout.history, self.selection.as_mut())
             && selection.dragging
@@ -352,25 +395,37 @@ impl Tui {
         }
     }
 
-    pub(super) fn scroll_frame_history_up(&mut self, rows: usize) {
-        self.anchor_frame_history_start(self.last_frame_history_start.saturating_sub(rows));
-    }
-
-    pub(super) fn scroll_frame_history_down(&mut self, rows: usize, height: u16) {
+    fn frame_history_scroll_bounds(&self, height: u16) -> FrameHistoryScrollBounds {
         let total_rows = self
             .last_splash_row_count
             .saturating_add(self.last_history_projection.total_rows);
         let max_start = total_rows.saturating_sub(usize::from(height));
-        let target = self
-            .last_frame_history_start
-            .saturating_add(rows)
-            .min(max_start);
+        FrameHistoryScrollBounds {
+            current_start: self.last_frame_history_start.min(max_start),
+            max_start,
+        }
+    }
 
-        if target >= max_start {
-            self.history_prefix_start = None;
-            self.history_scroll.jump_to_end();
-        } else {
-            self.anchor_frame_history_start(target);
+    pub(super) fn scroll_frame_history_up(&mut self, rows: usize) {
+        let bounds = self.frame_history_scroll_bounds(self.last_history_viewport_height);
+        self.apply_frame_history_scroll(bounds.scroll_up(rows));
+    }
+
+    pub(super) fn scroll_frame_history_down(&mut self, rows: usize, height: u16) {
+        let bounds = self.frame_history_scroll_bounds(height);
+        self.apply_frame_history_scroll(bounds.scroll_down(rows));
+    }
+
+    fn apply_frame_history_scroll(&mut self, outcome: FrameHistoryScrollOutcome) {
+        match outcome {
+            FrameHistoryScrollOutcome::Noop => {}
+            FrameHistoryScrollOutcome::Anchored { start } => {
+                self.anchor_frame_history_start(start);
+            }
+            FrameHistoryScrollOutcome::FollowTail => {
+                self.history_prefix_start = None;
+                self.history_scroll.jump_to_end();
+            }
         }
     }
 }
