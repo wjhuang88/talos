@@ -5,27 +5,27 @@
 | Story ID | TUI-045 |
 | Type | Bug / TUI / Permission UX Story |
 | Priority | P1 |
-| Status | Ready — I197 Planned / Unclaimed |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #125](https://github.com/wjhuang88/talos/issues/125) |
-| Selected Iteration | I197 — Planned / Unclaimed |
+| Selected Iteration | I197 — Active / Claimed |
 | Depends On | Inline TUI scrollback/composer ownership; permission panel state; ADR-054 renderer |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
+| Work Slice | TUI-045 / I197 only: preserve the logical viewport/composer anchor and prior tail-follow state across the transient permission prompt, queued prompts and resize using focused layout tests and real-terminal evidence. Presentation/layout only; excludes permission semantics, policy/default decisions, request identity, persistence, broad renderer changes and release work. |
+| Claimed At | 2026-08-19 |
 | Source Issue | #125 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #304 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #304 proposes this bounded claim from `main@99645e78`; it is ineffective before merge. No independent reviewer is currently available for this non-security planning claim. Exact-head CI, both governance validators, merge-time CAS and no blocking feedback remain required; any protected permission/security scope stops and requires independent security review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Establish an effective I197 claim on `main`, then implement from that claim merge or later current `main`; do not alter permission semantics. Per-child CI, Agent technical review and CAS remain merge gates; the natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Last Updated | 2026-08-19 |
+| Handoff / Release Condition | Claim #304 must merge before I197 is effective. Only then create the implementation branch from that merge or later current `main`; do not alter permission semantics. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -86,3 +86,6 @@ its exact-head CI, independent Agent technical review and CAS gates without touc
 policy or protected crates, its natural-person review and terminal matrix may be added to Issue
 #302 for I211. TUI-045 remains Review until those rows pass; policy or security-scope expansion
 cannot use this deferral.
+
+The I197 claim is proposed by PR #304 from `main@99645e78`; no implementation branch or product
+code authority exists until that claim reaches `main`.
