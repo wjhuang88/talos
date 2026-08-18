@@ -58,6 +58,24 @@ If the runtime path is intentionally out of scope for this story, the story is *
 say so explicitly, and register the integration work as a residual item — do not mark the
 behavior-facing parent story Done.
 
+### 3b. Deferred Human Validation In A Long Task
+
+When the active long-task contract explicitly selects `Deferred Human Validation Mode`, unavailable
+natural-person review or device-dependent acceptance may be scheduled into its linked validation
+Issue instead of idling the next non-overlapping child. Apply all of these rules:
+
+- run and record every non-deferred automated, technical-review, security-review and merge-time
+  gate first;
+- append the exact implementation head and remaining human/manual rows to the tracker;
+- keep this Story and iteration Review, with `Completion Commit: Pending`;
+- record an explicit predecessor disposition before activating the next child;
+- never defer an `AGENTS.md` security-review hard gate;
+- close the source owner only after the cleanup-validation phase records a pass, or create a new
+  corrective owner when it fails.
+
+The tracker is scheduling evidence, not acceptance evidence. An unchecked row cannot be inferred
+from a green CI run or an Agent review.
+
 ### 4. Commit
 
 Follow `GIT-WORKFLOW.md`:

@@ -25,7 +25,7 @@
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive I200's published implementation review or terminal walkthrough. |
 | Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 requires exact-head CI, independent technical review and merge-time CAS; after merge, remain Review until the published independent natural-person exact-head review and maintainer mouse/touchpad acceptance gates pass. |
+| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. Keep TUI-042 Review while VALIDATION-002/I211/Issue #302 owns the explicitly deferred natural-person review and maintainer mouse/touchpad acceptance; no further I200 implementation authority transfers. |
 
 ## Identity / Goal / Value
 
@@ -119,3 +119,15 @@ The Story is Review, not Complete. Exact-head CI, independent technical review, 
 independent natural-person exact-head review and maintainer mouse/touchpad walkthrough remain
 mandatory. No excluded renderer, transcript/session, provider, persistence or release behavior is
 authorized.
+
+## 2026-08-18 Deferred Human Validation Change Control
+
+PR #301 exact head `8a58cb2d56c2607a6c2ee383bed086f08e374811` passed CI
+`32149762367`, received independent Agent technical approval `5330234992` with its
+non-natural-person identity limit disclosed, passed merge-time CAS and merged as `9628e183`.
+
+The maintainer directed that unavailable natural-person review and mouse/touchpad acceptance be
+batched later instead of blocking the ordered long task. The original acceptance remains
+unchanged and unpassed. VALIDATION-002/I211/Issue #302 now owns those two evidence rows. TUI-042
+stays Review; the recorded scheduling disposition permits the separately scoped I197 claim to be
+prepared after this change reaches `main`.

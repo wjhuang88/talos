@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After predecessors are dispositioned, establish an effective claim on `main`; confirm the public compatibility contract before parser edits and branch only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After predecessors have implementation/deferred-validation dispositions, establish an effective claim on `main`; confirm the public compatibility contract before parser edits and branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I198 stays Review. |
 
 ## Published Baseline
 
@@ -105,6 +105,15 @@ The maintainer added Issues #69, #79 and #111 to the coordinating long-running t
 baseline was published. I198's objective, scope and acceptance remain unchanged. Its activation
 order now follows I201/#111 disposition; this is coordination only and creates no technical
 dependency between the TUI and skill-format slices.
+
+## Change Control - 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode. I198's decision checkpoint,
+parser fixtures, documentation and malformed-input acceptance remain unchanged. Exact-head CI,
+independent Agent technical review, locked checks, governance validation and CAS remain local merge
+gates. The natural-person compatibility review may move to VALIDATION-002/I211/Issue #302 after
+implementation merge; I198 remains Review until that row passes. A breaking contract still stops
+for a separate ADR/migration owner.
 
 ## Retrospective
 

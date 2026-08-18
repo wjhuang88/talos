@@ -23,8 +23,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After I197 disposition, establish an effective I201 claim on `main` and branch only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After I197 has an implementation/deferred-validation disposition, establish an effective I201 claim on `main` and branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
 
 ## Published Baseline
 
@@ -89,6 +89,15 @@ Completion Commit: Pending. A status-only commit cannot serve as its own evidenc
 ## Variance And Residuals
 
 Provider capability negotiation and general synthetic-status filtering require separate owners.
+
+## Change Control - 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode. I201's published objective,
+negative fixtures and no-legitimate-text-loss acceptance remain unchanged. Exact-head CI,
+independent Agent technical review, locked checks, governance validation and CAS remain local merge
+gates. The natural-person exact-head compatibility review may move to VALIDATION-002/I211/Issue
+#302 after implementation merge; I201 remains Review until that row passes, while I198 may proceed
+under its separate claim.
 
 ## Retrospective
 

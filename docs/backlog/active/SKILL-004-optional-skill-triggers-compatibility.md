@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Establish an effective I198 claim on `main`; confirm the compatibility contract before editing the parser; implement from the claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | Establish an effective I198 claim on `main`; confirm the compatibility contract before editing the parser; implement from the claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person compatibility review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Goal And Compatibility Contract
 
@@ -76,3 +76,11 @@ this compatibility decision separate from I175 conversation-engine source decomp
 - Remote discussion: Issue #155.
 - Derived views: `docs/backlog/PRODUCT-BACKLOG.md` and `docs/BOARD.md`.
 - Broader ClawHub-format compatibility requires a separate owner and iteration.
+
+## 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode. The public-contract decision,
+malformed-value safety and documentation acceptance remain unchanged. After exact-head CI,
+independent Agent technical review and CAS, the natural-person compatibility review may be added to
+Issue #302 for I211. SKILL-004 remains Review until that row passes; a breaking contract still
+stops for an ADR/migration owner.

@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After predecessors are dispositioned, establish an effective claim on `main`; create the implementation branch only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After the I200 deferred-validation disposition reaches `main`, establish an effective claim; create the implementation branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
 
 ## Published Baseline
 
@@ -104,6 +104,17 @@ The maintainer added Issues #69, #79 and #111 to the coordinating long-running t
 baseline was published. I197's objective, scope and acceptance remain unchanged. Its activation
 order now follows I199/#69 and I200/#79 dispositions so permission-prompt anchor work consumes the
 reviewed preview-capacity and scroll-normalization boundaries instead of duplicating them.
+
+## Change Control - 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode because a natural-person
+reviewer is unavailable during implementation. This changes scheduling only. I197 still requires
+its exact-head CI, independent Agent technical review, locked checks, governance validation and CAS
+before merge. If the diff remains TUI presentation/layout-only, the natural-person and terminal
+matrix rows move to VALIDATION-002/I211/Issue #302 and I197 remains Review while I201 proceeds.
+
+Any `talos-permission`, sandbox, process-hardening or permission-policy change is outside this
+deferral and must stop for a separately authorized independent security review.
 
 ## Retrospective
 

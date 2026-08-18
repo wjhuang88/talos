@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After the ordered TUI predecessor is dispositioned, establish an effective I201 claim on `main`; implement only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After the ordered TUI predecessor has an implementation/deferred-validation disposition, establish an effective I201 claim on `main`; implement only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -86,3 +86,11 @@ Do not present this Story as shipped while it remains Ready.
 ## Residual Destination
 
 Broader provider capability negotiation or synthetic-status filtering requires a separate owner.
+
+## 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode. The exact/split/negative and
+ordering acceptance remains unchanged. After an implementation passes exact-head CI, independent
+Agent technical review and CAS, its natural-person suppression-safety review may be recorded as an
+Issue #302 row for I211. TUI-043 remains Review until that row passes; the deferral cannot justify a
+global phrase filter or provider/protocol scope expansion.
