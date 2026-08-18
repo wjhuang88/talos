@@ -87,7 +87,7 @@ Required reads:
 | ARCH-031-A / I159 | Complete / Closed | Completion Commit `d886917e` plus cfg follow-up `34c09b14`; PR #236 merged as `f79c1ead` after CI `31801484313`, approval `5293622712` and CAS. |
 | ARCH-031-B / I160 | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161 is Complete and I162 is Active/Claimed from `main@38127228`. |
 | WORK-001-A / I196 | Ready / Planned / Claimed / priority hold | Claim PR #226 merged as `453d1fba`; resume only after v0.8.0 publication closure and a fresh exact-main inventory. |
-| ARCH-034-D / I171 | Complete | Completion Commit `c88c1d1a`; current v0.7.0 audit/register and bounded owner creation validated; no production refactor. |
+| ARCH-034-D / I171 | Complete | Completion Commit `56f419f7`; source current v0.7.0 audit/register evidence `c88c1d1a`; bounded owner creation validated; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
 | TUI-043 | Ready | Select a bounded compatibility-display iteration; preserve legitimate assistant text and ordered tool rows. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |

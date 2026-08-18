@@ -28,13 +28,13 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
-I158 and I171 completion evidence: `Completion Commit: c88c1d1a` (existing implementation/audit
+I158 and I171 completion evidence: closeout `56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
-| I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
+| I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `56f419f7`; source v0.7.0 audit/register evidence `c88c1d1a`; bounded remediation owners validated; no production refactor. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Complete / Closed | Completion Commit `d886917e45d5ca0f110e111b966cd379485e3580` plus cfg follow-up `34c09b14`; exact head `33a2c6ff` passed CI `31801484313`, approval `5293622712` and CAS, then PR #236 merged as `f79c1ead`. |
 | I160 | Shared CLI And Runtime Internal Composition | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161 is Complete and I162 is Planned/Claimed through claim PR #253 pending merge. |
 | I161 | Sandbox Fallback And Coding Preset | Complete / Closed | Completion Commits `74c5502d`/`3ca2ec62`; PRs #250/#251 merged after exact-head independent approvals and CI. I162 is Planned/Claimed through claim PR #253 pending merge. |
