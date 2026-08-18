@@ -75,7 +75,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I206 | Esc-Cancelled Steering Activation | Planned / Unclaimed | `TUI-048`; accepted steering must become one runnable Session turn after active-turn Esc cancellation. No implementation branch or authorization. |
 | I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
- | I205 | PR Workflow Throughput Simplification | Review / Claimed / PR #287 | Audit packet complete: 42-PR evidence snapshot and atomic claim-activation decision. No executable governance change; follow-up needs a new bounded claim. |
+| I205 | PR Workflow Throughput Simplification | Complete / Closed | Completion Commit `2e2cf04b`; PR #287 merged as `0394e264`; exact-head CI `32094384772` and independent technical audit `5323234878` passed. Audit selects atomic claim activation as a separately claimable follow-up; no executable governance change. |
 | I209 | Resumed Session Interactivity Under Provider Delay | Closed | TUI-051 / Issue #272 is Complete at Completion Commit `2eff6285`, with source implementation `7b82fea6`/`7d90def8`, exact-head CI `32025371877`, real-terminal acceptance and independent agent audit `5316533941`. Retry-progress acceptance remains transferred to I210. |
 | I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accept an ADR and establish an effective claim before any public contract or implementation change. |
 

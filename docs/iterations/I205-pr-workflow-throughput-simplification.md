@@ -1,6 +1,6 @@
 # Iteration I205: PR Workflow Throughput Simplification
 
-> Document status: Review
+> Document status: Complete / Closed
 > Published plan date: 2026-08-17
 > Planned objective: measure recent Talos delivery overhead and select a smaller PR/review workflow
 > that preserves evidence-bearing safety gates while eliminating mechanically preventable churn.
@@ -23,7 +23,7 @@
 | Authorization Evidence | The maintainer requested an evidence-based PR-flow simplification and unattended continuation of the long task. Claim head `5af455930a84871042b53b7bb1de12651edcc6a7` passed CI `32046397520`, both governance validators and merge-time CAS with no blocking feedback; PR #284 merged as `fd1eaad9076bed1b110e17bade3ff0dc48040fdf`. Any executable rule change requires its own bounded claim and review. |
 | Implementation PR | #287 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Audit packet is complete in PR #287. Establish a new bounded claim and iteration before changing SOPs, validators, workflows or branch protection. |
+| Handoff / Release Condition | Audit packet is complete and merged. Establish a new bounded claim and iteration before changing SOPs, validators, workflows or branch protection. |
 
 ## Published Baseline
 
@@ -76,6 +76,7 @@ infrastructure-only governance Spike and claims no product behavior.
 | 2026-08-18 | Implementation PR preparation | Audit branch `docs/i205-workflow-audit` starts exactly at activation merge `4635ef2b`; no audit artifact or executable governance change exists before the Draft PR number is assigned. |
 | 2026-08-18 | Implementation PR opened | Draft PR #287 binds the audit evidence and decision packet to branch `docs/i205-workflow-audit`; the PR remains limited to the evidence-only Work Slice. |
 | 2026-08-18 | Audit evidence and decision | PR #287 contains the reproducible 42-PR snapshot and throughput report. I205 moves to Review; no executable governance or product rule changed. |
+| 2026-08-18 | Owner-first closeout | PR #287 merged as `0394e26466543ee5dca4e5c02b1d7341d86cb290` after exact-head CI `32094384772` and independent technical audit `5323234878`; Completion Commit is the pre-existing audit commit `2e2cf04b7f07fe4744d0cf591c326e4514e346ac`. I205 is Complete/Closed; the atomic-activation follow-up remains separately unclaimed. |
 
 ## Claim Preparation Checkpoint - 2026-08-18
 
@@ -109,7 +110,10 @@ change is authorized by this checkpoint.
 
 ## Completion Evidence
 
-- No completion evidence. A status-only commit cannot certify this iteration.
+- Completion Commit: `2e2cf04b7f07fe4744d0cf591c326e4514e346ac` (pre-existing audit implementation/evidence commit).
+- Implementation PR: #287, merged as `0394e26466543ee5dca4e5c02b1d7341d86cb290`.
+- Final exact head: `d3047ec93bcc78fb197d81076130fd6bbf37ddb5`; CI `32094384772` passed 5/5.
+- Independent technical audit: APPROVE, comment `5323234878`, with shared-identity limitation disclosed.
 
 ## Variance And Residuals
 
