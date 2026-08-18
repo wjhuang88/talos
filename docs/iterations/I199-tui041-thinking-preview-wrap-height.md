@@ -1,6 +1,6 @@
 # Iteration I199: Thinking Preview Wrap And Bounded Height
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-14
 > Planned objective: render live thinking/stream previews from one display-width-aware plan so
 > multiline content wraps, grows to a bounded cap and shrinks without destabilizing composer,
@@ -21,10 +21,10 @@
 | Source Issue | #69 |
 | Governance Claim PR | #295 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Activation PR #295; effective only after merge to `main`, exact-head CI and independent review. |
-| Implementation PR | Not started |
+| Authorization Evidence | Activation PR #295 exact head `883d5cc1`, CI `32114936912`, independent approval `5325926209`, and claim merge `8127fa57`. |
+| Implementation PR | #297 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After claim merge, branch only from that merge or later current `main`; obtain exact-head CI, native-terminal evidence, independent review and owner-first closeout. |
+| Handoff / Release Condition | Close only after PR #297 exact-head CI, maintainer native-terminal acceptance, independent review, merge-time CAS and owner-first closeout. |
 
 ## Published Baseline
 
@@ -74,13 +74,23 @@
 
 ## Actual Activation And Execution
 
-I199 is proposed for activation through PR #295. It remains ineffective until that claim merges
-to `main`; it is ordered before I200 to establish the preview-driven viewport-capacity behavior
-that I200 must include in its scroll-bound matrix.
+PR #295 merged as `8127fa57` after exact-head CI `32114936912` and independent approval
+`5325926209`, making the bounded claim effective. The implementation branch started from later
+current `main@df2e6ed6`; commit `938c9edb9b3336e81a3b90232a69e0993574bc69` is submitted as PR
+#297. I199 remains ordered before I200 so the latter can include preview-driven viewport capacity
+in its scroll-bound matrix.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+- `cargo test -p talos-tui --locked`: 536 unit tests, 2 integration tests and 2 doctests passed.
+- `cargo clippy -p talos-tui --all-targets --locked -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+- `git diff --check`: passed before the implementation commit.
+- Isolated local PTY fixture at 80x24 and 40x15 exercised multiline ASCII/CJK wrapping, 1-to-6
+  row growth, clipping marker and newest-tail retention, completion shrink/clear and usable
+  composer/status regions. The fixture used no real provider credentials and was cleaned up.
+- Pending: PR #297 exact-head CI completion, maintainer native-terminal acceptance and independent
+  exact-head review. Agent-run PTY evidence does not substitute for the maintainer gate.
 
 ## Completion Evidence
 
@@ -92,4 +102,5 @@ User-configurable, scrollable or persistent preview behavior requires separate o
 
 ## Retrospective
 
-Pending execution.
+The shared plan removed measurement/render divergence while keeping the correction bounded to the
+existing transient preview. Completion remains pending the external terminal and review gates.

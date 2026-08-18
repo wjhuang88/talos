@@ -5,9 +5,9 @@
 | Story ID | TUI-041 |
 | Type | TUI / Product Story |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #69](https://github.com/wjhuang88/talos/issues/69) |
-| Selected Iteration | I199 — Active / Claimed |
+| Selected Iteration | I199 — Review / Claimed |
 | Depends On | TUI-039 layout continuity; ADR-034 reasoning boundary; ADR-054 renderer |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #69 |
 | Governance Claim PR | #295 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Activation PR #295; effective only after merge to `main`, exact-head CI and independent review. |
-| Implementation PR | Not started |
+| Authorization Evidence | Activation PR #295 exact head `883d5cc1`, CI `32114936912`, independent approval `5325926209`, and claim merge `8127fa57`. |
+| Implementation PR | #297 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After claim merge, create the implementation branch from the claim merge or later current `main`; preserve TUI-042/TUI-045 boundaries and obtain exact-head CI, native-terminal evidence and independent review before closeout. |
+| Handoff / Release Condition | Preserve TUI-042/TUI-045 boundaries; close only after PR #297 exact-head CI, maintainer native-terminal acceptance, independent review, merge-time CAS and owner-first closeout. |
 
 ## Identity / Goal / Value
 
@@ -68,7 +68,7 @@ than authorizing a renderer redesign.
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Refinement.
+Do not present this Story as shipped while it remains Review.
 
 ## Required Reads
 
@@ -95,3 +95,18 @@ The maintainer explicitly reconfirmed Issue #69 for the upcoming task pool. Its 
 iteration remain authoritative: TUI-041 is Ready and I199 is Planned / Unclaimed in the ordered
 mainline sequence. This checkpoint does not activate I199, establish a claim, create an
 implementation branch or change the published acceptance target.
+
+## 2026-08-18 Implementation Review Checkpoint
+
+Implementation commit `938c9edb9b3336e81a3b90232a69e0993574bc69` is in PR #297. It
+introduces one shared display-width-aware preview layout plan, bounded six-row growth, explicit
+clipping, constrained compression and cleanup tests without changing persistence, provider
+protocol, Cargo manifests, Desktop, Dashboard or release behavior.
+
+Focused evidence passed at the implementation commit: `cargo test -p talos-tui --locked` (536
+unit tests, 2 integration tests and 2 doctests), `cargo clippy -p talos-tui --all-targets --locked
+-- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check`. An isolated local PTY
+fixture exercised multiline ASCII/CJK growth, narrow wrapping, the six-row cap, clipped-tail
+retention and completion cleanup at 80x24 and 40x15. This agent-run fixture does not replace the
+required maintainer native-terminal acceptance or independent exact-head review, so TUI-041
+remains Review and its Completion Commit remains pending.
