@@ -1,0 +1,185 @@
+name: tmp-i195-closeout
+on:
+  push:
+    branches:
+      - tmp/i195-closeout-runner
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Build owner-first I195 closeout from runtime latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor 490503db905bcd2eb2ab5e3b5487b1f542873d63 origin/main
+          git checkout -B docs/i195-closeout origin/main
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          MERGE = "490503db905bcd2eb2ab5e3b5487b1f542873d63"
+          HEAD = "1ee4aa3786785473069c735e1985c9d720b82e2f"
+          CI = "32087223234"
+          AI_REVIEW = "5323625004"
+          HUMAN_UX = "5323801564"
+          OVERRIDE = "5326076971"
+
+          def read(path):
+              return Path(path).read_text()
+          def write(path, text):
+              Path(path).write_text(text)
+          def replace_one(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one occurrence, found {count}")
+              return text.replace(old, new, 1)
+          def replace_line(text, prefix, new, label):
+              lines = text.splitlines()
+              hits = [i for i,l in enumerate(lines) if l.startswith(prefix)]
+              if len(hits) != 1:
+                  raise SystemExit(f"{label}: expected one line, found {len(hits)}")
+              lines[hits[0]] = new
+              return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+          # Authoritative Story owner first.
+          p = "docs/backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md"
+          t = read(p)
+          t = replace_one(t,
+              "**Status**: In Progress — I195 Active through activation PR #288",
+              "**Status**: Complete — I195 closed after PR #233 merge `490503db905bcd2eb2ab5e3b5487b1f542873d63`",
+              "story status")
+          t = replace_line(t, "**Selected Iteration**:",
+              "**Selected Iteration**: I195 — Complete / Closed",
+              "story selected iteration")
+          t = replace_line(t, "| Claim State |", "| Claim State | Closed |", "story claim state")
+          t = replace_line(t, "| Authorization Evidence |",
+              f"| Authorization Evidence | Claim authorization remains bound to claim review comment `5289651455` and PR #212 merge `f123e534ce864a89eb3cabfc68f4a1518201c2d0`. For implementation merge, the maintainer explicitly waived I195's owner-local natural-person technical-review requirement for this non-protected read-only slice in PR #233 comment `{OVERRIDE}` and accepted independent AI exact-head review `{AI_REVIEW}` plus human manual browser acceptance `{HUMAN_UX}`. |",
+              "story auth evidence")
+          t = replace_line(t, "| Implementation PR |",
+              f"| Implementation PR | #233 — merged as `{MERGE}` from reviewed exact head `{HEAD}` |",
+              "story implementation PR")
+          t = replace_line(t, "| Handoff / Release Condition |",
+              "| Handoff / Release Condition | None — I195 is Complete/Closed; excluded live/write/control/remote work remains separately governed under WEB-001 residual owners. |",
+              "story handoff")
+          section_start = t.index("## Acceptance For Technical / Governance Work")
+          section_end = t.index("## Residual Destination", section_start)
+          sec = t[section_start:section_end]
+          sec = sec.replace(
+              "- [ ] Independent natural-person review is bound to the exact implementation head; shared-account\n      review explicitly discloses reviewer identity.",
+              f"- [x] Maintainer-authorized independent AI exact-head technical review is bound to `{HEAD}`; the owner-local natural-person reviewer requirement was explicitly waived for this non-protected slice in PR #233 comment `{OVERRIDE}`."
+          )
+          sec = sec.replace("- [ ]", "- [x]")
+          t = t[:section_start] + sec + t[section_end:]
+          completion = f"""## Completion Evidence\n\nCompletion Commit: `{MERGE}`\n\n- PR #233 merged with first parent current main and second parent reviewed exact head `{HEAD}`.\n- Exact-head CI `{CI}` passed the full Unix/macOS and Windows workspace gates plus both governance validators.\n- Independent AI technical review `{AI_REVIEW}` approved the exact head; human maintainer browser walkthrough `{HUMAN_UX}` passed the 320×568, 768×1024, 1440×900, 200% zoom, keyboard, CSP, empty/populated and security-presentation matrix.\n- Maintainer review-policy override `{OVERRIDE}` explicitly accepts the AI technical review for this non-protected I195 slice and waives the owner-local natural-person reviewer requirement.\n- The implementation preserves loopback binding, GET-only/read-only behavior, masking/redaction/escaping, non-HTML representations and unchanged CSP; no new dependency or durable state was introduced.\n\n"""
+          if "## Completion Evidence" not in t:
+              t = t.replace("## Residual Destination\n", completion + "## Residual Destination\n", 1)
+          else:
+              raise SystemExit("story unexpectedly already has completion section")
+          write(p, t)
+
+          # Authoritative iteration owner second.
+          p = "docs/iterations/I195-dashboard-read-only-visual-shell.md"
+          t = read(p)
+          t = replace_one(t, "> Document status: Active", "> Document status: Complete", "iteration status")
+          t = replace_line(t, "| Claim State |", "| Claim State | Closed |", "iteration claim state")
+          t = replace_line(t, "| Authorization Evidence |",
+              f"| Authorization Evidence | Claim authorization remains bound to claim review comment `5289651455` and PR #212 merge `f123e534ce864a89eb3cabfc68f4a1518201c2d0`. Implementation merge used maintainer override `{OVERRIDE}` to accept independent AI exact-head review `{AI_REVIEW}` plus human manual browser acceptance `{HUMAN_UX}` for this non-protected I195 slice. |",
+              "iteration auth evidence")
+          t = replace_line(t, "| Implementation PR |",
+              f"| Implementation PR | #233 — merged as `{MERGE}` from reviewed exact head `{HEAD}` |",
+              "iteration implementation PR")
+          t = replace_line(t, "| Handoff / Release Condition |",
+              "| Handoff / Release Condition | None — I195 is Complete/Closed; residual WEB-001 capabilities remain separately governed. |",
+              "iteration handoff")
+          t = replace_one(t,
+              "- New exact-head validator/CI/review and merge-time CAS evidence: pending.",
+              f"- Final implementation head `{HEAD}` passed exact-head CI `{CI}`; independent AI review `{AI_REVIEW}` and human manual browser acceptance `{HUMAN_UX}` passed; maintainer override `{OVERRIDE}` accepted that review path; PR #233 merged by merge-time CAS as `{MERGE}`.",
+              "iteration final verification")
+          old_completion = """## Completion Evidence\n\nNo completion evidence. No production implementation exists under I195. A governance/status commit\ncannot serve as `Completion Commit`.\n"""
+          new_completion = f"""## Completion Evidence\n\nCompletion Commit: `{MERGE}`\n\n- Source/reviewed implementation head: `{HEAD}`.\n- PR #233 merge parents are current-main first parent and reviewed exact head second parent.\n- Exact-head CI `{CI}`: SUCCESS.\n- Independent AI exact-head technical review: `{AI_REVIEW}`.\n- Human maintainer manual browser acceptance: `{HUMAN_UX}`.\n- Maintainer review-policy override accepting the AI review for I195: `{OVERRIDE}`.\n- No status-only closeout commit is used as its own completion evidence.\n"""
+          t = replace_one(t, old_completion, new_completion, "iteration completion")
+          t = replace_one(t, "Pending activation and execution.",
+              "Delivered the approved light/quiet Nord-derived read-only shell without widening the Dashboard security boundary. The main execution variance was governance/process recovery: activation had initially existed only on the implementation branch and was corrected through #288 before the final #233 rebuild. A later maintainer decision accepted independent AI exact-head technical review while retaining a human manual browser walkthrough. The non-blocking `Accept: text/html;q=0` negotiation nuance remains a possible separately governed compatibility refinement, not an I195 completion blocker.",
+              "iteration retrospective")
+          write(p, t)
+
+          # Parent WEB-001 current implementation truth/cross-link.
+          p = "docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+          t = read(p)
+          t = replace_line(t, "| Status |",
+              "| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell Complete (2026-08-18). Residuals: SSE log view, config editor, web approvals, session actions, remote/LAN — all require separate governance/ADR as applicable. |",
+              "parent status")
+          start = t.index("## Current Implementation Boundary")
+          end = t.index("## Opt-In Token Delivery Security Residual", start)
+          current = f"""## Current Implementation Boundary\n\n`talos-dashboard` serves the loopback-only, read-only snapshot surfaces at `/status`, `/history`,\n`/governance`, `/config`, and `/extensions`. Root plus all five data pages now share the completed\nWEB-001-A/I195 light, compact Nord-derived visual shell when HTML is explicitly requested. Existing\nJSON/plain-text representations remain authoritative for non-HTML requests, including default JSON\nfor `/extensions`; config masking, output-boundary redaction, HTML escaping and the existing CSP are\npreserved.\n\nWEB-001-A/I195 completed through PR #233 merge `{MERGE}` from reviewed exact head `{HEAD}`, with\nexact-head CI `{CI}`, independent AI technical review `{AI_REVIEW}`, human browser acceptance\n`{HUMAN_UX}`, and maintainer review-policy override `{OVERRIDE}`. The child remains presentation-only\nand introduced no write/action route, remote/LAN access, new dependency, durable state, or alternate\nruntime/domain/session authority.\n\nStill not implemented: a live log/SSE view, config editing, approvals, session actions, WebSocket\ncontrol, or remote/LAN access. SEC-002 separately owns the opt-in token-delivery residual.\n\n## Governed Dashboard Child Outcome\n\n[WEB-001-A](WEB-001-A-dashboard-read-only-visual-shell.md) and\n[I195](../../iterations/I195-dashboard-read-only-visual-shell.md) are Complete/Closed. Their bounded\nread-only visual-shell outcome does **not** reopen or satisfy WEB-001's separately gated live/write/\ncontrol/remote residual acceptance.\n\n"""
+          t = t[:start] + current + t[end:]
+          write(p, t)
+
+          # Derived Board: replace exactly the I195/WEB-001-A row, preserving all other rows.
+          p = "docs/BOARD.md"
+          t = read(p)
+          lines = t.splitlines()
+          hits = [i for i,l in enumerate(lines) if "WEB-001-A-dashboard-read-only-visual-shell.md" in l and "I195" in l]
+          if len(hits) != 1:
+              raise SystemExit(f"Board I195 row: expected 1, found {len(hits)}")
+          lines[hits[0]] = f"| Dashboard Read-Only Visual Shell | Complete / Closed / I195 | [WEB-001-A](backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md) / [I195](iterations/I195-dashboard-read-only-visual-shell.md) / PR #233 | Completion Commit `{MERGE}`; reviewed head `{HEAD}`; CI `{CI}`; AI review `{AI_REVIEW}` + human walkthrough `{HUMAN_UX}` accepted by maintainer override `{OVERRIDE}`. |"
+          write(p, "\n".join(lines) + ("\n" if t.endswith("\n") else ""))
+
+          # Derived Product Backlog: only mutate lines that already own WEB-001-A/I195.
+          p = "docs/backlog/PRODUCT-BACKLOG.md"
+          t = read(p)
+          lines = t.splitlines()
+          hits = []
+          for i,l in enumerate(lines):
+              if "WEB-001-A-dashboard-read-only-visual-shell.md" in l or ("WEB-001-A" in l and "I195" in l):
+                  hits.append(i)
+                  l = l.replace("In Progress / Claimed", "Complete / Closed")
+                  l = l.replace("In Progress / I195 Active", "Complete / I195 Closed")
+                  l = l.replace("I195 Active / Claimed", "I195 Complete / Closed")
+                  l = l.replace("I195 Active/Claimed", "I195 Complete/Closed")
+                  l = l.replace("Active / Claimed", "Complete / Closed")
+                  l = l.replace("Active/Claimed", "Complete/Closed")
+                  lines[i] = l
+          if not hits:
+              raise SystemExit("Product Backlog: no I195/WEB-001-A row found")
+          write(p, "\n".join(lines) + ("\n" if t.endswith("\n") else ""))
+
+          # Derived iteration index: replace one I195 row only.
+          p = "docs/iterations/README.md"
+          t = read(p)
+          lines = t.splitlines()
+          hits = [i for i,l in enumerate(lines) if l.startswith("| I195 |")]
+          if len(hits) != 1:
+              raise SystemExit(f"Iterations index I195 row: expected 1, found {len(hits)}")
+          lines[hits[0]] = f"| I195 | Dashboard Read-Only Visual Shell | Complete / Closed | WEB-001-A Completion Commit `{MERGE}`; PR #233 merged from reviewed head `{HEAD}` after CI `{CI}`, AI review `{AI_REVIEW}`, human walkthrough `{HUMAN_UX}` and maintainer override `{OVERRIDE}`. |"
+          write(p, "\n".join(lines) + ("\n" if t.endswith("\n") else ""))
+          PY
+
+          git diff --check
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            docs/BOARD.md
+            docs/backlog/PRODUCT-BACKLOG.md
+            docs/backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md
+            docs/backlog/active/WEB-001-embedded-web-control-surface.md
+            docs/iterations/I195-dashboard-read-only-visual-shell.md
+            docs/iterations/README.md
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          [[ "${changed[*]}" == "${expected_sorted[*]}" ]] || { printf 'changed files:\n%s\n' "${changed[*]}"; exit 1; }
+          scripts/validate_project_governance.sh .
+          COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .
+          git config user.name "ChatGPT GPT-5.6 Sol"
+          git config user.email "noreply@openai.com"
+          git add "${expected[@]}"
+          git commit -m "docs(dashboard): close I195 after implementation merge (#I195) [model:gpt-5.6-sol]"
+          git push origin HEAD:refs/heads/docs/i195-closeout
