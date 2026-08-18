@@ -115,22 +115,32 @@ Cargo manifest, lockfile, schema or fixture behavior change.
 
 ## Acceptance For Technical / Governance Work
 
-- [ ] A current-state inventory maps Todo persistence, repositories, tools, commands, prompt and
+- [x] A current-state inventory maps Todo persistence, repositories, tools, commands, prompt and
       projection consumers to their authoritative crates and public/transitional surfaces.
-- [ ] A Proposed ADR selects the canonical ownership/dependency boundary and states alternatives,
+- [x] A Proposed ADR selects the canonical ownership/dependency boundary and states alternatives,
       compatibility constraints, evaluator-isolation invariants and reversal triggers.
-- [ ] The migration contract defines identity/revision mapping, upgrade, compatibility window,
+- [x] The migration contract defines identity/revision mapping, upgrade, compatibility window,
       failure behavior, rollback/downgrade and duplicate-authority prevention.
-- [ ] P1 acceptance requires mechanical regression evidence for every existing `todo_*` tool
+- [x] P1 acceptance requires mechanical regression evidence for every existing `todo_*` tool
       contract and the TODO-001/TODO-002 behavior matrix; prose compatibility is insufficient.
-- [ ] P1-P4 remain separate owners, iterations, claims, implementation PRs and exact-head reviews.
-- [ ] `RUNTIME-001` and `SESSION-009` contain discoverable downstream references without changing
+- [x] P1-P4 remain separate owners, iterations, claims, implementation PRs and exact-head reviews.
+- [x] `RUNTIME-001` and `SESSION-009` contain discoverable downstream references without changing
       their completed/refinement evidence or selecting SESSION-009.
-- [ ] `git diff --name-only` proves no Rust, Cargo, lockfile, persistence schema or Desktop asset
+- [x] `git diff --name-only` proves no Rust, Cargo, lockfile, persistence schema or Desktop asset
       changed in P0.
-- [ ] Both governance validators and `git diff --check` pass with zero warnings/errors.
+- [x] Both governance validators and `git diff --check` pass with zero warnings/errors.
 - [ ] Independent exact-head architecture review finds no unresolved breaking or migration decision
       hidden for P1.
+
+## Execution Evidence — 2026-08-18
+
+- Current-state inventory: `docs/reference/I196-WORK-001-A-CURRENT-STATE-MIGRATION-CONTRACT.md`.
+- Proposed decision: `docs/decisions/061-canonical-work-domain-and-todo-migration.md`.
+- Changed paths are documentation/governance only; no Rust, Cargo, lockfile, schema or Desktop asset.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
+- `git diff --check`: pass.
+- Independent exact-head architecture review of the decision packet remains pending.
 
 ## Planned Validation
 

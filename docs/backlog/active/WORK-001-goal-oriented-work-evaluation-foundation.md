@@ -40,7 +40,7 @@ mainline work. It does not authorize any child merely because the overall direct
 
 | Child | Outcome | Status | Depends On | Iteration |
 |---|---|---|---|---|
-| WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Ready / proposed claim | Current repository and dependency inventory | I196 Planned |
+| WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Active / Claimed; P0 decision packet in progress | Current repository and dependency inventory | I196 Active / Claimed |
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Blocked; owner to be formed after P0 | WORK-001-A Accepted and Complete | None |
 | WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Blocked; owner to be formed after P1 | WORK-001-B Complete | None |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Blocked; owner to be formed after P2 | WORK-001-C Complete | None |
