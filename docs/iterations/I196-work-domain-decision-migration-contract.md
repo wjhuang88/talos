@@ -1,6 +1,6 @@
 # Iteration I196: Canonical Work Domain Decision And Migration Contract
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-14
 > Planned objective: establish the P0 canonical work-state architecture decision, current Todo
 > compatibility inventory, migration/rollback contract and separately governed P1-P4 boundaries
@@ -23,10 +23,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #226 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. A separate independent exact-head architecture review is still required for P0 decision acceptance. |
+| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. A separate independent exact-head architecture review is still required for P0 decision acceptance. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Claim is effective. Hold activation until the v0.8.0 GitHub-first/Cargo-second publication task closes; then repeat the full current-main dependency/overlap inventory and create the P0 branch from that current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | Activation is effective from current `main@b59912e3`; complete only the P0 decision/documentation slice, then obtain independent exact-head architecture review, exact-head CI and owner-first closeout. |
 
 The claim is effective through PR #226 merge `453d1fba97470639835468664c58397770db384c`.
 It authorizes only the frozen decision/documentation slice and does not by itself activate I196.
@@ -145,8 +145,8 @@ evaluator-isolation decision unresolved for P1.
 
 ## Actual Activation And Execution
 
-No activation has occurred. Append execution facts only after the finalized claim is effective on
-`main`; do not rewrite the published baseline.
+Append execution facts only after the finalized claim is effective on `main`; do not rewrite the
+published baseline.
 
 ### 2026-08-14 Pre-Activation Priority Hold
 
@@ -156,6 +156,15 @@ maintainer selected the v0.8.0 GitHub-first/Cargo-second publication sequence as
 work. I196 remains Planned / Claimed and unactivated; its scope and acceptance are unchanged. After
 the release task closes, I196 must refresh to then-current `main`, repeat every dependency and
 overlap check, and obtain independent exact-head review for the P0 decision implementation.
+
+### 2026-08-18 Activation Checkpoint
+
+I196 is Active from `main@b59912e36025088e4e3fa76b7b5b4e2aa7a1396c` as the mainline P0
+decision/documentation slice. The existing non-overlap authorization for Dashboard I195 is recorded
+by activation PR #288. Inventory at activation: I159/I160/I161/I162/I188 Complete; I164
+Paused; I189 Planned/Claimed; I195 Active/Claimed in the separately authorized Dashboard lane; no
+other iteration is Review. The I195/I196 scopes are explicitly non-overlapping. This activation
+does not authorize Rust, Cargo, persistence, public API, Desktop, Dashboard or TUI implementation.
 
 ## Verification Evidence
 
