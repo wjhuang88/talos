@@ -1144,10 +1144,74 @@ fn preview_plan_caps_at_six_and_keeps_semantic_head_and_newest_tail() {
         .map(|row| row.content.as_str())
         .collect::<Vec<_>>();
     assert_eq!(plan.natural_height, 8);
-    assert_eq!(content, ["row0", "…", "row4", "row5", "row6", "row7"]);
+    assert_eq!(content, ["row0", "…row3", "row4", "row5", "row6", "row7"]);
     assert!(plan.clipped_before);
     assert!(plan.rows[0].semantic_first);
     assert!(plan.rows[1].clipped_marker);
+}
+
+#[test]
+fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let plan = component.plan(20);
+    let content = plan
+        .rows
+        .iter()
+        .map(|row| row.content.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(plan.natural_height, 8);
+    assert_eq!(
+        content,
+        ["thinking", "…row2", "row3", "row4", "row5", "row6"]
+    );
+    assert!(plan.clipped_before);
+    assert!(plan.rows[0].semantic_first);
+    assert!(!plan.rows[1].semantic_first);
+    assert!(plan.rows[1].clipped_marker);
+}
+
+#[test]
+fn thinking_preview_compresses_to_title_before_hiding_it() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: latest content",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: 1,
+    };
+    let plan = component.plan(20);
+
+    assert_eq!(plan.natural_height, 2);
+    assert_eq!(plan.rows.len(), 1);
+    assert_eq!(plan.rows[0].content, "thinking");
+    assert!(plan.clipped_before);
+}
+
+#[test]
+fn thinking_preview_with_empty_content_does_not_create_a_blank_body_row() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: ",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let plan = component.plan(20);
+
+    assert_eq!(plan.natural_height, 1);
+    assert_eq!(plan.rows.len(), 1);
+    assert_eq!(plan.rows[0].content, "thinking");
+    assert!(!plan.clipped_before);
 }
 
 #[test]

@@ -110,3 +110,13 @@ fixture exercised multiline ASCII/CJK growth, narrow wrapping, the six-row cap, 
 retention and completion cleanup at 80x24 and 40x15. This agent-run fixture does not replace the
 required maintainer native-terminal acceptance or independent exact-head review, so TUI-041
 remains Review and its Completion Commit remains pending.
+
+## 2026-08-18 Maintainer Terminal-Acceptance Correction
+
+Maintainer terminal inspection rejected PR #297 head `f00c6e4d`: the `thinking` label was not a
+fixed title row, and the standalone clipping-marker row read as a persistent blank separator. The
+accepted in-scope correction keeps `thinking` on row zero, rolls the newest content beneath it
+within the existing six-row bound, and embeds the clipping marker in the first visible content row.
+It does not add persistence, keyboard scrolling, a collapsible panel or provider changes. All old
+exact-head CI and review evidence must be replaced after the implementation head changes, and
+maintainer native-terminal acceptance remains pending.

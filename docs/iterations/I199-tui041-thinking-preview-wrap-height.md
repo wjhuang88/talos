@@ -104,3 +104,18 @@ User-configurable, scrollable or persistent preview behavior requires separate o
 
 The shared plan removed measurement/render divergence while keeping the correction bounded to the
 existing transient preview. Completion remains pending the external terminal and review gates.
+
+## 2026-08-18 Maintainer Terminal-Acceptance Correction
+
+Maintainer terminal inspection of PR #297 rejected the thinking presentation at head `f00c6e4d`:
+the semantic `thinking` label and its content shared the first row, while clipping consumed a
+standalone marker row that appeared as a persistent separator before the rolling tail. This is an
+in-scope correction of the published semantic-prefix, bounded-tail and clipping requirements, not
+authorization for a full, persistent or keyboard-scrollable thinking panel.
+
+The corrected layout reserves row zero for the animated `thinking` title and uses the remaining
+preview capacity for automatically rolling newest content. When older content is hidden, the
+ellipsis is embedded in the first visible content row instead of consuming a separate row. Generic
+stream previews retain their semantic first row and newest tail under the same embedded-marker
+rule. PR #297 must obtain new exact-head CI, independent review and maintainer terminal acceptance;
+the earlier `f00c6e4d` evidence does not carry forward after this rework.

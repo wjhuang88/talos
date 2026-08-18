@@ -1140,7 +1140,7 @@ fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
 }
 
 #[test]
-fn parsed_thinking_title_stays_a_single_preview_row() {
+fn parsed_thinking_title_renders_below_the_fixed_thinking_title() {
     let text = preview_text_for_state(
         None,
         None,
@@ -1158,7 +1158,10 @@ fn parsed_thinking_title_stays_a_single_preview_row() {
         thinking_label_frame: Some(0),
         max_height: crate::scrollback::MAX_PREVIEW_LINES,
     };
-    assert_eq!(component.height_hint(80), 1);
+    assert_eq!(component.height_hint(80), 2);
+    let plan = component.plan(80);
+    assert_eq!(plan.rows[0].content, "thinking");
+    assert_eq!(plan.rows[1].content, "Short title");
 }
 
 // --- TUI-028: Stale preview clear ---
@@ -2081,7 +2084,8 @@ fn full_frame_multiline_preview_preserves_interactive_controls_at_all_sizes() {
         .set_test_size(ratatui::layout::Size::new(80, 24));
     tui.draw_frame().expect("restored 80x24 preview frame");
     let rendered = tui.terminal.test_rendered_text();
-    assert!(rendered.contains("thinking: first preview"));
+    assert!(rendered.contains("thinking"));
+    assert!(!rendered.contains("thinking:"));
     assert!(rendered.contains("newest"));
     assert!(rendered.contains("Add custom provider"));
     assert!(rendered.contains("composer one"));

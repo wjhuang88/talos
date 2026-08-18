@@ -171,6 +171,19 @@ impl PreviewComponent<'_> {
             };
         }
 
+        let thinking_content = self
+            .thinking_label_frame
+            .and_then(|_| self.text.strip_prefix("thinking: "));
+        if let Some(thinking_content) = thinking_content {
+            return thinking_preview_plan(
+                &prefix,
+                &continuation_prefix,
+                thinking_content,
+                content_width,
+                max_height as usize,
+            );
+        }
+
         let visual_rows = preview_visual_rows(self.text, content_width);
         let natural_height = visual_rows.len().min(u16::MAX as usize) as u16;
         let visible = capped_preview_rows(&visual_rows, content_width, max_height as usize);
@@ -196,6 +209,63 @@ impl PreviewComponent<'_> {
             natural_height,
             clipped_before,
         }
+    }
+}
+
+fn thinking_preview_plan(
+    prefix: &str,
+    continuation_prefix: &str,
+    content: &str,
+    content_width: usize,
+    max_rows: usize,
+) -> PreviewLayoutPlan {
+    let content_rows = if content.is_empty() {
+        Vec::new()
+    } else {
+        preview_visual_rows(content, content_width)
+    };
+    let natural_rows = 1usize.saturating_add(content_rows.len());
+    let visible_content_capacity = max_rows.saturating_sub(1);
+    let clipped_before = content_rows.len() > visible_content_capacity;
+    let visible_content = if clipped_before {
+        let start = content_rows.len() - visible_content_capacity;
+        content_rows[start..]
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                if index == 0 {
+                    (clipped_tail(row, content_width), true)
+                } else {
+                    (row.clone(), false)
+                }
+            })
+            .collect::<Vec<_>>()
+    } else {
+        content_rows.into_iter().map(|row| (row, false)).collect()
+    };
+
+    let mut rows = Vec::with_capacity(1 + visible_content.len());
+    rows.push(PreviewLayoutRow {
+        prefix: prefix.to_string(),
+        content: "thinking".to_string(),
+        semantic_first: true,
+        clipped_marker: false,
+    });
+    rows.extend(
+        visible_content
+            .into_iter()
+            .map(|(content, clipped_marker)| PreviewLayoutRow {
+                prefix: continuation_prefix.to_string(),
+                content,
+                semantic_first: false,
+                clipped_marker,
+            }),
+    );
+
+    PreviewLayoutPlan {
+        rows,
+        natural_height: natural_rows.min(u16::MAX as usize) as u16,
+        clipped_before,
     }
 }
 
@@ -304,16 +374,17 @@ fn capped_preview_rows(
             (clipped_tail(&tail, content_width), true),
         ],
         _ => {
-            let tail_count = max_rows - 2;
+            let tail_count = max_rows - 1;
+            let tail_start = rows.len() - tail_count;
             let mut visible = Vec::with_capacity(max_rows);
             visible.push((rows[0].clone(), false));
-            visible.push(("…".to_string(), true));
-            visible.extend(
-                rows[rows.len() - tail_count..]
-                    .iter()
-                    .cloned()
-                    .map(|row| (row, false)),
-            );
+            visible.extend(rows[tail_start..].iter().enumerate().map(|(index, row)| {
+                if index == 0 {
+                    (clipped_tail(row, content_width), true)
+                } else {
+                    (row.clone(), false)
+                }
+            }));
             visible
         }
     }
