@@ -1,6 +1,6 @@
 # Iteration I196: Canonical Work Domain Decision And Migration Contract
 
-> Document status: Active
+> Document status: Complete / Closed
 > Published plan date: 2026-08-14
 > Planned objective: establish the P0 canonical work-state architecture decision, current Todo
 > compatibility inventory, migration/rollback contract and separately governed P1-P4 boundaries
@@ -23,10 +23,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #226 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. A separate independent exact-head architecture review is still required for P0 decision acceptance. |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. Final exact-head architecture review and shared-account identity limitation are recorded in the P0 evidence. |
+| Implementation PR | #291 (merged as `1467a561`) |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Activation is effective from current `main@b59912e3`; complete only the P0 decision/documentation slice, then obtain independent exact-head architecture review, exact-head CI and owner-first closeout. |
+| Handoff / Release Condition | P0 accepted and closed after exact-head CI/review and owner-first closeout; P1-P4 remain separately governed and unactivated. |
 
 The claim is effective through PR #226 merge `453d1fba97470639835468664c58397770db384c`.
 It authorizes only the frozen decision/documentation slice and does not by itself activate I196.
@@ -182,11 +182,11 @@ Independent exact-head architecture review and owner acceptance remain pending.
 - `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
 - `git diff --check`: pass.
 - Changed-path assertion: documentation/governance only; no Rust/Cargo/lockfile/schema/Desktop asset.
-- Independent exact-head architecture review: pending.
+- Independent exact-head architecture review: approved exact head `2128c41c`; CI `32101943484` passed.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (P0 decision packet implementation; status closeout is separate)
 
 ## Variance And Residuals
 
@@ -196,4 +196,6 @@ Completion Commit: Pending. A status-only commit cannot serve as its own evidenc
 
 ## Retrospective
 
-Pending execution.
+P0 remained documentation-only as required. Final review found two current-state derived-view
+drifts; both were corrected before the final exact-head review and merge. P1-P4 remain separately
+governed and no implementation authority was transferred.

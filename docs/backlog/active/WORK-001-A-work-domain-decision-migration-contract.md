@@ -5,10 +5,10 @@
 | Story ID | WORK-001-A |
 | Type | Architecture / Migration Spike |
 | Priority | P0 |
-| Status | Active — I196 P0 decision/migration contract implementation in progress |
+| Status | Complete / Closed — P0 decision/migration contract accepted |
 | Parent Epic | WORK-001 |
 | Source | DESKTOP-001 P0 prerequisite; GitHub Issue #29; three-track development baseline |
-| Selected Iteration | I196 Active |
+| Selected Iteration | I196 Complete / Closed |
 | Depends On | RUNTIME-001 Complete; TODO-001 Complete; TODO-002 Complete; VALIDATION-001 Complete; current main inventory |
 
 ## Collaboration Claim
@@ -23,10 +23,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #226 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. Independent exact-head architecture review remains required for P0 decision acceptance; shared-account identity limits must be disclosed. |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #226 exact head `8d0cce3230b4030aab946fb0757da705dcfa4e26` passed CI `31781768908` and independent approval comment `5291072895`, then merged to `main` as `453d1fba97470639835468664c58397770db384c`. The claim is effective. Final exact-head architecture review and shared-account identity limitation are recorded in the P0 evidence. |
+| Implementation PR | #291 (merged as `1467a561`) |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | P0 branch starts from current `main@b59912e3`; complete only the decision/documentation slice, then obtain independent exact-head architecture review, exact-head CI and owner-first closeout. No P1-P4 or implementation authority is transferred. |
+| Handoff / Release Condition | P0 accepted and closed after exact-head CI/review and owner-first closeout; P1-P4 remain separately governed and unactivated. |
 
 The `Claimed` record above became effective when PR #226 merged as `453d1fba`. The P0
 implementation branch starts from the later current `main@b59912e3` activation checkpoint.
@@ -129,7 +129,7 @@ Cargo manifest, lockfile, schema or fixture behavior change.
 - [x] `git diff --name-only` proves no Rust, Cargo, lockfile, persistence schema or Desktop asset
       changed in P0.
 - [x] Both governance validators and `git diff --check` pass with zero warnings/errors.
-- [ ] Independent exact-head architecture review finds no unresolved breaking or migration decision
+- [x] Independent exact-head architecture review finds no unresolved breaking or migration decision
       hidden for P1.
 
 ## Execution Evidence — 2026-08-18
@@ -140,7 +140,7 @@ Cargo manifest, lockfile, schema or fixture behavior change.
 - `scripts/validate_project_governance.sh .`: 0 warnings.
 - `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
 - `git diff --check`: pass.
-- Independent exact-head architecture review of the decision packet remains pending.
+- Independent exact-head architecture review approved exact head `2128c41c`; CI `32101943484` passed and PR #291 merged as `1467a561`.
 
 ## Planned Validation
 
@@ -160,6 +160,12 @@ Cargo manifest, lockfile, schema or fixture behavior change.
 - Directional source: `docs/backlog/active/DESKTOP-001-desktop-product-direction.md`.
 - Current operating view: `docs/BOARD.md`.
 - Compact selection view: `docs/backlog/PRODUCT-BACKLOG.md`.
+
+## Completion Evidence
+
+Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (P0 decision packet implementation;
+the owner status closeout is a separate change). PR #291 merged as `1467a561` after exact-head
+CI `32101943484` and independent architecture review of exact head `2128c41c`.
 
 ## User-Facing Documentation
 
