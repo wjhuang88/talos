@@ -1,5 +1,7 @@
 # WORK-001-A: Canonical Work Domain Decision And Migration Contract
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | WORK-001-A |
