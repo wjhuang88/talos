@@ -1,6 +1,6 @@
 # Iteration I195: Dashboard Read-Only Visual Shell
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-08-13
 > Planned objective: deliver one coherent, accessible and responsive user-facing Dashboard shell over
 > the existing GET-only loopback status/history/governance/config/extensions surfaces without adding
@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard governance session 2026-08-13 |
 | Work Slice | Implement only WEB-001-A / I195 Dashboard-wide IA and the first cohesive read-only visual shell over the existing GET-only loopback `/status`, `/history`, `/governance`, `/config`, and `/extensions` surfaces. Preserve `127.0.0.1`, current config masking, output redaction, HTML escaping and JSON/plain-text negotiation; introduce no write/control/remote/session-mutation capability or duplicated shared business logic. |
@@ -22,15 +22,15 @@
 | Source Issue | None |
 | Governance Claim PR | #212 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making the bounded WEB-001-A/I195 claim effective. Implementation merge still requires a fresh exact-head independent natural-person review with shared-account identity disclosure. |
-| Implementation PR | #233 — Draft historical candidate; must be rebuilt from activation PR #288 merge or a later current `main` before implementation review |
+| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making the bounded WEB-001-A/I195 claim effective. For implementation merge, maintainer override `5326076971` explicitly accepted independent AI exact-head technical review `5323625004` plus human manual browser acceptance `5323801564` for this non-protected read-only slice; exact-head CI `32087223234` succeeded. |
+| Implementation PR | #233 — merged as `490503db905bcd2eb2ab5e3b5487b1f542873d63` from reviewed exact head `1ee4aa3786785473069c735e1985c9d720b82e2f` |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Activation PR #288 must reach `main` after exact-head validation and merge-time CAS. Then rebuild #233 from that activation merge or a later current `main`, pass implementation CI/UX acceptance, obtain independent natural-person exact-head implementation approval, and repeat merge-time CAS before merge. |
+| Handoff / Release Condition | None — I195 is Complete/Closed; residual WEB-001 capabilities remain separately governed. |
 
 The `Claimed` record above became effective when PR #212 merged as
 `f123e534ce864a89eb3cabfc68f4a1518201c2d0`. The earlier #233 branch-local activation was not
-authoritative because activation had not reached `main`; #233 therefore remains a Draft historical
-implementation candidate until it is rebuilt from the activation merge or a later current `main`.
+authoritative because activation had not reached `main`; that process error was corrected through
+activation PR #288 before the final implementation was rebuilt and reviewed.
 
 ## Activation Baseline - 2026-08-18
 
@@ -55,9 +55,24 @@ implementation candidate until it is rebuilt from the activation merge or a late
   preserve all other lane rows, and change only the factual I195 state plus any wording that would
   otherwise falsely claim I205 is the sole Active iteration.
 
+### Completion Record - 2026-08-18
+
+- Activation PR #288 merged as `8f1facc8d2955fb6c9a6e01da32a62be3d7c9d40` before the final #233 rebuild.
+- Final reviewed implementation head `1ee4aa3786785473069c735e1985c9d720b82e2f` passed exact-head CI
+  `32087223234`; publisher/focused validation had already passed `cargo test --locked -p talos-dashboard`.
+- Independent AI exact-head technical review `5323625004` approved the implementation, and human
+  maintainer browser acceptance `5323801564` passed the required viewport, zoom, keyboard, CSP,
+  empty/populated and security-presentation matrix.
+- Maintainer override `5326076971` explicitly accepted the AI technical review for this non-protected
+  read-only slice, superseding the owner-local natural-person implementation-review requirement while
+  leaving protected-scope repository policy unchanged.
+- Final merge-time CAS used then-current `main@8127fa579cef03a36e743a30003a682bc5f884b1`; no overlapping
+  Dashboard owner or unresolved blocking feedback existed. PR #233 merged as
+  `490503db905bcd2eb2ab5e3b5487b1f542873d63`, whose second parent is exactly the reviewed head.
+
 The earlier section named `Current Synchronized Claim Baseline` below is preserved as claim-time
-history. This activation baseline is the current execution truth and supersedes its pre-activation
-status statements without rewriting the published planning history.
+history. The activation and completion records above are the current execution truth and supersede
+pre-activation status statements without rewriting the published planning history.
 
 ## Published Baseline
 
@@ -335,6 +350,11 @@ Manual acceptance on the exact rebuilt implementation head:
 10. After implementation merge, governance closure records `Completion Commit: <pre-existing SHA>`;
     no state-only commit self-certifies completion.
 
+The natural-person implementation-review language above is preserved as the original execution gate.
+For this non-protected I195 slice, maintainer override `5326076971` explicitly superseded that
+owner-local requirement at merge time by accepting independent AI technical review `5323625004`
+plus human manual acceptance `5323801564`; protected-scope repository policy was not changed.
+
 ## Verification Evidence
 
 - Governance planning branch base observed at creation:
@@ -366,12 +386,23 @@ Manual acceptance on the exact rebuilt implementation head:
 - Earlier review comments and CI runs remain historical only and do not substitute for validation or
   independent review on the new exact head.
 - Governance claim PR: #212.
-- New exact-head validator/CI/review and merge-time CAS evidence: pending.
+- Final reviewed implementation head `1ee4aa3786785473069c735e1985c9d720b82e2f` passed exact-head
+  CI `32087223234`; independent AI review `5323625004` and human browser acceptance `5323801564`
+  passed; maintainer override `5326076971` accepted that implementation-review path; PR #233 merged
+  by expected-head CAS as `490503db905bcd2eb2ab5e3b5487b1f542873d63`.
 
 ## Completion Evidence
 
-No completion evidence. No production implementation exists under I195. A governance/status commit
-cannot serve as `Completion Commit`.
+Completion Commit: `490503db905bcd2eb2ab5e3b5487b1f542873d63`
+
+- Source/reviewed implementation head: `1ee4aa3786785473069c735e1985c9d720b82e2f`.
+- Exact-head CI `32087223234`: SUCCESS.
+- Independent AI exact-head technical review: `5323625004`.
+- Human maintainer manual browser acceptance: `5323801564`.
+- Maintainer review-policy override accepting the AI review for I195: `5326076971`.
+- Merge parent verification: first parent `8127fa579cef03a36e743a30003a682bc5f884b1`, second parent
+  exactly `1ee4aa3786785473069c735e1985c9d720b82e2f`.
+- No status-only closeout commit is used as its own completion evidence.
 
 ## Variance And Residuals
 
@@ -383,7 +414,14 @@ cannot serve as `Completion Commit`.
 - Internationalization of Dashboard UI text is not silently added to this first slice; if product
   requirements later require localized in-page UI, it receives explicit scope/acceptance rather
   than being inferred from bilingual README documentation.
+- Review noted a non-blocking `Accept: text/html;q=0` nuance; any correction is a separately governed
+  content-negotiation compatibility refinement and is not an I195 completion blocker.
 
 ## Retrospective
 
-Pending activation and execution.
+Delivered the approved light/quiet Nord-derived read-only shell without widening the Dashboard
+security boundary. The key execution variance was governance recovery: activation initially existed
+only on the implementation branch and was corrected through #288 before the final #233 rebuild. The
+maintainer later accepted independent AI exact-head technical review while retaining a human manual
+browser walkthrough. Keeping the final implementation PR to three product/documentation files made
+merge-time current-main CAS straightforward and preserved unrelated lane truth.
