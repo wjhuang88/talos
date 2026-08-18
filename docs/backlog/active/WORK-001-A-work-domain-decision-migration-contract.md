@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-14 |
 | Work Slice | WORK-001-A / I196 P0 only: inventory current Todo/runtime/session/projection obligations; decide the canonical work-state ownership and dependency boundary; define stable identity/revision plus migration, compatibility, rollback and P1-P4 contracts. No Work Graph, Evaluation, Evaluator, persistence, public API, Rust/Cargo, Desktop, Dashboard, TUI product or later-child implementation. |

@@ -47,7 +47,7 @@ mainline work. It does not authorize any child merely because the overall direct
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
 
 Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (WORK-001-A P0 decision packet; the
-the Epic remains open while P1-P4 are separately governed).
+Epic remains open while P1-P4 are separately governed).
 
 P1-P4 identifiers reserve dependency boundaries only. Their executable owner documents, iteration
 plans and claims must be created separately after the preceding child is accepted; this P0 claim
