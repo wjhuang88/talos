@@ -86,7 +86,7 @@ coordination or state rather than the deliverable itself.
 | I205 | 2 | 0 | 0 | 0 | Claim and activation PRs precede this audit implementation PR. |
 | I209 | 5 | 1 | 1 | 0 | Planning, claim, activation, urgent implementation and closeout. |
 
-Seven separate activation PRs appear in the sample. They changed 49 files in aggregate, produced
+Seven separate activation PRs appear in the sample. They changed 51 files in aggregate, produced
 four explicit approval rounds, and produced no blocking review finding. This does not prove an
 activation check can disappear; it shows the check can move into claim merge and implementation
 ancestry verification without needing its own PR.
