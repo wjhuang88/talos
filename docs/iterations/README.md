@@ -28,13 +28,13 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
-I158 and I171 completion evidence: `Completion Commit: c88c1d1a` (existing implementation/audit
+I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
-| I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `c88c1d1a`; v0.7.0 audit/register and bounded remediation owners validated; no production refactor. |
+| I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `56f419f7`; source v0.7.0 audit/register evidence `c88c1d1a`; bounded remediation owners validated; no production refactor. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Complete / Closed | Completion Commit `d886917e45d5ca0f110e111b966cd379485e3580` plus cfg follow-up `34c09b14`; exact head `33a2c6ff` passed CI `31801484313`, approval `5293622712` and CAS, then PR #236 merged as `f79c1ead`. |
 | I160 | Shared CLI And Runtime Internal Composition | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161 is Complete and I162 is Planned/Claimed through claim PR #253 pending merge. |
 | I161 | Sandbox Fallback And Coding Preset | Complete / Closed | Completion Commits `74c5502d`/`3ca2ec62`; PRs #250/#251 merged after exact-head independent approvals and CI. I162 is Planned/Claimed through claim PR #253 pending merge. |
@@ -75,7 +75,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I206 | Esc-Cancelled Steering Activation | Planned / Unclaimed | `TUI-048`; accepted steering must become one runnable Session turn after active-turn Esc cancellation. No implementation branch or authorization. |
 | I207 | Steering Wrap Padding Contract | Planned / Unclaimed | `TUI-049`; continuation lines must honor shared horizontal padding. No implementation branch or authorization. |
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
- | I205 | PR Workflow Throughput Simplification | Review / Claimed / PR #287 | Audit packet complete: 42-PR evidence snapshot and atomic claim-activation decision. No executable governance change; follow-up needs a new bounded claim. |
+| I205 | PR Workflow Throughput Simplification | Complete / Closed | Completion Commit `2e2cf04b`; PR #287 merged as `0394e264`; exact-head CI `32094384772` and independent technical audit `5323234878` passed. Audit selects atomic claim activation as a separately claimable follow-up; no executable governance change. |
 | I209 | Resumed Session Interactivity Under Provider Delay | Closed | TUI-051 / Issue #272 is Complete at Completion Commit `2eff6285`, with source implementation `7b82fea6`/`7d90def8`, exact-head CI `32025371877`, real-terminal acceptance and independent agent audit `5316533941`. Retry-progress acceptance remains transferred to I210. |
 | I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accept an ADR and establish an effective claim before any public contract or implementation change. |
 
