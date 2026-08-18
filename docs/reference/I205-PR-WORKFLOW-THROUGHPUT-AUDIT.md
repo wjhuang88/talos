@@ -7,7 +7,7 @@
 | Requested outcome | Measure recent PR/review overhead, retain evidence-bearing gates, and select the smallest separately claimable workflow simplification. |
 | Artifacts | This decision report, `I205-PR-WORKFLOW-EVIDENCE.json`, and `scripts/audit_pr_workflow.py`. |
 | Existing assets to preserve | Collaboration claims, protected-scope independent review, exact-head evidence, merge-time CAS, owner-first truth, pre-existing Completion Commit evidence, immutable release tags and GitHub-before-Cargo ordering. |
-| State owners | GOV-007 and I205 remain Active/Claimed until this audit PR is independently reviewed, merged and closed owner-first. |
+| State owners | GOV-007 and I205 are Review/Claimed pending exact-head review, merge, and owner-first closeout of this audit PR. |
 | Validation | Regenerate the JSON through GitHub REST, validate both governance contracts, compile-check the audit script, and run `git diff --check`. |
 | Evidence and uncertainty | GitHub PR/comment facts are confirmed by REST. Cause classification and future savings are reasoned interpretations declared below. GraphQL outage observations are local execution evidence and are not recoverable from GitHub REST. |
 | Residual destination | A new bounded governance child must claim and implement the selected atomic claim/activation rule. I205 changes no executable rule. |
