@@ -357,3 +357,14 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 |---|---|---|---|---|---|
 | 2026-08-18 | T5 merge and human-validation scheduling change | PR #301 head `8a58cb2d`; merge `9628e183`; CI `32149762367`; Agent technical review `5330234992`; Issue #302; VALIDATION-002/I211 | I200 implementation reached `main` after machine/technical/CAS gates. The maintainer selected Deferred Human Validation Mode and created one later cleanup phase for I200/I197/I201/I198 human rows. | I200 natural-person exact-head review and mouse/touchpad matrix remain unpassed. The mode cannot defer protected security review or justify Complete. | Merge #303 after exact-head validation/CAS, then re-inventory and prepare only the separately scoped I197 claim from current `main`. |
 | 2026-08-19 | T6 I197 claim preparation | PR #303 merge `99645e78`; governance branch `docs/i197-claim-governance` from exact `main` | #303 is effective; I197/TUI-045 is proposed Active/Claimed for the layout-only permission-prompt anchor slice. No implementation branch or permission-policy authority exists. | Claim #304 is ineffective until merge; I200 human rows remain open in #302/I211. Any protected permission/security change remains non-deferrable. | Validate and merge #304 with exact-head CI, both governance validators and CAS; only then create the I197 implementation branch from the claim merge or later `main`. |
+
+## 2026-08-19 Work Mode Record
+
+The active long task uses the `Deferred Human Validation` work mode defined by
+`docs/sop/LONG-RUNNING-TASK.md`. Its validation tracker is GitHub Issue #302 and its planned
+evidence-only cleanup iteration is I211 / VALIDATION-002. The tracker is a deferred-validation
+queue: an open natural-person or device-dependent row does not block a later non-overlapping child
+once that child's dependencies, claim, machine checks, technical review, applicable security review
+and merge-time CAS are terminal. Source owners remain `Review` until I211 records a pass; protected
+security-review gates are never deferred; the long task cannot close while a required tracker row is
+open.
