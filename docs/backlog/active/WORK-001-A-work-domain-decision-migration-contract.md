@@ -5,7 +5,7 @@
 | Story ID | WORK-001-A |
 | Type | Architecture / Migration Spike |
 | Priority | P0 |
-| Status | Complete / Closed — P0 decision/migration contract accepted |
+| Status | Complete / Closed |
 | Parent Epic | WORK-001 |
 | Source | DESKTOP-001 P0 prerequisite; GitHub Issue #29; three-track development baseline |
 | Selected Iteration | I196 Complete / Closed |
