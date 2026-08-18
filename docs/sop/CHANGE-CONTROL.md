@@ -56,6 +56,10 @@ For scope additions:
 - If the change invalidates completed work, record what needs rework.
 - If a planned prerequisite is deferred or superseded, mark dependent future iterations blocked or
   replan their dependency before activation.
+- If a maintainer changes human-validation timing inside a long task, preserve the original
+  acceptance baseline, activate `LONG-RUNNING-TASK.md` Deferred Human Validation Mode, create the
+  linked validation Issue/cleanup iteration, and leave each source owner Review until its row
+  passes. The timing change cannot defer a repository security-review hard gate.
 
 ## Rules
 

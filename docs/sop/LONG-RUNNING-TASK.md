@@ -97,6 +97,41 @@ Record the approved contract and authorization evidence before In Progress. One 
 planned cycle, not only its first item. Never infer permission for push, release, deployment,
 migration, spending, or destructive work from permission to edit code.
 
+## Deferred Human Validation Mode
+
+A maintainer may select this mode in the startup contract when natural-person review or
+device-dependent manual acceptance will be unavailable during an otherwise runnable long task.
+The mode changes scheduling, not evidence truth or merge safety.
+
+At activation:
+
+1. Create one GitHub Issue that inventories every deferred validation row. Link it from the task
+   record and name the planned evidence-only cleanup iteration.
+2. For each row, record the source owner, exact implementation head when known, required human or
+   device evidence, and the condition that adds the row when the implementation head does not yet
+   exist.
+3. Add a final ordered cleanup-validation item before long-task closure. The task cannot be
+   Complete while a required tracker row remains open.
+
+Per child implementation:
+
+- exact-head CI, locked checks, independent Agent technical review with identity limits disclosed,
+  applicable governance validation and merge-time CAS remain merge gates;
+- independent security review required by `AGENTS.md` for sandbox, `talos-permission`,
+  process-hardening or permission-policy changes cannot be deferred;
+- only explicitly listed natural-person review and device/manual acceptance rows may move to the
+  tracker;
+- the source Story/iteration remains Review and records the scheduling variance; it is not marked
+  Complete or described as human-accepted;
+- after the implementation merge and tracker update, the next non-overlapping child may start when
+  the task record explicitly dispositions the Review item and all of that child's own activation
+  gates hold.
+
+During the cleanup phase, execute every row against both its recorded source head and the final
+integrated runtime head where behavior can interact. A failed row keeps the source owner Review and
+creates a separately governed corrective item. Close the tracker and source owners only after
+owner-first evidence synchronization.
+
 ## Execution
 
 1. Execute items in dependency order.

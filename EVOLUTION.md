@@ -59,6 +59,7 @@ repeating known mistakes.
 | 47 | Governance / Review | 共享 GitHub 账号下的独立评审必须显式声明自然人隔离，并区分人工 attestation 与机器可验证身份 | PR #177 / GOV-004 |
 | 48 | Governance / Windows | 结构化子进程输出必须显式指定协议编码，不能继承 Windows locale | I183 / PR #184 |
 | 49 | Governance / CI | 分支级 validator 本地复现必须显式绑定 PR base，不能依赖 `HEAD^` 回退 | I159 / PR #236 |
+| 50 | Governance / Long Task | 人工验证不可用时建立 Issue 批量跟踪，不能让未验项冒充通过或空转阻塞实现队列 | I200 / VALIDATION-002 |
 
 ## Lessons
 
@@ -961,3 +962,23 @@ repeating known mistakes.
   code points; whole-string multilingual fixtures do not exercise transport framing.
 - Promoted to rule/check: `stream_utf8::tests::reassembles_code_points_split_across_transport_chunks`
   plus invalid-byte and incomplete-EOF regression tests.
+## 2026-08-18 - Batch unavailable human validation instead of idling a long task
+
+- Trigger: I200 implementation and Agent technical review reached `main`, but a distinct
+  natural-person reviewer and mouse/touchpad walkthrough were unavailable, repeatedly blocking the
+  ordered mainline task before I197.
+- Symptom: The execution loop polled the same external gates and made no product progress even
+  though the implementation was merged, automated gates passed and later children were separately
+  claimable.
+- Root cause: The long-task workflow treated every owner-local human gate as an immediate sequencing
+  prerequisite and had no truthful way to batch non-security human/device validation near task
+  closeout.
+- Fix: Add Deferred Human Validation Mode. Activation creates a tracking Issue and planned
+  evidence-only cleanup iteration; per-child machine, technical-review, CAS and security gates stay
+  local, while listed human/device rows are deferred without marking the source Complete.
+- Prevention: Long tasks with unavailable human validation select the mode at activation, update
+  the tracker after each implementation head, and cannot close until the cleanup phase resolves all
+  rows or creates corrective owners.
+- Promoted to rule/check: `docs/sop/LONG-RUNNING-TASK.md`,
+  `docs/sop/ITERATION-WORKFLOW.md`, `docs/sop/AGENT-COLLABORATION.md`, and
+  `docs/sop/CHANGE-CONTROL.md`; no mechanical validator is added in this slice.

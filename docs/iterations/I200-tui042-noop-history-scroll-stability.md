@@ -24,7 +24,7 @@
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive the published implementation review or terminal walkthrough acceptance. |
 | Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 may merge only after exact-head CI, independent technical review and merge-time CAS. I200 remains Review after merge until the published independent natural-person exact-head review and maintainer mouse/touchpad walkthrough are recorded. |
+| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 proposes that, on merge, I200 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
 
 ## Published Baseline
 
@@ -89,9 +89,12 @@ Review without claiming the remaining human acceptance gates.
 - Full-frame regressions cover non-scrollable alternating wheel bursts, exact fit, one-row
   overflow, top/tail idempotency, multiline input/cursor/history preservation, height growth,
   CJK width reflow and I199 preview shrink.
-- Pending: PR #301 exact-head CI and independent technical review, then maintainer mouse-wheel and
-  touchpad walkthrough plus the published independent natural-person exact-head review. Agent or
-  shared-account review evidence cannot be represented as a distinct natural person.
+- PR #301 exact head `8a58cb2d` passed CI `32149762367`, received independent Agent technical
+  approval `5330234992` with its identity limit disclosed, passed merge-time CAS and merged as
+  `9628e183`.
+- Pending in VALIDATION-002/I211/Issue #302: maintainer mouse-wheel and touchpad walkthrough plus
+  the published independent natural-person exact-head review. Agent or shared-account review
+  evidence cannot be represented as a distinct natural person.
 
 ## Completion Evidence
 
@@ -139,3 +142,15 @@ PR #301 is open from the exact claim merge. TUI tests, Clippy and full release p
 locally, but CI, independent technical review, merge-time CAS, independent natural-person
 exact-head review and maintainer mouse/touchpad acceptance remain open. Completion Commit remains
 Pending, so I200 is Review rather than Complete.
+
+## 2026-08-18 Deferred Human Validation Change Control
+
+PR #301 subsequently passed exact-head CI `32149762367`, independent Agent technical approval
+`5330234992` and merge-time CAS, then merged as `9628e183f410ddc0ae22067107d286cefa37d016`.
+The approval explicitly does not claim a distinct natural person.
+
+The maintainer changed only validation timing: unavailable natural-person review and real-terminal
+mouse/touchpad acceptance move to VALIDATION-002/I211/Issue #302 near long-task closeout. The
+published baseline and acceptance remain unchanged, those rows remain unpassed, and Completion
+Commit remains Pending. PR #303 proposes this residual disposition; only after it reaches `main`
+may the non-overlapping I197 claim be prepared.

@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Establish an effective I197 claim on `main`, then implement from that claim merge or later current `main`; do not alter permission semantics. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | Establish an effective I197 claim on `main`, then implement from that claim merge or later current `main`; do not alter permission semantics. Per-child CI, Agent technical review and CAS remain merge gates; the natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -77,3 +77,12 @@ layout tests and real-terminal evidence.
 ## Residual Destination
 
 General panel docking, user-configurable overlay placement or a broad terminal layout rewrite require separate design owners.
+
+## 2026-08-18 Deferred Human Validation Timing
+
+The maintainer selected the long-task Deferred Human Validation Mode. I197's objective, permission
+visibility/fail-closed boundary and full acceptance matrix are unchanged. If implementation reaches
+its exact-head CI, independent Agent technical review and CAS gates without touching permission
+policy or protected crates, its natural-person review and terminal matrix may be added to Issue
+#302 for I211. TUI-045 remains Review until those rows pass; policy or security-scope expansion
+cannot use this deferral.

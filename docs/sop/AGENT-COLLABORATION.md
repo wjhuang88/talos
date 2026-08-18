@@ -255,6 +255,20 @@ Use one of these paths:
 
 The PR author does not need to approve their own PR under the single-maintainer path.
 
+### Deferred Human Validation Does Not Change Merge Authorization
+
+`LONG-RUNNING-TASK.md` may schedule an owner-defined natural-person review or device/manual
+acceptance row into a linked cleanup-validation Issue. That mode does not replace the authorization
+path above and does not permit a false Complete state:
+
+- exact-head CI, applicable independent Agent technical review, both governance validators and
+  merge-time CAS still apply before merge;
+- independent security review for sandbox, `talos-permission`, process-hardening or
+  permission-policy scope remains non-deferrable;
+- the source owner stays Review until its deferred row passes;
+- a later child may proceed only when the long-task owner records the prior Review disposition,
+  non-overlap and the later child's own effective claim.
+
 ### 4. Mandatory Merge-Time CAS Preflight
 
 Immediately before merge, re-check all of the following against the exact head:
