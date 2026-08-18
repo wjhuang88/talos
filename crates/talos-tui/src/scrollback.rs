@@ -288,13 +288,13 @@ impl ViewportComponent for PreviewComponent<'_> {
             .map(|(index, row)| {
                 let padding_color = (index == 0).then_some(self.spinner_color).flatten();
                 if row.clipped_marker {
-                    return Line::from(vec![
-                        Span::styled(
-                            row.prefix.clone(),
-                            Style::default().fg(padding_color.unwrap_or(text_color)),
-                        ),
-                        Span::styled(row.content.clone(), Style::default().fg(semantic::DIM_TEXT)),
-                    ]);
+                    let content = row.content.strip_prefix('…').unwrap_or(&row.content);
+                    let mut spans = clipped_marker_prefix_spans(&row.prefix, text_color);
+                    spans.push(Span::styled(
+                        content.to_string(),
+                        Style::default().fg(text_color),
+                    ));
+                    return Line::from(spans);
                 }
                 Line::from(preview_line_spans(
                     &row.prefix,
@@ -310,6 +310,25 @@ impl ViewportComponent for PreviewComponent<'_> {
         debug_assert_eq!(lines.len(), self.height_hint(area.width) as usize);
         frame.render_widget(Paragraph::new(lines), area);
     }
+}
+
+fn clipped_marker_prefix_spans(prefix: &str, text_color: Color) -> Vec<Span<'static>> {
+    use unicode_width::UnicodeWidthStr;
+
+    let width = prefix.width();
+    if width == 0 {
+        return vec![Span::styled("…", Style::default().fg(semantic::DIM_TEXT))];
+    }
+
+    let marker_col = usize::from(width > 1);
+    vec![
+        Span::styled(" ".repeat(marker_col), Style::default().fg(text_color)),
+        Span::styled("…", Style::default().fg(semantic::DIM_TEXT)),
+        Span::styled(
+            " ".repeat(width - marker_col - 1),
+            Style::default().fg(text_color),
+        ),
+    ]
 }
 
 fn preview_visual_rows(text: &str, width: usize) -> Vec<String> {

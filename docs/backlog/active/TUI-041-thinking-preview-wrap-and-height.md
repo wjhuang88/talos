@@ -120,3 +120,8 @@ within the existing six-row bound, and embeds the clipping marker in the first v
 It does not add persistence, keyboard scrolling, a collapsible panel or provider changes. All old
 exact-head CI and review evidence must be replaced after the implementation head changes, and
 maintainer native-terminal acceptance remains pending.
+
+The first rework build also revealed that the embedded marker dimmed its whole content row. The
+follow-up moves `…` into the prefix slot and limits the dim style to that marker, so all visible
+thinking content remains aligned and retains one consistent foreground color; terminal acceptance
+remains pending on the corrected head.

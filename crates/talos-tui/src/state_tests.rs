@@ -1179,6 +1179,29 @@ fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
 }
 
 #[test]
+fn thinking_preview_dims_only_the_embedded_clipping_marker() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let height = component.height_hint(20);
+    let area = Rect::new(0, 0, 20, height);
+    let mut buffer = Buffer::empty(area);
+    let mut frame = InlineFrame::new(area, &mut buffer);
+    component.render(&mut frame, area);
+
+    assert_eq!(buffer[(1, 1)].symbol(), "…");
+    assert_eq!(buffer[(1, 1)].fg, crate::theme::semantic::DIM_TEXT);
+    assert_eq!(buffer[(3, 1)].symbol(), "r");
+    assert_eq!(buffer[(3, 1)].fg, crate::theme::semantic::PREVIEW_FG);
+    assert_eq!(buffer[(3, 2)].fg, crate::theme::semantic::PREVIEW_FG);
+}
+
+#[test]
 fn thinking_preview_compresses_to_title_before_hiding_it() {
     let component = PreviewComponent {
         padding: " ⠋ ",

@@ -119,3 +119,9 @@ ellipsis is embedded in the first visible content row instead of consuming a sep
 stream previews retain their semantic first row and newest tail under the same embedded-marker
 rule. PR #297 must obtain new exact-head CI, independent review and maintainer terminal acceptance;
 the earlier `f00c6e4d` evidence does not carry forward after this rework.
+
+The first rework build exposed one additional presentation inconsistency during maintainer
+inspection: embedding the clipping marker caused the entire first visible content row to inherit
+the marker's dim color. The follow-up moves `…` into the semantic prefix slot and confines dim
+styling to that marker; content across the rolling boundary keeps one aligned content column and
+the same preview foreground color.
