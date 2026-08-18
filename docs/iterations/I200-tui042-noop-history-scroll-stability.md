@@ -1,6 +1,6 @@
 # Iteration I200: No-Op History Scroll State Stability
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-14
 > Planned objective: make mouse/touchpad history input mutate anchor state only when the visible
 > frame-history start changes, and normalize anchors that become impossible after resize/reflow.
@@ -21,10 +21,10 @@
 | Source Issue | #79 |
 | Governance Claim PR | #300 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance PR #300 is ineffective until its finalized exact head passes CI, both validators, independent agent technical review with shared-identity limits disclosed, merge-time CAS and merge to `main`. The maintainer's unattended authorization permits this non-security claim path because no independent natural-person reviewer is available; it does not waive the published natural-person implementation review or terminal walkthrough acceptance. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive the published implementation review or terminal walkthrough acceptance. |
+| Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After #300 merges, create the implementation branch from that merge or later current `main`; implementation may reach Review unattended, but Complete still requires the published independent natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
+| Handoff / Release Condition | PR #301 may merge only after exact-head CI, independent technical review and merge-time CAS. I200 remains Review after merge until the published independent natural-person exact-head review and maintainer mouse/touchpad walkthrough are recorded. |
 
 ## Published Baseline
 
@@ -73,13 +73,25 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. I200 remains Unclaimed. I199 is ordered first to settle preview-driven
-capacity, but a recorded I199 blocked disposition permits I200 to proceed with current behavior and
-retain the preview interaction case as explicit residual evidence.
+Claim PR #300 merged as `356dc3c5321d4cb0b7fec2f9533947dcc3acdfd8`, making I200 the sole
+Active/Claimed iteration. The implementation branch started exactly from that merge. Commit
+`3afeeb2859a441ef7e1b7628ff4b5b83b974210d` is submitted as PR #301 and moves I200 to
+Review without claiming the remaining human acceptance gates.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+- `cargo test -p talos-tui --locked`: 533 unit tests, 2 integration tests and 2 doctests passed.
+- `cargo clippy -p talos-tui --all-targets --locked -- -D warnings`: passed.
+- `cargo fmt --check`: passed.
+- `git diff --check`: passed before the implementation commit.
+- `./scripts/release_preflight.sh`: passed, including locked workspace check, Clippy, tests,
+  doctests, site/installer validation, classifier tests and both governance validators.
+- Full-frame regressions cover non-scrollable alternating wheel bursts, exact fit, one-row
+  overflow, top/tail idempotency, multiline input/cursor/history preservation, height growth,
+  CJK width reflow and I199 preview shrink.
+- Pending: PR #301 exact-head CI and independent technical review, then maintainer mouse-wheel and
+  touchpad walkthrough plus the published independent natural-person exact-head review. Agent or
+  shared-account review evidence cannot be represented as a distinct natural person.
 
 ## Completion Evidence
 
@@ -114,3 +126,16 @@ claim remains ineffective before merge. Single-maintainer claim authorization is
 non-security governance transition; an independent agent technical audit must still bind the exact
 head, and the published natural-person implementation review plus maintainer terminal walkthrough
 remain mandatory before Complete.
+
+## 2026-08-18 Implementation Review Checkpoint
+
+Implementation commit `3afeeb2859a441ef7e1b7628ff4b5b83b974210d` centralizes rendering-derived
+frame-history scroll outcomes as Noop, Anchored or FollowTail. A target equal to the current start
+does not mutate anchors; reaching the real tail from an earlier viewport returns to FollowTail;
+and a post-layout projection that fully fits clears an obsolete anchor and replans the same frame
+once under the natural inline history cap.
+
+PR #301 is open from the exact claim merge. TUI tests, Clippy and full release preflight pass
+locally, but CI, independent technical review, merge-time CAS, independent natural-person
+exact-head review and maintainer mouse/touchpad acceptance remain open. Completion Commit remains
+Pending, so I200 is Review rather than Complete.

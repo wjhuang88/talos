@@ -5,9 +5,9 @@
 | Story ID | TUI-042 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #79](https://github.com/wjhuang88/talos/issues/79) |
-| Selected Iteration | I200 — Active / Claimed |
+| Selected Iteration | I200 — Review / Claimed |
 | Depends On | TUI-039 completed layout contract; ADR-054; interaction with TUI-041 |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #79 |
 | Governance Claim PR | #300 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance PR #300 is ineffective until its finalized exact head passes CI, both validators, independent agent technical review with shared-identity limits disclosed, merge-time CAS and merge to `main`. The unattended claim path does not waive I200's published natural-person implementation review or maintainer terminal walkthrough. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive I200's published implementation review or terminal walkthrough. |
+| Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After #300 merges, implement only from that merge or later current `main`; remain Review until the published exact-head review and mouse/touchpad acceptance gates pass. |
+| Handoff / Release Condition | PR #301 requires exact-head CI, independent technical review and merge-time CAS; after merge, remain Review until the published independent natural-person exact-head review and maintainer mouse/touchpad acceptance gates pass. |
 
 ## Identity / Goal / Value
 
@@ -106,3 +106,16 @@ PR #300 records the bounded Claimed work slice and proposes TUI-042/I200 as Acti
 not effective until merge to `main`; no implementation branch exists. The single-maintainer claim
 path is limited to governance activation and preserves the published independent natural-person
 implementation review and maintainer mouse/touchpad walkthrough gates.
+
+## 2026-08-18 Implementation Review Checkpoint
+
+PR #301 submits implementation commit `3afeeb2859a441ef7e1b7628ff4b5b83b974210d` from the
+effective #300 claim merge. Rendering-derived bounds now reject target-equals-current mutations,
+centralize Noop/Anchored/FollowTail outcomes and clear anchors that become impossible after
+height, CJK width reflow or preview-capacity changes. Focused full-frame tests preserve input
+buffer/cursor/history state and cover exact fit, one-row overflow and repeated boundaries.
+
+The Story is Review, not Complete. Exact-head CI, independent technical review, merge-time CAS,
+independent natural-person exact-head review and maintainer mouse/touchpad walkthrough remain
+mandatory. No excluded renderer, transcript/session, provider, persistence or release behavior is
+authorized.
