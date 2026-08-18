@@ -21,9 +21,9 @@ owner authority or make an ineffective child claim executable.
 | Work Slice | Coordination and recovery ledger for I205/GOV-007 → I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I198/#155 → I211/VALIDATION-002/#302, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #59 |
-| Governance Claim PR | #227 |
+| Governance Claim PR | #303 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, explicitly added Issues #69, #79 and #111, then directed on 2026-08-17 that stale #227/#228 governance residue be digested and PR-flow simplification be scheduled. On 2026-08-18 the maintainer selected Deferred Human Validation Mode: create Issue #302 at activation, do not block ordered implementation on unavailable human rows, and execute one cleanup-validation phase before long-task closure. No independent reviewer is currently available for this planning-only, non-security claim. Single-maintainer merge requires final exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback. Planning authorization does not authorize child implementation, release, migration, deployment, spending or destructive action. |
+| Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, explicitly added Issues #69, #79 and #111, then directed on 2026-08-17 that stale #227/#228 governance residue be digested and PR-flow simplification be scheduled. On 2026-08-18 the maintainer selected Deferred Human Validation Mode: create Issue #302 at activation, do not block ordered implementation on unavailable human rows, and execute one cleanup-validation phase before long-task closure. PR #303 proposes this scope amendment and is ineffective until merge. No independent reviewer is currently available for this planning-only, non-security claim. Single-maintainer merge requires final exact-head CI, both governance validators, merge-time CAS and no unresolved blocking feedback. Planning authorization does not authorize child implementation, release, migration, deployment, spending or destructive action. |
 | Implementation PR | None; child iterations require separate implementation PRs |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | Close only after every ordered child has a terminal disposition, every residual has an explicit owner/resume gate, and I211 resolves every required Issue #302 row. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
@@ -325,7 +325,8 @@ view work and mechanically preventable re-review, not removal of those controls.
 The maintainer directed that unavailable natural-person review must not idle the ordered long task.
 This is a validation-timing and priority change, not an acceptance reduction. Issue #302 is the
 tracker and VALIDATION-002/I211 is the evidence-only cleanup iteration. The original child
-baselines remain unchanged.
+baselines remain unchanged. PR #303 proposes the coordination-claim amendment; none of its changed
+activation or sequencing rules are effective before that PR reaches `main`.
 
 Per child, exact-head CI, locked checks, independent Agent technical review with identity limits,
 applicable security review, both governance validators and merge-time CAS remain merge gates. Only

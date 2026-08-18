@@ -24,7 +24,7 @@
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive the published implementation review or terminal walkthrough acceptance. |
 | Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. I200 remains Review while VALIDATION-002/I211/Issue #302 owns the explicitly deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
+| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 proposes that, on merge, I200 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
 
 ## Published Baseline
 
@@ -152,5 +152,5 @@ The approval explicitly does not claim a distinct natural person.
 The maintainer changed only validation timing: unavailable natural-person review and real-terminal
 mouse/touchpad acceptance move to VALIDATION-002/I211/Issue #302 near long-task closeout. The
 published baseline and acceptance remain unchanged, those rows remain unpassed, and Completion
-Commit remains Pending. I200 stays Review with a recorded residual disposition; this allows the
-non-overlapping I197 claim to be prepared after this governance change reaches `main`.
+Commit remains Pending. PR #303 proposes this residual disposition; only after it reaches `main`
+may the non-overlapping I197 claim be prepared.
