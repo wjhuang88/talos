@@ -125,3 +125,9 @@ inspection: embedding the clipping marker caused the entire first visible conten
 the marker's dim color. The follow-up moves `…` into the semantic prefix slot and confines dim
 styling to that marker; content across the rolling boundary keeps one aligned content column and
 the same preview foreground color.
+
+The next terminal run showed a separate visibility defect in the inherited model-title extractor:
+token usage continued growing while the preview remained frozen on the latest standalone Markdown
+heading, then the complete reasoning appeared at once in history. The fixed Talos-owned `thinking`
+title now replaces that extractor in the live preview, and the bounded body always follows the raw
+displayable thinking tail. This changes no reasoning archive, provider or persistence boundary.

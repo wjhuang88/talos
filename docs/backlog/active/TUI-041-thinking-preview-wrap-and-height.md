@@ -125,3 +125,9 @@ The first rework build also revealed that the embedded marker dimmed its whole c
 follow-up moves `…` into the prefix slot and limits the dim style to that marker, so all visible
 thinking content remains aligned and retains one consistent foreground color; terminal acceptance
 remains pending on the corrected head.
+
+Maintainer comparison of the active and finalized frames then proved that the inherited Markdown
+title extractor could freeze the live body on one model-generated heading even while thinking
+tokens continued arriving. The live preview now keeps the Talos-owned `thinking` title fixed and
+rolls the raw displayable thinking tail below it; completed-history presentation remains separate
+#298 scope.

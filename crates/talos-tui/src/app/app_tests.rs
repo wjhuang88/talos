@@ -1140,16 +1140,19 @@ fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
 }
 
 #[test]
-fn parsed_thinking_title_renders_below_the_fixed_thinking_title() {
+fn model_generated_heading_does_not_hide_newer_thinking_content() {
     let text = preview_text_for_state(
         None,
         None,
-        Some("raw details\n\n**Short title**\n"),
+        Some("raw details\n\n**Short title**\n\nnewest detail"),
         true,
         "",
         0,
     );
-    assert_eq!(text, "thinking: Short title");
+    assert_eq!(
+        text,
+        "thinking: raw details\n\n**Short title**\n\nnewest detail"
+    );
     let component = crate::scrollback::PreviewComponent {
         padding: " ⠋ ",
         text: &text,
@@ -1158,10 +1161,11 @@ fn parsed_thinking_title_renders_below_the_fixed_thinking_title() {
         thinking_label_frame: Some(0),
         max_height: crate::scrollback::MAX_PREVIEW_LINES,
     };
-    assert_eq!(component.height_hint(80), 2);
+    assert_eq!(component.height_hint(80), 6);
     let plan = component.plan(80);
     assert_eq!(plan.rows[0].content, "thinking");
-    assert_eq!(plan.rows[1].content, "Short title");
+    assert_eq!(plan.rows[1].content, "raw details");
+    assert_eq!(plan.rows[5].content, "newest detail");
 }
 
 // --- TUI-028: Stale preview clear ---
