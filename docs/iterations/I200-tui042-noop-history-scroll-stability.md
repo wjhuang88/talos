@@ -92,3 +92,17 @@ Kinetic scrolling, gesture accumulation and mouse hit testing require separate o
 ## Retrospective
 
 Pending execution.
+
+## 2026-08-18 Claim Preparation Checkpoint
+
+Claim preparation starts from exact `main@4acb896e5a76253c50aa2075517edd8b0e53a7f9` after
+I199/TUI-041 reached Complete/Closed and Issue #69 closed. No Active or Review iteration exists.
+I189 remains Planned/Claimed and unactivated; I197, I198, I200, I201, I206, I207, I208 and I210
+remain Planned/Unclaimed; I164 remains Paused. T3/#59 remains Blocked in the long-task ledger.
+Archival Draft PRs #120/#121 do not overlap this slice, and no open claim or implementation PR owns
+TUI-042/I200.
+
+The proposed claim is limited to the published no-op history-scroll state transition and obsolete
+anchor normalization scope. This governance branch contains no Rust/Cargo or implementation test
+change. `Claim State: Unclaimed` remains effective until a finalized Claimed record with the actual
+governance PR number reaches `main`; no implementation branch may be created before that merge.

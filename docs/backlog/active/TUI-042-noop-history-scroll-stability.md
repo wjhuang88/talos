@@ -89,3 +89,12 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 Gesture/kinetic enhancements require a separate product Story.
+
+## 2026-08-18 Claim Preparation Checkpoint
+
+I199/TUI-041 is Complete/Closed and its preview-capacity behavior is now available to the I200
+validation matrix. Exact claim-preparation base is
+`main@4acb896e5a76253c50aa2075517edd8b0e53a7f9`; Issue #79 remains open and no overlapping open PR
+owns this state-transition correction. The proposed work slice preserves the published acceptance
+and exclusions. It does not authorize implementation until the finalized I200 claim reaches
+`main`, and it does not transfer TUI-045, TUI-043, provider, persistence or release authority.
