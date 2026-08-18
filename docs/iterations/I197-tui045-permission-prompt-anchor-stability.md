@@ -1,6 +1,6 @@
 # Iteration I197: Permission Prompt Layout Anchor Stability
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-14
 > Planned objective: keep the inline permission prompt adjacent to the current interaction while
 > preserving the logical viewport/composer anchor and prior tail-follow state across prompt open,
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
+| Work Slice | I197/TUI-045 only: implement the bounded permission-prompt logical anchor/layout correction, focused tests and real-terminal evidence while preserving all permission semantics and request identity. No policy, persistence, broad renderer or release work. |
+| Claimed At | 2026-08-19 |
 | Source Issue | #125 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #304 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #304 proposes this claim from `main@99645e78`; it is ineffective before merge. No independent reviewer is currently available for this non-security planning claim. Exact-head CI, both governance validators, merge-time CAS and no blocking feedback remain required; protected permission/security scope is non-deferrable. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After the I200 deferred-validation disposition reaches `main`, establish an effective claim; create the implementation branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
+| Last Updated | 2026-08-19 |
+| Handoff / Release Condition | Claim #304 must merge before I197 is effective; create the implementation branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
 
 ## Published Baseline
 
@@ -81,9 +81,9 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. This planned iteration remains Unclaimed and follows I196/I188
-disposition in the mainline priority long task; that order is coordination, not implementation
-authority.
+I197 activation is proposed through claim PR #304 from `main@99645e78`; the claim and Active
+status become effective only after that PR reaches `main`. No implementation branch or code
+authority exists in this governance slice.
 
 ## Verification Evidence
 

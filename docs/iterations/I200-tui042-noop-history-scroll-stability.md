@@ -24,7 +24,7 @@
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive the published implementation review or terminal walkthrough acceptance. |
 | Implementation PR | #301 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 proposes that, on merge, I200 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
+| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 merged as `99645e78`; I200 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
 
 ## Published Baseline
 
