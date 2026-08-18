@@ -131,3 +131,11 @@ token usage continued growing while the preview remained frozen on the latest st
 heading, then the complete reasoning appeared at once in history. The fixed Talos-owned `thinking`
 title now replaces that extractor in the live preview, and the bounded body always follows the raw
 displayable thinking tail. This changes no reasoning archive, provider or persistence boundary.
+
+## 2026-08-18 Maintainer-Approved Height Variance
+
+After native-terminal inspection, the maintainer increased the bounded preview maximum from the
+published six rows to ten rows so the rolling thinking body retains more immediately useful
+context. This is an explicit, size-S variance within the same bounded-preview objective. Composer,
+required-panel and constrained-terminal compression priorities remain unchanged; the preview still
+shrinks below ten rows when those higher-priority controls need space.

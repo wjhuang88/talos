@@ -1132,9 +1132,9 @@ fn preview_plan_preserves_newlines_crlf_blank_and_trailing_rows() {
 }
 
 #[test]
-fn preview_plan_caps_at_six_and_keeps_semantic_head_and_newest_tail() {
+fn preview_plan_caps_at_configured_limit_and_keeps_semantic_head_and_newest_tail() {
     let plan = preview_component(
-        "row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7",
+        "row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10\nrow11",
         MAX_PREVIEW_LINES,
     )
     .plan(20);
@@ -1143,8 +1143,13 @@ fn preview_plan_caps_at_six_and_keeps_semantic_head_and_newest_tail() {
         .iter()
         .map(|row| row.content.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(plan.natural_height, 8);
-    assert_eq!(content, ["row0", "…row3", "row4", "row5", "row6", "row7"]);
+    assert_eq!(plan.natural_height, 12);
+    assert_eq!(
+        content,
+        [
+            "row0", "…row3", "row4", "row5", "row6", "row7", "row8", "row9", "row10", "row11"
+        ]
+    );
     assert!(plan.clipped_before);
     assert!(plan.rows[0].semantic_first);
     assert!(plan.rows[1].clipped_marker);
@@ -1154,7 +1159,7 @@ fn preview_plan_caps_at_six_and_keeps_semantic_head_and_newest_tail() {
 fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
     let component = PreviewComponent {
         padding: " ⠋ ",
-        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10",
         spinner_color: Some(ratatui::style::Color::Cyan),
         text_color: None,
         thinking_label_frame: Some(0),
@@ -1167,10 +1172,12 @@ fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
         .map(|row| row.content.as_str())
         .collect::<Vec<_>>();
 
-    assert_eq!(plan.natural_height, 8);
+    assert_eq!(plan.natural_height, 12);
     assert_eq!(
         content,
-        ["thinking", "…row2", "row3", "row4", "row5", "row6"]
+        [
+            "thinking", "…row2", "row3", "row4", "row5", "row6", "row7", "row8", "row9", "row10"
+        ]
     );
     assert!(plan.clipped_before);
     assert!(plan.rows[0].semantic_first);
@@ -1182,7 +1189,7 @@ fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
 fn thinking_preview_dims_only_the_embedded_clipping_marker() {
     let component = PreviewComponent {
         padding: " ⠋ ",
-        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10",
         spinner_color: Some(ratatui::style::Color::Cyan),
         text_color: None,
         thinking_label_frame: Some(0),

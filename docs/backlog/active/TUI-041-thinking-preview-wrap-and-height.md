@@ -131,3 +131,9 @@ title extractor could freeze the live body on one model-generated heading even w
 tokens continued arriving. The live preview now keeps the Talos-owned `thinking` title fixed and
 rolls the raw displayable thinking tail below it; completed-history presentation remains separate
 #298 scope.
+
+## 2026-08-18 Maintainer-Approved Height Variance
+
+Native-terminal inspection changed the bounded maximum from six rows to ten. The preview continues
+to yield to composer and required-panel capacity on constrained terminals; this variance does not
+authorize configurable height, keyboard scrolling or a full thinking panel.

@@ -122,7 +122,7 @@ pub(crate) struct PreviewComponent<'a> {
     pub(crate) max_height: u16,
 }
 
-pub(crate) const MAX_PREVIEW_LINES: u16 = 6;
+pub(crate) const MAX_PREVIEW_LINES: u16 = 10;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreviewLayoutRow {
