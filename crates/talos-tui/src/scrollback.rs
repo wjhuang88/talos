@@ -119,52 +119,227 @@ pub(crate) struct PreviewComponent<'a> {
     pub(crate) spinner_color: Option<Color>,
     pub(crate) text_color: Option<Color>,
     pub(crate) thinking_label_frame: Option<usize>,
+    pub(crate) max_height: u16,
+}
+
+pub(crate) const MAX_PREVIEW_LINES: u16 = 6;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PreviewLayoutRow {
+    pub(crate) prefix: String,
+    pub(crate) content: String,
+    pub(crate) semantic_first: bool,
+    pub(crate) clipped_marker: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PreviewLayoutPlan {
+    pub(crate) rows: Vec<PreviewLayoutRow>,
+    pub(crate) natural_height: u16,
+    pub(crate) clipped_before: bool,
+}
+
+impl PreviewComponent<'_> {
+    pub(crate) fn plan(&self, width: u16) -> PreviewLayoutPlan {
+        use unicode_width::UnicodeWidthStr;
+
+        let max_height = self.max_height.min(MAX_PREVIEW_LINES);
+        let active = !self.text.is_empty() || self.spinner_color.is_some();
+        if !active || width == 0 || max_height == 0 {
+            return PreviewLayoutPlan::default();
+        }
+
+        let width = width as usize;
+        let padding_width = self.padding.width().min(width);
+        let prefix = take_display_prefix(self.padding, padding_width);
+        let continuation_prefix = " ".repeat(padding_width);
+        let content_width = width.saturating_sub(padding_width);
+
+        // At widths narrower than the semantic prefix there is no safe content
+        // column. Keep the prefix bounded and avoid allowing a wide glyph to
+        // spill into a neighboring component.
+        if content_width == 0 {
+            return PreviewLayoutPlan {
+                rows: vec![PreviewLayoutRow {
+                    prefix,
+                    content: String::new(),
+                    semantic_first: true,
+                    clipped_marker: false,
+                }],
+                natural_height: 1,
+                clipped_before: false,
+            };
+        }
+
+        let visual_rows = preview_visual_rows(self.text, content_width);
+        let natural_height = visual_rows.len().min(u16::MAX as usize) as u16;
+        let visible = capped_preview_rows(&visual_rows, content_width, max_height as usize);
+        let clipped_before =
+            visual_rows.len() > visible.len() || visible.iter().any(|(_, clipped)| *clipped);
+        let rows = visible
+            .into_iter()
+            .enumerate()
+            .map(|(index, (content, clipped_marker))| PreviewLayoutRow {
+                prefix: if index == 0 {
+                    prefix.clone()
+                } else {
+                    continuation_prefix.clone()
+                },
+                content,
+                semantic_first: index == 0 && !clipped_marker,
+                clipped_marker,
+            })
+            .collect();
+
+        PreviewLayoutPlan {
+            rows,
+            natural_height,
+            clipped_before,
+        }
+    }
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 {
-        1
+    fn height_hint(&self, width: u16) -> u16 {
+        self.plan(width).rows.len().min(u16::MAX as usize) as u16
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let line = self.text.split('\n').next_back().unwrap_or("");
+        let plan = self.plan(area.width);
+        if plan.rows.is_empty() {
+            return;
+        }
+
         let text_color = self.text_color.unwrap_or(semantic::PREVIEW_FG);
-        if let Some(color) = self.spinner_color {
-            let full = format!("{}{}", self.padding, line);
-            let display = truncate_end_to_width(&full, area.width);
-            let padding_len = self.padding.chars().count();
-            let (pad_part, text_part) = display.split_at(
-                display
-                    .char_indices()
-                    .nth(padding_len)
-                    .map(|(i, _)| i)
-                    .unwrap_or(display.len()),
-            );
-            frame.render_widget(
-                Paragraph::new(Line::from(preview_line_spans(
-                    pad_part,
-                    text_part,
-                    Some(color),
+        let lines = plan
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                let padding_color = (index == 0).then_some(self.spinner_color).flatten();
+                if row.clipped_marker {
+                    return Line::from(vec![
+                        Span::styled(
+                            row.prefix.clone(),
+                            Style::default().fg(padding_color.unwrap_or(text_color)),
+                        ),
+                        Span::styled(row.content.clone(), Style::default().fg(semantic::DIM_TEXT)),
+                    ]);
+                }
+                Line::from(preview_line_spans(
+                    &row.prefix,
+                    &row.content,
+                    padding_color,
                     text_color,
-                    self.thinking_label_frame,
-                ))),
-                area,
+                    row.semantic_first
+                        .then_some(self.thinking_label_frame)
+                        .flatten(),
+                ))
+            })
+            .collect::<Vec<_>>();
+        debug_assert_eq!(lines.len(), self.height_hint(area.width) as usize);
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+}
+
+fn preview_visual_rows(text: &str, width: usize) -> Vec<String> {
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    normalized
+        .split('\n')
+        .flat_map(|line| wrap_preview_line(line, width))
+        .collect()
+}
+
+fn wrap_preview_line(text: &str, width: usize) -> Vec<String> {
+    use unicode_width::UnicodeWidthChar;
+
+    debug_assert!(width > 0);
+    if text.is_empty() {
+        return vec![String::new()];
+    }
+
+    let mut rows = Vec::new();
+    let mut current = String::new();
+    let mut current_width = 0usize;
+    for ch in text.chars() {
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if char_width > width {
+            if current_width > 0 {
+                rows.push(std::mem::take(&mut current));
+                current_width = 0;
+            } else {
+                current.clear();
+            }
+            rows.push("…".to_string());
+            continue;
+        }
+        if current_width + char_width > width && !current.is_empty() {
+            rows.push(std::mem::take(&mut current));
+            current_width = 0;
+        }
+        current.push(ch);
+        current_width += char_width;
+    }
+    if !current.is_empty() || rows.is_empty() {
+        rows.push(current);
+    }
+    rows
+}
+
+fn capped_preview_rows(
+    rows: &[String],
+    content_width: usize,
+    max_rows: usize,
+) -> Vec<(String, bool)> {
+    if rows.len() <= max_rows {
+        return rows.iter().cloned().map(|row| (row, false)).collect();
+    }
+
+    let tail = rows.last().cloned().unwrap_or_default();
+    match max_rows {
+        0 => Vec::new(),
+        1 => vec![(clipped_tail(&tail, content_width), true)],
+        2 => vec![
+            (rows[0].clone(), false),
+            (clipped_tail(&tail, content_width), true),
+        ],
+        _ => {
+            let tail_count = max_rows - 2;
+            let mut visible = Vec::with_capacity(max_rows);
+            visible.push((rows[0].clone(), false));
+            visible.push(("…".to_string(), true));
+            visible.extend(
+                rows[rows.len() - tail_count..]
+                    .iter()
+                    .cloned()
+                    .map(|row| (row, false)),
             );
-        } else {
-            let full = format!("{}{}", self.padding, line);
-            let display = truncate_end_to_width(&full, area.width);
-            frame.render_widget(
-                Paragraph::new(Line::from(preview_line_spans(
-                    "",
-                    &display,
-                    None,
-                    text_color,
-                    self.thinking_label_frame,
-                ))),
-                area,
-            );
+            visible
         }
     }
+}
+
+fn clipped_tail(tail: &str, width: usize) -> String {
+    if width <= 1 {
+        return "…".to_string();
+    }
+    format!("…{}", truncate_end_to_width(tail, (width - 1) as u16))
+}
+
+fn take_display_prefix(text: &str, max_width: usize) -> String {
+    use unicode_width::UnicodeWidthChar;
+
+    let mut result = String::new();
+    let mut width = 0usize;
+    for ch in text.chars() {
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + char_width > max_width {
+            break;
+        }
+        result.push(ch);
+        width += char_width;
+    }
+    result
 }
 
 pub(crate) fn preview_line_spans<'a>(
@@ -271,29 +446,34 @@ pub(crate) struct QueuePlan {
 /// Returned by `compress_layout` to guide component construction.
 pub(crate) struct CompressedLayout {
     pub(crate) panel_max_height: u16,
+    pub(crate) preview_max_height: u16,
     pub(crate) queue_max_rows: u16,
     pub(crate) input_max_height: u16,
 }
 
 /// Allocate the height remaining after fixed viewport components.
 ///
-/// Priority: modal panels (approval/credential/slash) > composer (minimum one row
-/// whenever the budget permits) > queue preview. The returned allocations always
-/// sum to no more than `content_budget`.
+/// Priority: modal panels (approval/credential/slash) > natural composer >
+/// bounded live preview > queue preview. The returned allocations always sum
+/// to no more than `content_budget`.
 pub(crate) fn compress_layout(
     content_budget: u16,
     panel_natural: u16,
     composer_natural: u16,
+    preview_natural: u16,
     queue_natural: u16,
 ) -> CompressedLayout {
     let composer_floor = u16::from(composer_natural > 0 && content_budget > 0);
     let panel_max_height = panel_natural.min(content_budget.saturating_sub(composer_floor));
     let after_panel = content_budget.saturating_sub(panel_max_height);
     let input_max_height = composer_natural.min(after_panel);
-    let queue_max_rows = queue_natural.min(after_panel.saturating_sub(input_max_height));
+    let after_input = after_panel.saturating_sub(input_max_height);
+    let preview_max_height = preview_natural.min(after_input);
+    let queue_max_rows = queue_natural.min(after_input.saturating_sub(preview_max_height));
 
     CompressedLayout {
         panel_max_height,
+        preview_max_height,
         queue_max_rows,
         input_max_height,
     }

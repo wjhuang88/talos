@@ -38,12 +38,13 @@ impl Tui {
             .as_ref()
             .filter(|_| status.is_processing && hold_status.is_none())
             .map(|_| self.processing_frame);
-        let preview = crate::scrollback::PreviewComponent {
+        let mut preview = crate::scrollback::PreviewComponent {
             padding: &preview_padding,
             text: &preview_text,
             spinner_color,
             text_color: preview_text_color,
             thinking_label_frame,
+            max_height: crate::scrollback::MAX_PREVIEW_LINES,
         };
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
@@ -101,7 +102,7 @@ impl Tui {
         };
         let status_comp = crate::scrollback::StatusComponent { status, width };
 
-        let preview_h = if is_startup {
+        let preview_natural = if is_startup {
             0
         } else {
             preview.height_hint(width)
@@ -116,8 +117,7 @@ impl Tui {
         }
         .height_hint(width);
         let modal_natural = bottom_panel.height_hint(width);
-        let fixed_heights = preview_h
-            + tips_h
+        let fixed_heights = tips_h
             + input_pad_top.height_hint(width)
             + input_pad_bot.height_hint(width)
             + status_comp.height_hint(width);
@@ -133,9 +133,11 @@ impl Tui {
             content_budget,
             modal_natural,
             input_natural,
+            preview_natural,
             queue_natural,
         );
         bottom_panel.max_height = compressed.panel_max_height;
+        preview.max_height = compressed.preview_max_height;
 
         let input = crate::scrollback::InputComponent {
             state,
@@ -148,8 +150,10 @@ impl Tui {
         };
 
         let actual_input_h = input.height_hint(width);
+        let preview_h = preview.height_hint(width);
         // `bottom_panel_placement` adds its third argument itself, so this base
-        // deliberately excludes the panel height.
+        // deliberately excludes the panel height. Preview is also excluded so
+        // token-by-token growth cannot flip an open panel between placements.
         let base_height = fixed_heights + actual_input_h + queue.height_hint(width);
         let menu_placement = crate::scrollback::bottom_panel_placement(
             screen_size.height,

@@ -12,6 +12,7 @@ use crate::app::{
 };
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::history_projection::{HistoryScrollMode, HistoryScrollState, project_history};
+use crate::inline_terminal::ViewportComponent;
 use crate::scrollback;
 use crate::state::{ApprovalState, CredentialField, CtrlCState, PanelKind, TuiState, WizardStep};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
@@ -1138,6 +1139,28 @@ fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
     );
 }
 
+#[test]
+fn parsed_thinking_title_stays_a_single_preview_row() {
+    let text = preview_text_for_state(
+        None,
+        None,
+        Some("raw details\n\n**Short title**\n"),
+        true,
+        "",
+        0,
+    );
+    assert_eq!(text, "thinking: Short title");
+    let component = crate::scrollback::PreviewComponent {
+        padding: " ⠋ ",
+        text: &text,
+        spinner_color: Some(semantic::PROCESSING_SPINNER[0]),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: crate::scrollback::MAX_PREVIEW_LINES,
+    };
+    assert_eq!(component.height_hint(80), 1);
+}
+
 // --- TUI-028: Stale preview clear ---
 
 #[test]
@@ -1857,6 +1880,35 @@ fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crat
 }
 
 #[test]
+fn preview_height_changes_preserve_follow_tail_and_anchored_history_modes() {
+    let tui = tui_with_projected_history(10, 10);
+
+    let follow_large = project_history(&tui.transcript, 80, 10, &HistoryScrollState::follow_tail());
+    let follow_small = project_history(&tui.transcript, 80, 6, &HistoryScrollState::follow_tail());
+    let follow_restored =
+        project_history(&tui.transcript, 80, 10, &HistoryScrollState::follow_tail());
+    assert_eq!(follow_large.visible_start, 20);
+    assert_eq!(follow_small.visible_start, 24);
+    assert_eq!(follow_restored.visible_start, follow_large.visible_start);
+
+    let anchor = follow_large
+        .anchor_at(follow_large.visible_start)
+        .expect("visible history row should expose an anchor");
+    let mut anchored = HistoryScrollState::follow_tail();
+    anchored.anchor(anchor, 0);
+    let anchored_large = project_history(&tui.transcript, 80, 10, &anchored);
+    let anchored_small = project_history(&tui.transcript, 80, 6, &anchored);
+    let anchored_restored = project_history(&tui.transcript, 80, 10, &anchored);
+    assert_eq!(anchored_large.visible_start, 20);
+    assert_eq!(anchored_small.visible_start, anchored_large.visible_start);
+    assert_eq!(
+        anchored_restored.visible_start,
+        anchored_large.visible_start
+    );
+    assert!(matches!(anchored.mode, HistoryScrollMode::Anchored { .. }));
+}
+
+#[test]
 fn entry_point_page_up_uses_history_rect_height() {
     let mut tui = tui_with_projected_history(4, 10);
     assert_eq!(tui.last_history_projection.visible_start, 26);
@@ -2001,6 +2053,39 @@ fn full_frame_renderer_handles_extreme_terminal_sizes() {
         tui.draw_frame()
             .unwrap_or_else(|error| panic!("{width}x{height}: {error}"));
     }
+}
+
+#[test]
+fn full_frame_multiline_preview_preserves_interactive_controls_at_all_sizes() {
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.thinking_preview = Some(
+        "first preview row with a long ASCII suffix\n第二行中文 preview\nthird\nfourth\nfifth\nsixth\nnewest"
+            .to_string(),
+    );
+    state.input_append_str("composer one\ncomposer two\ncomposer three");
+    state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+    let mut tui = crate::app::Tui::for_test(state, None);
+
+    for (width, height) in [(80, 24), (20, 5), (10, 3), (4, 2), (1, 1), (0, 0)] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(width, height));
+        tui.draw_frame()
+            .unwrap_or_else(|error| panic!("{width}x{height}: {error}"));
+        if let Some(cursor) = tui.terminal.test_cursor_position() {
+            assert!(cursor.x < width && cursor.y < height);
+        }
+    }
+
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("restored 80x24 preview frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("thinking: first preview"));
+    assert!(rendered.contains("newest"));
+    assert!(rendered.contains("Add custom provider"));
+    assert!(rendered.contains("composer one"));
+    assert!(rendered.contains("composer three"));
 }
 
 #[test]
