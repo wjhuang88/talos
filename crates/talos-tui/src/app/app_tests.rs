@@ -1883,6 +1883,10 @@ fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crat
         &HistoryScrollState::follow_tail(),
     );
     tui.last_history_viewport_height = viewport_height;
+    tui.last_frame_history_start = tui
+        .last_history_projection
+        .total_rows
+        .saturating_sub(usize::from(viewport_height));
     tui
 }
 
@@ -1944,6 +1948,249 @@ fn entry_point_mouse_wheel_scrolls_history_without_browsing_composer_history() {
     tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollDown));
     assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
     assert_eq!(tui.state.input_buffer, "live draft");
+}
+
+#[test]
+fn non_scrollable_mouse_wheel_is_a_full_frame_noop() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.state.input_history = vec!["older input".into()];
+    tui.state.input_append_str("first draft line\nsecond line");
+    tui.state.input_cursor_left();
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::Assistant,
+            text: "short conversation".into(),
+        },
+    ));
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("short conversation frame");
+    assert!(
+        tui.last_splash_row_count + tui.last_history_projection.total_rows
+            <= usize::from(tui.last_history_viewport_height)
+    );
+
+    let before_text = tui.terminal.test_rendered_text();
+    let before_cursor = tui.terminal.test_cursor_position();
+    let before_start = tui.last_frame_history_start;
+    let before_input = tui.state.input_buffer.clone();
+    let before_input_cursor = tui.state.cursor_byte_pos();
+    let before_history_cursor = tui.state.history_cursor;
+
+    for kind in [
+        MouseEventKind::ScrollUp,
+        MouseEventKind::ScrollDown,
+        MouseEventKind::ScrollUp,
+        MouseEventKind::ScrollDown,
+    ] {
+        tui.handle_input_event(&mouse_scroll(kind));
+        tui.draw_frame().expect("no-op wheel frame");
+        assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+        assert_eq!(tui.history_prefix_start, None);
+        assert_eq!(tui.last_frame_history_start, before_start);
+        assert_eq!(tui.terminal.test_cursor_position(), before_cursor);
+        assert_eq!(tui.terminal.test_rendered_text(), before_text);
+        assert_eq!(tui.state.input_buffer, before_input);
+        assert_eq!(tui.state.cursor_byte_pos(), before_input_cursor);
+        assert_eq!(tui.state.history_cursor, before_history_cursor);
+    }
+}
+
+#[test]
+fn frame_history_scroll_boundaries_are_idempotent() {
+    let mut tui = tui_with_projected_history(10, 10);
+    let first = tui
+        .last_history_projection
+        .first_anchor()
+        .expect("history starts with an anchor");
+    tui.history_scroll.anchor(first, 0);
+    tui.last_history_projection = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    tui.last_frame_history_start = 0;
+    let top_anchor = tui.history_scroll.clone();
+
+    for _ in 0..20 {
+        tui.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
+        assert_eq!(tui.history_scroll, top_anchor);
+    }
+
+    tui.history_scroll.jump_to_end();
+    tui.last_history_projection =
+        project_history(&tui.transcript, 80, 10, &HistoryScrollState::follow_tail());
+    tui.last_frame_history_start = 20;
+    for _ in 0..20 {
+        tui.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, 10);
+        assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+        assert_eq!(tui.history_prefix_start, None);
+    }
+}
+
+#[test]
+fn one_row_overflow_anchors_and_returns_to_follow_tail() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for index in 0..11 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("row-{index:02}"),
+                None,
+            )));
+    }
+    tui.last_history_projection =
+        project_history(&tui.transcript, 80, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_viewport_height = 10;
+    tui.last_frame_history_start = 1;
+
+    tui.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+
+    tui.last_frame_history_start = 0;
+    tui.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, 10);
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+}
+
+#[test]
+fn exact_fit_frame_history_rejects_noop_anchor_transitions() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for text in ["alpha", "beta"] {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+    }
+    tui.last_history_projection =
+        project_history(&tui.transcript, 20, 4, &HistoryScrollState::follow_tail());
+    tui.last_splash_row_count = 2;
+    tui.last_history_viewport_height = 4;
+    tui.last_frame_history_start = 0;
+
+    tui.scroll_frame_history_up(MOUSE_HISTORY_SCROLL_ROWS);
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+
+    tui.scroll_frame_history_down(MOUSE_HISTORY_SCROLL_ROWS, 4);
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+}
+
+#[test]
+fn anchored_history_that_fits_after_resize_returns_to_inline_follow_tail() {
+    let mut tui = startup_tui_at(40, 14);
+    for index in 0..30 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("history row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("overflow frame");
+    assert!(
+        tui.last_splash_row_count + tui.last_history_projection.total_rows
+            > usize::from(tui.last_history_viewport_height)
+    );
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("anchored frame");
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(120, 80));
+    tui.handle_input_event(&Event::Resize(120, 80));
+    tui.draw_frame().expect("resized frame");
+
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+    assert_eq!(tui.last_history_projection.visible_start, 0);
+    assert_eq!(
+        usize::from(tui.last_history_viewport_height),
+        tui.last_splash_row_count + tui.last_history_projection.total_rows,
+        "the same frame should restore the natural inline history cap"
+    );
+}
+
+#[test]
+fn cjk_reflow_that_fits_clears_obsolete_anchor() {
+    let mut tui = startup_tui_at(20, 14);
+    tui.handle_ui_output(talos_conversation::UiOutput::Content(
+        talos_conversation::ContentOutput::Block {
+            source: MessageSource::Assistant,
+            text: "中文历史内容用于验证宽度变化后折行收缩".repeat(8),
+        },
+    ));
+    tui.commit_pending_transcript()
+        .expect("commit CJK transcript");
+    tui.draw_frame().expect("narrow overflow frame");
+    assert!(
+        tui.last_splash_row_count + tui.last_history_projection.total_rows
+            > usize::from(tui.last_history_viewport_height)
+    );
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("narrow anchored frame");
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(160, 40));
+    tui.handle_input_event(&Event::Resize(160, 40));
+    tui.draw_frame().expect("wide reflow frame");
+
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+    assert_eq!(tui.last_history_projection.visible_start, 0);
+}
+
+#[test]
+fn preview_shrink_that_fits_clears_obsolete_anchor() {
+    let mut state = TuiState::new();
+    state.status.is_processing = true;
+    state.thinking_preview = Some(
+        (0..12)
+            .map(|index| format!("thinking preview row {index:02}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let mut tui = crate::app::Tui::for_test(state, None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    for index in 0..2 {
+        tui.handle_ui_output(talos_conversation::UiOutput::Content(
+            talos_conversation::ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: format!("history row {index:02}"),
+            },
+        ));
+    }
+    tui.commit_pending_transcript().expect("commit transcript");
+    tui.draw_frame().expect("expanded preview frame");
+    assert!(
+        tui.last_splash_row_count + tui.last_history_projection.total_rows
+            > usize::from(tui.last_history_viewport_height),
+        "expanded preview should make the frame history scrollable"
+    );
+
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("preview anchored frame");
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+
+    tui.state.thinking_preview = None;
+    tui.state.status.is_processing = false;
+    tui.draw_frame().expect("cleared preview frame");
+
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+    assert_eq!(tui.last_history_projection.visible_start, 0);
 }
 
 #[test]
