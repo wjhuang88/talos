@@ -21,7 +21,8 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{
-    HistoryProjection, HistoryProjectionCache, HistoryScrollState, HistorySelectionPoint,
+    HistoryProjection, HistoryProjectionCache, HistoryScrollMode, HistoryScrollState,
+    HistorySelectionPoint,
 };
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
@@ -157,6 +158,13 @@ pub struct Tui {
     first_message_dispatched: bool,
     selection: Option<SelectionState>,
     dashboard_availability: Option<crate::splash::DashboardAvailability>,
+    approval_viewport_snapshot: Option<ApprovalViewportSnapshot>,
+}
+
+#[derive(Clone, Debug)]
+struct ApprovalViewportSnapshot {
+    history_scroll: HistoryScrollState,
+    history_prefix_start: Option<usize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -229,6 +237,7 @@ impl Tui {
             first_message_dispatched: false,
             selection: None,
             dashboard_availability: None,
+            approval_viewport_snapshot: None,
         })
     }
 
@@ -270,6 +279,7 @@ impl Tui {
             first_message_dispatched: false,
             selection: None,
             dashboard_availability: None,
+            approval_viewport_snapshot: None,
         }
     }
 
@@ -468,12 +478,32 @@ impl Tui {
     }
 
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
+        if self.approval_viewport_snapshot.is_none() {
+            self.approval_viewport_snapshot = Some(ApprovalViewportSnapshot {
+                history_scroll: self.history_scroll.clone(),
+                history_prefix_start: self.history_prefix_start,
+            });
+
+            // A FollowTail projection is sized for the pre-prompt natural flow. Once the
+            // approval panel is present, that flow loses rows to the modal. Preserve the
+            // first visible logical row so the triggering context does not jump to the tail.
+            if matches!(self.history_scroll.mode, HistoryScrollMode::FollowTail) {
+                if let Some(anchor) = self.last_history_projection.first_anchor() {
+                    self.history_scroll.anchor(anchor, 0);
+                }
+                self.history_prefix_start = None;
+            }
+        }
         self.state.activate_approval(tool_name, arguments);
         self.state.slash_menu = crate::state::BottomPanelState::open_approval(tool_name, arguments);
     }
 
     pub fn hide_approval(&mut self) {
         self.state.approval_state = ApprovalState::Hidden;
+        if let Some(snapshot) = self.approval_viewport_snapshot.take() {
+            self.history_scroll = snapshot.history_scroll;
+            self.history_prefix_start = snapshot.history_prefix_start;
+        }
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
