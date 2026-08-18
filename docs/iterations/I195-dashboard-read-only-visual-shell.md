@@ -1,6 +1,6 @@
 # Iteration I195: Dashboard Read-Only Visual Shell
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-13
 > Planned objective: deliver one coherent, accessible and responsive user-facing Dashboard shell over
 > the existing GET-only loopback status/history/governance/config/extensions surfaces without adding
@@ -22,13 +22,42 @@
 | Source Issue | None |
 | Governance Claim PR | #212 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent natural-person exact-head review is required before claim merge and before implementation merge. If repository operations use the shared `@wjhuang88` account, the reviewer must explicitly disclose their natural-person identity. This proposed `Claimed` record remains ineffective until PR #212 reaches `main`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Pass exact-head governance/CI checks, obtain independent natural-person approval, repeat merge-time CAS against current `main` and all three lanes, and merge PR #212 to `main`; only then create the isolated implementation worktree/branch from the claim merge commit or a later current `main`. |
+| Authorization Evidence | Claim head `6e3cd2c5c761fc9b241daa85018b963dcb163f38` received independent natural-person approval in comment `5289651455`; PR #212 merged as `f123e534ce864a89eb3cabfc68f4a1518201c2d0`, making the bounded WEB-001-A/I195 claim effective. Implementation merge still requires a fresh exact-head independent natural-person review with shared-account identity disclosure. |
+| Implementation PR | #233 — Draft historical candidate; must be rebuilt from activation PR #288 merge or a later current `main` before implementation review |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | Activation PR #288 must reach `main` after exact-head validation and merge-time CAS. Then rebuild #233 from that activation merge or a later current `main`, pass implementation CI/UX acceptance, obtain independent natural-person exact-head implementation approval, and repeat merge-time CAS before merge. |
 
-The `Claimed` record above is proposed on PR #212. It is not effective ownership until that exact
-record reaches `main`; no Dashboard implementation branch or worktree is authorized beforehand.
+The `Claimed` record above became effective when PR #212 merged as
+`f123e534ce864a89eb3cabfc68f4a1518201c2d0`. The earlier #233 branch-local activation was not
+authoritative because activation had not reached `main`; #233 therefore remains a Draft historical
+implementation candidate until it is rebuilt from the activation merge or a later current `main`.
+
+## Activation Baseline - 2026-08-18
+
+- Activation PR: #288.
+- Exact activation source: `main@4635ef2b4cc9c894f03c0bcbce7e7802730e56ab`.
+- Effective claim: PR #212 merge `f123e534ce864a89eb3cabfc68f4a1518201c2d0`; reviewed claim head
+  `6e3cd2c5c761fc9b241daa85018b963dcb163f38`; independent approval comment `5289651455`.
+- Existing implementation PR #233 is deliberately retained as Draft provenance only. None of its
+  pre-activation heads are merge-authoritative; implementation must be rebuilt from #288's merge or
+  a later current `main` before review.
+- I205/GOV-007 is concurrently Active under claim merge `fd1eaad9` with Draft PR #287. The maintainer
+  explicitly directed this Dashboard development flow to continue on 2026-08-18, authorizing parallel
+  non-overlapping I195 activation. I205 is evidence-only governance work and transfers no authority
+  into Dashboard; I195 transfers no product/runtime/SOP/validator/CI authority into I205.
+- Current non-terminal disposition at activation: I189 and I196 stay Planned/Claimed; I197-I201,
+  I206-I208 and I210 stay Planned/Unclaimed; I164 stays Paused; I205 stays Active in its independent
+  audit slice. I188/I203/I204/I209 remain terminal and are not reopened.
+- Open PR disposition: #287 is the non-overlapping I205 audit Draft; #233 is the same-lane historical
+  Dashboard candidate to rebuild; #120/#121 remain archival recovery Drafts and are not implementation
+  authority. No other open PR owns WEB-001-A/I195.
+- Shared derived views continue to use the established union invariant: start from then-current main,
+  preserve all other lane rows, and change only the factual I195 state plus any wording that would
+  otherwise falsely claim I205 is the sole Active iteration.
+
+The earlier section named `Current Synchronized Claim Baseline` below is preserved as claim-time
+history. This activation baseline is the current execution truth and supersedes its pre-activation
+status statements without rewriting the published planning history.
 
 ## Published Baseline
 
