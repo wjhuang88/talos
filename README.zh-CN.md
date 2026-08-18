@@ -40,10 +40,15 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 - TUI、inline 和 print 运行模式。
 - TUI 模式下默认启动只读 loopback dashboard；成功后会在仅用于显示的 TUI Logo 区域给出
   完整、可复制的纯文本本地 URL。普通宽度占一行，窄宽度会完整换行而不截断；启动失败仍
-  显示临时错误提示。默认仅依赖 `127.0.0.1` 绑定；设置
-  `[dashboard] loopback_only = false` 后要求 bearer token，Logo 条目只显示不含 token 的
-  基础 URL 和 `authentication required`，凭据不会显示或写入日志。当前 TUI 不发送终端
-  超链接转义序列。
+  显示临时错误提示。浏览器中的 `/`、`/status`、`/history`、`/governance`、`/config` 和
+  `/extensions` 共享一套浅色、紧凑、Nord 衍生的只读界面，提供清晰的键盘焦点、响应式布局
+  和确定性的空状态。五个数据路由仅在显式 `Accept: text/html` 时返回渲染页面；未显式请求
+  HTML 时继续保持现有 JSON/纯文本接口。当前第一版 Dashboard UI 仅提供英文界面，双语
+  README 不代表页面本身已经国际化。所有动态内容都会在展示前进行 HTML 转义和输出边界
+  脱敏，配置继续保持掩码。服务仅绑定 `127.0.0.1`，不注册任何写入/动作路由；per-process
+  bearer token 默认关闭。设置 `[dashboard] loopback_only = false` 后要求 token，Logo 条目只
+  显示不含 token 的基础 URL 和 `authentication required`，凭据不会显示或写入日志。当前
+  TUI 不发送终端超链接转义序列。
 - 本地模型配置，密钥显示自动脱敏。
 - 无参数的提供商/模型选择器、自定义兼容提供商向导、受限模型发现和结构化会话切换。
 - 面向目录确认支持视觉输入模型的显式本地图片附件，采用精确路径授权和安全历史摘要。Anthropic 兼容 wire 行为已有 fixture 覆盖；真实 Provider 验证取决于操作者凭据。
