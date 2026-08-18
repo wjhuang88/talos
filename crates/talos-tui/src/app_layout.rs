@@ -69,10 +69,12 @@ fn allocate_heights(total: u16, metrics: ComponentMetrics) -> AllocatedComponent
     let composer_top_pad = take(u16::from(metrics.composer > 0));
     let composer_bottom_pad = take(u16::from(metrics.composer > 0));
     let tips = take(metrics.tips);
-    let preview = take(metrics.preview);
-    let queue = take(metrics.queue);
     let panel_optional = take(metrics.panel_preferred.saturating_sub(panel_required));
     let composer_extra = take(metrics.composer.saturating_sub(composer));
+    let preview_minimum = take(u16::from(metrics.preview > 0));
+    let preview_extra = take(metrics.preview.saturating_sub(preview_minimum));
+    let preview = preview_minimum.saturating_add(preview_extra);
+    let queue = take(metrics.queue);
     let history = match metrics.history_cap {
         Some(cap) => remaining.min(cap),
         None => remaining,
@@ -278,5 +280,28 @@ mod tests {
                 assert!(layout.status.is_some());
             }
         }
+    }
+
+    #[test]
+    fn dynamic_preview_yields_to_full_panel_and_composer_then_queue() {
+        let layout = compute_app_layout(
+            Size::new(80, 14),
+            ComponentMetrics {
+                preview: 6,
+                queue: 4,
+                tips: 1,
+                panel_required: 2,
+                panel_preferred: 4,
+                composer: 3,
+                history_cap: None,
+            },
+            BottomPanelPlacement::AboveInput,
+        );
+
+        assert_eq!(layout.panel.map(|rect| rect.height), Some(4));
+        assert_eq!(layout.composer.map(|rect| rect.height), Some(3));
+        assert_eq!(layout.preview.map(|rect| rect.height), Some(3));
+        assert!(layout.queue.is_none());
+        assert_bounded_and_ordered(layout);
     }
 }

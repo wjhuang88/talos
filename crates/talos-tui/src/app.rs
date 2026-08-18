@@ -620,8 +620,7 @@ pub(crate) fn preview_text_for_state(
     if let Some(thinking) = thinking_preview
         && is_processing
     {
-        let display = crate::scrollback::extract_thinking_title(thinking).unwrap_or(thinking);
-        return format!("thinking: {display}");
+        return format!("thinking: {thinking}");
     }
 
     if matches!(phase, Some(TurnPhase::Connecting)) && is_processing {

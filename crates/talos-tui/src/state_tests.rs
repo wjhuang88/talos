@@ -1037,7 +1037,7 @@ fn truncate_to_display_width_cjk_safe() {
 // ── I145 render tests using Buffer + InlineFrame ────────────────────────────
 
 use crate::inline_terminal::InlineFrame;
-use crate::scrollback::QueuePreviewComponent;
+use crate::scrollback::{MAX_PREVIEW_LINES, PreviewComponent, QueuePreviewComponent};
 
 fn render_queue(
     snapshot: Option<&SteeringQueueSnapshot>,
@@ -1064,6 +1064,298 @@ fn buffer_line(buf: &ratatui::buffer::Buffer, y: u16, width: u16) -> String {
         .collect::<String>()
         .trim_end()
         .to_string()
+}
+
+fn preview_component(text: &str, max_height: u16) -> PreviewComponent<'_> {
+    PreviewComponent {
+        padding: " > ",
+        text,
+        spinner_color: None,
+        text_color: None,
+        thinking_label_frame: None,
+        max_height,
+    }
+}
+
+fn render_preview(text: &str, width: u16, max_height: u16) -> (Buffer, u16) {
+    let component = preview_component(text, max_height);
+    let height = component.height_hint(width);
+    let area = Rect::new(0, 0, width, height.max(1));
+    let mut buffer = Buffer::empty(area);
+    let mut frame = InlineFrame::new(area, &mut buffer);
+    component.render(&mut frame, area);
+    (buffer, height)
+}
+
+#[test]
+fn preview_inactive_height_is_zero() {
+    assert_eq!(preview_component("", MAX_PREVIEW_LINES).height_hint(80), 0);
+}
+
+#[test]
+fn preview_plan_wraps_ascii_with_shared_prefix_width() {
+    let component = preview_component("abcdefgh", MAX_PREVIEW_LINES);
+    let plan = component.plan(8);
+    assert_eq!(plan.natural_height, 2);
+    assert_eq!(plan.rows.len(), 2);
+    assert_eq!(plan.rows[0].prefix, " > ");
+    assert_eq!(plan.rows[0].content, "abcde");
+    assert_eq!(plan.rows[1].prefix, "   ");
+    assert_eq!(plan.rows[1].content, "fgh");
+    assert!(!plan.clipped_before);
+    assert_eq!(component.height_hint(20), 1, "wider resize must shrink");
+    assert_eq!(component.height_hint(8), 2, "narrow resize must grow");
+}
+
+#[test]
+fn preview_plan_wraps_cjk_on_display_cell_boundaries() {
+    let plan = preview_component("你好世界", MAX_PREVIEW_LINES).plan(7);
+    let content = plan
+        .rows
+        .iter()
+        .map(|row| row.content.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(content, ["你好", "世界"]);
+    assert_eq!(plan.natural_height, 2);
+}
+
+#[test]
+fn preview_plan_preserves_newlines_crlf_blank_and_trailing_rows() {
+    let plan = preview_component("one\r\n\r\ntwo\n", MAX_PREVIEW_LINES).plan(20);
+    let content = plan
+        .rows
+        .iter()
+        .map(|row| row.content.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(content, ["one", "", "two", ""]);
+    assert_eq!(plan.natural_height, 4);
+}
+
+#[test]
+fn preview_plan_caps_at_configured_limit_and_keeps_semantic_head_and_newest_tail() {
+    let plan = preview_component(
+        "row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10\nrow11",
+        MAX_PREVIEW_LINES,
+    )
+    .plan(20);
+    let content = plan
+        .rows
+        .iter()
+        .map(|row| row.content.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(plan.natural_height, 12);
+    assert_eq!(
+        content,
+        [
+            "row0", "…row3", "row4", "row5", "row6", "row7", "row8", "row9", "row10", "row11"
+        ]
+    );
+    assert!(plan.clipped_before);
+    assert!(plan.rows[0].semantic_first);
+    assert!(plan.rows[1].clipped_marker);
+}
+
+#[test]
+fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let plan = component.plan(20);
+    let content = plan
+        .rows
+        .iter()
+        .map(|row| row.content.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(plan.natural_height, 12);
+    assert_eq!(
+        content,
+        [
+            "thinking", "…row2", "row3", "row4", "row5", "row6", "row7", "row8", "row9", "row10"
+        ]
+    );
+    assert!(plan.clipped_before);
+    assert!(plan.rows[0].semantic_first);
+    assert!(!plan.rows[1].semantic_first);
+    assert!(plan.rows[1].clipped_marker);
+}
+
+#[test]
+fn thinking_preview_dims_only_the_embedded_clipping_marker() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\nrow10",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let height = component.height_hint(20);
+    let area = Rect::new(0, 0, 20, height);
+    let mut buffer = Buffer::empty(area);
+    let mut frame = InlineFrame::new(area, &mut buffer);
+    component.render(&mut frame, area);
+
+    assert_eq!(buffer[(1, 1)].symbol(), "…");
+    assert_eq!(buffer[(1, 1)].fg, crate::theme::semantic::DIM_TEXT);
+    assert_eq!(buffer[(3, 1)].symbol(), "r");
+    assert_eq!(buffer[(3, 1)].fg, crate::theme::semantic::PREVIEW_FG);
+    assert_eq!(buffer[(3, 2)].fg, crate::theme::semantic::PREVIEW_FG);
+}
+
+#[test]
+fn thinking_preview_compresses_to_title_before_hiding_it() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: latest content",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: 1,
+    };
+    let plan = component.plan(20);
+
+    assert_eq!(plan.natural_height, 2);
+    assert_eq!(plan.rows.len(), 1);
+    assert_eq!(plan.rows[0].content, "thinking");
+    assert!(plan.clipped_before);
+}
+
+#[test]
+fn thinking_preview_with_empty_content_does_not_create_a_blank_body_row() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: ",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let plan = component.plan(20);
+
+    assert_eq!(plan.natural_height, 1);
+    assert_eq!(plan.rows.len(), 1);
+    assert_eq!(plan.rows[0].content, "thinking");
+    assert!(!plan.clipped_before);
+}
+
+#[test]
+fn preview_plan_compressed_to_one_row_marks_and_keeps_tail() {
+    let plan = preview_component("old\nnewest", 1).plan(12);
+    assert_eq!(plan.rows.len(), 1);
+    assert_eq!(plan.rows[0].content, "…newest");
+    assert!(plan.clipped_before);
+}
+
+#[test]
+fn preview_ripple_frame_never_changes_multiline_measurement() {
+    let component_at = |frame| PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: first line that wraps\nsecond line",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(frame),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    assert_eq!(component_at(0).plan(18), component_at(5).plan(18));
+    assert_eq!(
+        component_at(0).height_hint(18),
+        component_at(5).height_hint(18)
+    );
+}
+
+#[test]
+fn preview_spinner_and_thinking_ripple_are_confined_to_first_semantic_row() {
+    let component = PreviewComponent {
+        padding: " ⠋ ",
+        text: "thinking: first row wraps onto another row",
+        spinner_color: Some(ratatui::style::Color::Cyan),
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: MAX_PREVIEW_LINES,
+    };
+    let height = component.height_hint(18);
+    assert!(height > 1);
+    let area = Rect::new(0, 0, 18, height);
+    let mut buffer = Buffer::empty(area);
+    let mut frame = InlineFrame::new(area, &mut buffer);
+    component.render(&mut frame, area);
+
+    assert_eq!(buffer[(1, 0)].fg, ratatui::style::Color::Cyan);
+    assert_eq!(buffer[(1, 1)].fg, crate::theme::semantic::PREVIEW_FG);
+    assert_eq!(
+        buffer[(3, 0)].fg,
+        crate::theme::semantic::THINKING_RIPPLE_SECONDARY
+    );
+    assert_eq!(buffer[(3, 1)].fg, crate::theme::semantic::PREVIEW_FG);
+}
+
+#[test]
+fn preview_render_uses_same_rows_as_height_hint() {
+    let (buffer, height) = render_preview("abcdefgh", 8, MAX_PREVIEW_LINES);
+    assert_eq!(height, 2);
+    assert_eq!(buffer_line(&buffer, 0, 8), " > abcde");
+    assert_eq!(buffer_line(&buffer, 1, 8), "   fgh");
+}
+
+#[test]
+fn preview_very_narrow_widths_are_bounded_and_do_not_panic() {
+    for width in 0..=4 {
+        let component = preview_component("\u{301}你好🙂e\u{301}", MAX_PREVIEW_LINES);
+        let plan = component.plan(width);
+        assert!(plan.rows.len() <= MAX_PREVIEW_LINES as usize);
+        for row in &plan.rows {
+            let rendered = format!("{}{}", row.prefix, row.content);
+            assert!(unicode_width::UnicodeWidthStr::width(rendered.as_str()) <= width as usize);
+        }
+    }
+}
+
+#[test]
+fn preview_buffer_reset_clears_rows_after_shrink_clear_and_resize() {
+    use ratatui::layout::Size;
+
+    let mut terminal = crate::inline_terminal::TerminalSession::test_instance();
+    let narrow = Size::new(8, 6);
+    let multiline = preview_component("abcdefghijklmno", MAX_PREVIEW_LINES);
+    terminal
+        .draw(narrow, |frame| {
+            multiline.render(frame, Rect::new(0, 0, 8, multiline.height_hint(8)));
+        })
+        .expect("multiline preview draw should succeed");
+    assert!(terminal.selected_text((0, 0), (7, 5)).contains("mno"));
+
+    let single = preview_component("short", MAX_PREVIEW_LINES);
+    terminal
+        .draw(narrow, |frame| {
+            single.render(frame, Rect::new(0, 0, 8, single.height_hint(8)));
+        })
+        .expect("single-row preview draw should succeed");
+    let after_shrink = terminal.selected_text((0, 0), (7, 5));
+    assert!(after_shrink.contains("short"));
+    assert!(!after_shrink.contains("mno"));
+
+    let empty = preview_component("", MAX_PREVIEW_LINES);
+    terminal
+        .draw(narrow, |frame| {
+            empty.render(frame, Rect::new(0, 0, 8, empty.height_hint(8)));
+        })
+        .expect("cleared preview draw should succeed");
+    assert_eq!(terminal.selected_text((0, 0), (7, 5)).trim(), "");
+
+    terminal
+        .draw(Size::new(20, 6), |frame| {
+            single.render(frame, Rect::new(0, 0, 20, single.height_hint(20)));
+        })
+        .expect("resized preview draw should succeed");
+    let after_resize = terminal.selected_text((0, 0), (19, 5));
+    assert!(after_resize.contains("short"));
+    assert!(!after_resize.contains("mno"));
 }
 
 #[test]
@@ -1190,7 +1482,7 @@ fn session_boundary_empty_snapshot_produces_zero_height() {
 
 #[test]
 fn compress_layout_no_compression_when_fits() {
-    let r = crate::scrollback::compress_layout(24, 5, 3, 4);
+    let r = crate::scrollback::compress_layout(24, 5, 3, 0, 4);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.queue_max_rows, 4);
     assert_eq!(r.input_max_height, 3);
@@ -1199,7 +1491,7 @@ fn compress_layout_no_compression_when_fits() {
 #[test]
 fn compress_layout_preserves_panel_then_composer_then_queue() {
     // Content budget 10: panel=5 and composer=3 are preserved; queue gets 2.
-    let r = crate::scrollback::compress_layout(10, 5, 3, 6);
+    let r = crate::scrollback::compress_layout(10, 5, 3, 0, 6);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.input_max_height, 3);
     assert_eq!(r.queue_max_rows, 2);
@@ -1208,7 +1500,7 @@ fn compress_layout_preserves_panel_then_composer_then_queue() {
 #[test]
 fn compress_layout_queue_zeroed_before_composer_is_reduced() {
     // Content budget 8: panel=5, composer=3, queue=0.
-    let r = crate::scrollback::compress_layout(8, 5, 5, 6);
+    let r = crate::scrollback::compress_layout(8, 5, 5, 0, 6);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.queue_max_rows, 0);
     assert_eq!(r.input_max_height, 3);
@@ -1217,7 +1509,7 @@ fn compress_layout_queue_zeroed_before_composer_is_reduced() {
 #[test]
 fn compress_layout_composer_never_below_one() {
     // Content budget 7: panel=5, queue=0, composer retains 2 rows.
-    let r = crate::scrollback::compress_layout(7, 5, 10, 6);
+    let r = crate::scrollback::compress_layout(7, 5, 10, 0, 6);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.queue_max_rows, 0);
     assert_eq!(r.input_max_height, 2, "composer must not disappear");
@@ -1226,12 +1518,12 @@ fn compress_layout_composer_never_below_one() {
 #[test]
 fn compress_layout_compresses_panel_only_after_reserving_composer() {
     // Content budget 1: no queue and no panel rows, but composer retains one row.
-    let r = crate::scrollback::compress_layout(6, 5, 10, 6);
+    let r = crate::scrollback::compress_layout(6, 5, 10, 0, 6);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.queue_max_rows, 0);
     assert_eq!(r.input_max_height, 1);
 
-    let r = crate::scrollback::compress_layout(1, 5, 10, 6);
+    let r = crate::scrollback::compress_layout(1, 5, 10, 0, 6);
     assert_eq!(r.panel_max_height, 0);
     assert_eq!(r.queue_max_rows, 0);
     assert_eq!(r.input_max_height, 1);
@@ -1239,10 +1531,48 @@ fn compress_layout_compresses_panel_only_after_reserving_composer() {
 
 #[test]
 fn compress_layout_zero_queue_natural() {
-    let r = crate::scrollback::compress_layout(10, 5, 3, 0);
+    let r = crate::scrollback::compress_layout(10, 5, 3, 0, 0);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.queue_max_rows, 0);
     assert_eq!(r.input_max_height, 3);
+}
+
+#[test]
+fn compress_layout_preserves_panel_and_natural_composer_before_preview() {
+    // Panel and multiline composer retain their natural rows. Preview receives
+    // the remainder and queue is the first optional region removed.
+    let r = crate::scrollback::compress_layout(10, 5, 3, 6, 4);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.input_max_height, 3);
+    assert_eq!(r.preview_max_height, 2);
+    assert_eq!(r.queue_max_rows, 0);
+}
+
+#[test]
+fn compress_layout_preview_expansion_outranks_queue() {
+    let r = crate::scrollback::compress_layout(18, 5, 3, 6, 6);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.input_max_height, 3);
+    assert_eq!(r.preview_max_height, 6);
+    assert_eq!(r.queue_max_rows, 4);
+}
+
+#[test]
+fn panel_placement_ignores_optional_preview_growth() {
+    use crate::scrollback::{BottomPanelPlacement, bottom_panel_placement};
+
+    let screen_height = 12;
+    let base_without_preview = 8;
+    let panel_height = 4;
+    let placement_at_one_preview_row =
+        bottom_panel_placement(screen_height, base_without_preview, panel_height);
+    let placement_at_six_preview_rows =
+        bottom_panel_placement(screen_height, base_without_preview, panel_height);
+    assert_eq!(
+        placement_at_one_preview_row,
+        BottomPanelPlacement::BelowInput
+    );
+    assert_eq!(placement_at_six_preview_rows, placement_at_one_preview_row);
 }
 
 // ── I145 ComponentStack layout verification ──────────────────────────────
@@ -1292,7 +1622,7 @@ fn stack_total_height_with_zero_height_component() {
 fn stack_layout_compressed_queue_and_composer_fit_screen() {
     // Screen=9, fixed=5, so the production content budget is 4.
     // Panel is closed, composer gets 4 rows, and queue is compressed to zero.
-    let compressed = crate::scrollback::compress_layout(4, 0, 5, 4);
+    let compressed = crate::scrollback::compress_layout(4, 0, 5, 0, 4);
     assert_eq!(compressed.queue_max_rows, 0);
     assert_eq!(compressed.input_max_height, 4);
 
@@ -1314,7 +1644,7 @@ fn stack_layout_compressed_queue_and_composer_fit_screen() {
 #[test]
 fn stack_layout_composer_always_at_least_one() {
     // Screen=7, fixed=5, so the production content budget is 2.
-    let compressed = crate::scrollback::compress_layout(2, 0, 10, 6);
+    let compressed = crate::scrollback::compress_layout(2, 0, 10, 0, 6);
     let composer_h = compressed.input_max_height;
     assert!(
         composer_h >= 1,

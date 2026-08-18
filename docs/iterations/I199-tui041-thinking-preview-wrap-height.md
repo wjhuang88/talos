@@ -1,6 +1,6 @@
 # Iteration I199: Thinking Preview Wrap And Bounded Height
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-14
 > Planned objective: render live thinking/stream previews from one display-width-aware plan so
 > multiline content wraps, grows to a bounded cap and shrinks without destabilizing composer,
@@ -21,10 +21,10 @@
 | Source Issue | #69 |
 | Governance Claim PR | #295 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Activation PR #295; effective only after merge to `main`, exact-head CI and independent review. |
-| Implementation PR | Not started |
+| Authorization Evidence | Activation PR #295 exact head `883d5cc1`, CI `32114936912`, independent approval `5325926209`, and claim merge `8127fa57`. |
+| Implementation PR | #297 |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After claim merge, branch only from that merge or later current `main`; obtain exact-head CI, native-terminal evidence, independent review and owner-first closeout. |
+| Handoff / Release Condition | Close only after PR #297 exact-head CI, maintainer native-terminal acceptance, independent review, merge-time CAS and owner-first closeout. |
 
 ## Published Baseline
 
@@ -74,13 +74,23 @@
 
 ## Actual Activation And Execution
 
-I199 is proposed for activation through PR #295. It remains ineffective until that claim merges
-to `main`; it is ordered before I200 to establish the preview-driven viewport-capacity behavior
-that I200 must include in its scroll-bound matrix.
+PR #295 merged as `8127fa57` after exact-head CI `32114936912` and independent approval
+`5325926209`, making the bounded claim effective. The implementation branch started from later
+current `main@df2e6ed6`; commit `938c9edb9b3336e81a3b90232a69e0993574bc69` is submitted as PR
+#297. I199 remains ordered before I200 so the latter can include preview-driven viewport capacity
+in its scroll-bound matrix.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+- `cargo test -p talos-tui --locked`: 536 unit tests, 2 integration tests and 2 doctests passed.
+- `cargo clippy -p talos-tui --all-targets --locked -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+- `git diff --check`: passed before the implementation commit.
+- Isolated local PTY fixture at 80x24 and 40x15 exercised multiline ASCII/CJK wrapping, 1-to-6
+  row growth, clipping marker and newest-tail retention, completion shrink/clear and usable
+  composer/status regions. The fixture used no real provider credentials and was cleaned up.
+- Pending: PR #297 exact-head CI completion, maintainer native-terminal acceptance and independent
+  exact-head review. Agent-run PTY evidence does not substitute for the maintainer gate.
 
 ## Completion Evidence
 
@@ -92,4 +102,40 @@ User-configurable, scrollable or persistent preview behavior requires separate o
 
 ## Retrospective
 
-Pending execution.
+The shared plan removed measurement/render divergence while keeping the correction bounded to the
+existing transient preview. Completion remains pending the external terminal and review gates.
+
+## 2026-08-18 Maintainer Terminal-Acceptance Correction
+
+Maintainer terminal inspection of PR #297 rejected the thinking presentation at head `f00c6e4d`:
+the semantic `thinking` label and its content shared the first row, while clipping consumed a
+standalone marker row that appeared as a persistent separator before the rolling tail. This is an
+in-scope correction of the published semantic-prefix, bounded-tail and clipping requirements, not
+authorization for a full, persistent or keyboard-scrollable thinking panel.
+
+The corrected layout reserves row zero for the animated `thinking` title and uses the remaining
+preview capacity for automatically rolling newest content. When older content is hidden, the
+ellipsis is embedded in the first visible content row instead of consuming a separate row. Generic
+stream previews retain their semantic first row and newest tail under the same embedded-marker
+rule. PR #297 must obtain new exact-head CI, independent review and maintainer terminal acceptance;
+the earlier `f00c6e4d` evidence does not carry forward after this rework.
+
+The first rework build exposed one additional presentation inconsistency during maintainer
+inspection: embedding the clipping marker caused the entire first visible content row to inherit
+the marker's dim color. The follow-up moves `…` into the semantic prefix slot and confines dim
+styling to that marker; content across the rolling boundary keeps one aligned content column and
+the same preview foreground color.
+
+The next terminal run showed a separate visibility defect in the inherited model-title extractor:
+token usage continued growing while the preview remained frozen on the latest standalone Markdown
+heading, then the complete reasoning appeared at once in history. The fixed Talos-owned `thinking`
+title now replaces that extractor in the live preview, and the bounded body always follows the raw
+displayable thinking tail. This changes no reasoning archive, provider or persistence boundary.
+
+## 2026-08-18 Maintainer-Approved Height Variance
+
+After native-terminal inspection, the maintainer increased the bounded preview maximum from the
+published six rows to ten rows so the rolling thinking body retains more immediately useful
+context. This is an explicit, size-S variance within the same bounded-preview objective. Composer,
+required-panel and constrained-terminal compression priorities remain unchanged; the preview still
+shrinks below ten rows when those higher-priority controls need space.
