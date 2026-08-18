@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-18"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "GOV-007/I205 and WORK-001-A/I196 are Complete/Closed through their recorded evidence. TUI-041/I199 is Complete/Closed through Completion Commits `938c9edb`/`558b76d3`/`14bf4e60`/`add84074`/`de24bffd`, PR #297 merge `5fc814b5`, exact-head CI `32138003207`, maintainer terminal acceptance `5328282375` and independent review `5328531254`. I200/#79 is next Planned/Unclaimed; TUI-056/#298 remains separate, and no later TUI, provider, persistence or release authority transfers. I189 remains Planned/Claimed and unactivated."
+current_execution_note: "GOV-007/I205, WORK-001-A/I196 and TUI-041/I199 are Complete/Closed through their recorded evidence. Governance PR #300 proposes TUI-042/I200 as Active/Claimed for the bounded no-op scroll transition and obsolete-anchor normalization slice; it is ineffective before merge, no implementation branch exists, and final natural-person exact-head review plus maintainer terminal acceptance remain mandatory. I197/I201 and TUI-056/#298 remain separate and unclaimed; no provider, persistence or release authority transfers. I189 remains Planned/Claimed and unactivated."
 
 governance:
   skill_name: "agent-project-governance"

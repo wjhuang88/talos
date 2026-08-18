@@ -5,27 +5,27 @@
 | Story ID | TUI-042 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Ready — I200 Planned / Unclaimed |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #79](https://github.com/wjhuang88/talos/issues/79) |
-| Selected Iteration | I200 — Planned / Unclaimed |
+| Selected Iteration | I200 — Active / Claimed |
 | Depends On | TUI-039 completed layout contract; ADR-054; interaction with TUI-041 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | TUI-042/I200 only: correct no-op and real-movement frame-history scroll transitions, normalize impossible anchors after current resize/reflow/projection metrics are known, and validate the published focused/full-frame/native-terminal matrix. Excludes kinetic/pixel scrolling, wheel-step changes, hit testing, renderer redesign, transcript/session mutation, TUI-045, TUI-043, provider, persistence and release work. |
+| Claimed At | 2026-08-18 |
 | Source Issue | #79 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #300 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance PR #300 is ineffective until its finalized exact head passes CI, both validators, independent agent technical review with shared-identity limits disclosed, merge-time CAS and merge to `main`. The unattended claim path does not waive I200's published natural-person implementation review or maintainer terminal walkthrough. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After I199 is dispositioned in the ordered task, establish an effective I200 claim on `main`; implement only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After #300 merges, implement only from that merge or later current `main`; remain Review until the published exact-head review and mouse/touchpad acceptance gates pass. |
 
 ## Identity / Goal / Value
 
@@ -68,8 +68,9 @@ erase I200's independently testable no-op scroll outcome.
 
 ## User-Facing Documentation
 
-Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Refinement.
+Update user or SDK documentation only when observable behavior or a public integration contract
+changes. Do not present this Story as shipped while its claim is proposed or while implementation
+remains Active/Review.
 
 ## Required Reads
 
@@ -98,3 +99,10 @@ validation matrix. Exact claim-preparation base is
 owns this state-transition correction. The proposed work slice preserves the published acceptance
 and exclusions. It does not authorize implementation until the finalized I200 claim reaches
 `main`, and it does not transfer TUI-045, TUI-043, provider, persistence or release authority.
+
+## 2026-08-18 Finalized Claim Proposal
+
+PR #300 records the bounded Claimed work slice and proposes TUI-042/I200 as Active. The proposal is
+not effective until merge to `main`; no implementation branch exists. The single-maintainer claim
+path is limited to governance activation and preserves the published independent natural-person
+implementation review and maintainer mouse/touchpad walkthrough gates.
