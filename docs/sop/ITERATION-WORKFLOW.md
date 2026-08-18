@@ -69,6 +69,9 @@ Issue instead of idling the next non-overlapping child. Apply all of these rules
 - append the exact implementation head and remaining human/manual rows to the tracker;
 - keep this Story and iteration Review, with `Completion Commit: Pending`;
 - record an explicit predecessor disposition before activating the next child;
+- treat the linked Issue as a deferred-validation queue, not as an implementation blocker; a later
+  child may start once its own claim and dependencies are satisfied and the predecessor's machine,
+  technical-review, security and merge gates are terminal;
 - never defer an `AGENTS.md` security-review hard gate;
 - close the source owner only after the cleanup-validation phase records a pass, or create a new
   corrective owner when it fails.
