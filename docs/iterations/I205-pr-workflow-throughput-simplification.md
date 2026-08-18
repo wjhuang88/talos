@@ -61,7 +61,7 @@ infrastructure-only governance Spike and claims no product behavior.
 ## Non-Terminal Coordination Record
 
 - I164 remains Paused.
-- I188, I189, I195 and I196 remain Planned/Claimed and unactivated.
+- I188 is Complete/Closed; I195 is Active/Claimed under Dashboard activation PR #288; I189 and I196 remain Planned/Claimed and unactivated.
 - I197-I201 remain Planned/Unclaimed through the #227 coordination proposal.
 - I205 is scheduled before the long task resumes implementation so accepted simplifications can
   reduce later ceremony; planning does not activate it.
