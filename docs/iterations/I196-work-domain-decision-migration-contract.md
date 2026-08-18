@@ -166,9 +166,23 @@ Paused; I189 Planned/Claimed; I195 Active/Claimed in the separately authorized D
 other iteration is Review. The I195/I196 scopes are explicitly non-overlapping. This activation
 does not authorize Rust, Cargo, persistence, public API, Desktop, Dashboard or TUI implementation.
 
+### 2026-08-18 P0 Decision Packet
+
+The current-state inventory and migration contract are recorded in
+`docs/reference/I196-WORK-001-A-CURRENT-STATE-MIGRATION-CONTRACT.md`; ADR-061 is Proposed and
+selects one Work Graph authority while retaining `talos-session` Todo as the sole current durable
+authority. The packet changes no implementation behavior and leaves P1-P4 separately governed.
+Independent exact-head architecture review and owner acceptance remain pending.
+
 ## Verification Evidence
 
-Pending P0 implementation after claim merge.
+- Current-state inventory and migration contract: `docs/reference/I196-WORK-001-A-CURRENT-STATE-MIGRATION-CONTRACT.md`.
+- Proposed ADR: `docs/decisions/061-canonical-work-domain-and-todo-migration.md`.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`: 0 warnings.
+- `git diff --check`: pass.
+- Changed-path assertion: documentation/governance only; no Rust/Cargo/lockfile/schema/Desktop asset.
+- Independent exact-head architecture review: pending.
 
 ## Completion Evidence
 
