@@ -1,6 +1,6 @@
 # Iteration I199: Thinking Preview Wrap And Bounded Height
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-08-14
 > Planned objective: render live thinking/stream previews from one display-width-aware plan so
 > multiline content wraps, grows to a bounded cap and shrinks without destabilizing composer,
@@ -13,18 +13,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | TUI-041 / I199 only: bounded transient preview layout correction with shared display-width planning, six-row cap, constrained compression, anchor preservation and cleanup. No TUI-042/TUI-045, persistence, provider protocol or release work. |
+| Claimed At | 2026-08-18 |
 | Source Issue | #69 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #295 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Activation PR #295; effective only after merge to `main`, exact-head CI and independent review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | After predecessor disposition, establish an effective I199 claim on `main` and branch only from that claim merge or later current `main`. |
+| Last Updated | 2026-08-18 |
+| Handoff / Release Condition | After claim merge, branch only from that merge or later current `main`; obtain exact-head CI, native-terminal evidence, independent review and owner-first closeout. |
 
 ## Published Baseline
 
@@ -74,8 +74,9 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. I199 remains Unclaimed and is ordered before I200 to establish the
-preview-driven viewport-capacity behavior that I200 must include in its scroll-bound matrix.
+I199 is proposed for activation through PR #295. It remains ineffective until that claim merges
+to `main`; it is ordered before I200 to establish the preview-driven viewport-capacity behavior
+that I200 must include in its scroll-bound matrix.
 
 ## Verification Evidence
 
