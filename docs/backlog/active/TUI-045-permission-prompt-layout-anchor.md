@@ -23,7 +23,7 @@
 | Governance Claim PR | #304 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #304 proposes this bounded claim from `main@99645e78`; it is ineffective before merge. No independent reviewer is currently available for this non-security planning claim. Exact-head CI, both governance validators, merge-time CAS and no blocking feedback remain required; any protected permission/security scope stops and requires independent security review. |
-| Implementation PR | Not started |
+| Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Claim #304 must merge before I197 is effective. Only then create the implementation branch from that merge or later current `main`; do not alter permission semantics. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
@@ -87,5 +87,13 @@ policy or protected crates, its natural-person review and terminal matrix may be
 #302 for I211. TUI-045 remains Review until those rows pass; policy or security-scope expansion
 cannot use this deferral.
 
-The I197 claim is proposed by PR #304 from `main@99645e78`; no implementation branch or product
-code authority exists until that claim reaches `main`.
+The I197 claim became effective through PR #304 merge `0db92cf9`. Implementation PR #305 is open
+from `i197-tui045` at implementation commit `ff4141ca`; it remains presentation/layout-only and
+does not authorize permission-policy or protected-crate changes.
+
+## 2026-08-19 Implementation Checkpoint
+
+The implementation passed `cargo test -p talos-tui --locked` (535 unit tests, 2 integration tests,
+2 doctests), `cargo fmt --all -- --check`, `git diff --check` and the complete release preflight.
+Exact-head CI, independent technical review, merge-time CAS and the deferred human/manual rows
+remain open; this Story stays `Review`.
