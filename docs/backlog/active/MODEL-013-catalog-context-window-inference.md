@@ -5,7 +5,7 @@
 | Story ID | MODEL-013 |
 | Type | Model / Configuration Story |
 | Priority | P2 |
-| Status | Ready / Unclaimed; I212 claim preparation |
+| Status | Ready / Claimed; I212 claim proposed in PR #314 |
 | Source | [GitHub Issue #312](https://github.com/wjhuang88/talos/issues/312) |
 | Selected Iteration | I212 — Planned / Unclaimed |
 | Depends On | MODEL-008 custom-model registration; canonical model catalog; MODEL-011 evidence precedence boundary |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
+| Work Slice | I212/MODEL-013 only: pure local catalog identity resolver and context-window projection for custom models with explicit-value precedence, ambiguity rejection and derived provenance. Excludes active probes, network calls, capability/pricing/role inference, schema migration, dependency changes and release/publication. |
+| Claimed At | 2026-08-19 |
 | Source Issue | #312 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #314 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Draft claim PR #314; proposed exact-head governance/CI review and merge-time CAS required. Shared GitHub identity and independent-review availability will be disclosed before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Finalize the I212 claim, obtain exact-head governance/CI authorization and merge it to `main` before activation or implementation. This proposed claim remains ineffective and grants no Rust/Cargo authority. |
+| Handoff / Release Condition | Claim #314 is ineffective until its finalized exact head merges to `main`; only then may I212 activate and create an implementation branch from that merge or later `main`. |
 
 ## Identity / Goal / Value
 

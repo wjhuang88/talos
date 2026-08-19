@@ -1,6 +1,6 @@
 # Iteration I212: Catalog-Assisted Custom-Model Context Window
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Claimed proposal
 > Published plan date: 2026-08-19
 > Planned objective: resolve a custom provider model against the packaged Talos model catalog only
 > when one conservative local identity match exists, then use its context window as an editable
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
+| Work Slice | I212/MODEL-013 only: pure local catalog identity resolution and custom-model context-window projection with explicit precedence, ambiguity rejection and derived provenance. No active probe, network, capability inference, migration, dependency or release work. |
+| Claimed At | 2026-08-19 |
 | Source Issue | #312 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #314 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Draft claim PR #314; finalized exact-head governance/CI checks, independent technical review or documented single-maintainer authorization, and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Finalize this proposed claim, obtain exact-head governance/CI authorization, merge it to `main`, then activate I212 separately. No implementation branch or Rust/Cargo edit is authorized before that merge. |
+| Handoff / Release Condition | Claim #314 is ineffective until finalized and merged to `main`; activate I212 separately only after that merge, then branch from the claim merge or later current `main`. |
 
 ## Published Baseline
 
@@ -103,8 +103,8 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. The claim proposal is ineffective until its finalized record reaches
-`main`; no implementation branch or code change is authorized by this plan.
+No activation has occurred. Claim #314 is a proposed governance record and is ineffective until its
+finalized record reaches `main`; no implementation branch or code change is authorized by this plan.
 
 ## Verification Evidence
 
