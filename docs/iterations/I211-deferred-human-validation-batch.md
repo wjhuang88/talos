@@ -100,3 +100,11 @@ natural-person custom-provider walkthrough must confirm catalog-derived labeling
 precedence and ambiguous/unknown no-inference behavior. I211 activation now follows terminal
 implementation dispositions for I200, I197, I201, I212 and I198. This scheduling addition grants no
 product implementation authority and cannot convert Agent review or green CI into human evidence.
+
+## Change Control - 2026-08-19 Provider Reconnect Status
+
+The maintainer added I210/PROVIDER-006 to the long-task order. After its implementation head exists,
+append a human row to Issue #302 covering `Connecting…`, structured `Reconnecting… (attempt n/m)`,
+and terminal clear behavior against the integrated `main` head. I211 activation now follows terminal
+implementation dispositions for I200, I197, I201, I212, I210 and I198. I210's ADR, effective claim,
+machine/technical gates and CAS remain non-deferred.

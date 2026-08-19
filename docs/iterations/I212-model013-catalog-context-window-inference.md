@@ -1,6 +1,6 @@
 # Iteration I212: Catalog-Assisted Custom-Model Context Window
 
-> Document status: Planned / Claimed proposal
+> Document status: Active / Claimed
 > Published plan date: 2026-08-19
 > Planned objective: resolve a custom provider model against the packaged Talos model catalog only
 > when one conservative local identity match exists, then use its context window as an editable
@@ -22,10 +22,10 @@
 | Source Issue | #312 |
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft claim PR #314; finalized exact-head governance/CI checks, independent technical review or documented single-maintainer authorization, and merge-time CAS remain required. |
+| Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #314 is ineffective until finalized and merged to `main`; activate I212 separately only after that merge, then branch from the claim merge or later current `main`. |
+| Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; branch implementation only from that merge or later current `main`, then require exact-head CI, independent Agent technical review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -103,8 +103,11 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. Claim #314 is a proposed governance record and is ineffective until its
-finalized record reaches `main`; no implementation branch or code change is authorized by this plan.
+Claim PR #314 final head `ec5c6920` passed exact-head CI `32223903534`, both governance validators
+and merge-time CAS, then merged to `main` as `a62f448b`. The independent Agent reviewer attempt
+disconnected without producing a conclusion; the planning-only claim used the SOP single-maintainer
+path with disclosure `5338629524`. I212 is Active/Claimed and may create its implementation branch
+from `a62f448b` or later current `main` within the Published Baseline only.
 
 ## Verification Evidence
 

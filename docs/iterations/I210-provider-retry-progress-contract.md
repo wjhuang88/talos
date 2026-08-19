@@ -59,6 +59,16 @@ does not take over, repair or merge them.
 - [ ] Retry policy, dependency closure and unrelated consumers remain unchanged.
 - [ ] Focused and workspace locked validation plus affected user documentation pass at exact head.
 
+### Connecting/Reconnecting UI Row
+
+- [ ] Initial model request displays `Connecting…`.
+- [ ] A real retryable error or timeout projects `Reconnecting… (attempt n/m)` through the same
+      structured progress contract used for dispatch/backoff facts.
+- [ ] The row clears on success, terminal failure or cancellation; no text parsing or elapsed-time
+      inference is used for `n/m`.
+- [ ] OpenAI-compatible deterministic fixtures cover repeated timeout/error, bounded retries and
+      final success/failure as observed through the model-request activity surface.
+
 ## Status
 
 Planned / Unclaimed. Issue #278 is intake and planning evidence only. No claim, implementation

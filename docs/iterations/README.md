@@ -77,9 +77,9 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I208 | Steering Boundary Insertion | Planned / Unclaimed | `TUI-050`; insertion timing after a model response or tool-call boundary. No implementation branch or authorization. |
 | I205 | PR Workflow Throughput Simplification | Complete / Closed | Completion Commit `2e2cf04b`; PR #287 merged as `0394e264`; exact-head CI `32094384772` and independent technical audit `5323234878` passed. Audit selects atomic claim activation as a separately claimable follow-up; no executable governance change. |
 | I209 | Resumed Session Interactivity Under Provider Delay | Closed | TUI-051 / Issue #272 is Complete at Completion Commit `2eff6285`, with source implementation `7b82fea6`/`7d90def8`, exact-head CI `32025371877`, real-terminal acceptance and independent agent audit `5316533941`. Retry-progress acceptance remains transferred to I210. |
-| I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accept an ADR and establish an effective claim before any public contract or implementation change. |
-| I211 | Deferred Human Review And Acceptance Batch | Planned / Unclaimed | VALIDATION-002 / Issue #302; evidence-only cleanup after I200/I197/I201/I212/I198 implementation dispositions. No product implementation or gate waiver. |
-| I212 | Catalog-Assisted Custom-Model Context Window | Planned / Unclaimed; claim preparation | MODEL-013 / Issue #312; conservative local-only exact/unique matching with explicit configuration precedence and derived provenance. No implementation before an effective claim. |
+| I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accepted behavior is initial `Connecting…`, then structured `Reconnecting… (attempt n/m)` on real retry/timeout facts. Accept an ADR and establish an effective claim before implementation. |
+| I211 | Deferred Human Review And Acceptance Batch | Planned / Unclaimed | VALIDATION-002 / Issue #302; evidence-only cleanup after I200/I197/I201/I212/I210/I198 implementation dispositions. No product implementation or gate waiver. |
+| I212 | Catalog-Assisted Custom-Model Context Window | Active / Claimed | MODEL-013 / Issue #312; claim #314 merged as `a62f448b` after exact-head CI, both validators, single-maintainer disclosure and CAS. Implementation must start from that merge or later current `main`. |
 
 ## Completed This Closeout
 
