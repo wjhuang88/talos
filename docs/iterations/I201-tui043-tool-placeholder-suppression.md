@@ -80,8 +80,8 @@ TUI-visible placeholder suppression slice; implementation has not started.
 
 ## Verification Evidence
 
-Implementation commit `68f4fb7b` adds a TUI-local ordered-content gate and 12 focused state/event
-tests. `cargo test -p talos-tui --locked` passed 547 unit tests, 2 integration tests and 2 doctests;
+Implementation commits `68f4fb7b` and `d1fef291` add a TUI-local ordered-content gate and 14
+focused state/event tests. `cargo test -p talos-tui --locked` passed 549 unit tests, 2 integration tests and 2 doctests;
 focused tests, strict package Clippy, formatting, both governance validators, `git diff --check` and
 the complete release preflight also passed. PR #309 still requires exact-head CI, independent Agent
 technical review and merge-time CAS. Natural-person suppression-safety review remains deferred to
@@ -119,10 +119,12 @@ to the published Work Slice.
 
 ## 2026-08-19 Implementation Review Checkpoint
 
-Implementation commit `68f4fb7b` is published through PR #309 from branch base `25fe1f0c`. The
-change is limited to `crates/talos-tui/src/app.rs` and `app/output.rs`: it holds only a possible
-standalone compatibility-marker line, suppresses it after a confirmed structured `ToolCall`, and
-flushes it unchanged on ordinary text, terminal completion, error, or an unconfirmed start event.
+Implementation commits `68f4fb7b` and `d1fef291` are published through PR #309 from branch base
+`25fe1f0c`. The change is limited to `crates/talos-tui/src/app.rs` and `app/output.rs`: it holds only
+a possible standalone compatibility-marker line, suppresses it after a confirmed structured
+`ToolCall`, and flushes it unchanged on ordinary text, terminal completion, error, unconfirmed start,
+direct result or direct approval events. Independent technical review found and the second commit
+closed the result/approval false-confirmation paths before merge.
 Provider protocol, core Message, tool execution, permission, persistence, Cargo and release surfaces
 are unchanged. I201 stays `Review` with `Completion Commit: Pending`; exact-head PR gates and Issue
 #302 / I211 human validation remain open.

@@ -394,9 +394,10 @@ release changes.
 
 ## 2026-08-19 I201 Implementation Review Checkpoint
 
-Implementation commit `68f4fb7b` is published through PR #309 from exact activation merge
-`25fe1f0c`. Twelve focused state/event tests and the full `talos-tui` suite prove conditional
-suppression, fallback visibility, multi-tool ordering and no blank replacement row; strict package
+Implementation commits `68f4fb7b` and `d1fef291` are published through PR #309 from exact
+activation merge `25fe1f0c`. Fourteen focused state/event tests and the full `talos-tui` suite prove
+conditional suppression, fallback visibility, direct result/approval non-confirmation, multi-tool
+ordering and no blank replacement row; strict package
 Clippy, formatting, both governance validators, `git diff --check` and release preflight passed.
 The change touches only TUI ordered-content presentation. I201 remains `Review` with `Completion
 Commit: Pending`; exact-head CI, independent Agent technical review, merge-time CAS and the Issue

@@ -110,9 +110,10 @@ may start only from `78cb1ddd` or later current `main` and remains limited to th
 
 ## 2026-08-19 Implementation Review Checkpoint
 
-Implementation commit `68f4fb7b` is published through PR #309 from branch base `25fe1f0c`. Twelve
-focused state/event tests cover both marker spellings, split chunks, whitespace, preceding text,
-larger legitimate sentences, terminal flush, unconfirmed starts, no blank replacement and multiple
-tool calls. The full `talos-tui` suite, strict package Clippy, formatting, both governance validators,
-`git diff --check` and release preflight passed. TUI-043 stays `Review`; exact-head PR gates and the
-Issue #302 / I211 natural-person suppression-safety row remain open.
+Implementation commits `68f4fb7b` and `d1fef291` are published through PR #309 from branch base
+`25fe1f0c`. Fourteen focused state/event tests cover both marker spellings, split chunks,
+whitespace, preceding text, larger legitimate sentences, terminal flush, unconfirmed starts, no
+blank replacement, multiple tool calls, and the rule that direct result/approval events cannot
+confirm suppression. The full `talos-tui` suite, strict package Clippy, formatting, both governance
+validators, `git diff --check` and release preflight passed. TUI-043 stays `Review`; final
+exact-head PR gates and the Issue #302 / I211 natural-person suppression-safety row remain open.
