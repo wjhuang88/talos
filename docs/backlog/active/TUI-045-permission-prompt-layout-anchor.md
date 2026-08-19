@@ -22,10 +22,10 @@
 | Source Issue | #125 |
 | Governance Claim PR | #304 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | PR #304 proposes this bounded claim from `main@99645e78`; it is ineffective before merge. No independent reviewer is currently available for this non-security planning claim. Exact-head CI, both governance validators, merge-time CAS and no blocking feedback remain required; any protected permission/security scope stops and requires independent security review. |
+| Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Any protected permission/security scope stops and requires independent security review. |
 | Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 must merge before I197 is effective. Only then create the implementation branch from that merge or later current `main`; do not alter permission semantics. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 must pass per-child CI, Agent technical review and CAS; do not alter permission semantics. Eligible natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
