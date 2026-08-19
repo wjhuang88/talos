@@ -23,7 +23,7 @@
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review was attempted but disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
-| Implementation PR | Not started |
+| Implementation PR | #317 |
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; implementation must branch from that merge or later current `main` and remain within the recorded Work Slice. |
 
@@ -112,3 +112,19 @@ disconnected without producing a conclusion; the planning-only claim therefore u
 single-maintainer path with shared-identity/unavailable-review disclosure `5338629524`. I212 is now
 Active/Claimed; its implementation must begin from `a62f448b` or later current `main` and remains
 limited to local context-window inference without probes, capability inference or migration.
+
+## 2026-08-19 Implementation Checkpoint
+
+Implementation commit `3cb1a801` reuses the packaged catalog without a duplicated table or network
+call, exposes configured/catalog-inferred/unknown context provenance, applies inference to custom
+runtime limits and `/model` ready/recent rows, and labels inferred custom values `(catalog)`.
+Exact identity wins; ambiguity, missing context, unknown IDs, opaque suffixes and multiple prefixes
+remain unknown. Built-in provider matching stays provider-qualified, and no output limit,
+capability, pricing, provider identity or routing metadata is inherited.
+
+The isolated-HOME `talos-config` suite passed 224 unit tests plus one doctest; 28 focused CLI model
+lifecycle tests, strict Clippy, formatting and `git diff --check` passed. Full
+`./scripts/release_preflight.sh` passed outside the outer execution sandbox with macOS seatbelt
+tests. Exact-head CI, independent Agent review, CAS and the Issue #302 natural-person walkthrough
+remain open, so MODEL-013 stays In Progress and has no Completion Commit. Issue #316 tracks the
+separate process-HOME test isolation defect observed during non-isolated runs.

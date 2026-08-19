@@ -23,7 +23,7 @@
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
-| Implementation PR | Not started |
+| Implementation PR | #317 (implementation review pending) |
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; branch implementation only from that merge or later current `main`, then require exact-head CI, independent Agent technical review and merge-time CAS. |
 
@@ -109,9 +109,27 @@ disconnected without producing a conclusion; the planning-only claim used the SO
 path with disclosure `5338629524`. I212 is Active/Claimed and may create its implementation branch
 from `a62f448b` or later current `main` within the Published Baseline only.
 
+Implementation commit `3cb1a801` adds conservative packaged-catalog context resolution and the
+`Configured` / `CatalogInferred` / `Unknown` provenance result. Custom providers infer only from
+one exact opaque ID or, when no exact row exists, one `/` or `:` prefix removal that yields exactly
+one row with context metadata. Built-in providers remain provider-qualified; custom providers never
+inherit catalog output limits, capabilities, pricing or routing. `/model` ready and recent rows
+label only inferred custom context as `(catalog)`. Cargo manifests, default features, persistence
+and network behavior are unchanged.
+
 ## Verification Evidence
 
-Pending an effective claim and implementation.
+- `cargo test -p talos-config --locked`: 224 unit tests and 1 doctest passed with an isolated
+  writable HOME; a prior non-isolated run exposed one existing HOME-mutating test race, while every
+  I212 test passed and the isolated full rerun was green.
+- `cargo test -p talos-cli --locked model_lifecycle::tests::`: 28 focused lifecycle tests passed.
+- `cargo clippy -p talos-config -p talos-cli --all-targets --locked -- -D warnings` passed.
+- `cargo fmt --all -- --check` and `git diff --check` passed.
+- Diff review confirmed no Cargo manifest, `Cargo.lock`, default-feature, dependency, persistence or
+  network change. `HOME=/private/tmp/talos-i212-test-home RUSTUP_HOME=/Users/GHuang/.rustup
+  CARGO_HOME=/Users/GHuang/.cargo ./scripts/release_preflight.sh` passed outside the outer execution
+  sandbox, including macOS seatbelt tests. Exact-head CI, independent Agent technical review,
+  merge-time CAS and the Issue #302 natural-person custom-provider walkthrough remain pending.
 
 ## Completion Evidence
 
@@ -120,7 +138,9 @@ Completion Commit: Pending. A status-only commit cannot serve as its own evidenc
 ## Variance And Residuals
 
 Alias registries, active capability probes, role routing and broader model metadata inference remain
-owned by separate Stories.
+owned by separate Stories. Issue #316 owns the non-isolated `talos-config`/CLI test race where
+parallel tests mutate process `HOME`; an isolated-HOME full run passed, and this test-environment
+defect is not claimed as an I212 product defect.
 
 ## Retrospective
 
