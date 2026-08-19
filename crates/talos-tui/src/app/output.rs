@@ -1,4 +1,310 @@
 use super::*;
+use talos_conversation::MessageSource;
+
+const TOOL_PLACEHOLDER_MARKERS: [&str; 2] = ["Calling tools…", "Calling tools..."];
+
+/// Holds only a possible standalone compatibility marker until the ordered response
+/// proves whether a structured tool call follows.
+#[derive(Default)]
+pub(super) struct ToolPlaceholderGate {
+    enabled: bool,
+    at_line_start: bool,
+    line_candidate: String,
+    held_marker: String,
+}
+
+impl ToolPlaceholderGate {
+    pub(super) fn start(&mut self, source: &MessageSource) {
+        self.enabled = matches!(source, MessageSource::Assistant);
+        self.at_line_start = true;
+        self.line_candidate.clear();
+        self.held_marker.clear();
+    }
+
+    pub(super) fn push(&mut self, text: &str) -> String {
+        if !self.enabled {
+            return text.to_string();
+        }
+
+        let mut output = String::new();
+        for ch in text.chars() {
+            if !self.held_marker.is_empty() {
+                if ch.is_whitespace() {
+                    self.held_marker.push(ch);
+                    self.at_line_start = ch == '\n' || self.at_line_start;
+                    continue;
+                }
+                output.push_str(&std::mem::take(&mut self.held_marker));
+            }
+
+            if self.at_line_start {
+                self.line_candidate.push(ch);
+                if is_placeholder_prefix(&self.line_candidate) {
+                    if ch == '\n' && is_exact_placeholder(&self.line_candidate) {
+                        self.held_marker
+                            .push_str(&std::mem::take(&mut self.line_candidate));
+                        self.at_line_start = true;
+                    }
+                    continue;
+                }
+
+                let candidate = std::mem::take(&mut self.line_candidate);
+                self.at_line_start = candidate.ends_with('\n');
+                output.push_str(&candidate);
+            } else {
+                output.push(ch);
+                if ch == '\n' {
+                    self.at_line_start = true;
+                }
+            }
+        }
+        output
+    }
+
+    pub(super) fn finish_content(&mut self) -> String {
+        let candidate = std::mem::take(&mut self.line_candidate);
+        if is_exact_placeholder(&candidate) {
+            self.held_marker.push_str(&candidate);
+            String::new()
+        } else {
+            candidate
+        }
+    }
+
+    pub(super) fn confirm_tool_call(&mut self) -> String {
+        let candidate = std::mem::take(&mut self.line_candidate);
+        let output = if is_exact_placeholder(&candidate) {
+            String::new()
+        } else {
+            candidate
+        };
+        self.held_marker.clear();
+        self.enabled = false;
+        output
+    }
+
+    pub(super) fn is_pending(&self) -> bool {
+        !self.held_marker.is_empty()
+    }
+
+    pub(super) fn flush(&mut self) -> String {
+        self.enabled = false;
+        let mut output = std::mem::take(&mut self.held_marker);
+        output.push_str(&std::mem::take(&mut self.line_candidate));
+        output
+    }
+}
+
+fn is_placeholder_prefix(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    TOOL_PLACEHOLDER_MARKERS.iter().any(|marker| {
+        marker.starts_with(trimmed)
+            || (trimmed.starts_with(marker) && trimmed[marker.len()..].trim().is_empty())
+    })
+}
+
+fn is_exact_placeholder(text: &str) -> bool {
+    TOOL_PLACEHOLDER_MARKERS.contains(&text.trim())
+}
+
+#[cfg(test)]
+#[allow(clippy::items_after_test_module)]
+mod tests {
+    use super::*;
+    use talos_conversation::{ContentOutput, ToolCallDisplay, UiOutput};
+    use talos_core::tool::ToolProvenance;
+
+    fn assistant_gate() -> ToolPlaceholderGate {
+        let mut gate = ToolPlaceholderGate::default();
+        gate.start(&MessageSource::Assistant);
+        gate
+    }
+
+    #[test]
+    fn holds_split_unicode_marker_until_tool_call_decision() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling tools"), "");
+        assert_eq!(gate.push("…"), "");
+        assert_eq!(gate.finish_content(), "");
+        assert_eq!(gate.confirm_tool_call(), "");
+        assert_eq!(gate.flush(), "");
+    }
+
+    #[test]
+    fn flushes_marker_when_followed_by_normal_text() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling tools..."), "");
+        assert_eq!(
+            gate.push(" for this task"),
+            "Calling tools... for this task"
+        );
+    }
+
+    #[test]
+    fn flushes_marker_at_end_without_tool_call() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling tools…\n"), "");
+        assert_eq!(gate.flush(), "Calling tools…\n");
+    }
+
+    #[test]
+    fn does_not_filter_marker_inside_larger_text() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("I said Calling tools…"), "I said Calling tools…");
+    }
+
+    #[test]
+    fn non_assistant_content_is_not_gated() {
+        let mut gate = ToolPlaceholderGate::default();
+        gate.start(&MessageSource::User);
+        assert_eq!(gate.push("Calling tools…"), "Calling tools…");
+    }
+
+    #[test]
+    fn preserves_text_before_a_standalone_marker() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("First line\nCalling "), "First line\n");
+        assert_eq!(gate.push("tools...\n"), "");
+        assert_eq!(gate.finish_content(), "");
+        assert_eq!(gate.confirm_tool_call(), "");
+    }
+
+    #[test]
+    fn preserves_incomplete_marker_prefix_before_tool_call() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling too"), "");
+        assert_eq!(gate.finish_content(), "Calling too");
+        assert_eq!(gate.confirm_tool_call(), "");
+    }
+
+    fn tool_call_named(name: &str) -> ToolCallDisplay {
+        ToolCallDisplay {
+            tool_name: name.into(),
+            arguments: serde_json::json!({"path": "README.md"}),
+            provenance: ToolProvenance::Native,
+            summary_fields: vec!["path".into()],
+        }
+    }
+
+    fn tool_call() -> ToolCallDisplay {
+        tool_call_named("read_file")
+    }
+
+    fn pending_text(tui: &Tui) -> String {
+        tui.pending_transcript
+            .iter()
+            .filter_map(|block| match block {
+                TranscriptBlock::StyledLine(line) => Some(line.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn structured_tool_call_suppresses_split_marker_without_blank_row() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling ".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "tools…\n".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::ToolCall(tool_call()));
+
+        assert_eq!(pending_text(&tui), "");
+        assert_eq!(tui.pending_transcript.len(), 1);
+        assert!(matches!(
+            tui.pending_transcript[0],
+            TranscriptBlock::ToolCall(_)
+        ));
+        assert!(!tui.ordered_content_open);
+    }
+
+    #[test]
+    fn tool_call_started_without_confirmed_call_does_not_suppress_marker() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools…".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::ToolCallStarted {
+            name: "read_file".into(),
+        });
+        tui.handle_ui_output(UiOutput::Status(Default::default()));
+
+        assert!(pending_text(&tui).contains("Calling tools…"));
+        assert!(!tui.ordered_content_open);
+    }
+
+    #[test]
+    fn terminal_completion_flushes_standalone_marker() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools...".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::Status(Default::default()));
+
+        assert!(pending_text(&tui).contains("Calling tools..."));
+    }
+
+    #[test]
+    fn larger_sentence_is_visible_before_later_tool_call() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools... can take a moment.\n".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::ToolCall(tool_call()));
+
+        assert!(pending_text(&tui).contains("Calling tools... can take a moment."));
+        assert!(matches!(
+            tui.pending_transcript.last(),
+            Some(TranscriptBlock::ToolCall(_))
+        ));
+    }
+
+    #[test]
+    fn leading_whitespace_three_dot_marker_is_suppressed_for_multiple_tools() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "  Calling tools...  \n".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::ToolCall(tool_call_named("read_file")));
+        tui.handle_ui_output(UiOutput::ToolCall(tool_call_named("list_files")));
+
+        assert_eq!(pending_text(&tui), "");
+        assert_eq!(
+            tui.pending_transcript
+                .iter()
+                .filter(|block| matches!(block, TranscriptBlock::ToolCall(_)))
+                .count(),
+            2
+        );
+    }
+}
 
 impl Tui {
     pub(super) async fn next_stream_chunk(&mut self) -> Option<String> {
@@ -29,6 +335,7 @@ impl Tui {
         if !self.ordered_content_open {
             return;
         }
+        self.flush_tool_placeholder();
         let lines = self.stream_render.finish();
         if self.stream_opening_pending {
             self.stream_opening_pending = false;
@@ -46,7 +353,12 @@ impl Tui {
             self.finalize_active_stream();
         }
 
-        if !filter_out.text.is_empty() {
+        let text = self.tool_placeholder_gate.push(&filter_out.text);
+        self.append_visible_text(&text);
+    }
+
+    fn append_visible_text(&mut self, text: &str) {
+        if !text.is_empty() {
             if self.stream_opening_pending {
                 let opening = crate::scrollback::stream_opening_lines(
                     self.stream_count,
@@ -56,9 +368,14 @@ impl Tui {
                 self.stream_opening_pending = false;
                 self.stream_count += 1;
             }
-            let lines = self.stream_render.push_chunk(&filter_out.text);
+            let lines = self.stream_render.push_chunk(text);
             self.append_styled_lines(lines);
         }
+    }
+
+    fn flush_tool_placeholder(&mut self) {
+        let text = self.tool_placeholder_gate.flush();
+        self.append_visible_text(&text);
     }
 
     pub(super) fn handle_ui_output(&mut self, output: UiOutput) -> bool {
@@ -69,6 +386,7 @@ impl Tui {
                         self.finalize_active_stream();
                     }
                     self.finalize_ordered_content();
+                    self.tool_placeholder_gate.start(&source);
                     self.pending_stream_opening = self.stream_render.start(source);
                     self.stream_opening_pending = true;
                     self.ordered_content_open = true;
@@ -78,7 +396,13 @@ impl Tui {
                         self.consume_stream_chunk(&text);
                     }
                 }
-                ContentOutput::End => self.finalize_ordered_content(),
+                ContentOutput::End => {
+                    let text = self.tool_placeholder_gate.finish_content();
+                    self.append_visible_text(&text);
+                    if !self.tool_placeholder_gate.is_pending() {
+                        self.finalize_ordered_content();
+                    }
+                }
                 ContentOutput::Block { source, text } => {
                     if self.active_stream.is_some() {
                         self.finalize_active_stream();
@@ -110,16 +434,24 @@ impl Tui {
                 self.append_styled_lines(lines);
             }
             UiOutput::ToolCallStarted { .. } => {
-                self.finalize_ordered_content();
+                if !self.tool_placeholder_gate.is_pending() {
+                    self.finalize_ordered_content();
+                }
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
             }
             UiOutput::ToolCall(display) => {
+                let text = self.tool_placeholder_gate.confirm_tool_call();
+                self.append_visible_text(&text);
+                self.finalize_ordered_content();
                 self.pending_transcript
                     .push(TranscriptBlock::ToolCall(display));
             }
             UiOutput::ToolResult(display) => {
+                let text = self.tool_placeholder_gate.confirm_tool_call();
+                self.append_visible_text(&text);
+                self.finalize_ordered_content();
                 let icon = if display.is_error { "✗" } else { "" };
                 let color = if display.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
@@ -142,6 +474,9 @@ impl Tui {
                 summary_fields,
                 response,
             } => {
+                let text = self.tool_placeholder_gate.confirm_tool_call();
+                self.append_visible_text(&text);
+                self.finalize_ordered_content();
                 self.state.pending_approval_response = Some(response);
                 let args_str = serde_json::to_string_pretty(&arguments)
                     .unwrap_or_else(|_| arguments.to_string());
@@ -153,6 +488,9 @@ impl Tui {
                 self.show_approval(&tool_name, &summary);
             }
             UiOutput::Status(snapshot) => {
+                if !snapshot.is_processing {
+                    self.finalize_ordered_content();
+                }
                 let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
                 self.state.status = snapshot;
                 if self.state.status.workspace_path.is_empty() {
@@ -224,6 +562,7 @@ impl Tui {
                 }
             }
             UiOutput::Exit => {
+                self.finalize_ordered_content();
                 self.state.should_exit = true;
                 return true;
             }
