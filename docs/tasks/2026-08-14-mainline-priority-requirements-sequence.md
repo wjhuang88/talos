@@ -345,7 +345,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T4 | Deliver I199 / TUI-041 | Bounded multiline preview behavior | T3 disposition | Recorded Completion Commit and acceptance | Preserve one-row behavior | Complete |
 | T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Review / Human Validation Deferred |
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Active / Claimed; implementation not started |
+| T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Claimed; implementation PR #309 |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7 implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
@@ -391,3 +391,13 @@ implementation has not started and must branch only from `78cb1ddd` or later cur
 authorized scope remains the published TUI-visible placeholder suppression boundary and excludes
 provider protocol, core Message, tool execution, permission, persistence, broad renderer and
 release changes.
+
+## 2026-08-19 I201 Implementation Review Checkpoint
+
+Implementation commit `68f4fb7b` is published through PR #309 from exact activation merge
+`25fe1f0c`. Twelve focused state/event tests and the full `talos-tui` suite prove conditional
+suppression, fallback visibility, multi-tool ordering and no blank replacement row; strict package
+Clippy, formatting, both governance validators, `git diff --check` and release preflight passed.
+The change touches only TUI ordered-content presentation. I201 remains `Review` with `Completion
+Commit: Pending`; exact-head CI, independent Agent technical review, merge-time CAS and the Issue
+#302 / I211 human suppression-safety row remain open.

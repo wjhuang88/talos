@@ -1,6 +1,6 @@
 # Iteration I201: Tool-Call Placeholder Suppression
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-14
 > Planned objective: prevent an exact standalone `Calling tools…` compatibility marker from
 > becoming visible history only when the same assistant response proceeds to structured tool calls.
@@ -22,7 +22,7 @@
 | Governance Claim PR | #306 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #306 merged to `main` as `78cb1ddd` from exact base `8069ea6a` after exact-head CI `32209314843`, independent Agent governance review `5336890794`, both validators and merge-time CAS. This effective claim authorizes only the bounded I201/TUI-043 implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #309 |
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Claim #306 is effective at merge `78cb1ddd`; create the I201 implementation branch only from that merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
 
@@ -80,7 +80,12 @@ TUI-visible placeholder suppression slice; implementation has not started.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+Implementation commit `68f4fb7b` adds a TUI-local ordered-content gate and 12 focused state/event
+tests. `cargo test -p talos-tui --locked` passed 547 unit tests, 2 integration tests and 2 doctests;
+focused tests, strict package Clippy, formatting, both governance validators, `git diff --check` and
+the complete release preflight also passed. PR #309 still requires exact-head CI, independent Agent
+technical review and merge-time CAS. Natural-person suppression-safety review remains deferred to
+Issue #302 / I211.
 
 ## Completion Evidence
 
@@ -111,3 +116,13 @@ passed every routed job, both governance validators reported 0 warnings, indepen
 CAS passed. No Rust/Cargo or implementation change was included. I201 is now `Active / Claimed`;
 its implementation branch may start only from `78cb1ddd` or later current `main` and remains limited
 to the published Work Slice.
+
+## 2026-08-19 Implementation Review Checkpoint
+
+Implementation commit `68f4fb7b` is published through PR #309 from branch base `25fe1f0c`. The
+change is limited to `crates/talos-tui/src/app.rs` and `app/output.rs`: it holds only a possible
+standalone compatibility-marker line, suppresses it after a confirmed structured `ToolCall`, and
+flushes it unchanged on ordinary text, terminal completion, error, or an unconfirmed start event.
+Provider protocol, core Message, tool execution, permission, persistence, Cargo and release surfaces
+are unchanged. I201 stays `Review` with `Completion Commit: Pending`; exact-head PR gates and Issue
+#302 / I211 human validation remain open.
