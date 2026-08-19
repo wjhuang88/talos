@@ -5,9 +5,9 @@
 | Story ID | TUI-043 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Active / Claimed (pending merge) |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #111](https://github.com/wjhuang88/talos/issues/111) |
-| Selected Iteration | I201 — Active / Claimed (pending merge) |
+| Selected Iteration | I201 — Active / Claimed |
 | Depends On | Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #111 |
 | Governance Claim PR | #306 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | PR #306 proposes this governance-only claim from `main@8069ea6a`; it is ineffective before merge. Exact-head CI, both governance validators, independent Agent technical review, merge-time CAS and no blocking feedback remain required; no implementation branch or product behavior authority exists in this slice. |
+| Authorization Evidence | PR #306 merged to `main` as `78cb1ddd` from exact base `8069ea6a` after exact-head CI `32209314843`, independent Agent governance review `5336890794`, both validators and merge-time CAS. This effective claim authorizes only the bounded I201/TUI-043 implementation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Claim becomes effective only after its governance PR merges to `main`; implement only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Handoff / Release Condition | Claim #306 is effective at merge `78cb1ddd`; implement only from that merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -54,13 +54,14 @@ Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle
 
 ## Uncertainty And Validation Path
 
-I201 is the selected runnable iteration. Its claim is pending governance merge; implementation must
-keep the pending-marker state local to the TUI-visible ordered-content boundary.
+I201 is the selected runnable iteration. Its claim is effective through PR #306 merge `78cb1ddd`;
+implementation must keep the pending-marker state local to the TUI-visible ordered-content boundary.
 
 ## 2026-08-19 Claim Preparation
 
-The governance-only claim is proposed from `main@8069ea6a` after I197 implementation merge
-`d98f37e7`. No implementation branch or product behavior authority exists until the claim merges.
+The governance-only claim merged through PR #306 as `78cb1ddd` from exact base `8069ea6a` after
+I197 implementation merge `d98f37e7`. No implementation branch existed before that claim became
+effective.
 
 ## State / Status Owners
 
@@ -99,3 +100,10 @@ ordering acceptance remains unchanged. After an implementation passes exact-head
 Agent technical review and CAS, its natural-person suppression-safety review may be recorded as an
 Issue #302 row for I211. TUI-043 remains Review until that row passes; the deferral cannot justify a
 global phrase filter or provider/protocol scope expansion.
+
+## 2026-08-19 Claim Activation Checkpoint
+
+PR #306 final head `153e470f` merged to `main` as `78cb1ddd` after exact-head CI `32209314843`, both
+governance validators, independent Agent review `5336890794` and merge-time CAS passed. No
+Rust/Cargo or implementation change was included. TUI-043 is now `Active / Claimed`; implementation
+may start only from `78cb1ddd` or later current `main` and remains limited to the published Work Slice.
