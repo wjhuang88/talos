@@ -368,3 +368,15 @@ once that child's dependencies, claim, machine checks, technical review, applica
 and merge-time CAS are terminal. Source owners remain `Review` until I211 records a pass; protected
 security-review gates are never deferred; the long task cannot close while a required tracker row is
 open.
+
+## 2026-08-19 I197 Implementation Merge Checkpoint
+
+I197/TUI-045 implementation PR #305 merged to `main` as `d98f37e742e32313a9b670837b5c45129cf4e700`.
+The implementation head was `9fce4f13c6f1e598025f661494f67af73b60fcd3`, based on effective claim
+merge `0db92cf9`. Exact-head CI run `32204974418` passed all five jobs and independent Agent review
+`5336592072` approved the exact head with shared-account identity limits disclosed. The changed
+runtime scope remains TUI layout/anchor behavior only; no permission policy, request identity,
+protected crate, persistence or release authority changed. I197 remains `Review` with
+`Completion Commit: Pending`; its natural-person and terminal rows are tracked in Issue #302 / I211.
+The next non-overlapping child may proceed only after its own effective claim and current-main
+inventory gates.
