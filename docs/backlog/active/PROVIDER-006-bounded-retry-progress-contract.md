@@ -24,7 +24,7 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
+| Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Accept an ADR defining the semver-compatible progress contract, then establish an effective claim before implementation. |
 
 ## Identity / Goal / Value
@@ -48,6 +48,17 @@ present a static indefinite connection label when the provider knows the current
 - Project those facts through runtime status to CLI/TUI consumers.
 - Keep cancellation responsive during dispatch, retry backoff and first-packet wait.
 - Add deterministic contract, cancellation and presentation tests.
+
+## Additional Acceptance - 2026-08-19 Connecting/Reconnecting Presentation
+
+- The model-request activity surface starts at `Connecting…` for the initial provider dispatch.
+- After a structured retryable provider error or timeout, it changes to `Reconnecting… (attempt
+  n/m)` and remains visible through the corresponding bounded backoff/next-attempt wait.
+- Success, terminal failure and cancellation clear the activity state.
+- `n/m` and every state transition come from typed provider progress events; the TUI must not parse
+  error text or infer retry counts from elapsed time.
+- This is a projection requirement only: retry policy, max attempts, timeout, backoff and
+  cancellation semantics remain unchanged.
 
 ## Exclusions
 

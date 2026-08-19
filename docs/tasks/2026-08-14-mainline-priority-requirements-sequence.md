@@ -4,8 +4,8 @@
 by each child; this record alone activates none of them.
 **Published plan date**: 2026-08-14
 **Prerequisite claim**: I196 / WORK-001-A claim effective through PR #226 merge `453d1fba`
-**Source requirements**: Issues #59, #69, #79, #111, #125, #155, #312 and deferred-validation
-tracker #302
+**Source requirements**: Issues #59, #69, #79, #111, #125, #155, #278, #312 and
+deferred-validation tracker #302
 
 This task is the durable execution and recovery ledger requested for the ordered requirements. It
 coordinates independently governed iterations; it does not combine their scopes, transfer their
@@ -18,7 +18,7 @@ owner authority or make an ineffective child claim executable.
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline planning session 2026-08-14 |
-| Work Slice | Coordination and recovery ledger for I205/GOV-007 → I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I212/#312 → I198/#155 → I211/VALIDATION-002/#302, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
+| Work Slice | Coordination and recovery ledger for I205/GOV-007 → I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I212/#312 → I210/#278 → I198/#155 → I211/VALIDATION-002/#302, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
 | Claimed At | 2026-08-14 |
 | Source Issue | #59 |
 | Governance Claim PR | #303 |
@@ -346,9 +346,10 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Review / Human Validation Deferred |
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Planned / Claim preparation |
-| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7A implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
+| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Active / Claimed through #314 merge `a62f448b` |
+| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Planned / Unclaimed |
+| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
@@ -416,3 +417,17 @@ local catalog-inference slice. This is a priority change only: I212 remains Plan
 its separate claim reaches `main`; it does not inherit I201 authority, and it adds no network probe,
 capability inference, config migration or Rust/Cargo authorization during claim preparation. After
 I212 receives an implementation/deferred-validation disposition, execution returns to I198/#155.
+
+## 2026-08-19 I212 Activation And I210 UI Requirement Checkpoint
+
+I212 claim PR #314 final head `ec5c6920` passed exact-head CI `32223903534`, both governance
+validators and merge-time CAS, then merged as `a62f448b`. The independent reviewer attempt
+disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path
+with disclosure `5338629524`. I212 is Active/Claimed and implementation must branch from that merge
+or later current `main`.
+
+The maintainer also clarified Issue #278/I210: the existing model-request activity row must start as
+`Connecting…`, then show `Reconnecting… (attempt n/m)` from actual structured retry/timeout facts,
+and clear on success, terminal failure or cancellation. This is part of the long task after I212 and
+before I198, but I210 remains Planned/Unclaimed and still requires its ADR and separate effective
+claim. It cannot be implemented inside I212 or inferred from error text/timers.

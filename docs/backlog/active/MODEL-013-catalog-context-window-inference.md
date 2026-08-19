@@ -5,9 +5,9 @@
 | Story ID | MODEL-013 |
 | Type | Model / Configuration Story |
 | Priority | P2 |
-| Status | Ready / Claimed; I212 claim proposed in PR #314 |
+| Status | In Progress / Claimed; I212 Active |
 | Source | [GitHub Issue #312](https://github.com/wjhuang88/talos/issues/312) |
-| Selected Iteration | I212 — Planned / Unclaimed |
+| Selected Iteration | I212 — Active / Claimed |
 | Depends On | MODEL-008 custom-model registration; canonical model catalog; MODEL-011 evidence precedence boundary |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #312 |
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft claim PR #314; proposed exact-head governance/CI review and merge-time CAS required. Shared GitHub identity and independent-review availability will be disclosed before merge. |
+| Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review was attempted but disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #314 is ineffective until its finalized exact head merges to `main`; only then may I212 activate and create an implementation branch from that merge or later `main`. |
+| Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; implementation must branch from that merge or later current `main` and remain within the recorded Work Slice. |
 
 ## Identity / Goal / Value
 
@@ -103,3 +103,12 @@ The maintainer explicitly requested Issue #312 implementation before the remaini
 of the active mainline long task. The requirement remains an independent MODEL-013/I212 slice; this
 priority change does not merge it into I201, I198 or I211 and does not authorize implementation
 before the separate I212 claim reaches `main`.
+
+## 2026-08-19 Claim Activation Checkpoint
+
+Claim PR #314 final head `ec5c6920` passed exact-head CI `32223903534`, both governance validators
+and merge-time CAS, then merged to `main` as `a62f448b`. The independent Agent reviewer attempt
+disconnected without producing a conclusion; the planning-only claim therefore used the SOP
+single-maintainer path with shared-identity/unavailable-review disclosure `5338629524`. I212 is now
+Active/Claimed; its implementation must begin from `a62f448b` or later current `main` and remains
+limited to local context-window inference without probes, capability inference or migration.
