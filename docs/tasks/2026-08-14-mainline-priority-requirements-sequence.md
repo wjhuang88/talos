@@ -452,7 +452,7 @@ and direct internal result/approval events were not exercised. Resumed `out` cou
 Issue #302 records this as an unresolved semantics question, not a confirmed defect.
 
 I212 implementation commit `3cb1a801` now provides the bounded local catalog inference slice; its
-implementation PR is #317.
+implementation PR is #318.
 Config tests passed 224/224 plus one doctest with isolated HOME; 28 CLI lifecycle tests, strict
 Clippy, formatting and diff checks passed. Full release preflight also passed outside the outer
 execution sandbox, including macOS seatbelt tests. No Cargo/default-feature/dependency/persistence/

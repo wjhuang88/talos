@@ -23,7 +23,7 @@
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review was attempted but disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
-| Implementation PR | #317 |
+| Implementation PR | #318 |
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; implementation must branch from that merge or later current `main` and remain within the recorded Work Slice. |
 
