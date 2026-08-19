@@ -1,6 +1,6 @@
 # Iteration I201: Tool-Call Placeholder Suppression
 
-> Document status: Planned
+> Document status: Planned / Unclaimed
 > Published plan date: 2026-08-14
 > Planned objective: prevent an exact standalone `Calling tools…` compatibility marker from
 > becoming visible history only when the same assistant response proceeds to structured tool calls.
@@ -16,15 +16,15 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Work Slice | I201/TUI-043 only: suppress an exact standalone tool-call compatibility marker at the TUI ordered-content boundary while preserving legitimate text, tool rows, ordering and persistence. No provider protocol, core Message, execution, permission, persistence, broad renderer or release changes. |
 | Claimed At | Not applicable |
 | Source Issue | #111 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Authorization Evidence | Proposed governance-only claim from `main@8069ea6a`; it becomes effective only after a claim PR reaches `main`. No implementation branch or product behavior authority exists in this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After I197 has an implementation/deferred-validation disposition, establish an effective I201 claim on `main` and branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
+| Handoff / Release Condition | Claim becomes effective only after its governance PR merges to `main`; only then create the I201 implementation branch from that merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
 
 ## Published Baseline
 
@@ -74,9 +74,9 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. I201 remains Unclaimed and follows the layout/anchor corrections in the
-ordered task to minimize overlapping TUI exact-head review churn; it is not technically coupled to
-their outcome.
+I201 claim preparation is proposed from `main@8069ea6a` after I197 implementation merge
+`d98f37e7`. The owner remains Unclaimed until its governance PR reaches `main`; no implementation
+branch or product behavior authority exists in this slice.
 
 ## Verification Evidence
 

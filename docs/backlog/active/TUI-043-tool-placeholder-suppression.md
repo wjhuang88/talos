@@ -5,7 +5,7 @@
 | Story ID | TUI-043 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Ready — I201 Planned / Unclaimed |
+| Status | Planned / Unclaimed |
 | Source | [GitHub Issue #111](https://github.com/wjhuang88/talos/issues/111) |
 | Selected Iteration | I201 — Planned / Unclaimed |
 | Depends On | Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle |
@@ -17,15 +17,15 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Work Slice | I201/TUI-043 only: suppress an exact standalone tool-call compatibility marker at the TUI ordered-content boundary while preserving legitimate text, tool rows, ordering and persistence. No provider protocol, core Message, execution, permission, persistence, broad renderer or release changes. |
 | Claimed At | Not applicable |
 | Source Issue | #111 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Authorization Evidence | Proposed governance-only claim from `main@8069ea6a`; it becomes effective only after a claim PR reaches `main`. No implementation branch or product behavior authority exists in this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After the ordered TUI predecessor has an implementation/deferred-validation disposition, establish an effective I201 claim on `main`; implement only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Handoff / Release Condition | Claim becomes effective only after its governance PR merges to `main`; implement only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -54,8 +54,13 @@ Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle
 
 ## Uncertainty And Validation Path
 
-I201 is the selected runnable iteration. Implementation still requires its own effective claim and
-must keep the pending-marker state local to the TUI-visible ordered-content boundary.
+I201 is the selected runnable iteration. Its claim is pending governance merge; implementation must
+keep the pending-marker state local to the TUI-visible ordered-content boundary.
+
+## 2026-08-19 Claim Preparation
+
+The governance-only claim is proposed from `main@8069ea6a` after I197 implementation merge
+`d98f37e7`. No implementation branch or product behavior authority exists until the claim merges.
 
 ## State / Status Owners
 
