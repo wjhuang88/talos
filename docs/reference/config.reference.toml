@@ -95,6 +95,12 @@ model = "claude-sonnet-4-20250514"
 #   image_input    Optional bool: Some(true) marks a custom/discovered model as
 #                  vision-capable so /attach and read_image work. Some(false)
 #                  explicitly disables. None (default) uses catalog metadata.
+#   If context_limit is omitted, a custom model may receive a derived context
+#   window in the /model picker and runtime only when one packaged catalog row
+#   matches its exact ID (or one leading gateway/ or gateway: prefix). This is
+#   a hint, not
+#   endpoint capability proof. Duplicate, unknown, or metadata-less matches
+#   remain conservative; set context_limit explicitly to override the catalog.
 #
 # Reasoning options (ADR-034):
 #   effort         "low" | "medium" | "high" (OpenAI o-series)

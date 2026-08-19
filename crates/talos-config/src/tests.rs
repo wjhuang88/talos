@@ -862,6 +862,200 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
     assert_eq!(out, None);
 }
 
+fn catalog_model(id: &str, provider: &str, context_limit: Option<u32>) -> model::ModelMetadata {
+    model::ModelMetadata {
+        id: id.to_string(),
+        provider: provider.to_string(),
+        context_limit,
+        output_limit: Some(9_999),
+        pricing: None,
+        capabilities: model::ModelCapabilities::default(),
+        release_date: None,
+        variants: vec![],
+        source: model::ModelSource::Builtin,
+    }
+}
+
+fn custom_model_config(model: &str, context_limit: Option<u32>) -> Config {
+    Config {
+        provider: "gateway".to_string(),
+        model: model.to_string(),
+        providers: HashMap::from([(
+            "gateway".to_string(),
+            ProviderConfig {
+                models: HashMap::from([(
+                    model.to_string(),
+                    ModelConfig {
+                        context_limit,
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
+        )]),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn test_custom_context_limit_exact_catalog_match_reports_provenance() {
+    let config = custom_model_config("unique-model", None);
+    let catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+
+    let resolution = config.resolve_context_limit_with_catalog(&catalog);
+
+    assert_eq!(resolution.limit, Some(256_000));
+    assert_eq!(resolution.source, ContextLimitSource::CatalogInferred);
+}
+
+#[test]
+fn test_custom_context_limit_normalizes_one_slash_or_colon_prefix() {
+    let catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+
+    for id in ["proxy/unique-model", "proxy:unique-model"] {
+        let config = custom_model_config(id, None);
+        assert_eq!(
+            config.resolve_context_limit_with_catalog(&catalog),
+            ContextLimitResolution {
+                limit: Some(256_000),
+                source: ContextLimitSource::CatalogInferred,
+            }
+        );
+    }
+}
+
+#[test]
+fn test_custom_context_limit_rejects_ambiguity_even_when_limits_agree() {
+    let config = custom_model_config("shared", None);
+    let catalog = vec![
+        catalog_model("shared", "one", Some(64_000)),
+        catalog_model("shared", "two", Some(64_000)),
+    ];
+
+    assert_eq!(
+        config.resolve_context_limit_with_catalog(&catalog),
+        ContextLimitResolution {
+            limit: None,
+            source: ContextLimitSource::Unknown,
+        }
+    );
+}
+
+#[test]
+fn test_custom_context_limit_rejects_missing_context_and_unknown_identity() {
+    let catalog = vec![catalog_model("missing-limit", "one", None)];
+
+    for id in ["missing-limit", "unknown"] {
+        let config = custom_model_config(id, None);
+        assert_eq!(
+            config.resolve_context_limit_with_catalog(&catalog).source,
+            ContextLimitSource::Unknown
+        );
+    }
+}
+
+#[test]
+fn test_custom_context_limit_does_not_normalize_after_exact_metadata_miss() {
+    let config = custom_model_config("proxy/model", None);
+    let catalog = vec![
+        catalog_model("proxy/model", "one", None),
+        catalog_model("model", "two", Some(32_000)),
+    ];
+
+    assert_eq!(
+        config.resolve_context_limit_with_catalog(&catalog).source,
+        ContextLimitSource::Unknown
+    );
+}
+
+#[test]
+fn test_builtin_provider_never_falls_through_to_cross_provider_identity() {
+    let config = Config {
+        provider: "anthropic".to_string(),
+        model: "shared".to_string(),
+        ..Default::default()
+    };
+    let catalog = vec![
+        catalog_model("shared", "anthropic", None),
+        catalog_model("shared", "other", Some(32_000)),
+    ];
+
+    assert_eq!(
+        config.resolve_context_limit_with_catalog(&catalog).source,
+        ContextLimitSource::Unknown
+    );
+}
+
+#[test]
+fn test_custom_context_limit_does_not_strip_opaque_suffixes_or_multiple_prefixes() {
+    let catalog = vec![catalog_model("model", "one", Some(32_000))];
+
+    for id in ["model@latest", "model-v2", "one/two/model"] {
+        let config = custom_model_config(id, None);
+        assert_eq!(
+            config.resolve_context_limit_with_catalog(&catalog).source,
+            ContextLimitSource::Unknown
+        );
+    }
+}
+
+#[test]
+fn test_explicit_custom_context_limit_always_wins() {
+    let config = custom_model_config("shared", Some(777_000));
+    let catalog = vec![
+        catalog_model("shared", "one", Some(64_000)),
+        catalog_model("shared", "two", Some(128_000)),
+    ];
+
+    assert_eq!(
+        config.resolve_context_limit_with_catalog(&catalog),
+        ContextLimitResolution {
+            limit: Some(777_000),
+            source: ContextLimitSource::Configured,
+        }
+    );
+}
+
+#[test]
+fn test_custom_catalog_projection_never_inherits_output_limit() {
+    let config = custom_model_config("unique-model", None);
+    let catalog = vec![catalog_model("unique-model", "gateway", Some(256_000))];
+
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&catalog)),
+        (256_000, None)
+    );
+}
+
+#[test]
+fn test_custom_catalog_projection_rejects_provider_qualified_ambiguity() {
+    let config = custom_model_config("shared", None);
+    let catalog = vec![
+        catalog_model("shared", "gateway", Some(256_000)),
+        catalog_model("shared", "other", Some(128_000)),
+    ];
+
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&catalog)),
+        (128_000, None)
+    );
+}
+
+#[test]
+fn test_all_models_projects_inferred_context_for_custom_picker_row() {
+    let config = custom_model_config("proxy:unique-model", None);
+    let catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+
+    let projected = config
+        .all_models_with_catalog(Some(&catalog))
+        .into_iter()
+        .find(|entry| entry.provider == "gateway" && entry.id == "proxy:unique-model")
+        .expect("custom model should remain visible");
+
+    assert_eq!(projected.context_limit, Some(256_000));
+    assert_eq!(projected.source, model::ModelSource::Manual);
+}
+
 #[test]
 fn test_credentials_default_path() {
     let path = Credentials::default_path();
@@ -1593,8 +1787,8 @@ fn test_all_models_with_catalog_none_matches_all_models() {
 
 #[test]
 fn test_resolve_model_limits_with_catalog_precedence() {
-    let mut config = Config {
-        provider: "test-provider".to_string(),
+    let config = Config {
+        provider: "openai".to_string(),
         model: "test-model".to_string(),
         ..Default::default()
     };
@@ -1602,7 +1796,7 @@ fn test_resolve_model_limits_with_catalog_precedence() {
     let catalog_models = vec![model::ModelMetadata {
         variants: vec![],
         id: "test-model".to_string(),
-        provider: "test-provider".to_string(),
+        provider: "openai".to_string(),
         context_limit: Some(300_000),
         output_limit: Some(30_000),
         pricing: None,
