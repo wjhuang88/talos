@@ -1,6 +1,6 @@
 # Iteration I201: Tool-Call Placeholder Suppression
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (pending merge)
 > Published plan date: 2026-08-14
 > Planned objective: prevent an exact standalone `Calling tools…` compatibility marker from
 > becoming visible history only when the same assistant response proceeds to structured tool calls.
@@ -13,15 +13,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
 | Work Slice | I201/TUI-043 only: suppress an exact standalone tool-call compatibility marker at the TUI ordered-content boundary while preserving legitimate text, tool rows, ordering and persistence. No provider protocol, core Message, execution, permission, persistence, broad renderer or release changes. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-19 |
 | Source Issue | #111 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Proposed governance-only claim from `main@8069ea6a`; it becomes effective only after a claim PR reaches `main`. No implementation branch or product behavior authority exists in this slice. |
+| Governance Claim PR | #306 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #306 proposes this governance-only claim from `main@8069ea6a`; it is ineffective before merge. Exact-head CI, both governance validators, independent Agent technical review, merge-time CAS and no blocking feedback remain required; no implementation branch or product behavior authority exists in this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | Claim becomes effective only after its governance PR merges to `main`; only then create the I201 implementation branch from that merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
@@ -74,9 +74,9 @@
 
 ## Actual Activation And Execution
 
-I201 claim preparation is proposed from `main@8069ea6a` after I197 implementation merge
-`d98f37e7`. The owner remains Unclaimed until its governance PR reaches `main`; no implementation
-branch or product behavior authority exists in this slice.
+I201 claim preparation is proposed by PR #306 from `main@8069ea6a` after I197 implementation merge
+`d98f37e7`. The claim remains ineffective until that PR reaches `main`; no implementation branch or
+product behavior authority exists in this slice.
 
 ## Verification Evidence
 

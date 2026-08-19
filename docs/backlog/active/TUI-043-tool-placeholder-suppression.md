@@ -5,24 +5,24 @@
 | Story ID | TUI-043 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed (pending merge) |
 | Source | [GitHub Issue #111](https://github.com/wjhuang88/talos/issues/111) |
-| Selected Iteration | I201 — Planned / Unclaimed |
+| Selected Iteration | I201 — Active / Claimed (pending merge) |
 | Depends On | Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
 | Work Slice | I201/TUI-043 only: suppress an exact standalone tool-call compatibility marker at the TUI ordered-content boundary while preserving legitimate text, tool rows, ordering and persistence. No provider protocol, core Message, execution, permission, persistence, broad renderer or release changes. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-19 |
 | Source Issue | #111 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Proposed governance-only claim from `main@8069ea6a`; it becomes effective only after a claim PR reaches `main`. No implementation branch or product behavior authority exists in this slice. |
+| Governance Claim PR | #306 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | PR #306 proposes this governance-only claim from `main@8069ea6a`; it is ineffective before merge. Exact-head CI, both governance validators, independent Agent technical review, merge-time CAS and no blocking feedback remain required; no implementation branch or product behavior authority exists in this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | Claim becomes effective only after its governance PR merges to `main`; implement only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
