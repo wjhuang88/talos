@@ -5,9 +5,9 @@
 | Story ID | TUI-045 |
 | Type | Bug / TUI / Permission UX Story |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #125](https://github.com/wjhuang88/talos/issues/125) |
-| Selected Iteration | I197 — Active / Claimed |
+| Selected Iteration | I197 — Review / Claimed |
 | Depends On | Inline TUI scrollback/composer ownership; permission panel state; ADR-054 renderer |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Any protected permission/security scope stops and requires independent security review. |
 | Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 must pass per-child CI, Agent technical review and CAS; do not alter permission semantics. Eligible natural-person and terminal rows may be recorded in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 merged as `d98f37e7` after exact-head CI, Agent technical review and CAS without altering permission semantics. Eligible natural-person and terminal rows remain in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
 ## Identity / Goal / Value
 
@@ -87,9 +87,10 @@ policy or protected crates, its natural-person review and terminal matrix may be
 #302 for I211. TUI-045 remains Review until those rows pass; policy or security-scope expansion
 cannot use this deferral.
 
-The I197 claim became effective through PR #304 merge `0db92cf9`. Implementation PR #305 is open
-from `i197-tui045` at implementation commit `ff4141ca`; it remains presentation/layout-only and
-does not authorize permission-policy or protected-crate changes.
+The I197 claim became effective through PR #304 merge `0db92cf9`. Implementation PR #305 merged to
+`main` as `d98f37e7` from final head `9fce4f13`, including implementation commit `ff4141ca`; it
+remains presentation/layout-only and does not authorize permission-policy or protected-crate
+changes.
 
 ## 2026-08-19 Implementation Checkpoint
 
@@ -97,3 +98,11 @@ The implementation passed `cargo test -p talos-tui --locked` (535 unit tests, 2 
 2 doctests), `cargo fmt --all -- --check`, `git diff --check` and the complete release preflight.
 Exact-head CI, independent technical review, merge-time CAS and the deferred human/manual rows
 remain open; this Story stays `Review`.
+
+## 2026-08-19 Implementation Merge Disposition
+
+PR #305 final head `9fce4f13` merged to `main` as `d98f37e7` after exact-head CI `32204974418`
+passed all five jobs, independent Agent technical review `5336592072` approved the exact head with
+shared-account identity limits disclosed, and merge-time CAS passed. The implementation remains
+presentation/layout-only and preserves permission semantics and request identity. TUI-045 remains
+`Review`; only the deferred natural-person and real-terminal rows in Issue #302 / I211 remain open.

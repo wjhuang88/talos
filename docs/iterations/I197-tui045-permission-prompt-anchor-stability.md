@@ -1,6 +1,6 @@
 # Iteration I197: Permission Prompt Layout Anchor Stability
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-14
 > Planned objective: keep the inline permission prompt adjacent to the current interaction while
 > preserving the logical viewport/composer anchor and prior tail-follow state across prompt open,
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Protected permission/security scope is non-deferrable. |
 | Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 must pass per-child CI, Agent technical review and CAS. Eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
+| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 merged as `d98f37e7` after exact-head CI, Agent technical review and CAS. Eligible human/manual rows remain in VALIDATION-002/I211/Issue #302 while I197 stays Review. |
 
 ## Published Baseline
 
@@ -81,15 +81,16 @@
 
 ## Actual Activation And Execution
 
-I197 activation is effective through claim PR #304 merge `0db92cf9`. Implementation PR #305 is
-open from `i197-tui045`, with implementation commit `ff4141ca`; the bounded implementation branch
-contains no permission-policy or protected-crate changes.
+I197 activation is effective through claim PR #304 merge `0db92cf9`. Implementation PR #305 merged
+to `main` as `d98f37e7` from final head `9fce4f13`, which contains implementation commit
+`ff4141ca`; the bounded implementation contains no permission-policy or protected-crate changes.
 
 ## Verification Evidence
 
 The implementation worktree passed focused TUI tests and the complete release preflight. Exact-head
-CI and independent technical review for PR #305 remain pending. Natural-person and terminal rows
-remain deferred to Issue #302 / I211.
+CI run `32204974418` passed all five jobs, independent Agent technical review `5336592072` approved
+final head `9fce4f13`, and merge-time CAS passed before merge `d98f37e7`. Natural-person and terminal
+rows remain deferred to Issue #302 / I211.
 
 ## Completion Evidence
 
@@ -128,3 +129,12 @@ PR #305 contains the layout-only anchor correction. `cargo test -p talos-tui --l
 unit tests, 2 integration tests and 2 doctests; `cargo fmt --all -- --check`, `git diff --check`
 and `./scripts/release_preflight.sh` also passed. Completion remains pending exact-head CI,
 independent review, merge-time CAS and the deferred human-validation rows.
+
+## 2026-08-19 Implementation Merge Disposition
+
+PR #305 final head `9fce4f13` merged to `main` as `d98f37e7` after exact-head CI `32204974418`
+passed all five jobs, independent Agent technical review `5336592072` approved the exact head with
+shared-account identity limits disclosed, and merge-time CAS passed. The merged change remains
+TUI layout/anchor-only and contains no permission-policy, request-identity, protected-crate,
+persistence or release change. I197 remains `Review` with `Completion Commit: Pending`; only the
+deferred natural-person and terminal rows in Issue #302 / I211 remain open.
