@@ -91,3 +91,12 @@ None at planning time. Product defects found by I211 must use new corrective own
 ## Retrospective
 
 Pending execution.
+
+## Change Control - 2026-08-19 MODEL-013 Priority Advance
+
+The maintainer advanced MODEL-013/#312 into new I212 before I198. Preserve the published I211
+baseline and append one I212 row to Issue #302 after its implementation head exists: a
+natural-person custom-provider walkthrough must confirm catalog-derived labeling, explicit-value
+precedence and ambiguous/unknown no-inference behavior. I211 activation now follows terminal
+implementation dispositions for I200, I197, I201, I212 and I198. This scheduling addition grants no
+product implementation authority and cannot convert Agent review or green CI into human evidence.

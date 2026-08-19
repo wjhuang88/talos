@@ -128,3 +128,11 @@ closed the result/approval false-confirmation paths before merge.
 Provider protocol, core Message, tool execution, permission, persistence, Cargo and release surfaces
 are unchanged. I201 stays `Review` with `Completion Commit: Pending`; exact-head PR gates and Issue
 #302 / I211 human validation remain open.
+
+## 2026-08-19 Implementation Merge Checkpoint
+
+PR #309 final head `d8d414ce3f2d65c6859fa4f30566efb3ac94196c` passed exact-head CI run `32220300200`
+(5/5), independent Agent technical review `5338185591`, both governance validators and merge-time
+CAS, then merged to `main` as `7f5a6df2122d9b5ed70e55e59281e3e4e127f18c`. This is implementation
+evidence, not completion evidence: the natural-person suppression-safety row remains open in Issue
+#302/I211, so I201 remains `Review / Claimed` with `Completion Commit: Pending`.

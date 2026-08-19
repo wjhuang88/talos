@@ -117,3 +117,14 @@ blank replacement, multiple tool calls, and the rule that direct result/approval
 confirm suppression. The full `talos-tui` suite, strict package Clippy, formatting, both governance
 validators, `git diff --check` and release preflight passed. TUI-043 stays `Review`; final
 exact-head PR gates and the Issue #302 / I211 natural-person suppression-safety row remain open.
+
+## 2026-08-19 Implementation Merge Checkpoint
+
+PR #309 final head `d8d414ce3f2d65c6859fa4f30566efb3ac94196c` passed exact-head CI `32220300200`,
+independent Agent technical review `5338185591`, both governance validators and merge-time CAS,
+then merged to `main` as `7f5a6df2122d9b5ed70e55e59281e3e4e127f18c`. This Story remains
+`Review / Claimed` with `Completion Commit: Pending` until its Issue #302/I211 natural-person row
+passes; the merge does not self-certify acceptance.
+
+The Issue #111 reconciliation comment `5338422462` records this Review state and final merge head
+for the remote owner validator; no acceptance or completion status was advanced.

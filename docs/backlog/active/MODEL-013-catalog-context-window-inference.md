@@ -5,27 +5,27 @@
 | Story ID | MODEL-013 |
 | Type | Model / Configuration Story |
 | Priority | P2 |
-| Status | Refinement / Unclaimed |
+| Status | Ready / Claimed; I212 claim proposed in PR #314 |
 | Source | [GitHub Issue #312](https://github.com/wjhuang88/talos/issues/312) |
-| Selected Iteration | None |
+| Selected Iteration | I212 — Planned / Unclaimed |
 | Depends On | MODEL-008 custom-model registration; canonical model catalog; MODEL-011 evidence precedence boundary |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline planning session |
+| Work Slice | I212/MODEL-013 only: pure local catalog identity resolver and context-window projection for custom models with explicit-value precedence, ambiguity rejection and derived provenance. Excludes active probes, network calls, capability/pricing/role inference, schema migration, dependency changes and release/publication. |
+| Claimed At | 2026-08-19 |
 | Source Issue | #312 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #314 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Draft claim PR #314; proposed exact-head governance/CI review and merge-time CAS required. Shared GitHub identity and independent-review availability will be disclosed before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Decide conservative identity matching, precedence and provenance representation, then select one runnable iteration through a separate effective claim. This intake grants no implementation authority. |
+| Handoff / Release Condition | Claim #314 is ineffective until its finalized exact head merges to `main`; only then may I212 activate and create an implementation branch from that merge or later `main`. |
 
 ## Identity / Goal / Value
 
@@ -42,16 +42,22 @@ as an editable default without turning model-name matching into authoritative ca
 - Preserve enough provenance to distinguish a user-authored value from catalog-derived metadata.
 - Leave unknown or ambiguous models registerable without a fabricated context size or network call.
 
-## Required Decisions Before Ready
+## Ready Decision - 2026-08-19
 
-- Inventory the canonical model identity/alias fields and current custom-model persistence path.
-- Define supported normalization rules for `/`, `:`, `@`, provider prefixes and version suffixes;
-  generic substring, edit-distance or semantic matching is prohibited.
-- Decide whether existing config metadata can represent configured/catalog-inferred/unknown
-  provenance without a migration; otherwise create a separate migration/ADR owner.
-- Define when inference occurs and prove a later catalog update cannot overwrite an explicit value.
-- Keep MODEL-011/#124 active probing and capability evidence independent from passive metadata
-  convenience.
+- The packaged `models.toml` exposes provider plus opaque model ID and context metadata; it has no
+  separate alias table. Duplicate model IDs are common and some duplicates disagree on limits, so
+  any multiplicity is ambiguous even when current values happen to agree.
+- Match the raw ID exactly first. If absent, consider only one leading gateway/provider segment
+  separated by `/` or `:` and accept it only when the remaining ID selects exactly one catalog row.
+  Do not strip `@`, version suffixes, substrings or edit distance; exact IDs containing those
+  characters remain opaque and matchable.
+- Existing `ModelConfig.context_limit: Option<u32>` avoids a schema migration: `Some` is explicit
+  configured authority; `None` plus one accepted match is catalog-inferred; `None` without one is
+  unknown. Additive resolver provenance may expose those states without changing the public struct.
+- Inference is derived at resolution/display time and does not persist merely to materialize a
+  default. A later catalog update therefore cannot replace an explicit `Some` value.
+- MODEL-011/#124 remains the independent active-probe path. MODEL-013 projects context metadata only
+  and never imports endpoint capability, pricing, output limit, provider identity or routing facts.
 
 ## Exclusions
 
@@ -61,14 +67,15 @@ as an editable default without turning model-name matching into authoritative ca
 - No model-role/routing decision owned by MODEL-012/#146.
 - No implementation iteration, branch or authorization from this intake record.
 
-## Acceptance For Refinement
+## Acceptance For I212
 
-- [ ] Exact, alias, supported-normalization, ambiguity and unknown cases are deterministic.
-- [ ] Explicit values always win and catalog updates cannot silently replace them.
-- [ ] Provenance representation and any migration/rollback consequence are explicit.
-- [ ] Catalog entries without context metadata produce no fabricated value.
-- [ ] MODEL-011 capability probing remains an independent evidence path.
-- [ ] One runnable iteration and effective Collaboration Claim exist before implementation.
+- [x] Exact, supported one-prefix normalization, ambiguity and unknown decisions are deterministic.
+- [x] Explicit values always win and catalog updates cannot silently replace them.
+- [x] Provenance is derived without a config/public-struct migration; rollback is removal of the
+      resolver/display projection with existing config remaining readable.
+- [x] Catalog entries without context metadata produce no fabricated value.
+- [x] MODEL-011 capability probing remains an independent evidence path.
+- [ ] I212 has an effective Collaboration Claim on `main` before implementation.
 
 ## State / Status Owners
 
@@ -88,3 +95,11 @@ intake changes no runtime or user-visible behavior.
 - `docs/backlog/active/MODEL-011-custom-model-capability-probe.md`
 - `docs/backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md`
 - `docs/decisions/022-agent-config-compatibility-boundary.md`
+- `docs/iterations/I212-model013-catalog-context-window-inference.md`
+
+## Change Control - 2026-08-19 Priority Advance
+
+The maintainer explicitly requested Issue #312 implementation before the remaining I198/#155 child
+of the active mainline long task. The requirement remains an independent MODEL-013/I212 slice; this
+priority change does not merge it into I201, I198 or I211 and does not authorize implementation
+before the separate I212 claim reaches `main`.
