@@ -115,7 +115,7 @@ fn is_exact_placeholder(text: &str) -> bool {
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
-    use talos_conversation::{ContentOutput, ToolCallDisplay, UiOutput};
+    use talos_conversation::{ContentOutput, ToolCallDisplay, ToolResultDisplay, UiOutput};
     use talos_core::tool::ToolProvenance;
 
     fn assistant_gate() -> ToolPlaceholderGate {
@@ -304,6 +304,51 @@ mod tests {
             2
         );
     }
+
+    #[test]
+    fn tool_result_without_confirmed_call_flushes_marker() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools…".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            tool_name: Some("read_file".into()),
+            is_error: false,
+            content: "done".into(),
+        }));
+
+        assert!(pending_text(&tui).contains("Calling tools…"));
+        assert!(matches!(
+            tui.pending_transcript.last(),
+            Some(TranscriptBlock::ToolResult(_))
+        ));
+    }
+
+    #[test]
+    fn approval_without_confirmed_call_flushes_marker() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools...".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        let (response, _receiver) = tokio::sync::oneshot::channel();
+        tui.handle_ui_output(UiOutput::ToolApprovalRequest {
+            tool_name: "write_file".into(),
+            arguments: serde_json::json!({"path": "README.md"}),
+            summary_fields: vec!["path".into()],
+            response,
+        });
+
+        assert!(pending_text(&tui).contains("Calling tools..."));
+        assert!(tui.state.pending_approval_response.is_some());
+    }
 }
 
 impl Tui {
@@ -449,8 +494,6 @@ impl Tui {
                     .push(TranscriptBlock::ToolCall(display));
             }
             UiOutput::ToolResult(display) => {
-                let text = self.tool_placeholder_gate.confirm_tool_call();
-                self.append_visible_text(&text);
                 self.finalize_ordered_content();
                 let icon = if display.is_error { "✗" } else { "" };
                 let color = if display.is_error {
@@ -474,8 +517,6 @@ impl Tui {
                 summary_fields,
                 response,
             } => {
-                let text = self.tool_placeholder_gate.confirm_tool_call();
-                self.append_visible_text(&text);
                 self.finalize_ordered_content();
                 self.state.pending_approval_response = Some(response);
                 let args_str = serde_json::to_string_pretty(&arguments)
