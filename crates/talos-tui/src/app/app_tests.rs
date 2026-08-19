@@ -1891,6 +1891,50 @@ fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crat
 }
 
 #[test]
+fn approval_open_preserves_visible_follow_tail_anchor_until_resolution() {
+    let mut tui = tui_with_projected_history(10, 10);
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+    let first_visible = tui
+        .last_history_projection
+        .first_anchor()
+        .expect("projected history should expose a visible anchor");
+
+    tui.show_approval("bash", "command: echo hello");
+
+    assert_eq!(
+        tui.history_scroll,
+        HistoryScrollState {
+            mode: HistoryScrollMode::Anchored {
+                anchor: first_visible,
+                screen_row: 0,
+            },
+        }
+    );
+    assert!(tui.approval_viewport_snapshot.is_some());
+
+    tui.hide_approval();
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+    assert!(tui.approval_viewport_snapshot.is_none());
+}
+
+#[test]
+fn approval_open_preserves_existing_manual_history_anchor() {
+    let mut tui = tui_with_projected_history(10, 10);
+    let anchor = tui
+        .last_history_projection
+        .first_anchor()
+        .expect("projected history should expose a visible anchor");
+    tui.history_scroll.anchor(anchor, 2);
+    let before = tui.history_scroll.clone();
+
+    tui.show_approval("bash", "command: echo hello");
+    assert_eq!(tui.history_scroll, before);
+
+    tui.hide_approval();
+    assert_eq!(tui.history_scroll, before);
+}
+
+#[test]
 fn preview_height_changes_preserve_follow_tail_and_anchored_history_modes() {
     let tui = tui_with_projected_history(10, 10);
 

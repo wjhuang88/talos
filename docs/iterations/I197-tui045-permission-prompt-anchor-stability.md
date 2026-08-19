@@ -22,10 +22,10 @@
 | Source Issue | #125 |
 | Governance Claim PR | #304 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | PR #304 proposes this claim from `main@99645e78`; it is ineffective before merge. No independent reviewer is currently available for this non-security planning claim. Exact-head CI, both governance validators, merge-time CAS and no blocking feedback remain required; protected permission/security scope is non-deferrable. |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Protected permission/security scope is non-deferrable. |
+| Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 must merge before I197 is effective; create the implementation branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
+| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 must pass per-child CI, Agent technical review and CAS. Eligible human/manual rows move to VALIDATION-002/I211/Issue #302 while I197 stays Review. |
 
 ## Published Baseline
 
@@ -81,13 +81,15 @@
 
 ## Actual Activation And Execution
 
-I197 activation is proposed through claim PR #304 from `main@99645e78`; the claim and Active
-status become effective only after that PR reaches `main`. No implementation branch or code
-authority exists in this governance slice.
+I197 activation is effective through claim PR #304 merge `0db92cf9`. Implementation PR #305 is
+open from `i197-tui045`, with implementation commit `ff4141ca`; the bounded implementation branch
+contains no permission-policy or protected-crate changes.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+The implementation worktree passed focused TUI tests and the complete release preflight. Exact-head
+CI and independent technical review for PR #305 remain pending. Natural-person and terminal rows
+remain deferred to Issue #302 / I211.
 
 ## Completion Evidence
 
@@ -119,3 +121,10 @@ deferral and must stop for a separately authorized independent security review.
 ## Retrospective
 
 Pending execution.
+
+## 2026-08-19 Implementation Checkpoint
+
+PR #305 contains the layout-only anchor correction. `cargo test -p talos-tui --locked` passed 535
+unit tests, 2 integration tests and 2 doctests; `cargo fmt --all -- --check`, `git diff --check`
+and `./scripts/release_preflight.sh` also passed. Completion remains pending exact-head CI,
+independent review, merge-time CAS and the deferred human-validation rows.
