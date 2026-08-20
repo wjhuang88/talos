@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | SKILL-004 |
 | Source Issue | #155 |
-| Status | Ready — I198 Active / Claimed via governance PR #324; ineffective before target-branch merge |
+| Status | Review / Claimed — implementation evidence prepared; exact-head PR gates and human validation remain open |
 | Priority | P1 |
 | Type | Skill Format / Compatibility |
-| Selected Iteration | I198 — Active / Claimed via governance PR #324; ineffective before target-branch merge |
+| Selected Iteration | I198 — Review / Claimed |
 | Depends On | Current `talos-skill` parser and SKILL-001 through SKILL-003 compatibility contracts |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #155 |
 | Governance Claim PR | #324 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #324 must pass independent exact-head claim review, exact-head CI, both governance validators and merge-time CAS. The proposed claim remains ineffective while the PR is open. |
+| Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #324 exact-head review, CI and CAS must pass and this claim must reach `main`. Only then create implementation work from that merge or later exact `main`; per-child implementation review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation starts from that merge and remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
 
 ## Goal And Compatibility Contract
 
@@ -100,3 +100,39 @@ It must stop and create a separate ADR/migration owner if implementation evidenc
 values become accepted, explicit lists change, or another published contract requires omission to
 fail. Governance PR #324 now contains the finalized proposed claim. It remains ineffective until
 independent exact-head review, CI, merge-time CAS and target-branch merge pass.
+
+## 2026-08-20 Implementation Characterization Correction
+
+The first implementation test pass disproved one over-broad preparation assumption: `yaml_serde`
+coerces a numeric sequence item such as `42` into the string `"42"`; `Vec<String>` does not reject
+every non-string YAML scalar. Scalar and mapping containers plus mapping entries do fail with
+`triggers` diagnostics. The implementation therefore preserves existing scalar coercion, adds a
+regression for it, and limits the compatibility change to the missing-field default. Tightening
+accepted scalar coercion would be a separate format-policy change and is not authorized by I198.
+
+This correction does not change the omitted-field goal or public struct shape. It narrows an
+incorrect evidence statement before implementation completion rather than silently expanding the
+parser contract.
+
+## 2026-08-20 Claim Activation And Implementation Checkpoint
+
+PR #324 final head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`,
+independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then
+merged as `ea6686855de971df42de0311333617090c30de47`. The implementation worktree starts exactly
+from that merge.
+
+The implementation adds only the missing-field default, focused parser compatibility tests, one
+real-binary inline activation fixture without `triggers`, and bilingual documentation. No Cargo,
+dependency, discovery/routing, permission, persistence, release or publication surface changes.
+
+## 2026-08-20 Implementation Validation Checkpoint
+
+The implementation worktree passed `cargo test -p talos-skill --locked` (81 unit tests and one
+doctest), `cargo test -p talos-cli --test skill_runtime_e2e --locked` (2 tests), strict
+`talos-skill` Clippy, both governance validators, manifest YAML parsing, `git diff --check`, and the
+complete `./scripts/release_preflight.sh`. The real `talos` binary fixture proves that a discovered
+Skill without `triggers` can be explicitly activated and projected into the request preview.
+
+SKILL-004 is now `Review / Claimed`. Exact-head implementation CI, independent Agent technical
+review, merge-time CAS and the Issue #302 natural-person compatibility row remain open; no
+completion is claimed.

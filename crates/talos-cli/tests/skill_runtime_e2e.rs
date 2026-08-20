@@ -52,7 +52,7 @@ This temporary fixture verifies runtime discovery.
 }
 
 #[test]
-fn inline_binary_skill_activation_reaches_request_preview() {
+fn inline_binary_skill_without_triggers_reaches_request_preview() {
     let workspace = tempfile::tempdir().expect("create temporary workspace");
     let skill_dir = workspace.path().join(".talos/skills/review");
     fs::create_dir_all(&skill_dir).expect("create skill directory");
@@ -61,8 +61,6 @@ fn inline_binary_skill_activation_reaches_request_preview() {
         r#"---
 name: review
 description: Review code safely
-triggers:
-  - review
 ---
 # Review Skill
 

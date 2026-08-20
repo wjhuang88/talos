@@ -28,15 +28,17 @@ impl std::fmt::Display for SkillSource {
 
 /// YAML frontmatter extracted from a SKILL.md file.
 ///
-/// All fields are required. The frontmatter must appear between `---` delimiters
-/// at the start of the file.
+/// `name` and `description` are required. `triggers` is optional and defaults to
+/// an empty list. The frontmatter must appear between `---` delimiters at the
+/// start of the file.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SkillFrontmatter {
     /// Unique name identifier for the skill.
     pub name: String,
     /// Human-readable description of what the skill does.
     pub description: String,
-    /// Keywords or patterns that activate this skill.
+    /// Keywords or patterns that activate this skill, or an empty list when omitted.
+    #[serde(default)]
     pub triggers: Vec<String>,
 }
 
