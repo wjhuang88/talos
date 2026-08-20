@@ -347,7 +347,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Planned / Unclaimed |
+| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Active / Claimed through PR #321 target merge; proposal ineffective while open |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
@@ -482,3 +482,22 @@ provider walkthrough is now an explicit Issue #302/I211 row.
 This is the terminal implementation/deferred-validation disposition required to resume T7B. The
 next exact action is I210/PROVIDER-006 ADR and claim preparation from fresh `main`; I210 remains
 Planned/Unclaimed and no provider API, retry-policy or implementation authority exists yet.
+
+## 2026-08-20 I210 ADR And Claim Proposal Checkpoint
+
+Fresh inventory at `main@7c5cc8b7b4d75d7a71d2f632e6696d9023588396` found no Active
+iteration; I197/I200/I201/I212 remain Review under Issue #302/I211, I189 remains
+Planned/Claimed and unactivated, I198/I206-I208/I210/I211 remain Planned/Unclaimed, and I164
+remains Paused. Open PRs #120/#121 are archival Drafts and no open PR overlaps Issue #278.
+
+Governance PR #321 proposes the bounded I210 claim and ADR-062. The decision uses a defaulted
+additive provider progress entrypoint, real request-local retry/backoff/first-packet facts, the
+existing ordered non-exhaustive Agent/session progress path and a distinct reconnecting phase. It
+preserves retry/timeout/backoff policy, third-party providers that do not opt into progress,
+persistence, dependencies and release state. The public conversation enum addition is explicitly
+gated to a future pre-1.0 minor release, not a patch.
+
+The proposal remains ineffective while #321 is open. Independent exact-head architecture/claim
+review, CI, both governance validators and merge-time CAS must pass before merge. No implementation
+branch, Rust/Cargo change, version, tag or publication action is authorized before that target-branch
+merge.
