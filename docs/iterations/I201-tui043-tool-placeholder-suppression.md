@@ -136,3 +136,14 @@ PR #309 final head `d8d414ce3f2d65c6859fa4f30566efb3ac94196c` passed exact-head 
 CAS, then merged to `main` as `7f5a6df2122d9b5ed70e55e59281e3e4e127f18c`. This is implementation
 evidence, not completion evidence: the natural-person suppression-safety row remains open in Issue
 #302/I211, so I201 remains `Review / Claimed` with `Completion Commit: Pending`.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Natural-person checkpoint `5341637918` passed the non-tool, legitimate-text, ordinary tool ordering,
+deny, failure, cancel and resume observations, but failed the permission-mediated path. Approved
+write/read sequences retained `Calling tools…`, then displayed an unnamed approved row, then the
+named structured tool row.
+
+I201 and TUI-043 remain Review with `Completion Commit: Pending`. Corrective Story TUI-058 / Issue
+#329 separately owns approval-boundary marker correlation and named outcome rows. It is
+Ready/Unclaimed and authorizes no product or permission-policy implementation.

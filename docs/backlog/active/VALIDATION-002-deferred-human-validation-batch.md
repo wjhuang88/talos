@@ -5,9 +5,9 @@
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | In Progress - I211 Active / Claimed via PR #328; ineffective before target-branch merge |
+| Status | In Progress - I211 Active / Claimed |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Active / Claimed via PR #328; ineffective before target-branch merge |
+| Selected Iteration | I211 - Active / Claimed |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
@@ -118,3 +118,15 @@ both governance validators and merge-time CAS, then merged as `285fc3c7`. The ef
 permits an evidence-only activation proposal from that exact merge through PR #328. Activation
 remains ineffective until PR #328 reaches `main`; no human row is treated as passed and no product repair is
 authorized.
+
+## 2026-08-20 Activation Merge And Initial Evidence Classification
+
+PR #328 final head `bb501862` passed CI `32349317758` attempt 3, independent Agent approval
+`5353504113`, both governance validators and merge-time CAS, then merged as `a2f43248`. I211 is
+Active and no human result is inferred from that governance merge.
+
+Natural-person checkpoint `5341637918` contains both passed observations and failures. The
+permission-mediated marker/unnamed outcome failure is assigned to Ready/Unclaimed TUI-058 / Issue
+#329. The permission prompt hierarchy, new-session physical-bottom docking and incomplete terminal
+matrix are assigned to Ready/Unclaimed TUI-059 / Issue #330. Source owners I201 and I197 remain
+Review. I200, I212, I210 and I198 matrices and I201 direct internal negative cases remain pending.

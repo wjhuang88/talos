@@ -138,3 +138,14 @@ shared-account identity limits disclosed, and merge-time CAS passed. The merged 
 TUI layout/anchor-only and contains no permission-policy, request-identity, protected-crate,
 persistence or release change. I197 remains `Review` with `Completion Commit: Pending`; only the
 deferred natural-person and terminal rows in Issue #302 / I211 remain open.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Natural-person checkpoint `5341637918` on integrated `main@ec794515` found the permission selector
+below the composer while running tool activity remained above it, and the required resize,
+small-terminal and queued-prompt matrix was not completed. A separate new-session observation found
+a non-bottom composer while the permission request rendered at the physical terminal bottom.
+
+I197 and TUI-045 remain Review with `Completion Commit: Pending`. Corrective Story TUI-059 / Issue
+#330 now owns composer-relative docking and the complete terminal matrix. It is Ready/Unclaimed and
+does not authorize implementation or permission-policy changes.

@@ -128,3 +128,10 @@ passes; the merge does not self-certify acceptance.
 
 The Issue #111 reconciliation comment `5338422462` records this Review state and final merge head
 for the remote owner validator; no acceptance or completion status was advanced.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Issue #302 checkpoint `5341637918` passed the negative legitimate-text and ordinary tool-ordering
+observations but failed permission-mediated suppression: the marker and an unnamed approved line
+remained before the named tool row. This Story remains Review. TUI-058 / Issue #329 is the separate
+Ready/Unclaimed corrective owner; no implementation or permission-policy authority transfers.

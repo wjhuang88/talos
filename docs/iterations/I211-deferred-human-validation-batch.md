@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Active / Claimed via PR #328; ineffective before target-branch merge
+> Document status: Active / Claimed
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -73,9 +73,8 @@
 
 ## Actual Activation And Execution
 
-Activation is proposed from effective claim merge `285fc3c7` through PR #328. It remains
-ineffective until PR #328 reaches `main`; the slice is evidence-only and creates no product implementation
-authority.
+PR #328 merged as `a2f43248`; I211 is the sole Active iteration. Execution is evidence-only and
+creates no product implementation authority.
 
 ## Verification Evidence
 
@@ -145,3 +144,22 @@ I206-I208 remain Planned/Unclaimed; I164 remains Paused; no other iteration is A
 a non-overlapping Dashboard claim. The activation proposal authorizes only Issue #302 evidence
 reconciliation and separately governed corrective-owner preparation, not product repair. PR #328
 is the activation PR and remains ineffective while open.
+
+## 2026-08-20 Activation Merge And Initial Evidence Classification
+
+PR #328 final head `bb501862` passed CI `32349317758` attempt 3, independent Agent approval
+`5353504113`, both governance validators and merge-time CAS, then merged as `a2f43248`. I211 is
+Active; I197/I198/I200/I201/I210/I212 remain Review.
+
+Issue #302 checkpoint `5341637918` provides partial natural-person evidence. Passed observations
+cover non-tool marker preservation, legitimate longer text, ordinary one/multiple tool ordering,
+permission deny/approve execution semantics, missing-file recovery, prompt cancellation and
+durable resume ordering. They do not complete a source owner whose required matrix also failed or
+remains incomplete.
+
+Two failed rows now have separate corrective owners: TUI-058 / Issue #329 owns the
+permission-mediated leaked marker and unnamed approval outcome; TUI-059 / Issue #330 owns
+composer-relative permission docking and the incomplete terminal matrix. Both are Ready/Unclaimed
+and grant no implementation authority. I200 device coverage, I212 custom-provider inference, I210
+live reconnect terminal states, I198 Skill compatibility and unsynthesized I201 direct-event
+negative cases remain pending.

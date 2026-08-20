@@ -106,3 +106,10 @@ passed all five jobs, independent Agent technical review `5336592072` approved t
 shared-account identity limits disclosed, and merge-time CAS passed. The implementation remains
 presentation/layout-only and preserves permission semantics and request identity. TUI-045 remains
 `Review`; only the deferred natural-person and real-terminal rows in Issue #302 / I211 remain open.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Issue #302 checkpoint `5341637918` did not accept the presentation hierarchy and did not complete
+the required terminal matrix. A new-session, non-bottom composer also exposed physical-bottom
+permission-panel placement. This Story remains Review; TUI-059 / Issue #330 is the separate
+Ready/Unclaimed corrective owner. No permission semantic or implementation authority transfers.

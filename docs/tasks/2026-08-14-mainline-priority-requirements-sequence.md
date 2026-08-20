@@ -349,7 +349,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Active proposed via #328 / Claim effective through #326; ineffective before #328 merge |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Active / Initial failures owned by TUI-058/#329 and TUI-059/#330; remaining rows pending |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
@@ -625,3 +625,15 @@ The non-terminal inventory remains six Review children, I189 Planned/Claimed but
 I206-I208 Planned/Unclaimed and I164 Paused; no other iteration is Active. Open PR #327 is a
 separate Dashboard claim and does not overlap I211. The activation proposal remains ineffective
 until PR #328 merges and grants no product repair, release or publication authority.
+
+## 2026-08-20 I211 Activation Merge And Evidence Disposition
+
+PR #328 final head `bb501862` passed CI `32349317758` attempt 3, independent Agent approval
+`5353504113` and merge-time CAS, then merged as `a2f43248`. I211 is the sole Active iteration.
+
+Issue #302 checkpoint `5341637918` is partial: several ordinary runtime observations passed, but
+the permission-mediated marker/unnamed outcome path failed and is now owned by TUI-058 / Issue
+#329; permission prompt hierarchy/composer docking failed or remained incomplete and is owned by
+TUI-059 / Issue #330. Both corrective Stories are Ready/Unclaimed and authorize no implementation.
+I200, I212, I210, I198 and the remaining direct-event rows stay pending; the long task remains In
+Progress and cannot close.
