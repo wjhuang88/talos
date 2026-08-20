@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Active / Claimed - activation proposed; ineffective before activation PR merge
+> Document status: Active / Claimed via PR #328; ineffective before target-branch merge
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -73,8 +73,8 @@
 
 ## Actual Activation And Execution
 
-Activation is proposed from effective claim merge `285fc3c7`. It remains ineffective until the
-activation PR reaches `main`; the slice is evidence-only and creates no product implementation
+Activation is proposed from effective claim merge `285fc3c7` through PR #328. It remains
+ineffective until PR #328 reaches `main`; the slice is evidence-only and creates no product implementation
 authority.
 
 ## Verification Evidence
@@ -143,4 +143,5 @@ effective on `main`; this activation branch starts exactly at that merge.
 I197, I198, I200, I201, I210 and I212 remain Review; I189 remains Planned/Claimed and unactivated;
 I206-I208 remain Planned/Unclaimed; I164 remains Paused; no other iteration is Active. PR #327 is
 a non-overlapping Dashboard claim. The activation proposal authorizes only Issue #302 evidence
-reconciliation and separately governed corrective-owner preparation, not product repair.
+reconciliation and separately governed corrective-owner preparation, not product repair. PR #328
+is the activation PR and remains ineffective while open.

@@ -5,9 +5,9 @@
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | In Progress - I211 Active / Claimed; activation ineffective before activation PR merge |
+| Status | In Progress - I211 Active / Claimed via PR #328; ineffective before target-branch merge |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Active / Claimed; activation ineffective before activation PR merge |
+| Selected Iteration | I211 - Active / Claimed via PR #328; ineffective before target-branch merge |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
@@ -115,6 +115,6 @@ PR #327 is an unrelated Dashboard claim and does not overlap I211's evidence-onl
 
 PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`,
 both governance validators and merge-time CAS, then merged as `285fc3c7`. The effective claim now
-permits an evidence-only activation proposal from that exact merge. Activation remains ineffective
-until its own PR reaches `main`; no human row is treated as passed and no product repair is
+permits an evidence-only activation proposal from that exact merge through PR #328. Activation
+remains ineffective until PR #328 reaches `main`; no human row is treated as passed and no product repair is
 authorized.
