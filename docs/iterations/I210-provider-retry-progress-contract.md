@@ -1,26 +1,26 @@
 # Iteration I210: Provider Retry Progress Contract
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed when governance PR #321 reaches `main`; ineffective while open
 > Planned date: 2026-08-17
 > Objective: deliver PROVIDER-006 through a truthful semver-compatible progress contract for
 > provider dispatch, retry backoff and first-packet wait.
 
-## Collaboration Claim Preparation
+## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed; governance proposal not yet effective |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I210/PROVIDER-006 only: accept ADR-062; add a source-compatible defaulted provider progress entrypoint; project real built-in provider dispatch/backoff/first-packet facts through Agent/session/conversation; render Connecting/Reconnecting state; add deterministic compatibility, retry, cancellation and UI tests; update directly affected docs. No retry-policy, timeout, persistence, dependency, release, Desktop/Dashboard, I198 or I211 implementation. |
-| Claimed At | Not effective until target-branch merge |
+| Claimed At | 2026-08-20 |
 | Source Issue | #278 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review proposed |
-| Authorization Evidence | Pending exact-head review, CI, both governance validators and merge-time CAS. |
+| Governance Claim PR | #321 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #321 must pass independent exact-head architecture/claim review, exact-head CI, both governance validators and merge-time CAS. The claim and ADR acceptance remain ineffective while the PR is open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Do not create an implementation branch until the finalized claim and accepted ADR exist on `main`; implementation must start from that merge or later exact `main`. |
+| Handoff / Release Condition | Do not create an implementation branch until PR #321 passes all exact-head gates and the finalized claim plus ADR-062 acceptance exist on `main`; implementation must start from that merge or later exact `main`. |
 
 ## Selected Story
 
@@ -88,8 +88,9 @@ does not take over, repair or merge them.
 
 ## Status
 
-Planned / Unclaimed. Issue #278 is intake and planning evidence only. No claim, implementation
-branch, public API change or code authorization exists.
+Governance PR #321 proposes Active / Claimed plus ADR-062 acceptance. The proposal has no
+target-branch effect while open. No implementation branch, public API change or code authorization
+exists until the exact-head gates pass and #321 merges to `main`.
 
 ## Exact-Main Claim Inventory - 2026-08-20
 
@@ -118,6 +119,6 @@ Agent/session event projection, and a distinct reconnecting phase carrying the p
 ordinal and ceiling. It explicitly preserves retry policy and requires the public conversation enum
 addition to wait for a pre-1.0 minor release rather than a patch.
 
-The preparation branch is governance-only. Until the actual claim PR is finalized, independently
-reviewed and merged, I210 remains Planned/Unclaimed and no Rust, Cargo, implementation branch,
-version, tag or publication action is authorized.
+The preparation branch is governance-only. PR #321 now contains the finalized proposed claim. Until
+it is independently reviewed and merged, target-branch I210 remains Planned/Unclaimed and no Rust,
+Cargo, implementation branch, version, tag or publication action is authorized.

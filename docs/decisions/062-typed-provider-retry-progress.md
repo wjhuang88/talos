@@ -1,10 +1,14 @@
 # ADR-062: Typed Provider Retry Progress Boundary
 
-**Status**: Proposed
+**Status**: Accepted when governance PR #321 reaches `main`; Proposed while the PR is open
 
 **Date**: 2026-08-20
 
 **Owners**: PROVIDER-006 / I210
+
+**Acceptance Gate**: independent exact-head architecture review, CI, both governance validators,
+merge-time CAS and PR #321 target-branch merge. No implementation authority exists while the PR is
+open.
 
 ## Context
 
