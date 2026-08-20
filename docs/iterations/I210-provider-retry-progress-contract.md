@@ -5,6 +5,23 @@
 > Objective: deliver PROVIDER-006 through a truthful semver-compatible progress contract for
 > provider dispatch, retry backoff and first-packet wait.
 
+## Collaboration Claim Preparation
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed; governance proposal not yet effective |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I210/PROVIDER-006 only: accept ADR-062; add a source-compatible defaulted provider progress entrypoint; project real built-in provider dispatch/backoff/first-packet facts through Agent/session/conversation; render Connecting/Reconnecting state; add deterministic compatibility, retry, cancellation and UI tests; update directly affected docs. No retry-policy, timeout, persistence, dependency, release, Desktop/Dashboard, I198 or I211 implementation. |
+| Claimed At | Not effective until target-branch merge |
+| Source Issue | #278 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review proposed |
+| Authorization Evidence | Pending exact-head review, CI, both governance validators and merge-time CAS. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | Do not create an implementation branch until the finalized claim and accepted ADR exist on `main`; implementation must start from that merge or later exact `main`. |
+
 ## Selected Story
 
 - `PROVIDER-006` - `docs/backlog/active/PROVIDER-006-bounded-retry-progress-contract.md`
@@ -73,3 +90,34 @@ does not take over, repair or merge them.
 
 Planned / Unclaimed. Issue #278 is intake and planning evidence only. No claim, implementation
 branch, public API change or code authorization exists.
+
+## Exact-Main Claim Inventory - 2026-08-20
+
+Baseline: `main@7c5cc8b7b4d75d7a71d2f632e6696d9023588396` after `git fetch origin`;
+local and remote heads matched and the primary worktree was clean.
+
+| State | Iterations | Disposition |
+|---|---|---|
+| Active | None | I210 may be proposed, but remains unactivated until this claim reaches `main`. |
+| Review / implementation merged | I197, I200, I201, I212 | Preserve their Issue #302/I211 human-validation rows. Their TUI/model scopes do not transfer authority or overlap provider retry progress. |
+| Planned / Claimed | I189 | Keep unactivated; its protected permission scope is independent of I210. |
+| Planned / Unclaimed | I198, I206, I207, I208, I210, I211 | Preserve their owners and order. I210 is the next mainline child; none grants overlapping authority. |
+| Paused | I164 | Preserve its superseded target; do not resume. |
+| Blocked | None with a current iteration document status | Backlog-level blockers, including Issue #59 production children, retain their independent owners and gates. |
+
+Open PRs #120/#121 are archival Drafts. No open implementation or claim PR targets Issue #278,
+PROVIDER-006 or I210. The retained `/private/tmp/talos-i201-impl` worktree and its branch belong to
+I201 history and must not be modified. Stashes `stash@{0}` and `stash@{1}` remain historical and
+must not be restored as a unit.
+
+## 2026-08-20 Decision And Claim Preparation
+
+ADR-062 is Proposed. It defines a typed, non-secret request-local progress protocol, an additive
+defaulted `LanguageModel` method for third-party source compatibility, the existing ordered
+Agent/session event projection, and a distinct reconnecting phase carrying the provider-owned retry
+ordinal and ceiling. It explicitly preserves retry policy and requires the public conversation enum
+addition to wait for a pre-1.0 minor release rather than a patch.
+
+The preparation branch is governance-only. Until the actual claim PR is finalized, independently
+reviewed and merged, I210 remains Planned/Unclaimed and no Rust, Cargo, implementation branch,
+version, tag or publication action is authorized.

@@ -27,6 +27,23 @@
 | Last Updated | 2026-08-19 |
 | Handoff / Release Condition | Accept an ADR defining the semver-compatible progress contract, then establish an effective claim before implementation. |
 
+## Claim Preparation - 2026-08-20
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed; governance proposal not yet effective |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I210/PROVIDER-006 only: ADR-062 typed progress contract; additive defaulted provider progress entrypoint; built-in OpenAI-compatible and Anthropic dispatch/backoff/first-packet facts; ordered Agent/session/conversation projection; Connecting/Reconnecting activity presentation; deterministic compatibility, retry, cancellation and UI tests; directly affected docs. Excludes retry/timeout/backoff policy changes, error-text/timer inference, persistence, dependencies, release/publication, Desktop/Dashboard and unrelated I198/I211 work. |
+| Claimed At | Not effective until target-branch merge |
+| Source Issue | #278 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review proposed |
+| Authorization Evidence | Pending exact-head review, CI, both governance validators and merge-time CAS. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | This preparation record grants no implementation authority. Finalize the actual claim PR number and accepted ADR, merge the claim to `main`, then create implementation work only from that merge or later exact `main`. |
+
 ## Identity / Goal / Value
 
 Users waiting on provider dispatch or retry backoff need truthful bounded progress based on actual
@@ -88,3 +105,16 @@ present a static indefinite connection label when the provider knows the current
 - `crates/talos-provider/src/lib.rs`
 - `crates/talos-provider/src/openai.rs`
 - `crates/talos-agent/src/session/turn.rs`
+
+## 2026-08-20 Architecture And Claim Preparation Checkpoint
+
+ADR-062 selects a request-local typed progress channel and a defaulted additive `LanguageModel`
+method so existing third-party provider implementations retain their current source contract. The
+existing non-exhaustive Agent/session progress path carries the facts; a new reconnecting phase owns
+the visible `n/m` presentation while the legacy retry phase remains available. The ADR records the
+pre-1.0 minor-release requirement for the new public conversation enum variant; I210 itself does
+not change versions or authorize release.
+
+The exact-main inventory and overlap audit are recorded in I210. No active implementation or claim
+PR overlaps Issue #278. This governance proposal remains ineffective until its actual PR number,
+accepted decision evidence, exact-head checks and merge-time CAS are complete on `main`.
