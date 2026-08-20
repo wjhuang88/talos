@@ -75,7 +75,7 @@ as an editable default without turning model-name matching into authoritative ca
       resolver/display projection with existing config remaining readable.
 - [x] Catalog entries without context metadata produce no fabricated value.
 - [x] MODEL-011 capability probing remains an independent evidence path.
-- [ ] I212 has an effective Collaboration Claim on `main` before implementation.
+- [x] I212 has an effective Collaboration Claim on `main` before implementation.
 
 ## State / Status Owners
 
@@ -128,3 +128,14 @@ lifecycle tests, strict Clippy, formatting and `git diff --check` passed. Full
 tests. Exact-head CI, independent Agent review, CAS and the Issue #302 natural-person walkthrough
 remain open, so MODEL-013 stays In Progress and has no Completion Commit. Issue #316 tracks the
 separate process-HOME test isolation defect observed during non-isolated runs.
+
+## 2026-08-20 Independent Review Correction
+
+Independent Agent review `5349780559` of superseded PR head `7f6838a0` verified the implementation
+semantics, explicit precedence, conservative ambiguity behavior, context-only projection and scope
+boundaries. It requested changes because exact-head CI failed remote owner reconciliation for
+Issues #316/#317 and this owner still left the already-satisfied effective-claim row unchecked.
+Governance PR #319 then registered those Issues and merged to `main` as `8d0d3166`; this branch was
+rebased onto that merge and the claim row above now reflects claim #314 merge `a62f448b`. The old CI
+and review conclusion do not carry to the new head; MODEL-013 remains In Progress pending new
+exact-head CI, independent review, CAS and the Issue #302 walkthrough.

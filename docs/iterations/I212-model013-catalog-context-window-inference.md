@@ -145,3 +145,13 @@ defect is not claimed as an I212 product defect.
 ## Retrospective
 
 Pending execution.
+
+## 2026-08-20 Review And Main Synchronization Checkpoint
+
+Independent Agent review `5349780559` bound to superseded head `7f6838a0` verified the I212 code
+semantics and requested changes only for failed exact-head remote owner reconciliation (#316/#317)
+and the stale unchecked claim-acceptance row in MODEL-013. PR #319 created the separate Unclaimed
+owners and merged as `8d0d3166`; I212 was rebased onto that current `main`, and the owner now marks
+the effective claim fact truthfully. This invalidates the old exact-head CI and review disposition.
+I212 stays Review/Active with Completion Commit pending until the new head passes CI, independent
+review and merge-time CAS; its natural-person custom-provider row remains deferred to #302/I211.

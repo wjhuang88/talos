@@ -460,3 +460,13 @@ network surface changed. Issue #316 now owns the separate HOME-mutating test iso
 still requires exact-head CI, independent Agent review, CAS and its custom-provider Issue #302 row
 before closeout. I210 remains the next ordered child and has no implementation authority until its
 separate ADR and claim land.
+
+## 2026-08-20 I212 Review Correction Checkpoint
+
+Independent Agent review `5349780559` verified I212 implementation behavior at superseded head
+`7f6838a0` but requested changes because remote owner reconciliation lacked #316/#317 and MODEL-013
+still showed the already-effective claim gate unchecked. Governance PR #319 reconciled those Issues
+without adding I212 product scope and merged as `8d0d3166`. The I212 branch is rebased onto that
+merge, the claim fact is corrected, and all exact-head CI/review evidence must now be regenerated.
+I212 remains the active T7A item; no I210/I198 authority transfers before its implementation merge
+and deferred-validation disposition.
