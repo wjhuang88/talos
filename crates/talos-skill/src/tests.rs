@@ -74,6 +74,84 @@ fn parse_valid_skill_md() {
 }
 
 #[test]
+fn parse_skill_without_triggers_defaults_to_empty() {
+    let dir = tempfile::tempdir().expect("failed to create temp dir");
+    let path = dir.path().join("SKILL.md");
+    fs::write(
+        &path,
+        r#"---
+name: minimal-skill
+description: A minimal compatible skill
+---
+
+# Minimal Skill
+"#,
+    )
+    .expect("failed to write test file");
+
+    let skill = SkillLoader::parse(&path).expect("omitted triggers should default to empty");
+
+    assert!(skill.triggers.is_empty());
+    assert_eq!(skill.name, "minimal-skill");
+    assert_eq!(skill.description, "A minimal compatible skill");
+}
+
+#[test]
+fn parse_malformed_trigger_values_remains_rejected() {
+    let cases = [
+        ("scalar", "triggers: build"),
+        ("mapping", "triggers:\n  build: true"),
+        ("mapping entry", "triggers:\n  - build\n  - nested: value"),
+    ];
+
+    for (case, triggers) in cases {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().join("SKILL.md");
+        fs::write(
+            &path,
+            format!(
+                "---\nname: malformed-{case}\ndescription: Malformed trigger fixture\n{triggers}\n---\n\nBody.\n"
+            ),
+        )
+        .expect("failed to write test file");
+
+        match SkillLoader::parse(&path).expect_err("malformed triggers should fail") {
+            SkillError::YamlParseError(error) => {
+                assert!(
+                    error.to_string().contains("triggers"),
+                    "{case} diagnostic should identify triggers: {error}"
+                );
+            }
+            other => panic!("{case}: expected YamlParseError, got: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn parse_numeric_trigger_entry_preserves_existing_scalar_coercion() {
+    let dir = tempfile::tempdir().expect("failed to create temp dir");
+    let path = dir.path().join("SKILL.md");
+    fs::write(
+        &path,
+        r#"---
+name: scalar-coercion
+description: Existing yaml_serde scalar behavior
+triggers:
+  - build
+  - 42
+---
+
+Body.
+"#,
+    )
+    .expect("failed to write test file");
+
+    let skill =
+        SkillLoader::parse(&path).expect("existing scalar coercion should remain compatible");
+    assert_eq!(skill.triggers, vec!["build", "42"]);
+}
+
+#[test]
 fn parse_skill_without_frontmatter_errors() {
     let dir = tempfile::tempdir().expect("failed to create temp dir");
     let path = dir.path().join("SKILL.md");

@@ -632,6 +632,12 @@ Talos discovers `SKILL.md` files at session startup and injects Level 0 metadata
 (skill name, description, and triggers) into the system prompt before the first
 model turn.
 
+In YAML frontmatter, `name` and `description` are required. `triggers` is optional: omitting it has
+the same result as `triggers: []`. Explicit empty and non-empty lists retain their existing
+behavior, and malformed scalar, mapping, or mapping-entry shapes are rejected as YAML parse errors.
+Skill authors should write trigger entries as strings; Talos preserves the YAML scalar coercion
+behavior accepted by earlier releases.
+
 Skill search paths, in priority order:
 
 - `.talos/skills/` in the active workspace

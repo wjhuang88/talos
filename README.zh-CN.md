@@ -444,6 +444,11 @@ talos --available-models --available-models-all
 ## Skills
 
 Talos 会在启动时发现运行时 Skill 元数据，并把可用 Skill 的简要清单加入模型上下文。
+YAML frontmatter 中的 `name` 和 `description` 为必填字段。`triggers` 可以省略，省略时与
+`triggers: []` 等价。显式空列表和非空列表保持既有行为；标量、映射或包含映射项的错误
+结构会作为 YAML 解析错误被拒绝。Skill 作者应将 trigger 项写成字符串；Talos 保留旧版本
+已经接受的 YAML 标量转换行为。
+
 发现路径包括：
 
 - `.talos/skills/`（当前工作区）

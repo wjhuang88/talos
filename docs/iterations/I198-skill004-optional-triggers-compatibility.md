@@ -1,6 +1,6 @@
 # Iteration I198: Optional Skill Triggers Compatibility
 
-> Document status: Active / Claimed via governance PR #324; ineffective before target-branch merge
+> Document status: Review / Claimed
 > Published plan date: 2026-08-14
 > Planned objective: decide and implement the smallest compatible omitted-`triggers` contract for
 > otherwise-valid `SKILL.md` files without weakening malformed-value validation or changing skill
@@ -22,10 +22,10 @@
 | Source Issue | #155 |
 | Governance Claim PR | #324 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #324 must pass independent exact-head claim review, exact-head CI, both governance validators and merge-time CAS. The proposed claim remains ineffective while the PR is open. |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
+| Implementation PR | #325 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #324 exact-head review, CI and CAS must pass and the claim must reach `main`. Only then branch from that merge or later current `main`; implementation CI/review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation PR #325 remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
 
 ## Published Baseline
 
@@ -151,3 +151,38 @@ a missing-field default without a public type break.
 The preparation branch is governance-only. PR #324 now contains the finalized proposed claim.
 Until it is independently reviewed and merged, target-branch I198 remains Planned/Unclaimed and no
 parser, Rust, Cargo, dependency, version, tag or publication action is authorized.
+
+## 2026-08-20 Implementation Characterization Correction
+
+A test written before the production edit showed that `yaml_serde` preserves historical scalar
+coercion inside `Vec<String>`: a numeric entry `42` becomes `"42"`. Scalar or mapping `triggers`
+containers and mapping entries remain rejected with field-specific YAML diagnostics. I198 preserves
+that existing explicit-list behavior and tests it; it does not introduce stricter scalar validation.
+
+The authorized implementation remains one additive missing-field default plus focused omitted,
+empty, non-empty, rejected-shape and compatibility fixtures and bilingual documentation. Any future
+strict scalar-type policy requires a separate owner and compatibility decision.
+
+## 2026-08-20 Claim Activation And Implementation Checkpoint
+
+PR #324 final head `a06e34a51dabd33a3204d2e96e749f2342545438` passed exact-head CI
+`32337065552`, independent Agent claim review `5351981686`, both governance validators and CAS,
+then merged as `ea6686855de971df42de0311333617090c30de47`. This implementation branch starts exactly
+from that effective claim merge.
+
+The code slice is one serde missing-field default with omitted, explicit, rejected-shape and legacy
+scalar-coercion regressions. The actual `talos` inline binary fixture omits `triggers`, explicitly
+activates the Skill and observes its body in the request preview. English and Chinese documentation
+state the optional-field contract. Cargo, dependencies, discovery/routing, permissions, persistence
+and release/publication remain unchanged.
+
+## 2026-08-20 Implementation Validation Checkpoint
+
+The implementation worktree passed `cargo test -p talos-skill --locked` (81 unit tests and one
+doctest), `cargo test -p talos-cli --test skill_runtime_e2e --locked` (2 tests), strict package
+Clippy, both governance validators, manifest YAML parsing, `git diff --check`, and the complete
+release preflight. The binary E2E fixture demonstrates runtime reachability rather than parser-only
+success.
+
+I198 is now `Review / Claimed` with `Completion Commit: Pending`. Exact-head CI, independent Agent
+technical review, merge-time CAS and the deferred Issue #302 human row remain required.
