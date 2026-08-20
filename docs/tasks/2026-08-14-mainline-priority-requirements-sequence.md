@@ -348,8 +348,8 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
-| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; implementation and preflight complete, exact-head PR gates open |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
+| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned / Claim proposed in #326; ineffective while open |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
@@ -587,3 +587,30 @@ Implementation commit `f719ed913d36ad7ad00f5a99d3d990b414dbbd5d` is published in
 The owner records now identify that PR; the next head requires fresh exact-head CI and independent
 Agent technical review before merge-time CAS. This evidence backfill does not complete I198 or
 authorize I211.
+
+## 2026-08-20 I198 Merge And I211 Claim-Preparation Checkpoint
+
+PR #325 final head `b2d5adaf0cdbc57906f37661dfe42762c7deead6` passed CI run
+`32340432185` attempt 2, independent Agent review `5352638953` and merge-time CAS, then merged as
+`15a3d4248d13d3951c823628454a2629398a9d48`. Issue #302 comment `5352702000` records the final
+I198 disposition; its natural-person row remains open.
+
+All six I211 child implementation dispositions are now terminal. Current iteration inventory has
+no Active item; I197/I198/I200/I201/I210/I212 remain Review for #302; I189 remains
+Planned/Claimed and unactivated; I206-I208 and I211 remain Planned/Unclaimed; I164 remains Paused;
+no current iteration document is Blocked. Open PRs #120/#121 are archival Drafts and do not overlap
+I211. PR #326 proposes the governance-only evidence claim; it grants no product repair, release or
+publication authority before target-branch merge.
+
+## 2026-08-20 I211 Claim Review Correction Checkpoint
+
+Independent Agent claim review `5353122975` bound to PR #326 head `229b9754` accepted the
+evidence-only scope, dependency inventory and baseline preservation but requested the missing I200
+final disposition in Issue #302. Comment `5353130091` now records PR #301 final head `8a58cb2d`,
+implementation `3afeeb28`, CI `32149762367`, Agent technical review `5330234992`, merge-time CAS
+and merge `9628e183`; I200 remains Review and its natural-person rows remain open.
+
+The correction resolves the sole review blocker without changing product code or acceptance
+truth. Open PR #327 is an unrelated Dashboard claim. Re-run both exact-base governance
+validators, CI and independent review on the new #326 head before merge-time CAS; only the claim
+merge may authorize a later I211 activation branch.

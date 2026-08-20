@@ -5,27 +5,27 @@
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | Ready - I211 Planned / Unclaimed |
+| Status | Ready - I211 Planned / Claimed via PR #326; ineffective before target-branch merge |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Planned / Unclaimed |
+| Selected Iteration | I211 - Planned / Claimed via PR #326; ineffective before target-branch merge |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline validation session |
+| Work Slice | I211/VALIDATION-002/#302 evidence only: execute and record the already-defined natural-person and real-terminal rows for I200, I197, I201, I212, I210 and I198; synchronize source owners first; create separately governed corrective owners for failures. No product implementation, policy, dependency, persistence, release or publication change. |
+| Claimed At | 2026-08-20 |
 | Source Issue | #302 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #326 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #326 must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. The proposed claim has no target-branch effect while the PR is open. |
 | Implementation PR | None - evidence-only validation slice |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | After I200, I197, I201, I212, I210 and I198 have terminal implementation dispositions, establish an effective evidence-only I211 claim and execute every Issue #302 row before the mainline long task can close. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | Merge claim PR #326 after exact-head gates; only then activate I211 from that merge or later current `main`. Every #302 row must pass or name a separately governed corrective owner before long-task closure. |
 
 ## Identity / Goal / Value
 
@@ -87,3 +87,26 @@ claim, exact-head CI, technical review or CAS gates.
 Implementation defects found during the batch use new corrective Stories/iterations. Automation of
 this scheduling mode belongs to a separately claimed governance improvement; I211 changes no SOP
 validator or CI behavior.
+
+## 2026-08-20 Claim Preparation Checkpoint
+
+The implementation queue is terminal: I200 merged as `9628e183`, I197 as `d98f37e7`, I201 as
+`7f5a6df2`, I212 as `5a1709cb`, I210 as `9d5c8a71`, and I198 as `15a3d424`. Each remains Review
+only for its Issue #302 natural-person/manual rows. No active iteration or overlapping open PR owns
+this evidence slice; I189 remains Planned/Claimed but unactivated, I206-I208 remain separately
+Planned/Unclaimed, and I164 remains Paused.
+
+PR #326 proposes the evidence-only claim. It records no human pass and authorizes no product
+repair. The claim is ineffective until its finalized exact head reaches `main`.
+
+## 2026-08-20 Claim Review Correction Checkpoint
+
+Independent Agent claim review `5353122975` bound to PR #326 head `229b9754` requested one
+correction: Issue #302 did not yet record I200's final implementation disposition. Issue comment
+`5353130091` now records PR #301 final head `8a58cb2d`, implementation evidence `3afeeb28`, CI
+`32149762367`, Agent technical review `5330234992`, merge-time CAS and merge `9628e183`, while
+preserving I200 as Review with its mouse/touchpad rows unpassed.
+
+That remote evidence resolves the sole review blocker without claiming a human pass. Open
+PR #327 is an unrelated Dashboard claim and does not overlap I211's evidence-only slice. Any new
+#326 head requires fresh exact-head CI and independent claim review before merge-time CAS.
