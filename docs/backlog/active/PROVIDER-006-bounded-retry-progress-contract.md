@@ -127,3 +127,11 @@ The remaining natural-person live retry-status row is recorded in Issue #302 com
 PROVIDER-006 stays Review/Claimed with `Completion Commit: Pending`; the implementation disposition
 allows the non-overlapping I198 claim to proceed but does not claim human acceptance or transfer
 release authority.
+
+## 2026-08-20 I211 Human Validation Partial Failure
+
+Integrated mock-provider validation confirmed the retry ordinal and terminal clearing but found
+the initial `Connecting...` state too brief to observe and an idle first submission incorrectly
+labeled as queued. TUI-060 / Issue #332 owns that corrective presentation/sequencing work.
+PROVIDER-006 remains Review; no retry-policy change or implementation authority transfers through
+this note.

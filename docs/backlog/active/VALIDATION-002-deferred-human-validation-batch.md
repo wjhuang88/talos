@@ -130,3 +130,11 @@ permission-mediated marker/unnamed outcome failure is assigned to Ready/Unclaime
 #329. The permission prompt hierarchy, new-session physical-bottom docking and incomplete terminal
 matrix are assigned to Ready/Unclaimed TUI-059 / Issue #330. Source owners I201 and I197 remain
 Review. I200, I212, I210 and I198 matrices and I201 direct internal negative cases remain pending.
+
+## 2026-08-20 Integrated Runtime And I210 Natural-Person Checkpoint
+
+Integrated locked tests passed the automatically constructible I198, I212, I210 and I201 negative
+event cases. Maintainer validation of I210 observed a correct `Reconnecting... (attempt 1/2)` and
+terminal clearing, but the initial `Connecting...` state was too brief to observe and the first
+idle submission incorrectly displayed a queue hint. TUI-060 / Issue #332 separately owns both
+status-sequencing defects. This is a partial result, not I210 or I211 completion.

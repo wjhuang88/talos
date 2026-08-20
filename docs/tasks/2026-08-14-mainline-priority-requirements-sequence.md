@@ -637,3 +637,13 @@ the permission-mediated marker/unnamed outcome path failed and is now owned by T
 TUI-059 / Issue #330. Both corrective Stories are Ready/Unclaimed and authorize no implementation.
 I200, I212, I210, I198 and the remaining direct-event rows stay pending; the long task remains In
 Progress and cannot close.
+
+## 2026-08-20 I211 Integrated Validation Checkpoint
+
+Integrated locked tests now cover I198 omitted-trigger runtime reachability and parser compatibility,
+I212 catalog resolution/provenance, I210 provider-to-TUI retry projection and terminal cleanup, and
+I201 direct-event negative cases. Maintainer mock-provider validation confirmed truthful
+`Reconnecting... (attempt 1/2)` and cleanup, but found `Connecting...` too brief to observe and the
+first idle submission falsely labeled as queued. Ready/Unclaimed TUI-060 / Issue #332 owns those
+defects without authorizing implementation. Remaining human/device work is I200, I212 and I198;
+the long task and I210 remain open.

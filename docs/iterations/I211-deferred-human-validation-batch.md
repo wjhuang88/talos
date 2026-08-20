@@ -163,3 +163,18 @@ composer-relative permission docking and the incomplete terminal matrix. Both ar
 and grant no implementation authority. I200 device coverage, I212 custom-provider inference, I210
 live reconnect terminal states, I198 Skill compatibility and unsynthesized I201 direct-event
 negative cases remain pending.
+
+## 2026-08-20 Integrated Runtime Evidence And I210 Disposition
+
+Agent-executed locked tests on integrated `main@a2f43248` passed I198's real-binary omitted-trigger
+path and parser compatibility matrix, I212's exact/prefix/override/ambiguous/unknown catalog
+resolution and picker provenance, I210's provider-to-TUI progress projection and terminal cleanup,
+and I201's direct-result/direct-approval negative cases. These results strengthen machine/runtime
+coverage and are not represented as natural-person review.
+
+The maintainer then exercised I210 with a local OpenAI-compatible mock provider configured for two
+retry attempts. `Reconnecting... (attempt 1/2)` matched the provider fact and cleared, but
+`Connecting...` was too brief to observe reliably. An otherwise idle first message also displayed
+`Message queued and will send after current turn.` immediately on Enter. TUI-060 / Issue #332 owns
+both corrective status-sequencing defects as Ready/Unclaimed. I210 remains Review; I200, I212 and
+I198 natural-person/device rows remain open.
