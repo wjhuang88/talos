@@ -431,3 +431,42 @@ The maintainer also clarified Issue #278/I210: the existing model-request activi
 and clear on success, terminal failure or cancellation. This is part of the long task after I212 and
 before I198, but I210 remains Planned/Unclaimed and still requires its ADR and separate effective
 claim. It cannot be implemented inside I212 or inferred from error text/timers.
+
+## 2026-08-19 Human Validation And I212 Implementation Checkpoint
+
+The maintainer executed the available Issue #302 real-terminal matrix on integrated
+`main@ec794515` under macOS. Plain Unicode/ASCII markers, streamed multiline and long-sentence
+content, ordered read-only tools, denied and approved permission recovery, tool failure recovery,
+prompt Esc cancellation within about one second, the following turn, and session resume all
+completed. The approved write executed exactly once and its content was verified; the temporary
+artifact was removed afterward.
+
+The same matrix found that a permission-mediated tool sequence can retain `Calling tools…`, an
+unnamed `approved` row and the named structured tool row. This is a failing I201/#111 sequence
+(`marker -> approval -> ToolCall`), so I201 remains Review and the corrective requirement stays in
+Issue #111/#302 rather than being called accepted. I197/#125 also remains Review: the permission
+selector and running-tool status occupy opposite sides of the composer and the full resize,
+small-terminal and queued-prompt matrix is incomplete. Esc cancellation was responsive, but resumed
+history lacked an explicit cancelled terminal row; Issue #45 owns that observation. Retry/timeout
+and direct internal result/approval events were not exercised. Resumed `out` counters reset to zero;
+Issue #302 records this as an unresolved semantics question, not a confirmed defect.
+
+I212 implementation commit `3cb1a801` now provides the bounded local catalog inference slice; its
+implementation PR is #318.
+Config tests passed 224/224 plus one doctest with isolated HOME; 28 CLI lifecycle tests, strict
+Clippy, formatting and diff checks passed. Full release preflight also passed outside the outer
+execution sandbox, including macOS seatbelt tests. No Cargo/default-feature/dependency/persistence/
+network surface changed. Issue #316 now owns the separate HOME-mutating test isolation defect. I212
+still requires exact-head CI, independent Agent review, CAS and its custom-provider Issue #302 row
+before closeout. I210 remains the next ordered child and has no implementation authority until its
+separate ADR and claim land.
+
+## 2026-08-20 I212 Review Correction Checkpoint
+
+Independent Agent review `5349780559` verified I212 implementation behavior at superseded head
+`7f6838a0` but requested changes because remote owner reconciliation lacked #316/#317 and MODEL-013
+still showed the already-effective claim gate unchecked. Governance PR #319 reconciled those Issues
+without adding I212 product scope and merged as `8d0d3166`. The I212 branch is rebased onto that
+merge, the claim fact is corrected, and all exact-head CI/review evidence must now be regenerated.
+I212 remains the active T7A item; no I210/I198 authority transfers before its implementation merge
+and deferred-validation disposition.

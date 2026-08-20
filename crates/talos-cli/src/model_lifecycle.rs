@@ -19,6 +19,31 @@ use crate::mode_runtime::{SessionModelActivation, SessionModelIdentity};
 use crate::session_transition::SessionTransition;
 use crate::tui_runtime_builder::TuiRuntimeBuilder;
 
+fn model_picker_label(
+    config: &Config,
+    model: &talos_config::model::ModelMetadata,
+    is_builtin_provider: bool,
+) -> String {
+    let context = model
+        .context_limit
+        .map(|limit| {
+            let suffix = if !is_builtin_provider
+                && config
+                    .providers
+                    .get(&model.provider)
+                    .and_then(|provider| provider.models.get(&model.id))
+                    .is_some_and(|configured| configured.context_limit.is_none())
+            {
+                " (catalog)"
+            } else {
+                ""
+            };
+            format!("{}K{suffix}", limit / 1000)
+        })
+        .unwrap_or_else(|| "?".to_string());
+    format!("{}   {}   {}", model.id, model.provider, context)
+}
+
 /// Constructs [`ModelPickerData`] from the given [`Config`].
 ///
 /// Iterates the model catalog, checks provider authentication, and formats display strings. Models from
@@ -26,6 +51,10 @@ use crate::tui_runtime_builder::TuiRuntimeBuilder;
 /// are intentionally omitted from `/model` and handled by `/connect`.
 pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
     let catalog = config.all_models();
+    let builtin_providers: std::collections::HashSet<_> = talos_config::model::builtin_providers()
+        .into_iter()
+        .map(|provider| provider.id)
+        .collect();
 
     let mut ready_models: Vec<ModelPickerItem> = Vec::new();
     for m in &catalog {
@@ -39,11 +68,6 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 format!("{input}/{output}")
             }
         });
-        let ctx_str = m
-            .context_limit
-            .map(|c| format!("{}K", c / 1000))
-            .unwrap_or_else(|| "?".to_string());
-
         if provider_authed {
             ready_models.push(ModelPickerItem {
                 command: "/model".to_string(),
@@ -52,7 +76,7 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 // duplicate model IDs in the structured switch lifecycle.
                 model_id: m.id.clone(),
                 provider: m.provider.clone(),
-                label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
+                label: model_picker_label(config, m, builtin_providers.contains(&m.provider)),
                 context_limit: m.context_limit,
                 pricing: pricing_str,
                 authenticated: true,
@@ -100,16 +124,11 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                     format!("{input}/{output}")
                 }
             });
-            let ctx_str = m
-                .context_limit
-                .map(|c| format!("{}K", c / 1000))
-                .unwrap_or_else(|| "?".to_string());
-
             recent_items.push(ModelPickerItem {
                 command: "/model".to_string(),
                 model_id: m.id.clone(),
                 provider: m.provider.clone(),
-                label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
+                label: model_picker_label(config, m, builtin_providers.contains(&m.provider)),
                 context_limit: m.context_limit,
                 pricing: pricing_str,
                 authenticated: true,
@@ -716,9 +735,10 @@ fn send_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::path::Path;
     use talos_agent::Agent;
-    use talos_config::ProviderConfig;
+    use talos_config::{ModelConfig, ProviderConfig};
     use talos_core::model::{ModelCapabilities, ReasoningEffort, VariantDef};
     use talos_core::tool::ToolRegistry;
     use talos_provider::mock::MockProvider;
@@ -806,6 +826,59 @@ mod tests {
                 m.model_id
             );
         }
+    }
+
+    #[test]
+    fn custom_catalog_context_is_labeled_without_relabeling_builtin_models() {
+        let catalog = talos_config::model::builtin_models();
+        let source = catalog
+            .iter()
+            .find(|candidate| {
+                candidate.context_limit.is_some()
+                    && catalog
+                        .iter()
+                        .filter(|model| model.id == candidate.id)
+                        .count()
+                        == 1
+            })
+            .expect("catalog should contain one unique model with context metadata");
+        let model_id = source.id.clone();
+        let builtin_provider = source.provider.clone();
+        let mut config = Config {
+            model: model_id.clone(),
+            provider: "my-private-gateway".to_string(),
+            ..Default::default()
+        };
+        config.providers.insert(
+            "my-private-gateway".to_string(),
+            ProviderConfig {
+                api_key: Some("test-key".to_string()),
+                models: HashMap::from([(model_id.clone(), ModelConfig::default())]),
+                ..Default::default()
+            },
+        );
+        config.providers.insert(
+            builtin_provider.clone(),
+            ProviderConfig {
+                api_key: Some("test-key".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let data = build_model_picker_data(&config);
+        let custom = data
+            .ready_models
+            .iter()
+            .find(|model| model.provider == "my-private-gateway" && model.model_id == model_id)
+            .expect("custom model should be visible");
+        let builtin = data
+            .ready_models
+            .iter()
+            .find(|model| model.provider == builtin_provider && model.model_id == model_id)
+            .expect("built-in model should be visible");
+
+        assert!(custom.label.contains("(catalog)"));
+        assert!(!builtin.label.contains("(catalog)"));
     }
 
     #[tokio::test]

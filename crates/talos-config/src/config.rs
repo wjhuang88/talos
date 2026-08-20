@@ -6,6 +6,60 @@ use crate::{
 use std::env;
 use std::path::PathBuf;
 
+/// Provenance for the active model's resolved context window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextLimitSource {
+    /// The user supplied an explicit per-model limit.
+    Configured,
+    /// A single packaged catalog record supplied the limit.
+    CatalogInferred,
+    /// No safe local catalog match exists.
+    Unknown,
+}
+
+/// Context-window resolution result, including its provenance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContextLimitResolution {
+    /// Resolved context window, or `None` when the catalog has no safe value.
+    pub limit: Option<u32>,
+    /// Why this value was (or was not) resolved.
+    pub source: ContextLimitSource,
+}
+
+fn infer_catalog_context(
+    catalog: &[model::ModelMetadata],
+    provider: &str,
+    model_id: &str,
+) -> Option<u32> {
+    if model::builtin_providers()
+        .iter()
+        .any(|entry| entry.id == provider)
+    {
+        return model::find_model_by_provider(catalog, provider, model_id)
+            .and_then(|meta| meta.context_limit);
+    }
+
+    let exact: Vec<_> = catalog.iter().filter(|meta| meta.id == model_id).collect();
+    match exact.as_slice() {
+        [meta] => return meta.context_limit,
+        [] => {}
+        _ => return None,
+    }
+
+    let normalized = model_id
+        .split_once(['/', ':'])
+        .and_then(|(_, remainder)| (!remainder.is_empty()).then_some(remainder));
+    normalized.and_then(|normalized| {
+        let matches: Vec<_> = catalog
+            .iter()
+            .filter(|meta| meta.id == normalized)
+            .collect();
+        (matches.len() == 1)
+            .then(|| matches[0].context_limit)
+            .flatten()
+    })
+}
+
 impl Config {
     /// Returns the default path for the configuration file: `~/.talos/config.toml`.
     pub fn default_path() -> PathBuf {
@@ -132,6 +186,48 @@ impl Config {
         self.resolve_model_limits_with_catalog(None)
     }
 
+    /// Resolves only the context window and reports whether it was configured,
+    /// conservatively inferred from the packaged catalog, or left unknown.
+    ///
+    /// Custom providers may use one leading gateway/provider segment in the
+    /// model id (`gateway/model` or `gateway:model`). Matching is exact first;
+    /// a normalized match is accepted only when exactly one catalog record has
+    /// a known context limit. No fuzzy matching or network access occurs.
+    #[must_use]
+    pub fn resolve_context_limit(&self) -> ContextLimitResolution {
+        self.resolve_context_limit_with_catalog(&model::builtin_models())
+    }
+
+    /// Variant of [`Config::resolve_context_limit`] for tests or callers with
+    /// an explicit local catalog overlay.
+    #[must_use]
+    pub fn resolve_context_limit_with_catalog(
+        &self,
+        catalog: &[model::ModelMetadata],
+    ) -> ContextLimitResolution {
+        if let Some(limit) = self
+            .active_model_config()
+            .and_then(|model_config| model_config.context_limit)
+        {
+            return ContextLimitResolution {
+                limit: Some(limit),
+                source: ContextLimitSource::Configured,
+            };
+        }
+
+        if let Some(context_limit) = infer_catalog_context(catalog, &self.provider, &self.model) {
+            return ContextLimitResolution {
+                limit: Some(context_limit),
+                source: ContextLimitSource::CatalogInferred,
+            };
+        }
+
+        ContextLimitResolution {
+            limit: None,
+            source: ContextLimitSource::Unknown,
+        }
+    }
+
     /// Resolves model limits with an optional catalog overlay.
     ///
     /// Precedence (highest first):
@@ -154,6 +250,26 @@ impl Config {
             && let Some(ctx) = model_config.context_limit
         {
             return (ctx, model_config.output_limit);
+        }
+
+        if !model::builtin_providers()
+            .iter()
+            .any(|provider| provider.id == self.provider)
+        {
+            let builtin_catalog;
+            let inference_catalog = match catalog {
+                Some(catalog) => catalog,
+                None => {
+                    builtin_catalog = model::builtin_models();
+                    &builtin_catalog
+                }
+            };
+            if let Some(context_limit) =
+                infer_catalog_context(inference_catalog, &self.provider, &self.model)
+            {
+                return (context_limit, None);
+            }
+            return (CONSERVATIVE_FALLBACK, None);
         }
 
         if let Some(catalog_models) = catalog
@@ -381,6 +497,11 @@ impl Config {
             }
         }
 
+        // Keep inference input separate from user overlays. A manually
+        // configured row with the same opaque id must not make a unique
+        // packaged row appear ambiguous.
+        let inference_catalog = models.clone();
+
         for (provider_name, provider) in &self.providers {
             for (model_id, cfg) in &provider.models {
                 if let Some(existing) = models
@@ -412,6 +533,19 @@ impl Config {
                         variants: vec![],
                         source: model::ModelSource::Manual,
                     });
+                }
+            }
+        }
+        for (provider_name, provider) in &self.providers {
+            for (model_id, cfg) in &provider.models {
+                if cfg.context_limit.is_none()
+                    && let Some(existing) = models
+                        .iter_mut()
+                        .find(|entry| entry.provider == *provider_name && entry.id == *model_id)
+                    && existing.context_limit.is_none()
+                {
+                    existing.context_limit =
+                        infer_catalog_context(&inference_catalog, provider_name, model_id);
                 }
             }
         }
