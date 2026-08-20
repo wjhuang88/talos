@@ -138,3 +138,16 @@ The earlier CLI failure was an outer-sandbox configuration-I/O denial, not a pro
 The implementation remains `Review / Claimed`: exact-head CI, independent technical review,
 merge-time CAS, and the live retry-status human row in Issue #302 remain required. No
 `Completion Commit` is recorded before those gates and the deferred human validation pass.
+
+## 2026-08-20 Implementation Merge Disposition
+
+PR #323 final head `c984ec483aaba5f6d4d1e96d288cfcb874b0f239` passed exact-head CI
+`32333116774`, independent Agent technical re-review `5351610613`, both governance validators and
+merge-time CAS, then merged to `main` as `9d5c8a71718b44d424092a45a75d3da0d593547d`.
+Issue #302 comment `5351796088` now binds the merged implementation and the still-open natural-person
+Connecting/Reconnecting matrix.
+
+I210 remains Review/Claimed with `Completion Commit: Pending`. Its machine, technical-review and
+merge gates are terminal; only the deferred human row prevents completion. This truthful Review
+disposition permits the non-overlapping I198 claim to proceed under its own owner and effective
+claim.

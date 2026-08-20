@@ -118,3 +118,36 @@ for a separate ADR/migration owner.
 ## Retrospective
 
 Pending execution.
+
+## Exact-Main Claim Inventory - 2026-08-20
+
+Baseline: `main@9d5c8a71718b44d424092a45a75d3da0d593547d` after refreshing `origin`; local and
+remote heads matched and the primary worktree was clean.
+
+| State | Iterations | Disposition |
+|---|---|---|
+| Active | None | I198 may be proposed, but remains unactivated until its finalized claim reaches `main`. |
+| Review / implementation merged | I197, I200, I201, I210, I212 | Preserve every Issue #302/I211 natural-person/manual row. These scopes do not transfer authority or overlap I198 parser compatibility. |
+| Planned / Claimed | I189 | Keep unactivated; its protected permission scope is independent of I198. |
+| Planned / Unclaimed | I198, I206, I207, I208, I211 | Preserve their owners. I198 is the next ordered implementation child; I211 remains the later evidence-only cleanup. |
+| Paused | I164 | Preserve its superseded target; do not resume. |
+| Blocked | None with a current iteration document status | Backlog-level blockers, including Issue #59 production children, retain their independent owners and gates. |
+
+Open PRs #120/#121 are archival Drafts. No open implementation or claim PR targets Issue #155,
+SKILL-004 or I198. The retained I201 and I210 worktrees are historical evidence and must not be
+modified or reused. Stashes `stash@{0}` and `stash@{1}` remain historical and must not be restored
+as a unit.
+
+## 2026-08-20 Compatibility Decision And Claim Preparation
+
+Read-only characterization confirms the planned contract is additive: `SkillFrontmatter` remains
+the same public struct with `triggers: Vec<String>`; explicit empty and non-empty lists already
+parse deterministically; malformed YAML and wrong trigger types fail before validation; omission
+fails only at serde deserialization because the vector field has no default. The public comment
+describing all fields as required records current behavior, but no ADR, generated schema or migration
+contract freezes omission rejection. The implementation may therefore update that comment and add
+a missing-field default without a public type break.
+
+The preparation branch is governance-only. Until the actual claim PR is finalized, independently
+reviewed and merged, I198 remains Planned/Unclaimed and no parser, Rust, Cargo, dependency,
+version, tag or publication action is authorized.

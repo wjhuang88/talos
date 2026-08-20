@@ -27,6 +27,23 @@
 | Last Updated | 2026-08-18 |
 | Handoff / Release Condition | Establish an effective I198 claim on `main`; confirm the compatibility contract before editing the parser; implement from the claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person compatibility review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
 
+## Claim Preparation - 2026-08-20
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed; governance proposal not yet effective |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I198/SKILL-004 only: confirm the additive omitted-`triggers` contract; default an omitted field to an empty list; preserve explicit empty/non-empty lists and malformed-value rejection; add focused parser/runtime fixtures; update English and Chinese skill-author documentation. Excludes discovery, linked-skill policy, trigger routing, permissions, registry/ClawHub clients, dependencies, persistence, release/publication and unrelated I211 work. |
+| Claimed At | Not effective until target-branch merge |
+| Source Issue | #155 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review proposed |
+| Authorization Evidence | Pending exact-head review, CI, both governance validators and merge-time CAS. |
+| Implementation PR | Not started |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | This preparation record grants no implementation authority. Finalize the actual claim PR number, merge the claim to `main`, then create implementation work only from that merge or later exact `main`. |
+
 ## Goal And Compatibility Contract
 
 Register the ClawHub-compatible `SKILL.md` parsing gap for contract and compatibility refinement.
@@ -84,3 +101,19 @@ malformed-value safety and documentation acceptance remain unchanged. After exac
 independent Agent technical review and CAS, the natural-person compatibility review may be added to
 Issue #302 for I211. SKILL-004 remains Review until that row passes; a breaking contract still
 stops for an ADR/migration owner.
+
+## 2026-08-20 Compatibility Decision And Claim Preparation
+
+Current code and public documentation were checked before parser edits. `SkillFrontmatter` keeps
+the same public `Vec<String>` field, explicit `triggers: []` already succeeds, explicit non-empty
+lists preserve their values, and malformed YAML/types already fail in `serde_yaml`. Omission fails
+only because the field has no serde default. The public type comment describes all fields as
+required, but no accepted ADR, generated schema or migration guarantee freezes that rejection as an
+invariant. Updating that current-behavior statement together with the parser therefore forms an
+additive input-compatibility extension rather than a public type or semantic break.
+
+The proposed implementation may add only a missing-field default and the acceptance fixtures above.
+It must stop and create a separate ADR/migration owner if implementation evidence shows malformed
+values become accepted, explicit lists change, or another published contract requires omission to
+fail. This governance proposal remains ineffective until its actual PR number, exact-head review,
+CI and merge-time CAS are complete on `main`.

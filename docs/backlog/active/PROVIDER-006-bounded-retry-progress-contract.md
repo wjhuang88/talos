@@ -114,3 +114,16 @@ Locked validation passed with an isolated writable `HOME`: affected crates and t
 `talos-cli` suite passed; strict affected-crate Clippy, formatting and `git diff --check` passed.
 The implementation is still Review/Claimed pending exact-head CI, independent review, merge-time
 CAS and the deferred live retry-status row in Issue #302. `Completion Commit` remains pending.
+
+## 2026-08-20 Implementation Merge Disposition
+
+PR #323 final head `c984ec483aaba5f6d4d1e96d288cfcb874b0f239` passed exact-head CI
+`32333116774` (five jobs, including Windows), independent Agent technical re-review `5351610613`
+with shared-account identity limits disclosed, both governance validators and merge-time CAS. It
+merged to `main` as `9d5c8a71718b44d424092a45a75d3da0d593547d`; implementation commit
+`6efee2b8b257f5c5fde5754d9cd4f211bf9474c7` is an ancestor of that merge.
+
+The remaining natural-person live retry-status row is recorded in Issue #302 comment `5351796088`.
+PROVIDER-006 stays Review/Claimed with `Completion Commit: Pending`; the implementation disposition
+allows the non-overlapping I198 claim to proceed but does not claim human acceptance or transfer
+release authority.
