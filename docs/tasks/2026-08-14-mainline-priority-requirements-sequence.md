@@ -347,8 +347,8 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation evidence `6efee2b8` |
-| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
+| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
+| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Claim proposed in PR #324; ineffective while open |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
@@ -528,3 +528,35 @@ reproduced as an outer-sandbox configuration-I/O restriction and did not recur w
 test home. I210 remains Review/Claimed until exact-head CI, independent technical review,
 merge-time CAS and its Issue #302 live retry-status row are complete; no Completion Commit is
 claimed yet. I212 and the other deferred rows remain unchanged.
+
+## 2026-08-20 I210 Merge And I198 Claim-Preparation Checkpoint
+
+I210 PR #323 final head `c984ec483aaba5f6d4d1e96d288cfcb874b0f239` passed CI
+`32333116774`, independent Agent technical re-review `5351610613`, both governance validators and
+merge-time CAS, then merged as `9d5c8a71718b44d424092a45a75d3da0d593547d`. Issue #302 comment
+`5351796088` records its open natural-person live retry-status row. I210 remains Review/Claimed;
+its implementation disposition is terminal for scheduling but is not a human-acceptance or
+completion claim.
+
+Current `main`/`origin/main` match at `9d5c8a71`; no iteration is Active. I197, I200, I201, I210 and
+I212 remain Review for Issue #302; I189 stays Planned/Claimed and unactivated; I198, I206, I207,
+I208 and I211 remain Planned/Unclaimed; I164 stays Paused; no current iteration document is Blocked.
+Open PRs #120/#121 are archival Drafts and no open branch/PR overlaps I198.
+
+Read-only I198 characterization confirms omission fails only because `SkillFrontmatter.triggers`
+has no serde default, while explicit empty/non-empty lists and malformed-type rejection already
+have distinct deterministic behavior. The proposed missing-field default is an additive input
+extension with no struct-shape, routing, permission, dependency or persistence change. The I198
+claim preparation remains ineffective until its actual PR number, exact-head CI/review and CAS are
+complete; no implementation branch or parser edit is authorized yet.
+
+## 2026-08-20 I198 Finalized Claim Proposal
+
+Draft PR #324 supplied the governance identifier. Its finalized exact head now proposes one
+Active/Claimed I198 Work Slice limited to omitted-`triggers` defaulting, focused compatibility
+fixtures and bilingual skill-author documentation. The compatibility checkpoint remains additive;
+explicit lists and malformed-value rejection are hard acceptance boundaries.
+
+The proposal has no target-branch effect while #324 is open. Independent exact-head claim review,
+CI, both governance validators and merge-time CAS must pass before merge. No implementation branch,
+Rust/Cargo change, dependency, release, tag or publication action is authorized before that merge.
