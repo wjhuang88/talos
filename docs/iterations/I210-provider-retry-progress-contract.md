@@ -1,6 +1,6 @@
 # Iteration I210: Provider Retry Progress Contract
 
-> Document status: Active / Claimed when governance PR #321 reaches `main`; ineffective while open
+> Document status: Active / Claimed
 > Planned date: 2026-08-17
 > Objective: deliver PROVIDER-006 through a truthful semver-compatible progress contract for
 > provider dispatch, retry backoff and first-packet wait.
@@ -17,10 +17,10 @@
 | Source Issue | #278 |
 | Governance Claim PR | #321 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #321 must pass independent exact-head architecture/claim review, exact-head CI, both governance validators and merge-time CAS. The claim and ADR acceptance remain ineffective while the PR is open. |
+| Authorization Evidence | PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent governance/architecture review `5350249740`, both governance validators and merge-time CAS, then merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Do not create an implementation branch until PR #321 passes all exact-head gates and the finalized claim plus ADR-062 acceptance exist on `main`; implementation must start from that merge or later exact `main`. |
+| Handoff / Release Condition | Claim is effective on `main@e58fbd39`; create the implementation branch from this merge or later exact `main`. Implementation remains limited to the Work Slice and requires its own exact-head CI, technical review, CAS and human validation row. |
 
 ## Selected Story
 
@@ -88,9 +88,9 @@ does not take over, repair or merge them.
 
 ## Status
 
-Governance PR #321 proposes Active / Claimed plus ADR-062 acceptance. The proposal has no
-target-branch effect while open. No implementation branch, public API change or code authorization
-exists until the exact-head gates pass and #321 merges to `main`.
+Governance PR #321 established Active / Claimed plus ADR-062 acceptance on `main@e58fbd39`.
+The implementation branch may now be created from this exact main, but no implementation commit,
+release or publication action is implied by the governance merge.
 
 ## Exact-Main Claim Inventory - 2026-08-20
 
@@ -119,6 +119,6 @@ Agent/session event projection, and a distinct reconnecting phase carrying the p
 ordinal and ceiling. It explicitly preserves retry policy and requires the public conversation enum
 addition to wait for a pre-1.0 minor release rather than a patch.
 
-The preparation branch is governance-only. PR #321 now contains the finalized proposed claim. Until
-it is independently reviewed and merged, target-branch I210 remains Planned/Unclaimed and no Rust,
-Cargo, implementation branch, version, tag or publication action is authorized.
+The preparation branch was governance-only. PR #321 is merged and the claim is effective; the next
+exact action is to create an implementation worktree from `main@e58fbd39` and implement only the
+accepted I210 Work Slice. Version, tag and publication actions remain excluded.

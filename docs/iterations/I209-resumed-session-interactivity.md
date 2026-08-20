@@ -20,7 +20,7 @@
 | Authorization Evidence | Claim PR #276 merged as `33b11433`; activation PR #277 merged as `c7380332`. Exact implementation head `6657d14e` passed CI `32025371877`, both governance validators, real-terminal acceptance, independent agent technical audit `5316533941` with the shared-identity limitation disclosed, and merge-time CAS before PR #279 merged as `2eff6285`. |
 | Implementation PR | #279 |
 | Last Updated | 2026-08-17 |
-| Handoff / Release Condition | None - I209 is complete. Truthful retry-progress projection remains separately Planned/Unclaimed as PROVIDER-006/I210/#278. |
+| Handoff / Release Condition | None - I209 is complete. The separately owned truthful retry-progress projection is Active/Claimed as PROVIDER-006/I210/#278 through claim merge `e58fbd39`; no authority transfers back to I209. |
 
 ## Selected Story
 

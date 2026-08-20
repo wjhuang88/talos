@@ -5,9 +5,9 @@
 | Story ID | PROVIDER-006 |
 | Type | Provider / Runtime Observability Story |
 | Priority | P1 |
-| Status | Active / Claimed when governance PR #321 reaches `main`; proposal ineffective while open |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #278](https://github.com/wjhuang88/talos/issues/278) |
-| Selected Iteration | I210 - Active / Claimed when PR #321 reaches `main` |
+| Selected Iteration | I210 - Active / Claimed |
 | Depends On | I209 disposition; ADR for a semver-compatible provider progress contract |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #278 |
 | Governance Claim PR | #321 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #321 must pass independent exact-head architecture/claim review, exact-head CI, both governance validators and merge-time CAS. The proposed claim and ADR acceptance remain ineffective while the PR is open. |
+| Authorization Evidence | PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent governance/architecture review `5350249740`, both governance validators and merge-time CAS, then merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #321 exact-head review, CI and CAS must pass and the claim plus ADR-062 acceptance must reach `main`. Only then create implementation work from that merge or later exact `main`. |
+| Handoff / Release Condition | Claim is effective on `main@e58fbd39`. Create implementation work only from this merge or later exact `main`; implementation still requires the separately governed I210 scope and final review gates. |
 
 ## Identity / Goal / Value
 
@@ -99,5 +99,5 @@ pre-1.0 minor-release requirement for the new public conversation enum variant; 
 not change versions or authorize release.
 
 The exact-main inventory and overlap audit are recorded in I210. No active implementation or claim
-PR overlaps Issue #278. Governance PR #321 proposes this claim and ADR acceptance; both remain
-ineffective until independent exact-head review, CI, merge-time CAS and target-branch merge pass.
+PR overlaps Issue #278. Governance PR #321 is now effective on `main@e58fbd39`; it authorizes only
+the bounded I210 implementation scope recorded above, not release, publication or unrelated work.
