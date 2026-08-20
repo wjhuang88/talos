@@ -98,3 +98,15 @@ Planned/Unclaimed, and I164 remains Paused.
 
 PR #326 proposes the evidence-only claim. It records no human pass and authorizes no product
 repair. The claim is ineffective until its finalized exact head reaches `main`.
+
+## 2026-08-20 Claim Review Correction Checkpoint
+
+Independent Agent claim review `5353122975` bound to PR #326 head `229b9754` requested one
+correction: Issue #302 did not yet record I200's final implementation disposition. Issue comment
+`5353130091` now records PR #301 final head `8a58cb2d`, implementation evidence `3afeeb28`, CI
+`32149762367`, Agent technical review `5330234992`, merge-time CAS and merge `9628e183`, while
+preserving I200 as Review with its mouse/touchpad rows unpassed.
+
+That remote evidence resolves the sole review blocker without claiming a human pass. Open Draft
+PR #327 is an unrelated Dashboard claim and does not overlap I211's evidence-only slice. Any new
+#326 head requires fresh exact-head CI and independent claim review before merge-time CAS.

@@ -601,3 +601,16 @@ Planned/Claimed and unactivated; I206-I208 and I211 remain Planned/Unclaimed; I1
 no current iteration document is Blocked. Open PRs #120/#121 are archival Drafts and do not overlap
 I211. PR #326 proposes the governance-only evidence claim; it grants no product repair, release or
 publication authority before target-branch merge.
+
+## 2026-08-20 I211 Claim Review Correction Checkpoint
+
+Independent Agent claim review `5353122975` bound to PR #326 head `229b9754` accepted the
+evidence-only scope, dependency inventory and baseline preservation but requested the missing I200
+final disposition in Issue #302. Comment `5353130091` now records PR #301 final head `8a58cb2d`,
+implementation `3afeeb28`, CI `32149762367`, Agent technical review `5330234992`, merge-time CAS
+and merge `9628e183`; I200 remains Review and its natural-person rows remain open.
+
+The correction resolves the sole review blocker without changing product code or acceptance
+truth. Open Draft #327 is an unrelated Dashboard claim. Re-run both exact-base governance
+validators, CI and independent review on the new #326 head before merge-time CAS; only the claim
+merge may authorize a later I211 activation branch.
