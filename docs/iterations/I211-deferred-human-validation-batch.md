@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Planned / Unclaimed - claim preparation in progress
+> Document status: Planned / Claimed via PR #326; ineffective before target-branch merge
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | @wjhuang88 proposed; ineffective before claim merge |
-| Executing Agent | Codex / GPT-5 mainline validation session proposed |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline validation session |
 | Work Slice | I211/VALIDATION-002/#302 evidence only: execute and record the already-defined natural-person and real-terminal rows for I200, I197, I201, I212, I210 and I198; synchronize source owners first; create separately governed corrective owners for failures. No product implementation, policy, dependency, persistence, release or publication change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-20 |
 | Source Issue | #302 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review proposed |
-| Authorization Evidence | The finalized governance-only claim head must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. This preparation record remains Unclaimed and has no target-branch effect before merge. |
+| Governance Claim PR | #326 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #326 must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. The proposed claim has no target-branch effect while the PR is open. |
 | Implementation PR | None - evidence-only validation slice |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | All ordered implementation children have terminal merge dispositions. Finalize and merge the evidence-only claim, then activate from that merge or later current `main`; finish or explicitly route every Issue #302 row before long-task closure. |
+| Handoff / Release Condition | Merge claim PR #326 after exact-head gates; only then activate I211 from that merge or later current `main`. Finish or explicitly route every Issue #302 row before long-task closure. |
 
 ## Published Baseline
 
@@ -117,5 +117,5 @@ iterations are Review; I189 is Planned/Claimed but explicitly unactivated; I206-
 Planned/Unclaimed; I164 remains Paused; no current iteration document is Blocked. Issue #59 retains
 its separate backlog-level production blockers.
 
-Open PRs #120/#121 are archival Drafts and do not overlap this evidence slice. This branch prepares
-no implementation work and keeps I211 Unclaimed until the finalized claim reaches `main`.
+Open PRs #120/#121 are archival Drafts and do not overlap this evidence slice. PR #326 proposes no
+implementation work; its `Claimed` record is ineffective until the finalized head reaches `main`.
