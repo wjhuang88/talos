@@ -1,6 +1,6 @@
 # Iteration I212: Catalog-Assisted Custom-Model Context Window
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed - implementation merged, human validation deferred
 > Published plan date: 2026-08-19
 > Planned objective: resolve a custom provider model against the packaged Talos model catalog only
 > when one conservative local identity match exists, then use its context window as an editable
@@ -23,9 +23,9 @@
 | Governance Claim PR | #314 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
-| Implementation PR | #318 (implementation review pending) |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; branch implementation only from that merge or later current `main`, then require exact-head CI, independent Agent technical review and merge-time CAS. |
+| Implementation PR | #318 (merged as `5a1709cb`) |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | Implementation head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and CAS, then merged as `5a1709cb`. Keep I212 Review until the Issue #302/I211 natural-person walkthrough passes; no further implementation authority transfers. |
 
 ## Published Baseline
 
@@ -155,3 +155,13 @@ owners and merged as `8d0d3166`; I212 was rebased onto that current `main`, and 
 the effective claim fact truthfully. This invalidates the old exact-head CI and review disposition.
 I212 stays Review/Active with Completion Commit pending until the new head passes CI, independent
 review and merge-time CAS; its natural-person custom-provider row remains deferred to #302/I211.
+
+## 2026-08-20 Implementation Merge Disposition
+
+PR #318 exact head `a2466c55641cc893ae5cf9248519af8b1ca4f093` passed exact-head CI
+`32319297491` (5/5), independent Agent technical review `5349952979`, both governance validators
+and merge-time CAS, then merged to `main` as `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`.
+Implementation and machine/technical merge gates are terminal. The source and iteration remain
+Review / Claimed with `Completion Commit: Pending` because the natural-person custom-provider
+walkthrough remains open in Issue #302/I211. This state-only synchronization cannot serve as
+completion evidence.

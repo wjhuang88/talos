@@ -79,7 +79,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I209 | Resumed Session Interactivity Under Provider Delay | Closed | TUI-051 / Issue #272 is Complete at Completion Commit `2eff6285`, with source implementation `7b82fea6`/`7d90def8`, exact-head CI `32025371877`, real-terminal acceptance and independent agent audit `5316533941`. Retry-progress acceptance remains transferred to I210. |
 | I210 | Provider Retry Progress Contract | Planned / Unclaimed | PROVIDER-006 / Issue #278; accepted behavior is initial `Connecting…`, then structured `Reconnecting… (attempt n/m)` on real retry/timeout facts. Accept an ADR and establish an effective claim before implementation. |
 | I211 | Deferred Human Review And Acceptance Batch | Planned / Unclaimed | VALIDATION-002 / Issue #302; evidence-only cleanup after I200/I197/I201/I212/I210/I198 implementation dispositions. No product implementation or gate waiver. |
-| I212 | Catalog-Assisted Custom-Model Context Window | Active / Claimed | MODEL-013 / Issue #312; claim #314 merged as `a62f448b` after exact-head CI, both validators, single-maintainer disclosure and CAS. Implementation must start from that merge or later current `main`. |
+| I212 | Catalog-Assisted Custom-Model Context Window | Review / Claimed - implementation merged; human validation deferred | MODEL-013 / Issue #312; PR #318 exact head `a2466c55` passed CI `32319297491`, Agent approval `5349952979` and CAS, then merged as `5a1709cb`. Completion Commit remains pending for #302/I211. |
 
 ## Completed This Closeout
 
