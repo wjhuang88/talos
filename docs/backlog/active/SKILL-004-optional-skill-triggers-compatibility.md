@@ -23,9 +23,9 @@
 | Governance Claim PR | #324 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
-| Implementation PR | Not started |
+| Implementation PR | #325 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation starts from that merge and remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation PR #325 remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
 
 ## Goal And Compatibility Contract
 

@@ -580,3 +580,10 @@ Clippy, both governance validators, manifest parsing, whitespace checks and the 
 preflight. I198 is `Review / Claimed`; exact-head implementation CI, independent Agent technical
 review, merge-time CAS and its Issue #302 natural-person row remain open. T9/I211 is not activated
 by this checkpoint.
+
+## 2026-08-20 I198 Implementation PR Checkpoint
+
+Implementation commit `f719ed913d36ad7ad00f5a99d3d990b414dbbd5d` is published in PR #325.
+The owner records now identify that PR; the next head requires fresh exact-head CI and independent
+Agent technical review before merge-time CAS. This evidence backfill does not complete I198 or
+authorize I211.
