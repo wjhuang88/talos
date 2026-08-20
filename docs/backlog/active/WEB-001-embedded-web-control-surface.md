@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell Complete (2026-08-18). Residuals: SSE log view, config editor, web approvals, session actions, remote/LAN — all remain separately governed. |
+| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell Complete (2026-08-18). WEB-001-B/I213 is a bounded live-activity/log-SSE claim proposed in PR #327 and remains ineffective while open. Config editor, web approvals, session actions, remote/LAN and other control residuals remain separately governed. |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | live log viewer; web config editor; later write/control surfaces |
@@ -18,7 +18,8 @@ capabilities remain future separately governed work rather than being implied by
 
 WEB-001 remains Partial because the completed read-only shell does not authorize or complete live
 logs, configuration writes, approvals, session actions, remote/LAN access or other control-plane
-behavior.
+behavior. WEB-001-B/I213 now owns only a proposed bounded live observation slice; its PR #327 claim is
+not effective until merged to `main` and it does not authorize implementation while open.
 
 ## Gate Status
 
@@ -50,10 +51,10 @@ WEB-001-A/I195 completed through PR #233 merge
 technical review `5323625004`, human browser acceptance `5323801564`, and maintainer review-policy
 override `5326076971`.
 
-Still not implemented: a live log/SSE view, config editing, approvals, session actions, WebSocket
-control, or remote/LAN access.
+Still not implemented: the WEB-001-B live activity/log SSE slice proposed in #327, config editing,
+approvals, session actions, WebSocket control, or remote/LAN access.
 
-## Governed Dashboard Child Outcome
+## Governed Dashboard Child Outcomes
 
 [WEB-001-A](WEB-001-A-dashboard-read-only-visual-shell.md) and
 [I195](../../iterations/I195-dashboard-read-only-visual-shell.md) are Complete/Closed. Their bounded
@@ -65,13 +66,21 @@ snapshot surfaces and added cohesive navigation, visual hierarchy, responsive re
 keyboard/focus behavior, useful empty states, and HTML presentation parity for `/extensions` while
 preserving JSON/plain-text negotiation, config masking, output redaction, and HTML escaping.
 
+[WEB-001-B](WEB-001-B-dashboard-live-activity-log-viewer.md) and
+[I213](../../iterations/I213-dashboard-live-activity-log-viewer.md) propose the next bounded child:
+default-loopback GET/read-only semantic live activity plus bounded existing-log observation over SSE.
+PR #327 owns the proposed claim only and is ineffective while open. The child explicitly excludes
+config writes, approvals, prompt/session actions, WebSocket, remote/LAN, SEC-002 token delivery,
+SESSION-009 multi-client authority, PERM-006 behavior, a global event bus, and new
+runtime/Session/persistence authority.
+
 ## Opt-In Token Delivery Security Residual
 
 [SEC-002](SEC-002-dashboard-token-delivery-boundary.md) separately owns the pre-existing ADR-031
 gap where `[dashboard] loopback_only = false` generates and enforces a memory-only token but defines
 no compliant operator-delivery channel. SEC-002 is Refinement / Unclaimed / Selected Iteration None;
 it must choose an ADR-backed delivery, authentication-redesign or mode-deprecation contract before
-implementation. It does not alter WEB-001-A/I195 completion or reuse their authorization.
+implementation. It does not alter WEB-001-A/I195 completion or transfer authority to WEB-001-B/I213.
 
 ## Target Model (Not Current Implementation)
 
@@ -84,13 +93,14 @@ implementation. It does not alter WEB-001-A/I195 completion or reuse their autho
 ```
 
 The diagram remains a target-space sketch only; WebSocket/control behavior is not implemented or
-authorized by I195.
+authorized by I195 or the proposed I213 claim.
 
 ## Product MVP Target (Not Complete)
 
 - In-process loopback-only HTTP server serving the completed read-only visual shell.
-- Read-only status/history/governance/config/extensions presentation is delivered; a log-tail (SSE)
-  view remains future work.
+- Read-only status/history/governance/config/extensions presentation is delivered; a bounded
+  live-activity/log-tail SSE view is selected only through WEB-001-B/I213 and remains unimplemented
+  until that claim is effective and activated.
 - Config editing via CONF-001 primitives (secret masking), only after an explicit write/permission
   design is accepted.
 - Any future web-driven action must use the same permission pipeline as the TUI and receive separate
@@ -99,8 +109,9 @@ authorized by I195.
 ## Open Questions
 
 See `docs/proposals/embedded-web-control-surface.md` for the remaining design space (realtime
-transport, lifecycle, auth, and WEB-001 vs REMOTE-001 handler convergence). The completed I195 shell
-does not settle those residual questions.
+transport, lifecycle, auth, and WEB-001 vs REMOTE-001 handler convergence). WEB-001-B/I213 narrows
+only a default-loopback read-only SSE observation slice; it does not settle interactive or remote
+transport questions.
 
 ## Project Management UI (GOV-003 integration)
 
@@ -113,8 +124,10 @@ logic and avoid a second source of truth.
 - `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/proposals/embedded-web-control-surface.md`
 - `docs/backlog/active/WEB-001-A-dashboard-read-only-visual-shell.md`
+- `docs/backlog/active/WEB-001-B-dashboard-live-activity-log-viewer.md`
 - `docs/backlog/active/SEC-002-dashboard-token-delivery-boundary.md`
 - `docs/iterations/I195-dashboard-read-only-visual-shell.md`
+- `docs/iterations/I213-dashboard-live-activity-log-viewer.md`
 - `docs/backlog/active/EXT-002-oh-my-pi-feature-analysis.md`
 - `crates/talos-rpc/src/` (existing JSON-RPC infrastructure)
 - `docs/backlog/active/REMOTE-001-remote-session-protocol.md`
