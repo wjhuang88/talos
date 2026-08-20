@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Planned / Claimed via PR #326; ineffective before target-branch merge
+> Document status: Active / Claimed via PR #328; ineffective before target-branch merge
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -23,10 +23,10 @@
 | Source Issue | #302 |
 | Governance Claim PR | #326 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #326 must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. The proposed claim has no target-branch effect while the PR is open. |
+| Authorization Evidence | PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`, both governance validators and merge-time CAS, then merged as `285fc3c7`. |
 | Implementation PR | None - evidence-only validation slice |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Merge claim PR #326 after exact-head gates; only then activate I211 from that merge or later current `main`. Finish or explicitly route every Issue #302 row before long-task closure. |
+| Handoff / Release Condition | Finish or explicitly route every Issue #302 row, synchronize source owners first, and close the long task only after all passed rows or separately governed corrective owners are recorded. |
 
 ## Published Baseline
 
@@ -73,8 +73,9 @@
 
 ## Actual Activation And Execution
 
-No activation has occurred. I211 is a planned evidence-only cleanup phase after the ordered child
-implementations; it creates no implementation authority.
+Activation is proposed from effective claim merge `285fc3c7` through PR #328. It remains
+ineffective until PR #328 reaches `main`; the slice is evidence-only and creates no product implementation
+authority.
 
 ## Verification Evidence
 
@@ -132,3 +133,15 @@ has been fabricated.
 Open PR #327 is a separately owned Dashboard claim and does not overlap I211. The correction
 resolves the sole prior blocker, but a new PR #326 head must obtain fresh exact-head CI and
 independent claim review before merge-time CAS.
+
+## 2026-08-20 Claim Merge And Activation Proposal
+
+PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`,
+both governance validators and merge-time CAS, then merged as `285fc3c7`. The I211 claim is now
+effective on `main`; this activation branch starts exactly at that merge.
+
+I197, I198, I200, I201, I210 and I212 remain Review; I189 remains Planned/Claimed and unactivated;
+I206-I208 remain Planned/Unclaimed; I164 remains Paused; no other iteration is Active. PR #327 is
+a non-overlapping Dashboard claim. The activation proposal authorizes only Issue #302 evidence
+reconciliation and separately governed corrective-owner preparation, not product repair. PR #328
+is the activation PR and remains ineffective while open.
