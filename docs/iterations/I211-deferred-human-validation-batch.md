@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Active / Claimed via PR #328; ineffective before target-branch merge
+> Document status: Review / Claimed
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -73,13 +73,14 @@
 
 ## Actual Activation And Execution
 
-Activation is proposed from effective claim merge `285fc3c7` through PR #328. It remains
-ineffective until PR #328 reaches `main`; the slice is evidence-only and creates no product implementation
-authority.
+PR #328 merged as `a2f43248`; I211 is the sole Active iteration. Execution is evidence-only and
+creates no product implementation authority.
 
 ## Verification Evidence
 
-Pending an effective claim and completed Issue #302 row inventory.
+The exact source heads, integrated runtime head, maintainer observations and separately owned
+failures are recorded in Issue #302 and the appended checkpoints below. Final exact-head CI and
+independent review remain pending on rolling evidence PR #331.
 
 ## Completion Evidence
 
@@ -145,3 +146,62 @@ I206-I208 remain Planned/Unclaimed; I164 remains Paused; no other iteration is A
 a non-overlapping Dashboard claim. The activation proposal authorizes only Issue #302 evidence
 reconciliation and separately governed corrective-owner preparation, not product repair. PR #328
 is the activation PR and remains ineffective while open.
+
+## 2026-08-20 Activation Merge And Initial Evidence Classification
+
+PR #328 final head `bb501862` passed CI `32349317758` attempt 3, independent Agent approval
+`5353504113`, both governance validators and merge-time CAS, then merged as `a2f43248`. I211 is
+Active; I197/I198/I200/I201/I210/I212 remain Review.
+
+Issue #302 checkpoint `5341637918` provides partial natural-person evidence. Passed observations
+cover non-tool marker preservation, legitimate longer text, ordinary one/multiple tool ordering,
+permission deny/approve execution semantics, missing-file recovery, prompt cancellation and
+durable resume ordering. They do not complete a source owner whose required matrix also failed or
+remains incomplete.
+
+Two failed rows now have separate corrective owners: TUI-058 / Issue #329 owns the
+permission-mediated leaked marker and unnamed approval outcome; TUI-059 / Issue #330 owns
+composer-relative permission docking and the incomplete terminal matrix. Both are Ready/Unclaimed
+and grant no implementation authority. I200 device coverage, I212 custom-provider inference, I210
+live reconnect terminal states, I198 Skill compatibility and unsynthesized I201 direct-event
+negative cases remain pending.
+
+## 2026-08-20 Integrated Runtime Evidence And I210 Disposition
+
+Agent-executed locked tests on integrated `main@a2f43248` passed I198's real-binary omitted-trigger
+path and parser compatibility matrix, I212's exact/prefix/override/ambiguous/unknown catalog
+resolution and picker provenance, I210's provider-to-TUI progress projection and terminal cleanup,
+and I201's direct-result/direct-approval negative cases. These results strengthen machine/runtime
+coverage and are not represented as natural-person review.
+
+The maintainer then exercised I210 with a local OpenAI-compatible mock provider configured for two
+retry attempts. `Reconnecting... (attempt 1/2)` matched the provider fact and cleared, but
+`Connecting...` was too brief to observe reliably. An otherwise idle first message also displayed
+`Message queued and will send after current turn.` immediately on Enter. TUI-060 / Issue #332 owns
+both corrective status-sequencing defects as Ready/Unclaimed. I210 remains Review; I200, I212 and
+I198 natural-person/device rows remain open.
+
+## 2026-08-20 I198, I212 And I200 Natural-Person Checkpoint
+
+The maintainer completed the remaining real-binary Skill and custom-model walkthroughs on
+integrated `main@a2f43248`. I212 passed exact/one-prefix catalog provenance, explicit override,
+ambiguous/unknown fallback, non-persistence and no-request checks and is now Complete/Closed at
+pre-existing mainline implementation merge `5a1709cb`.
+
+I198 passed omitted, empty and non-empty trigger discovery/activation/request projection and safely
+excluded malformed containers, but the real CLI hid the required `triggers` diagnostic behind a
+generic not-found message. SKILL-005 / Issue #333 is its Ready/Unclaimed corrective owner; I198
+remains Review.
+
+I200 touchpad validation passed short/exact-fit no-op, multiline draft preservation, true-overflow
+bidirectional movement/tail return and height/CJK width reflow. A physical mouse was unavailable
+and was not executed; the maintainer explicitly accepted the touchpad as the native scrolling-device
+substitute for this validation row. Ordinary wrapped history also lost the documented blank
+three-column continuation prefix; TUI-061 / Issue #334 separately owns that renderer regression.
+I200 is Complete/Closed at pre-existing implementation commit `3afeeb28`.
+
+Every Issue #302 row now has either passing evidence or a separately governed corrective owner.
+I197, I198, I201 and I210 remain Review under TUI-059/#330, SKILL-005/#333, TUI-058/#329 and
+TUI-060/#332 respectively; TUI-061/#334 preserves the unrelated regression found during I200
+validation. I211 moves to Review, not Complete: rolling evidence PR #331 must merge before a later
+status-only closeout may cite its pre-existing evidence commit.

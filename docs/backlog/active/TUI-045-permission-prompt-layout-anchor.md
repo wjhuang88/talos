@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Any protected permission/security scope stops and requires independent security review. |
 | Implementation PR | #305 |
 | Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 merged as `d98f37e7` after exact-head CI, Agent technical review and CAS without altering permission semantics. Eligible natural-person and terminal rows remain in VALIDATION-002/I211/Issue #302 while this Story stays Review. |
+| Handoff / Release Condition | PR #305 passed exact-head CI/review/CAS and merged as `d98f37e7` without altering permission semantics. I211 terminal validation found docking/hierarchy defects and left part of the matrix incomplete; TUI-059/#330 is the separate Ready/Unclaimed corrective owner. Keep TUI-045 Review with no transferred permission-policy authority. |
 
 ## Identity / Goal / Value
 
@@ -106,3 +106,10 @@ passed all five jobs, independent Agent technical review `5336592072` approved t
 shared-account identity limits disclosed, and merge-time CAS passed. The implementation remains
 presentation/layout-only and preserves permission semantics and request identity. TUI-045 remains
 `Review`; only the deferred natural-person and real-terminal rows in Issue #302 / I211 remain open.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Issue #302 checkpoint `5341637918` did not accept the presentation hierarchy and did not complete
+the required terminal matrix. A new-session, non-bottom composer also exposed physical-bottom
+permission-panel placement. This Story remains Review; TUI-059 / Issue #330 is the separate
+Ready/Unclaimed corrective owner. No permission semantic or implementation authority transfers.

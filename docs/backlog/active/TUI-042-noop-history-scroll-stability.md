@@ -1,20 +1,22 @@
 # TUI-042: No-Op History Scroll State Stability
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-042 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #79](https://github.com/wjhuang88/talos/issues/79) |
-| Selected Iteration | I200 — Review / Claimed |
+| Selected Iteration | I200 - Complete / Closed |
 | Depends On | TUI-039 completed layout contract; ADR-054; interaction with TUI-041 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | TUI-042/I200 only: correct no-op and real-movement frame-history scroll transitions, normalize impossible anchors after current resize/reflow/projection metrics are known, and validate the published focused/full-frame/native-terminal matrix. Excludes kinetic/pixel scrolling, wheel-step changes, hit testing, renderer redesign, transcript/session mutation, TUI-045, TUI-043, provider, persistence and release work. |
@@ -24,8 +26,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive I200's published implementation review or terminal walkthrough. |
 | Implementation PR | #301 |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 merged as `99645e78`; TUI-042 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person review and maintainer mouse/touchpad acceptance; no further I200 implementation authority transfers. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | Closed after PR #301 merge gates and the integrated maintainer walkthrough. The maintainer accepted macOS touchpad evidence as the substitute for the unavailable physical mouse; TUI-061/#334 owns the unrelated continuation-padding regression. |
 
 ## Identity / Goal / Value
 
@@ -91,6 +93,11 @@ remains Active/Review.
 
 Gesture/kinetic enhancements require a separate product Story.
 
+## Completion Evidence
+
+Completion Commit: `3afeeb2859a441ef7e1b7628ff4b5b83b974210d`. This pre-existing implementation
+commit is an ancestor of `main`; the evidence/status commit cannot serve as its own evidence.
+
 ## 2026-08-18 Claim Preparation Checkpoint
 
 I199/TUI-041 is Complete/Closed and its preview-capacity behavior is now available to the I200
@@ -131,3 +138,16 @@ batched later instead of blocking the ordered long task. The original acceptance
 unchanged and unpassed. PR #303 proposes transferring those two evidence rows to
 VALIDATION-002/I211/Issue #302 while TUI-042 stays Review. That ownership transfer and the
 separately scoped I197 preparation become effective only after this change reaches `main`.
+
+## 2026-08-20 Natural-Person Touchpad And Reflow Disposition
+
+On integrated `main@a2f43248`, macOS touchpad validation passed short/exact-fit no-op behavior,
+multiline draft preservation, real-overflow bidirectional navigation and deterministic tail return,
+plus height and CJK width reflow with stable fixed bottom rows. Complete CJK glyphs and scroll
+anchors survived narrow-to-wide recovery.
+
+No physical mouse was available or executed. The maintainer explicitly accepted the available
+touchpad as the native scrolling-device substitute after the complete matrix showed stable no-op,
+overflow, draft and reflow behavior. TUI-061 / Issue #334 separately owns the observed
+ordinary-history continuation-padding regression; it does not expand I200's scroll-transition work
+slice. TUI-042/I200 is Complete/Closed at pre-existing implementation commit `3afeeb28`.

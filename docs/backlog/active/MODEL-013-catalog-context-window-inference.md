@@ -5,9 +5,9 @@
 | Story ID | MODEL-013 |
 | Type | Model / Configuration Story |
 | Priority | P2 |
-| Status | Review / Claimed; implementation merged, human validation deferred |
+| Status | Complete / Closed; implementation and human validation complete |
 | Source | [GitHub Issue #312](https://github.com/wjhuang88/talos/issues/312) |
-| Selected Iteration | I212 — Review / Claimed |
+| Selected Iteration | I212 — Complete / Closed |
 | Depends On | MODEL-008 custom-model registration; canonical model catalog; MODEL-011 evidence precedence boundary |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review was attempted but disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
 | Implementation PR | #318 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #318 exact head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and merge-time CAS, then merged as `5a1709cb`. Keep this Story Review until the Issue #302/I211 natural-person custom-provider walkthrough passes; no further implementation authority transfers. |
+| Handoff / Release Condition | Complete. PR #318 exact head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and merge-time CAS, then merged as `5a1709cb`; the Issue #302/I211 natural-person walkthrough passed on integrated `main@a2f43248`. |
 
 ## Identity / Goal / Value
 
@@ -152,3 +152,18 @@ precedence and context-only inference without Cargo, persistence or network chan
 MODEL-013 is now Review / Claimed with Completion Commit pending. Its remaining natural-person
 custom-provider walkthrough is tracked in Issue #302/I211; this status synchronization does not
 self-certify completion. Issue #316 separately owns the parallel-test HOME isolation residual.
+
+## 2026-08-20 Natural-Person Walkthrough And Closeout
+
+The maintainer's integrated TUI walkthrough on `main@a2f43248` confirmed visible catalog provenance
+for the unique exact and one-prefix custom identities, preserved an explicit `777K` override,
+left ambiguous and unknown identities at `?`, used only the conservative runtime fallback for
+those unknown cases, and did not persist inferred context metadata or send a model request.
+
+MODEL-013 is Complete/Closed at the pre-existing mainline implementation merge `5a1709cb`; this
+evidence/status commit does not self-certify completion. Issue #316 remains separate.
+
+## Completion Evidence
+
+Completion Commit: `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`. The commit predates this
+status update and contains the implementation code merged through PR #318.

@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | SKILL-004 |
 | Source Issue | #155 |
-| Status | Review / Claimed — implementation evidence prepared; exact-head PR gates and human validation remain open |
+| Status | Review / Claimed - compatibility delivered; diagnostic visibility failed and transferred to SKILL-005/#333 |
 | Priority | P1 |
 | Type | Skill Format / Compatibility |
 | Selected Iteration | I198 — Review / Claimed |
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | #325 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation PR #325 remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | PR #325 passed exact-head CI/review/CAS and merged as `15a3d424`. I211 terminal validation passed omitted/empty/list behavior but exposed a hidden malformed-input diagnostic; SKILL-005/#333 is the separate Ready/Unclaimed corrective owner. Keep SKILL-004 Review with no transferred implementation authority. |
 
 ## Goal And Compatibility Contract
 
@@ -136,3 +136,15 @@ Skill without `triggers` can be explicitly activated and projected into the requ
 SKILL-004 is now `Review / Claimed`. Exact-head implementation CI, independent Agent technical
 review, merge-time CAS and the Issue #302 natural-person compatibility row remain open; no
 completion is claimed.
+
+## 2026-08-20 Natural-Person Compatibility Disposition
+
+On integrated `main@a2f43248`, the maintainer confirmed through the real binary that omitted,
+explicit-empty and non-empty string-list triggers remain discoverable and explicitly activatable,
+and their bodies reach the mock request preview. Malformed scalar and mapping trigger containers
+remain excluded, but explicit activation exposes only a generic not-found error instead of the
+required field-specific diagnostic.
+
+SKILL-005 / Issue #333 is the separate Ready/Unclaimed corrective owner for diagnostic visibility.
+SKILL-004 remains Review with Completion Commit Pending; I211 records evidence only and grants no
+implementation authority.

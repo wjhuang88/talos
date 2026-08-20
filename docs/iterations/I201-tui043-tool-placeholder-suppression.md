@@ -23,8 +23,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #306 merged to `main` as `78cb1ddd` from exact base `8069ea6a` after exact-head CI `32209314843`, independent Agent governance review `5336890794`, both validators and merge-time CAS. This effective claim authorizes only the bounded I201/TUI-043 implementation. |
 | Implementation PR | #309 |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #306 is effective at merge `78cb1ddd`; create the I201 implementation branch only from that merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I201 stays Review. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | PR #309 passed exact-head CI/review/CAS and merged as `7f5a6df2`. I211 terminal validation found the permission-mediated suppression failure; TUI-058/#329 is the separate Ready/Unclaimed corrective owner. Keep I201 Review with no implementation authority transfer. |
 
 ## Published Baseline
 
@@ -136,3 +136,14 @@ PR #309 final head `d8d414ce3f2d65c6859fa4f30566efb3ac94196c` passed exact-head 
 CAS, then merged to `main` as `7f5a6df2122d9b5ed70e55e59281e3e4e127f18c`. This is implementation
 evidence, not completion evidence: the natural-person suppression-safety row remains open in Issue
 #302/I211, so I201 remains `Review / Claimed` with `Completion Commit: Pending`.
+
+## 2026-08-20 I211 Human Validation Failure Disposition
+
+Natural-person checkpoint `5341637918` passed the non-tool, legitimate-text, ordinary tool ordering,
+deny, failure, cancel and resume observations, but failed the permission-mediated path. Approved
+write/read sequences retained `Calling tools…`, then displayed an unnamed approved row, then the
+named structured tool row.
+
+I201 and TUI-043 remain Review with `Completion Commit: Pending`. Corrective Story TUI-058 / Issue
+#329 separately owns approval-boundary marker correlation and named outcome rows. It is
+Ready/Unclaimed and authorizes no product or permission-policy implementation.

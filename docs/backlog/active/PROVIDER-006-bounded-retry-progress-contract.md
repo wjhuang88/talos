@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent governance/architecture review `5350249740`, both governance validators and merge-time CAS, then merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. |
 | Implementation PR | #323 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@e58fbd39`. Create implementation work only from this merge or later exact `main`; implementation still requires the separately governed I210 scope and final review gates. |
+| Handoff / Release Condition | PR #323 passed exact-head CI/review/CAS and merged as `9d5c8a71`. I211 confirmed retry ordinals/cleanup but found the initial connection and first-turn queue sequencing defects; TUI-060/#332 is the separate Ready/Unclaimed corrective owner. Keep PROVIDER-006 Review with no retry-policy or implementation authority transfer. |
 
 ## Identity / Goal / Value
 
@@ -127,3 +127,11 @@ The remaining natural-person live retry-status row is recorded in Issue #302 com
 PROVIDER-006 stays Review/Claimed with `Completion Commit: Pending`; the implementation disposition
 allows the non-overlapping I198 claim to proceed but does not claim human acceptance or transfer
 release authority.
+
+## 2026-08-20 I211 Human Validation Partial Failure
+
+Integrated mock-provider validation confirmed the retry ordinal and terminal clearing but found
+the initial `Connecting...` state too brief to observe and an idle first submission incorrectly
+labeled as queued. TUI-060 / Issue #332 owns that corrective presentation/sequencing work.
+PROVIDER-006 remains Review; no retry-policy change or implementation authority transfers through
+this note.

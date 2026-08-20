@@ -1,6 +1,6 @@
 # Iteration I212: Catalog-Assisted Custom-Model Context Window
 
-> Document status: Review / Claimed - implementation merged, human validation deferred
+> Document status: Complete / Closed - implementation and human validation complete
 > Published plan date: 2026-08-19
 > Planned objective: resolve a custom provider model against the packaged Talos model catalog only
 > when one conservative local identity match exists, then use its context window as an editable
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
 | Implementation PR | #318 (merged as `5a1709cb`) |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Implementation head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and CAS, then merged as `5a1709cb`. Keep I212 Review until the Issue #302/I211 natural-person walkthrough passes; no further implementation authority transfers. |
+| Handoff / Release Condition | Complete. Implementation head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and CAS, then merged as `5a1709cb`; the Issue #302/I211 natural-person walkthrough passed on integrated `main@a2f43248`. |
 
 ## Published Baseline
 
@@ -133,7 +133,9 @@ and network behavior are unchanged.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`. This pre-existing mainline
+merge contains the catalog resolver and projection; the later evidence/status commit does not
+self-certify completion.
 
 ## Variance And Residuals
 
@@ -165,3 +167,17 @@ Implementation and machine/technical merge gates are terminal. The source and it
 Review / Claimed with `Completion Commit: Pending` because the natural-person custom-provider
 walkthrough remains open in Issue #302/I211. This state-only synchronization cannot serve as
 completion evidence.
+
+## 2026-08-20 Natural-Person Walkthrough And Closeout
+
+The maintainer exercised the integrated TUI from `main@a2f43248` with an isolated custom provider
+and local configuration only. The model picker showed exact `deepseek-v3.2-thinking` and one-prefix
+`gateway/deepseek-v3.2-thinking` as `128K (catalog)`; switching retained each opaque model ID and
+projected `128k ctx`. Explicit `explicit-override` remained `777K` without a catalog label. The
+ambiguous `gpt-5` and unknown `unknown-model` remained `?` in the picker, switched using the
+conservative `128k` runtime fallback and did not gain a persisted `context_limit`. Browsing and
+switching sent no model request.
+
+This satisfies the remaining Issue #302 row. I212 is Complete/Closed at pre-existing mainline
+implementation merge `5a1709cb`; the evidence/status commit cannot serve as its own Completion
+Commit.

@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | #325 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation PR #325 remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | PR #325 passed exact-head CI/review/CAS and merged as `15a3d424`. I211 terminal validation passed compatibility behavior but exposed the hidden malformed-input diagnostic; SKILL-005/#333 is the separate Ready/Unclaimed corrective owner. Keep I198 Review with no implementation authority transfer. |
 
 ## Published Baseline
 
@@ -186,3 +186,16 @@ success.
 
 I198 is now `Review / Claimed` with `Completion Commit: Pending`. Exact-head CI, independent Agent
 technical review, merge-time CAS and the deferred Issue #302 human row remain required.
+
+## 2026-08-20 Natural-Person Compatibility Disposition
+
+The maintainer exercised the integrated real binary from `main@a2f43248` in a macOS terminal with
+isolated HOME/workspace fixtures. Omitted `triggers`, `triggers: []` and a normal non-empty string
+list were all discoverable, explicitly activatable and projected their Skill body into the mock
+request preview. Malformed scalar and mapping containers remained safely excluded from `/skills`.
+
+The malformed-input diagnostic row failed: explicit activation of `bad-scalar` and `bad-map`
+reported only `skill '...' was not found`, so the parser's actionable `triggers` diagnostic was not
+visible through the real CLI path. Ready/Unclaimed SKILL-005 / Issue #333 separately owns that
+correction without implementation authority. I198 remains Review with Completion Commit Pending;
+this evidence-only update does not repair or complete it.

@@ -1,6 +1,6 @@
 # Iteration I200: No-Op History Scroll State Stability
 
-> Document status: Review
+> Document status: Complete / Closed
 > Published plan date: 2026-08-14
 > Planned objective: make mouse/touchpad history input mutate anchor state only when the visible
 > frame-history start changes, and normalize anchors that become impossible after resize/reflow.
@@ -13,7 +13,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I200/TUI-042 only: correct no-op and real-movement frame-history scroll transitions, normalize impossible anchors after current resize/reflow/projection metrics are known, and validate the published focused/full-frame/native-terminal matrix. Excludes kinetic/pixel scrolling, wheel-step changes, hit testing, renderer redesign, transcript/session mutation, TUI-045, TUI-043, provider, persistence and release work. |
@@ -23,8 +23,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #300 exact head `c70dcfa7` passed CI `32144285868`, independent agent review `5329269096`, merge-time CAS `5329300644` and merged as `356dc3c5`. The shared-identity agent review is not represented as a distinct natural person and does not waive the published implementation review or terminal walkthrough acceptance. |
 | Implementation PR | #301 |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | PR #301 merged after exact-head CI, independent Agent technical review and merge-time CAS. PR #303 merged as `99645e78`; I200 stays Review while VALIDATION-002/I211/Issue #302 owns the deferred natural-person exact-head review and maintainer mouse/touchpad walkthrough. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | Closed after PR #301 merge gates and the integrated maintainer walkthrough. The maintainer explicitly accepted the available macOS touchpad as the native scrolling-device substitute; TUI-061/#334 separately owns the unrelated continuation-padding regression. |
 
 ## Published Baseline
 
@@ -92,13 +92,15 @@ Review without claiming the remaining human acceptance gates.
 - PR #301 exact head `8a58cb2d` passed CI `32149762367`, received independent Agent technical
   approval `5330234992` with its identity limit disclosed, passed merge-time CAS and merged as
   `9628e183`.
-- Pending in VALIDATION-002/I211/Issue #302: maintainer mouse-wheel and touchpad walkthrough plus
-  the published independent natural-person exact-head review. Agent or shared-account review
-  evidence cannot be represented as a distinct natural person.
+- VALIDATION-002/I211/Issue #302 binds the source head to the integrated maintainer walkthrough.
+  The macOS touchpad matrix passed, and the maintainer explicitly accepted touchpad evidence as the
+  substitute for the unavailable physical mouse. The device fact remains disclosed rather than
+  being represented as a physical-mouse execution.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `3afeeb2859a441ef7e1b7628ff4b5b83b974210d`. This pre-existing implementation
+commit is an ancestor of `main`; the evidence/status commit cannot serve as its own evidence.
 
 ## Variance And Residuals
 
@@ -106,7 +108,9 @@ Kinetic scrolling, gesture accumulation and mouse hit testing require separate o
 
 ## Retrospective
 
-Pending execution.
+The rendering-derived transition correction passed its locked automated coverage and the complete
+available native-device walkthrough. The continuation-padding defect observed during reflow is a
+different renderer concern and remains visible under TUI-061/#334 rather than expanding I200.
 
 ## 2026-08-18 Claim Preparation Checkpoint
 
@@ -154,3 +158,20 @@ mouse/touchpad acceptance move to VALIDATION-002/I211/Issue #302 near long-task 
 published baseline and acceptance remain unchanged, those rows remain unpassed, and Completion
 Commit remains Pending. PR #303 proposes this residual disposition; only after it reaches `main`
 may the non-overlapping I197 claim be prepared.
+
+## 2026-08-20 Natural-Person Touchpad And Reflow Disposition
+
+The maintainer exercised integrated `main@a2f43248` in a macOS real terminal. Touchpad bursts over
+short and exact-fit history were true no-ops: Logo/history, composer, cursor and fixed rows did not
+move. A multiline CJK/ASCII draft retained text, line breaks, composer height and cursor. Under
+true overflow, upward navigation visibly reached the Logo prefix and the reverse gesture returned
+deterministically to the user/assistant tail while fixed bottom rows stayed anchored. Height and
+wide-to-narrow/narrow-to-wide CJK reflow preserved complete glyphs and normalized the tail.
+
+A physical mouse was unavailable and was not executed. The maintainer explicitly accepted the
+available touchpad as the native scrolling-device substitute for this row after the complete
+short/exact/overflow/draft/resize/reflow matrix showed no unexpected movement. The walkthrough also
+exposed a separate renderer regression: wrapped ordinary user and assistant continuation rows lose
+the documented blank three-column prefix. Ready/Unclaimed TUI-061 / Issue #334 owns that
+presentation correction. I200/TUI-042 is Complete/Closed at pre-existing implementation commit
+`3afeeb28`; no TUI-061 product repair is authorized here.
