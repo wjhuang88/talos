@@ -5,9 +5,9 @@
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | Ready - I211 Planned / Claimed via PR #326; ineffective before target-branch merge |
+| Status | In Progress - I211 Active / Claimed; activation ineffective before activation PR merge |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Planned / Claimed via PR #326; ineffective before target-branch merge |
+| Selected Iteration | I211 - Active / Claimed; activation ineffective before activation PR merge |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #302 |
 | Governance Claim PR | #326 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #326 must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. The proposed claim has no target-branch effect while the PR is open. |
+| Authorization Evidence | PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`, both governance validators and merge-time CAS, then merged as `285fc3c7`. |
 | Implementation PR | None - evidence-only validation slice |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Merge claim PR #326 after exact-head gates; only then activate I211 from that merge or later current `main`. Every #302 row must pass or name a separately governed corrective owner before long-task closure. |
+| Handoff / Release Condition | Every #302 row must pass or name a separately governed corrective owner; synchronize source owners first before long-task closure. |
 
 ## Identity / Goal / Value
 
@@ -110,3 +110,11 @@ preserving I200 as Review with its mouse/touchpad rows unpassed.
 That remote evidence resolves the sole review blocker without claiming a human pass. Open
 PR #327 is an unrelated Dashboard claim and does not overlap I211's evidence-only slice. Any new
 #326 head requires fresh exact-head CI and independent claim review before merge-time CAS.
+
+## 2026-08-20 Claim Merge And Activation Proposal
+
+PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`,
+both governance validators and merge-time CAS, then merged as `285fc3c7`. The effective claim now
+permits an evidence-only activation proposal from that exact merge. Activation remains ineffective
+until its own PR reaches `main`; no human row is treated as passed and no product repair is
+authorized.
