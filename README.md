@@ -23,6 +23,9 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 
 - **Local-first coding agent**: interactive TUI, inline mode, and print mode for scripts and smoke tests.
 - **Configurable providers and models**: use the parameterless `/connect` and `/model` pickers to add an OpenAI- or Anthropic-compatible provider, discover its models, and switch the live session without command-string parsing.
+- **Truthful provider progress**: model requests show `Connecting...` initially and
+  `Reconnecting... (attempt n/m)` during provider-reported retry dispatch or backoff; the values
+  come from typed provider events and do not change retry policy or infer progress from timers.
 - **Explicit vision attachments**: attach PNG, JPEG, GIF, or WebP images with `/attach` (or print-mode `--attach`) only after capability, permission, format, size, pixel, and replacement checks; image paths are never auto-read from ordinary text.
 - **Safety-first tool runtime**: file writes, deletes, Git writes, shell execution, network actions, and MCP tools route through explicit permission boundaries.
 - **Rust-native core**: workspace-oriented crates with minimal runtime assumptions and no Node/Python runtime dependency.
