@@ -5,9 +5,9 @@
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | In Progress - I211 Active / Claimed |
+| Status | Review - I211 Review / Claimed |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Active / Claimed |
+| Selected Iteration | I211 - Review / Claimed |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
@@ -138,3 +138,21 @@ event cases. Maintainer validation of I210 observed a correct `Reconnecting... (
 terminal clearing, but the initial `Connecting...` state was too brief to observe and the first
 idle submission incorrectly displayed a queue hint. TUI-060 / Issue #332 separately owns both
 status-sequencing defects. This is a partial result, not I210 or I211 completion.
+
+## 2026-08-20 I198, I212 And I200 Natural-Person Checkpoint
+
+On integrated `main@a2f43248`, I212's exact and one-prefix catalog labels, explicit override,
+ambiguous/unknown fallback, non-persistence and no-request checks passed; I212/MODEL-013 is
+Complete/Closed using pre-existing mainline implementation merge `5a1709cb` as Completion Commit.
+
+I198's omitted/empty/list compatibility passed, while malformed containers stayed excluded. Its
+real CLI diagnostic row failed because explicit activation returned only not-found; SKILL-005 /
+Issue #333 owns the correction. I200's macOS touchpad matrix passed no-op, overflow, multiline and
+resize/CJK behavior. No physical mouse was available or executed; the maintainer explicitly
+accepted touchpad evidence as the native scrolling-device substitute. TUI-061 / Issue #334
+separately owns the ordinary-history continuation-padding regression exposed during reflow. I200
+is Complete/Closed at `3afeeb28`; I198 remains Review.
+
+All Issue #302 rows now pass or have a separate corrective owner. VALIDATION-002/I211 is Review
+pending #331 exact-head CI, independent review, merge-time CAS and a later closeout that cites the
+pre-existing evidence commit. This evidence update does not self-certify I211 completion.

@@ -136,3 +136,15 @@ Skill without `triggers` can be explicitly activated and projected into the requ
 SKILL-004 is now `Review / Claimed`. Exact-head implementation CI, independent Agent technical
 review, merge-time CAS and the Issue #302 natural-person compatibility row remain open; no
 completion is claimed.
+
+## 2026-08-20 Natural-Person Compatibility Disposition
+
+On integrated `main@a2f43248`, the maintainer confirmed through the real binary that omitted,
+explicit-empty and non-empty string-list triggers remain discoverable and explicitly activatable,
+and their bodies reach the mock request preview. Malformed scalar and mapping trigger containers
+remain excluded, but explicit activation exposes only a generic not-found error instead of the
+required field-specific diagnostic.
+
+SKILL-005 / Issue #333 is the separate Ready/Unclaimed corrective owner for diagnostic visibility.
+SKILL-004 remains Review with Completion Commit Pending; I211 records evidence only and grants no
+implementation authority.

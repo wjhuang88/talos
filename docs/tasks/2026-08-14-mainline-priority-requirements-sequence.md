@@ -343,13 +343,13 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T2 | Reconcile and deliver I188 / TOOL-024-A | Accepted lifecycle/security decision and characterization | T1 disposition | Recorded Completion Commit and security review | Keep TOOL-024 children blocked | Complete |
 | T3 | Decide Issue #59 production readiness | TOOL-024-B/C/D dependency matrix | T2 | All owner-defined runtime/permission gates true | Keep exact blocked residual and continue | Blocked |
 | T4 | Deliver I199 / TUI-041 | Bounded multiline preview behavior | T3 disposition | Recorded Completion Commit and acceptance | Preserve one-row behavior | Complete |
-| T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Review / Human Validation Deferred |
+| T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Complete / Completion Commit `3afeeb28` |
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
+| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Complete / Completion Commit `5a1709cb` |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Active / Initial failures owned by TUI-058/#329 and TUI-059/#330; remaining rows pending |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Review / all rows terminal; #331 and evidence-bound closeout pending |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
@@ -647,3 +647,24 @@ I201 direct-event negative cases. Maintainer mock-provider validation confirmed 
 first idle submission falsely labeled as queued. Ready/Unclaimed TUI-060 / Issue #332 owns those
 defects without authorizing implementation. Remaining human/device work is I200, I212 and I198;
 the long task and I210 remain open.
+
+## 2026-08-20 I198, I212 And I200 Human Validation Checkpoint
+
+Maintainer real-binary validation on integrated `main@a2f43248` closed I212/MODEL-013: exact and
+one-prefix custom identities showed catalog provenance, explicit `777K` remained authoritative,
+ambiguous/unknown identities stayed manual with conservative fallback, no inferred value was
+persisted and no model request was sent. I212 is Complete/Closed at pre-existing mainline
+implementation merge `5a1709cb`.
+
+I198 passed omitted/empty/list activation and body projection but failed the required real-CLI
+malformed-`triggers` diagnostic; Ready/Unclaimed SKILL-005 / Issue #333 owns the correction. I200's
+macOS touchpad short/exact/overflow/multiline/resize/CJK matrix passed. No physical mouse was
+available or executed; the maintainer explicitly accepted touchpad evidence as the native
+scrolling-device substitute. Reflow exposed a separate ordinary-history continuation-prefix
+regression owned by Ready/Unclaimed TUI-061 / Issue #334. I200 is Complete/Closed at pre-existing
+implementation commit `3afeeb28`; I198 remains Review.
+
+Every Issue #302 row now passes or has a separately governed corrective owner. I211 moves to
+Review pending rolling evidence PR #331 exact-head CI, independent review and merge-time CAS. A
+later status-only closeout must cite the already-existing #331 evidence commit and then reassess
+Issue #59; this evidence update cannot self-certify I211 completion.

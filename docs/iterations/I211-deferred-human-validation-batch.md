@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -78,7 +78,9 @@ creates no product implementation authority.
 
 ## Verification Evidence
 
-Pending an effective claim and completed Issue #302 row inventory.
+The exact source heads, integrated runtime head, maintainer observations and separately owned
+failures are recorded in Issue #302 and the appended checkpoints below. Final exact-head CI and
+independent review remain pending on rolling evidence PR #331.
 
 ## Completion Evidence
 
@@ -178,3 +180,28 @@ retry attempts. `Reconnecting... (attempt 1/2)` matched the provider fact and cl
 `Message queued and will send after current turn.` immediately on Enter. TUI-060 / Issue #332 owns
 both corrective status-sequencing defects as Ready/Unclaimed. I210 remains Review; I200, I212 and
 I198 natural-person/device rows remain open.
+
+## 2026-08-20 I198, I212 And I200 Natural-Person Checkpoint
+
+The maintainer completed the remaining real-binary Skill and custom-model walkthroughs on
+integrated `main@a2f43248`. I212 passed exact/one-prefix catalog provenance, explicit override,
+ambiguous/unknown fallback, non-persistence and no-request checks and is now Complete/Closed at
+pre-existing mainline implementation merge `5a1709cb`.
+
+I198 passed omitted, empty and non-empty trigger discovery/activation/request projection and safely
+excluded malformed containers, but the real CLI hid the required `triggers` diagnostic behind a
+generic not-found message. SKILL-005 / Issue #333 is its Ready/Unclaimed corrective owner; I198
+remains Review.
+
+I200 touchpad validation passed short/exact-fit no-op, multiline draft preservation, true-overflow
+bidirectional movement/tail return and height/CJK width reflow. A physical mouse was unavailable
+and was not executed; the maintainer explicitly accepted the touchpad as the native scrolling-device
+substitute for this validation row. Ordinary wrapped history also lost the documented blank
+three-column continuation prefix; TUI-061 / Issue #334 separately owns that renderer regression.
+I200 is Complete/Closed at pre-existing implementation commit `3afeeb28`.
+
+Every Issue #302 row now has either passing evidence or a separately governed corrective owner.
+I197, I198, I201 and I210 remain Review under TUI-059/#330, SKILL-005/#333, TUI-058/#329 and
+TUI-060/#332 respectively; TUI-061/#334 preserves the unrelated regression found during I200
+validation. I211 moves to Review, not Complete: rolling evidence PR #331 must merge before a later
+status-only closeout may cite its pre-existing evidence commit.

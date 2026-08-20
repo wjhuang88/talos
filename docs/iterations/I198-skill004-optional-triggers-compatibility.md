@@ -186,3 +186,16 @@ success.
 
 I198 is now `Review / Claimed` with `Completion Commit: Pending`. Exact-head CI, independent Agent
 technical review, merge-time CAS and the deferred Issue #302 human row remain required.
+
+## 2026-08-20 Natural-Person Compatibility Disposition
+
+The maintainer exercised the integrated real binary from `main@a2f43248` in a macOS terminal with
+isolated HOME/workspace fixtures. Omitted `triggers`, `triggers: []` and a normal non-empty string
+list were all discoverable, explicitly activatable and projected their Skill body into the mock
+request preview. Malformed scalar and mapping containers remained safely excluded from `/skills`.
+
+The malformed-input diagnostic row failed: explicit activation of `bad-scalar` and `bad-map`
+reported only `skill '...' was not found`, so the parser's actionable `triggers` diagnostic was not
+visible through the real CLI path. Ready/Unclaimed SKILL-005 / Issue #333 separately owns that
+correction without implementation authority. I198 remains Review with Completion Commit Pending;
+this evidence-only update does not repair or complete it.
