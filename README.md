@@ -307,6 +307,12 @@ talos -p "summarize this repository"
 
 If the provider reaches its output-token limit, Talos preserves the partial answer and prints an explicit truncation warning. Unsupported terminal reasons, transport failures, and streams that close without a protocol terminal signal fail instead of being reported as normal completion. See [`docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`](docs/reference/PROVIDER-TERMINAL-OUTCOMES.md).
 
+In the interactive TUI, a model request starts with `Connecting...`. Built-in OpenAI-compatible
+and Anthropic providers replace it with `Reconnecting... (attempt n/m)` during an actual bounded
+retry, using the provider's configured retry ordinal and ceiling. The activity is transient and
+clears on content, failure, cancellation, or completion; providers that do not implement typed
+progress retain the compatible static `Connecting...` display.
+
 Attach one or more local images to a print-mode prompt (requires a vision-capable model):
 
 ```bash

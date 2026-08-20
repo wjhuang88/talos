@@ -8,7 +8,9 @@ use talos_core::message::{
     AgentEvent, AssistantReasoning, ContentDigest, ContentPart, Message, MessageToolResult,
     ReasoningBlock, StopReason, ToolCall, Usage,
 };
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
+use talos_core::provider::{
+    LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
+};
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolContinuation, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolPresentationPolicy, ToolRegistry, ToolResourceKind,
@@ -986,6 +988,77 @@ async fn test_run_streaming_forwards_events() {
     }
     assert_eq!(received.len(), events.len());
     assert_eq!(received, events);
+}
+
+#[tokio::test]
+#[allow(deprecated)] // Agent::new is correct for unit tests
+async fn test_run_streaming_forwards_provider_progress_before_content() {
+    struct ProgressModel;
+
+    #[async_trait]
+    impl LanguageModel for ProgressModel {
+        async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            unreachable!("agent must use the progress-aware entrypoint")
+        }
+
+        async fn stream_with_tools_and_progress(
+            &self,
+            _messages: &[Message],
+            _tools: &[ToolDefinition],
+            progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            progress_tx
+                .send(ProviderProgress::InitialDispatch {
+                    attempt: 0,
+                    max_attempts: 3,
+                })
+                .expect("progress receiver available");
+            progress_tx
+                .send(ProviderProgress::ScheduledBackoff {
+                    attempt: 1,
+                    max_attempts: 3,
+                    delay_ms: 25,
+                })
+                .expect("progress receiver available");
+            let (tx, rx) = mpsc::channel(4);
+            tx.send(AgentEvent::TextDelta { delta: "ok".into() })
+                .await
+                .expect("event receiver available");
+            tx.send(AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            })
+            .await
+            .expect("event receiver available");
+            Ok(rx)
+        }
+    }
+
+    let agent = Agent::new(Arc::new(ProgressModel), ToolRegistry::new());
+    let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+    let (response, _) = agent
+        .run_streaming("Hi".into(), vec![], tx)
+        .await
+        .expect("turn succeeds");
+    assert_eq!(response, "ok");
+
+    let mut received = Vec::new();
+    while let Ok(event) = rx.try_recv() {
+        received.push(event);
+    }
+    assert!(matches!(
+        received.as_slice(),
+        [
+            AgentEvent::ProviderProgress {
+                progress: ProviderProgress::InitialDispatch { attempt: 0, .. }
+            },
+            AgentEvent::ProviderProgress {
+                progress: ProviderProgress::ScheduledBackoff { attempt: 1, .. }
+            },
+            AgentEvent::TextDelta { .. },
+            AgentEvent::TurnEnd { .. }
+        ]
+    ));
 }
 
 #[tokio::test]

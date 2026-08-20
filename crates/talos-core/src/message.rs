@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::provider::ProviderProgress;
 use crate::tool::ToolProvenance;
 
 /// Provider-side caching behavior for a system prompt range.
@@ -269,6 +270,11 @@ pub struct Usage {
 pub enum AgentEvent {
     /// Turn has started.
     TurnStart,
+    /// Transient, typed provider dispatch/retry progress for the active request.
+    ProviderProgress {
+        /// Provider-owned progress facts. This event is never a transcript message.
+        progress: ProviderProgress,
+    },
     /// A text delta was received from the provider.
     TextDelta {
         /// The text chunk.
@@ -373,6 +379,12 @@ mod tests {
     fn event_roundtrip() {
         let events = vec![
             AgentEvent::TurnStart,
+            AgentEvent::ProviderProgress {
+                progress: ProviderProgress::RetryDispatch {
+                    attempt: 1,
+                    max_attempts: 3,
+                },
+            },
             AgentEvent::TextDelta {
                 delta: "Hello".into(),
             },

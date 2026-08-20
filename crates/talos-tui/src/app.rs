@@ -644,6 +644,14 @@ pub(crate) fn preview_text_for_state(
     if let Some(TurnPhase::Retrying { attempt }) = phase {
         return format!("retrying (attempt {attempt})...");
     }
+    if let Some(TurnPhase::Reconnecting {
+        attempt,
+        max_attempts,
+    }) = phase
+        && is_processing
+    {
+        return format!("Reconnecting... (attempt {attempt}/{max_attempts})");
+    }
     if let Some(TurnPhase::RunningTool { name }) = phase
         && is_processing
     {
@@ -657,7 +665,7 @@ pub(crate) fn preview_text_for_state(
     }
 
     if matches!(phase, Some(TurnPhase::Connecting)) && is_processing {
-        return "connecting...".to_string();
+        return "Connecting...".to_string();
     }
 
     if is_processing && stream_preview.is_empty() {

@@ -362,9 +362,38 @@ impl ConversationEngine {
         match event {
             AgentEvent::TurnStart => {
                 self.is_processing = true;
-                self.current_phase = Some(TurnPhase::Connecting);
+                if !matches!(self.current_phase, Some(TurnPhase::Reconnecting { .. })) {
+                    self.current_phase = Some(TurnPhase::Connecting);
+                }
                 self.current_turn_text.clear();
                 self.current_thinking_text.clear();
+                outputs.push(UiOutput::Status(self.status_snapshot()));
+            }
+            AgentEvent::ProviderProgress { progress } => {
+                use talos_core::provider::ProviderProgress;
+
+                let phase = match progress {
+                    ProviderProgress::InitialDispatch { .. } => TurnPhase::Connecting,
+                    ProviderProgress::RetryDispatch {
+                        attempt,
+                        max_attempts,
+                    }
+                    | ProviderProgress::ScheduledBackoff {
+                        attempt,
+                        max_attempts,
+                        ..
+                    }
+                    | ProviderProgress::FirstPacketWait {
+                        attempt,
+                        max_attempts,
+                    } if *attempt > 0 => TurnPhase::Reconnecting {
+                        attempt: *attempt,
+                        max_attempts: *max_attempts,
+                    },
+                    ProviderProgress::FirstPacketWait { .. } => TurnPhase::Connecting,
+                    _ => return outputs,
+                };
+                self.current_phase = Some(phase);
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TextDelta { delta } => {

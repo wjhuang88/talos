@@ -1,6 +1,7 @@
 #![allow(warnings)]
 use futures::StreamExt;
 use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
+use talos_core::provider::ProviderProgress;
 use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
@@ -97,6 +98,58 @@ fn turn_start_creates_status_and_defers_content_until_delta() {
 
     assert!(engine.current_turn_text.is_empty());
     assert!(engine.is_processing);
+}
+
+#[test]
+fn provider_progress_projects_connecting_and_reconnecting_without_history() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+
+    let connecting = engine.handle_agent_event(&AgentEvent::ProviderProgress {
+        progress: ProviderProgress::FirstPacketWait {
+            attempt: 0,
+            max_attempts: 3,
+        },
+    });
+    assert_eq!(
+        find_status(&connecting).and_then(|s| s.phase.clone()),
+        Some(TurnPhase::Connecting)
+    );
+
+    let reconnecting = engine.handle_agent_event(&AgentEvent::ProviderProgress {
+        progress: ProviderProgress::ScheduledBackoff {
+            attempt: 2,
+            max_attempts: 3,
+            delay_ms: 700,
+        },
+    });
+    assert_eq!(
+        find_status(&reconnecting).and_then(|s| s.phase.clone()),
+        Some(TurnPhase::Reconnecting {
+            attempt: 2,
+            max_attempts: 3,
+        })
+    );
+    assert!(
+        engine.messages.is_empty(),
+        "progress must not create transcript messages"
+    );
+
+    let protocol_start = engine.handle_agent_event(&AgentEvent::TurnStart);
+    assert_eq!(
+        find_status(&protocol_start).and_then(|s| s.phase.clone()),
+        Some(TurnPhase::Reconnecting {
+            attempt: 2,
+            max_attempts: 3,
+        }),
+        "provider protocol start must not regress a retry to initial connecting"
+    );
+
+    let content = engine.handle_agent_event(&AgentEvent::TextDelta { delta: "ok".into() });
+    assert_eq!(
+        find_status(&content).and_then(|s| s.phase.clone()),
+        Some(TurnPhase::Generating)
+    );
 }
 
 // ---------------------------------------------------------------------------

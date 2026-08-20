@@ -1,7 +1,7 @@
 #![allow(warnings)]
 use serde_json::json;
 use talos_core::message::{AgentEvent, Message, StopReason};
-use talos_core::provider::LanguageModel;
+use talos_core::provider::{LanguageModel, ProviderProgress};
 use talos_provider::AnthropicProvider;
 
 fn sse_event(event_type: &str, data: &str) -> String {
@@ -130,6 +130,48 @@ async fn test_successful_streaming_response() {
     assert_eq!(usage.cache_write_tokens, 3);
 
     mock.assert();
+}
+
+#[tokio::test]
+async fn test_successful_progress_protocol_matches_openai_contract() {
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/")
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body(successful_stream_body())
+        .create_async()
+        .await;
+    let provider =
+        AnthropicProvider::new("test-key", "claude-sonnet-4-20250514").with_base_url(server.url());
+    let messages = vec![Message::User {
+        content: "Hello".into(),
+    }];
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
+
+    let result = provider
+        .stream_with_tools_and_progress(&messages, &[], progress_tx)
+        .await;
+
+    assert!(result.is_ok());
+    assert_eq!(
+        vec![
+            progress_rx.try_recv().expect("initial dispatch"),
+            progress_rx.try_recv().expect("first packet wait"),
+        ],
+        vec![
+            ProviderProgress::InitialDispatch {
+                attempt: 0,
+                max_attempts: 3,
+            },
+            ProviderProgress::FirstPacketWait {
+                attempt: 0,
+                max_attempts: 3,
+            },
+        ]
+    );
+    assert!(progress_rx.try_recv().is_err());
+    mock.assert_async().await;
 }
 
 #[tokio::test]
