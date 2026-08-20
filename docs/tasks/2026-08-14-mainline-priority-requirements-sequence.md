@@ -348,7 +348,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
-| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
+| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Claim proposed in PR #324; ineffective while open |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
@@ -549,3 +549,14 @@ have distinct deterministic behavior. The proposed missing-field default is an a
 extension with no struct-shape, routing, permission, dependency or persistence change. The I198
 claim preparation remains ineffective until its actual PR number, exact-head CI/review and CAS are
 complete; no implementation branch or parser edit is authorized yet.
+
+## 2026-08-20 I198 Finalized Claim Proposal
+
+Draft PR #324 supplied the governance identifier. Its finalized exact head now proposes one
+Active/Claimed I198 Work Slice limited to omitted-`triggers` defaulting, focused compatibility
+fixtures and bilingual skill-author documentation. The compatibility checkpoint remains additive;
+explicit lists and malformed-value rejection are hard acceptance boundaries.
+
+The proposal has no target-branch effect while #324 is open. Independent exact-head claim review,
+CI, both governance validators and merge-time CAS must pass before merge. No implementation branch,
+Rust/Cargo change, dependency, release, tag or publication action is authorized before that merge.

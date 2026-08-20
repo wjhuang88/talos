@@ -1,6 +1,6 @@
 # Iteration I198: Optional Skill Triggers Compatibility
 
-> Document status: Planned
+> Document status: Active / Claimed via governance PR #324; ineffective before target-branch merge
 > Published plan date: 2026-08-14
 > Planned objective: decide and implement the smallest compatible omitted-`triggers` contract for
 > otherwise-valid `SKILL.md` files without weakening malformed-value validation or changing skill
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I198/SKILL-004 only: confirm the additive omitted-`triggers` contract; default an omitted field to an empty list; preserve explicit empty/non-empty lists and malformed-value rejection; add focused parser/runtime fixtures; update English and Chinese skill-author documentation. Excludes discovery, linked-skill policy, trigger routing, permissions, registry/ClawHub clients, dependencies, persistence, release/publication and unrelated I211 work. |
+| Claimed At | 2026-08-20 |
 | Source Issue | #155 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #324 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #324 must pass independent exact-head claim review, exact-head CI, both governance validators and merge-time CAS. The proposed claim remains ineffective while the PR is open. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | After predecessors have implementation/deferred-validation dispositions, establish an effective claim on `main`; confirm the public compatibility contract before parser edits and branch only from that claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person review moves to VALIDATION-002/I211/Issue #302 while I198 stays Review. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | PR #324 exact-head review, CI and CAS must pass and the claim must reach `main`. Only then branch from that merge or later current `main`; implementation CI/review/CAS and Issue #302 human validation remain required. |
 
 ## Published Baseline
 
@@ -148,6 +148,6 @@ describing all fields as required records current behavior, but no ADR, generate
 contract freezes omission rejection. The implementation may therefore update that comment and add
 a missing-field default without a public type break.
 
-The preparation branch is governance-only. Until the actual claim PR is finalized, independently
-reviewed and merged, I198 remains Planned/Unclaimed and no parser, Rust, Cargo, dependency,
-version, tag or publication action is authorized.
+The preparation branch is governance-only. PR #324 now contains the finalized proposed claim.
+Until it is independently reviewed and merged, target-branch I198 remains Planned/Unclaimed and no
+parser, Rust, Cargo, dependency, version, tag or publication action is authorized.

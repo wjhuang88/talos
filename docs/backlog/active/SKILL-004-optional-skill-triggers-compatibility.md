@@ -4,45 +4,28 @@
 |---|---|
 | Story ID | SKILL-004 |
 | Source Issue | #155 |
-| Status | Ready — I198 Planned / Unclaimed |
+| Status | Ready — I198 Active / Claimed via governance PR #324; ineffective before target-branch merge |
 | Priority | P1 |
 | Type | Skill Format / Compatibility |
-| Selected Iteration | I198 — Planned / Unclaimed |
+| Selected Iteration | I198 — Active / Claimed via governance PR #324; ineffective before target-branch merge |
 | Depends On | Current `talos-skill` parser and SKILL-001 through SKILL-003 compatibility contracts |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
-| Source Issue | #155 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Establish an effective I198 claim on `main`; confirm the compatibility contract before editing the parser; implement from the claim merge or later current `main`. Per-child CI, Agent technical review and CAS remain merge gates; eligible natural-person compatibility review moves to VALIDATION-002/I211/Issue #302 while this Story stays Review. |
-
-## Claim Preparation - 2026-08-20
-
-| Field | Value |
-|---|---|
-| Claim State | Unclaimed; governance proposal not yet effective |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I198/SKILL-004 only: confirm the additive omitted-`triggers` contract; default an omitted field to an empty list; preserve explicit empty/non-empty lists and malformed-value rejection; add focused parser/runtime fixtures; update English and Chinese skill-author documentation. Excludes discovery, linked-skill policy, trigger routing, permissions, registry/ClawHub clients, dependencies, persistence, release/publication and unrelated I211 work. |
-| Claimed At | Not effective until target-branch merge |
+| Claimed At | 2026-08-20 |
 | Source Issue | #155 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Independent review proposed |
-| Authorization Evidence | Pending exact-head review, CI, both governance validators and merge-time CAS. |
+| Governance Claim PR | #324 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #324 must pass independent exact-head claim review, exact-head CI, both governance validators and merge-time CAS. The proposed claim remains ineffective while the PR is open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | This preparation record grants no implementation authority. Finalize the actual claim PR number, merge the claim to `main`, then create implementation work only from that merge or later exact `main`. |
+| Handoff / Release Condition | PR #324 exact-head review, CI and CAS must pass and this claim must reach `main`. Only then create implementation work from that merge or later exact `main`; per-child implementation review/CAS and Issue #302 human validation remain required. |
 
 ## Goal And Compatibility Contract
 
@@ -115,5 +98,5 @@ additive input-compatibility extension rather than a public type or semantic bre
 The proposed implementation may add only a missing-field default and the acceptance fixtures above.
 It must stop and create a separate ADR/migration owner if implementation evidence shows malformed
 values become accepted, explicit lists change, or another published contract requires omission to
-fail. This governance proposal remains ineffective until its actual PR number, exact-head review,
-CI and merge-time CAS are complete on `main`.
+fail. Governance PR #324 now contains the finalized proposed claim. It remains ineffective until
+independent exact-head review, CI, merge-time CAS and target-branch merge pass.
