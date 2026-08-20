@@ -347,7 +347,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Active / Claimed through PR #321 target merge; proposal ineffective while open |
+| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Active / Claimed |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
@@ -501,3 +501,15 @@ The proposal remains ineffective while #321 is open. Independent exact-head arch
 review, CI, both governance validators and merge-time CAS must pass before merge. No implementation
 branch, Rust/Cargo change, version, tag or publication action is authorized before that target-branch
 merge.
+
+## 2026-08-20 I210 Claim Activation Checkpoint
+
+PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent
+governance/architecture review `5350249740`, both governance validators, `git diff --check` and
+merge-time CAS. It merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. ADR-062 is
+Accepted and PROVIDER-006/I210 is now Active/Claimed. No implementation, release, tag or
+publication action was included.
+
+The next exact action is to create an I210 implementation worktree from `main@e58fbd39`, verify the
+owner/claim and current non-terminal inventory once more, then implement only the accepted provider
+progress Work Slice. I212 remains Review pending its Issue #302 natural-person walkthrough.
