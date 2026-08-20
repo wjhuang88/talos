@@ -94,7 +94,7 @@ Required reads:
 | WORK-001-A / I196 | Complete / Closed | Completion Commit `779a4c71`; PR #291 merged as `1467a561` after exact-head CI `32101943484` and independent architecture review. P0 was documentation-only; P1-P4 remain separately governed. |
 | ARCH-034-D / I171 | Complete | Completion Commit `56f419f7`; source current v0.7.0 audit/register evidence `c88c1d1a`; bounded owner creation validated; no production refactor. |
 | MEM-010 | Ready | Select one bounded safety iteration and preserve existing session/memory behavior. |
-| TUI-043 / I201 | Review / Claimed | PR #309 head `d8d414ce` passed exact-head CI, Agent review and CAS, then merged as `7f5a6df2`; preserve Review until Issue #302/I211 human validation passes. |
+| TUI-043 / I201 | Review / Claimed | Implementation merged as `7f5a6df2`; permission-mediated suppression failed terminal validation and is now owned by Ready/Unclaimed TUI-058/#329. Preserve Review until that separately governed correction is delivered. |
 | TOOL-023-B | Ready | Separate timeout-default/configuration change; do not reopen completed A/C behavior. |
 | PROVIDER-004 | Ready | Force unique text-path tool-call IDs and prove cross-turn pairing; keep separate from shell/runtime timeouts. |
 | Issue #136 | Open follow-up | Implement and validate exact `/delete <uuid>` and `talos storage maintenance --reconcile` guidance without changing accepted cleanup ownership. |

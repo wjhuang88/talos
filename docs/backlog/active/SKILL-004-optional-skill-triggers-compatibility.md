@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | SKILL-004 |
 | Source Issue | #155 |
-| Status | Review / Claimed — implementation evidence prepared; exact-head PR gates and human validation remain open |
+| Status | Review / Claimed - compatibility delivered; diagnostic visibility failed and transferred to SKILL-005/#333 |
 | Priority | P1 |
 | Type | Skill Format / Compatibility |
 | Selected Iteration | I198 — Review / Claimed |
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | #325 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@ea668685`; implementation PR #325 remains limited to the Work Slice. Exact-head implementation CI/review/CAS and Issue #302 human validation remain required. |
+| Handoff / Release Condition | PR #325 passed exact-head CI/review/CAS and merged as `15a3d424`. I211 terminal validation passed omitted/empty/list behavior but exposed a hidden malformed-input diagnostic; SKILL-005/#333 is the separate Ready/Unclaimed corrective owner. Keep SKILL-004 Review with no transferred implementation authority. |
 
 ## Goal And Compatibility Contract
 

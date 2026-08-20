@@ -24,8 +24,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #304 merged to `main` as `0db92cf9` from the exact claim base. This effective claim authorizes only the bounded TUI-045 implementation; exact-head CI, independent Agent technical review, merge-time CAS and deferred human/manual rows remain required. Protected permission/security scope is non-deferrable. |
 | Implementation PR | #305 |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #304 is effective at merge `0db92cf9`; implementation PR #305 merged as `d98f37e7` after exact-head CI, Agent technical review and CAS. Eligible human/manual rows remain in VALIDATION-002/I211/Issue #302 while I197 stays Review. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | PR #305 merged as `d98f37e7` after exact-head CI/review/CAS. I211 terminal validation found docking/hierarchy defects and left part of the matrix incomplete; TUI-059/#330 is the separate Ready/Unclaimed corrective owner. Keep I197 Review with no permission-policy authority transfer. |
 
 ## Published Baseline
 

@@ -20,7 +20,7 @@
 | Authorization Evidence | PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent governance/architecture review `5350249740`, both governance validators and merge-time CAS, then merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. |
 | Implementation PR | #323 |
 | Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Claim is effective on `main@e58fbd39`; create the implementation branch from this merge or later exact `main`. Implementation remains limited to the Work Slice and requires its own exact-head CI, technical review, CAS and human validation row. |
+| Handoff / Release Condition | PR #323 passed exact-head CI/review/CAS and merged as `9d5c8a71`. I211 confirmed retry ordinals/cleanup but found initial connection and first-turn queue sequencing defects; TUI-060/#332 is the separate Ready/Unclaimed corrective owner. Keep I210 Review with no retry-policy or implementation authority transfer. |
 
 ## Selected Story
 
