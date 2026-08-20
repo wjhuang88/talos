@@ -56,9 +56,9 @@ Relevant owner disposition:
 | Owner | State | I213 disposition |
 |---|---|---|
 | WEB-001 | Partial | Parent explicitly retains live log/SSE and live activity residual. |
-| WEB-001-A / I195 | Complete / Closed | Consume shell only; do not reuse authorization. |
+| WEB-001-A / I195 | Closed historical shell | Consume shell only; do not reuse authorization. |
 | SEC-002 | Refinement / Unclaimed | Token delivery/auth redesign stays separate. |
-| OBS-001 | Complete | Consume bounded logging baseline only. |
+| OBS-001 | Delivered logging baseline | Consume bounded logging baseline only. |
 | CONF-001 | Partial | Config writes excluded. |
 | SESSION-009 | Refinement / Unclaimed | Multi-client replay/control excluded. |
 | SERVER-001 | Intake | Serve/connect/interactive architecture excluded. |
