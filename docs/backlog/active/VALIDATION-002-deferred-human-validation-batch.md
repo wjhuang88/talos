@@ -107,6 +107,6 @@ correction: Issue #302 did not yet record I200's final implementation dispositio
 `32149762367`, Agent technical review `5330234992`, merge-time CAS and merge `9628e183`, while
 preserving I200 as Review with its mouse/touchpad rows unpassed.
 
-That remote evidence resolves the sole review blocker without claiming a human pass. Open Draft
+That remote evidence resolves the sole review blocker without claiming a human pass. Open
 PR #327 is an unrelated Dashboard claim and does not overlap I211's evidence-only slice. Any new
 #326 head requires fresh exact-head CI and independent claim review before merge-time CAS.

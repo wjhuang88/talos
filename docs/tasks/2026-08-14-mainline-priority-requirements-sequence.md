@@ -611,6 +611,6 @@ implementation `3afeeb28`, CI `32149762367`, Agent technical review `5330234992`
 and merge `9628e183`; I200 remains Review and its natural-person rows remain open.
 
 The correction resolves the sole review blocker without changing product code or acceptance
-truth. Open Draft #327 is an unrelated Dashboard claim. Re-run both exact-base governance
+truth. Open PR #327 is an unrelated Dashboard claim. Re-run both exact-base governance
 validators, CI and independent review on the new #326 head before merge-time CAS; only the claim
 merge may authorize a later I211 activation branch.

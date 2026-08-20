@@ -129,6 +129,6 @@ Issue comment `5353130091` now records final head `8a58cb2d`, implementation `3a
 I200 Review and leaves the natural-person mouse/touchpad matrix unpassed, so no acceptance result
 has been fabricated.
 
-Open Draft PR #327 is a separately owned Dashboard claim and does not overlap I211. The correction
+Open PR #327 is a separately owned Dashboard claim and does not overlap I211. The correction
 resolves the sole prior blocker, but a new PR #326 head must obtain fresh exact-head CI and
 independent claim review before merge-time CAS.
