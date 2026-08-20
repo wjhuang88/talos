@@ -703,11 +703,38 @@ impl Agent {
                 "dispatching sealed provider request plan"
             );
 
-            let mut rx = match self
-                .provider
-                .stream_with_tools(&plan.messages, &plan.tool_definitions)
-                .await
-            {
+            let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
+            let provider_request = self.provider.stream_with_tools_and_progress(
+                &plan.messages,
+                &plan.tool_definitions,
+                progress_tx,
+            );
+            tokio::pin!(provider_request);
+            let provider_result = loop {
+                tokio::select! {
+                    biased;
+                    progress = progress_rx.recv() => {
+                        match progress {
+                            Some(progress) => {
+                                if let Some(ref tx) = event_tx {
+                                    let _ = tx.send(AgentEvent::ProviderProgress { progress });
+                                }
+                            }
+                            None => break provider_request.await,
+                        }
+                    }
+                    result = &mut provider_request => {
+                        while let Ok(progress) = progress_rx.try_recv() {
+                            if let Some(ref tx) = event_tx {
+                                let _ = tx.send(AgentEvent::ProviderProgress { progress });
+                            }
+                        }
+                        break result;
+                    }
+                }
+            };
+
+            let mut rx = match provider_result {
                 Ok(rx) => rx,
                 Err(error) => {
                     if let Some(ref tx) = event_tx {
@@ -830,7 +857,9 @@ impl Agent {
                     AgentEvent::ReasoningComplete { blocks } => {
                         turn_reasoning_blocks = Some(blocks);
                     }
-                    AgentEvent::TurnStart | AgentEvent::ToolResult { .. } => {}
+                    AgentEvent::TurnStart
+                    | AgentEvent::ProviderProgress { .. }
+                    | AgentEvent::ToolResult { .. } => {}
                     _ => {}
                 }
             }

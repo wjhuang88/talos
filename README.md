@@ -23,6 +23,9 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 
 - **Local-first coding agent**: interactive TUI, inline mode, and print mode for scripts and smoke tests.
 - **Configurable providers and models**: use the parameterless `/connect` and `/model` pickers to add an OpenAI- or Anthropic-compatible provider, discover its models, and switch the live session without command-string parsing.
+- **Truthful provider progress**: model requests show `Connecting...` initially and
+  `Reconnecting... (attempt n/m)` during provider-reported retry dispatch or backoff; the values
+  come from typed provider events and do not change retry policy or infer progress from timers.
 - **Explicit vision attachments**: attach PNG, JPEG, GIF, or WebP images with `/attach` (or print-mode `--attach`) only after capability, permission, format, size, pixel, and replacement checks; image paths are never auto-read from ordinary text.
 - **Safety-first tool runtime**: file writes, deletes, Git writes, shell execution, network actions, and MCP tools route through explicit permission boundaries.
 - **Rust-native core**: workspace-oriented crates with minimal runtime assumptions and no Node/Python runtime dependency.
@@ -306,6 +309,12 @@ talos -p "summarize this repository"
 ```
 
 If the provider reaches its output-token limit, Talos preserves the partial answer and prints an explicit truncation warning. Unsupported terminal reasons, transport failures, and streams that close without a protocol terminal signal fail instead of being reported as normal completion. See [`docs/reference/PROVIDER-TERMINAL-OUTCOMES.md`](docs/reference/PROVIDER-TERMINAL-OUTCOMES.md).
+
+In the interactive TUI, a model request starts with `Connecting...`. Built-in OpenAI-compatible
+and Anthropic providers replace it with `Reconnecting... (attempt n/m)` during an actual bounded
+retry, using the provider's configured retry ordinal and ceiling. The activity is transient and
+clears on content, failure, cancellation, or completion; providers that do not implement typed
+progress retain the compatible static `Connecting...` display.
 
 Attach one or more local images to a print-mode prompt (requires a vision-capable model):
 

@@ -162,6 +162,7 @@ pub enum TipKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TurnPhase {
     Connecting,
+    Reconnecting { attempt: u32, max_attempts: u32 },
     Retrying { attempt: u32 },
     Thinking,
     Generating,

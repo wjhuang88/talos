@@ -260,6 +260,11 @@ talos "inspect this repository"
 talos -p "summarize this repository"
 ```
 
+在交互式 TUI 中，模型请求开始时显示 `Connecting...`。内置 OpenAI 兼容与 Anthropic
+provider 发生真实的有界重试时，会按 provider 配置的重试序号和上限显示
+`Reconnecting... (attempt n/m)`。该活动状态是瞬态的，在收到内容、失败、取消或完成时清除；
+未实现类型化进度的 provider 继续保持兼容的静态 `Connecting...` 显示。
+
 显式指定工作区：
 
 ```bash

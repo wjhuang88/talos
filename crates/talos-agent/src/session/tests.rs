@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use talos_core::message::{Message, StopReason};
-use talos_core::provider::{LanguageModel, ProviderResult};
+use talos_core::provider::{LanguageModel, ProviderProgress, ProviderResult, ToolDefinition};
 use talos_core::session::{RuntimePolicy, SessionEvent, TurnCompletionStatus, TurnEventPayload};
 use talos_core::tool::ToolRegistry;
 use tokio::sync::mpsc;
@@ -73,6 +73,37 @@ impl LanguageModel for MockModel {
 struct SlowModel {
     delay: Duration,
     events: Vec<AgentEvent>,
+}
+
+struct BlockingProgressModel {
+    progress: ProviderProgress,
+}
+
+#[async_trait]
+impl LanguageModel for BlockingProgressModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        unreachable!("session agent must use progress-aware provider entrypoint")
+    }
+
+    async fn stream_with_tools_and_progress(
+        &self,
+        _messages: &[Message],
+        _tools: &[ToolDefinition],
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        progress_tx
+            .send(self.progress.clone())
+            .expect("progress receiver available");
+        if matches!(self.progress, ProviderProgress::FirstPacketWait { .. }) {
+            let (tx, rx) = mpsc::channel(1);
+            tokio::spawn(async move {
+                std::future::pending::<()>().await;
+                drop(tx);
+            });
+            return Ok(rx);
+        }
+        std::future::pending::<ProviderResult<Receiver<AgentEvent>>>().await
+    }
 }
 
 #[async_trait]
@@ -934,6 +965,80 @@ async fn test_interrupt() {
             .any(|e| matches!(completed_status(e), Some(TurnCompletionStatus::Cancelled))),
         "Should have TurnCompleted(Cancelled)"
     );
+}
+
+#[tokio::test]
+async fn provider_wait_boundaries_cancel_through_existing_session_lifecycle() {
+    let stages = [
+        ProviderProgress::InitialDispatch {
+            attempt: 0,
+            max_attempts: 3,
+        },
+        ProviderProgress::ScheduledBackoff {
+            attempt: 1,
+            max_attempts: 3,
+            delay_ms: 500,
+        },
+        ProviderProgress::FirstPacketWait {
+            attempt: 1,
+            max_attempts: 3,
+        },
+    ];
+
+    for expected_progress in stages {
+        let agent = make_agent(BlockingProgressModel {
+            progress: expected_progress.clone(),
+        });
+        let config = SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let mut eq_rx = handle.eq_rx;
+        let sq_tx = handle.sq_tx;
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "wait".into(),
+            })
+            .await
+            .expect("submit");
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let event = eq_rx.recv().await.expect("session event");
+                if matches!(
+                    progress_event(&event),
+                    Some(AgentEvent::ProviderProgress { progress }) if progress == &expected_progress
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("typed provider progress should arrive");
+
+        sq_tx.send(SessionOp::Interrupt).await.expect("interrupt");
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let event = eq_rx.recv().await.expect("terminal event");
+                if matches!(
+                    completed_status(&event),
+                    Some(TurnCompletionStatus::Cancelled)
+                ) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("provider wait should cancel promptly");
+
+        sq_tx.send(SessionOp::Shutdown).await.expect("shutdown");
+        actor_task.await.expect("actor");
+    }
 }
 
 #[tokio::test]

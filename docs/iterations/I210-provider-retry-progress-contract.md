@@ -1,6 +1,6 @@
 # Iteration I210: Provider Retry Progress Contract
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Planned date: 2026-08-17
 > Objective: deliver PROVIDER-006 through a truthful semver-compatible progress contract for
 > provider dispatch, retry backoff and first-packet wait.
@@ -18,7 +18,7 @@
 | Governance Claim PR | #321 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #321 exact head `4d45f1ba890fa7cb1ea6f6f058ecb0f0916eb639` passed CI `32322271343`, independent governance/architecture review `5350249740`, both governance validators and merge-time CAS, then merged to `main` as `e58fbd399a7071aad7ad8fd846a82f2745611fa0`. |
-| Implementation PR | Not started |
+| Implementation PR | #323 |
 | Last Updated | 2026-08-20 |
 | Handoff / Release Condition | Claim is effective on `main@e58fbd39`; create the implementation branch from this merge or later exact `main`. Implementation remains limited to the Work Slice and requires its own exact-head CI, technical review, CAS and human validation row. |
 
@@ -122,3 +122,19 @@ addition to wait for a pre-1.0 minor release rather than a patch.
 The preparation branch was governance-only. PR #321 is merged and the claim is effective; the next
 exact action is to create an implementation worktree from `main@e58fbd39` and implement only the
 accepted I210 Work Slice. Version, tag and publication actions remain excluded.
+
+## 2026-08-20 Implementation Checkpoint
+
+Implementation commit `6efee2b8` adds the accepted typed provider-progress path and its runtime/TUI
+projection. It preserves retry policy, dependency closure, persistence and release boundaries. The
+implementation branch used the effective claim base and contains no Cargo, version, tag or
+publication changes.
+
+Validation completed against the implementation head: affected-crate locked tests passed (including
+core/provider/agent/conversation/TUI), the full `talos-cli` locked suite passed with an isolated
+writable `HOME`, formatting and strict affected-crate Clippy passed, and `git diff --check` passed.
+The earlier CLI failure was an outer-sandbox configuration-I/O denial, not a product failure.
+
+The implementation remains `Review / Claimed`: exact-head CI, independent technical review,
+merge-time CAS, and the live retry-status human row in Issue #302 remain required. No
+`Completion Commit` is recorded before those gates and the deferred human validation pass.

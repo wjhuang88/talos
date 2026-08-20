@@ -1098,8 +1098,36 @@ fn preview_text_uses_phase_priority_states() {
         "retrying (attempt 2)..."
     );
     assert_eq!(
+        preview_text_for_state(
+            None,
+            Some(&TurnPhase::Reconnecting {
+                attempt: 2,
+                max_attempts: 3,
+            }),
+            None,
+            true,
+            "",
+            0,
+        ),
+        "Reconnecting... (attempt 2/3)"
+    );
+    assert!(
+        preview_text_for_state(
+            None,
+            Some(&TurnPhase::Reconnecting {
+                attempt: 2,
+                max_attempts: 3,
+            }),
+            None,
+            false,
+            "",
+            0,
+        )
+        .is_empty()
+    );
+    assert_eq!(
         preview_text_for_state(None, Some(&TurnPhase::Connecting), None, true, "", 0),
-        "connecting..."
+        "Connecting..."
     );
     assert_eq!(
         preview_text_for_state(

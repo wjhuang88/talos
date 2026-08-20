@@ -18,7 +18,9 @@ use reqwest::Client;
 use serde_json::{Value, json};
 use talos_config::{ProviderTimeoutConfig, ReasoningOptions};
 use talos_core::message::{AgentEvent, Message};
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
+use talos_core::provider::{
+    LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
+};
 use tokio::sync::mpsc;
 
 use crate::openai_request::{build_request_body, redact_secret};
@@ -106,7 +108,7 @@ impl OpenAIProvider {
             self.reasoning.as_ref(),
             self.output_limit,
         );
-        self.send_request(&body).await
+        self.send_request(&body, None).await
     }
 
     async fn make_request_with_tools(
@@ -121,14 +123,32 @@ impl OpenAIProvider {
             self.reasoning.as_ref(),
             self.output_limit,
         );
-        self.send_request(&body).await
+        self.send_request(&body, None).await
     }
 
-    async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
+    async fn send_request(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+    ) -> ProviderResult<reqwest::Response> {
         let max_attempts = self.timeout_config.max_attempts;
         let dispatch_timeout = Duration::from_secs(self.timeout_config.dispatch_timeout_secs);
         let mut attempt = 0u32;
         loop {
+            emit_progress(
+                progress_tx,
+                if attempt == 0 {
+                    ProviderProgress::InitialDispatch {
+                        attempt,
+                        max_attempts,
+                    }
+                } else {
+                    ProviderProgress::RetryDispatch {
+                        attempt,
+                        max_attempts,
+                    }
+                },
+            );
             let request_fut = self
                 .client
                 .post(self.endpoint_url())
@@ -155,6 +175,14 @@ impl OpenAIProvider {
                             attempt: new_attempt,
                             delay_ms,
                         } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: new_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
                             tracing::warn!(
                                 attempt = new_attempt,
                                 delay_ms,
@@ -170,7 +198,16 @@ impl OpenAIProvider {
             };
 
             match response {
-                Ok(resp) if resp.status().is_success() => return Ok(resp),
+                Ok(resp) if resp.status().is_success() => {
+                    emit_progress(
+                        progress_tx,
+                        ProviderProgress::FirstPacketWait {
+                            attempt,
+                            max_attempts,
+                        },
+                    );
+                    return Ok(resp);
+                }
                 Ok(resp) => {
                     let status = resp.status();
                     let body_text = resp.text().await.unwrap_or_default();
@@ -186,6 +223,14 @@ impl OpenAIProvider {
                             attempt: new_attempt,
                             delay_ms,
                         } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: new_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
                             tracing::warn!(
                                 attempt = new_attempt,
                                 delay_ms,
@@ -211,6 +256,14 @@ impl OpenAIProvider {
                             attempt: new_attempt,
                             delay_ms,
                         } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: new_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
                             tracing::warn!(
                                 attempt = new_attempt,
                                 delay_ms,
@@ -225,6 +278,15 @@ impl OpenAIProvider {
                 }
             }
         }
+    }
+}
+
+fn emit_progress(
+    progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+    progress: ProviderProgress,
+) {
+    if let Some(progress_tx) = progress_tx {
+        let _ = progress_tx.send(progress);
     }
 }
 
@@ -258,6 +320,31 @@ impl LanguageModel for OpenAIProvider {
         tools: &[ToolDefinition],
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request_with_tools(messages, tools).await?;
+        let (tx, rx) = mpsc::channel(32);
+        let timeout_config = self.timeout_config.clone();
+        tokio::spawn(crate::openai_sse::parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+        ));
+        Ok(rx)
+    }
+
+    async fn stream_with_tools_and_progress(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let body = build_request_body(
+            &self.model,
+            messages,
+            tools,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
+        let response = self.send_request(&body, Some(&progress_tx)).await?;
         let (tx, rx) = mpsc::channel(32);
         let timeout_config = self.timeout_config.clone();
         tokio::spawn(crate::openai_sse::parse_sse_stream(
