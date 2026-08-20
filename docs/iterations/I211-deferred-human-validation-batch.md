@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Unclaimed - claim preparation in progress
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -16,17 +16,17 @@
 | Field | Value |
 |---|---|
 | Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Responsible Actor | @wjhuang88 proposed; ineffective before claim merge |
+| Executing Agent | Codex / GPT-5 mainline validation session proposed |
+| Work Slice | I211/VALIDATION-002/#302 evidence only: execute and record the already-defined natural-person and real-terminal rows for I200, I197, I201, I212, I210 and I198; synchronize source owners first; create separately governed corrective owners for failures. No product implementation, policy, dependency, persistence, release or publication change. |
 | Claimed At | Not applicable |
 | Source Issue | #302 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review proposed |
+| Authorization Evidence | The finalized governance-only claim head must pass exact-head CI, both governance validators, independent Agent claim review and merge-time CAS. This preparation record remains Unclaimed and has no target-branch effect before merge. |
 | Implementation PR | None - evidence-only validation slice |
-| Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Activate only after the ordered implementation children have terminal dispositions and an effective I211 claim exists on `main`; finish all Issue #302 rows before long-task closure. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | All ordered implementation children have terminal merge dispositions. Finalize and merge the evidence-only claim, then activate from that merge or later current `main`; finish or explicitly route every Issue #302 row before long-task closure. |
 
 ## Published Baseline
 
@@ -108,3 +108,14 @@ append a human row to Issue #302 covering `Connecting…`, structured `Reconnect
 and terminal clear behavior against the integrated `main` head. I211 activation now follows terminal
 implementation dispositions for I200, I197, I201, I212, I210 and I198. I210's ADR, effective claim,
 machine/technical gates and CAS remain non-deferred.
+
+## 2026-08-20 Claim Preparation And Dependency Inventory
+
+I200, I197, I201, I212, I210 and I198 have terminal implementation merge dispositions and remain
+Review only for their Issue #302 rows. Current iteration inventory: no Active iteration; those six
+iterations are Review; I189 is Planned/Claimed but explicitly unactivated; I206-I208 and I211 are
+Planned/Unclaimed; I164 remains Paused; no current iteration document is Blocked. Issue #59 retains
+its separate backlog-level production blockers.
+
+Open PRs #120/#121 are archival Drafts and do not overlap this evidence slice. This branch prepares
+no implementation work and keeps I211 Unclaimed until the finalized claim reaches `main`.
