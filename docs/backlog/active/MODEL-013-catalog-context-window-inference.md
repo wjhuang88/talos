@@ -5,9 +5,9 @@
 | Story ID | MODEL-013 |
 | Type | Model / Configuration Story |
 | Priority | P2 |
-| Status | In Progress / Claimed; I212 Active |
+| Status | Review / Claimed; implementation merged, human validation deferred |
 | Source | [GitHub Issue #312](https://github.com/wjhuang88/talos/issues/312) |
-| Selected Iteration | I212 — Active / Claimed |
+| Selected Iteration | I212 — Review / Claimed |
 | Depends On | MODEL-008 custom-model registration; canonical model catalog; MODEL-011 evidence precedence boundary |
 
 ## Collaboration Claim
@@ -24,8 +24,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #314 exact head `ec5c6920` passed CI `32223903534`, both governance validators and merge-time CAS; independent Agent review was attempted but disconnected without a conclusion, so the planning-only claim used the SOP single-maintainer path with disclosure `5338629524` and merged as `a62f448b`. |
 | Implementation PR | #318 |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Claim #314 is effective through merge `a62f448b`; implementation must branch from that merge or later current `main` and remain within the recorded Work Slice. |
+| Last Updated | 2026-08-20 |
+| Handoff / Release Condition | PR #318 exact head `a2466c55` passed CI `32319297491`, independent Agent review `5349952979` and merge-time CAS, then merged as `5a1709cb`. Keep this Story Review until the Issue #302/I211 natural-person custom-provider walkthrough passes; no further implementation authority transfers. |
 
 ## Identity / Goal / Value
 
@@ -139,3 +139,16 @@ Governance PR #319 then registered those Issues and merged to `main` as `8d0d316
 rebased onto that merge and the claim row above now reflects claim #314 merge `a62f448b`. The old CI
 and review conclusion do not carry to the new head; MODEL-013 remains In Progress pending new
 exact-head CI, independent review, CAS and the Issue #302 walkthrough.
+
+## 2026-08-20 Implementation Merge Disposition
+
+PR #318 exact head `a2466c55641cc893ae5cf9248519af8b1ca4f093` passed CI run
+`32319297491` (5/5), independent Agent technical approval `5349952979`, both governance validators
+and merge-time CAS, then merged to `main` as `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`.
+The review independently confirmed the rebased Rust files were byte-equivalent to the earlier
+reviewed implementation and preserved exact-first matching, ambiguity rejection, configured-value
+precedence and context-only inference without Cargo, persistence or network changes.
+
+MODEL-013 is now Review / Claimed with Completion Commit pending. Its remaining natural-person
+custom-provider walkthrough is tracked in Issue #302/I211; this status synchronization does not
+self-certify completion. Issue #316 separately owns the parallel-test HOME isolation residual.

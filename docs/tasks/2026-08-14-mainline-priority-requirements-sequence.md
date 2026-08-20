@@ -346,7 +346,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Review / Human Validation Deferred |
 | T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Active / Claimed through #314 merge `a62f448b` |
+| T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Review / Implementation merged; human validation deferred to #302 / I211 |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Planned / Unclaimed |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Planned |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Planned |
@@ -470,3 +470,15 @@ without adding I212 product scope and merged as `8d0d3166`. The I212 branch is r
 merge, the claim fact is corrected, and all exact-head CI/review evidence must now be regenerated.
 I212 remains the active T7A item; no I210/I198 authority transfers before its implementation merge
 and deferred-validation disposition.
+
+## 2026-08-20 I212 Merge And T7B Resume Checkpoint
+
+PR #318 exact head `a2466c55641cc893ae5cf9248519af8b1ca4f093` passed exact-head CI
+`32319297491` (5/5), independent Agent approval `5349952979`, both governance validators and
+merge-time CAS, then merged as `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`. I212/MODEL-013 is
+Review / Claimed with Completion Commit pending; its natural-person exact/explicit/ambiguous custom
+provider walkthrough is now an explicit Issue #302/I211 row.
+
+This is the terminal implementation/deferred-validation disposition required to resume T7B. The
+next exact action is I210/PROVIDER-006 ADR and claim preparation from fresh `main`; I210 remains
+Planned/Unclaimed and no provider API, retry-policy or implementation authority exists yet.
