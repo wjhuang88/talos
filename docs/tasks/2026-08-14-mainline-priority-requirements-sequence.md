@@ -716,3 +716,17 @@ the independent Dashboard lane; I164 stays Paused/superseded. RUNTIME-005-B/C, P
 TOOL-024-B/C/D remain blocked or unauthorized in their existing order. No Rust, Cargo, API,
 runtime, persistence, permission, sandbox, product UI, dependency, release, publication or
 `unsafe` change is authorized by this activation.
+
+## 2026-08-21 Governance Workflow Repair Interruption
+
+The maintainer explicitly paused further product/runtime development to correct the delivery
+workflow measured by GOV-007/I205. Issue #339, GOV-008 and I215 own a non-overlapping governance
+slice: atomic claim+activation, local design/implementation/test/documentation convergence, one
+stable remote stage candidate, scenario fixtures and an EVOLUTION lesson. The claim+activation PR
+has no effect until merge and contains no SOP, validator, Rust/Cargo or product implementation.
+
+I214 remains Active/Claimed with decision PR #338 waiting for valid independent exact-head review;
+no new I214 edits are scheduled during the governance repair. After I215 closes, finish the already
+started I214 flow, then govern RUNTIME-005-B/C and later long-task work using the revised process.
+I197/I198/I201/I210 remain Review, I189/I213 remain Planned/Claimed and unactivated, I206-I208
+remain Planned/Unclaimed, and I164 remains Paused.
