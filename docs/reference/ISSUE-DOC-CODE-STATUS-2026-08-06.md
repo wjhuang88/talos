@@ -41,7 +41,6 @@ RUNTIME-006 registration for Issue #234
 | [#45](https://github.com/wjhuang88/talos/issues/45) | persist interrupted-turn partial results | [SESSION-008](../backlog/active/SESSION-008-interrupted-turn-partial-persistence.md) | Refinement | Legacy error path is partial; A decides durable shape and B implements cancellation/error replay parity. |
 | [#46](https://github.com/wjhuang88/talos/issues/46) | multi-client session architecture | [SESSION-009](../backlog/active/SESSION-009-multi-client-session-architecture.md) | Refinement | Architecture boundary required. |
 | [#47](https://github.com/wjhuang88/talos/issues/47) | ACP-compatible Agent server | [ACP-001](../backlog/active/ACP-001-agent-client-protocol-server.md) | Blocked | Blocked by SESSION-009. |
-| [#49](https://github.com/wjhuang88/talos/issues/49) | bounded graceful shutdown | [RUNTIME-005](../backlog/active/RUNTIME-005-bounded-graceful-shutdown.md) | Complete / Closed | A/I214, B/I216 and C/I217 Completion Commits `6719c876`/`c123328d`/`44e840d7`; remote Issue closed after evidence-bearing closeout merge `1503ca21`. |
 | [#52](https://github.com/wjhuang88/talos/issues/52) | permission pipeline convergence | [PERM-006](../backlog/active/PERM-006-permission-pipeline-convergence.md) | Refinement | Epic registered; children staged. |
 | [#53](https://github.com/wjhuang88/talos/issues/53) | structured permission decisions | [PERM-006-A](../backlog/active/PERM-006-A-structured-permission-decisions.md) | Refinement | First additive child; unclaimed. |
 | [#54](https://github.com/wjhuang88/talos/issues/54) | scoped grant stores | [PERM-006-B](../backlog/active/PERM-006-B-scoped-grant-store.md) | Blocked | Blocked by PERM-006-A. |
@@ -79,6 +78,7 @@ RUNTIME-006 registration for Issue #234
 | [#312](https://github.com/wjhuang88/talos/issues/312) | MODEL-013 / I212 | Completed | Completion Commit `5a1709cb`; PR #318 merge gates and integrated exact/prefix/override/unknown no-request validation passed; owner closeout reached main through PR #331 merge `97dbf35f`. TEST-001/#316 remains separate. |
 | [#302](https://github.com/wjhuang88/talos/issues/302) | VALIDATION-002 / I211 | Completed | Completion Commits `b7d55a0d`/`7c333d98`; PR #331 merged as `97dbf35f`; status-only closeout PR #335 merged as `5301b8c2`; the remote evidence tracker then closed. TUI-058/#329, TUI-059/#330, TUI-060/#332, SKILL-005/#333 and TUI-061/#334 remain separate. |
 | [#339](https://github.com/wjhuang88/talos/issues/339) | GOV-008 / I215 | Completed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, independent review `5365129718` and merge-time CAS. |
+| [#49](https://github.com/wjhuang88/talos/issues/49) | RUNTIME-005 / I214 / I216 / I217 | Completed | A/B/C Completion Commits `6719c876`/`c123328d`/`44e840d7`; C PR #348 merged as `6e5fa8c3` after CI `32475052535`, independent runtime review `5369328072` and CAS; evidence-bearing closeout merged as `1503ca21`, then the remote Issue closed. |
 
 ## Closure Rule
 
