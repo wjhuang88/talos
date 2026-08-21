@@ -1,10 +1,10 @@
 # ADR-063: Bounded Runtime Shutdown And Finalizer Coordination
 
-> Status: Proposed
+> Status: Accepted
 > Date: 2026-08-21
 > Owner: RUNTIME-005-A / I214
-> Proposal evidence: content commit `648a35d3`; PR #338; exact final head, CI and independent
-> architecture review pending.
+> Decision evidence: content commits `648a35d3`/`6719c876`; PR #338 merge `fc70e396`;
+> exact-head CI `32449605985`; independent architecture review `5365529351`; merge-time CAS.
 
 ## Context
 
