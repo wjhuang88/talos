@@ -80,6 +80,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I210 | Provider Retry Progress Contract | Review / Claimed - implementation merged; human validation partial failure | PROVIDER-006 / Issue #278; PR #323 merged as `9d5c8a71`. Issue #302 confirmed retry ordinals but TUI-060/#332 owns initial connection/first-turn queue status defects; Completion Commit is Pending. |
 | I211 | Deferred Human Review And Acceptance Batch | Complete / Closed | Completion Commits `b7d55a0d`/`7c333d98`; PR #331 merged as `97dbf35f` after CI `32372514265`, independent review and CAS. Four failed source children retain separate corrective owners. |
 | I212 | Catalog-Assisted Custom-Model Context Window | Complete / Closed | Completion Commit `5a1709cb`; PR #318 CI/review/CAS and integrated exact/prefix/override/unknown no-request walkthrough passed. |
+| I213 | Dashboard Live Activity And Log Viewer | Planned / Claimed | Governance claim PR #327 merged as `66747214`; Dashboard-only implementation remains unactivated and outside the mainline task. |
+| I214 | Bounded Shutdown Contract Decision | Planned / claim proposed in #336 | RUNTIME-005-A decision-only slice; proposed ownership is ineffective before #336 merges, and no ADR execution or Rust/Cargo/runtime change is authorized. |
 
 ## Completed This Closeout
 
