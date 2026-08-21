@@ -83,7 +83,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I213 | Dashboard Live Activity And Log Viewer | Planned / Claimed | Governance claim PR #327 merged as `66747214`; Dashboard-only implementation remains unactivated and outside the mainline task. |
 | I214 | Bounded Shutdown Contract Decision | Complete / Closed | Completion Commit `6719c876`; PR #338 merged as `fc70e396` after exact-head CI `32449605985`, independent architecture review `5365529351` and CAS. ADR-063 is Accepted; B is Ready/Unclaimed and C remains Blocked. |
 | I215 | Local Convergence And Stage Validation | Complete / Closed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, review `5365129718` and CAS. No product/runtime authority. |
-| I216 | Bounded Shutdown Coordinator And Admission Fence | Active / Claimed | PR #344 merged as `2016acce` after exact-head CI/review/CAS, making the atomic claim+activation effective. B-only implementation is locally converging; no Review/Complete claim exists yet. |
+| I216 | Bounded Shutdown Coordinator And Admission Fence | Review / Claimed | Claim PR #344 merged as `2016acce`. Stable implementation commit `c123328d` is in PR #345 after full local preflight; exact-head CI/review/CAS and later evidence-only closeout remain. |
 
 ## Completed This Closeout
 

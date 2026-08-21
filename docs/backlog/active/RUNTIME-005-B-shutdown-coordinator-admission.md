@@ -1,16 +1,16 @@
 # RUNTIME-005-B: Bounded Shutdown Coordinator And Admission Fence
 
-**Status**: Active / Claimed
+**Status**: Review / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-005-B |
 | Type | Runtime / Public SDK Story |
 | Priority | P0 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I216 - Active / Claimed |
+| Selected Iteration | I216 - Review / Claimed |
 | Depends On | RUNTIME-005-A / I214 Complete; ADR-063 Accepted; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
@@ -26,9 +26,9 @@
 | Governance Claim PR | #344 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 exact head `e0f572a0` passed CI `32454558957`, both validators, independent runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. Shared-account review establishes Agent-role separation only. |
-| Implementation PR | Not started |
+| Implementation PR | #345 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Claim and activation are effective through PR #344 merge `2016acce`. Converge the full Work Slice locally before one stable implementation PR; completion still requires exact-head Unix/Windows CI, independent runtime architecture review, merge-time CAS and a later closeout naming pre-existing implementation commit evidence. |
+| Handoff / Release Condition | Claim and activation are effective through PR #344 merge `2016acce`. Stable implementation PR #345 is in Review; completion still requires exact-head Unix/Windows CI, independent runtime architecture review, merge-time CAS and a later closeout naming pre-existing implementation commit evidence. |
 
 ## Goal And User Value
 
@@ -132,3 +132,13 @@ cloneable controller, bounded runtime-owned driver, typed redacted report, legac
 deterministic race tests, durable-failure coverage, the external migration fixture and SDK docs.
 This is not completion evidence: no implementation PR or exact-head remote validation exists yet,
 and RUNTIME-005-C, I189, TOOL-024, release and publication remain unauthorized.
+
+## 2026-08-21 Stable Review Submission
+
+Implementation commit `c123328d` was created directly from claim merge `2016acce` after one local
+convergence cycle. Full release preflight, focused agent/runtime suites, default and `coding`
+external SDK fixtures, explicit-base validators, YAML/diff/EOF checks and Published Baseline
+preservation passed before the first push. Draft PR #345 was then opened only to obtain and
+backfill its number; this owner now moves to Review. Exact-head CI, independent runtime architecture
+review, merge-time CAS and a later evidence-only closeout remain pending. No C, TOOL-024, I189,
+release or publication authority transfers.

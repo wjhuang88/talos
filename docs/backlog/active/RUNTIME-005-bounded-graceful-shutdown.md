@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | In Progress / Unclaimed — B/I216 Active; C remains Blocked |
+| Status | In Progress / Unclaimed — B/I216 Review; C remains Blocked |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -64,7 +64,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
-| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Active / Claimed through I216/#344 merge `2016acce` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Review / Claimed in implementation PR #345; claim effective through #344 merge `2016acce` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
