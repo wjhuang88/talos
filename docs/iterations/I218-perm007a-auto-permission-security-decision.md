@@ -1,6 +1,6 @@
 # Iteration I218: Auto Permission Security Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed atomically by PR #352; ineffective before merge)
 > Published plan date: 2026-08-22
 > Planned objective: decide the bounded security contract for cross-surface model-assisted `auto`
 > permission decisions without changing executable behavior.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-22 |
 | Work Slice | Decide only PERM-007-A / I218: threat model and one ADR revising or superseding ADR-011, including eligible decisions, maximum authority, mode precedence, privacy, validation, audit, deadline, circuit-breaker, migration, rollback and bounded B-D implementation children. No Rust/Cargo/config schema, `/auto`, model request, prompt, grant, approval, runtime, sandbox, TOOL-024, Desktop, release or publication implementation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-22 |
 | Source Issue | #188 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent security review and target-branch merge. |
+| Authorization Evidence | Maintainer explicitly requested early ADR acceptance for unattended continuity. Claim PR #352 must pass exact-head independent security review and merge-time CAS; the claim becomes effective only after target-branch merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Claim and activation must merge before decision work. ADR acceptance requires independent exact-head security review; implementation waits for all PERM-006 A-C gates and separate child claims. |
+| Handoff / Release Condition | Claim and activation become effective only when PR #352 merges. ADR acceptance requires independent exact-head security review; implementation waits for all PERM-006 A-C gates and separate child claims. |
 
 ## Published Baseline
 
@@ -73,6 +73,7 @@ command, model request, permission result, sandbox, product UI, release or publi
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-22 | Selection | The maintainer requested early ADR completion for later unattended work. I218 is decision-only and non-overlapping with Active I189; this draft creates no authority before merge. |
+| 2026-08-22 | Claim proposed | PR #352 atomically proposes Claimed/Active state. It remains ineffective before target-branch merge and authorizes no executable behavior. |
 
 ## Verification Evidence
 

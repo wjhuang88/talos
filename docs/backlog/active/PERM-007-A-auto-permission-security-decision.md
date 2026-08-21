@@ -1,34 +1,41 @@
 # PERM-007-A: Auto Permission Security Decision
 
-**Status**: Ready / Unclaimed
+**Status**: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-A |
 | Type | Permission / Security Decision |
 | Priority | P0 |
-| Status | Ready / Unclaimed |
+| Status | Active / Claimed |
 | Parent Epic | PERM-007 |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 - proposed |
+| Selected Iteration | I218 - Active / Claimed |
 | Depends On | Existing ADR-011 and current permission/config/command behavior; PERM-006-A/B/C are implementation prerequisites, not decision prerequisites |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-22 |
 | Work Slice | Decide only PERM-007-A / I218: threat model and one ADR revising or superseding ADR-011, including eligible decisions, maximum authority, mode precedence, privacy, validation, audit, deadline, circuit-breaker, migration, rollback and bounded B-D implementation children. No Rust/Cargo/config schema, `/auto`, model request, prompt, grant, approval, runtime, sandbox, TOOL-024, Desktop, release or publication implementation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-22 |
 | Source Issue | #188 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent security review and target-branch merge. |
+| Authorization Evidence | Maintainer explicitly requested early ADR acceptance for unattended continuity. Claim PR #352 must pass exact-head independent security review and merge-time CAS; the claim becomes effective only after target-branch merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Claim and activation must reach `main`; the decision head then requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
+| Handoff / Release Condition | Claim and activation become effective only when PR #352 reaches `main`; the decision head then requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
+
+## Claim Activation Checkpoint — 2026-08-22
+
+PR #352 proposes one atomic claim and activation for decision-only PERM-007-A/I218. Before that PR
+reaches `main`, this Claimed/Active record is proposal metadata and grants no authority. After merge,
+the executing Agent may create only the threat matrix and Proposed ADR described by the Work Slice.
+No executable permission, configuration, command, model-call or grant behavior is authorized.
 
 ## Identity / Goal / Value
 

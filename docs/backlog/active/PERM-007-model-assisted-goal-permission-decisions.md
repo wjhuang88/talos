@@ -8,9 +8,9 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | Refinement — PERM-007-A / I218 decision claim proposed; no behavior authority |
+| Status | In Progress — PERM-007-A / I218 claim proposed by PR #352; ineffective before merge |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 proposed for PERM-007-A decision only; implementation none |
+| Selected Iteration | I218 proposed Active/Claimed for PERM-007-A decision only; implementation none |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; ADR-011 revision; existing Deny precedence |
 
 ## Collaboration Claim
@@ -69,7 +69,7 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 
 | Child | Deliverable | Current State | Gate |
 |---|---|---|---|
-| PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Ready / Unclaimed; claim proposed | Independent exact-head security review; no behavior change |
+| PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Active / Claimed proposed by PR #352; ineffective before merge | Independent exact-head security review; no behavior change |
 | PERM-007-B | Canonical config plus `/auto` session command | Blocked / Unclaimed | Accepted A and all PERM-006 A-C gates closed |
 | PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Blocked / Unclaimed | B closed and separate protected-scope claim |
 | PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
