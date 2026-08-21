@@ -395,6 +395,15 @@ elif ! python3 "$sqlite_validator" "$root" --self-test; then
   error "ADR-008 SQLite consumer validation failed"
 fi
 
+delivery_workflow_validator="$root/scripts/validate_delivery_workflow.py"
+if [ ! -f "$delivery_workflow_validator" ]; then
+  error "missing delivery workflow validator: scripts/validate_delivery_workflow.py"
+elif ! command -v python3 >/dev/null 2>&1; then
+  error "delivery workflow validation requires Python 3"
+elif ! python3 "$delivery_workflow_validator"; then
+  error "delivery workflow scenario validation failed"
+fi
+
 if [ "$errors" -gt 0 ]; then
   printf 'Governance validation failed: %d error(s), %d warning(s).\n' "$errors" "$warnings"
   exit 1

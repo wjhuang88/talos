@@ -23,8 +23,9 @@
 | Last Updated | YYYY-MM-DD |
 | Handoff / Release Condition | None |
 
-Before activation, follow `docs/sop/AGENT-COLLABORATION.md`. A claim PR proposes `Claimed`, but the
-claim is effective only after the finalized record is merged into the target branch.
+Before implementation, follow `docs/sop/AGENT-COLLABORATION.md`. One governance-only PR proposes
+both `Claimed` and `Active`; both are ineffective until the finalized record reaches the target
+branch. Implementation then converges locally before the first stable stage candidate is pushed.
 
 ## Published Baseline
 
@@ -69,7 +70,7 @@ claim is effective only after the finalized record is merged into the target bra
 
 | Date | Type | Record |
 |---|---|---|
-| YYYY-MM-DD | Activation | {dependency inventory, merge-time CAS result, and activation decision} |
+| YYYY-MM-DD | Atomic claim+activation | {dependency inventory, merge-time CAS result, and statement that both states become effective only on merge} |
 
 ## Verification Evidence
 

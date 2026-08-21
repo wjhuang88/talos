@@ -247,6 +247,9 @@ validate_required_file_text \
   docs/sop/AGENT-COLLABORATION.md \
   "Adoption And Migration" \
   "Persistent Claim Model" \
+  "Atomic Claim And Activation Flow" \
+  "Local Convergence Before Remote Submission" \
+  "Valid Review Output" \
   "Single-maintainer merge" \
   "Emergency Override" \
   "Mandatory Merge-Time CAS Preflight"
@@ -262,6 +265,7 @@ validate_required_file_text \
 validate_required_file_text \
   docs/sop/START-ITERATION.md \
   "effective Collaboration Claim" \
+  "Establish Claim And Activation Atomically" \
   "merge-time CAS"
 validate_required_file_text \
   docs/sop/LONG-RUNNING-TASK.md \
@@ -270,6 +274,11 @@ validate_required_file_text \
 validate_required_file_text \
   docs/sop/DOC-CHECK.md \
   "validate_collaboration_claims.sh"
+validate_required_file_text \
+  scripts/validate_delivery_workflow.py \
+  "local convergence" \
+  "protected scope requires independent review" \
+  "GitHub release must precede Cargo publication"
 validate_required_file_text \
   scripts/release_preflight.sh \
   "validate_collaboration_claims.sh"

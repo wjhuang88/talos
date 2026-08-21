@@ -89,10 +89,12 @@ For new governed work:
 5. Run both governance validators and exact-head CI.
 6. Repeat the merge-time compare-and-swap preflight.
 7. Merge using an allowed authorization path.
-8. Refresh the target branch.
-9. Create the implementation branch from the claim merge commit or a later target commit.
-10. Implement, validate, and open the implementation PR.
-11. After implementation merge, submit governance closure citing the existing implementation SHA.
+8. The same merge establishes claim and activation; refresh the target branch.
+9. Create the implementation branch from that merge commit or a later target commit.
+10. Converge implementation, tests, documentation and owner Review state locally.
+11. Push and open one stable stage candidate only after the local checkpoint passes.
+12. After implementation merge, close with existing implementation evidence; when safe, combine
+    that owner-first closeout with the next non-overlapping atomic claim+activation PR.
 
 An open claim PR does not reserve the task. Proposed `Claimed` content is ineffective until it
 exists on the target branch.
@@ -168,13 +170,19 @@ Any changed item invalidates the previous review/validation snapshot and require
 - References Story/iteration/task ID, source Issue when present, owner document, and merged claim PR.
 - Implements only the recorded Work Slice.
 - Records validation and residuals.
+- Is first pushed only after the local stable-candidate checkpoint; GitHub CI is stage validation,
+  not an edit-by-edit loop.
 - Normally leaves delivery state at `Review`; an unmerged commit cannot be Completion Commit evidence.
+- Uses the existing PR for batched reviewer corrections. Substantive new heads require new exact-
+  head evidence, but not a new PR.
 
 ### Governance Closure
 
 - Occurs after implementation merge.
 - Cites an already-existing target-branch implementation or merge SHA.
 - Synchronizes owner, inventories, Board, and Issue in that order.
+- May share the next non-overlapping claim+activation PR only when the previous Completion Commit
+  already exists and all previous owner/derived/Issue state is closed before the next activation.
 
 ### General
 

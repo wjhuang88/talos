@@ -4,7 +4,7 @@
 
 Define how to execute work during an active iteration.
 
-## Daily Loop
+## Local Convergence Loop
 
 ### 1. Pick a Story
 
@@ -23,6 +23,10 @@ Follow `NEW-FEATURE.md` for feature work:
 3. Implement the minimum that satisfies acceptance criteria.
 4. Run `cargo check --workspace`, `cargo clippy --workspace`, `cargo test --workspace`.
 5. Fix all errors and warnings before proceeding.
+
+Repeat implementation and verification locally until the whole Work Slice is coherent. Local
+commits and corrections do not require GitHub CI or review because no remote candidate exists yet.
+Do not push a partial candidate to use CI as a formatting, compile, test or documentation loop.
 
 ### 3. Verify
 
@@ -87,7 +91,23 @@ Follow `GIT-WORKFLOW.md`:
 - Reference the story ID in the commit message.
 - Review `git diff --cached` before committing.
 
-### 5. Update Status
+### 5. Stable Candidate Checkpoint
+
+Before the first remote implementation push:
+
+- [ ] Scope, acceptance, code, tests, docs and owner Review state agree.
+- [ ] Focused and required full/local validation pass from the candidate tree.
+- [ ] Runtime/manual evidence available locally is recorded; unavailable human rows use the
+      explicitly selected long-task mode.
+- [ ] `git diff --cached` or the final branch diff contains no unrelated files or secrets.
+- [ ] Residuals and non-goals are explicit.
+- [ ] The candidate can be reviewed end-to-end without requesting routine remote debugging.
+
+Push only after this checkpoint. If remote review finds substantive defects, return to the local
+loop, batch corrections, rerun the checkpoint and push a new stable head. Fresh exact-head CI and
+review are then required; do not open a new PR for each correction.
+
+### 6. Update Status
 
 Mark the story as "Done" in the backlog and iteration file.
 Record any residual work or follow-up items.

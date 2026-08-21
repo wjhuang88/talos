@@ -3,14 +3,14 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-08-18"
+last_audited_at: "2026-08-21"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "I214/RUNTIME-005-A remains Active/Claimed with decision PR #338 in independent review and no Rust/Cargo/runtime authority. The maintainer explicitly inserted the non-overlapping GOV-008/I215 governance repair before further development: one governance-only PR proposes atomic claim+activation, ineffective until merge, followed by local convergence and one stable implementation candidate. I189 remains Planned/Claimed and unactivated; I197/I198/I201/I210 remain Review; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
+current_execution_note: "GOV-008/I215 is Review/Claimed after atomic claim+activation PR #340 merged as `e66d039c`; its SOP/validator/scenario implementation converged locally without intermediate pushes and awaits one stable stage candidate. I214/RUNTIME-005-A remains Active/Claimed; #338 review found an admission race and invalid-options/Drop contract conflict, to be corrected locally after I215. I189 remains Planned/Claimed and unactivated; I197/I198/I201/I210 remain Review; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-08-18"
+  last_refresh: "2026-08-21"
 
 entrypoints:
   agent_guide: "AGENTS.md"

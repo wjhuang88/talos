@@ -57,6 +57,8 @@ owners do not have—is a correctness defect, not cosmetic.
       retroactively blocked without a triggering new branch/PR or owner lifecycle change.
 - [ ] Immediately before claim merge, target branch, overlapping PRs, claimant/scope, dependencies,
       exact-head CI, authorization, and review feedback were rechecked as the merge-time CAS gate.
+- [ ] A new iteration's Claimed and Active state are proposed atomically and both are described as
+      ineffective until target-branch merge; any separate activation PR has a recorded dependency reason.
 - [ ] Single-maintainer merges record why independent review was unavailable and show exact-head CI
       plus both governance validators.
 - [ ] Emergency overrides contain the minimum incident/security record and a reconciliation owner
@@ -68,6 +70,10 @@ owners do not have—is a correctness defect, not cosmetic.
 - [ ] Active, Review, Planned, and Blocked iterations have current dispositions before new work is
       activated.
 - [ ] Board mirrors owner documents and never substitutes for owner evidence.
+- [ ] The implementation candidate was locally converged before first push; CI/review evidence is
+      attached only to submitted stable heads and was refreshed after substantive changes.
+- [ ] Review evidence names the exact head/base, covers the assigned risk surface and gives an
+      explicit verdict; unrelated or generic Agent output is not treated as review.
 - [ ] `.agent-governance/manifest.yaml` status, audit date, skill version/refresh, and next actions
       are current.
 - [ ] `scripts/assess_project_scale.sh .` supports current profile/branch/worktree assumptions.
