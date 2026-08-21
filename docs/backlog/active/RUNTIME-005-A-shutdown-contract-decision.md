@@ -5,10 +5,10 @@
 | Story ID | RUNTIME-005-A |
 | Type | Runtime / Architecture Spike |
 | Priority | P1 |
-| Status | Ready / proposed Claimed through governance PR #336; not effective before merge |
+| Status | Active / Claimed |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I214 - Planned / proposed Claimed through PR #336 |
+| Selected Iteration | I214 - Active / Claimed |
 | Depends On | SESSION-008-A decision output; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
@@ -23,10 +23,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #336 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #336 must pass exact-head CI, both governance validators, independent architecture/claim review and merge-time CAS. This proposed claim has no target-branch effect while the PR is open. |
+| Authorization Evidence | PR #336 exact head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge PR #336 after exact-head approval and CAS; then activate I214 from that merge or later current main before decision work begins. |
+| Handoff / Release Condition | I214 is activated from claim merge `7de582a3`. Execute only the current-path matrix and decision ADR; require exact-head independent architecture review and CAS before merge. |
 
 ## Identity / Goal / Value
 
@@ -113,3 +113,14 @@ documentation targets for B/C; it must not present structured shutdown as shippe
 Implementation belongs only to separately claimed RUNTIME-005-B/C iterations after this decision
 is Accepted. Process-specific finalization remains in TOOL-024 after RUNTIME-005 and PERM-006-C
 complete.
+
+## 2026-08-21 Activation Checkpoint
+
+Claim PR #336 final head `cc99af9e` passed exact-head CI `32435705544`, both governance
+validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as
+`7de582a3`. RUNTIME-005-A and I214 are Active/Claimed from that exact merge point.
+
+Activation authorizes only read-only current-path characterization and the Proposed shutdown
+contract ADR defined above. It grants no Rust, Cargo, API, runtime, Session, persistence,
+permission, sandbox, TOOL-024, product UI, dependency, release, publication or `unsafe` change.
+I189 remains Planned/Claimed and unactivated; I213 remains in the independent Dashboard lane.

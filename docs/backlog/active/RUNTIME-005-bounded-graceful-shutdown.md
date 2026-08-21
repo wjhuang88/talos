@@ -63,7 +63,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Ready / I214 Planned / claim proposed in #336 | SESSION-008-A/B Complete; RUNTIME-001 Complete |
+| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Active / I214 Claimed through #336 merge `7de582a3` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
 | RUNTIME-005-B | Shared admission fence, bounded active-turn policy and structured report | Blocked | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
 
@@ -121,3 +121,9 @@ decision-only prerequisite and is selected as Planned I214 with its claim propos
 The proposal is ineffective before merge. RUNTIME-005-B remains
 blocked until that decision is Accepted; C remains blocked on B. This checkpoint changes no
 runtime behavior and does not authorize TOOL-024 or permission work.
+
+## 2026-08-21 I214 Activation
+
+PR #336 passed exact-head claim gates and merged as `7de582a3`; RUNTIME-005-A/I214 is now
+Active/Claimed for the decision-only matrix and ADR. The parent remains Refinement/Unclaimed,
+RUNTIME-005-B/C remain blocked, and no runtime or TOOL-024 implementation authority transfers.
