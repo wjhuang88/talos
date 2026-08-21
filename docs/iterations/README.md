@@ -84,7 +84,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I214 | Bounded Shutdown Contract Decision | Complete / Closed | Completion Commit `6719c876`; PR #338 merged as `fc70e396` after exact-head CI `32449605985`, independent architecture review `5365529351` and CAS. ADR-063 is Accepted; B later completed through I216 and C is Ready/Unclaimed. |
 | I215 | Local Convergence And Stage Validation | Complete / Closed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, review `5365129718` and CAS. No product/runtime authority. |
 | I216 | Bounded Shutdown Coordinator And Admission Fence | Complete / Closed | Completion Commit `c123328d`; PR #345 merged as `020de694` after exact-head CI `32459530911`, independent runtime review `5367434951` and CAS. C is Ready/Unclaimed under the parent only. |
-| I217 | Ordered Finalizer Registry And Durable Closure | Active / Claimed (proposed; ineffective until #347 merges) | RUNTIME-005-C; atomic governance claim+activation PR #347 contains no implementation code. Implementation starts only from its merge or later `main`. |
+| I217 | Ordered Finalizer Registry And Durable Closure | Active / Claimed | RUNTIME-005-C; claim+activation PR #347 merged as `bb6f5ed9`. Local implementation and full preflight converged; stable implementation PR, exact-head CI and independent review remain. |
 
 ## Completed This Closeout
 

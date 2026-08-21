@@ -531,6 +531,11 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 `RuntimeHandle::shutdown()` 仍然保留，并在清理未完成时返回 `ShutdownIncomplete`，不会伪报
 成功。
 
+在 actor 自己完成持久化协调后，关闭流程会在同一个总 deadline 内，按固定顺序且仅执行
+一次构建期冻结的 Talos 自有资源 finalizer。`ShutdownReport::finalizers()` 只包含固定标识和
+类型化结果，不支持嵌入方任意 callback 或调用方提供的报告文本。当前默认组合不安装资源
+finalizer。
+
 注册的工具默认会经过权限包装。在 headless 嵌入模式下，未解决的 `Ask` 决策会被拒绝，
 除非 embedder 提供更窄的 allow-list 规则。
 

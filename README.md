@@ -730,6 +730,11 @@ shutdown fence closes, new SDK submissions return typed `RuntimeClosing` without
 existing consuming `RuntimeHandle::shutdown()` remains available and returns
 `ShutdownIncomplete` instead of reporting incomplete cleanup as success.
 
+After actor-owned durable reconciliation, shutdown runs a build-time frozen set of Talos-owned
+resource finalizers once in fixed order under the same total deadline. `ShutdownReport::finalizers()`
+contains only fixed identifiers and typed outcomes; arbitrary embedder callbacks and caller-provided
+report text are not supported. The current default composition installs no resource finalizers.
+
 Registered tools are permission-wrapped by default. In headless embedding, unresolved `Ask`
 decisions are denied unless the embedder supplies narrower allow-list rules.
 

@@ -1,16 +1,16 @@
 # RUNTIME-005-C: Ordered Finalizer Registry And Durable Closure
 
-**Status**: Active / Claimed (proposed by PR #347; ineffective until merge)
+**Status**: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-005-C |
 | Type | Runtime / Public SDK Story |
 | Priority | P0 |
-| Status | Active / Claimed (proposed by PR #347; ineffective until merge) |
+| Status | Active / Claimed |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I217 - Active / Claimed (proposed; ineffective until #347 merges) |
+| Selected Iteration | I217 - Active / Claimed |
 | Depends On | RUNTIME-005-B / I216 Complete; ADR-063 Accepted; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
@@ -25,10 +25,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #347 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
+| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 exact head `3253abb5` passed CI `32471570214`, both validators, independent runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #347 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
+| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Keep I217 Active until one stable implementation candidate passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS; completion requires a later closeout naming the pre-existing implementation commit. |
 
 ## Goal And User Value
 
@@ -79,23 +79,23 @@ new end-user product surface or authorize arbitrary embedder callbacks.
 
 ## Acceptance Criteria
 
-- [ ] Runtime construction freezes the reviewed runtime-owned finalizer set; duplicate fixed
+- [x] Runtime construction freezes the reviewed runtime-owned finalizer set; duplicate fixed
       identifiers or order values fail construction, and no post-build registration path exists.
-- [ ] Finalizers run exactly once in ascending order only after the Session actor reports active
+- [x] Finalizers run exactly once in ascending order only after the Session actor reports active
       terminalization and durable reconciliation.
-- [ ] A typed failure or caught panic is recorded without free text and later finalizers continue
+- [x] A typed failure or caught panic is recorded without free text and later finalizers continue
       while the original global deadline has time remaining.
-- [ ] A timed-out finalizer is cancelled and contained fail-closed; later entries run only with
+- [x] A timed-out finalizer is cancelled and contained fail-closed; later entries run only with
       remaining global budget, and unstarted entries are `NotRunDeadline`.
-- [ ] Per-finalizer caps shorten but never extend the one ADR-063 monotonic deadline; deterministic
+- [x] Per-finalizer caps shorten but never extend the one ADR-063 monotonic deadline; deterministic
       tests prove the clock is not reset between stages.
-- [ ] Every caller receives the same immutable cached redacted report containing only fixed
+- [x] Every caller receives the same immutable cached redacted report containing only fixed
       finalizer identifiers and closed outcome categories.
-- [ ] Durable reconciliation failure remains authoritative and typed; cleanup can continue safely
+- [x] Durable reconciliation failure remains authoritative and typed; cleanup can continue safely
       but no incomplete durable/finalizer outcome is reported as clean shutdown.
-- [ ] Legacy `RuntimeHandle::shutdown(self)` remains source-compatible, preserves `ActorJoin`, and
+- [x] Legacy `RuntimeHandle::shutdown(self)` remains source-compatible, preserves `ActorJoin`, and
       maps incomplete structured cleanup to bounded `ShutdownIncomplete` rather than `Ok(())`.
-- [ ] Existing idle/active/concurrent/submit-start/Drop/Session durable regressions and an external
+- [x] Existing idle/active/concurrent/submit-start/Drop/Session durable regressions and an external
       SDK fixture pass together with finalizer order/failure/panic/timeout/deadline fixtures.
 - [ ] Full locked preflight, Unix/Windows exact-head CI, redaction review and independent runtime
       architecture review pass at one stable implementation head.
@@ -123,3 +123,18 @@ Issue #49 remains open until this child is implemented, independently reviewed a
 third-party finalizer extension requires its own public API, panic, identifier, semver and
 resource-containment decision. TOOL-024-B remains blocked until all RUNTIME-005 and PERM-006-C are
 Complete.
+
+## 2026-08-21 Claim Effective And Local Convergence
+
+PR #347 exact head `3253abb5` passed CI `32471570214`, both governance validators, independent
+runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. I217's
+claim and activation are effective, and implementation started from that exact merge.
+
+The locally converged stage freezes and validates the internal Talos-owned registry at build,
+orders durable reconciliation before bounded finalizers and actor join, shares ADR-063's original
+deadline, contains failure/panic/timeout into fixed redacted outcomes, and preserves the existing
+legacy wrapper. Deterministic finalizer tests passed three consecutive runs; both external SDK
+fixture modes and the full locked release preflight passed. The default production registry is
+intentionally empty, and no public arbitrary callback registration surface was added. I217 remains
+Active pending publication as one stable implementation PR, exact-head Unix/Windows CI,
+independent runtime architecture review and merge-time CAS.
