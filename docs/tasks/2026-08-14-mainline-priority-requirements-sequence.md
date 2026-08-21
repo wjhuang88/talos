@@ -800,3 +800,16 @@ iteration and effective claim reach `main`. C remains Blocked on B. T10/Issue #5
 until all RUNTIME-005 and PERM-006-C complete; I189 stays Planned/Claimed and unactivated, and no
 TOOL-024, Rust/Cargo/runtime, release or publication authority transfers. The next mainline planning
 step is the smallest RUNTIME-005-B iteration/claim, not implementation on the I214 branch.
+
+## 2026-08-21 I216 RUNTIME-005-B Claim Preparation
+
+Current `main@3c98f315` contains the I214 closeout. RUNTIME-005-B now has a separate child owner and
+I216 runnable plan for only the coordinator, validated options, shared SDK/actor admission-start
+arbiter, active-turn policies, one deadline, cached redacted report, Drop/legacy behavior and
+deterministic fixtures fixed by ADR-063.
+
+This governance-only proposal remains Planned/Unclaimed until its actual PR number is backfilled and
+the finalized exact head passes CI, both validators, independent runtime architecture review and
+merge-time CAS. Parent RUNTIME-005 remains Unclaimed; C, PERM-006-B/C and TOOL-024-B/C/D remain
+blocked or unauthorized. No implementation branch, Rust/Cargo change, version, release or
+publication action is allowed before the claim reaches `main`.

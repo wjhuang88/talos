@@ -64,7 +64,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
-| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Ready / Unclaimed | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Ready / Unclaimed; I216 claim proposal pending | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
@@ -151,3 +151,11 @@ Complete/Closed at that pre-existing Completion Commit. B is now Ready/Unclaimed
 unselected and unactivated until a runnable iteration and effective claim reach `main`; C remains
 Blocked on B. Issue #49 stays open and no TOOL-024, permission, release or publication authority
 transfers.
+
+## 2026-08-21 B Claim Preparation
+
+I216 and the child owner `RUNTIME-005-B` define the independently runnable coordinator/admission
+slice already fixed by ADR-063. The proposal is governance-only and ineffective until finalized
+exact-head CI, both validators, independent runtime architecture review and merge-time CAS pass and
+the claim reaches `main`. Parent RUNTIME-005 remains Unclaimed; C and Issue #59 remain blocked, and
+no I189, TOOL-024, release or publication authority transfers.
