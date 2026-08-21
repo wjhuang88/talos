@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Epic parent is not an implementation unit. A/I214, B/I216 and C/I217 are Complete/Closed at pre-existing commits `6719c876`, `c123328d` and `44e840d7`; close Issue #49 only after this closeout reaches `main`. |
+| Handoff / Release Condition | Epic parent is not an implementation unit. A/I214, B/I216 and C/I217 are Complete/Closed at pre-existing commits `6719c876`, `c123328d` and `44e840d7`; Issue #49 closed after closeout merge `1503ca21`. |
 
 ## Identity / Goal / Value
 
@@ -230,3 +230,9 @@ pre-existing implementation commit `44e840d7`. With A at `6719c876` and B at `c1
 RUNTIME-005 chain is Complete/Closed. Issue #49 closes only after this closeout reaches `main`.
 TOOL-024-B remains blocked on PERM-006-C; no I189, TOOL-024 implementation, release or publication
 authority transfers.
+
+## 2026-08-21 Remote Issue Reconciliation
+
+The evidence-bearing closeout merged as `1503ca21`, after which remote Issue #49 was closed as
+Completed. This changes no child evidence or runtime behavior. Issue #59 remains open and blocked
+on PERM-006-C plus a separate effective TOOL-024 child claim.

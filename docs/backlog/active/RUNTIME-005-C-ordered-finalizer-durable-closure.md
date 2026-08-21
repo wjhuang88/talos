@@ -123,7 +123,7 @@ new end-user product surface or authorize arbitrary embedder callbacks.
 
 ## Residual Destination
 
-Issue #49 closes only after this evidence-bearing closeout reaches `main`. A later
+Issue #49 closed after this evidence-bearing closeout merged as `1503ca21`. A later
 third-party finalizer extension requires its own public API, panic, identifier, semver and
 resource-containment decision. TOOL-024-B remains blocked until all RUNTIME-005 and PERM-006-C are
 Complete.
@@ -165,3 +165,9 @@ empty and no public arbitrary finalizer registration API was introduced. RUNTIME
 is now complete. Issue #49 may close only after this closeout reaches `main`; TOOL-024-B remains
 blocked on PERM-006-C, and no I189, TOOL-024 implementation, release or publication authority
 transfers.
+
+## 2026-08-21 Remote Issue Reconciliation
+
+Closeout merge `1503ca21` reached `main`, and remote Issue #49 was then closed as Completed.
+TOOL-024-B remains blocked on PERM-006-C and separate effective authority; no implementation
+authority transfers from this reconciliation.
