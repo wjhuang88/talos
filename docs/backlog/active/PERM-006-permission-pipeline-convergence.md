@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — activation PR #351 proposes PERM-006-A/I189 as the only Active child; B-E remain blocked/unclaimed |
+| Status | In Progress — PERM-006-A/I189 is the only Active child; B-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | I189 for PERM-006-A only; activation is ineffective until PR #351 reaches `main` |
+| Selected Iteration | I189 for PERM-006-A only (Active after PR #351 merge `20cfcce4`) |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -89,3 +89,9 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 Epic completion requires all children; partial implementation remains owned by the corresponding child.
+
+## 2026-08-22 I189 API Decision Checkpoint
+
+- PR #351 merged as `20cfcce4`; I189/PERM-006-A is the sole Active child under its effective claim.
+- ADR-065 is an in-scope public API/migration prerequisite for truthful rule/grant provenance. It
+  changes no decision behavior or child ordering. PERM-006-B/C/D/E remain blocked/unclaimed.
