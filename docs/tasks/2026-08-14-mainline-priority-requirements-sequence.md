@@ -702,3 +702,17 @@ PR #336 now carries that governance-only proposal. Its Claimed records remain in
 open; exact-head CI, both governance validators, independent architecture/claim review and
 merge-time CAS are still required. No I214 decision execution or implementation branch may start
 before the claim reaches `main` and a later activation record is established.
+
+## 2026-08-21 I214 Claim Merge And Activation
+
+PR #336 final head `cc99af9e` passed exact-head CI `32435705544`, both governance validators,
+independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`.
+RUNTIME-005-A/I214 is now Active/Claimed from that claim merge for the current-path matrix and
+Proposed shutdown-contract ADR only.
+
+The non-terminal inventory remains explicit: I197, I198, I201 and I210 stay Review; I206-I208
+stay Planned/Unclaimed; I189 stays Planned/Claimed and unactivated; I213 stays Planned/Claimed in
+the independent Dashboard lane; I164 stays Paused/superseded. RUNTIME-005-B/C, PERM-006-B/C and
+TOOL-024-B/C/D remain blocked or unauthorized in their existing order. No Rust, Cargo, API,
+runtime, persistence, permission, sandbox, product UI, dependency, release, publication or
+`unsafe` change is authorized by this activation.

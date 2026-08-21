@@ -1,6 +1,6 @@
 # Iteration I214: Bounded Shutdown Contract Decision
 
-> Document status: Planned / proposed Claimed through governance PR #336; not Active
+> Document status: Active / Claimed
 > Published plan date: 2026-08-21
 > Planned objective: decide the idempotent, deadline-bounded runtime shutdown, arbitration,
 > finalizer and structured-report contract without changing production behavior.
@@ -20,10 +20,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #336 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #336 must pass exact-head CI, both governance validators, independent architecture/claim review and merge-time CAS. This proposed claim has no target-branch effect while the PR is open. |
+| Authorization Evidence | PR #336 exact head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge PR #336 after exact-head approval and CAS; then activate from that merge or later current main before decision work begins. |
+| Handoff / Release Condition | Activated from claim merge `7de582a3`; execute only the current-path matrix and decision ADR, then require exact-head independent architecture review and CAS. |
 
 ## Published Baseline
 
@@ -105,10 +105,13 @@ Issue #49 shutdown decisions or this Work Slice.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-21 | Selection | T10 reassessment found TOOL-024-A and TOOL-023-C complete, but TOOL-024-B still blocked by RUNTIME-005 and PERM-006-C. RUNTIME-005-A is the smallest currently runnable gate-clearing slice; this planning record creates no implementation authority. |
+| 2026-08-21 | Claim effective | PR #336 final head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged as `7de582a3`. |
+| 2026-08-21 | Activation | I214 is Active/Claimed from `7de582a3`. Only read-only current-path characterization and the Proposed ADR are authorized. I189 remains unactivated and I213 remains in the independent Dashboard lane. |
 
 ## Verification Evidence
 
-- Pending claim exact-head validation and review.
+- Claim exact-head CI `32435705544`, both governance validators, independent review `5364050202`
+  and merge-time CAS passed before merge `7de582a3`.
 - Runtime evidence: not applicable to this decision-only iteration; current-path code evidence and
   a reviewed ADR are the deliverable.
 
