@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | In Progress / Unclaimed — A/B Complete; C Review/Claimed |
+| Status | Complete / Closed — A/B/C Complete |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Epic parent is not an implementation unit. C/I217 is Review/Claimed in implementation PR #348 at `44e840d7`; keep Issue #49 open through independently reviewed C completion. |
+| Handoff / Release Condition | Epic parent is not an implementation unit. A/I214, B/I216 and C/I217 are Complete/Closed at pre-existing commits `6719c876`, `c123328d` and `44e840d7`; close Issue #49 only after this closeout reaches `main`. |
 
 ## Identity / Goal / Value
 
@@ -65,10 +65,11 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
 | RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Complete / Closed through I216; Completion Commit `c123328d`; PR #345 merge `020de694` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
-| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Review / Claimed through I217; implementation PR #348 at `44e840d7` | RUNTIME-005-B Complete |
+| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Complete / Closed through I217; Completion Commit `44e840d7`; PR #348 merge `6e5fa8c3` | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
-decision evidence only; parent RUNTIME-005 remains In Progress/Unclaimed until B and C complete.
+decision evidence only; parent completion additionally cites the separately reviewed B and C
+implementation commits in the Completion Evidence below.
 
 The finalizer registry must be proven with runtime-owned test finalizers. A
 specific TOOL-024 implementation registers as a later consumer and cannot hold
@@ -116,6 +117,16 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 If a public or durable-format break is required, stop and create an accepted ADR/migration plan.
+
+## Completion Evidence
+
+- Completion Commits: A `6719c876fe9f190e47fba5ef62f3263e782d6e8b`; B
+  `c123328d8699b4bd4990603b639578930f29ba4e`; C
+  `44e840d73370c94fca1e5e7a8d1faa7fde924f0c`
+- C implementation PR: #348, merged as `6e5fa8c3bd95f938a7adc14ea8b9aa90bc4d7258`
+- C exact-head CI: `32475052535`; independent runtime review `5369328072`
+- Parent completion is derived from its three pre-existing child implementation/decision commits;
+  this status-only closeout cannot self-certify it.
 
 ## 2026-08-21 T10 Gate Reassessment
 
@@ -210,3 +221,12 @@ The locally converged C implementation was committed as `44e840d7` directly on c
 C/I217 now moves to Review / Claimed. Exact-head Unix/Windows CI, both validators, independent
 runtime architecture review and merge-time CAS remain required before merge. Parent RUNTIME-005
 stays Unclaimed/In Progress and Issue #49 remains open until an evidence-bearing closeout.
+
+## 2026-08-21 C And Parent Completion
+
+PR #348 exact head `0921eb0c` passed CI `32475052535`, independent runtime architecture review
+`5369328072` and merge-time CAS, then merged as `6e5fa8c3`. C/I217 is Complete/Closed at the
+pre-existing implementation commit `44e840d7`. With A at `6719c876` and B at `c123328d`, the full
+RUNTIME-005 chain is Complete/Closed. Issue #49 closes only after this closeout reaches `main`.
+TOOL-024-B remains blocked on PERM-006-C; no I189, TOOL-024 implementation, release or publication
+authority transfers.

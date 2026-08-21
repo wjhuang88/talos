@@ -350,7 +350,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
-| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / reassessed; RUNTIME-005 and PERM-006-C incomplete |
+| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / reassessed; RUNTIME-005 Complete, PERM-006-C incomplete |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
 ### Change-Control Checkpoint
@@ -909,3 +909,17 @@ The next stage is exact-head Unix/Windows CI, both validators, independent runti
 review and merge-time CAS. This implementation PR cannot mark I217 Complete; a later closeout must
 name pre-existing implementation commit `44e840d7`. Issue #49 and T10/#59 remain open/Blocked, and
 I189, TOOL-024, release and publication remain unauthorized.
+
+## 2026-08-21 I217 And RUNTIME-005 Completion
+
+PR #348 exact head `0921eb0c` passed all five CI jobs in run `32475052535`. Independent runtime
+architecture review `5369328072` approved the same head after source inspection and repeated
+focused/runtime/agent/external fixture validation. Merge-time CAS confirmed
+`origin/main@bb6f5ed9`, open Issue #49 and no overlapping non-archival PR; #348 then merged as
+`6e5fa8c3`.
+
+I217/RUNTIME-005-C is Complete/Closed at pre-existing implementation commit `44e840d7`; with A at
+`6719c876` and B at `c123328d`, parent RUNTIME-005 is Complete/Closed. This status-only closeout
+cannot self-certify those implementations. Issue #49 closes only after the closeout reaches
+`main`. T10/Issue #59 remains Blocked because PERM-006-C is incomplete and no separate TOOL-024-B
+claim exists. I189, TOOL-024 implementation, release and publication remain unauthorized.

@@ -120,6 +120,15 @@ Accepted, focused and workspace validation pass, and real Unix/Windows interacti
 prove that background work does not block the conversation, every job is reaped, and the model can
 retrieve exactly one bounded terminal result through the documented `process` contract.
 
+## RUNTIME-005 Dependency Completion Checkpoint (2026-08-21)
+
+RUNTIME-005 A/B/C is Complete/Closed through Completion Commits `6719c876`, `c123328d` and
+`44e840d7`; C implementation PR #348 merged as `6e5fa8c3` after exact-head CI and independent
+runtime architecture review. This clears the runtime half of TOOL-024-B's prerequisite conjunction
+only. TOOL-024-B remains Blocked because PERM-006-C is incomplete and no separate B claim or
+implementation PR exists. TOOL-024-C remains blocked on B, Windows spawn remains fail-closed until
+D, and Issue #59 stays open.
+
 ## Decision Links
 
 - [ADR-060: Supervised Background Command Job Lifecycle](../../decisions/060-supervised-background-command-jobs.md)
