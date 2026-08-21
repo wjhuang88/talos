@@ -18,7 +18,7 @@
 | Work Slice | Implement only the I205-selected delivery-workflow optimization: atomic claim+activation, mandatory local convergence before remote implementation submission, stable-stage exact-head CI/review semantics, reduced PR-number/status backfill churn, safe owner-first closeout combination, executable scenario fixtures, and the reusable process lesson. Preserve protected-scope independent review, release preflight/order, merge-time CAS, target-branch truth, published baselines and pre-existing Completion Commit evidence. No product/runtime/TUI/permission/sandbox/release/dependency behavior change. |
 | Claimed At | 2026-08-21 |
 | Source Issue | #339 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #340 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Talos optimize the governance guidance before further development and specified local design/implementation/test convergence followed by stage-level remote validation. This governance-only PR proposes claim and activation atomically; neither is effective until merge. Exact-head CI, both governance validators, no blocking feedback and merge-time CAS remain required. |
 | Implementation PR | Not started |
@@ -82,7 +82,7 @@ Archival Draft PRs #120/#121 remain untouched.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-21 | Atomic claim+activation proposal | The governance-only PR proposes both Claimed and Active from exact `main@14531bbc`. Neither state is effective until merge; no SOP, validator, product or runtime implementation exists on this branch. |
+| 2026-08-21 | Atomic claim+activation proposal | Governance PR #340 proposes both Claimed and Active from exact `main@14531bbc`. Neither state is effective until merge; no SOP, validator, product or runtime implementation exists on this branch. |
 
 ## Verification Evidence
 
