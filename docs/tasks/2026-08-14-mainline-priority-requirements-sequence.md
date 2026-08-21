@@ -350,7 +350,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
-| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
+| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / reassessed; RUNTIME-005 and PERM-006-C incomplete |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
 ### Change-Control Checkpoint
@@ -680,3 +680,20 @@ I200 and I212 are Complete. I197, I198, I201 and I210 remain Review with correct
 TUI-059/#330, SKILL-005/#333, TUI-058/#329 and TUI-060/#332; TUI-061/#334 remains the separate
 padding regression owner. T9 is terminal. The next exact action is T10: re-fetch current main and
 reassess Issue #59's RUNTIME-005, PERM-006-C and TOOL-023-C gates before selecting any new child.
+
+## 2026-08-21 T10 Issue #59 Gate Reassessment
+
+Current `main@5301b8c2` contains the I211 closeout; Issue #302 is remotely closed after evidence
+commits `b7d55a0d`/`7c333d98`, #331 merge `97dbf35f` and #335 closeout merge `5301b8c2`.
+
+Issue #59 is not production-ready. TOOL-024-A/I188 and TOOL-023-C are Complete, but TOOL-024-B
+still requires all of RUNTIME-005 and PERM-006-C. RUNTIME-005-A is Ready because SESSION-008-A/B
+and RUNTIME-001 are Complete; B/C remain blocked in order. PERM-006-A/I189 remains
+Planned/Claimed and deliberately unactivated, while PERM-006-B/C remain blocked in order. No
+TOOL-024-B/C/D owner, iteration, claim or implementation branch is created.
+
+T10 therefore receives a terminal Blocked disposition under its published fallback. The smallest
+independent gate-clearing follow-up is the decision-only RUNTIME-005-A / I214 claim preparation;
+it changes no Rust/Cargo/runtime behavior and transfers no I211, I189 or TOOL-024 authority. T11
+remains pending until that separate claim proposal is recorded and the long-task residual packet is
+synchronized.

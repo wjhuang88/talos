@@ -63,7 +63,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Ready, not selected | SESSION-008-A decision output; RUNTIME-001 Complete |
+| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Ready / I214 Planned / Unclaimed | SESSION-008-A/B Complete; RUNTIME-001 Complete |
 | RUNTIME-005-B | Shared admission fence, bounded active-turn policy and structured report | Blocked | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
 
@@ -98,7 +98,7 @@ Do not present this Story as shipped while it remains Refinement.
 - docs/backlog/active/SESSION-008-interrupted-turn-partial-persistence.md
 - docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md
 - docs/backlog/active/TOOL-024-background-command-jobs.md
-- docs/decisions/039-session-integrity-and-lifecycle-semantics.md
+- docs/decisions/039-runtime-event-semantic-single-flow.md
 - crates/talos-runtime/src/
 - crates/talos-agent/src/session.rs
 - crates/talos-agent/src/session/turn.rs
@@ -113,3 +113,10 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 If a public or durable-format break is required, stop and create an accepted ADR/migration plan.
+
+## 2026-08-21 T10 Gate Reassessment
+
+SESSION-008-A/B and RUNTIME-001 are Complete, so RUNTIME-005-A is now the smallest runnable
+decision-only prerequisite and is selected as Planned/Unclaimed I214. RUNTIME-005-B remains
+blocked until that decision is Accepted; C remains blocked on B. This checkpoint changes no
+runtime behavior and does not authorize TOOL-024 or permission work.
