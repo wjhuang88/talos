@@ -81,9 +81,9 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I211 | Deferred Human Review And Acceptance Batch | Complete / Closed | Completion Commits `b7d55a0d`/`7c333d98`; PR #331 merged as `97dbf35f` after CI `32372514265`, independent review and CAS. Four failed source children retain separate corrective owners. |
 | I212 | Catalog-Assisted Custom-Model Context Window | Complete / Closed | Completion Commit `5a1709cb`; PR #318 CI/review/CAS and integrated exact/prefix/override/unknown no-request walkthrough passed. |
 | I213 | Dashboard Live Activity And Log Viewer | Planned / Claimed | Governance claim PR #327 merged as `66747214`; Dashboard-only implementation remains unactivated and outside the mainline task. |
-| I214 | Bounded Shutdown Contract Decision | Complete / Closed | Completion Commit `6719c876`; PR #338 merged as `fc70e396` after exact-head CI `32449605985`, independent architecture review `5365529351` and CAS. ADR-063 is Accepted; B is Ready/Unclaimed and C remains Blocked. |
+| I214 | Bounded Shutdown Contract Decision | Complete / Closed | Completion Commit `6719c876`; PR #338 merged as `fc70e396` after exact-head CI `32449605985`, independent architecture review `5365529351` and CAS. ADR-063 is Accepted; B later completed through I216 and C is Ready/Unclaimed. |
 | I215 | Local Convergence And Stage Validation | Complete / Closed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, review `5365129718` and CAS. No product/runtime authority. |
-| I216 | Bounded Shutdown Coordinator And Admission Fence | Review / Claimed | Claim PR #344 merged as `2016acce`. Stable implementation commit `c123328d` is in PR #345 after full local preflight; exact-head CI/review/CAS and later evidence-only closeout remain. |
+| I216 | Bounded Shutdown Coordinator And Admission Fence | Complete / Closed | Completion Commit `c123328d`; PR #345 merged as `020de694` after exact-head CI `32459530911`, independent runtime review `5367434951` and CAS. C is Ready/Unclaimed under the parent only. |
 
 ## Completed This Closeout
 

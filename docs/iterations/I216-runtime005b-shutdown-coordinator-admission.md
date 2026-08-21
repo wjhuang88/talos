@@ -1,6 +1,6 @@
 # Iteration I216: Bounded Shutdown Coordinator And Admission Fence
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-B as a bounded, independently runnable
 > runtime SDK shutdown coordinator without finalizer-registry, permission, product or release work.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline long-task session 2026-08-21 |
 | Work Slice | I216/RUNTIME-005-B only: implement ADR-063's runtime-local shutdown coordinator, validated options, cloneable shutdown-only controller, one SDK/actor admission-start arbiter and StartCommitted token boundary, two active-turn policies, one total monotonic deadline, immutable cached redacted report, primary/controller Drop semantics, legacy shutdown compatibility, deterministic race tests, external next-minor migration fixture and directly affected SDK docs. Excludes RUNTIME-005-C finalizer registry/durable closure, TOOL-024, process, permission/sandbox, I189, product UI, dependency, persistence schema, unsafe, version, tag, release and publication. |
@@ -22,7 +22,7 @@
 | Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 exact head `e0f572a0` passed CI `32454558957`, both validators, independent runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | #345 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Claim and activation are effective through PR #344 merge `2016acce`. Stable implementation PR #345 is in Review; completion requires exact-head Unix/Windows CI, independent runtime architecture review, merge-time CAS and a later status closeout naming pre-existing implementation commit evidence. |
+| Handoff / Release Condition | Closed through implementation commit `c123328d` and PR #345 merge `020de694`. Prepare RUNTIME-005-C only through a separate child owner, runnable iteration and effective claim; keep Issue #49 open. |
 
 ## Published Baseline
 
@@ -114,7 +114,10 @@ branch or code authority before merge.
 
 ## Completion Evidence
 
-- Completion Commit: Pending
+- Completion Commit: `c123328d8699b4bd4990603b639578930f29ba4e`
+- Implementation PR: #345, merged as `020de694d056ad580d8d2f13fb65f2369bdd73db`
+- Exact-head CI: `32459530911`
+- Independent review: `5367434951`, APPROVE at `abf8d0dae44be44d1bb8307699f7c0523019f61a`
 - The claim/activation record and later status-only commits cannot self-certify implementation.
 
 ## 2026-08-21 Execution Checkpoint
@@ -138,3 +141,11 @@ local convergence checkpoint passed. Draft PR #345 was opened only to obtain and
 number; I216 now moves to Review / Claimed. The PR must still pass exact-head Unix/Windows CI,
 independent runtime architecture review and merge-time CAS. Completion remains forbidden until a
 later closeout names the pre-existing implementation commit.
+
+## 2026-08-21 Completion
+
+PR #345 exact head `abf8d0da` passed all five CI jobs in run `32459530911`, independent runtime
+architecture review `5367434951` approved the same head, and merge-time CAS passed before merge
+`020de694`. I216 is Complete/Closed at the pre-existing implementation commit `c123328d`; this
+status-only closeout does not cite itself. RUNTIME-005-C is only Ready/Unclaimed, while Issue #49,
+I189, TOOL-024, release and publication retain their separate gates.
