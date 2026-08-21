@@ -1,6 +1,6 @@
 # Iteration I217: Ordered Finalizer Registry And Durable Closure
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-C as a bounded, independently runnable
 > runtime SDK finalization slice without third-party callbacks, TOOL-024, permission, product or
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline long-task session 2026-08-21 |
 | Work Slice | I217/RUNTIME-005-C only: implement ADR-063's build-time frozen runtime-owned finalizer registry, fixed identifiers and unique order, one-global-deadline execution with per-finalizer caps, typed failure/panic/timeout/not-run outcomes, durable-reconciliation-before-finalizer ordering, immutable redacted report closure, legacy shutdown compatibility, deterministic runtime-owned test finalizers and directly affected SDK docs. Excludes public arbitrary third-party callback/plugin registration, TOOL-024, process, permission/sandbox, I189, product UI, dependency, persistence schema/writer, global bus, unsafe, version, tag, release and publication. |
@@ -23,7 +23,7 @@
 | Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 exact head `3253abb5` passed CI `32471570214`, both validators, independent runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | #348 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Implementation PR #348 is in Review at implementation commit `44e840d7`; require exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Completion requires a later closeout naming this pre-existing implementation commit. |
+| Handoff / Release Condition | Closed through implementation commit `44e840d7` and PR #348 merge `6e5fa8c3` after exact-head CI `32475052535`, independent runtime architecture review `5369328072` and merge-time CAS. A future third-party finalizer extension requires a separate decision and claim. |
 
 ## Published Baseline
 
@@ -119,8 +119,11 @@ implementation authority before merge.
 
 ## Completion Evidence
 
-- Completion Commit: Pending
-- The claim/activation record and later status-only commits cannot self-certify implementation.
+- Completion Commit: `44e840d73370c94fca1e5e7a8d1faa7fde924f0c`
+- Implementation PR: #348, merged as `6e5fa8c3bd95f938a7adc14ea8b9aa90bc4d7258`
+- Exact-head CI: `32475052535`
+- Independent review: `5369328072`, APPROVE at `0921eb0c2c978d658eb3c34fbcf801cb738f7518`
+- The claim/activation record and this later status-only closeout cannot self-certify implementation.
 
 ## 2026-08-21 Claim Effective And Local Convergence
 
@@ -144,3 +147,12 @@ its number; I217 now moves to Review / Claimed. This metadata-only follow-up doe
 Published Baseline or implementation behavior. Exact-head Unix/Windows CI, both validators,
 independent runtime architecture review and merge-time CAS remain required, and Completion Commit
 stays Pending until a later closeout.
+
+## 2026-08-21 Completion
+
+PR #348 exact head `0921eb0c` passed all five CI jobs in run `32475052535`, independent runtime
+architecture review `5369328072` approved the same head, and merge-time CAS passed before merge
+`6e5fa8c3`. I217 is Complete/Closed at the pre-existing implementation commit `44e840d7`; this
+status-only closeout does not cite itself. The Published Baseline remains byte-preserved. Issue #49
+may close after this closeout reaches `main`; TOOL-024-B still waits for PERM-006-C, and I189,
+TOOL-024 implementation, release and publication remain unauthorized.
