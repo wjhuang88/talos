@@ -1,6 +1,6 @@
 # Iteration I216: Bounded Shutdown Coordinator And Admission Fence
 
-> Document status: Active / Claimed (proposed by PR #344; ineffective until merge)
+> Document status: Review / Claimed
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-B as a bounded, independently runnable
 > runtime SDK shutdown coordinator without finalizer-registry, permission, product or release work.
@@ -19,10 +19,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #344 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
-| Implementation PR | Not started |
+| Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 exact head `e0f572a0` passed CI `32454558957`, both validators, independent runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. Shared-account review establishes Agent-role separation only. |
+| Implementation PR | #345 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #344 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
+| Handoff / Release Condition | Claim and activation are effective through PR #344 merge `2016acce`. Stable implementation PR #345 is in Review; completion requires exact-head Unix/Windows CI, independent runtime architecture review, merge-time CAS and a later status closeout naming pre-existing implementation commit evidence. |
 
 ## Published Baseline
 
@@ -116,3 +116,25 @@ branch or code authority before merge.
 
 - Completion Commit: Pending
 - The claim/activation record and later status-only commits cannot self-certify implementation.
+
+## 2026-08-21 Execution Checkpoint
+
+PR #344 exact head `e0f572a0` passed CI `32454558957`, both governance validators, independent
+runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. The atomic
+claim and activation are effective, and implementation started from that exact merge.
+
+The current locally converged stage implements and tests the B-only coordinator/admission contract,
+including deterministic reserve/fence/start-commit order, both active policies, caller-cancellation
+independence, Drop/legacy behavior, deadline containment, durable-failure projection, report
+redaction and the external fallback-match migration fixture. It is not yet Review or Complete:
+publication as one stable implementation PR, exact-head Windows/Unix CI and independent runtime
+architecture review remain required. Full local preflight has passed, and the Published Baseline
+above remains unchanged.
+
+## 2026-08-21 Stable Review Submission
+
+Implementation commit `c123328d` was created directly from claim merge `2016acce` after the full
+local convergence checkpoint passed. Draft PR #345 was opened only to obtain and backfill its
+number; I216 now moves to Review / Claimed. The PR must still pass exact-head Unix/Windows CI,
+independent runtime architecture review and merge-time CAS. Completion remains forbidden until a
+later closeout names the pre-existing implementation commit.

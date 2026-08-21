@@ -25,7 +25,7 @@ talos-skill = { version = "0.8.0", path = "../talos-skill" }
 talos-tools = { version = "0.8.0", path = "../talos-tools", optional = true, features = ["coding"] }
 
 thiserror = "2"
-tokio = { version = "1", features = ["rt", "sync"] }
+tokio = { version = "1", features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
 talos-provider = { version = "0.8.0", path = "../talos-provider" }

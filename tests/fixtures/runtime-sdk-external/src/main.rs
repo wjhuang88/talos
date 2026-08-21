@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -9,8 +10,8 @@ use talos_core::tool::{AgentTool, ToolNature, ToolResult};
 use talos_permission::PermissionDecision;
 use talos_provider::mock::MockProvider;
 use talos_runtime::{
-    ApprovalHandler, RuntimeBuilder, RuntimeTurnCompletionStatus, SandboxFallbackPolicy,
-    collect_until_turn_completed,
+    ApprovalHandler, RuntimeBuilder, RuntimeError, RuntimeTurnCompletionStatus,
+    SandboxFallbackPolicy, ShutdownOptions, collect_until_turn_completed,
 };
 use talos_session::SessionManager;
 
@@ -61,6 +62,14 @@ fn provider(response: &str) -> Arc<dyn LanguageModel> {
     Arc::new(MockProvider::new().with_response(response))
 }
 
+fn classify_runtime_error(error: &RuntimeError) -> &'static str {
+    match error {
+        RuntimeError::RuntimeClosing => "closing",
+        RuntimeError::ShutdownIncomplete { .. } => "shutdown_incomplete",
+        _ => "other_runtime_error",
+    }
+}
+
 async fn run_minimal_runtime() -> Result<()> {
     let mut runtime = RuntimeBuilder::new()
         .provider(Arc::new(
@@ -85,6 +94,15 @@ async fn run_minimal_runtime() -> Result<()> {
         .await
         .ok_or_else(|| anyhow::anyhow!("fixture runtime ended before completion"))?;
     assert!(matches!(status, RuntimeTurnCompletionStatus::Success { .. }));
+    let report = runtime
+        .shutdown_controller()
+        .shutdown(ShutdownOptions::interrupt(Duration::from_secs(1))?)
+        .await?;
+    assert!(report.is_complete());
+    assert_eq!(
+        classify_runtime_error(&RuntimeError::RuntimeClosing),
+        "closing"
+    );
     runtime.shutdown().await?;
     Ok(())
 }

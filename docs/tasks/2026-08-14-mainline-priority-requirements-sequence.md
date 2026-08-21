@@ -818,3 +818,32 @@ PR #344 is now the atomic claim+activation proposal. Its exact branch records Cl
 RUNTIME-005-B/I216, but those values remain ineffective while the PR is open. The only next action
 is finalized governance validation, exact-head CI, independent runtime architecture review and
 merge-time CAS; implementation must start from the resulting merge or later `main`.
+
+## 2026-08-21 I216 Claim Effective And Local Convergence
+
+PR #344 exact head `e0f572a0` passed CI `32454558957`, both governance validators, independent
+runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. The atomic
+RUNTIME-005-B/I216 claim and activation are now effective. Implementation started from that exact
+merge in an isolated worktree.
+
+The current local stage covers only B: one SDK/actor admission-start arbiter, validated options,
+cloneable controller, two active policies, one monotonic total deadline, runtime-owned driver,
+cached typed redacted report, Drop/legacy compatibility, deterministic race/failure tests, external
+migration fixture and SDK docs. Focused `talos-agent` and `talos-runtime` suites plus the external
+fixture pass locally. This is not Review or Completion evidence; full preflight, one stable
+implementation commit/PR, exact-head Unix/Windows CI, independent runtime architecture review and
+merge-time CAS remain. RUNTIME-005-C, I189, TOOL-024, release and publication remain unauthorized,
+so T10/#59 stays Blocked.
+
+## 2026-08-21 I216 Stable Review Submission
+
+The B-only implementation converged locally at commit `c123328d`, directly descended from claim
+merge `2016acce`. Full release preflight, focused agent/runtime suites, external SDK fixtures with
+default and `coding` features, explicit-base validators, YAML/diff/EOF checks and Published
+Baseline preservation passed before the first push. Draft PR #345 was opened only to obtain and
+backfill its number; owner-first status now moves to Review / Claimed.
+
+The next action is exact-head Unix/Windows CI and independent runtime architecture review of the
+single stable candidate, followed by merge-time CAS. Do not mark I216 Complete in the implementation
+PR. A later closeout must name pre-existing implementation commit `c123328d`; RUNTIME-005-C, I189,
+TOOL-024, release and publication remain unauthorized, and T10/#59 stays Blocked.
