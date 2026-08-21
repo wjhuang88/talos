@@ -813,3 +813,8 @@ the finalized exact head passes CI, both validators, independent runtime archite
 merge-time CAS. Parent RUNTIME-005 remains Unclaimed; C, PERM-006-B/C and TOOL-024-B/C/D remain
 blocked or unauthorized. No implementation branch, Rust/Cargo change, version, release or
 publication action is allowed before the claim reaches `main`.
+
+PR #344 is now the atomic claim+activation proposal. Its exact branch records Claimed/Active for
+RUNTIME-005-B/I216, but those values remain ineffective while the PR is open. The only next action
+is finalized governance validation, exact-head CI, independent runtime architecture review and
+merge-time CAS; implementation must start from the resulting merge or later `main`.

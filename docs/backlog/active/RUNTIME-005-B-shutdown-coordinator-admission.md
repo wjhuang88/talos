@@ -1,34 +1,34 @@
 # RUNTIME-005-B: Bounded Shutdown Coordinator And Admission Fence
 
-**Status**: Ready / Unclaimed
+**Status**: Active / Claimed (proposed by PR #344; ineffective until merge)
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-005-B |
 | Type | Runtime / Public SDK Story |
 | Priority | P0 |
-| Status | Ready / Unclaimed |
+| Status | Active / Claimed (proposed by PR #344; ineffective until merge) |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I216 - Planned / Unclaimed |
+| Selected Iteration | I216 - Active / Claimed (proposed; ineffective until #344 merges) |
 | Depends On | RUNTIME-005-A / I214 Complete; ADR-063 Accepted; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline long-task session 2026-08-21 |
+| Work Slice | I216/RUNTIME-005-B only: implement ADR-063's runtime-local shutdown coordinator, validated options, cloneable shutdown-only controller, one SDK/actor admission-start arbiter and StartCommitted token boundary, two active-turn policies, one total monotonic deadline, immutable cached redacted report, primary/controller Drop semantics, legacy shutdown compatibility, deterministic race tests, external next-minor migration fixture and directly affected SDK docs. Excludes RUNTIME-005-C finalizer registry/durable closure, TOOL-024, process, permission/sandbox, I189, product UI, dependency, persistence schema, unsafe, version, tag, release and publication. |
+| Claimed At | 2026-08-21 |
 | Source Issue | #49 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #344 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | The proposed I216 claim is ineffective until its finalized exact head passes CI, both governance validators, independent runtime architecture review and merge-time CAS, then reaches `main`. |
+| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #344 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
 
 ## Goal And User Value
 

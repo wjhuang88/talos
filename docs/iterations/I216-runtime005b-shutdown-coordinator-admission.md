@@ -1,6 +1,6 @@
 # Iteration I216: Bounded Shutdown Coordinator And Admission Fence
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by PR #344; ineffective until merge)
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-B as a bounded, independently runnable
 > runtime SDK shutdown coordinator without finalizer-registry, permission, product or release work.
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline long-task session 2026-08-21 |
+| Work Slice | I216/RUNTIME-005-B only: implement ADR-063's runtime-local shutdown coordinator, validated options, cloneable shutdown-only controller, one SDK/actor admission-start arbiter and StartCommitted token boundary, two active-turn policies, one total monotonic deadline, immutable cached redacted report, primary/controller Drop semantics, legacy shutdown compatibility, deterministic race tests, external next-minor migration fixture and directly affected SDK docs. Excludes RUNTIME-005-C finalizer registry/durable closure, TOOL-024, process, permission/sandbox, I189, product UI, dependency, persistence schema, unsafe, version, tag, release and publication. |
+| Claimed At | 2026-08-21 |
 | Source Issue | #49 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #344 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | The maintainer directed continuation of the active mainline long task after I214 closeout. PR #344 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Finalize this governance-only proposal, pass exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then begin implementation from that merge or later `main`. |
+| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #344 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
 
 ## Published Baseline
 
