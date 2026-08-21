@@ -1,8 +1,8 @@
 # I218 Auto Permission Current-Path And Threat Matrix
 
-**Status**: Decision evidence for PERM-007-A / I218
+**Status**: Accepted decision evidence for PERM-007-A / I218 at Completion Commit `a289a07f`
 **Code baseline**: `main@ca30081a883cdf130784ceb04551465b71adf505`
-**Behavior claim**: none; this matrix describes current code and the boundary proposed by ADR-064.
+**Behavior claim**: none; this matrix describes current code and the boundary accepted by ADR-064.
 
 ## Current Path
 

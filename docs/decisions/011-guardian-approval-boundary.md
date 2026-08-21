@@ -1,8 +1,11 @@
 # ADR-011: Guardian Approval Boundary
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-064 (2026-08-22)
 - **Date**: 2026-06-05
 - **Backlog**: #I010-S6
+
+> ADR-064 owns the current bounded model-assisted `auto` policy. This file remains the historical
+> first-version boundary and must not be read as current implementation authority.
 
 ## Context
 

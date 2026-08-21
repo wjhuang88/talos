@@ -1,6 +1,6 @@
 # Iteration I218: Auto Permission Security Decision
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-22
 > Planned objective: decide the bounded security contract for cross-surface model-assisted `auto`
 > permission decisions without changing executable behavior.
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-22 |
 | Work Slice | Decide only PERM-007-A / I218: threat model and one ADR revising or superseding ADR-011, including eligible decisions, maximum authority, mode precedence, privacy, validation, audit, deadline, circuit-breaker, migration, rollback and bounded B-D implementation children. No Rust/Cargo/config schema, `/auto`, model request, prompt, grant, approval, runtime, sandbox, TOOL-024, Desktop, release or publication implementation. |
@@ -20,10 +20,10 @@
 | Source Issue | #188 |
 | Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer requested early ADR acceptance for unattended continuity. Claim PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance review `5372605087` and merge-time CAS, then merged as `ca30081a`. |
-| Implementation PR | #353 (decision documentation only; ADR not yet accepted) |
+| Authorization Evidence | Claim PR #352 merged as `ca30081a`. Decision PR #353 exact head `a289a07f` passed CI `32505438495`, independent Agent-role security review `5372825090` and merge-time CAS, then merged as `c129d4a5`. |
+| Implementation PR | #353 (decision documentation only) |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Active from claim merge `ca30081a`. ADR acceptance requires independent exact-head security review; implementation waits for all PERM-006 A-C gates and separate child claims. |
+| Handoff / Release Condition | Closed at Completion Commit `a289a07f`; ADR-064 is Accepted. Implementation waits for all PERM-006 A-C gates and separate child claims. |
 
 ## Published Baseline
 
@@ -77,19 +77,20 @@ command, model request, permission result, sandbox, product UI, release or publi
 | 2026-08-22 | Claim effective | Exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role review `5372605087` and CAS; PR #352 merged as `ca30081a`. |
 | 2026-08-22 | Decision execution | PR #353 carries the current-path/threat matrix and Proposed ADR-064: default-on attempted assistance, a narrow one-shot atomic no-clobber text-create class, deterministic exclusions, redaction, timeout/circuit, cross-surface and migration boundaries. No executable behavior changes. |
 | 2026-08-22 | Security correction | Exact-head review `5372757905` found a same-path modification TOCTOU. The first eligible class is now create-only with absent-target/path/parent binding and atomic no-clobber at the mutation point; existing-file modification requires a later portable CAS decision. |
+| 2026-08-22 | Decision accepted | Corrected exact head `a289a07f` passed CI `32505438495`, independent Agent-role security review `5372825090` and CAS; PR #353 merged as `c129d4a5`. ADR-064 is Accepted and supersedes ADR-011 without authorizing executable behavior. |
 
 ## Verification Evidence
 
 - Claim: exact head `13ecbdfa`, CI `32503441611`, independent review `5372605087`, merge
   `ca30081a`.
-- Decision evidence: `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md` and Proposed ADR-064 in
-  PR #353; exact-head CI and independent security review pending.
+- Decision evidence: `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md` and Accepted ADR-064 at
+  exact head `a289a07f`; CI `32505438495`, independent security review `5372825090`, CAS and PR
+  #353 merge `c129d4a5` passed.
 
 ## Completion Evidence
 
-- Completion Commit: pending
-- A later status-only closeout cannot certify itself; it must reference the pre-existing reviewed
-  decision commit.
+- Completion Commit: `a289a07ff97746d877f3a422d15f8044bbf50ab6`
+- This pre-existing reviewed decision commit, not the status-only closeout, certifies completion.
 
 ## Variance And Residuals
 

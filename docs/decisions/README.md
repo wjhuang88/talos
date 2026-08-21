@@ -23,7 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
-| [064: Bounded Model-Assisted Auto Permission Decisions](064-bounded-model-assisted-auto-permission.md) | **Proposed / I218 Active / PR #353** | Default-on means attempted bounded assistance, never default Allow. Only atomic no-clobber creation of a new structured text file under a typed managed-workspace lease is initially eligible; existing-file modification, Deny, Execute, Network, external paths, destructive/sensitive work, sandbox fallback and grants remain excluded. Exact-head security review gates acceptance and no behavior is authorized. |
+| [064: Bounded Model-Assisted Auto Permission Decisions](064-bounded-model-assisted-auto-permission.md) | **Accepted / I218 Complete** | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. Default-on means attempted assistance, never default Allow; only capability-relative atomic no-clobber creation is initially eligible. No behavior or child authority is granted. |
 | [063: Bounded Runtime Shutdown And Finalizer Coordination](063-bounded-runtime-shutdown-finalization.md) | **Accepted / I214 Complete** | One SDK/actor admission-start arbiter, validated borrowing structured shutdown, first-valid-request arbitration, one total deadline, actor-owned ADR-058 reconciliation, frozen ordered finalizers and a redacted shared report are accepted at Completion Commit `6719c876`. RUNTIME-005-B later completed through I216 at `c123328d`; C is Ready/Unclaimed and TOOL-024 production remains dependency-gated. |
 | [062: Typed Provider Retry Progress Boundary](062-typed-provider-retry-progress.md) | **Accepted / I210 Review** | Provider retry progress uses a defaulted additive request-local typed channel, existing non-exhaustive Agent/session events and a distinct reconnecting phase. Retry policy, persistence and dependencies remain unchanged; implementation evidence is `6efee2b8`. |
 | [060: Supervised Background Command Job Lifecycle](060-supervised-background-command-jobs.md) | **Proposed / I188 Review / PR #228** | Session-owned bounded supervisor, explicit `background:` permission resource, live-only terminal event and Unix-first group cleanup are proposed. Independent exact-head review gates acceptance; production still waits for RUNTIME-005 and PERM-006-C, and Windows waits for a separate D Job Object decision. |
@@ -58,6 +58,8 @@ Use the individual ADR document—not this range summary—when making implement
 
 ## Superseded / Deferred Decisions
 
+- [011: Guardian Approval Boundary](011-guardian-approval-boundary.md) — Superseded by ADR-064;
+  retained as the historical disabled-by-default/read-only first-version boundary.
 - [019: TUI Splash Scrollback-Only Boundary](019-tui-splash-scrollback-boundary.md) — Superseded by amended ADR-054.
 - [035: TUI Conversation History Scrollback Boundary](035-tui-history-scrollback-boundary.md) — Superseded by amended ADR-054.
 - [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — Persistent task runtime intentionally not authorized.
