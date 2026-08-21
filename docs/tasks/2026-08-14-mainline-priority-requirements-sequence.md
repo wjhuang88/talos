@@ -776,3 +776,14 @@ with the implementation merge and receives the same owner evidence.
 The next mainline action returns to already Active/Claimed I214/#338. Batch its admission
 check-to-start race and invalid-options/Drop contract corrections locally, rerun the complete local
 checkpoint, then submit one new stable #338 head for fresh exact-head architecture review.
+
+## 2026-08-21 I214 Batched Architecture Corrections
+
+After I215 closed, #338 was synchronized locally with `main@457895c5`. The two architecture
+findings are corrected in one local convergence cycle: ADR-063 now uses one SDK/actor
+admission-start arbiter whose non-await start commit shares the shutdown fence, and structured
+shutdown borrows its handle and accepts only construction-time validated options, with explicit
+primary/controller Drop semantics. I214 remains Active/Claimed and ADR-063 remains Proposed pending
+local validation, one stable push and fresh exact-head independent architecture review. No
+Rust/Cargo/runtime behavior, RUNTIME-005-B/C, I189, TOOL-024, release or publication authority is
+added.

@@ -47,12 +47,15 @@ Session actor wrapper and a cloneable shutdown controller. The intended public s
 
 ```text
 RuntimeHandle::shutdown_controller(&self) -> RuntimeShutdownHandle
-RuntimeShutdownHandle::shutdown(options) -> RuntimeResult<ShutdownReport>
-RuntimeHandle::shutdown_with(self, options) -> RuntimeResult<ShutdownReport>
+RuntimeShutdownHandle::shutdown(&self, options) -> RuntimeResult<ShutdownReport>
+RuntimeHandle::shutdown_with(&self, options) -> RuntimeResult<ShutdownReport>
 RuntimeHandle::shutdown(self) -> RuntimeResult<()>
 ```
 
 Names may change during implementation only when the semantics and migration notes remain exact.
+`ShutdownOptions` has private fields and is created only through a validating constructor or a
+validated deserialization path. The structured methods borrow their handle and never accept an
+unvalidated options draft; only the legacy compatibility wrapper consumes the primary handle.
 `RuntimeShutdownHandle` is cloneable but exposes no submit, event-consumption or resource mutation
 surface. A cancelled caller future does not cancel shutdown: after the first accepted request, a
 runtime-owned driver completes the plan and caches its terminal report.
@@ -67,9 +70,20 @@ No transition reopens admission. The terminal report is immutable and cloneable.
 
 ### 2. First valid request wins; every later caller joins
 
-A request contains a total deadline and one active-turn policy. Invalid options are rejected before
-the `Open -> Closing` compare-and-set and do not start shutdown. The first valid request that wins
-that compare-and-set establishes the policy and absolute monotonic deadline.
+A request contains a total deadline and one active-turn policy. An unvalidated draft cannot be
+passed to `shutdown_with`: `ShutdownOptions` construction validates the positive total deadline,
+finish grace and policy relationship before it touches the coordinator or consumes the primary
+handle. Its fields remain private, and any serde/config conversion performs the same validation.
+Invalid construction therefore changes no runtime state and leaves the primary handle available;
+it cannot accidentally invoke primary-handle Drop. A future API that accepts an unvalidated draft
+must borrow a controller or return ownership on validation failure rather than consume the primary
+handle.
+
+The first submitted validated request that wins the `Open -> Closing` transition establishes the
+policy and absolute monotonic deadline. `RuntimeHandle::shutdown_with(&self, options)` and the
+controller method borrow their handles, so validation failure or a rejected request cannot trigger
+primary-handle Drop. The consuming legacy `shutdown(self)` constructs the valid documented default,
+joins the same structured path and cannot introduce an invalid-options branch.
 
 Concurrent or repeated valid requests after `Closing`:
 
@@ -82,26 +96,42 @@ Concurrent or repeated valid requests after `Closing`:
 This is scheduling arbitration, not authorization. The accepted-plan identifier is a
 runtime-generated opaque value and is never derived from prompt, tool or credential data.
 
-### 3. Admission closes atomically before the actor shutdown signal
+### 3. One admission/start arbiter closes before the actor shutdown signal
 
-Supported SDK admission and shutdown initiation share one runtime-local serialization gate.
-Submission that passes the gate and enqueues before the winning shutdown request is pre-fence;
-submission that observes `Closing` or `Closed` returns a typed `RuntimeClosing` error without
-enqueueing. The winner closes admission before sending the existing `SessionOp::Shutdown` signal.
+RUNTIME-005-B adds one runtime-local admission/start arbiter shared by supported SDK admission,
+the shutdown coordinator and the Session actor's pending-to-active transition. The winning
+`Open -> Closing` transition while holding this arbiter is the shutdown fence linearization point.
+It is not a separate SDK CAS followed by an actor check.
 
-The same monotonic closing bit is injected into the Session actor's internal run state. The actor
-must check it before popping or starting another pending submission, not only after it eventually
-receives `SessionOp::Shutdown`. Therefore an active turn that finishes after the SDK fence cannot
-cause the next queued item to start in the gap between fence closure and shutdown-op receipt.
-Direct lower-level Session construction that is outside the supported runtime facade retains its
-current default-open control unless it explicitly installs this coordinator seam.
+An SDK submission reserves bounded channel capacity before acquiring the arbiter. While holding
+the arbiter it rechecks `Open` and commits the reserved send; if it observes `Closing` or `Closed`,
+it drops the reservation and returns typed `RuntimeClosing` without enqueueing. It never awaits
+channel capacity while holding the arbiter. A committed send is pre-fence even if the actor has not
+yet received it.
+
+The actor refactors start into preparation and a short start-commit step. Preparation may inspect
+or build an internal turn plan but performs no externally visible model/tool work. At the final
+commit point the actor acquires the same arbiter and, only while it remains `Open`, atomically moves
+one item from Pending to `StartCommitted` and installs its cancellation token. It then releases the
+arbiter before durable I/O, provider/tool work, task await or compaction. `StartCommitted` is
+treated as active by shutdown: `Interrupt` cancels its installed token before external work can
+begin, while `FinishCurrent` permits it within the accepted grace. Every asynchronous stage after
+start commit, including compaction and provider/tool execution, observes that same token before and
+during external work. A failure after start commit is terminalized through the existing ADR-058
+actor path.
+
+If shutdown wins the arbiter, no pending item can become `StartCommitted`; the item remains pending
+for the actor's existing reject/pause handling. If the actor wins, the item is unambiguously active
+before the fence. This removes the check-to-start gap without holding a lock across an await or
+provider work. Direct lower-level Session construction outside the supported runtime facade retains
+its current default-open control unless it explicitly installs this arbiter seam.
 
 The implementation preserves the serialized public `SessionOp::Shutdown` shape. It must not add a
 policy payload to that enum merely for the SDK coordinator. Already queued work is handled by the
 Session actor's existing order: active work follows the selected policy, in-memory pending work is
 rejected `SessionClosed`, and durable unstarted work becomes `PausedPending`.
 
-If enqueue and shutdown race, the serialization gate determines exactly one side of the fence.
+If enqueue, actor start commit and shutdown race, the shared arbiter determines exactly one order.
 Returning success from `submit` still means accepted by the SDK queue, not successful model
 completion; user-facing documentation must keep that distinction.
 
@@ -214,20 +244,26 @@ projection; there is no richer hidden debug report.
 - No persistence migration is required. Removing the compatibility wrapper, changing default
   policy after shipment, or changing serialized report fields requires a new ADR and migration plan.
 
-Dropping the primary `RuntimeHandle` while the coordinator is still `Open` initiates the same
+`RuntimeHandle` is the unique primary handle; `RuntimeShutdownHandle` is a cloneable controller,
+not another primary. Dropping the primary while the coordinator is still `Open` initiates the same
 default shutdown plan through a non-blocking runtime-owned wakeup but cannot wait or return a
-report from `Drop`. Cloneable shutdown controllers do not keep ordinary admission open. Explicit
-`shutdown` remains the only API that proves terminal cleanup to the host; Drop remains best-effort
-initiation, and panic/unwinding must not block.
+report from Drop. Dropping a controller never initiates shutdown, and retained controllers do not
+prevent primary Drop from closing admission. Once any explicit request has reached `Closing`,
+primary Drop can only leave or join that accepted plan; it never proposes a second default.
+Explicit `shutdown` remains the only API that proves terminal cleanup to the host; Drop remains
+best-effort initiation, and panic/unwinding must not block.
 
 ## Required Race Semantics
 
 | Race / failure | Required result |
 |---|---|
 | Two valid shutdown callers race while Open | One plan wins the compare-and-set; both receive the same report. |
-| Invalid request races a valid request | Invalid request changes no state; the valid request may win. |
+| Invalid options draft races a valid request | Draft validation fails before coordinator or primary-handle access; the valid request may win. A later explicit primary Drop is a separate default request, not an effect of validation. |
 | Submit wins the admission gate before shutdown | It is queued pre-fence and then completed, cancelled, rejected or paused by the accepted shutdown plan. |
 | Shutdown wins the gate before submit | Submit returns `RuntimeClosing` and never reaches the Session queue. |
+| Actor pauses after preparation and shutdown wins before start commit | The item never becomes `StartCommitted`, performs no model/tool work and is rejected or paused by the actor. |
+| Actor start commit wins before shutdown | The item is pre-fence active; shutdown applies `FinishCurrent` or `Interrupt` to its preinstalled cancellation token. |
+| Primary Drop races explicit structured shutdown | The first valid plan wins; Drop never installs a second default plan. Controller Drop changes no state. |
 | Active Success finalizes before interrupt wins | Report `Finished`; ADR-058 Success remains authoritative. |
 | Interrupt wins before Success finalization | ADR-058 first-terminal-outcome rules decide Cancelled/Error; report the observed durable result. |
 | Finish grace expires | Issue actor-owned interrupt using the remaining global budget; do not start pending work. |
@@ -241,7 +277,7 @@ initiation, and panic/unwinding must not block.
 
 | Slice | Runnable/testable deliverable | Principal surfaces | Exit gate |
 |---|---|---|---|
-| RUNTIME-005-B | Cloneable coordinator, atomic admission fence, two active-turn policies, one absolute deadline, cached redacted report and deterministic idle/active/concurrent/racing fixtures. | `talos-runtime`, existing Session coordination seam, SDK reference docs | ADR-063 Accepted; exact-head Unix/Windows workspace tests; no finalizer registry or TOOL-024 dependency. |
+| RUNTIME-005-B | Cloneable coordinator, validated shutdown options, one admission/start arbiter, explicit primary/controller Drop semantics, two active-turn policies, one absolute deadline, cached redacted report and deterministic idle/active/concurrent/racing fixtures. | `talos-runtime`, existing Session coordination seam, SDK reference docs | ADR-063 Accepted; exact-head Unix/Windows workspace tests; no finalizer registry or TOOL-024 dependency. |
 | RUNTIME-005-C | Frozen build-time ordered finalizer registry, durable reconciliation outcomes, compatibility wrapper closure and failure/panic/timeout ordering fixtures using runtime-owned test finalizers. | `talos-runtime`, minimal lower-layer finalizer handle seam, SDK/reference docs | B Complete; independent architecture review; legacy `shutdown()` and durable-session regressions pass. |
 
 Neither slice authorizes TOOL-024 production behavior. A later TOOL-024-B implementation may
@@ -253,7 +289,10 @@ gates remain satisfied.
 Before this ADR becomes Accepted, independent exact-head architecture review must verify:
 
 - first-valid-request arbitration and caller-cancellation independence;
-- the submit/shutdown fence has no check-then-send race;
+- the submit/shutdown fence and actor start commit share one linearization mechanism with no
+  check-to-send or check-to-start race and no arbiter held across asynchronous/external work;
+- invalid options cannot consume the primary handle, and primary/controller Drop cannot create a
+  second shutdown plan;
 - `FinishCurrent` cannot consume or extend the total deadline;
 - ADR-058 remains the only turn finalizer and durable reconciliation owner;
 - finalizer order, panic, timeout and cancellation containment are implementable without a global bus;
@@ -262,7 +301,8 @@ Before this ADR becomes Accepted, independent exact-head architecture review mus
 - B and C are independently runnable/testable and create no TOOL-024 dependency cycle.
 
 Implementation must then add deterministic idle, active success, interrupt, concurrent caller,
-submit race, persistence failure, finalizer ordering/failure/panic/timeout and total-deadline tests.
+submit race, paused-before-start-commit shutdown, invalid-options plus primary/controller Drop,
+persistence failure, finalizer ordering/failure/panic/timeout and total-deadline tests.
 Observable SDK documentation must stay marked planned until the implementation commit exists.
 
 ## Consequences
@@ -282,8 +322,8 @@ Observable SDK documentation must stay marked planned until the implementation c
 
 Revisit this decision if implementation shows that:
 
-- the SDK admission gate cannot serialize submit and shutdown without changing established queue
-  semantics or introducing deadlock;
+- one admission/start arbiter cannot serialize submit, shutdown and actor start commit without
+  changing established queue semantics, holding across external work or introducing deadlock;
 - actor-owned ADR-058 finalization cannot fit within one absolute deadline without losing admitted
   durable facts;
 - a registered resource cannot provide cancellation-safe containment;

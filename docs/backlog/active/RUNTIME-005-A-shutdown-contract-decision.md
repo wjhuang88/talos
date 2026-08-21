@@ -105,7 +105,8 @@ documentation targets for B/C; it must not present structured shutdown as shippe
 - Proposed decision: `docs/decisions/063-bounded-runtime-shutdown-finalization.md`.
 - Decision content commit: `648a35d3`; implementation PR #338. The later status commit cannot use
   itself as completion evidence.
-- The proposal selects first-valid-request arbitration, an atomic SDK admission fence,
+- The proposal selects first-valid-request arbitration, a shared SDK/actor admission-start arbiter,
+  construction-time validated shutdown options and explicit primary/controller Drop semantics,
   `FinishCurrent`/`Interrupt` policies, one absolute deadline, actor-owned durable reconciliation,
   a frozen ordered finalizer registry and a redacted shared report.
 - RUNTIME-005-B and C remain separate implementation slices. This evidence changes no production
@@ -137,3 +138,14 @@ Activation authorizes only read-only current-path characterization and the Propo
 contract ADR defined above. It grants no Rust, Cargo, API, runtime, Session, persistence,
 permission, sandbox, TOOL-024, product UI, dependency, release, publication or `unsafe` change.
 I189 remains Planned/Claimed and unactivated; I213 remains in the independent Dashboard lane.
+
+## 2026-08-21 Architecture Review Correction
+
+Independent review of PR #338 head `0adcd072` found two blocking contract defects: a standalone
+actor closing-bit check left a check-to-start race, and a consuming structured shutdown could turn
+invalid options into default shutdown through primary-handle Drop. The corrected proposal uses one
+SDK/actor admission-start arbiter with an explicit non-await start-commit point, validates options
+before coordinator access, makes structured shutdown borrow its handle, and defines primary versus
+controller Drop behavior.
+RUNTIME-005-A/I214 remains Active pending fresh exact-head review; no B/C implementation authority
+is created.

@@ -135,3 +135,7 @@ I214 produced the current-path matrix at
 the coordinator/admission/active-turn/deadline/report slice and C the ordered-finalizer/durable
 reconciliation/compatibility slice. A remains Active pending exact-head independent architecture
 review; B/C remain blocked and no production behavior is claimed.
+
+PR #338 architecture review required B's admission fence to include the actor's start-commit
+linearization and required invalid shutdown options to fail before a primary handle can be
+consumed. The corrections remain decision-only and do not unblock B until ADR-063 is accepted.

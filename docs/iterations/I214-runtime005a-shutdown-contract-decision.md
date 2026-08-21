@@ -108,6 +108,7 @@ Issue #49 shutdown decisions or this Work Slice.
 | 2026-08-21 | Claim effective | PR #336 final head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged as `7de582a3`. |
 | 2026-08-21 | Activation | I214 is Active/Claimed from `7de582a3`. Only read-only current-path characterization and the Proposed ADR are authorized. I189 remains unactivated and I213 remains in the independent Dashboard lane. |
 | 2026-08-21 | Decision execution | Current-path matrix and Proposed ADR-063 were committed as `648a35d3` from activation merge `14531bbc` and submitted in PR #338. They define independently runnable B/C boundaries without changing Rust, Cargo, APIs, persistence or runtime behavior. |
+| 2026-08-21 | Review correction | Architecture review of head `0adcd072` rejected the separate actor closing-bit check and invalid consuming-options contract. ADR-063 now requires one SDK/actor admission-start linearization point, construction-time validated options, borrowing structured shutdown and explicit primary/controller Drop semantics; both findings are batched locally before one new stable #338 head. |
 
 ## Verification Evidence
 
@@ -116,6 +117,8 @@ Issue #49 shutdown decisions or this Work Slice.
 - Current-path evidence: `docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md` at `14531bbc`.
 - Decision evidence: Proposed `docs/decisions/063-bounded-runtime-shutdown-finalization.md`;
   exact-head CI and independent architecture review remain pending.
+- Review correction evidence: PR #338 comment `5364268484`; the corrected head must receive fresh
+  exact-head CI and architecture review before I214 can close.
 - Runtime behavior evidence: not applicable; this decision-only iteration changes no executable
   path and cannot claim B/C behavior.
 
