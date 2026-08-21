@@ -716,3 +716,13 @@ the independent Dashboard lane; I164 stays Paused/superseded. RUNTIME-005-B/C, P
 TOOL-024-B/C/D remain blocked or unauthorized in their existing order. No Rust, Cargo, API,
 runtime, persistence, permission, sandbox, product UI, dependency, release, publication or
 `unsafe` change is authorized by this activation.
+
+## 2026-08-21 I214 Decision Execution
+
+From activation merge `14531bbc`, the decision-only branch prepared a code-grounded runtime
+shutdown matrix and Proposed ADR-063. The proposal retains the current Session/ADR-058 finalizer,
+adds no implementation, and defines B as coordinator/admission/active-turn/deadline/report work
+and C as ordered-finalizer/durable-reconciliation/compatibility work.
+
+I214 remains Active until its exact decision head passes CI and independent architecture review.
+RUNTIME-005-B/C, I189/PERM-006 and TOOL-024-B/C/D remain blocked or unactivated exactly as before.

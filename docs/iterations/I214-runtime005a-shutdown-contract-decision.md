@@ -107,13 +107,17 @@ Issue #49 shutdown decisions or this Work Slice.
 | 2026-08-21 | Selection | T10 reassessment found TOOL-024-A and TOOL-023-C complete, but TOOL-024-B still blocked by RUNTIME-005 and PERM-006-C. RUNTIME-005-A is the smallest currently runnable gate-clearing slice; this planning record creates no implementation authority. |
 | 2026-08-21 | Claim effective | PR #336 final head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged as `7de582a3`. |
 | 2026-08-21 | Activation | I214 is Active/Claimed from `7de582a3`. Only read-only current-path characterization and the Proposed ADR are authorized. I189 remains unactivated and I213 remains in the independent Dashboard lane. |
+| 2026-08-21 | Decision execution | Current-path matrix and Proposed ADR-063 were prepared from activation merge `14531bbc`. They define independently runnable B/C boundaries without changing Rust, Cargo, APIs, persistence or runtime behavior. |
 
 ## Verification Evidence
 
 - Claim exact-head CI `32435705544`, both governance validators, independent review `5364050202`
   and merge-time CAS passed before merge `7de582a3`.
-- Runtime evidence: not applicable to this decision-only iteration; current-path code evidence and
-  a reviewed ADR are the deliverable.
+- Current-path evidence: `docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md` at `14531bbc`.
+- Decision evidence: Proposed `docs/decisions/063-bounded-runtime-shutdown-finalization.md`;
+  exact-head CI and independent architecture review remain pending.
+- Runtime behavior evidence: not applicable; this decision-only iteration changes no executable
+  path and cannot claim B/C behavior.
 
 ## Completion Evidence
 

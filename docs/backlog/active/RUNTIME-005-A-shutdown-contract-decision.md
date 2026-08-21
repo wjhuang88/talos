@@ -98,6 +98,17 @@ documentation targets for B/C; it must not present structured shutdown as shippe
 - `crates/talos-agent/src/session.rs`
 - `crates/talos-agent/src/session/turn.rs`
 
+## Decision Execution Evidence
+
+- Current-path matrix: `docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md`, grounded at
+  activation merge `14531bbc`.
+- Proposed decision: `docs/decisions/063-bounded-runtime-shutdown-finalization.md`.
+- The proposal selects first-valid-request arbitration, an atomic SDK admission fence,
+  `FinishCurrent`/`Interrupt` policies, one absolute deadline, actor-owned durable reconciliation,
+  a frozen ordered finalizer registry and a redacted shared report.
+- RUNTIME-005-B and C remain separate implementation slices. This evidence changes no production
+  behavior and does not authorize TOOL-024 or I189.
+
 ## Acceptance For Technical / Governance Work
 
 - [ ] A current-path matrix traces admission, active-turn cancellation/completion, persistence,
