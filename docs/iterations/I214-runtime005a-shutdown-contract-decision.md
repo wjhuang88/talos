@@ -1,6 +1,6 @@
 # Iteration I214: Bounded Shutdown Contract Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / proposed Claimed through governance PR #336; not Active
 > Published plan date: 2026-08-21
 > Planned objective: decide the idempotent, deadline-bounded runtime shutdown, arbitration,
 > finalizer and structured-report contract without changing production behavior.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-21 |
+| Work Slice | Decide only RUNTIME-005-A / I214: current-path characterization plus one shutdown policy, arbitration, admission, deadline, finalizer ordering, durable reconciliation, redacted report and compatibility ADR with B/C boundaries. No Rust/Cargo/API/runtime/Session/persistence, TOOL-024, permission, sandbox, product UI, dependency, release, publication or unsafe change. |
+| Claimed At | 2026-08-21 |
 | Source Issue | #49 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #336 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #336 must pass exact-head CI, both governance validators, independent architecture/claim review and merge-time CAS. This proposed claim has no target-branch effect while the PR is open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge a finalized governance-only claim after exact-head CI, independent architecture review and merge-time CAS; then activate from that merge or later current main. |
+| Handoff / Release Condition | Merge PR #336 after exact-head approval and CAS; then activate from that merge or later current main before decision work begins. |
 
 ## Published Baseline
 

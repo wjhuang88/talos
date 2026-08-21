@@ -697,3 +697,8 @@ independent gate-clearing follow-up is the decision-only RUNTIME-005-A / I214 cl
 it changes no Rust/Cargo/runtime behavior and transfers no I211, I189 or TOOL-024 authority. T11
 remains pending until that separate claim proposal is recorded and the long-task residual packet is
 synchronized.
+
+PR #336 now carries that governance-only proposal. Its Claimed records remain ineffective while
+open; exact-head CI, both governance validators, independent architecture/claim review and
+merge-time CAS are still required. No I214 decision execution or implementation branch may start
+before the claim reaches `main` and a later activation record is established.

@@ -5,28 +5,28 @@
 | Story ID | RUNTIME-005-A |
 | Type | Runtime / Architecture Spike |
 | Priority | P1 |
-| Status | Ready / Unclaimed - selected for planned I214 claim preparation |
+| Status | Ready / proposed Claimed through governance PR #336; not effective before merge |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I214 - Planned / Unclaimed |
+| Selected Iteration | I214 - Planned / proposed Claimed through PR #336 |
 | Depends On | SESSION-008-A decision output; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-08-21 |
+| Work Slice | Decide only RUNTIME-005-A / I214: current-path characterization plus one shutdown policy, arbitration, admission, deadline, finalizer ordering, durable reconciliation, redacted report and compatibility ADR with B/C boundaries. No Rust/Cargo/API/runtime/Session/persistence, TOOL-024, permission, sandbox, product UI, dependency, release, publication or unsafe change. |
+| Claimed At | 2026-08-21 |
 | Source Issue | #49 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #336 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #336 must pass exact-head CI, both governance validators, independent architecture/claim review and merge-time CAS. This proposed claim has no target-branch effect while the PR is open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Finalize a governance-only claim, pass exact-head CI and independent architecture review, perform merge-time CAS, and merge the claim before decision work begins. |
+| Handoff / Release Condition | Merge PR #336 after exact-head approval and CAS; then activate I214 from that merge or later current main before decision work begins. |
 
 ## Identity / Goal / Value
 
