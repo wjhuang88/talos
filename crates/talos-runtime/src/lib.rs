@@ -30,7 +30,14 @@ use talos_session::{DurableSession, PersistencePolicy};
 use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+
+mod shutdown;
+
+use shutdown::ShutdownCoordinator;
+pub use shutdown::{
+    ActiveTurnPolicy, RuntimeShutdownHandle, ShutdownActiveTurnOutcome, ShutdownActorOutcome,
+    ShutdownDurableOutcome, ShutdownOptions, ShutdownOptionsError, ShutdownPlanId, ShutdownReport,
+};
 
 #[cfg(feature = "shared-composition")]
 #[doc(hidden)]
@@ -61,6 +68,7 @@ impl RuntimePreset {
 
 /// Errors returned by the embeddable runtime facade.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum RuntimeError {
     /// The builder cannot create a runtime without a provider.
     #[error("runtime provider is required")]
@@ -69,6 +77,14 @@ pub enum RuntimeError {
     /// A command could not be sent because the runtime actor is closed.
     #[error("runtime command channel is closed")]
     CommandChannelClosed,
+
+    /// A submission was rejected because the runtime shutdown fence has closed.
+    #[error("runtime is closing")]
+    RuntimeClosing,
+
+    /// Runtime construction requires an active Tokio runtime.
+    #[error("runtime construction requires an active Tokio runtime")]
+    AsyncRuntimeUnavailable,
 
     /// The runtime actor task failed to join.
     #[error("runtime actor failed: {0}")]
@@ -85,6 +101,13 @@ pub enum RuntimeError {
     /// A durable session could not be read or committed.
     #[error("durable session error: {0}")]
     Session(#[from] talos_session::SessionError),
+
+    /// The legacy shutdown wrapper observed incomplete bounded cleanup.
+    #[error("runtime shutdown did not complete")]
+    ShutdownIncomplete {
+        /// Redacted structured report describing the incomplete stages.
+        report: ShutdownReport,
+    },
 }
 
 /// Result alias for runtime facade operations.
@@ -354,9 +377,10 @@ impl RuntimeBuilder {
 
     /// Builds and starts the runtime actor.
     ///
-    /// The returned handle owns the command sender, event receiver, and actor
-    /// task. Dropping the handle drops those channels; prefer
-    /// [`RuntimeHandle::shutdown`] for orderly shutdown.
+    /// The returned primary handle owns submission and event access. Dropping
+    /// it initiates the non-blocking default shutdown plan; use
+    /// [`RuntimeHandle::shutdown`] or [`RuntimeHandle::shutdown_with`] when the
+    /// host must observe terminal cleanup.
     pub fn build(self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
         #[allow(unused_mut)]
@@ -445,17 +469,24 @@ impl RuntimeBuilder {
             model_context_limit: self.model_context_limit,
         };
         let (handle, mut actor) = AppServerSession::new(agent, config);
+        let admission = talos_agent::session::RuntimeAdmissionControl::new();
+        actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
             actor.set_durable_persistence(session, policy);
         }
-        let actor_task = tokio::spawn(async move {
+        let runtime = tokio::runtime::Handle::try_current()
+            .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
+        let actor_task = runtime.spawn(async move {
             actor.run().await;
         });
+        let coordinator =
+            ShutdownCoordinator::new(admission, handle.sq_tx.clone(), actor_task, runtime);
 
         Ok(RuntimeHandle {
             command_tx: handle.sq_tx,
             event_rx: handle.eq_rx,
-            actor_task,
+            coordinator,
+            primary_drop_armed: true,
         })
     }
 }
@@ -470,28 +501,53 @@ impl Default for RuntimeBuilder {
 pub struct RuntimeHandle {
     command_tx: mpsc::Sender<SessionOp>,
     event_rx: mpsc::UnboundedReceiver<SessionEvent>,
-    actor_task: JoinHandle<()>,
+    coordinator: Arc<ShutdownCoordinator>,
+    primary_drop_armed: bool,
 }
 
 impl RuntimeHandle {
     /// Submits a user message as a new turn.
     pub async fn submit(&self, message: impl Into<String>) -> RuntimeResult<()> {
-        self.command_tx
-            .send(SessionOp::Submit {
-                message: message.into(),
-            })
-            .await
-            .map_err(|_| RuntimeError::CommandChannelClosed)
+        if !self.coordinator.is_admission_open() {
+            return Err(RuntimeError::RuntimeClosing);
+        }
+        let permit = self.command_tx.reserve().await.map_err(|_| {
+            if self.coordinator.is_admission_open() {
+                RuntimeError::CommandChannelClosed
+            } else {
+                RuntimeError::RuntimeClosing
+            }
+        })?;
+        self.coordinator
+            .commit_reserved(
+                permit,
+                SessionOp::Submit {
+                    message: message.into(),
+                },
+            )
+            .map_err(|_| RuntimeError::RuntimeClosing)
     }
 
     /// Requests a provider request preview without making a provider call.
     pub async fn preview_request(&self, message: impl Into<String>) -> RuntimeResult<()> {
-        self.command_tx
-            .send(SessionOp::PreviewRequest {
-                message: message.into(),
-            })
-            .await
-            .map_err(|_| RuntimeError::CommandChannelClosed)
+        if !self.coordinator.is_admission_open() {
+            return Err(RuntimeError::RuntimeClosing);
+        }
+        let permit = self.command_tx.reserve().await.map_err(|_| {
+            if self.coordinator.is_admission_open() {
+                RuntimeError::CommandChannelClosed
+            } else {
+                RuntimeError::RuntimeClosing
+            }
+        })?;
+        self.coordinator
+            .commit_reserved(
+                permit,
+                SessionOp::PreviewRequest {
+                    message: message.into(),
+                },
+            )
+            .map_err(|_| RuntimeError::RuntimeClosing)
     }
 
     /// Interrupts the active turn, if any.
@@ -507,11 +563,43 @@ impl RuntimeHandle {
         self.event_rx.recv().await
     }
 
+    /// Returns a cloneable controller that can only initiate or join shutdown.
+    #[must_use]
+    pub fn shutdown_controller(&self) -> RuntimeShutdownHandle {
+        RuntimeShutdownHandle {
+            coordinator: self.coordinator.clone(),
+        }
+    }
+
+    /// Starts or joins structured bounded shutdown without consuming the handle.
+    pub async fn shutdown_with(&self, options: ShutdownOptions) -> RuntimeResult<ShutdownReport> {
+        self.coordinator.shutdown(options).await
+    }
+
     /// Shuts down the runtime actor and waits for it to finish.
-    pub async fn shutdown(self) -> RuntimeResult<()> {
-        let _ = self.command_tx.send(SessionOp::Shutdown).await;
-        self.actor_task.await?;
-        Ok(())
+    pub async fn shutdown(mut self) -> RuntimeResult<()> {
+        self.primary_drop_armed = false;
+        let report = self
+            .coordinator
+            .shutdown(ShutdownOptions::legacy_default())
+            .await?;
+        if let Some(error) = self.coordinator.take_actor_join_error() {
+            return Err(RuntimeError::ActorJoin(error));
+        }
+        if report.is_complete() {
+            Ok(())
+        } else {
+            Err(RuntimeError::ShutdownIncomplete { report })
+        }
+    }
+}
+
+impl Drop for RuntimeHandle {
+    fn drop(&mut self) {
+        if self.primary_drop_armed {
+            self.primary_drop_armed = false;
+            self.coordinator.initiate_default();
+        }
     }
 }
 
@@ -726,6 +814,7 @@ pub async fn collect_until_turn_completed(
 mod tests {
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
 
     use talos_core::message::Message;
     use talos_core::provider::ProviderResult;
@@ -734,6 +823,7 @@ mod tests {
     use talos_provider::mock::MockProvider;
     use talos_session::SessionManager;
     use talos_tools::{ReadTool, snapshot_aware_file_tools};
+    use tokio::sync::Notify;
 
     use super::*;
 
@@ -748,6 +838,488 @@ mod tests {
     struct PrivateInputWriteTool;
 
     struct PrivateResultReadTool;
+
+    struct GatedModel {
+        entered: Arc<Notify>,
+        release: Arc<Notify>,
+    }
+
+    #[async_trait]
+    impl LanguageModel for GatedModel {
+        async fn stream(
+            &self,
+            _messages: &[Message],
+        ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            let (tx, rx) = mpsc::channel(8);
+            let release = self.release.clone();
+            self.entered.notify_one();
+            tokio::spawn(async move {
+                release.notified().await;
+                let events = [
+                    AgentEvent::TurnStart,
+                    AgentEvent::TextDelta {
+                        delta: "finished".into(),
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Usage::default(),
+                    },
+                ];
+                for event in events {
+                    if tx.send(event).await.is_err() {
+                        break;
+                    }
+                }
+            });
+            Ok(rx)
+        }
+    }
+
+    async fn gated_runtime() -> (RuntimeHandle, Arc<Notify>, Arc<Notify>) {
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(GatedModel {
+                entered: entered.clone(),
+                release: release.clone(),
+            }))
+            .build()
+            .expect("gated runtime builds");
+        (runtime, entered, release)
+    }
+
+    #[test]
+    fn shutdown_options_reject_invalid_drafts_before_runtime_access() {
+        assert_eq!(
+            ShutdownOptions::interrupt(Duration::ZERO),
+            Err(ShutdownOptionsError::ZeroTotalTimeout)
+        );
+        assert_eq!(
+            ShutdownOptions::finish_current(Duration::from_secs(1), Duration::from_secs(1)),
+            Err(ShutdownOptionsError::FinishGraceNotLessThanTotal)
+        );
+        assert_eq!(
+            ShutdownOptions::interrupt(Duration::MAX),
+            Err(ShutdownOptionsError::TotalTimeoutOutOfRange)
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_options_leave_the_primary_runtime_usable() {
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("still open")))
+            .build()
+            .expect("runtime builds");
+        assert!(ShutdownOptions::interrupt(Duration::ZERO).is_err());
+
+        runtime
+            .submit("continue")
+            .await
+            .expect("submit still succeeds");
+        assert!(matches!(
+            collect_until_turn_completed(&mut runtime).await,
+            Some(TurnCompletionStatus::Success { .. })
+        ));
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn concurrent_shutdown_callers_share_one_cached_report() {
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("unused")))
+            .build()
+            .expect("runtime builds");
+        let first = runtime.shutdown_controller();
+        let second = first.clone();
+        let first_task = tokio::spawn(async move {
+            first
+                .shutdown(
+                    ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+                )
+                .await
+        });
+        let second_task = tokio::spawn(async move {
+            second
+                .shutdown(
+                    ShutdownOptions::finish_current(
+                        Duration::from_secs(2),
+                        Duration::from_millis(10),
+                    )
+                    .expect("valid options"),
+                )
+                .await
+        });
+        let first_report = first_task.await.expect("caller joins").expect("report");
+        let second_report = second_task.await.expect("caller joins").expect("report");
+
+        assert_eq!(first_report, second_report);
+        assert!(first_report.is_complete());
+        assert_eq!(first_report.active_turn(), ShutdownActiveTurnOutcome::Idle);
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy caller joins cached result");
+    }
+
+    #[tokio::test]
+    async fn interrupt_closes_admission_and_finalizes_the_active_turn() {
+        let (runtime, entered, _release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+        assert_eq!(
+            report.active_turn(),
+            ShutdownActiveTurnOutcome::InterruptedAndFinalized
+        );
+        assert!(report.is_complete());
+        assert!(matches!(
+            runtime.submit("too late").await,
+            Err(RuntimeError::RuntimeClosing)
+        ));
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
+
+    #[tokio::test]
+    async fn finish_current_uses_grace_without_starting_post_fence_work() {
+        let (runtime, entered, release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+        let controller = runtime.shutdown_controller();
+        let shutdown = tokio::spawn(async move {
+            controller
+                .shutdown(
+                    ShutdownOptions::finish_current(
+                        Duration::from_secs(1),
+                        Duration::from_millis(500),
+                    )
+                    .expect("valid options"),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        assert!(matches!(
+            runtime.submit("post-fence").await,
+            Err(RuntimeError::RuntimeClosing)
+        ));
+        release.notify_one();
+        let report = shutdown.await.expect("caller joins").expect("report");
+
+        assert_eq!(report.active_turn(), ShutdownActiveTurnOutcome::Finished);
+        assert!(report.is_complete());
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
+
+    #[tokio::test]
+    async fn finish_current_grace_expiry_uses_actor_owned_interrupt() {
+        let (runtime, entered, _release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::finish_current(Duration::from_secs(1), Duration::from_millis(10))
+                    .expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+        assert_eq!(
+            report.active_turn(),
+            ShutdownActiveTurnOutcome::InterruptedAndFinalized
+        );
+        assert!(report.is_complete());
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
+
+    #[tokio::test]
+    async fn finish_current_never_starts_pre_fence_pending_work() {
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        struct CountingGatedModel {
+            entered: Arc<Notify>,
+            release: Arc<Notify>,
+            calls: Arc<AtomicUsize>,
+        }
+        #[async_trait]
+        impl LanguageModel for CountingGatedModel {
+            async fn stream(
+                &self,
+                _messages: &[Message],
+            ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let (tx, rx) = mpsc::channel(8);
+                let release = self.release.clone();
+                self.entered.notify_one();
+                tokio::spawn(async move {
+                    release.notified().await;
+                    for event in [
+                        AgentEvent::TurnStart,
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Usage::default(),
+                        },
+                    ] {
+                        let _ = tx.send(event).await;
+                    }
+                });
+                Ok(rx)
+            }
+        }
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(CountingGatedModel {
+                entered: entered.clone(),
+                release: release.clone(),
+                calls: calls.clone(),
+            }))
+            .build()
+            .expect("runtime builds");
+        let entered_wait = entered.notified();
+        runtime.submit("active").await.expect("first submit");
+        entered_wait.await;
+        runtime.submit("pending").await.expect("pre-fence submit");
+        let controller = runtime.shutdown_controller();
+        let shutdown = tokio::spawn(async move {
+            controller
+                .shutdown(
+                    ShutdownOptions::finish_current(
+                        Duration::from_secs(1),
+                        Duration::from_millis(500),
+                    )
+                    .expect("valid options"),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        release.notify_one();
+        let report = shutdown.await.expect("caller joins").expect("report");
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(report.active_turn(), ShutdownActiveTurnOutcome::Finished);
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
+
+    #[tokio::test]
+    async fn cancelling_one_waiter_does_not_cancel_the_runtime_driver() {
+        let (runtime, entered, _release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+        let first = runtime.shutdown_controller();
+        let later = first.clone();
+        let waiter = tokio::spawn(async move {
+            first
+                .shutdown(
+                    ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+                )
+                .await
+        });
+        loop {
+            if matches!(
+                runtime.submit("fence probe").await,
+                Err(RuntimeError::RuntimeClosing)
+            ) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        waiter.abort();
+
+        let report = later
+            .shutdown(
+                ShutdownOptions::finish_current(Duration::from_secs(2), Duration::from_millis(100))
+                    .expect("valid options"),
+            )
+            .await
+            .expect("later caller receives cached report");
+        assert_eq!(report.active_turn_policy(), ActiveTurnPolicy::Interrupt);
+        assert!(report.is_complete());
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
+
+    #[tokio::test]
+    async fn primary_drop_initiates_default_plan_and_controller_drop_is_inert() {
+        let (runtime, entered, _release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+        let controller = runtime.shutdown_controller();
+        drop(runtime.shutdown_controller());
+        drop(runtime);
+
+        let report = controller
+            .shutdown(
+                ShutdownOptions::finish_current(Duration::from_secs(2), Duration::from_millis(100))
+                    .expect("valid options"),
+            )
+            .await
+            .expect("controller joins Drop-initiated report");
+        assert_eq!(report.active_turn_policy(), ActiveTurnPolicy::Interrupt);
+        assert!(report.is_complete());
+    }
+
+    #[tokio::test]
+    async fn primary_drop_cannot_replace_an_explicit_winning_plan() {
+        let (runtime, entered, release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime.submit("block").await.expect("submit succeeds");
+        entered_wait.await;
+        let controller = runtime.shutdown_controller();
+        let observer = controller.clone();
+        let shutdown = tokio::spawn(async move {
+            controller
+                .shutdown(
+                    ShutdownOptions::finish_current(
+                        Duration::from_secs(1),
+                        Duration::from_millis(500),
+                    )
+                    .expect("valid options"),
+                )
+                .await
+        });
+        loop {
+            if matches!(
+                runtime.submit("fence probe").await,
+                Err(RuntimeError::RuntimeClosing)
+            ) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        drop(runtime);
+        release.notify_one();
+
+        let report = shutdown.await.expect("caller joins").expect("report");
+        let cached = observer
+            .shutdown(ShutdownOptions::interrupt(Duration::from_secs(2)).expect("valid options"))
+            .await
+            .expect("observer joins cached report");
+        assert_eq!(report, cached);
+        assert!(matches!(
+            report.active_turn_policy(),
+            ActiveTurnPolicy::FinishCurrent { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn legacy_shutdown_preserves_actor_join_errors() {
+        let admission = talos_agent::session::RuntimeAdmissionControl::new();
+        let (command_tx, command_rx) = mpsc::channel(1);
+        drop(command_rx);
+        let (_event_tx, event_rx) = mpsc::unbounded_channel();
+        let actor_task = tokio::spawn(async move {
+            panic!("intentional actor join failure");
+        });
+        let runtime_handle = tokio::runtime::Handle::current();
+        let coordinator =
+            ShutdownCoordinator::new(admission, command_tx.clone(), actor_task, runtime_handle);
+        let runtime = RuntimeHandle {
+            command_tx,
+            event_rx,
+            coordinator,
+            primary_drop_armed: true,
+        };
+
+        assert!(matches!(
+            runtime.shutdown().await,
+            Err(RuntimeError::ActorJoin(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn exhausted_total_deadline_returns_a_redacted_incomplete_report() {
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("unused")))
+            .build()
+            .expect("runtime builds");
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_nanos(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured timeout remains observable");
+
+        assert!(report.deadline_exhausted());
+        assert!(!report.is_complete());
+        assert!(matches!(
+            runtime.shutdown().await,
+            Err(RuntimeError::ShutdownIncomplete { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn durable_reconciliation_failure_is_typed_and_incomplete() {
+        let blocked_root = tempfile::NamedTempFile::new().expect("temporary file");
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("unused")))
+            .workspace_root(blocked_root.path())
+            .build()
+            .expect("runtime construction is lazy over pending custody");
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+
+        assert!(matches!(
+            report.durable_reconciliation(),
+            ShutdownDurableOutcome::Failed { .. }
+        ));
+        assert!(!report.is_complete());
+        assert!(matches!(
+            runtime.shutdown().await,
+            Err(RuntimeError::ShutdownIncomplete { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn shutdown_report_never_contains_submitted_content() {
+        let (runtime, entered, _release) = gated_runtime().await;
+        let entered_wait = entered.notified();
+        runtime
+            .submit("secret-prompt-and-credential")
+            .await
+            .expect("submit succeeds");
+        entered_wait.await;
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+
+        let projection = format!("{report:?}");
+        assert!(!projection.contains("secret-prompt-and-credential"));
+        assert!(!projection.contains("GatedModel"));
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy wrapper joins report");
+    }
 
     #[cfg(feature = "shared-composition")]
     struct PresetOverrideTool {

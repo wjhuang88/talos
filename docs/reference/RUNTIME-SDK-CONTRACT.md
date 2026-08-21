@@ -20,6 +20,9 @@ project does not imply it is exported by the runtime facade.
 |---|---|---|
 | `RuntimeBuilder` | Configure and construct an embedded runtime | Pre-1.0 stable shape; method set may grow |
 | `RuntimeHandle` | Interact with a running runtime (submit, events, shutdown) | Pre-1.0 stable shape; method set may grow |
+| `RuntimeShutdownHandle` | Cloneable shutdown-only controller; starts or joins one bounded plan | I216 additive API |
+| `ShutdownOptions` / `ActiveTurnPolicy` | Validated total timeout and active-turn policy | I216 additive API |
+| `ShutdownReport` and shutdown outcome enums | Immutable redacted terminal shutdown projection | I216 additive API |
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
 | `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
@@ -124,6 +127,43 @@ while let Some(event) = handle.next_event().await {
 }
 handle.shutdown()?;
 ```
+
+`submit` returning success means the command crossed the SDK admission fence and entered the
+bounded Session queue; it does not mean the model turn completed. Once shutdown closes admission,
+new submissions return `RuntimeError::RuntimeClosing` without enqueueing.
+
+### Pattern 1a: Bounded Shared Shutdown
+
+```rust,ignore
+use std::time::Duration;
+use talos_runtime::{ActiveTurnPolicy, ShutdownOptions};
+
+let controller = handle.shutdown_controller();
+let options = ShutdownOptions::new(
+    Duration::from_secs(20),
+    ActiveTurnPolicy::FinishCurrent {
+        grace: Duration::from_secs(5),
+    },
+)?;
+
+// Structured methods borrow their handles. Concurrent callers join the first
+// valid plan and receive the same immutable redacted report.
+let report = controller.shutdown(options).await?;
+if !report.is_complete() {
+    // Decide host policy from typed outcomes; the report contains no prompt,
+    // tool, provider, path, credential, or arbitrary error text.
+}
+
+// The source-compatible consuming wrapper remains available. It uses a
+// 30-second Interrupt plan and maps incomplete cleanup to ShutdownIncomplete.
+handle.shutdown().await?;
+```
+
+`FinishCurrent` never admits or starts pending work during its grace. `Interrupt` uses the existing
+Session cancellation and ADR-058 finalization path. Both policies share one total monotonic
+deadline; cancelling one waiting caller does not cancel the runtime-owned shutdown driver. Dropping
+the primary handle initiates the default plan without blocking, while dropping a controller is
+inert. See [I216 Runtime Shutdown Migration](I216-RUNTIME-SHUTDOWN-MIGRATION.md).
 
 ### Pattern 2: Custom Tool + Approval
 
@@ -276,6 +316,13 @@ needed capability features, or `coding` when the full product-oriented set is in
 future `RuntimePreset::coding()` remains owned by ARCH-031-C/I161 and is not implemented by I159.
 
 ## Pre-1.0 Change Policy
+
+I216 marks `RuntimeError` non-exhaustive and adds `RuntimeClosing`, `AsyncRuntimeUnavailable`, and
+`ShutdownIncomplete`. This is queued for the next minor release, not a patch release. Existing
+external exhaustive matches must add a fallback arm; the repository's independent external fixture
+compiles that migration shape. See the dedicated
+[I216 migration note](I216-RUNTIME-SHUTDOWN-MIGRATION.md). No workspace version or release state is
+changed by I216.
 
 - **Additive changes** (new builder methods, new event variants, new handle methods) may land in
   any pre-1.0 release without a major version bump.

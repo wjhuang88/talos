@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | Ready / Unclaimed — ADR-063 Accepted; B requires iteration and claim |
+| Status | In Progress / Unclaimed — B/I216 Active; C remains Blocked |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-21 |
+| Handoff / Release Condition | Epic parent is not an implementation unit. Complete B/I216 through its effective child claim, then establish a separate runnable C iteration/claim; keep Issue #49 open through C. |
 
 ## Identity / Goal / Value
 
@@ -64,11 +64,11 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
-| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Active / Claimed proposed by I216/#344; ineffective until merge | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Active / Claimed through I216/#344 merge `2016acce` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
-decision evidence only; parent RUNTIME-005 remains Ready/Unclaimed until B and C complete.
+decision evidence only; parent RUNTIME-005 remains In Progress/Unclaimed until B and C complete.
 
 The finalizer registry must be proven with runtime-owned test finalizers. A
 specific TOOL-024 implementation registers as a later consumer and cannot hold
@@ -160,3 +160,11 @@ governance-only and ineffective until finalized exact-head CI, both validators, 
 architecture review and merge-time CAS pass and the claim reaches `main`. Parent RUNTIME-005
 remains Unclaimed; C and Issue #59 remain blocked, and no I189, TOOL-024, release or publication
 authority transfers.
+
+## 2026-08-21 B Claim Effective And Implementation Started
+
+PR #344 exact head `e0f572a0` passed CI `32454558957`, independent architecture review
+`5366165116`, both validators and merge-time CAS, then merged as `2016acce`. RUNTIME-005-B/I216 is
+the only Active child and implementation started from that merge under its bounded Work Slice.
+Parent RUNTIME-005 remains Unclaimed and In Progress; C remains Blocked until B is Complete. Issue
+#49 stays open, and no I189, TOOL-024, release or publication authority transfers.

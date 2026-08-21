@@ -1,6 +1,7 @@
 use super::*;
 use async_trait::async_trait;
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use talos_core::message::{Message, StopReason};
@@ -73,6 +74,19 @@ impl LanguageModel for MockModel {
 struct SlowModel {
     delay: Duration,
     events: Vec<AgentEvent>,
+}
+
+struct CountingModel {
+    calls: Arc<AtomicUsize>,
+}
+
+#[async_trait]
+impl LanguageModel for CountingModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let (_tx, rx) = mpsc::channel(1);
+        Ok(rx)
+    }
 }
 
 struct BlockingProgressModel {
@@ -359,6 +373,61 @@ async fn test_submit_and_receive() {
             Some(TurnCompletionStatus::Success { .. })
         )),
         "Should have TurnCompleted(Success)"
+    );
+}
+
+#[tokio::test]
+async fn shutdown_before_start_commit_performs_no_provider_work() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let agent = make_agent(CountingModel {
+        calls: calls.clone(),
+    });
+    let workspace = tempfile::tempdir().expect("temporary workspace");
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: workspace.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let control = RuntimeAdmissionControl::new();
+    actor.set_runtime_admission(control.clone());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    actor.set_start_commit_gate(reached.clone(), release.clone());
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    let permit = handle.sq_tx.reserve().await.expect("channel remains open");
+    control
+        .commit_reserved(
+            permit,
+            SessionOp::Submit {
+                message: "must-not-run".into(),
+            },
+        )
+        .expect("pre-fence submit commits");
+    reached.notified().await;
+    assert_eq!(
+        control.begin_shutdown(31, RuntimeShutdownTurnPolicy::Interrupt),
+        RuntimeAdmissionClose::Accepted {
+            active_at_fence: false
+        }
+    );
+    release.notify_one();
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown signal sends");
+    tokio::time::timeout(Duration::from_secs(1), actor_task)
+        .await
+        .expect("actor exits within bound")
+        .expect("actor joins");
+
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        control.snapshot().active_turn,
+        RuntimeActiveTurnOutcome::Idle
     );
 }
 

@@ -818,3 +818,19 @@ PR #344 is now the atomic claim+activation proposal. Its exact branch records Cl
 RUNTIME-005-B/I216, but those values remain ineffective while the PR is open. The only next action
 is finalized governance validation, exact-head CI, independent runtime architecture review and
 merge-time CAS; implementation must start from the resulting merge or later `main`.
+
+## 2026-08-21 I216 Claim Effective And Local Convergence
+
+PR #344 exact head `e0f572a0` passed CI `32454558957`, both governance validators, independent
+runtime architecture review `5366165116` and merge-time CAS, then merged as `2016acce`. The atomic
+RUNTIME-005-B/I216 claim and activation are now effective. Implementation started from that exact
+merge in an isolated worktree.
+
+The current local stage covers only B: one SDK/actor admission-start arbiter, validated options,
+cloneable controller, two active policies, one monotonic total deadline, runtime-owned driver,
+cached typed redacted report, Drop/legacy compatibility, deterministic race/failure tests, external
+migration fixture and SDK docs. Focused `talos-agent` and `talos-runtime` suites plus the external
+fixture pass locally. This is not Review or Completion evidence; full preflight, one stable
+implementation commit/PR, exact-head Unix/Windows CI, independent runtime architecture review and
+merge-time CAS remain. RUNTIME-005-C, I189, TOOL-024, release and publication remain unauthorized,
+so T10/#59 stays Blocked.

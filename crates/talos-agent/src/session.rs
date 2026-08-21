@@ -34,7 +34,14 @@ use crate::token::TokenEstimator;
 use crate::{ActivatedSkillContext, Agent};
 
 mod custody;
+mod lifecycle;
 mod turn;
+
+#[doc(hidden)]
+pub use lifecycle::{
+    RuntimeActiveTurnOutcome, RuntimeAdmissionClose, RuntimeAdmissionControl,
+    RuntimeDurableReconciliationOutcome, RuntimeLifecycleSnapshot, RuntimeShutdownTurnPolicy,
+};
 
 #[cfg(test)]
 #[allow(warnings)]
@@ -64,6 +71,41 @@ struct StartedTurn {
     structured: Option<ActiveStructuredTurn>,
 }
 
+fn immediate_started_turn(
+    eq_tx: mpsc::UnboundedSender<SessionEvent>,
+    session_id: String,
+    turn_id: String,
+    token: CancellationToken,
+    structured: Option<ActiveStructuredTurn>,
+    completion: TurnCompletionStatus,
+) -> StartedTurn {
+    let status = match &completion {
+        TurnCompletionStatus::Success { .. } => TurnRecordStatus::Success,
+        TurnCompletionStatus::Cancelled => TurnRecordStatus::Cancelled,
+        TurnCompletionStatus::Error { .. } => TurnRecordStatus::Error,
+    };
+    let handle = tokio::spawn(async move {
+        let _ = eq_tx.send(SessionEvent::TurnEvent {
+            session_id,
+            turn_id,
+            sequence: 1,
+            payload: TurnEventPayload::Completed {
+                status: completion.clone(),
+            },
+        });
+        Some(TurnRecord {
+            new_messages: Vec::new(),
+            status,
+            completion,
+        })
+    });
+    StartedTurn {
+        handle,
+        token,
+        structured,
+    }
+}
+
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
 /// Created via [`AppServerSession::new`], which returns a [`SessionHandle`]
@@ -83,6 +125,9 @@ pub struct AppServerSession {
     session_generation: u64,
     turn_prefix: String,
     model_context_limit: u32,
+    runtime_admission: Option<RuntimeAdmissionControl>,
+    #[cfg(test)]
+    start_commit_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
 }
 
 impl AppServerSession {
@@ -121,6 +166,9 @@ impl AppServerSession {
             session_generation: 0,
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
             model_context_limit: config.model_context_limit,
+            runtime_admission: None,
+            #[cfg(test)]
+            start_commit_gate: None,
         };
 
         (handle, actor)
@@ -129,6 +177,21 @@ impl AppServerSession {
     /// Assigns the authoritative generation before this Actor is spawned.
     pub fn set_generation(&mut self, generation: u64) {
         self.session_generation = generation;
+    }
+
+    /// Installs the runtime facade's admission/start linearization seam.
+    #[doc(hidden)]
+    pub fn set_runtime_admission(&mut self, admission: RuntimeAdmissionControl) {
+        self.runtime_admission = Some(admission);
+    }
+
+    #[cfg(test)]
+    fn set_start_commit_gate(
+        &mut self,
+        reached: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    ) {
+        self.start_commit_gate = Some((reached, release));
     }
 
     /// Returns the authoritative generation assigned by the composition root.
@@ -206,9 +269,24 @@ impl AppServerSession {
                     images,
                     image_bytes,
                 );
+                let start_token = CancellationToken::new();
+                #[cfg(test)]
+                if let Some((reached, release)) = &self.start_commit_gate {
+                    reached.notify_one();
+                    release.notified().await;
+                }
+                let start_committed = self
+                    .runtime_admission
+                    .as_ref()
+                    .is_none_or(|admission| admission.commit_start(start_token.clone()));
+                if !start_committed {
+                    pending.push_front(submission);
+                    paused = true;
+                    continue;
+                }
                 turn_counter = turn_counter.saturating_add(1);
                 match self
-                    .start_submission(submission.clone(), turn_counter)
+                    .start_submission(submission.clone(), turn_counter, start_token)
                     .await
                 {
                     Some(started) => {
@@ -218,6 +296,9 @@ impl AppServerSession {
                         cancel_token = Some(started.token);
                     }
                     None => {
+                        if let Some(admission) = &self.runtime_admission {
+                            admission.finish_active(None);
+                        }
                         pending.push_front(submission);
                         paused = true;
                     }
@@ -252,6 +333,9 @@ impl AppServerSession {
                             let custody_ok = structured.as_ref().is_none_or(|active| {
                                 self.finish_structured_turn(active, &completion)
                             });
+                            if let Some(admission) = &self.runtime_admission {
+                                admission.finish_active(Some(&completion));
+                            }
                             paused = status != TurnRecordStatus::Success || !custody_ok;
                         }
                         None => {
@@ -261,6 +345,9 @@ impl AppServerSession {
                                 };
                                 let _ = self.finish_structured_turn(active, &completion);
                             }
+                            if let Some(admission) = &self.runtime_admission {
+                                admission.finish_active(None);
+                            }
                             paused = true;
                         }
                     }
@@ -268,11 +355,24 @@ impl AppServerSession {
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
                         shutting_down = true;
-                        if let Some(token) = cancel_token.take() {
+                        let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
+                            !matches!(
+                                control.shutdown_policy(),
+                                Some(RuntimeShutdownTurnPolicy::FinishCurrent)
+                            )
+                        });
+                        if should_interrupt && let Some(token) = cancel_token.take() {
                             token.cancel();
                         }
+                        let rejected_pending = pending.len();
                         self.release_in_memory_pending_on_shutdown(&mut pending);
-                        let _ = self.pending_store.pause_unstarted();
+                        let reconciliation_succeeded = self.pending_store.pause_unstarted().is_ok();
+                        if let Some(control) = &self.runtime_admission {
+                            control.record_reconciliation(
+                                rejected_pending,
+                                reconciliation_succeeded,
+                            );
+                        }
                         pending_items = current_submission_size.map_or(0, |size| size.0);
                         pending_bytes = current_submission_size.map_or(0, |size| size.1);
                         pending_images = current_submission_size.map_or(0, |size| size.2);
@@ -462,12 +562,29 @@ impl AppServerSession {
                         }
                         SessionOp::Shutdown => {
                             shutting_down = true;
-                            if let Some(token) = &cancel_token {
+                            let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
+                                !matches!(
+                                    control.shutdown_policy(),
+                                    Some(RuntimeShutdownTurnPolicy::FinishCurrent)
+                                )
+                            });
+                            if should_interrupt && let Some(token) = &cancel_token {
                                 token.cancel();
                             }
+                            let rejected_pending = pending.len();
                             self.release_in_memory_pending_on_shutdown(&mut pending);
-                            if let Err(error) = self.pending_store.pause_unstarted() {
-                                self.emit_custody_error("failed to persist shutdown pause", &error);
+                            let reconciliation_succeeded = match self.pending_store.pause_unstarted() {
+                                Ok(_) => true,
+                                Err(error) => {
+                                    self.emit_custody_error("failed to persist shutdown pause", &error);
+                                    false
+                                }
+                            };
+                            if let Some(control) = &self.runtime_admission {
+                                control.record_reconciliation(
+                                    rejected_pending,
+                                    reconciliation_succeeded,
+                                );
                             }
                             pending_items = current_submission_size.map_or(0, |size| size.0);
                             pending_bytes = current_submission_size.map_or(0, |size| size.1);
@@ -490,56 +607,61 @@ impl AppServerSession {
         &mut self,
         submission: StructuredSubmission,
         turn_counter: u64,
+        token: CancellationToken,
     ) -> Option<StartedTurn> {
-        if self.compactor.should_compact(&self.history) {
-            let compacted = self.compactor.apply_budget(self.history.clone());
-            let compacted = self.compactor.apply_trim(compacted);
-            let compacted = self.compactor.apply_microcompact(compacted);
-            self.history = match self
-                .compactor
-                .compact(compacted, self.agent.provider())
-                .await
-            {
-                Ok(history) => history,
-                Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
-            };
-            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                let _ = self.try_archive_session(file, dir, &self.history);
-            }
-        }
-
-        let prepared_turn = if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+        let runtime_managed = self.runtime_admission.is_some();
+        let prepared_before_commit = if runtime_managed {
             None
         } else {
-            match self
-                .agent
-                .prepare_session_turn(
-                    &submission.items,
-                    self.history.clone(),
-                    self.model_context_limit,
-                )
-                .await
-            {
-                Ok(prepared) => Some(prepared),
-                Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
-                    self.pause_before_start(
-                        &submission,
-                        SubmissionRejectionReason::ContextBudgetExceeded,
-                    );
-                    return None;
+            if self.compactor.should_compact(&self.history) {
+                let compacted = self.compactor.apply_budget(self.history.clone());
+                let compacted = self.compactor.apply_trim(compacted);
+                let compacted = self.compactor.apply_microcompact(compacted);
+                self.history = match self
+                    .compactor
+                    .compact(compacted, self.agent.provider())
+                    .await
+                {
+                    Ok(history) => history,
+                    Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
+                };
+                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+                    let _ = self.try_archive_session(file, dir, &self.history);
                 }
-                Err(error) => {
-                    let _ = self.eq_tx.send(SessionEvent::Error {
-                        message: format!(
-                            "failed to seal Provider request plan for {}: {error}",
-                            submission.id
-                        ),
-                    });
-                    self.pause_before_start(
-                        &submission,
-                        SubmissionRejectionReason::InvalidStructure,
-                    );
-                    return None;
+            }
+            if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+                None
+            } else {
+                match self
+                    .agent
+                    .prepare_session_turn(
+                        &submission.items,
+                        self.history.clone(),
+                        self.model_context_limit,
+                    )
+                    .await
+                {
+                    Ok(prepared) => Some(prepared),
+                    Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
+                        self.pause_before_start(
+                            &submission,
+                            SubmissionRejectionReason::ContextBudgetExceeded,
+                        );
+                        return None;
+                    }
+                    Err(error) => {
+                        let _ = self.eq_tx.send(SessionEvent::Error {
+                            message: format!(
+                                "failed to seal Provider request plan for {}: {error}",
+                                submission.id
+                            ),
+                        });
+                        self.pause_before_start(
+                            &submission,
+                            SubmissionRejectionReason::InvalidStructure,
+                        );
+                        return None;
+                    }
                 }
             }
         };
@@ -606,13 +728,93 @@ impl AppServerSession {
             payload: TurnEventPayload::Started,
         });
 
+        if runtime_managed && self.compactor.should_compact(&self.history) {
+            let compacted = self.compactor.apply_budget(self.history.clone());
+            let compacted = self.compactor.apply_trim(compacted);
+            let compacted = self.compactor.apply_microcompact(compacted);
+            let compact_result = tokio::select! {
+                () = token.cancelled() => {
+                    return Some(immediate_started_turn(
+                        self.eq_tx.clone(),
+                        self.session_id.clone(),
+                        turn_id,
+                        token,
+                        structured,
+                        TurnCompletionStatus::Cancelled,
+                    ));
+                }
+                result = self.compactor.compact(compacted, self.agent.provider()) => result,
+            };
+            self.history = match compact_result {
+                Ok(history) => history,
+                Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
+            };
+            if token.is_cancelled() {
+                return Some(immediate_started_turn(
+                    self.eq_tx.clone(),
+                    self.session_id.clone(),
+                    turn_id,
+                    token,
+                    structured,
+                    TurnCompletionStatus::Cancelled,
+                ));
+            }
+            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+                let _ = self.try_archive_session(file, dir, &self.history);
+            }
+        }
+
+        let prepared_turn = if !runtime_managed {
+            prepared_before_commit
+        } else if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+            None
+        } else {
+            let prepare_result = tokio::select! {
+                () = token.cancelled() => {
+                    return Some(immediate_started_turn(
+                        self.eq_tx.clone(),
+                        self.session_id.clone(),
+                        turn_id,
+                        token,
+                        structured,
+                        TurnCompletionStatus::Cancelled,
+                    ));
+                }
+                result = self.agent.prepare_session_turn(
+                    &submission.items,
+                    self.history.clone(),
+                    self.model_context_limit,
+                ) => result,
+            };
+            match prepare_result {
+                Ok(prepared) => Some(prepared),
+                Err(error) => {
+                    let _ = self.eq_tx.send(SessionEvent::Error {
+                        message: format!(
+                            "failed to seal Provider request plan for {}: {error}",
+                            submission.id
+                        ),
+                    });
+                    return Some(immediate_started_turn(
+                        self.eq_tx.clone(),
+                        self.session_id.clone(),
+                        turn_id,
+                        token,
+                        structured,
+                        TurnCompletionStatus::Error {
+                            message: error.to_string(),
+                        },
+                    ));
+                }
+            }
+        };
+
         if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
             let agent = self.agent.clone();
             let eq_tx = self.eq_tx.clone();
             let history = self.history.clone();
             let session_id = self.session_id.clone();
             let message = submission.items[0].text.clone();
-            let token = CancellationToken::new();
             let preview_token = token.clone();
             let handle = tokio::spawn(async move {
                 let result = tokio::select! {
@@ -716,7 +918,6 @@ impl AppServerSession {
         }
 
         let sequence = Arc::new(AtomicU64::new(1));
-        let token = CancellationToken::new();
         let token_clone = token.clone();
         let agent = self.agent.clone();
         let eq_tx = self.eq_tx.clone();

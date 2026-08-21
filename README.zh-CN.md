@@ -524,6 +524,13 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 用于注入 provider/tool、接收类型化事件流、中断、关闭和显式 request preview。
 嵌入方也可以通过 `RuntimeBuilder` 提供审批处理器，并替换或追加运行时系统提示词。
 
+运行时关闭现在具有有界且可共享的契约。`RuntimeHandle::shutdown_controller()` 返回可克隆、
+只能发起关闭的 controller；`ShutdownOptions` 在同一个单调总 deadline 下选择
+`FinishCurrent` 或 `Interrupt`，所有调用方会得到同一份脱敏 `ShutdownReport`。关闭 fence
+生效后，新的 SDK submit 会返回类型化 `RuntimeClosing`，不会再入队。原有消费式
+`RuntimeHandle::shutdown()` 仍然保留，并在清理未完成时返回 `ShutdownIncomplete`，不会伪报
+成功。
+
 注册的工具默认会经过权限包装。在 headless 嵌入模式下，未解决的 `Ask` 决策会被拒绝，
 除非 embedder 提供更窄的 allow-list 规则。
 

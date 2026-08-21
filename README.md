@@ -723,6 +723,13 @@ linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuil
 explicit request previews. Embedders can also provide approval handlers and customize or append the
 runtime system prompt through `RuntimeBuilder`.
 
+Runtime shutdown is bounded and shareable. `RuntimeHandle::shutdown_controller()` returns a
+cloneable shutdown-only controller; `ShutdownOptions` selects `FinishCurrent` or `Interrupt` under
+one total monotonic deadline, and every caller receives the same redacted `ShutdownReport`. Once the
+shutdown fence closes, new SDK submissions return typed `RuntimeClosing` without enqueueing. The
+existing consuming `RuntimeHandle::shutdown()` remains available and returns
+`ShutdownIncomplete` instead of reporting incomplete cleanup as success.
+
 Registered tools are permission-wrapped by default. In headless embedding, unresolved `Ask`
 decisions are denied unless the embedder supplies narrower allow-list rules.
 
