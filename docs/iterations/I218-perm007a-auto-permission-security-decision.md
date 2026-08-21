@@ -1,6 +1,6 @@
 # Iteration I218: Auto Permission Security Decision
 
-> Document status: Active / Claimed (proposed atomically by PR #352; ineffective before merge)
+> Document status: Active / Claimed
 > Published plan date: 2026-08-22
 > Planned objective: decide the bounded security contract for cross-surface model-assisted `auto`
 > permission decisions without changing executable behavior.
@@ -20,10 +20,10 @@
 | Source Issue | #188 |
 | Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer explicitly requested early ADR acceptance for unattended continuity. Claim PR #352 must pass exact-head independent security review and merge-time CAS; the claim becomes effective only after target-branch merge. |
+| Authorization Evidence | Maintainer requested early ADR acceptance for unattended continuity. Claim PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance review `5372605087` and merge-time CAS, then merged as `ca30081a`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Claim and activation become effective only when PR #352 merges. ADR acceptance requires independent exact-head security review; implementation waits for all PERM-006 A-C gates and separate child claims. |
+| Handoff / Release Condition | Active from claim merge `ca30081a`. ADR acceptance requires independent exact-head security review; implementation waits for all PERM-006 A-C gates and separate child claims. |
 
 ## Published Baseline
 
@@ -74,10 +74,15 @@ command, model request, permission result, sandbox, product UI, release or publi
 |---|---|---|
 | 2026-08-22 | Selection | The maintainer requested early ADR completion for later unattended work. I218 is decision-only and non-overlapping with Active I189; this draft creates no authority before merge. |
 | 2026-08-22 | Claim proposed | PR #352 atomically proposes Claimed/Active state. It remains ineffective before target-branch merge and authorizes no executable behavior. |
+| 2026-08-22 | Claim effective | Exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role review `5372605087` and CAS; PR #352 merged as `ca30081a`. |
+| 2026-08-22 | Decision execution | The current-path/threat matrix and Proposed ADR-064 define default-on attempted assistance, a narrow one-shot managed-worktree write class, deterministic exclusions, redaction, timeout/circuit, cross-surface and migration boundaries. No executable behavior changes. |
 
 ## Verification Evidence
 
-Pending claim merge, decision execution, exact-head CI and independent security review.
+- Claim: exact head `13ecbdfa`, CI `32503441611`, independent review `5372605087`, merge
+  `ca30081a`.
+- Decision evidence: `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md` and Proposed ADR-064;
+  exact-head CI and independent security review pending.
 
 ## Completion Evidence
 
