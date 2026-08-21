@@ -683,11 +683,7 @@ mod tests {
 
     #[test]
     fn storage_cleanup_nature_deny_rule() {
-        let mut engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-            trusted_workspace: false,
-        };
+        let mut engine = PermissionEngine::empty();
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Write,
             None,
@@ -707,11 +703,7 @@ mod tests {
 
     #[test]
     fn storage_cleanup_nature_allow_rule_precedes_default_ask() {
-        let mut engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-            trusted_workspace: false,
-        };
+        let mut engine = PermissionEngine::empty();
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Write,
             None,
