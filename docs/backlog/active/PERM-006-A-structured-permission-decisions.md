@@ -5,9 +5,9 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Active |
+| Status | Review |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
-| Selected Iteration | I189 (Active) |
+| Selected Iteration | I189 (Review) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
 
 ## Collaboration Claim
@@ -23,9 +23,9 @@
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 merged as `20cfcce4e72be3da4e3efc1190ee498975e7476b` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921`, and merge-time CAS. |
-| Implementation PR | Not started |
+| Implementation PR | #356 |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | I189 implementation begins from activation merge `20cfcce4` or later `main`. ADR-065 must be Accepted after independent exact-head security/API review before the source-compatible migration implementation begins; retain a second independent security review for the implementation candidate. |
+| Handoff / Release Condition | Review implementation commit `6b577d6afcb05230c821214902b9067c45c767a9` through PR #356 with fresh exact-head CI, independent security/code review and merge-time CAS. A later owner-first closeout may cite that pre-existing implementation commit; this Review state does not authorize PERM-006-B/C/D/E or PERM-007 behavior. |
 
 ## Identity / Goal / Value
 
@@ -65,7 +65,7 @@ Decide public type ownership and compatibility in an ADR or explicit pre-1.0 API
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Refinement.
+Do not present this Story as shipped while implementation review and owner-first closeout remain pending.
 
 ## Required Reads
 
@@ -94,3 +94,14 @@ Any behavior correction discovered here must become a separately reviewed securi
 - ADR-065 is the required pre-1.0 API/migration decision already anticipated by the Published
   Baseline. It changes no permission outcome, approval routing, serialized configuration, grant
   lifetime, hook DTO, workspace version or release state. Implementation waits for ADR acceptance.
+
+## 2026-08-22 Implementation Review Checkpoint
+
+- ADR-065 was Accepted through PR #355 merge `9579df7a` after exact-head CI `32508015164`,
+  independent Agent-role security/API review `5373150265` and merge-time CAS.
+- Implementation commit `6b577d6afcb05230c821214902b9067c45c767a9` adds the bounded structured
+  request/context/report evaluator and preserves the claim exclusions. Local focused and dependent
+  crate tests plus the complete repository release preflight passed; an independent local red-team
+  review approved the corrected closed reason dimension and MCP/plugin redaction coverage.
+- I189 is Review/Claimed through implementation PR #356. Completion remains pending fresh
+  exact-head CI, independent security/code review, merge-time CAS and a later owner-first closeout.

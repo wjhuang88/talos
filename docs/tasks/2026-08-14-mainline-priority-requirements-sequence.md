@@ -975,3 +975,18 @@ then independently review and close A before selecting B and C in order. PERM-00
 Blocked until PERM-006-A/B/C close and each child obtains its own effective protected-scope claim.
 TOOL-024-B/C/D and Issue #59 remain Blocked until PERM-006-C and their separate claims; no release,
 publication, Desktop or Dashboard authority is transferred.
+
+## 2026-08-22 I189 ADR Acceptance And Implementation Review Checkpoint
+
+ADR-065 was Accepted through PR #355 merge `9579df7a` after exact-head CI `32508015164`,
+independent Agent-role security/API review `5373150265` and merge-time CAS. Implementation commit
+`6b577d6afcb05230c821214902b9067c45c767a9` then completed the bounded I189 source slice after
+local locked workspace, permission and dependent-crate validation plus independent local red-team
+review. The corrected tree passed the complete repository release preflight. Draft PR #356 is the
+implementation review carrier; I189 is Review/Claimed and is not yet Complete.
+
+Resume by validating the stable PR #356 exact head, obtaining independent security/code review,
+performing merge-time CAS and merging only that implementation. A later owner-first closeout must
+name pre-existing implementation commit `6b577d6a`; only after that closeout may PERM-006-B be
+prepared through a separate runnable iteration and effective protected-scope claim. PERM-006-C,
+PERM-007-B/C/D, TOOL-024-B/C/D, release, publication, Desktop and Dashboard remain unauthorized.
