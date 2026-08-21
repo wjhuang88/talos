@@ -39,8 +39,8 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 ## Scope
 
 - Define a redacted structured input and validated output for model-assisted risk classification.
-- Define the canonical configuration field for `auto`, its default-on target, persistence and
-  precedence against a per-session `/auto` toggle; exact naming and migration remain ADR work.
+- Implement ADR-064's canonical `auto.enabled` default-on attempt mode and its precedence against a
+  non-persistent per-session `/auto` override through separately claimed children.
 - Define `/auto` as an explicit TUI/session command that reports enabled, disabled, policy, model,
   timeout and degradation state without changing the underlying permission authority.
 - Define equivalent behavior for Goal, interactive CLI/TUI, headless, Runtime and MCP entrypoints
@@ -48,14 +48,14 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 - Preserve configured Deny, hard boundaries and fail-closed behavior as non-overridable.
 - Define timeout, unavailable-model, malformed-output, uncertainty and human-escalation behavior.
 - Define auditable policy/model versions, bounded decisions and final authorization outcomes.
-- Decompose decision/threat-model, configuration and command surface, implementation and
-  cross-surface conformance work before Ready.
+- Preserve the accepted A decision and deliver configuration/command, resolver and cross-surface
+  conformance only through the separately governed B-D child sequence.
 
 ## Exclusions
 
 - No arbitrary model-generated permission rules, permanent grants or widened resource scopes.
-- No sandbox rewrite, bypass of `PermissionController`, or implementation before the revised ADR
-  explicitly accepts the proposed default-on target.
+- No sandbox rewrite, bypass of the authoritative permission pipeline, or behavior implementation
+  before PERM-006-A/B/C close and the selected child has an effective protected-scope claim.
 - No implementation, dependency or public API authorization from this intake record.
 
 ## Dependencies
@@ -85,17 +85,17 @@ The parent Epic remains In Progress and does not claim completion from this chil
 - `AGENTS.md` Hard Constraints 4 and 5 remain authoritative.
 - Deny precedence, workspace boundaries and headless deny-by-default cannot be weakened.
 - Any native/process/model integration failure must degrade to human confirmation or Deny.
-- ADR-011 currently says Guardian/model assistance is disabled by default and cannot auto-approve
-  write-capable tools in its first implementation. A new ADR must explicitly revise or supersede
-  that decision before the requested default-on `auto` mode can become Ready.
-- The new ADR must define maximum automatic authority, privacy, audit, timeout, configuration and
-  session-override precedence, headless behavior, migration and rollback policy.
+- Accepted ADR-064 supersedes ADR-011 and defines default-on as attempted bounded assistance, never
+  default Allow. Its first automatic class is capability-relative atomic no-clobber creation of a
+  new text file; existing-file modification remains human-mediated pending a later CAS decision.
+- ADR-064's maximum authority, privacy, audit, timeout, configuration/session precedence, headless,
+  migration and rollback rules are normative for B-D and cannot be widened by a child claim.
 
 ## Uncertainty And Validation Path
 
-Refine the exact risk classes that can be automated, prove the model cannot enlarge the structured
-request, and define deterministic adversarial fixtures before selecting the first child. The
-default-on request is a product target, not an accepted safety decision until ADR-011 is revised.
+Before selecting B, finish PERM-006-A/B/C and translate ADR-064's fixed create-only class, request
+binding and adversarial matrix into runnable acceptance. Any inability to provide a trusted open
+parent-directory capability keeps that platform ineligible rather than weakening the contract.
 
 ## State / Status Owners
 
@@ -108,7 +108,7 @@ default-on request is a product target, not an accepted safety decision until AD
 
 If implemented, document the global `auto` policy, `/auto` control, model identity, default and
 session overrides, escalation behavior and audit visibility across every supported surface. Do not
-present the capability as shipped while this owner remains Refinement.
+present the capability as shipped while this parent remains In Progress and B-D are Blocked.
 
 ## Required Reads
 
@@ -122,6 +122,8 @@ present the capability as shipped while this owner remains Refinement.
 - `crates/talos-config/src/types.rs`
 - `crates/talos-conversation/src/command_registry.rs`
 - `docs/decisions/011-guardian-approval-boundary.md`
+- `docs/decisions/064-bounded-model-assisted-auto-permission.md`
+- `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md`
 
 ## Acceptance For Behavior / Technical Work
 
@@ -133,8 +135,8 @@ present the capability as shipped while this owner remains Refinement.
 - Equivalent requests have equivalent authorization semantics across CLI, TUI, Goal, headless,
   Runtime and MCP surfaces.
 - Audit evidence is useful without storing credentials, secrets or complete sensitive inputs.
-- The revised ADR, bounded children and cross-surface security tests complete with independent
-  security review before any default-on behavior is claimed.
+- Accepted ADR-064 remains the fixed boundary; bounded children and cross-surface security tests
+  require independent protected-scope review before any default-on behavior is claimed.
 
 ## Residual Destination
 
