@@ -82,7 +82,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I212 | Catalog-Assisted Custom-Model Context Window | Complete / Closed | Completion Commit `5a1709cb`; PR #318 CI/review/CAS and integrated exact/prefix/override/unknown no-request walkthrough passed. |
 | I213 | Dashboard Live Activity And Log Viewer | Planned / Claimed | Governance claim PR #327 merged as `66747214`; Dashboard-only implementation remains unactivated and outside the mainline task. |
 | I214 | Bounded Shutdown Contract Decision | Active / Claimed | Claim #336 merged as `7de582a3` after exact-head CI, independent review and CAS. Only the current-path matrix and Proposed ADR are authorized; no Rust/Cargo/runtime behavior change. |
-| I215 | Local Convergence And Stage Validation | Active / Claimed only when its atomic governance PR merges | GOV-008 / Issue #339. The same governance-only merge establishes claim and activation; implementation then converges locally and submits one stable stage candidate. No product/runtime authority. |
+| I215 | Local Convergence And Stage Validation | Review / Claimed | Atomic claim+activation PR #340 merged as `e66d039c`; locally converged AGENTS/SOP/validator/scenario work awaits one stable candidate's exact-head validation. No product/runtime authority. |
 
 ## Completed This Closeout
 

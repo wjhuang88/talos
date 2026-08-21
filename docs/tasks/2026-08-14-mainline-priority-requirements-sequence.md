@@ -730,3 +730,26 @@ no new I214 edits are scheduled during the governance repair. After I215 closes,
 started I214 flow, then govern RUNTIME-005-B/C and later long-task work using the revised process.
 I197/I198/I201/I210 remain Review, I189/I213 remain Planned/Claimed and unactivated, I206-I208
 remain Planned/Unclaimed, and I164 remains Paused.
+
+## 2026-08-21 I215 Atomic Activation And Local Convergence
+
+PR #340 head `1e00249b` passed exact-head CI `32439457491`, both validators, manifest parsing, scale
+assessment and merge-time CAS, then merged as `e66d039c`. GOV-008/I215 became Claimed and Active in
+that single merge; no separate activation PR was created.
+
+The implementation worktree began at the activation merge. The AGENTS/SOP changes, POSIX and
+PowerShell harness integration, 12 ordinary/protected/release/bounded-maintenance scenarios and
+EVOLUTION lesson converged locally without intermediate pushes. I215 is Review pending one stable
+stage candidate, not Complete.
+
+The final local convergence passed the full release preflight, both governance validators,
+PowerShell strict parse and execution, workflow and SQLite scenario harnesses, manifest/scale/site/
+installer/classifier checks, workspace check/Clippy/tests/doctests and diff/scope hygiene. This loop
+caught a PowerShell wiring defect that had omitted the SQLite self-test; it was repaired and all
+affected gates were rerun before the first push.
+
+Meanwhile #338 review identified two blocking decision defects: the proposed closing-bit check does
+not atomically pair actor admission with turn start, leaving a check-to-start race; and consuming
+`shutdown_with(self, invalid_options)` conflicts with Drop-triggered default shutdown. I214 remains
+Active/Claimed. After I215 closes, batch both corrections locally on #338 and obtain fresh exact-head
+review; do not convert either finding into a separate micro-PR.

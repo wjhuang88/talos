@@ -982,3 +982,21 @@ repeating known mistakes.
 - Promoted to rule/check: `docs/sop/LONG-RUNNING-TASK.md`,
   `docs/sop/ITERATION-WORKFLOW.md`, `docs/sop/AGENT-COLLABORATION.md`, and
   `docs/sop/CHANGE-CONTROL.md`; no mechanical validator is added in this slice.
+
+## 2026-08-21 - Remote review is a stage gate, not the development loop
+
+- Trigger: The I205 audit found 32 coordination/state/review/correction PRs versus 10
+  implementation or delivery-evidence PRs in a 42-PR sample; I214 then repeated separate claim,
+  activation, decision and expected closeout PRs.
+- Symptom: PR and review round trips exceeded the underlying code/document changes, while repeated
+  owner/derived-state drift still passed mechanical validation and delayed product progress.
+- Root cause: Talos required target-branch ownership and exact-head evidence but encoded each state
+  transition as a remote ceremony. It did not explicitly require local convergence before first
+  push, atomic claim+activation, or a validity contract for delegated review output.
+- Fix: Merge claim and activation into one governance transition, require a complete local
+  convergence checkpoint, submit one stable stage candidate, batch review corrections in the same
+  PR, and allow safe prior-closeout plus next-activation combination with pre-existing evidence.
+- Prevention: Four scenario classes now exercise early implementation, partial remote candidates,
+  protected review, release ordering, bounded maintenance and self-certifying completion failures.
+- Promoted to rule/check: `AGENTS.md`, collaboration/iteration/Git/release/document/long-task SOPs,
+  `scripts/validate_delivery_workflow.py`, and `scripts/fixtures/delivery-workflow-cases.json`.

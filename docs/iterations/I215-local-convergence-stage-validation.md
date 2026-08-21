@@ -1,6 +1,6 @@
 # Iteration I215: Local Convergence And Stage Validation
 
-> Document status: Active / Claimed when this atomic claim+activation record reaches `main`; ineffective while its PR is open
+> Document status: Review / Claimed - atomic activation merged; locally converged stage candidate ready
 > Published plan date: 2026-08-21
 > Planned objective: replace remote micro-PR editing loops with local convergence and stable-stage
 > validation while preserving Talos security, release, ownership and completion gates.
@@ -21,9 +21,9 @@
 | Governance Claim PR | #340 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Talos optimize the governance guidance before further development and specified local design/implementation/test convergence followed by stage-level remote validation. This governance-only PR proposes claim and activation atomically; neither is effective until merge. Exact-head CI, both governance validators, no blocking feedback and merge-time CAS remain required. |
-| Implementation PR | Not started |
+| Implementation PR | Not started - stable candidate not yet pushed |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge this governance-only atomic claim+activation record, then start the implementation worktree from that merge or later `main`. Push one locally converged stage candidate; do not use GitHub PRs as an intermediate editing loop. |
+| Handoff / Release Condition | Submit the locally converged stable candidate for exact-head CI and review. Complete only after merge and owner-first closeout cite a pre-existing implementation/evidence commit. |
 
 ## Published Baseline
 
@@ -83,10 +83,22 @@ Archival Draft PRs #120/#121 remain untouched.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-21 | Atomic claim+activation proposal | Governance PR #340 proposes both Claimed and Active from exact `main@14531bbc`. Neither state is effective until merge; no SOP, validator, product or runtime implementation exists on this branch. |
+| 2026-08-21 | Atomic activation merge | PR #340 head `1e00249b` passed CI `32439457491`, both validators, manifest/scale checks and CAS, then merged as `e66d039c`. Claim and Active became effective together. |
+| 2026-08-21 | Local convergence | AGENTS/SOP rules, POSIX/PowerShell validator integration, 12 workflow scenarios and the EVOLUTION lesson converged locally from the activation merge without intermediate implementation pushes. I215 moves to Review for one stable stage candidate. |
 
 ## Verification Evidence
 
-- Pending exact-head governance validation for the atomic claim+activation PR.
+- Atomic governance PR #340: CI `32439457491`, both validators, manifest parse, scale harness and
+  merge-time CAS passed at exact head `1e00249b`; merge `e66d039c`.
+- `python3 scripts/validate_delivery_workflow.py`: 12/12 scenario expectations passed locally.
+- `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`:
+  passed locally with 0 warnings.
+- `pwsh -NoProfile -File scripts/validate_project_governance.ps1 .`: passed locally with both the
+  SQLite 17-case self-test and delivery-workflow 12-case harness executed, 0 warnings.
+- `./scripts/release_preflight.sh`: passed from the final local candidate tree, including locked
+  workspace check, Clippy, tests and doctests.
+- Manifest parsing, scale assessment, classifier/public-site/installer validation,
+  `git diff --check`, EOF checks and the no-Rust/Cargo scope check passed locally.
 
 ## Completion Evidence
 
@@ -96,9 +108,13 @@ Archival Draft PRs #120/#121 remain untouched.
 
 ## Variance And Residuals
 
-- I214 remains separately in progress and must be closed after this governance optimization using
-  its already-started workflow.
+- I214 remains separately in progress. Its #338 review found an admission check-to-start race and
+  an invalid-options/Drop semantic conflict; correct both locally after I215 closes, then submit one
+  new stable #338 head under the revised workflow.
 
 ## Retrospective
 
-- Pending implementation and scenario evidence.
+- The local loop caught and repaired a PowerShell validator wiring defect before any implementation
+  push: the draft block had skipped the SQLite self-test and referenced the delivery validator too
+  early. Cross-platform execution, not syntax-only parsing, is required evidence for validator
+  changes.

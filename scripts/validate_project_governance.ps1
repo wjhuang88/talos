@@ -355,6 +355,26 @@ else {
     }
 }
 
+$DeliveryWorkflowValidator = Join-Path $script:Root "scripts/validate_delivery_workflow.py"
+if (-not (Test-Path -LiteralPath $DeliveryWorkflowValidator)) {
+    Add-ErrorMessage "missing delivery workflow validator: scripts/validate_delivery_workflow.py"
+}
+else {
+    $PythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+    if ($null -eq $PythonCommand) {
+        $PythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $PythonCommand) {
+        Add-ErrorMessage "delivery workflow validation requires Python 3"
+    }
+    else {
+        & $PythonCommand.Source $DeliveryWorkflowValidator
+        if ($LASTEXITCODE -ne 0) {
+            Add-ErrorMessage "delivery workflow scenario validation failed"
+        }
+    }
+}
+
 if ($ErrorCount -gt 0) {
     Write-Output "Governance validation failed: $ErrorCount error(s), $WarningCount warning(s)."
     exit 1

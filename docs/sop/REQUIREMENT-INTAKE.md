@@ -38,8 +38,8 @@ A Story is ready to implement when:
       are identified.
 - [ ] Mandatory implementation context appears under `Required Reads`.
 - [ ] It fits current iteration scope or is explicitly deferred.
-- [ ] Before activation, an effective Collaboration Claim identifies Responsible Actor, Work Slice,
-      claim PR/commit, authorization, and date.
+- [ ] The atomic claim+activation proposal identifies Responsible Actor, Work Slice, claim
+      PR/commit, authorization, and date; both states remain ineffective until target-branch merge.
 
 An Epic is ready when:
 
@@ -130,9 +130,11 @@ Use this owner shape:
 - [ ] <residual or exception> is recorded.
 ```
 
-`Claim Pending` is never persisted. A Draft claim PR may temporarily leave the owner Unclaimed with
-`Governance Claim PR: Pending`; after the PR number is assigned, finalize the proposed record as
-Claimed with the actual `#NN` before review.
+`Claim Pending` is never persisted. A Draft governance PR may temporarily leave the owner Unclaimed
+with `Governance Claim PR: Pending`; after the PR number is assigned, finalize the proposed record
+as Claimed and Active with the actual `#NN` before review. Both states remain ineffective until the
+record reaches the target branch. After merge, converge implementation locally before pushing a
+stable stage candidate.
 
 Parallel non-overlapping work uses separate child owner documents, not multiple active claim records
 inside one Story.

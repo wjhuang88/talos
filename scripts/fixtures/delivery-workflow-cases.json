@@ -1,0 +1,134 @@
+[
+  {
+    "name": "ordinary atomic activation and stable candidate",
+    "kind": "ordinary",
+    "valid": true,
+    "claim_effective": true,
+    "activation_effective": true,
+    "implementation_started": true,
+    "implementation_pushed": true,
+    "local_convergence_passed": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true
+  },
+  {
+    "name": "open atomic proposal cannot authorize implementation",
+    "kind": "ordinary",
+    "valid": false,
+    "claim_effective": false,
+    "activation_effective": false,
+    "implementation_started": true
+  },
+  {
+    "name": "partial candidate cannot use remote CI as local loop",
+    "kind": "ordinary",
+    "valid": false,
+    "claim_effective": true,
+    "activation_effective": true,
+    "implementation_started": true,
+    "implementation_pushed": true,
+    "local_convergence_passed": false
+  },
+  {
+    "name": "substantive review correction invalidates old evidence",
+    "kind": "ordinary",
+    "valid": false,
+    "claim_effective": true,
+    "substantive_change_after_review": true,
+    "fresh_exact_head_evidence": false
+  },
+  {
+    "name": "protected permission candidate retains independent review",
+    "kind": "permission",
+    "valid": true,
+    "claim_effective": true,
+    "activation_effective": true,
+    "implementation_started": true,
+    "implementation_pushed": true,
+    "local_convergence_passed": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true,
+    "independent_review": true,
+    "review_used": true,
+    "review_exact_head": true,
+    "review_verdict": "APPROVE",
+    "review_covers_assigned_risks": true
+  },
+  {
+    "name": "unrelated protected review result is not evidence",
+    "kind": "security",
+    "valid": false,
+    "claim_effective": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true,
+    "independent_review": true,
+    "review_used": true,
+    "review_exact_head": false,
+    "review_verdict": "",
+    "review_covers_assigned_risks": false
+  },
+  {
+    "name": "release keeps preflight review immutable tag and ordering",
+    "kind": "release",
+    "valid": true,
+    "claim_effective": true,
+    "local_convergence_passed": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true,
+    "independent_review": true,
+    "release_preflight": true,
+    "immutable_tag_policy": true,
+    "github_before_cargo": true
+  },
+  {
+    "name": "release cannot publish Cargo first",
+    "kind": "release",
+    "valid": false,
+    "claim_effective": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true,
+    "independent_review": true,
+    "release_preflight": true,
+    "immutable_tag_policy": true,
+    "github_before_cargo": false
+  },
+  {
+    "name": "bounded wording maintenance remains single PR",
+    "kind": "bounded-maintenance",
+    "valid": true,
+    "implementation_pushed": true,
+    "local_convergence_passed": true,
+    "merge_requested": true,
+    "exact_head_evidence": true,
+    "merge_time_cas": true
+  },
+  {
+    "name": "bounded maintenance cannot change owner state",
+    "kind": "bounded-maintenance",
+    "valid": false,
+    "implementation_pushed": true,
+    "local_convergence_passed": true,
+    "changes_owner_state": true
+  },
+  {
+    "name": "combined closeout cites pre-existing evidence",
+    "kind": "ordinary",
+    "valid": true,
+    "claim_effective": true,
+    "completion_claimed": true,
+    "completion_commit_preexisting": true
+  },
+  {
+    "name": "status commit cannot self-certify completion",
+    "kind": "ordinary",
+    "valid": false,
+    "claim_effective": true,
+    "completion_claimed": true,
+    "completion_commit_preexisting": false
+  }
+]

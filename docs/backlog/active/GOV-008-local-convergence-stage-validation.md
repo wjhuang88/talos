@@ -5,7 +5,7 @@
 | Story ID | GOV-008 |
 | Type | Governance / Delivery Workflow |
 | Priority | P0 |
-| Status | Active / Claimed when this atomic claim+activation record reaches `main`; ineffective while its PR is open |
+| Status | Review / Claimed - atomic activation merged; locally converged stage candidate ready |
 | Source | Maintainer correction on 2026-08-21; GOV-007/I205 throughput audit; Issue #339 |
 | Selected Iteration | I215 - atomic claim+activation pilot |
 | Depends On | GOV-007/I205 Complete; current collaboration, Git, iteration, document-check and long-task contracts |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #340 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Talos optimize the governance guidance before further development and specified local design/implementation/test convergence followed by stage-level remote validation. This governance-only PR proposes claim and activation atomically; neither is effective until merge. Exact-head CI, both governance validators, no blocking feedback and merge-time CAS remain required. |
-| Implementation PR | Not started |
+| Implementation PR | Not started - stable candidate not yet pushed |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge this governance-only atomic claim+activation record, then start the implementation worktree from that merge or later `main`. Push one locally converged stage candidate; do not use GitHub PRs as an intermediate editing loop. |
+| Handoff / Release Condition | Submit the locally converged stable candidate for exact-head CI and review. Complete only after merge and owner-first closeout cite a pre-existing implementation/evidence commit. |
 
 ## Goal
 
@@ -87,3 +87,22 @@ long-task SOPs as required; no end-user product documentation change is claimed.
 
 Revert the executable workflow change and return to the pre-I215 separate claim/activation flow.
 Do not roll back owner truth, completed evidence or published baselines.
+
+## Execution Checkpoint - 2026-08-21
+
+PR #340 head `1e00249b` passed exact-head CI `32439457491`, both governance validators, manifest
+parsing, the scale harness and merge-time CAS, then merged as `e66d039c`. That single merge made
+both claim and activation effective; no separate activation PR was used.
+
+The implementation worktree starts at that merge. AGENTS/SOP updates, the cross-platform harness,
+12 ordinary/protected/release/bounded-maintenance scenarios and the EVOLUTION lesson have converged
+locally without an intermediate implementation push. GOV-008 is Review, not Complete; the stable
+candidate still requires remote exact-head validation and merge evidence.
+
+Final local convergence passed `./scripts/release_preflight.sh`, both governance validators,
+PowerShell strict parsing and execution, the SQLite 17-case self-test, the delivery-workflow
+12-case harness, manifest parsing, scale assessment, classifier/public-site/installer checks,
+workspace check/Clippy/tests/doctests, `git diff --check`, and the no-Rust/Cargo scope check. During
+that loop, the PowerShell validator was found to call the delivery harness before its variable was
+defined and to omit the SQLite self-test; the defect was corrected locally and every affected gate
+was rerun before the first implementation push.
