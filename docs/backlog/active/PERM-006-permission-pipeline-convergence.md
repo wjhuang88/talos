@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | Refinement — PERM-006-A claim PR #197 pending independent review; B-E blocked/unclaimed |
+| Status | In Progress — activation PR #351 proposes PERM-006-A/I189 as the only Active child; B-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | I189 proposes PERM-006-A only through #197; ineffective until claim merge |
+| Selected Iteration | I189 for PERM-006-A only; activation is ineffective until PR #351 reaches `main` |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim

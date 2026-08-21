@@ -1,6 +1,6 @@
 # Iteration I189: PERM-006-A Structured Permission Decisions
 
-> Document status: Planned
+> Document status: Active (effective only after activation PR #351 reaches `main`)
 > Published plan date: 2026-08-11
 > Planned objective: add one behavior-preserving structured permission request, evaluation context and per-facet decision-report contract as the implementation source for existing permission entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -12,16 +12,16 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-21 |
 | Work Slice | Implement only PERM-006-A / I189: add one structured permission request/context/per-facet decision-report evaluator, delegate existing permission entrypoints to it, preserve current Deny/Ask/Allow outcomes and compatibility-visible Deny messages, and add provenance, redaction, fail-closed and order-independence tests. No approval routing, wrapper removal, grant/store, AlwaysApprove, typed-resource, policy, sandbox, PERM-006-B/C/D/E, PERM-007, TOOL-024, ACP or release change. |
 | Claimed At | 2026-08-11 |
 | Source Issue | #53 |
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
+| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #197 before implementation; explicitly disposition current non-terminal iterations before activation. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | Merge governance-only activation PR #351 after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
 
 ## Published Baseline
 
@@ -86,6 +86,10 @@
 
 ## Non-Terminal Coordination Record
 
+The following bullets are the preserved selection-time snapshot from 2026-08-11. The dated
+activation table below is the current execution record and supersedes their old current-state
+wording without rewriting it.
+
 - I185 remains Planned under its separate SQLite validator claim and PR #191.
 - I186/TUI-046-B remains separately owned by its claim/implementation chain and PR #193.
 - I187/SESSION-008-A remains Review in PR #195; I189 remains Planned until current non-terminal work receives an explicit activation disposition.
@@ -98,10 +102,15 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-11 | Selection | PERM-006-A selected as a Planned additive foundation only. PR #197 proposes the claim but remains ineffective before merge; no implementation branch is authorized before independent review, validation and CAS. |
+| 2026-08-21 | Claim reconciliation | PR #197 is merged as `0df88638`; its claim is effective. The earlier pending/ineffective wording is historical and is superseded by this execution fact. |
+| 2026-08-21 | Non-terminal inventory | I197, I198, I201 and I210 remain Review under their separate corrective owners; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed and unactivated in the independent Dashboard lane; I164 remains Paused/superseded. None overlaps the PERM-006-A evaluator slice. |
+| 2026-08-21 | Activation proposal | I189 is the only proposed Active iteration. The proposal changes governance state only and is ineffective until its exact head passes CI, independent security review and merge-time CAS and reaches `main`; no implementation branch or Rust/Cargo edit is authorized before then. |
+| 2026-08-22 | Activation PR | Governance-only activation PR #351 is the proposed record. Its open branch has no activation effect; only the reviewed exact head reaching `main` authorizes implementation. |
 
 ## Verification Evidence
 
-- PR #197 records the finalized proposed claim; exact-head CI, both governance validators, independent security review and merge-time CAS gate merge.
+- PR #197 claim evidence: exact head `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, CI `31554958547`, independent security approval comment `5261239200`, merge `0df88638409027849e5bf4ba13ef72d2e96b9b90`.
+- Activation PR #351 evidence remains pending exact-head CI, both governance validators, independent security review and merge-time CAS.
 
 ## Completion Evidence
 

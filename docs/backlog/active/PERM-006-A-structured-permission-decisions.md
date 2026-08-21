@@ -5,9 +5,9 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Planned — claim PR #197 pending independent security review |
+| Status | Active — effective only after activation PR #351 reaches `main` |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
-| Selected Iteration | I189 (proposed; no authority before target-branch claim merge) |
+| Selected Iteration | I189 (Active only after activation PR #351 reaches `main`) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
 
 ## Collaboration Claim
@@ -16,16 +16,16 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-5.6 implementation session 2026-08-11 |
+| Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-21 |
 | Work Slice | Implement only PERM-006-A / I189: add one structured permission request/context/per-facet decision-report evaluator, delegate existing permission entrypoints to it, preserve current Deny/Ask/Allow outcomes and compatibility-visible Deny messages, and add provenance, redaction, fail-closed and order-independence tests. No approval routing, wrapper removal, grant/store, AlwaysApprove, typed-resource, policy, sandbox, PERM-006-B/C/D/E, PERM-007, TOOL-024, ACP or release change. |
 | Claimed At | 2026-08-11 |
 | Source Issue | #53 |
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Independent security review is mandatory on the finalized exact head before merge; no approval exists yet. This proposed claim remains ineffective until target-branch merge. |
+| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-11 |
-| Handoff / Release Condition | Obtain independent exact-head security review, pass CI and merge-time CAS, and merge PR #197 before implementation. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | Merge governance-only activation PR #351 after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
 
 ## Identity / Goal / Value
 
