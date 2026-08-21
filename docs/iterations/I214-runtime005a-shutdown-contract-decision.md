@@ -21,7 +21,7 @@
 | Governance Claim PR | #336 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #336 exact head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`. |
-| Implementation PR | Not started |
+| Implementation PR | #338 |
 | Last Updated | 2026-08-21 |
 | Handoff / Release Condition | Activated from claim merge `7de582a3`; execute only the current-path matrix and decision ADR, then require exact-head independent architecture review and CAS. |
 
@@ -107,7 +107,7 @@ Issue #49 shutdown decisions or this Work Slice.
 | 2026-08-21 | Selection | T10 reassessment found TOOL-024-A and TOOL-023-C complete, but TOOL-024-B still blocked by RUNTIME-005 and PERM-006-C. RUNTIME-005-A is the smallest currently runnable gate-clearing slice; this planning record creates no implementation authority. |
 | 2026-08-21 | Claim effective | PR #336 final head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged as `7de582a3`. |
 | 2026-08-21 | Activation | I214 is Active/Claimed from `7de582a3`. Only read-only current-path characterization and the Proposed ADR are authorized. I189 remains unactivated and I213 remains in the independent Dashboard lane. |
-| 2026-08-21 | Decision execution | Current-path matrix and Proposed ADR-063 were prepared from activation merge `14531bbc`. They define independently runnable B/C boundaries without changing Rust, Cargo, APIs, persistence or runtime behavior. |
+| 2026-08-21 | Decision execution | Current-path matrix and Proposed ADR-063 were committed as `648a35d3` from activation merge `14531bbc` and submitted in PR #338. They define independently runnable B/C boundaries without changing Rust, Cargo, APIs, persistence or runtime behavior. |
 
 ## Verification Evidence
 

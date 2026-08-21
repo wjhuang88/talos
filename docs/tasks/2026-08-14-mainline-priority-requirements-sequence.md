@@ -726,3 +726,5 @@ and C as ordered-finalizer/durable-reconciliation/compatibility work.
 
 I214 remains Active until its exact decision head passes CI and independent architecture review.
 RUNTIME-005-B/C, I189/PERM-006 and TOOL-024-B/C/D remain blocked or unactivated exactly as before.
+Decision content commit `648a35d3` is submitted through PR #338; that existing content commit, not
+a later status-only commit, is the candidate completion evidence after acceptance.

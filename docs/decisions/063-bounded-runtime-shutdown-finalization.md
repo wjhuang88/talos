@@ -3,8 +3,8 @@
 > Status: Proposed
 > Date: 2026-08-21
 > Owner: RUNTIME-005-A / I214
-> Proposal evidence: `docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md`; exact decision head,
-> CI and independent architecture review pending.
+> Proposal evidence: content commit `648a35d3`; PR #338; exact final head, CI and independent
+> architecture review pending.
 
 ## Context
 

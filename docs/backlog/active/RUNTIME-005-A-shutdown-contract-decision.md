@@ -24,7 +24,7 @@
 | Governance Claim PR | #336 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #336 exact head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`. |
-| Implementation PR | Not started |
+| Implementation PR | #338 |
 | Last Updated | 2026-08-21 |
 | Handoff / Release Condition | I214 is activated from claim merge `7de582a3`. Execute only the current-path matrix and decision ADR; require exact-head independent architecture review and CAS before merge. |
 
@@ -103,6 +103,8 @@ documentation targets for B/C; it must not present structured shutdown as shippe
 - Current-path matrix: `docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md`, grounded at
   activation merge `14531bbc`.
 - Proposed decision: `docs/decisions/063-bounded-runtime-shutdown-finalization.md`.
+- Decision content commit: `648a35d3`; implementation PR #338. The later status commit cannot use
+  itself as completion evidence.
 - The proposal selects first-valid-request arbitration, an atomic SDK admission fence,
   `FinishCurrent`/`Interrupt` policies, one absolute deadline, actor-owned durable reconciliation,
   a frozen ordered finalizer registry and a redacted shared report.
