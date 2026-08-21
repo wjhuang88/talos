@@ -875,3 +875,8 @@ architecture review and merge-time CAS before reaching `main`. Parent RUNTIME-00
 Unclaimed/In Progress and Issue #49 remains open. No implementation branch, arbitrary third-party
 callback API, TOOL-024, permission/sandbox, I189, persistence-format, dependency, version, release
 or publication action is authorized by this preparation; T10/#59 stays Blocked.
+
+PR #347 is now the atomic C/I217 claim+activation proposal. Its branch records Claimed/Active, but
+both remain ineffective while the PR is open. The next action is exact-head CI, both validators,
+independent runtime architecture review and merge-time CAS; implementation must start from the
+resulting merge or later `main`.

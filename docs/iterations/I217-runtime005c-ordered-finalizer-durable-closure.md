@@ -1,6 +1,6 @@
 # Iteration I217: Ordered Finalizer Registry And Durable Closure
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by PR #347; ineffective until merge)
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-C as a bounded, independently runnable
 > runtime SDK finalization slice without third-party callbacks, TOOL-024, permission, product or
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline long-task session 2026-08-21 |
 | Work Slice | I217/RUNTIME-005-C only: implement ADR-063's build-time frozen runtime-owned finalizer registry, fixed identifiers and unique order, one-global-deadline execution with per-finalizer caps, typed failure/panic/timeout/not-run outcomes, durable-reconciliation-before-finalizer ordering, immutable redacted report closure, legacy shutdown compatibility, deterministic runtime-owned test finalizers and directly affected SDK docs. Excludes public arbitrary third-party callback/plugin registration, TOOL-024, process, permission/sandbox, I189, product UI, dependency, persistence schema/writer, global bus, unsafe, version, tag, release and publication. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-21 |
 | Source Issue | #49 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #347 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. This Draft record remains ineffective until its actual PR number is backfilled and the finalized exact head passes CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
+| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Do not create an implementation branch or modify production code until the finalized atomic claim+activation reaches `main`. |
+| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #347 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
 
 ## Published Baseline
 

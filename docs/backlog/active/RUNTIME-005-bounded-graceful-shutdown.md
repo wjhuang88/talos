@@ -65,7 +65,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
 | RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Complete / Closed through I216; Completion Commit `c123328d`; PR #345 merge `020de694` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
-| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Ready / Unclaimed; I217 Planned/Unclaimed Draft with claim PR pending | RUNTIME-005-B Complete |
+| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Active / Claimed through I217 (proposed by PR #347; ineffective until merge) | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
 decision evidence only; parent RUNTIME-005 remains In Progress/Unclaimed until B and C complete.
@@ -187,3 +187,8 @@ the finalized atomic claim+activation passes exact-head CI, both validators, ind
 architecture review and merge-time CAS into `main`. Parent RUNTIME-005 stays Unclaimed/In Progress,
 Issue #49 stays open, and no arbitrary third-party finalizer API, TOOL-024, permission, I189,
 release or publication authority transfers.
+
+PR #347 is now the atomic C/I217 claim+activation proposal. Its exact branch records
+Claimed/Active, but those values remain ineffective while the PR is open. Only after finalized
+exact-head CI, both validators, independent runtime architecture review and merge-time CAS may the
+claim reach `main`; implementation must start from that merge or later `main`.
