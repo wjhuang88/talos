@@ -1,6 +1,6 @@
 # Iteration I217: Ordered Finalizer Registry And Durable Closure
 
-> Document status: Active / Claimed (proposed by PR #347; ineffective until merge)
+> Document status: Review / Claimed
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-C as a bounded, independently runnable
 > runtime SDK finalization slice without third-party callbacks, TOOL-024, permission, product or
@@ -20,10 +20,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #347 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 is the atomic claim+activation record and may merge only after exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Shared-account review establishes Agent-role separation only. |
-| Implementation PR | Not started |
+| Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 exact head `3253abb5` passed CI `32471570214`, both validators, independent runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. Shared-account review establishes Agent-role separation only. |
+| Implementation PR | #348 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Proposed claim and activation remain ineffective until finalized PR #347 passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS, then reaches `main`; implementation starts only from that merge or later `main`. |
+| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Implementation PR #348 is in Review at implementation commit `44e840d7`; require exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Completion requires a later closeout naming this pre-existing implementation commit. |
 
 ## Published Baseline
 
@@ -121,3 +121,26 @@ implementation authority before merge.
 
 - Completion Commit: Pending
 - The claim/activation record and later status-only commits cannot self-certify implementation.
+
+## 2026-08-21 Claim Effective And Local Convergence
+
+PR #347 exact head `3253abb5` passed CI `32471570214`, both governance validators, independent
+runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. The claim
+and activation are effective, and implementation started from that exact merge.
+
+The single local stage now implements the frozen internal registry, fixed identity/order
+validation, durable-before-finalizer barrier, exactly-once cached execution, one-deadline caps,
+failure/panic/timeout containment, typed redacted report projection, legacy compatibility and the
+external SDK fixture. Full locked release preflight and three consecutive focused finalizer runs
+passed. The Published Baseline above remains byte-preserved. I217 stays Active until this locally
+converged stage is published once and receives fresh exact-head CI, independent runtime
+architecture review and merge-time CAS; Completion Commit remains Pending.
+
+## 2026-08-21 Stable Review Submission
+
+Implementation commit `44e840d7` was created directly from claim merge `bb6f5ed9` after local
+convergence and full locked preflight passed. Draft PR #348 was opened only to obtain and backfill
+its number; I217 now moves to Review / Claimed. This metadata-only follow-up does not change the
+Published Baseline or implementation behavior. Exact-head Unix/Windows CI, both validators,
+independent runtime architecture review and merge-time CAS remain required, and Completion Commit
+stays Pending until a later closeout.

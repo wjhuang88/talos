@@ -880,3 +880,32 @@ PR #347 is now the atomic C/I217 claim+activation proposal. Its branch records C
 both remain ineffective while the PR is open. The next action is exact-head CI, both validators,
 independent runtime architecture review and merge-time CAS; implementation must start from the
 resulting merge or later `main`.
+
+## 2026-08-21 I217 Claim Effective And Local Implementation Convergence
+
+PR #347 exact head `3253abb5` passed CI `32471570214`, both governance validators, independent
+runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. The
+RUNTIME-005-C/I217 claim and activation are effective, and implementation started from that exact
+merge.
+
+The locally converged stage implements only the frozen internal Talos-owned finalizer registry,
+fixed identity/order validation, durable-before-finalizer barrier, exactly-once cached execution,
+the original global deadline with shorter entry caps, typed redacted failure/panic/timeout/not-run
+outcomes, legacy compatibility, deterministic tests and directly affected SDK documentation. Full
+locked release preflight, both external fixture modes and three consecutive focused finalizer runs
+passed locally. The default production registry remains empty and no public arbitrary callback API
+was introduced. I217 stays Active pending one stable implementation PR, exact-head Unix/Windows
+CI, independent runtime architecture review and merge-time CAS. Issue #49 and T10/#59 remain open
+and Blocked respectively; I189, TOOL-024, release and publication remain unauthorized.
+
+## 2026-08-21 I217 Stable Review Submission
+
+Implementation commit `44e840d7` was created directly from effective claim merge `bb6f5ed9` after
+the full local convergence checkpoint passed. Draft PR #348 was opened only to obtain and backfill
+its number; the metadata-only follow-up moves RUNTIME-005-C/I217 to Review / Claimed without
+changing implementation behavior or the Published Baseline.
+
+The next stage is exact-head Unix/Windows CI, both validators, independent runtime architecture
+review and merge-time CAS. This implementation PR cannot mark I217 Complete; a later closeout must
+name pre-existing implementation commit `44e840d7`. Issue #49 and T10/#59 remain open/Blocked, and
+I189, TOOL-024, release and publication remain unauthorized.

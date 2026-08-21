@@ -1,4 +1,6 @@
+use std::future::Future;
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -161,6 +163,127 @@ pub enum ShutdownActorOutcome {
     Contained,
 }
 
+/// Code-owned identifier for a runtime shutdown finalizer.
+///
+/// Identifiers can be constructed only inside `talos-runtime`; embedders
+/// cannot inject caller-controlled report text through this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ShutdownFinalizerId(&'static str);
+
+impl ShutdownFinalizerId {
+    #[cfg(test)]
+    pub(crate) const fn new(value: &'static str) -> Self {
+        Self(value)
+    }
+
+    /// Returns the fixed code-owned identifier.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+/// Redacted terminal outcome for one runtime-owned shutdown finalizer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ShutdownFinalizerOutcome {
+    /// The finalizer completed within its cap and the global deadline.
+    Completed,
+    /// The finalizer returned its closed failure category.
+    Failed,
+    /// The finalizer task panicked and was contained.
+    Panicked,
+    /// The finalizer exceeded its cap or the remaining global deadline.
+    TimedOut,
+    /// The global deadline expired before this finalizer could start.
+    NotRunDeadline,
+}
+
+/// Redacted report entry for one fixed runtime-owned finalizer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShutdownFinalizerReport {
+    identifier: ShutdownFinalizerId,
+    outcome: ShutdownFinalizerOutcome,
+}
+
+impl ShutdownFinalizerReport {
+    /// Returns the code-owned finalizer identifier.
+    #[must_use]
+    pub const fn identifier(&self) -> ShutdownFinalizerId {
+        self.identifier
+    }
+
+    /// Returns the finalizer's closed terminal outcome.
+    #[must_use]
+    pub const fn outcome(&self) -> ShutdownFinalizerOutcome {
+        self.outcome
+    }
+}
+
+/// Validation failure for the frozen runtime-owned finalizer registry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum ShutdownFinalizerRegistryError {
+    /// Two runtime-owned finalizers used the same fixed identifier.
+    #[error("duplicate shutdown finalizer identifier")]
+    DuplicateIdentifier,
+    /// Two runtime-owned finalizers used the same execution order.
+    #[error("duplicate shutdown finalizer order")]
+    DuplicateOrder,
+    /// A finalizer cap must be greater than zero.
+    #[error("shutdown finalizer cap must be greater than zero")]
+    ZeroCap,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RuntimeFinalizerError;
+
+pub(crate) type RuntimeFinalizerFuture =
+    Pin<Box<dyn Future<Output = Result<(), RuntimeFinalizerError>> + Send + 'static>>;
+
+pub(crate) trait RuntimeFinalizer: Send + Sync {
+    fn identifier(&self) -> ShutdownFinalizerId;
+    fn order(&self) -> u16;
+    fn cap(&self) -> Duration;
+    fn finalize(&self) -> RuntimeFinalizerFuture;
+}
+
+pub(crate) struct RuntimeFinalizerRegistry {
+    entries: Vec<Arc<dyn RuntimeFinalizer>>,
+}
+
+impl RuntimeFinalizerRegistry {
+    pub(crate) fn freeze(
+        mut entries: Vec<Arc<dyn RuntimeFinalizer>>,
+    ) -> Result<Self, ShutdownFinalizerRegistryError> {
+        for (index, entry) in entries.iter().enumerate() {
+            if entry.cap().is_zero() {
+                return Err(ShutdownFinalizerRegistryError::ZeroCap);
+            }
+            for other in &entries[..index] {
+                if other.identifier() == entry.identifier() {
+                    return Err(ShutdownFinalizerRegistryError::DuplicateIdentifier);
+                }
+                if other.order() == entry.order() {
+                    return Err(ShutdownFinalizerRegistryError::DuplicateOrder);
+                }
+            }
+        }
+        entries.sort_by_key(|entry| entry.order());
+        Ok(Self { entries })
+    }
+
+    fn not_run_deadline(&self) -> Vec<ShutdownFinalizerReport> {
+        self.entries
+            .iter()
+            .map(|entry| ShutdownFinalizerReport {
+                identifier: entry.identifier(),
+                outcome: ShutdownFinalizerOutcome::NotRunDeadline,
+            })
+            .collect()
+    }
+}
+
 /// Immutable redacted result shared by every shutdown caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -171,6 +294,7 @@ pub struct ShutdownReport {
     deadline_exhausted: bool,
     active_turn: ShutdownActiveTurnOutcome,
     durable_reconciliation: ShutdownDurableOutcome,
+    finalizers: Vec<ShutdownFinalizerReport>,
     actor: ShutdownActorOutcome,
 }
 
@@ -211,21 +335,31 @@ impl ShutdownReport {
         self.durable_reconciliation
     }
 
+    /// Returns the fixed ordered runtime-owned finalizer outcomes.
+    #[must_use]
+    pub fn finalizers(&self) -> &[ShutdownFinalizerReport] {
+        &self.finalizers
+    }
+
     /// Returns the actor join/containment outcome.
     #[must_use]
     pub const fn actor(&self) -> ShutdownActorOutcome {
         self.actor
     }
 
-    /// Returns true only when all B-stage shutdown work completed cleanly.
+    /// Returns true only when every shutdown stage completed cleanly.
     #[must_use]
-    pub const fn is_complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         !self.deadline_exhausted
             && !matches!(self.active_turn, ShutdownActiveTurnOutcome::Unreconciled)
             && matches!(
                 self.durable_reconciliation,
                 ShutdownDurableOutcome::Completed { .. }
             )
+            && self
+                .finalizers
+                .iter()
+                .all(|entry| matches!(entry.outcome, ShutdownFinalizerOutcome::Completed))
             && matches!(self.actor, ShutdownActorOutcome::Joined)
     }
 }
@@ -268,6 +402,7 @@ pub(crate) struct ShutdownCoordinator {
     state: Mutex<CoordinatorState>,
     changed: Notify,
     runtime: Handle,
+    finalizers: RuntimeFinalizerRegistry,
 }
 
 impl ShutdownCoordinator {
@@ -276,6 +411,7 @@ impl ShutdownCoordinator {
         command_tx: mpsc::Sender<SessionOp>,
         actor_task: JoinHandle<()>,
         runtime: Handle,
+        finalizers: RuntimeFinalizerRegistry,
     ) -> Arc<Self> {
         Arc::new(Self {
             admission,
@@ -284,6 +420,7 @@ impl ShutdownCoordinator {
             state: Mutex::new(CoordinatorState::Open),
             changed: Notify::new(),
             runtime,
+            finalizers,
         })
     }
 
@@ -408,6 +545,35 @@ impl ShutdownCoordinator {
 
         let mut actor_join_error = None;
         let actor = self.actor_task().take();
+        let shutdown_barrier =
+            tokio::time::timeout_at(deadline, self.admission.wait_until_shutdown_barrier()).await;
+        let barrier_finished = shutdown_barrier.is_ok();
+
+        let snapshot = self.admission.snapshot();
+        let durable_reconciliation = match shutdown_barrier {
+            Ok(true) => match snapshot.durable_reconciliation {
+                AgentDurableReconciliationOutcome::Completed => ShutdownDurableOutcome::Completed {
+                    rejected_pending: snapshot.rejected_pending,
+                },
+                AgentDurableReconciliationOutcome::Failed => ShutdownDurableOutcome::Failed {
+                    rejected_pending: snapshot.rejected_pending,
+                },
+                AgentDurableReconciliationOutcome::Pending => ShutdownDurableOutcome::Failed {
+                    rejected_pending: snapshot.rejected_pending,
+                },
+            },
+            Ok(false) => ShutdownDurableOutcome::Failed {
+                rejected_pending: snapshot.rejected_pending,
+            },
+            Err(_) => ShutdownDurableOutcome::NotRunDeadline,
+        };
+
+        let finalizers = if barrier_finished {
+            self.run_finalizers(deadline).await
+        } else {
+            self.finalizers.not_run_deadline()
+        };
+
         let actor_outcome = if let Some(mut actor) = actor {
             match tokio::time::timeout_at(deadline, &mut actor).await {
                 Ok(Ok(())) => ShutdownActorOutcome::Joined,
@@ -442,15 +608,6 @@ impl ShutdownCoordinator {
                 AgentActiveTurnOutcome::Running => ShutdownActiveTurnOutcome::Unreconciled,
             }
         };
-        let durable_reconciliation = match snapshot.durable_reconciliation {
-            AgentDurableReconciliationOutcome::Completed => ShutdownDurableOutcome::Completed {
-                rejected_pending: snapshot.rejected_pending,
-            },
-            AgentDurableReconciliationOutcome::Failed => ShutdownDurableOutcome::Failed {
-                rejected_pending: snapshot.rejected_pending,
-            },
-            AgentDurableReconciliationOutcome::Pending => ShutdownDurableOutcome::NotRunDeadline,
-        };
         let report = ShutdownReport {
             plan_id: plan.id,
             active_turn_policy: plan.options.active_turn_policy,
@@ -458,6 +615,7 @@ impl ShutdownCoordinator {
             deadline_exhausted,
             active_turn,
             durable_reconciliation,
+            finalizers,
             actor: actor_outcome,
         };
         self.admission.mark_closed();
@@ -466,6 +624,55 @@ impl ShutdownCoordinator {
             actor_join_error,
         };
         self.changed.notify_waiters();
+    }
+
+    async fn run_finalizers(&self, deadline: tokio::time::Instant) -> Vec<ShutdownFinalizerReport> {
+        let mut reports = Vec::with_capacity(self.finalizers.entries.len());
+        for (index, entry) in self.finalizers.entries.iter().enumerate() {
+            let now = tokio::time::Instant::now();
+            if now >= deadline {
+                reports.extend(self.finalizers.entries[index..].iter().map(|remaining| {
+                    ShutdownFinalizerReport {
+                        identifier: remaining.identifier(),
+                        outcome: ShutdownFinalizerOutcome::NotRunDeadline,
+                    }
+                }));
+                break;
+            }
+
+            let remaining = deadline.saturating_duration_since(now);
+            let finalizer_deadline = now + entry.cap().min(remaining);
+            let future = catch_unwind(AssertUnwindSafe(|| entry.finalize()));
+            let outcome = match future {
+                Err(_) => ShutdownFinalizerOutcome::Panicked,
+                Ok(future) => {
+                    let spawned = catch_unwind(AssertUnwindSafe(|| self.runtime.spawn(future)));
+                    match spawned {
+                        Err(_) => ShutdownFinalizerOutcome::Panicked,
+                        Ok(mut task) => {
+                            match tokio::time::timeout_at(finalizer_deadline, &mut task).await {
+                                Ok(Ok(Ok(()))) => ShutdownFinalizerOutcome::Completed,
+                                Ok(Ok(Err(_))) => ShutdownFinalizerOutcome::Failed,
+                                Ok(Err(error)) if error.is_panic() => {
+                                    ShutdownFinalizerOutcome::Panicked
+                                }
+                                Ok(Err(_)) => ShutdownFinalizerOutcome::Failed,
+                                Err(_) => {
+                                    task.abort();
+                                    let _ = task.await;
+                                    ShutdownFinalizerOutcome::TimedOut
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            reports.push(ShutdownFinalizerReport {
+                identifier: entry.identifier(),
+                outcome,
+            });
+        }
+        reports
     }
 
     fn publish_driver_failure(&self, plan: AcceptedPlan) {
@@ -498,6 +705,7 @@ impl ShutdownCoordinator {
                         ShutdownDurableOutcome::NotRunDeadline
                     }
                 },
+                finalizers: self.finalizers.not_run_deadline(),
                 actor: ShutdownActorOutcome::Contained,
             },
             actor_join_error: None,

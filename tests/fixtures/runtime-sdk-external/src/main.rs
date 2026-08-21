@@ -99,6 +99,7 @@ async fn run_minimal_runtime() -> Result<()> {
         .shutdown(ShutdownOptions::interrupt(Duration::from_secs(1))?)
         .await?;
     assert!(report.is_complete());
+    assert!(report.finalizers().is_empty());
     assert_eq!(
         classify_runtime_error(&RuntimeError::RuntimeClosing),
         "closing"

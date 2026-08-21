@@ -95,6 +95,7 @@ struct AdmissionState {
     active_outcome: RuntimeActiveTurnOutcome,
     durable_reconciliation: RuntimeDurableReconciliationOutcome,
     rejected_pending: u32,
+    actor_stopped: bool,
 }
 
 /// Shared SDK-admission and actor-start linearization seam.
@@ -120,6 +121,7 @@ impl RuntimeAdmissionControl {
                 active_outcome: RuntimeActiveTurnOutcome::Idle,
                 durable_reconciliation: RuntimeDurableReconciliationOutcome::Pending,
                 rejected_pending: 0,
+                actor_stopped: false,
             })),
             active_changed: Arc::new(Notify::new()),
         }
@@ -248,6 +250,42 @@ impl RuntimeAdmissionControl {
         } else {
             RuntimeDurableReconciliationOutcome::Failed
         };
+        drop(state);
+        self.active_changed.notify_waiters();
+    }
+
+    /// Waits until active work and durable custody are terminal, or the actor stops.
+    ///
+    /// Returns `true` only for the normal active-plus-durable barrier. A `false`
+    /// result lets the runtime report actor/durable failure and continue safe
+    /// cleanup without joining the actor before registered finalizers run.
+    pub async fn wait_until_shutdown_barrier(&self) -> bool {
+        loop {
+            let notified = self.active_changed.notified();
+            {
+                let state = self.lock();
+                if state.active.is_none()
+                    && !matches!(
+                        state.durable_reconciliation,
+                        RuntimeDurableReconciliationOutcome::Pending
+                    )
+                {
+                    return true;
+                }
+                if state.actor_stopped {
+                    return false;
+                }
+            }
+            notified.await;
+        }
+    }
+
+    /// Records that the Session actor future returned or unwound.
+    pub fn record_actor_stopped(&self) {
+        let mut state = self.lock();
+        state.actor_stopped = true;
+        drop(state);
+        self.active_changed.notify_waiters();
     }
 
     /// Returns the current redacted actor-owned lifecycle projection.

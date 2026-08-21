@@ -23,6 +23,7 @@ project does not imply it is exported by the runtime facade.
 | `RuntimeShutdownHandle` | Cloneable shutdown-only controller; starts or joins one bounded plan | I216 additive API |
 | `ShutdownOptions` / `ActiveTurnPolicy` | Validated total timeout and active-turn policy | I216 additive API |
 | `ShutdownReport` and shutdown outcome enums | Immutable redacted terminal shutdown projection | I216 additive API |
+| `ShutdownFinalizerId`, `ShutdownFinalizerReport`, `ShutdownFinalizerOutcome`, `ShutdownFinalizerRegistryError` | Fixed runtime-owned finalizer projection and closed construction errors; no public callback registration | I217 additive API |
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
 | `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
@@ -164,6 +165,16 @@ Session cancellation and ADR-058 finalization path. Both policies share one tota
 deadline; cancelling one waiting caller does not cancel the runtime-owned shutdown driver. Dropping
 the primary handle initiates the default plan without blocking, while dropping a controller is
 inert. See [I216 Runtime Shutdown Migration](I216-RUNTIME-SHUTDOWN-MIGRATION.md).
+
+Before the actor is joined, shutdown observes actor-owned durable reconciliation and then runs the
+build-time frozen Talos-owned finalizer registry once in fixed order. Every entry shares the
+original total deadline; its own cap can shorten but never extend that deadline. The report exposes
+only fixed code-owned identifiers and typed `Completed`, `Failed`, `Panicked`, `TimedOut`, or
+`NotRunDeadline` outcomes. There is no supported public API for registering arbitrary callbacks,
+plugins, identifiers, or error text. The current default runtime composition has no resource
+finalizers, so `ShutdownReport::finalizers()` is empty unless reviewed Talos-owned composition code
+installs one in a later governed change. See
+[I217 Runtime Finalizer Migration](I217-RUNTIME-FINALIZER-MIGRATION.md).
 
 ### Pattern 2: Custom Tool + Approval
 

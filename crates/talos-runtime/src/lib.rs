@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_agent::session::AppServerSession;
+use talos_agent::session::{AppServerSession, RuntimeAdmissionControl};
 use talos_agent::{Agent, AgentError, SandboxFallbackHandler};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
@@ -33,11 +33,13 @@ use tokio::sync::mpsc;
 
 mod shutdown;
 
-use shutdown::ShutdownCoordinator;
 pub use shutdown::{
     ActiveTurnPolicy, RuntimeShutdownHandle, ShutdownActiveTurnOutcome, ShutdownActorOutcome,
-    ShutdownDurableOutcome, ShutdownOptions, ShutdownOptionsError, ShutdownPlanId, ShutdownReport,
+    ShutdownDurableOutcome, ShutdownFinalizerId, ShutdownFinalizerOutcome,
+    ShutdownFinalizerRegistryError, ShutdownFinalizerReport, ShutdownOptions, ShutdownOptionsError,
+    ShutdownPlanId, ShutdownReport,
 };
+use shutdown::{RuntimeFinalizer, RuntimeFinalizerRegistry, ShutdownCoordinator};
 
 #[cfg(feature = "shared-composition")]
 #[doc(hidden)]
@@ -108,6 +110,10 @@ pub enum RuntimeError {
         /// Redacted structured report describing the incomplete stages.
         report: ShutdownReport,
     },
+
+    /// Talos-owned shutdown finalizers could not be frozen safely.
+    #[error("invalid runtime shutdown finalizer registry: {0}")]
+    InvalidShutdownFinalizerRegistry(#[from] ShutdownFinalizerRegistryError),
 }
 
 /// Result alias for runtime facade operations.
@@ -145,6 +151,16 @@ struct RuntimeSandboxFallbackHandler {
     inner: Arc<dyn ApprovalHandler>,
 }
 
+struct RuntimeActorExitGuard {
+    admission: RuntimeAdmissionControl,
+}
+
+impl Drop for RuntimeActorExitGuard {
+    fn drop(&mut self) {
+        self.admission.record_actor_stopped();
+    }
+}
+
 #[async_trait]
 impl SandboxFallbackHandler for RuntimeSandboxFallbackHandler {
     async fn request_fallback(&self, context: SandboxFallbackContext) -> SandboxFallbackDecision {
@@ -173,6 +189,7 @@ pub struct RuntimeBuilder {
     hook_registry: Option<Arc<HookRegistry>>,
     skill_index: Vec<SkillIndex>,
     durable_session: Option<(DurableSession, PersistencePolicy)>,
+    shutdown_finalizers: Vec<Arc<dyn RuntimeFinalizer>>,
 }
 
 impl RuntimeBuilder {
@@ -196,6 +213,7 @@ impl RuntimeBuilder {
             hook_registry: None,
             skill_index: Vec::new(),
             durable_session: None,
+            shutdown_finalizers: Vec::new(),
         }
     }
 
@@ -375,6 +393,12 @@ impl RuntimeBuilder {
         self
     }
 
+    #[cfg(test)]
+    fn runtime_finalizer(mut self, finalizer: Arc<dyn RuntimeFinalizer>) -> Self {
+        self.shutdown_finalizers.push(finalizer);
+        self
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned primary handle owns submission and event access. Dropping
@@ -382,6 +406,7 @@ impl RuntimeBuilder {
     /// [`RuntimeHandle::shutdown`] or [`RuntimeHandle::shutdown_with`] when the
     /// host must observe terminal cleanup.
     pub fn build(self) -> RuntimeResult<RuntimeHandle> {
+        let finalizers = RuntimeFinalizerRegistry::freeze(self.shutdown_finalizers)?;
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
         #[allow(unused_mut)]
         let mut tools = self.tools;
@@ -476,11 +501,20 @@ impl RuntimeBuilder {
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
+        let actor_exit_guard = RuntimeActorExitGuard {
+            admission: admission.clone(),
+        };
         let actor_task = runtime.spawn(async move {
+            let _actor_exit_guard = actor_exit_guard;
             actor.run().await;
         });
-        let coordinator =
-            ShutdownCoordinator::new(admission, handle.sq_tx.clone(), actor_task, runtime);
+        let coordinator = ShutdownCoordinator::new(
+            admission,
+            handle.sq_tx.clone(),
+            actor_task,
+            runtime,
+            finalizers,
+        );
 
         Ok(RuntimeHandle {
             command_tx: handle.sq_tx,
@@ -813,7 +847,7 @@ pub async fn collect_until_turn_completed(
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex as StdMutex;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Duration;
 
     use talos_core::message::Message;
@@ -842,6 +876,85 @@ mod tests {
     struct GatedModel {
         entered: Arc<Notify>,
         release: Arc<Notify>,
+    }
+
+    #[derive(Clone)]
+    enum TestFinalizerBehavior {
+        Complete,
+        Fail,
+        Panic,
+        Delay(Duration),
+        Pending(Arc<AtomicBool>),
+    }
+
+    struct TestFinalizer {
+        identifier: ShutdownFinalizerId,
+        order: u16,
+        cap: Duration,
+        behavior: TestFinalizerBehavior,
+        starts: Arc<StdMutex<Vec<&'static str>>>,
+    }
+
+    impl RuntimeFinalizer for TestFinalizer {
+        fn identifier(&self) -> ShutdownFinalizerId {
+            self.identifier
+        }
+
+        fn order(&self) -> u16 {
+            self.order
+        }
+
+        fn cap(&self) -> Duration {
+            self.cap
+        }
+
+        fn finalize(&self) -> shutdown::RuntimeFinalizerFuture {
+            let identifier = self.identifier.as_str();
+            let starts = self.starts.clone();
+            let behavior = self.behavior.clone();
+            Box::pin(async move {
+                starts
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push(identifier);
+                match behavior {
+                    TestFinalizerBehavior::Complete => Ok(()),
+                    TestFinalizerBehavior::Fail => Err(shutdown::RuntimeFinalizerError),
+                    TestFinalizerBehavior::Panic => panic!("intentional runtime finalizer panic"),
+                    TestFinalizerBehavior::Delay(duration) => {
+                        tokio::time::sleep(duration).await;
+                        Ok(())
+                    }
+                    TestFinalizerBehavior::Pending(cancelled) => {
+                        struct CancellationMarker(Arc<AtomicBool>);
+                        impl Drop for CancellationMarker {
+                            fn drop(&mut self) {
+                                self.0.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        let _marker = CancellationMarker(cancelled);
+                        std::future::pending::<()>().await;
+                        Ok(())
+                    }
+                }
+            })
+        }
+    }
+
+    fn test_finalizer(
+        identifier: &'static str,
+        order: u16,
+        cap: Duration,
+        behavior: TestFinalizerBehavior,
+        starts: Arc<StdMutex<Vec<&'static str>>>,
+    ) -> Arc<dyn RuntimeFinalizer> {
+        Arc::new(TestFinalizer {
+            identifier: ShutdownFinalizerId::new(identifier),
+            order,
+            cap,
+            behavior,
+            starts,
+        })
     }
 
     #[async_trait]
@@ -901,6 +1014,309 @@ mod tests {
         assert_eq!(
             ShutdownOptions::interrupt(Duration::MAX),
             Err(ShutdownOptionsError::TotalTimeoutOutOfRange)
+        );
+    }
+
+    #[test]
+    fn runtime_build_freezes_and_validates_finalizer_identity_and_order() {
+        let starts = Arc::new(StdMutex::new(Vec::new()));
+        let duplicate_identifier = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.duplicate",
+                10,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.duplicate",
+                20,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .build();
+        assert!(matches!(
+            duplicate_identifier,
+            Err(RuntimeError::InvalidShutdownFinalizerRegistry(
+                ShutdownFinalizerRegistryError::DuplicateIdentifier
+            ))
+        ));
+
+        let duplicate_order = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.first",
+                10,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.second",
+                10,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .build();
+        assert!(matches!(
+            duplicate_order,
+            Err(RuntimeError::InvalidShutdownFinalizerRegistry(
+                ShutdownFinalizerRegistryError::DuplicateOrder
+            ))
+        ));
+
+        let zero_cap = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.zero-cap",
+                10,
+                Duration::ZERO,
+                TestFinalizerBehavior::Complete,
+                starts,
+            ))
+            .build();
+        assert!(matches!(
+            zero_cap,
+            Err(RuntimeError::InvalidShutdownFinalizerRegistry(
+                ShutdownFinalizerRegistryError::ZeroCap
+            ))
+        ));
+    }
+
+    #[tokio::test]
+    async fn durable_reconciliation_precedes_ordered_finalizers() {
+        let admission = talos_agent::session::RuntimeAdmissionControl::new();
+        let actor_admission = admission.clone();
+        let (command_tx, mut command_rx) = mpsc::channel(1);
+        let order = Arc::new(StdMutex::new(Vec::new()));
+        let actor_order = order.clone();
+        let actor_task = tokio::spawn(async move {
+            assert!(matches!(command_rx.recv().await, Some(SessionOp::Shutdown)));
+            actor_order
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("durable");
+            actor_admission.record_reconciliation(0, true);
+        });
+        let registry = RuntimeFinalizerRegistry::freeze(vec![test_finalizer(
+            "test.finalizer",
+            10,
+            Duration::from_secs(1),
+            TestFinalizerBehavior::Complete,
+            order.clone(),
+        )])
+        .expect("registry is valid");
+        let coordinator = ShutdownCoordinator::new(
+            admission,
+            command_tx,
+            actor_task,
+            tokio::runtime::Handle::current(),
+            registry,
+        );
+
+        let report = coordinator
+            .shutdown(ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"))
+            .await
+            .expect("shutdown report");
+
+        assert_eq!(
+            *order
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec!["durable", "test.finalizer"]
+        );
+        assert_eq!(report.finalizers().len(), 1);
+        assert_eq!(
+            report.finalizers()[0].identifier(),
+            ShutdownFinalizerId::new("test.finalizer")
+        );
+        assert_eq!(
+            report.finalizers()[0].outcome(),
+            ShutdownFinalizerOutcome::Completed
+        );
+        assert!(report.is_complete());
+    }
+
+    #[tokio::test]
+    async fn finalizer_failure_and_panic_are_typed_and_do_not_stop_later_entries() {
+        let starts = Arc::new(StdMutex::new(Vec::new()));
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.third",
+                30,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.first",
+                10,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Fail,
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.second",
+                20,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Panic,
+                starts.clone(),
+            ))
+            .build()
+            .expect("runtime builds");
+
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+
+        assert_eq!(
+            *starts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec!["test.first", "test.second", "test.third"]
+        );
+        assert_eq!(
+            report
+                .finalizers()
+                .iter()
+                .map(ShutdownFinalizerReport::outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                ShutdownFinalizerOutcome::Failed,
+                ShutdownFinalizerOutcome::Panicked,
+                ShutdownFinalizerOutcome::Completed,
+            ]
+        );
+        assert!(!report.is_complete());
+        assert!(matches!(
+            runtime.shutdown().await,
+            Err(RuntimeError::ShutdownIncomplete { .. })
+        ));
+        assert_eq!(
+            *starts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec!["test.first", "test.second", "test.third"]
+        );
+    }
+
+    #[tokio::test]
+    async fn finalizer_cap_contains_timeout_and_allows_later_entry() {
+        let starts = Arc::new(StdMutex::new(Vec::new()));
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.timeout",
+                10,
+                Duration::from_millis(20),
+                TestFinalizerBehavior::Pending(cancelled.clone()),
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.after-timeout",
+                20,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .build()
+            .expect("runtime builds");
+
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_secs(1)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+        tokio::task::yield_now().await;
+
+        assert!(cancelled.load(Ordering::SeqCst));
+        assert_eq!(
+            *starts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec!["test.timeout", "test.after-timeout"]
+        );
+        assert_eq!(
+            report
+                .finalizers()
+                .iter()
+                .map(ShutdownFinalizerReport::outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                ShutdownFinalizerOutcome::TimedOut,
+                ShutdownFinalizerOutcome::Completed,
+            ]
+        );
+        assert!(!report.deadline_exhausted());
+    }
+
+    #[tokio::test]
+    async fn finalizers_share_the_original_global_deadline_without_resetting_it() {
+        let starts = Arc::new(StdMutex::new(Vec::new()));
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .runtime_finalizer(test_finalizer(
+                "test.delay",
+                10,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Delay(Duration::from_millis(50)),
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.consume-remaining",
+                20,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Pending(cancelled.clone()),
+                starts.clone(),
+            ))
+            .runtime_finalizer(test_finalizer(
+                "test.not-run",
+                30,
+                Duration::from_secs(1),
+                TestFinalizerBehavior::Complete,
+                starts.clone(),
+            ))
+            .build()
+            .expect("runtime builds");
+
+        let report = runtime
+            .shutdown_with(
+                ShutdownOptions::interrupt(Duration::from_millis(200)).expect("valid options"),
+            )
+            .await
+            .expect("structured report");
+        tokio::task::yield_now().await;
+
+        assert!(cancelled.load(Ordering::SeqCst));
+        assert!(report.elapsed() < Duration::from_millis(500));
+        assert!(report.deadline_exhausted());
+        assert_eq!(
+            report
+                .finalizers()
+                .iter()
+                .map(ShutdownFinalizerReport::outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                ShutdownFinalizerOutcome::Completed,
+                ShutdownFinalizerOutcome::TimedOut,
+                ShutdownFinalizerOutcome::NotRunDeadline,
+            ]
+        );
+        assert_eq!(
+            *starts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec!["test.delay", "test.consume-remaining"]
         );
     }
 
@@ -1230,12 +1646,21 @@ mod tests {
         let (command_tx, command_rx) = mpsc::channel(1);
         drop(command_rx);
         let (_event_tx, event_rx) = mpsc::unbounded_channel();
+        let actor_exit_guard = RuntimeActorExitGuard {
+            admission: admission.clone(),
+        };
         let actor_task = tokio::spawn(async move {
+            let _actor_exit_guard = actor_exit_guard;
             panic!("intentional actor join failure");
         });
         let runtime_handle = tokio::runtime::Handle::current();
-        let coordinator =
-            ShutdownCoordinator::new(admission, command_tx.clone(), actor_task, runtime_handle);
+        let coordinator = ShutdownCoordinator::new(
+            admission,
+            command_tx.clone(),
+            actor_task,
+            runtime_handle,
+            RuntimeFinalizerRegistry::freeze(Vec::new()).expect("empty registry is valid"),
+        );
         let runtime = RuntimeHandle {
             command_tx,
             event_rx,
