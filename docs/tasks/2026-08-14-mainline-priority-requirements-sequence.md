@@ -728,3 +728,51 @@ I214 remains Active until its exact decision head passes CI and independent arch
 RUNTIME-005-B/C, I189/PERM-006 and TOOL-024-B/C/D remain blocked or unactivated exactly as before.
 Decision content commit `648a35d3` is submitted through PR #338; that existing content commit, not
 a later status-only commit, is the candidate completion evidence after acceptance.
+
+## 2026-08-21 Governance Workflow Repair Interruption
+
+The maintainer explicitly paused further product/runtime development to correct the delivery
+workflow measured by GOV-007/I205. Issue #339, GOV-008 and I215 own a non-overlapping governance
+slice: atomic claim+activation, local design/implementation/test/documentation convergence, one
+stable remote stage candidate, scenario fixtures and an EVOLUTION lesson. The claim+activation PR
+has no effect until merge and contains no SOP, validator, Rust/Cargo or product implementation.
+
+I214 remains Active/Claimed with decision PR #338 waiting for valid independent exact-head review;
+no new I214 edits are scheduled during the governance repair. After I215 closes, finish the already
+started I214 flow, then govern RUNTIME-005-B/C and later long-task work using the revised process.
+I197/I198/I201/I210 remain Review, I189/I213 remain Planned/Claimed and unactivated, I206-I208
+remain Planned/Unclaimed, and I164 remains Paused.
+
+## 2026-08-21 I215 Atomic Activation And Local Convergence
+
+PR #340 head `1e00249b` passed exact-head CI `32439457491`, both validators, manifest parsing, scale
+assessment and merge-time CAS, then merged as `e66d039c`. GOV-008/I215 became Claimed and Active in
+that single merge; no separate activation PR was created.
+
+The implementation worktree began at the activation merge. The AGENTS/SOP changes, POSIX and
+PowerShell harness integration, 12 ordinary/protected/release/bounded-maintenance scenarios and
+EVOLUTION lesson converged locally without intermediate pushes. I215 is Review pending one stable
+stage candidate, not Complete.
+
+The final local convergence passed the full release preflight, both governance validators,
+PowerShell strict parse and execution, workflow and SQLite scenario harnesses, manifest/scale/site/
+installer/classifier checks, workspace check/Clippy/tests/doctests and diff/scope hygiene. This loop
+caught a PowerShell wiring defect that had omitted the SQLite self-test; it was repaired and all
+affected gates were rerun before the first push.
+
+Meanwhile #338 review identified two blocking decision defects: the proposed closing-bit check does
+not atomically pair actor admission with turn start, leaving a check-to-start race; and consuming
+`shutdown_with(self, invalid_options)` conflicts with Drop-triggered default shutdown. I214 remains
+Active/Claimed. After I215 closes, batch both corrections locally on #338 and obtain fresh exact-head
+review; do not convert either finding into a separate micro-PR.
+
+## 2026-08-21 I215 Stable-Stage Completion
+
+PR #341 exact head `06e61e3c` passed CI `32442052401`, independent Agent-role review
+`5365129718` and merge-time CAS, then merged as `81a603b4`. GOV-008/I215 is Complete/Closed at
+Completion Commit `06e61e3c`; this status synchronization does not cite itself. Issue #339 closed
+with the implementation merge and receives the same owner evidence.
+
+The next mainline action returns to already Active/Claimed I214/#338. Batch its admission
+check-to-start race and invalid-options/Drop contract corrections locally, rerun the complete local
+checkpoint, then submit one new stable #338 head for fresh exact-head architecture review.

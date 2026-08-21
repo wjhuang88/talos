@@ -93,6 +93,14 @@ These are immutable facts that every change must respect:
   Collaboration Claim before creating the implementation branch. Pre-adoption work, bounded
   maintenance, reviewer follow-ups, and emergency overrides follow the explicit rules in
   `docs/sop/AGENT-COLLABORATION.md`.
+- Use local convergence as the normal implementation loop: complete design, code, tests,
+  documentation, owner synchronization, and staged-diff review locally before pushing a stable
+  stage candidate. GitHub CI and review validate stages; they are not an edit-by-edit loop.
+- A governance-only PR may establish claim and activation atomically. Both remain ineffective until
+  that record reaches the target branch; implementation still starts from that merge or later.
+- After a submitted candidate changes substantively, batch corrections locally and obtain fresh
+  exact-head CI/review for the next stable candidate. Metadata-only remote actions that do not move
+  the head do not invalidate evidence.
 - **Completion evidence is mandatory.** An iteration, backlog Story, or long-task phase may be
   marked `Complete` only in its owner document and only with a `Completion Commit:` field naming
   one or more already-existing implementation commit SHA(s). A commit that merely changes status
@@ -131,11 +139,12 @@ These are immutable facts that every change must respect:
 5. **Never force-push to main.**
 6. **Commit messages reference iteration/story IDs** when applicable: `feat(agent): implement turn loop (#I1-S3)`
 7. **Use executable collaboration governance.** For governed work, follow
-   `docs/sop/AGENT-COLLABORATION.md`: `Claim Pending` is open-PR metadata only; a proposed
-   `Claimed` record becomes effective only on the target branch; backfill the actual claim PR
-   number, run both governance validators, repeat merge-time CAS checks, and use an allowed
-   authorization path. Do not apply the normal path retroactively to grandfathered work or use it
-   to block bounded maintenance or emergency response outside the SOP's applicability rules.
+   `docs/sop/AGENT-COLLABORATION.md`: `Claim Pending` is open-PR metadata only; a proposed atomic
+   `Claimed`/`Active` record becomes effective only on the target branch; backfill the actual claim
+   PR number, run both governance validators, repeat merge-time CAS checks, and use an allowed
+   authorization path. Converge implementation locally before pushing a stable stage candidate.
+   Do not apply the normal path retroactively to grandfathered work or use it to block bounded
+   maintenance or emergency response outside the SOP's applicability rules.
 
 ### Standard Build And Release Flow
 

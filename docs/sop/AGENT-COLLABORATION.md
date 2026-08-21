@@ -105,6 +105,9 @@ Emergency authority does not waive security review when disclosure and time perm
    implementation/evidence commit recorded as `Completion Commit: <SHA>`.
 7. **Owner first, derived views second.** Update the owner document, then inventories and Board,
    then the originating Issue.
+8. **Local convergence, remote stage validation.** Local design, implementation, tests,
+   documentation, and corrections form the normal edit loop. Push only a stable stage candidate;
+   CI and review validate that candidate rather than every intermediate edit.
 
 ## Sources Of Truth
 
@@ -210,20 +213,21 @@ An existing owner may be claimed only when:
 
 Update the owner first, then inventory/Board, then Issue.
 
-## PR-Based Claim Flow
+## Atomic Claim And Activation Flow
 
-### 1. Open A Draft Claim PR
+### 1. Open A Draft Governance PR
 
 Create a governance-only branch from the current target branch. Before a PR number exists, the draft
 owner record may remain `Unclaimed` with `Governance Claim PR: Pending`.
 
 Open the Draft PR to obtain its number. The draft is not reviewable or mergeable in this state.
 
-### 2. Finalize The Proposed Claim
+### 2. Finalize The Proposed Claim And Activation
 
 Update the same branch so the exact-head owner record contains:
 
 - `Claim State: Claimed`;
+- the owner and iteration delivery state that will become Active on merge;
 - the actual `Governance Claim PR: #NN`;
 - complete Work Slice and authorization fields;
 - no production implementation, implementation tests, speculative dependencies, or generated
@@ -236,7 +240,9 @@ scripts/validate_project_governance.sh .
 scripts/validate_collaboration_claims.sh .
 ```
 
-Only this finalized exact head may enter claim review.
+The open PR has neither ownership nor activation effect. Only this finalized exact head may enter
+governance review. A separate activation PR is prohibited for an ordinary newly selected slice
+unless a recorded dependency can become true only after the claim merge.
 
 ### 3. Authorization Paths
 
@@ -287,10 +293,11 @@ Immediately before merge, re-check all of the following against the exact head:
 If any check changes, do not merge. Refresh the branch, update the owner, and rerun exact-head
 validation. This is the collaboration compare-and-swap gate.
 
-### 5. Merge Establishes Ownership
+### 5. Merge Establishes Ownership And Activation
 
-The claim becomes effective only when the finalized `Claimed` record exists on the target branch.
-The implementation branch starts from that claim merge commit or a later target-branch commit.
+The claim and proposed Active state become effective together only when the finalized record exists
+on the target branch. The implementation branch starts from that merge commit or a later
+target-branch commit.
 
 Do not create the implementation branch, commit/push implementation, change production dependencies,
 or open a draft implementation PR before this point.
@@ -298,20 +305,56 @@ or open a draft implementation PR before this point.
 Read-only investigation and disposable uncommitted experiments do not establish ownership and must
 not be represented as implementation progress.
 
-## Implementation PR
+## Local Convergence Before Remote Submission
 
-After claim merge:
+After the atomic governance merge, use the implementation worktree as the edit loop. Before the
+first implementation push, complete one local convergence checkpoint:
+
+- the diff remains inside the effective Work Slice and published acceptance;
+- implementation, tests, documentation, owner-first Review state and residuals agree;
+- focused checks pass, followed by every required locked/workspace or governance check;
+- the staged diff is reviewed for unrelated files, secrets, generated residue and stale status;
+- any required runtime, device or security evidence that can run locally is recorded;
+- the candidate is coherent enough for one end-to-end review, not a request for remote debugging.
+
+Intermediate local commits are allowed and may be amended or reorganized before first push. Do not
+open or push a PR merely to discover routine compile, formatting, wording or owner-sync defects.
+
+## Stable Stage Candidate PR
+
+After local convergence:
 
 1. refresh the target branch and verify the claim remains effective;
 2. create the implementation branch from the claim merge or later target commit;
-3. implement only the Work Slice;
-4. append execution and validation evidence to the owner;
-5. record the implementation PR number;
-6. move delivery state to `Review` when submitted.
+3. push the locally validated candidate and open one implementation PR;
+4. append execution and validation evidence to the owner and move delivery state to `Review`;
+5. leave `Implementation PR: Not started` on the first candidate when its number was not knowable
+   before push; the PR body links the owner, and the later closure records the actual `#NN`;
+6. run exact-head CI and the authorization-specific review for that stable stage.
 
 The implementation PR references the Issue, task ID, owner, claim PR, acceptance, validation,
 residuals, and non-goals. It normally does not mark the owner Complete because its implementation
 commit is not yet on the target branch.
+
+If review finds defects, collect related findings, correct them locally, rerun the complete local
+checkpoint, then push the next stable candidate. Any substantive code, contract, acceptance,
+security, release, or evidence change invalidates prior exact-head CI/review. A label, comment,
+Issue synchronization, rerun, or other metadata-only action that leaves the head unchanged does
+not. Do not split each reviewer finding into a separate PR.
+
+## Valid Review Output
+
+A review is merge evidence only when it:
+
+- names the exact candidate head and target base;
+- states `APPROVE` or `REQUEST CHANGES`;
+- checks the assigned requirements and risk questions against repository evidence;
+- identifies blocking findings and residual non-blocking findings separately;
+- discloses role/identity limits when a shared GitHub identity is used.
+
+An unrelated task result, generic summary, old-head conclusion, or response that omits the assigned
+risk surface is not review evidence. Reassign or repeat the review; do not reinterpret it as an
+approval.
 
 ## Governance Closure
 
@@ -326,6 +369,12 @@ After implementation merge:
 
 A status-only commit cannot cite itself.
 
+When the next non-overlapping iteration is ready, its atomic claim+activation PR may also close the
+previous merged implementation owner-first. The previous owner must cite a pre-existing target-
+branch implementation/evidence SHA, and all previous acceptance, residual, Board/index and Issue
+state must be synchronized before the new owner/derived rows. Protected or release closeout review
+requirements still apply. Otherwise use a focused closeout PR.
+
 ## Direct-Commit Sequence
 
 When Direct commit is authorized, preserve the same order:
@@ -335,7 +384,9 @@ When Direct commit is authorized, preserve the same order:
 3. commit/push implementation;
 4. commit/push closure citing the existing implementation SHA.
 
-Do not combine these into one commit.
+Do not combine claim and implementation into one commit. Direct-commit activation may be included
+with the claim record when dependencies are already satisfied; completion still requires a later
+commit citing pre-existing evidence.
 
 ## Handoff, Release, And Abandonment
 

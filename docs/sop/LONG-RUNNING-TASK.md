@@ -83,17 +83,21 @@ uses separately owned child task records rather than multiple active claims in o
 
 Every task item has an ID, expected output, completion gate, dependencies, and fallback.
 
-## Claim And Activation Gate
+## Atomic Claim And Activation Gate
 
-Before status becomes In Progress:
+In one governance-only transition before implementation:
 
 1. Apply `docs/sop/AGENT-COLLABORATION.md`.
 2. Backfill the actual Draft claim PR number.
-3. Finalize the proposed record as Claimed.
+3. Finalize the proposed record as Claimed and In Progress while stating that both are ineffective
+   until target-branch merge.
 4. Run exact-head CI, `validate_project_governance.sh`, and `validate_collaboration_claims.sh`.
 5. Repeat merge-time CAS checks.
 6. Merge using an allowed Authorization Mode.
 7. Start implementation from the claim merge commit or later target commit.
+
+Do not create a second activation PR unless a recorded dependency can become true only after the
+claim merge.
 
 Existing pre-adoption long tasks are grandfathered as defined by `AGENT-COLLABORATION.md`.
 
@@ -154,14 +158,21 @@ owner-first evidence synchronization.
 ## Execution
 
 1. Execute items in dependency order.
-2. Use confirmed defaults for non-blocking ambiguity.
-3. Run each Completion Gate before marking the item done.
-4. Record a checkpoint before the next implementation phase.
-5. Follow `GIT-WORKFLOW.md`; commits preserve code state but do not replace task records.
-6. Update owner documents before Board or other derived views.
-7. Put optional or unsuccessful non-blocking work in the declared residual destination.
-8. Keep Collaboration Claim fields current when implementation PR, claimant, authorization, or
+2. Establish each child through one atomic claim+activation governance merge when its dependencies
+   are already satisfied; do not schedule a separate activation PR by default.
+3. Use confirmed defaults for non-blocking ambiguity.
+4. Converge each implementation phase locally and push only its stable stage candidate.
+5. Run each Completion Gate before marking the item done.
+6. Record a checkpoint before the next implementation phase.
+7. Follow `GIT-WORKFLOW.md`; commits preserve code state but do not replace task records.
+8. Update owner documents before Board or other derived views.
+9. Put optional or unsuccessful non-blocking work in the declared residual destination.
+10. Keep Collaboration Claim fields current when implementation PR, claimant, authorization, or
    handoff changes.
+
+Remote CI/review is a phase boundary, not the inner development loop. If a stable candidate receives
+blocking findings, batch the related corrections locally, rerun the full local checkpoint and update
+the same PR once. Do not create a PR per finding or per status-field correction.
 
 Interrupt the user only when an unconfirmed condition prevents safe progress: missing access,
 unapproved irreversible action, contradictory outcomes, material safety/security/privacy/cost risk,

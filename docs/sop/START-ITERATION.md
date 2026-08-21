@@ -53,30 +53,33 @@ The committed plan preserves:
 
 Do not replace a committed plan with a newer objective.
 
-### 4. Establish The Collaboration Claim
+### 4. Establish Claim And Activation Atomically
 
-Before activation:
+In one governance-only PR:
 
 1. Create or update the iteration Collaboration Claim.
 2. Record one bounded Work Slice and one Responsible Actor.
-3. Use the Draft-PR number backfill sequence from `AGENT-COLLABORATION.md`.
-4. Run both governance validators and exact-head CI.
-5. Repeat the merge-time CAS check immediately before claim merge.
-6. Use an allowed independent-review, single-maintainer, direct-commit, or emergency authorization
+3. Set the proposed owner/iteration state to Active while stating that claim and activation are both
+   ineffective until merge.
+4. Use the Draft-PR number backfill sequence from `AGENT-COLLABORATION.md`.
+5. Run both governance validators and exact-head CI.
+6. Repeat the merge-time CAS check immediately before merge.
+7. Use an allowed independent-review, single-maintainer, direct-commit, or emergency authorization
    path.
 
-An effective Collaboration Claim exists only when the finalized Claimed record is on the target
-branch. `Claim Pending` is never stored in the iteration owner.
+An effective Collaboration Claim and Active state exist only when the finalized atomic record is on
+the target branch. `Claim Pending` is never stored in the iteration owner. Do not create a separate
+activation PR unless a recorded post-claim dependency requires one.
 
 ### 5. Activate And Begin Work
 
-After the effective claim exists:
+After the atomic claim+activation merge:
 
 - refresh the target branch;
 - create the implementation branch from the claim merge commit or a later target commit;
-- mark selected Stories In Progress and the iteration Active;
-- append the activation date, claim PR/commit, authorization, dependency inventory, and merge-time
-  CAS result;
+- verify the target-branch owner already records selected Stories In Progress and the iteration
+  Active;
+- append later execution facts without rewriting the published activation record;
 - follow `ITERATION-WORKFLOW.md`.
 
 ## Rules

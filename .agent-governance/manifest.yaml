@@ -3,14 +3,14 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-08-18"
+last_audited_at: "2026-08-21"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "I211/VALIDATION-002 is Complete/Closed through evidence commits `b7d55a0d`/`7c333d98`, #331 merge `97dbf35f` and #335 closeout merge `5301b8c2`; Issue #302 is closed. T10 reassessed Issue #59 as Blocked: TOOL-024-A and TOOL-023-C are Complete, but RUNTIME-005 and PERM-006-C are incomplete. RUNTIME-005-A/I214 is Active/Claimed after #336 exact-head CI `32435705544`, independent review `5364050202`, CAS and merge `7de582a3`; authority is limited to the current-path matrix and Proposed ADR, with no Rust/Cargo/runtime or TOOL-024 change. I189 remains Planned/Claimed and unactivated; I197/I198/I201/I210 remain Review; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
+current_execution_note: "GOV-008/I215 is Complete/Closed at Completion Commit `06e61e3c` through PR #341 merge `81a603b4`, CI `32442052401`, review `5365129718` and CAS. I214/RUNTIME-005-A remains Active/Claimed; batch #338's admission-race and invalid-options/Drop corrections locally before submitting one new stable head. I189 remains Planned/Claimed and unactivated; I197/I198/I201/I210 remain Review; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-08-18"
+  last_refresh: "2026-08-21"
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -66,6 +66,7 @@ migration:
   next_actions:
     - "Use Deferred Human Validation Mode only when the long-task startup/change record links a validation Issue and cleanup iteration; keep source owners Review, preserve exact implementation heads, never defer AGENTS.md security-review gates, and resolve every required row before long-task completion"
     - "Keep Issue #59 production work blocked until RUNTIME-005 and PERM-006-C are Complete. Execute only the separately governed Active/Claimed RUNTIME-005-A/I214 shutdown-contract decision from claim merge `7de582a3`; do not activate I189 or create TOOL-024-B/C/D implementation authority from this gate-clearing plan"
+    - "Keep GOV-008/I215 completion bound to implementation `06e61e3c`, PR #341 merge `81a603b4`, CI `32442052401`, independent Agent-role review `5365129718` and merge-time CAS; use its local-convergence/stable-stage workflow for later work"
     - "Preserve the separately authorized WEB-001-A/I195 read-only Dashboard slice; keep I189 and all other planned children unactivated unless separately authorized; preserve the completed I196 P0 decision/documentation packet without Rust/Cargo/persistence/API/product changes; create a separate bounded claim/iteration for atomic claim activation before changing SOPs or validators"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
     - "Keep I177/ARCH-034-R08 completion evidence bound to squash implementation commit `f505eea8`, PR #162 exact-head CI `31166594367`, and closeout PR #163 merge `c4fbd02d`; keep I178/ARCH-034-R09 completion evidence bound to squash implementation commit `f92634803560dc50e0b15ca8d7d511e9928c983f`, source implementation `c662a7e6`, PR #165, and exact-head CI `31180591881`; keep I179/ARCH-034-R10 completion evidence bound to squash implementation commit `dafc9be08736aee91e0f9cdd92e5226930808061`, source implementation `63d494c5`, PR #168, and exact-head CI `31189425069`; keep I180/ARCH-034-R11 completion evidence bound to squash implementation commit `10cceec6aeb9089fe9c830355992c8fc60430d63`, source implementation `fd8ac75d`, PR #171, and exact-head CI `31238721507`; keep review-only I181 completion evidence bound to PR #174 squash merge `aea26ad011af04396ab8588c9326d309538f31a2`, and track R04 remediation through later bounded child owners"

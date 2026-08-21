@@ -78,6 +78,7 @@ RUNTIME-006 registration for Issue #234
 | [#79](https://github.com/wjhuang88/talos/issues/79) | TUI-042 / I200 | Completed | Completion Commit `3afeeb28`; PR #301 merge gates and the maintainer-approved touchpad substitute passed; owner closeout reached main through PR #331 merge `97dbf35f`. TUI-061/#334 remains separate. |
 | [#312](https://github.com/wjhuang88/talos/issues/312) | MODEL-013 / I212 | Completed | Completion Commit `5a1709cb`; PR #318 merge gates and integrated exact/prefix/override/unknown no-request validation passed; owner closeout reached main through PR #331 merge `97dbf35f`. TEST-001/#316 remains separate. |
 | [#302](https://github.com/wjhuang88/talos/issues/302) | VALIDATION-002 / I211 | Completed | Completion Commits `b7d55a0d`/`7c333d98`; PR #331 merged as `97dbf35f`; status-only closeout PR #335 merged as `5301b8c2`; the remote evidence tracker then closed. TUI-058/#329, TUI-059/#330, TUI-060/#332, SKILL-005/#333 and TUI-061/#334 remain separate. |
+| [#339](https://github.com/wjhuang88/talos/issues/339) | GOV-008 / I215 | Completed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, independent review `5365129718` and merge-time CAS. |
 
 ## Closure Rule
 
