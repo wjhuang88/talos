@@ -127,3 +127,15 @@ runtime behavior and does not authorize TOOL-024 or permission work.
 PR #336 passed exact-head claim gates and merged as `7de582a3`; RUNTIME-005-A/I214 is now
 Active/Claimed for the decision-only matrix and ADR. The parent remains Refinement/Unclaimed,
 RUNTIME-005-B/C remain blocked, and no runtime or TOOL-024 implementation authority transfers.
+
+## 2026-08-21 A Decision Execution
+
+I214 produced the current-path matrix at
+`docs/reference/I214-RUNTIME-SHUTDOWN-CURRENT-PATH.md` and Proposed ADR-063. The proposal makes B
+the coordinator/admission/active-turn/deadline/report slice and C the ordered-finalizer/durable
+reconciliation/compatibility slice. A remains Active pending exact-head independent architecture
+review; B/C remain blocked and no production behavior is claimed.
+
+PR #338 architecture review required B's admission fence to include the actor's start-commit
+linearization and required invalid shutdown options to fail before a primary handle can be
+consumed. The corrections remain decision-only and do not unblock B until ADR-063 is accepted.

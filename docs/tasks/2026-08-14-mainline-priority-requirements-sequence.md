@@ -717,6 +717,18 @@ TOOL-024-B/C/D remain blocked or unauthorized in their existing order. No Rust, 
 runtime, persistence, permission, sandbox, product UI, dependency, release, publication or
 `unsafe` change is authorized by this activation.
 
+## 2026-08-21 I214 Decision Execution
+
+From activation merge `14531bbc`, the decision-only branch prepared a code-grounded runtime
+shutdown matrix and Proposed ADR-063. The proposal retains the current Session/ADR-058 finalizer,
+adds no implementation, and defines B as coordinator/admission/active-turn/deadline/report work
+and C as ordered-finalizer/durable-reconciliation/compatibility work.
+
+I214 remains Active until its exact decision head passes CI and independent architecture review.
+RUNTIME-005-B/C, I189/PERM-006 and TOOL-024-B/C/D remain blocked or unactivated exactly as before.
+Decision content commit `648a35d3` is submitted through PR #338; that existing content commit, not
+a later status-only commit, is the candidate completion evidence after acceptance.
+
 ## 2026-08-21 Governance Workflow Repair Interruption
 
 The maintainer explicitly paused further product/runtime development to correct the delivery
@@ -764,3 +776,14 @@ with the implementation merge and receives the same owner evidence.
 The next mainline action returns to already Active/Claimed I214/#338. Batch its admission
 check-to-start race and invalid-options/Drop contract corrections locally, rerun the complete local
 checkpoint, then submit one new stable #338 head for fresh exact-head architecture review.
+
+## 2026-08-21 I214 Batched Architecture Corrections
+
+After I215 closed, #338 was synchronized locally with `main@457895c5`. The two architecture
+findings are corrected in one local convergence cycle: ADR-063 now uses one SDK/actor
+admission-start arbiter whose non-await start commit shares the shutdown fence, and structured
+shutdown borrows its handle and accepts only construction-time validated options, with explicit
+primary/controller Drop semantics. I214 remains Active/Claimed and ADR-063 remains Proposed pending
+local validation, one stable push and fresh exact-head independent architecture review. No
+Rust/Cargo/runtime behavior, RUNTIME-005-B/C, I189, TOOL-024, release or publication authority is
+added.
