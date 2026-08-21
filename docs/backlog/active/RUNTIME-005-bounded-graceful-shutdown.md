@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | Refinement — shutdown policy and finalization order require ADR review |
+| Status | Ready / Unclaimed — ADR-063 Accepted; B requires iteration and claim |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -63,9 +63,12 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
-| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Active / I214 Claimed through #336 merge `7de582a3` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
-| RUNTIME-005-B | Shared admission fence, bounded active-turn policy and structured report | Blocked | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
+| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Ready / Unclaimed | RUNTIME-005-A Accepted; SESSION-008-B Complete |
 | RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
+
+RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
+decision evidence only; parent RUNTIME-005 remains Ready/Unclaimed until B and C complete.
 
 The finalizer registry must be proven with runtime-owned test finalizers. A
 specific TOOL-024 implementation registers as a later consumer and cannot hold
@@ -139,3 +142,12 @@ review; B/C remain blocked and no production behavior is claimed.
 PR #338 architecture review required B's admission fence to include the actor's start-commit
 linearization and required invalid shutdown options to fail before a primary handle can be
 consumed. The corrections remain decision-only and do not unblock B until ADR-063 is accepted.
+
+## 2026-08-21 A Decision Acceptance
+
+PR #338 corrected exact head `6719c876` passed CI `32449605985`, independent architecture review
+`5365529351` and merge-time CAS, then merged as `fc70e396`. ADR-063 is Accepted and A/I214 is
+Complete/Closed at that pre-existing Completion Commit. B is now Ready/Unclaimed but remains
+unselected and unactivated until a runnable iteration and effective claim reach `main`; C remains
+Blocked on B. Issue #49 stays open and no TOOL-024, permission, release or publication authority
+transfers.

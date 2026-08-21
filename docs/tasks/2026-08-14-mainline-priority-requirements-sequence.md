@@ -787,3 +787,16 @@ primary/controller Drop semantics. I214 remains Active/Claimed and ADR-063 remai
 local validation, one stable push and fresh exact-head independent architecture review. No
 Rust/Cargo/runtime behavior, RUNTIME-005-B/C, I189, TOOL-024, release or publication authority is
 added.
+
+## 2026-08-21 I214 Decision Acceptance
+
+PR #338 corrected exact head `6719c876` passed CI `32449605985`, independent architecture review
+`5365529351` and merge-time CAS, then merged as `fc70e396`. ADR-063 is Accepted and
+RUNTIME-005-A/I214 is Complete/Closed at the pre-existing decision commit; the status closeout does
+not self-certify.
+
+RUNTIME-005-B is now Ready/Unclaimed but remains unselected and unactivated until a new runnable
+iteration and effective claim reach `main`. C remains Blocked on B. T10/Issue #59 remains Blocked
+until all RUNTIME-005 and PERM-006-C complete; I189 stays Planned/Claimed and unactivated, and no
+TOOL-024, Rust/Cargo/runtime, release or publication authority transfers. The next mainline planning
+step is the smallest RUNTIME-005-B iteration/claim, not implementation on the I214 branch.

@@ -1,21 +1,23 @@
 # RUNTIME-005-A: Bounded Shutdown And Finalizer Contract Decision
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-005-A |
 | Type | Runtime / Architecture Spike |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I214 - Active / Claimed |
+| Selected Iteration | I214 - Complete / Closed |
 | Depends On | SESSION-008-A decision output; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-21 |
 | Work Slice | Decide only RUNTIME-005-A / I214: current-path characterization plus one shutdown policy, arbitration, admission, deadline, finalizer ordering, durable reconciliation, redacted report and compatibility ADR with B/C boundaries. No Rust/Cargo/API/runtime/Session/persistence, TOOL-024, permission, sandbox, product UI, dependency, release, publication or unsafe change. |
@@ -23,10 +25,10 @@
 | Source Issue | #49 |
 | Governance Claim PR | #336 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #336 exact head `cc99af9e` passed CI `32435705544`, both governance validators, independent claim review `5364050202` and merge-time CAS, then merged to `main` as `7de582a3`. |
+| Authorization Evidence | Claim PR #336 merged as `7de582a3`. Decision PR #338 exact head `6719c876` passed CI `32449605985`, independent architecture review `5365529351` and merge-time CAS, then merged as `fc70e396`. |
 | Implementation PR | #338 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | I214 is activated from claim merge `7de582a3`. Execute only the current-path matrix and decision ADR; require exact-head independent architecture review and CAS before merge. |
+| Handoff / Release Condition | Closed at Completion Commit `6719c876`; RUNTIME-005-B requires its own runnable iteration and effective claim before implementation. |
 
 ## Identity / Goal / Value
 
@@ -149,3 +151,14 @@ before coordinator access, makes structured shutdown borrow its handle, and defi
 controller Drop behavior.
 RUNTIME-005-A/I214 remains Active pending fresh exact-head review; no B/C implementation authority
 is created.
+
+## Completion Evidence
+
+- Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b` (pre-existing reviewed
+  decision correction; this closeout status commit does not self-certify).
+- PR #338 merged as `fc70e3969f5fd1c7f57b386c3ed9859458cd0127` after exact-head CI
+  `32449605985`, independent architecture approval `5365529351` and merge-time CAS.
+- ADR-063 is Accepted. The matrix and decision remain documentation-only; no runtime behavior is
+  claimed.
+- RUNTIME-005-B is Ready/Unclaimed and still requires a separate iteration and effective claim;
+  C remains Blocked and TOOL-024/PERM-006 authority is unchanged.
