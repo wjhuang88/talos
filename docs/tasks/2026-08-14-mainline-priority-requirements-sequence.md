@@ -1,7 +1,7 @@
 # Mainline Priority Requirements — Ordered Long-Running Task
 
-**Status**: In Progress / coordination claim effective through PR #227. Child state remains owned
-by each child; this record alone activates none of them.
+**Status**: Complete / Closed — ordered delivery finished with owned residuals. Child state remains
+owned by each child; this record alone activates none of them.
 **Published plan date**: 2026-08-14
 **Prerequisite claim**: I196 / WORK-001-A claim effective through PR #226 merge `453d1fba`
 **Source requirements**: Issues #59, #69, #79, #111, #125, #155, #278, #312 and
@@ -15,7 +15,7 @@ owner authority or make an ineffective child claim executable.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline planning session 2026-08-14 |
 | Work Slice | Coordination and recovery ledger for I205/GOV-007 → I196 → I188/#59 → I199/#69 → I200/#79 → I197/#125 → I201/#111 → I212/#312 → I210/#278 → I198/#155 → I211/VALIDATION-002/#302, plus a dependency-only TOOL-024-B/C/D readiness disposition. This claim does not implement, activate, merge or close any child and does not replace child claims or implementation PRs. |
@@ -25,8 +25,9 @@ owner authority or make an ineffective child claim executable.
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer authorized planning Issues #59, #125 and #155 in order on 2026-08-14, explicitly added Issues #69, #79 and #111, then directed on 2026-08-17 that stale #227/#228 governance residue be digested and PR-flow simplification be scheduled. On 2026-08-18 the maintainer selected Deferred Human Validation Mode; PR #303 passed full preflight, exact-head CI, remote Issue reconciliation and merge-time CAS, then merged to `main` as `99645e78`. No independent reviewer was available for this planning-only, non-security amendment. Planning authorization does not authorize child implementation, release, migration, deployment, spending or destructive action; each child still requires its own effective claim and gates. |
 | Implementation PR | None; child iterations require separate implementation PRs |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Close only after every ordered child has a terminal disposition, every residual has an explicit owner/resume gate, and I211 resolves every required Issue #302 row. Before each child implementation, establish that child's own effective claim and start from its claim merge or later current `main`. |
+| Last Updated | 2026-08-21 |
+| Completion Commit | Coordination completion is evidenced by pre-existing delivered-child commits `779a4c71`, `245eddeb`, `938c9edb`, `3afeeb28`, `5a1709cb`, `b7d55a0d`, `7c333d98` and `44e840d7`; Review children retain Pending Completion Commit in their own owners. This status-only closeout cannot self-certify those implementations. |
+| Handoff / Release Condition | Closed after T1-T10 reached terminal dispositions, I211 resolved every required Issue #302 row, and every failed/incomplete row received an explicit corrective owner. Resume only through the listed residual owner and a separate effective claim; no child authority transfers from this closed coordination record. |
 
 ## Startup Contract
 
@@ -344,14 +345,14 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T3 | Decide Issue #59 production readiness | TOOL-024-B/C/D dependency matrix | T2 | All owner-defined runtime/permission gates true | Keep exact blocked residual and continue | Blocked |
 | T4 | Deliver I199 / TUI-041 | Bounded multiline preview behavior | T3 disposition | Recorded Completion Commit and acceptance | Preserve one-row behavior | Complete |
 | T5 | Deliver I200 / TUI-042 implementation | No-op scroll stability and obsolete-anchor normalization in `main` | T4 | PR #301 exact-head CI, Agent technical review and CAS; add human rows to #302 | Keep I200 Review and do not claim acceptance | Complete / Completion Commit `3afeeb28` |
-| T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; human validation deferred to #302 / I211 |
-| T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; human validation deferred to #302 / I211 |
+| T6 | Claim and deliver I197 / TUI-045 implementation | Permission-prompt anchor correction without permission semantic changes | T5 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review, applicable security gate and CAS; add eligible human rows to #302 | Preserve permission visibility/fail-closed behavior; leave Review/Blocked | Review / Implementation merged; I211 resolved the failed/incomplete terminal matrix to TUI-059/#330 |
+| T7 | Claim and deliver I201 / TUI-043 implementation | Conditional tool-call marker suppression with negative/order fixtures | T6 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve legitimate text; leave Review/Partial | Review / Implementation merged; I211 resolved the failed permission-mediated row to TUI-058/#329 |
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Complete / Completion Commit `5a1709cb` |
-| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
-| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
+| T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`; I211 passed retry ordinals and assigned remaining sequencing defects to TUI-060/#332 |
+| T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`; I211 assigned the real-CLI diagnostic failure to SKILL-005/#333 |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and register corrective owners | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / reassessed; RUNTIME-005 Complete, PERM-006-C incomplete |
-| T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
+| T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Complete |
 
 ### Change-Control Checkpoint
 
@@ -923,3 +924,32 @@ I217/RUNTIME-005-C is Complete/Closed at pre-existing implementation commit `44e
 cannot self-certify those implementations. Issue #49 closes only after the closeout reaches
 `main`. T10/Issue #59 remains Blocked because PERM-006-C is incomplete and no separate TOOL-024-B
 claim exists. I189, TOOL-024 implementation, release and publication remain unauthorized.
+
+## 2026-08-21 T11 Final Closeout And Residual Packet
+
+The ordered long task is Complete/Closed because every delivery item has a terminal disposition,
+I211 resolved every Issue #302 validation row, and each failed or incomplete outcome has a separate
+owner. Completion is supported by pre-existing child evidence: I196 `779a4c71`, I188 `245eddeb`,
+I199 `938c9edb`, I200 `3afeeb28`, I212 `5a1709cb`, I211 `b7d55a0d`/`7c333d98`, and the final
+RUNTIME-005 child `44e840d7`. This governance-only T11 closeout cannot self-certify any child
+implementation. I197, I198, I201 and I210 deliberately remain Review with Pending Completion
+Commit in their owners.
+
+Issue #49 closed after the evidence-bearing RUNTIME-005 closeout merged as `1503ca21`. T10 and
+Issue #59 remain Blocked: RUNTIME-005 is Complete, but PERM-006-C is incomplete and no separate
+TOOL-024-B/C/D implementation claim is effective. This terminal blocked disposition satisfies the
+published fallback; it does not authorize I189, permission work or background-process work.
+
+Current non-terminal inventory at `main@1503ca21` is: no Active iteration; I197/I198/I201/I210 in
+Review/Claimed; I189 and independent Dashboard I213 Planned/Claimed; I206-I208 Planned/Unclaimed;
+and superseded I164 Paused. Review residuals resume only through TUI-059/#330 (I197),
+SKILL-005/#333 (I198), TUI-058/#329 (I201), and TUI-060/#332 (I210). TUI-061/#334 separately owns
+the history continuation-padding regression discovered during I200 validation. I189 remains
+unactivated; I206-I208 retain their ordered steering sequence; I213 remains outside mainline.
+Remote Issues #111/#125/#155/#278 remain open with those Review/corrective owners; #59 remains
+open/Blocked, while delivered Issues #69/#79/#312 and completed runtime Issue #49 are closed.
+
+Recovery state is intentionally quiet: archival Draft PRs #120/#121 and historical stashes remain
+untouched. A future session must fetch exact `main`, re-inventory all non-terminal iterations, and
+establish the selected owner's runnable iteration and effective claim before implementation. This
+closed task transfers no Desktop, Dashboard, release, publish, PERM-006 or TOOL-024 authority.
