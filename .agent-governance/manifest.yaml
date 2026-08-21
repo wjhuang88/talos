@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-21"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "The ordered mainline priority long task is Complete/Closed with owned residuals. Issue #59 remains Blocked on PERM-006-C and separate TOOL-024 child authority. Claim merge `0df88638` is effective; I189/PERM-006-A becomes the only Active iteration only after its governance activation reaches `main`, and protected-scope implementation review remains mandatory. I197/I198/I201/I210 remain Review with corrective owners; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
+current_execution_note: "The ordered mainline priority long task is Complete/Closed with owned residuals. Issue #59 remains Blocked on PERM-006-C and separate TOOL-024 child authority. PR #351 merged as `20cfcce4`; I189/PERM-006-A is Active/Claimed with protected-scope review mandatory. PR #352 proposes atomic Active/Claimed state for decision-only PERM-007-A/I218; it is ineffective before merge, and later Issue #188 behavior remains blocked on PERM-006-A/B/C plus separate child claims. I197/I198/I201/I210 remain Review; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed in the independent Dashboard lane."
 
 governance:
   skill_name: "agent-project-governance"
