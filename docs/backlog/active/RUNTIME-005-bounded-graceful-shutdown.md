@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | In Progress / Unclaimed — B/I216 Review; C remains Blocked |
+| Status | In Progress / Unclaimed — A/B Complete; C Ready/Unclaimed |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Epic parent is not an implementation unit. Complete B/I216 through its effective child claim, then establish a separate runnable C iteration/claim; keep Issue #49 open through C. |
+| Handoff / Release Condition | Epic parent is not an implementation unit. Establish a separate C child owner, runnable iteration and effective claim; keep Issue #49 open through C. |
 
 ## Identity / Goal / Value
 
@@ -64,8 +64,8 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 | ID | Deliverable | Status | Depends On |
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
-| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Review / Claimed in implementation PR #345; claim effective through #344 merge `2016acce` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
-| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Blocked | RUNTIME-005-B Complete |
+| RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Complete / Closed through I216; Completion Commit `c123328d`; PR #345 merge `020de694` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
+| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Ready / Unclaimed; no child owner or iteration selected | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
 decision evidence only; parent RUNTIME-005 remains In Progress/Unclaimed until B and C complete.
@@ -168,3 +168,11 @@ PR #344 exact head `e0f572a0` passed CI `32454558957`, independent architecture 
 the only Active child and implementation started from that merge under its bounded Work Slice.
 Parent RUNTIME-005 remains Unclaimed and In Progress; C remains Blocked until B is Complete. Issue
 #49 stays open, and no I189, TOOL-024, release or publication authority transfers.
+
+## 2026-08-21 B Completion And C Readiness
+
+PR #345 exact head `abf8d0da` passed CI `32459530911`, independent runtime architecture review
+`5367434951` and merge-time CAS, then merged as `020de694`. RUNTIME-005-B/I216 is Complete/Closed at
+pre-existing implementation commit `c123328d`. C is now Ready/Unclaimed but has no child owner,
+selected iteration, claim or implementation PR. Parent RUNTIME-005 remains In Progress/Unclaimed,
+Issue #49 stays open, and no TOOL-024, I189, release or publication authority transfers.
