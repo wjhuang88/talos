@@ -1,6 +1,6 @@
 # Iteration I189: PERM-006-A Structured Permission Decisions
 
-> Document status: Active (effective only after activation PR #351 reaches `main`)
+> Document status: Active
 > Published plan date: 2026-08-11
 > Planned objective: add one behavior-preserving structured permission request, evaluation context and per-facet decision-report contract as the implementation source for existing permission entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,10 +18,10 @@
 | Source Issue | #53 |
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
+| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 merged as `20cfcce4e72be3da4e3efc1190ee498975e7476b` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921`, and merge-time CAS. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Merge governance-only activation PR #351 after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
+| Handoff / Release Condition | I189 implementation begins from activation merge `20cfcce4` or later `main`. ADR-065 must be Accepted after independent exact-head security/API review before the source-compatible migration implementation begins; retain a second independent security review for the implementation candidate. |
 
 ## Published Baseline
 
@@ -106,11 +106,14 @@ wording without rewriting it.
 | 2026-08-21 | Non-terminal inventory | I197, I198, I201 and I210 remain Review under their separate corrective owners; I206-I208 remain Planned/Unclaimed; I213 remains Planned/Claimed and unactivated in the independent Dashboard lane; I164 remains Paused/superseded. None overlaps the PERM-006-A evaluator slice. |
 | 2026-08-21 | Activation proposal | I189 is the only proposed Active iteration. The proposal changes governance state only and is ineffective until its exact head passes CI, independent security review and merge-time CAS and reaches `main`; no implementation branch or Rust/Cargo edit is authorized before then. |
 | 2026-08-22 | Activation PR | Governance-only activation PR #351 is the proposed record. Its open branch has no activation effect; only the reviewed exact head reaching `main` authorizes implementation. |
+| 2026-08-22 | Activation effective | PR #351 merged as `20cfcce4` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921` and merge-time CAS. I189 is Active/Claimed. |
+| 2026-08-22 | API blocker | Read-only assessment proved that configured rules and runtime grants are indistinguishable in the public mutable `PermissionEngine.rules` vector. ADR-065 records the required pre-1.0 encapsulation and migration boundary; no provenance guess or hidden sentinel is permitted. |
 
 ## Verification Evidence
 
 - PR #197 claim evidence: exact head `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, CI `31554958547`, independent security approval comment `5261239200`, merge `0df88638409027849e5bf4ba13ef72d2e96b9b90`.
-- Activation PR #351 evidence remains pending exact-head CI, both governance validators, independent security review and merge-time CAS.
+- Activation PR #351 evidence: exact head `c025f7b94cf71fb12650f24ad8f1fe1d2467f7bf`, CI `32500829272`, independent Agent-role security/governance approval `5372336921`, merge `20cfcce4e72be3da4e3efc1190ee498975e7476b`.
+- ADR-065 acceptance evidence is pending exact-head independent security/API review and target-branch merge.
 
 ## Completion Evidence
 

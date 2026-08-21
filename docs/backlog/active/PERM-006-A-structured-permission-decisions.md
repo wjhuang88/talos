@@ -5,9 +5,9 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Active — effective only after activation PR #351 reaches `main` |
+| Status | Active |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
-| Selected Iteration | I189 (Active only after activation PR #351 reaches `main`) |
+| Selected Iteration | I189 (Active) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #53 |
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
+| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 merged as `20cfcce4e72be3da4e3efc1190ee498975e7476b` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921`, and merge-time CAS. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Merge governance-only activation PR #351 after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
+| Handoff / Release Condition | I189 implementation begins from activation merge `20cfcce4` or later `main`. ADR-065 must be Accepted after independent exact-head security/API review before the source-compatible migration implementation begins; retain a second independent security review for the implementation candidate. |
 
 ## Identity / Goal / Value
 
@@ -83,3 +83,14 @@ Do not present this Story as shipped while it remains Refinement.
 ## Residual Destination
 
 Any behavior correction discovered here must become a separately reviewed security fix.
+
+## 2026-08-22 Activation And API Decision Checkpoint
+
+- Activation PR #351 merged as `20cfcce4` after exact-head CI `32500829272`, independent
+  Agent-role security/governance approval `5372336921` and merge-time CAS. I189 is Active/Claimed.
+- Read-only API assessment found that public mutable `PermissionEngine` fields erase the source
+  identity needed to distinguish configured rules from runtime grants. Guessing from rule shape,
+  vector position or a hidden sentinel would produce untrustworthy provenance.
+- ADR-065 is the required pre-1.0 API/migration decision already anticipated by the Published
+  Baseline. It changes no permission outcome, approval routing, serialized configuration, grant
+  lifetime, hook DTO, workspace version or release state. Implementation waits for ADR acceptance.
