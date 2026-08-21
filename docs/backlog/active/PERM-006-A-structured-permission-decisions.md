@@ -5,9 +5,9 @@
 | Story ID | PERM-006-A |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Active — effective only after the I189 activation PR reaches `main` |
+| Status | Active — effective only after activation PR #351 reaches `main` |
 | Source | [GitHub Issue #53](https://github.com/wjhuang88/talos/issues/53) |
-| Selected Iteration | I189 (Active only after the activation record reaches `main`) |
+| Selected Iteration | I189 (Active only after activation PR #351 reaches `main`) |
 | Depends On | Parent PERM-006; foundational dependency for PERM-006-B/C |
 
 ## Collaboration Claim
@@ -22,10 +22,10 @@
 | Source Issue | #53 |
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. The current activation still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
+| Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 still requires fresh exact-head independent security review, CI and CAS before it reaches `main`. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Merge the governance-only I189 activation record after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | Merge governance-only activation PR #351 after exact-head independent security review, CI and merge-time CAS. Begin implementation only from that activation merge or later `main`; retain a second independent security review for the implementation candidate. |
 
 ## Identity / Goal / Value
 
