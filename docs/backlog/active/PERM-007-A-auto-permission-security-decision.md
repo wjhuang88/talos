@@ -26,7 +26,7 @@
 | Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested early ADR acceptance for unattended continuity. Claim PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance review `5372605087` and merge-time CAS, then merged as `ca30081a`. |
-| Implementation PR | Not started |
+| Implementation PR | #353 (decision documentation only; ADR not yet accepted) |
 | Last Updated | 2026-08-22 |
 | Handoff / Release Condition | Active from claim merge `ca30081a`. The decision head requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
 
@@ -105,6 +105,7 @@ reviewed threat model and accepted decision, not permission behavior.
 - Current-path and threat matrix:
   `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md`.
 - Proposed decision: `docs/decisions/064-bounded-model-assisted-auto-permission.md`.
+- Decision documentation PR: #353; its exact head still requires independent security review.
 - ADR-064 proposes default-on *attempted* assistance, not default Allow; only one-shot structured
   text create/modify in an isolated claimed non-`main` managed worktree is initially eligible.
 - Execute, Network, external paths, secrets, destructive/binary mutations, sandbox fallback,
