@@ -8,9 +8,9 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | Refinement — scope change requires ADR-011 revision, threat model and bounded child decomposition |
+| Status | Refinement — PERM-007-A / I218 decision claim proposed; no behavior authority |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | None |
+| Selected Iteration | I218 proposed for PERM-007-A decision only; implementation none |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; ADR-011 revision; existing Deny precedence |
 
 ## Collaboration Claim
@@ -64,6 +64,18 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 - PERM-006-B scoped grant semantics where any automatic grant is proposed.
 - PERM-006-C authoritative evaluate-to-execute pipeline.
 - Independent security review before any protected implementation claim.
+
+## Governed Child Sequence
+
+| Child | Deliverable | Current State | Gate |
+|---|---|---|---|
+| PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Ready / Unclaimed; claim proposed | Independent exact-head security review; no behavior change |
+| PERM-007-B | Canonical config plus `/auto` session command | Blocked / Unclaimed | Accepted A and all PERM-006 A-C gates closed |
+| PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Blocked / Unclaimed | B closed and separate protected-scope claim |
+| PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
+
+The maintainer requested A early for unattended continuity. Decision work may run alongside I189
+because it changes no behavior; B-D cannot bypass the ordered PERM-006 implementation chain.
 
 ## Decision Links And Constraints
 
