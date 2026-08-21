@@ -75,7 +75,8 @@ command, model request, permission result, sandbox, product UI, release or publi
 | 2026-08-22 | Selection | The maintainer requested early ADR completion for later unattended work. I218 is decision-only and non-overlapping with Active I189; this draft creates no authority before merge. |
 | 2026-08-22 | Claim proposed | PR #352 atomically proposes Claimed/Active state. It remains ineffective before target-branch merge and authorizes no executable behavior. |
 | 2026-08-22 | Claim effective | Exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role review `5372605087` and CAS; PR #352 merged as `ca30081a`. |
-| 2026-08-22 | Decision execution | PR #353 carries the current-path/threat matrix and Proposed ADR-064: default-on attempted assistance, a narrow one-shot managed-workspace text-write class, deterministic exclusions, redaction, timeout/circuit, cross-surface and migration boundaries. No executable behavior changes. |
+| 2026-08-22 | Decision execution | PR #353 carries the current-path/threat matrix and Proposed ADR-064: default-on attempted assistance, a narrow one-shot atomic no-clobber text-create class, deterministic exclusions, redaction, timeout/circuit, cross-surface and migration boundaries. No executable behavior changes. |
+| 2026-08-22 | Security correction | Exact-head review `5372757905` found a same-path modification TOCTOU. The first eligible class is now create-only with absent-target/path/parent binding and atomic no-clobber at the mutation point; existing-file modification requires a later portable CAS decision. |
 
 ## Verification Evidence
 

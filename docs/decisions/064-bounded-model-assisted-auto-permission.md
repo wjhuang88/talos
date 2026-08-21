@@ -53,7 +53,8 @@ session, and is consumed once. Any Deny or hard-boundary result is terminal befo
 ### 2. First implementation maximum authority
 
 The first implementation may assess only an Ask composed entirely of workspace-local `Write`
-facets for structured text create/modify operations by explicitly allowlisted native Talos tools.
+facets for creation of one new structured text file by an explicitly allowlisted native Talos
+tool. Modification of any existing file remains ineligible.
 The operation must carry a typed managed-workspace lease proving an isolated non-`main` worktree
 and must not overwrite a pre-existing user or parallel-session change. Talos CLI derives this lease
 from the effective claimed Work Slice; SDK hosts may supply an equivalent narrowly scoped lease
@@ -63,7 +64,7 @@ The following are always ineligible and therefore require a human or headless De
 
 - Execute or Network facets, mixed profiles containing either, direct shell/process execution;
 - external/unresolved paths, VCS internals, credentials, secret stores or sensitive config;
-- delete, rename, chmod, binary mutation, sandbox fallback or persistent grants;
+- modification, delete, rename, chmod, binary mutation, sandbox fallback or persistent grants;
 - plugin/MCP-originated tools, Talos CLI work without an effective claim, `main`, and workspaces
   without a typed managed-workspace lease; and
 - any request whose safe assessment would require unredacted secrets or large raw content.
@@ -71,6 +72,21 @@ The following are always ineligible and therefore require a human or headless De
 Eligibility is a code-owned allowlist and predicate. The evaluator cannot declare itself eligible.
 Expanding any excluded class requires a new ADR or explicit ADR-064 amendment with fresh security
 review and adversarial evidence.
+
+The request and one-shot authorization bind `TargetState::Absent`, the normalized target path and a
+trusted open parent-directory capability/identity held through the mutation. Creation must be
+relative to that capability and use atomic no-clobber semantics. A path-string parent recheck
+followed by `create_new` is not sufficient against parent-directory swap. If another actor creates
+the target after assessment, execution fails without opening or replacing it; if the platform
+cannot provide the capability-bound primitive without separately approved dependency/`unsafe`
+work, that platform remains ineligible. The current `WriteTool` check-then-`tokio::fs::write`
+sequence is explicitly insufficient and must be replaced before the tool enters the allowlist.
+
+Automatic modification is deferred because a content digest check followed by rename is not a
+cross-process atomic compare-and-write. A later ADR amendment must bind a trusted target-state
+version to the one-shot authorization, define an implementable atomic mutation primitive on every
+supported platform, and pass same-path parallel-modification fixtures before any existing file is
+eligible.
 
 ### 3. Mode, configuration and session precedence
 
@@ -105,7 +121,7 @@ provider reasoning and external-path contents are forbidden.
 
 Output is a closed schema with `schema_version`, `request_digest`, `decision`, `reason_code` and
 `confidence`. `AllowOnce` requires `confidence=high` and the sole initial allow reason
-`bounded_workspace_text_change`; human-required reason codes are closed and non-authoritative.
+`bounded_workspace_text_create`; human-required reason codes are closed and non-authoritative.
 Free-form explanation is display-only and cannot affect execution. Unknown/extra/conflicting
 fields, any lower confidence, injection indicators or request-digest mismatch become
 `HumanRequired`.
@@ -153,7 +169,7 @@ model decisions never persist grants.
 | Child | Runnable deliverable | Acceptance focus |
 |---|---|---|
 | PERM-007-B | Versioned `auto.enabled` configuration and typed `/auto` session state/status only | precedence, defaults, session transitions, public-config migration; no model call |
-| PERM-007-C | Deterministic eligibility plus isolated evaluator, closed schemas, audit and circuit breaker at the PERM-006-C seam | Deny precedence, one-shot binding, privacy, injection, timeout, replay and no grants |
+| PERM-007-C | Deterministic create-only eligibility plus isolated evaluator, closed schemas, audit and circuit breaker at the PERM-006-C seam | Deny precedence, absent-target/parent binding, atomic no-clobber create, privacy, injection, timeout, replay and no grants |
 | PERM-007-D | Shared cross-surface conformance and rollout/rollback evidence | CLI/TUI/Goal/print/Runtime/MCP parity and human/headless fallback |
 
 Each child needs its own runnable iteration, effective Collaboration Claim, protected-scope review
@@ -166,8 +182,10 @@ of them.
   deterministic eligibility or auditable boundary.
 - **Default-on for every Ask**: makes Execute/Network/external-path prompts implicit model
   authority and violates the requested human fallback.
-- **Keep all writes human-only**: safe but does not support the requested unattended governed
-  development use case; the selected managed-worktree class is narrower and one-shot.
+- **Keep all writes human-only**: safe but prevents even new bounded artifacts; create-only
+  no-clobber is a smaller independently provable first step.
+- **Allow model-assisted modification using hash-check then rename**: still has a cross-process
+  check-to-replace race; deferred until a portable atomic compare-and-write contract is reviewed.
 - **Persist model approvals as grants**: compounds model error across later operations and policy
   changes.
 - **Make SDKs read `~/.talos/config.toml`**: violates host-owned Runtime composition and creates
@@ -180,8 +198,10 @@ Before this ADR becomes Accepted:
 - independently review every threat-matrix row at the exact decision head;
 - prove the current-path statements against the named source seams;
 - confirm default-on means attempted assistance, not default Allow;
-- confirm first-version write eligibility is limited to the managed-worktree predicate and cannot
-  override Deny, create grants, approve external/execute/network/sandbox paths or reuse results;
+- confirm first-version write eligibility is create-only, binds absent target/path/open parent
+  capability, uses capability-relative atomic no-clobber at the mutation point and cannot override
+  Deny, modify existing content, create grants, approve external/execute/network/sandbox paths or
+  reuse results;
 - verify privacy, injection, race, timeout, circuit, headless, semver and rollback contracts; and
 - run both governance validators with an explicit target-branch base, manifest YAML parsing and
   `git diff --check`.
@@ -192,8 +212,10 @@ the adversarial and conformance fixtures specified by the threat matrix.
 ## Consequences
 
 - The product default can be “on” while actual authority remains narrow, typed and fail-closed.
-- Governed unattended text changes under a typed managed-workspace lease can avoid repeated human
-  prompts without coupling third-party SDK hosts to Talos governance documents.
+- Governed unattended creation of new text files under a typed managed-workspace lease can avoid
+  repeated human prompts without coupling third-party SDK hosts to Talos governance documents.
+- Editing existing files remains human-mediated until a portable atomic compare-and-write boundary
+  is separately accepted.
 - General shell, network, external-path and arbitrary-workspace Ask outcomes still require a human.
 - The separate evaluator adds latency and provider cost; bounded timeout/circuit behavior makes that
   visible and reversible.
@@ -204,6 +226,6 @@ the adversarial and conformance fixtures specified by the threat matrix.
 
 Disable or supersede this decision if adversarial testing shows scope enlargement, secret leakage,
 result replay, policy bypass, cross-surface divergence, unacceptable false approval, or inability
-to distinguish user/parallel-session changes. Any proposal to admit Execute, Network, external
-paths, sandbox fallback, persistent grants or unmanaged workspaces requires a fresh decision and
-independent security review.
+to distinguish user/parallel-session changes. Any proposal to admit modification, Execute,
+Network, external paths, sandbox fallback, persistent grants or unmanaged workspaces requires a
+fresh decision and independent security review.

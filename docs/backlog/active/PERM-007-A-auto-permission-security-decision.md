@@ -106,8 +106,9 @@ reviewed threat model and accepted decision, not permission behavior.
   `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md`.
 - Proposed decision: `docs/decisions/064-bounded-model-assisted-auto-permission.md`.
 - Decision documentation PR: #353; its exact head still requires independent security review.
-- ADR-064 proposes default-on *attempted* assistance, not default Allow; only one-shot structured
-  text create/modify in an isolated claimed non-`main` managed worktree is initially eligible.
+- ADR-064 proposes default-on *attempted* assistance, not default Allow; only one-shot atomic
+  no-clobber creation of a new structured text file under a typed managed-workspace lease is
+  initially eligible. Existing-file modification remains human-mediated.
 - Execute, Network, external paths, secrets, destructive/binary mutations, sandbox fallback,
   plugin/MCP calls, persistent grants and unmanaged/user-dirty work remain human/headless-Deny.
 - This documentation changes no executable behavior and does not authorize PERM-007-B/C/D.
