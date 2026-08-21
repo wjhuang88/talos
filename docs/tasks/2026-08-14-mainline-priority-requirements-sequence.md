@@ -953,3 +953,25 @@ Recovery state is intentionally quiet: archival Draft PRs #120/#121 and historic
 untouched. A future session must fetch exact `main`, re-inventory all non-terminal iterations, and
 establish the selected owner's runnable iteration and effective claim before implementation. This
 closed task transfers no Desktop, Dashboard, release, publish, PERM-006 or TOOL-024 authority.
+
+## 2026-08-22 Issue #59 / #188 Resumption And I218 Decision Closeout
+
+The maintainer resumed the dependency-clearing chain toward Issue #59 and explicitly added Issue
+#188. I189/PERM-006-A became Active/Claimed through PR #351 merge `20cfcce4`. In parallel, the
+non-overlapping decision-only PERM-007-A/I218 claim passed CI `32503441611`, independent
+Agent-role review `5372605087` and CAS, then merged through PR #352 as `ca30081a`.
+
+I218 decision content at Completion Commit `a289a07f` passed exact-head CI `32505438495`,
+independent security review `5372825090` and CAS; PR #353 merged as `c129d4a5`. ADR-064 is Accepted
+and supersedes ADR-011. Default-on means attempted assistance, never default Allow. The only
+initial model-eligible write is capability-relative atomic no-clobber creation of a new text file
+under a typed managed-workspace lease. Existing-file modification, Execute, Network, external
+paths, secrets, sandbox fallback, grants and unsupported platform primitives remain human or
+headless-Deny. This status-only closeout cannot self-certify the decision and authorizes no code.
+
+Resume from exact current `main` by implementing only the already effective I189/PERM-006-A Work
+Slice in `/private/tmp/talos-i189-impl` (or a clean replacement at the same-or-later claim ancestry),
+then independently review and close A before selecting B and C in order. PERM-007-B/C/D remain
+Blocked until PERM-006-A/B/C close and each child obtains its own effective protected-scope claim.
+TOOL-024-B/C/D and Issue #59 remain Blocked until PERM-006-C and their separate claims; no release,
+publication, Desktop or Dashboard authority is transferred.

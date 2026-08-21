@@ -8,10 +8,10 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | In Progress — PERM-007-A / I218 Active/Claimed from merge `ca30081a` |
+| Status | In Progress — PERM-007-A / I218 Complete; PERM-007-B/C/D Blocked |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 Active/Claimed for PERM-007-A decision only; implementation none |
-| Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; ADR-011 revision; existing Deny precedence |
+| Selected Iteration | I218 Complete / Closed for PERM-007-A; implementation none |
+| Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; Accepted ADR-064; existing Deny precedence |
 
 ## Collaboration Claim
 
@@ -27,8 +27,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Independently review and accept an ADR that revises or supersedes ADR-011, then claim one bounded child before implementation. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | ADR-064 is Accepted through I218. Finish PERM-006-A/B/C, then prepare one bounded PERM-007 child with its own protected-scope claim before implementation. |
 
 ## Identity / Goal / Value
 
@@ -69,13 +69,16 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 
 | Child | Deliverable | Current State | Gate |
 |---|---|---|---|
-| PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Active / Claimed from PR #352 merge `ca30081a` | Independent exact-head security review; no behavior change |
+| PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Complete / Closed at Completion Commit `a289a07f`; ADR-064 Accepted | No behavior change; evidence retained |
 | PERM-007-B | Canonical config plus `/auto` session command | Blocked / Unclaimed | Accepted A and all PERM-006 A-C gates closed |
 | PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Blocked / Unclaimed | B closed and separate protected-scope claim |
 | PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
 
 The maintainer requested A early for unattended continuity. Decision work may run alongside I189
 because it changes no behavior; B-D cannot bypass the ordered PERM-006 implementation chain.
+
+PERM-007-A child Completion Commit: `a289a07ff97746d877f3a422d15f8044bbf50ab6`.
+The parent Epic remains In Progress and does not claim completion from this child evidence.
 
 ## Decision Links And Constraints
 

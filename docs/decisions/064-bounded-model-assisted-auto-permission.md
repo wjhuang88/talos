@@ -1,9 +1,19 @@
 # ADR-064: Bounded Model-Assisted Auto Permission Decisions
 
-> Status: Proposed
+> Status: Accepted
 > Date: 2026-08-22
 > Owner: PERM-007-A / I218
-> Supersession: on acceptance, supersedes ADR-011; until then ADR-011 remains authoritative.
+> Supersession: supersedes ADR-011 at reviewed Completion Commit `a289a07f`.
+
+## Acceptance Evidence
+
+- Decision and threat-matrix content: `a0cbe9b9`; create-only TOCTOU correction and exact reviewed
+  head: `a289a07ff97746d877f3a422d15f8044bbf50ab6`.
+- Exact-head CI: `32505438495`.
+- Independent Agent-role security review: `5372825090`; the earlier finding `5372757905` required
+  removal of existing-file modification and capability-relative atomic no-clobber creation.
+- Merge-time CAS passed and PR #353 merged as `c129d4a54e021f50aa7df8ab2040f9abcd8edba7`.
+- Acceptance changes no executable behavior and grants no PERM-007-B/C/D implementation authority.
 
 ## Context
 

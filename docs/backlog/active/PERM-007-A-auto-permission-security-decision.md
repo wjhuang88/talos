@@ -1,23 +1,23 @@
 # PERM-007-A: Auto Permission Security Decision
 
-**Status**: Active / Claimed
+**Status**: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-A |
 | Type | Permission / Security Decision |
 | Priority | P0 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | PERM-007 |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 - Active / Claimed |
+| Selected Iteration | I218 - Complete / Closed |
 | Depends On | Existing ADR-011 and current permission/config/command behavior; PERM-006-A/B/C are implementation prerequisites, not decision prerequisites |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-22 |
 | Work Slice | Decide only PERM-007-A / I218: threat model and one ADR revising or superseding ADR-011, including eligible decisions, maximum authority, mode precedence, privacy, validation, audit, deadline, circuit-breaker, migration, rollback and bounded B-D implementation children. No Rust/Cargo/config schema, `/auto`, model request, prompt, grant, approval, runtime, sandbox, TOOL-024, Desktop, release or publication implementation. |
@@ -25,10 +25,10 @@
 | Source Issue | #188 |
 | Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer requested early ADR acceptance for unattended continuity. Claim PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance review `5372605087` and merge-time CAS, then merged as `ca30081a`. |
-| Implementation PR | #353 (decision documentation only; ADR not yet accepted) |
+| Authorization Evidence | Claim PR #352 merged as `ca30081a`. Decision PR #353 exact head `a289a07f` passed CI `32505438495`, independent Agent-role security review `5372825090` and merge-time CAS, then merged as `c129d4a5`. |
+| Implementation PR | #353 (decision documentation only) |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Active from claim merge `ca30081a`. The decision head requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
+| Handoff / Release Condition | Closed at Completion Commit `a289a07f`; ADR-064 is Accepted and supersedes ADR-011. PERM-007-B/C/D remain blocked until PERM-006-A/B/C close and separate child claims become effective. |
 
 ## Claim Activation Checkpoint — 2026-08-22
 
@@ -93,25 +93,35 @@ reviewed threat model and accepted decision, not permission behavior.
 
 ## Acceptance
 
-- [ ] A current-path/threat matrix cites the actual policy, execution, config and command seams.
-- [ ] A Proposed ADR explicitly accepts, rejects or narrows default-on `auto` per risk class.
-- [ ] The ADR fixes authority, precedence, privacy, validation, deadlines, audit, circuit-breaker,
+- [x] A current-path/threat matrix cites the actual policy, execution, config and command seams.
+- [x] A Proposed ADR explicitly accepts, rejects or narrows default-on `auto` per risk class.
+- [x] The ADR fixes authority, precedence, privacy, validation, deadlines, audit, circuit-breaker,
       headless, migration and rollback semantics and defines runnable B-D children.
-- [ ] Independent exact-head security review covers every matrix row and accepts the decision.
-- [ ] Both governance validators, YAML parsing and `git diff --check` pass with no behavior change.
+- [x] Independent exact-head security review covers every matrix row and accepts the decision.
+- [x] Both governance validators, YAML parsing and `git diff --check` pass with no behavior change.
 
 ## Decision Execution Evidence
 
 - Current-path and threat matrix:
   `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md`.
-- Proposed decision: `docs/decisions/064-bounded-model-assisted-auto-permission.md`.
-- Decision documentation PR: #353; its exact head still requires independent security review.
+- Accepted decision: `docs/decisions/064-bounded-model-assisted-auto-permission.md`.
+- Decision documentation PR #353 exact head `a289a07f` passed CI `32505438495`, independent
+  security review `5372825090` and CAS, then merged as `c129d4a5`.
 - ADR-064 proposes default-on *attempted* assistance, not default Allow; only one-shot atomic
   no-clobber creation of a new structured text file under a typed managed-workspace lease is
   initially eligible. Existing-file modification remains human-mediated.
 - Execute, Network, external paths, secrets, destructive/binary mutations, sandbox fallback,
   plugin/MCP calls, persistent grants and unmanaged/user-dirty work remain human/headless-Deny.
 - This documentation changes no executable behavior and does not authorize PERM-007-B/C/D.
+
+## Completion Evidence
+
+- Completion Commit: `a289a07ff97746d877f3a422d15f8044bbf50ab6`
+- The Completion Commit predates this status-only closeout and contains the independently reviewed
+  create-only capability-relative no-clobber correction to ADR-064 and its threat matrix.
+- PR #353 merged as `c129d4a54e021f50aa7df8ab2040f9abcd8edba7` after exact-head CI
+  `32505438495`, independent Agent-role security approval `5372825090` and merge-time CAS.
+- ADR-064 is Accepted and ADR-011 is Superseded. No executable behavior is claimed.
 
 ## Residual Destination
 

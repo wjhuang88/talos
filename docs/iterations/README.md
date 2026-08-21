@@ -85,7 +85,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I215 | Local Convergence And Stage Validation | Complete / Closed | Completion Commit `06e61e3c`; PR #341 merged as `81a603b4` after CI `32442052401`, review `5365129718` and CAS. No product/runtime authority. |
 | I216 | Bounded Shutdown Coordinator And Admission Fence | Complete / Closed | Completion Commit `c123328d`; PR #345 merged as `020de694` after exact-head CI `32459530911`, independent runtime review `5367434951` and CAS. C/I217 later completed at `44e840d7`. |
 | I217 | Ordered Finalizer Registry And Durable Closure | Complete / Closed | Completion Commit `44e840d7`; PR #348 merged as `6e5fa8c3`; exact-head CI `32475052535`; independent runtime architecture review `5369328072`. |
-| I218 | Auto Permission Security Decision | Active / Claimed | Claim PR #352 merged as `ca30081a`; threat matrix and Proposed ADR-064 are decision-only. Exact-head security review gates acceptance; no executable behavior or later child authority. |
+| I218 | Auto Permission Security Decision | Complete / Closed | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent Agent-role security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. ADR-064 Accepted; no behavior or later child authority. |
 
 ## Completed This Closeout
 
