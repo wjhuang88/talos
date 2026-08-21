@@ -1,6 +1,6 @@
 # Iteration I215: Local Convergence And Stage Validation
 
-> Document status: Review / Claimed - atomic activation merged; locally converged stage candidate ready
+> Document status: Complete / Closed
 > Published plan date: 2026-08-21
 > Planned objective: replace remote micro-PR editing loops with local convergence and stable-stage
 > validation while preserving Talos security, release, ownership and completion gates.
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-21 |
 | Work Slice | Implement only the I205-selected delivery-workflow optimization: atomic claim+activation, mandatory local convergence before remote implementation submission, stable-stage exact-head CI/review semantics, reduced PR-number/status backfill churn, safe owner-first closeout combination, executable scenario fixtures, and the reusable process lesson. Preserve protected-scope independent review, release preflight/order, merge-time CAS, target-branch truth, published baselines and pre-existing Completion Commit evidence. No product/runtime/TUI/permission/sandbox/release/dependency behavior change. |
@@ -21,9 +21,9 @@
 | Governance Claim PR | #340 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Talos optimize the governance guidance before further development and specified local design/implementation/test convergence followed by stage-level remote validation. This governance-only PR proposes claim and activation atomically; neither is effective until merge. Exact-head CI, both governance validators, no blocking feedback and merge-time CAS remain required. |
-| Implementation PR | Not started - stable candidate not yet pushed |
+| Implementation PR | #341 merged as `81a603b4` |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Submit the locally converged stable candidate for exact-head CI and review. Complete only after merge and owner-first closeout cite a pre-existing implementation/evidence commit. |
+| Handoff / Release Condition | Closed. Resume I214/#338 and batch its two architecture corrections locally before submitting a new stable head. |
 
 ## Published Baseline
 
@@ -85,6 +85,7 @@ Archival Draft PRs #120/#121 remain untouched.
 | 2026-08-21 | Atomic claim+activation proposal | Governance PR #340 proposes both Claimed and Active from exact `main@14531bbc`. Neither state is effective until merge; no SOP, validator, product or runtime implementation exists on this branch. |
 | 2026-08-21 | Atomic activation merge | PR #340 head `1e00249b` passed CI `32439457491`, both validators, manifest/scale checks and CAS, then merged as `e66d039c`. Claim and Active became effective together. |
 | 2026-08-21 | Local convergence | AGENTS/SOP rules, POSIX/PowerShell validator integration, 12 workflow scenarios and the EVOLUTION lesson converged locally from the activation merge without intermediate implementation pushes. I215 moves to Review for one stable stage candidate. |
+| 2026-08-21 | Stable-stage merge | PR #341 exact head `06e61e3c` passed CI `32442052401`, independent Agent-role review `5365129718` and merge-time CAS, then merged as `81a603b4`. |
 
 ## Verification Evidence
 
@@ -102,9 +103,13 @@ Archival Draft PRs #120/#121 remain untouched.
 
 ## Completion Evidence
 
-- Completion Commit: pending.
-- A later status transition must cite pre-existing SOP/validator/evidence commits; this claim and
-  activation record cannot self-certify completion.
+- Completion Commit: `06e61e3c87354131f8fd70d7e5319ce6e10980a3`; PR #341 merge
+  `81a603b4b0b2bb5168bae00d0a806879fb62c684`.
+- Exact-head CI `32442052401`: all five checks passed.
+- Independent Agent-role review `5365129718`: APPROVE, bound to exact head/base with shared-account
+  identity limitation disclosed.
+- Merge-time CAS passed immediately before the SHA-bound merge.
+- This owner-first closeout cites pre-existing implementation/evidence and cannot self-certify.
 
 ## Variance And Residuals
 
@@ -118,3 +123,6 @@ Archival Draft PRs #120/#121 remain untouched.
   push: the draft block had skipped the SQLite self-test and referenced the delivery validator too
   early. Cross-platform execution, not syntax-only parsing, is required evidence for validator
   changes.
+- Atomic claim+activation plus one locally converged implementation candidate reduced the ordinary
+  flow to two stage PRs while retaining exact-head CI, independent review, CAS and evidence-based
+  completion.

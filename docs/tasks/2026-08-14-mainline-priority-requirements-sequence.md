@@ -753,3 +753,14 @@ not atomically pair actor admission with turn start, leaving a check-to-start ra
 `shutdown_with(self, invalid_options)` conflicts with Drop-triggered default shutdown. I214 remains
 Active/Claimed. After I215 closes, batch both corrections locally on #338 and obtain fresh exact-head
 review; do not convert either finding into a separate micro-PR.
+
+## 2026-08-21 I215 Stable-Stage Completion
+
+PR #341 exact head `06e61e3c` passed CI `32442052401`, independent Agent-role review
+`5365129718` and merge-time CAS, then merged as `81a603b4`. GOV-008/I215 is Complete/Closed at
+Completion Commit `06e61e3c`; this status synchronization does not cite itself. Issue #339 closed
+with the implementation merge and receives the same owner evidence.
+
+The next mainline action returns to already Active/Claimed I214/#338. Batch its admission
+check-to-start race and invalid-options/Drop contract corrections locally, rerun the complete local
+checkpoint, then submit one new stable #338 head for fresh exact-head architecture review.

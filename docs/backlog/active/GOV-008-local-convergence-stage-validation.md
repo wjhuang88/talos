@@ -1,11 +1,13 @@
 # GOV-008: Local Convergence And Stage Validation
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | GOV-008 |
 | Type | Governance / Delivery Workflow |
 | Priority | P0 |
-| Status | Review / Claimed - atomic activation merged; locally converged stage candidate ready |
+| Status | Complete / Closed |
 | Source | Maintainer correction on 2026-08-21; GOV-007/I205 throughput audit; Issue #339 |
 | Selected Iteration | I215 - atomic claim+activation pilot |
 | Depends On | GOV-007/I205 Complete; current collaboration, Git, iteration, document-check and long-task contracts |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-08-21 |
 | Work Slice | Implement only the I205-selected delivery-workflow optimization: atomic claim+activation, mandatory local convergence before remote implementation submission, stable-stage exact-head CI/review semantics, reduced PR-number/status backfill churn, safe owner-first closeout combination, executable scenario fixtures, and the reusable process lesson. Preserve protected-scope independent review, release preflight/order, merge-time CAS, target-branch truth, published baselines and pre-existing Completion Commit evidence. No product/runtime/TUI/permission/sandbox/release/dependency behavior change. |
@@ -23,9 +25,9 @@
 | Governance Claim PR | #340 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The maintainer explicitly directed that Talos optimize the governance guidance before further development and specified local design/implementation/test convergence followed by stage-level remote validation. This governance-only PR proposes claim and activation atomically; neither is effective until merge. Exact-head CI, both governance validators, no blocking feedback and merge-time CAS remain required. |
-| Implementation PR | Not started - stable candidate not yet pushed |
+| Implementation PR | #341 merged as `81a603b4` |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Submit the locally converged stable candidate for exact-head CI and review. Complete only after merge and owner-first closeout cite a pre-existing implementation/evidence commit. |
+| Handoff / Release Condition | Closed. Preserve the workflow gates and scenario harness; I214 may resume under the revised local-convergence process. |
 
 ## Goal
 
@@ -106,3 +108,16 @@ workspace check/Clippy/tests/doctests, `git diff --check`, and the no-Rust/Cargo
 that loop, the PowerShell validator was found to call the delivery harness before its variable was
 defined and to omit the SQLite self-test; the defect was corrected locally and every affected gate
 was rerun before the first implementation push.
+
+## Completion Evidence - 2026-08-21
+
+- Completion Commit: `06e61e3c87354131f8fd70d7e5319ce6e10980a3`; merged to `main` by
+  PR #341 as `81a603b4b0b2bb5168bae00d0a806879fb62c684`.
+- Exact-head CI run `32442052401` passed all five checks, including Linux full preflight, Windows
+  workspace, installer, classifier and remote Issue reconciliation.
+- Independent Agent-role review `5365129718` approved exact head `06e61e3c` against base
+  `e66d039c`, covered all six assigned risks and disclosed the shared-account identity limit.
+- Merge-time CAS reconfirmed unchanged head/base, `MERGEABLE/CLEAN`, all checks successful,
+  non-overlapping open PRs, Issue #339 state, both validators at 0 warnings and a clean worktree.
+- This closeout cites the already-existing implementation/evidence commit and does not use its own
+  status synchronization commit as completion evidence.
