@@ -107,13 +107,13 @@ wording without rewriting it.
 | 2026-08-21 | Activation proposal | I189 is the only proposed Active iteration. The proposal changes governance state only and is ineffective until its exact head passes CI, independent security review and merge-time CAS and reaches `main`; no implementation branch or Rust/Cargo edit is authorized before then. |
 | 2026-08-22 | Activation PR | Governance-only activation PR #351 is the proposed record. Its open branch has no activation effect; only the reviewed exact head reaching `main` authorizes implementation. |
 | 2026-08-22 | Activation effective | PR #351 merged as `20cfcce4` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921` and merge-time CAS. I189 is Active/Claimed. |
-| 2026-08-22 | API blocker | Read-only assessment proved that configured rules and runtime grants are indistinguishable in the public mutable `PermissionEngine.rules` vector. ADR-065 records the required pre-1.0 encapsulation and migration boundary; no provenance guess or hidden sentinel is permitted. |
+| 2026-08-22 | API blocker | Read-only assessment proved that configured rules and runtime grants are indistinguishable in the public mutable `PermissionEngine.rules` vector. ADR-065 decision content commit `dae98460` records the required pre-1.0 encapsulation and migration boundary; no provenance guess or hidden sentinel is permitted. Its Accepted status is ineffective until exact-head review, CI, CAS and target-branch merge. |
 
 ## Verification Evidence
 
 - PR #197 claim evidence: exact head `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, CI `31554958547`, independent security approval comment `5261239200`, merge `0df88638409027849e5bf4ba13ef72d2e96b9b90`.
 - Activation PR #351 evidence: exact head `c025f7b94cf71fb12650f24ad8f1fe1d2467f7bf`, CI `32500829272`, independent Agent-role security/governance approval `5372336921`, merge `20cfcce4e72be3da4e3efc1190ee498975e7476b`.
-- ADR-065 acceptance evidence is pending exact-head independent security/API review and target-branch merge.
+- ADR-065 decision content commit `dae98460c29c72cb61da391ddf998630e67d6f15` pre-exists its status commit. Acceptance remains ineffective until exact-head independent security/API review, CI, CAS and target-branch merge.
 
 ## Completion Evidence
 

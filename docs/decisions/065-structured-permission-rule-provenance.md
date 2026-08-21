@@ -1,6 +1,6 @@
 # ADR-065: Encapsulated Permission Rules And Diagnostic Provenance
 
-- Status: Proposed
+- Status: Accepted (effective when this exact reviewed status reaches `main`)
 - Date: 2026-08-22
 - Owners: PERM-006-A / I189
 - Related: Issues #52 and #53; ADR-024; ADR-026; ADR-047; ADR-064
@@ -126,6 +126,16 @@ No JSON/TOML permission configuration migration is required. No durable data is 
 - A future crates.io publication containing this change must use v0.9.0 or later and mention the
   migration; release/publish work remains outside I189.
 
+## Acceptance Evidence
+
+- Decision-content commit: `dae98460c29c72cb61da391ddf998630e67d6f15`.
+- The status commit cannot self-certify the decision. Acceptance is effective only after the final
+  exact PR head passes both governance validators, CI, independent Agent-role security/API review,
+  merge-time CAS and target-branch merge.
+- This acceptance authorizes only the I189 migration and structured evaluator already bounded by
+  its effective claim. It does not authorize PERM-006-B/C/D/E, PERM-007 behavior, TOOL-024,
+  version changes, release or crates.io publication.
+
 ## Rejected Alternatives
 
 ### Encode source in an ignored `PermissionRule` field
@@ -171,4 +181,3 @@ Revisit or supersede this ADR if:
 - a future durable audit requirement needs identifiers to survive restart;
 - PERM-006-C requires a report transport that cannot remain additive at the hook boundary; or
 - the migration removes a currently supported construction path without an equivalent method.
-
