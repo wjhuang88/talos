@@ -1,20 +1,22 @@
 # VALIDATION-002: Deferred Human Review And Acceptance Batch
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | VALIDATION-002 |
 | Type | Governance / Human Validation Story |
 | Priority | P0 within the mainline long-task closeout |
-| Status | Review - I211 Review / Claimed |
+| Status | Complete / Closed - I211 Complete / Closed |
 | Source | [GitHub Issue #302](https://github.com/wjhuang88/talos/issues/302) |
-| Selected Iteration | I211 - Review / Claimed |
+| Selected Iteration | I211 - Complete / Closed |
 | Depends On | Terminal dispositions for I200, I197, I201, I212, I210 and I198; exact implementation heads recorded in Issue #302 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline validation session |
 | Work Slice | I211/VALIDATION-002/#302 evidence only: execute and record the already-defined natural-person and real-terminal rows for I200, I197, I201, I212, I210 and I198; synchronize source owners first; create separately governed corrective owners for failures. No product implementation, policy, dependency, persistence, release or publication change. |
@@ -23,9 +25,9 @@
 | Governance Claim PR | #326 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`, both governance validators and merge-time CAS, then merged as `285fc3c7`. |
-| Implementation PR | None - evidence-only validation slice |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Every #302 row must pass or name a separately governed corrective owner; synchronize source owners first before long-task closure. |
+| Implementation PR | #331 - evidence-only validation slice |
+| Last Updated | 2026-08-21 |
+| Handoff / Release Condition | None - every #302 row passed or has a separate corrective owner; PR #331 merged as `97dbf35f`. Product fixes remain separately unclaimed. |
 
 ## Identity / Goal / Value
 
@@ -156,3 +158,12 @@ is Complete/Closed at `3afeeb28`; I198 remains Review.
 All Issue #302 rows now pass or have a separate corrective owner. VALIDATION-002/I211 is Review
 pending #331 exact-head CI, independent review, merge-time CAS and a later closeout that cites the
 pre-existing evidence commit. This evidence update does not self-certify I211 completion.
+
+## 2026-08-21 Completion Evidence
+
+Completion Commits: `b7d55a0dd928d22df06cff43754046d0239a5ad8`,
+`7c333d98e0b3807af0bc277bada8a4e7cbf2048e`. PR #331 final head `7c333d98` passed CI
+`32372514265`, independent Agent approval `5356366597`, both governance validators, remote owner
+reconciliation and merge-time CAS, then merged as `97dbf35f`. This later status-only closeout does
+not self-certify completion. VALIDATION-002/I211 is Complete/Closed; the five corrective owners
+remain Ready/Unclaimed.

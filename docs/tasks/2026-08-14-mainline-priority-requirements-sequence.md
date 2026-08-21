@@ -349,7 +349,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7A | Claim and deliver I212 / MODEL-013 implementation | Conservative local catalog context-window inference with explicit precedence/provenance | T7 implementation/deferred-validation disposition | Effective claim, exact-head CI, Agent technical review and CAS; add custom-provider walkthrough row to #302 | Preserve unknown fallback; reject ambiguous matches | Complete / Completion Commit `5a1709cb` |
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`, human row deferred |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`, human row deferred |
-| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Review / all rows terminal; #331 and evidence-bound closeout pending |
+| T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and long task Partial | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
 | T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Planned |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Planned |
 
@@ -668,3 +668,15 @@ Every Issue #302 row now passes or has a separately governed corrective owner. I
 Review pending rolling evidence PR #331 exact-head CI, independent review and merge-time CAS. A
 later status-only closeout must cite the already-existing #331 evidence commit and then reassess
 Issue #59; this evidence update cannot self-certify I211 completion.
+
+## 2026-08-21 I211 Evidence Merge And Closeout Checkpoint
+
+PR #331 final head `7c333d98` passed exact-head CI `32372514265`, independent Agent approval
+`5356366597`, both governance validators, remote owner reconciliation and merge-time CAS, then
+merged as `97dbf35f`. I211/VALIDATION-002 is Complete/Closed at pre-existing evidence commits
+`b7d55a0d` and `7c333d98`; this status-only closeout does not self-certify completion.
+
+I200 and I212 are Complete. I197, I198, I201 and I210 remain Review with corrective destinations
+TUI-059/#330, SKILL-005/#333, TUI-058/#329 and TUI-060/#332; TUI-061/#334 remains the separate
+padding regression owner. T9 is terminal. The next exact action is T10: re-fetch current main and
+reassess Issue #59's RUNTIME-005, PERM-006-C and TOOL-023-C gates before selecting any new child.

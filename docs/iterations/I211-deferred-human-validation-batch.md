@@ -1,6 +1,6 @@
 # Iteration I211: Deferred Human Review And Acceptance Batch
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-18
 > Planned objective: execute one independent human validation phase for the mainline long-task
 > children whose natural-person review or device-dependent acceptance was explicitly deferred.
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline validation session |
 | Work Slice | I211/VALIDATION-002/#302 evidence only: execute and record the already-defined natural-person and real-terminal rows for I200, I197, I201, I212, I210 and I198; synchronize source owners first; create separately governed corrective owners for failures. No product implementation, policy, dependency, persistence, release or publication change. |
@@ -24,9 +24,9 @@
 | Governance Claim PR | #326 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #326 exact head `d51d5721` passed CI `32347993402`, independent Agent approval `5353284891`, both governance validators and merge-time CAS, then merged as `285fc3c7`. |
-| Implementation PR | None - evidence-only validation slice |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Finish or explicitly route every Issue #302 row, synchronize source owners first, and close the long task only after all passed rows or separately governed corrective owners are recorded. |
+| Implementation PR | #331 - evidence-only validation slice |
+| Last Updated | 2026-08-21 |
+| Handoff / Release Condition | None - every Issue #302 row passed or has a separately governed corrective owner; PR #331 merged as `97dbf35f`. Product correction remains with TUI-058/#329, TUI-059/#330, TUI-060/#332, SKILL-005/#333 and TUI-061/#334. |
 
 ## Published Baseline
 
@@ -79,12 +79,15 @@ creates no product implementation authority.
 ## Verification Evidence
 
 The exact source heads, integrated runtime head, maintainer observations and separately owned
-failures are recorded in Issue #302 and the appended checkpoints below. Final exact-head CI and
-independent review remain pending on rolling evidence PR #331.
+failures are recorded in Issue #302 and the appended checkpoints below. PR #331 final head
+`7c333d98` passed exact-head CI `32372514265`, independent Agent review `5356366597`, both
+governance validators, remote owner reconciliation and merge-time CAS, then merged as `97dbf35f`.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commits: `b7d55a0dd928d22df06cff43754046d0239a5ad8`,
+`7c333d98e0b3807af0bc277bada8a4e7cbf2048e`. These pre-existing evidence commits are ancestors
+of `main`; this status-only closeout cannot serve as its own evidence.
 
 ## Variance And Residuals
 
@@ -92,7 +95,10 @@ None at planning time. Product defects found by I211 must use new corrective own
 
 ## Retrospective
 
-Pending execution.
+The deferred mode preserved delivery throughput without fabricating acceptance. Aggregated human
+validation found five separately owned product defects while allowing I200 and I212 to close on
+passing evidence. Future recovery must enter through those corrective owners, not reopen I211 or
+reinterpret failed rows as pending.
 
 ## Change Control - 2026-08-19 MODEL-013 Priority Advance
 
@@ -205,3 +211,11 @@ I197, I198, I201 and I210 remain Review under TUI-059/#330, SKILL-005/#333, TUI-
 TUI-060/#332 respectively; TUI-061/#334 preserves the unrelated regression found during I200
 validation. I211 moves to Review, not Complete: rolling evidence PR #331 must merge before a later
 status-only closeout may cite its pre-existing evidence commit.
+
+## 2026-08-21 Evidence Merge And Closeout
+
+PR #331 merged as `97dbf35f` from exact head `7c333d98` after CI `32372514265`, independent Agent
+approval `5356366597`, explicit-base governance validation, remote reconciliation and merge-time
+CAS. The evidence commits `b7d55a0d` and `7c333d98` predate this status closeout and are now main
+ancestors. I211/VALIDATION-002 is Complete/Closed; the four failed source iterations remain Review
+and the five Ready/Unclaimed corrective owners receive no implementation authority from closure.
