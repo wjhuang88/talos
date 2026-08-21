@@ -1,6 +1,6 @@
 # Iteration I217: Ordered Finalizer Registry And Durable Closure
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-21
 > Planned objective: implement only ADR-063 RUNTIME-005-C as a bounded, independently runnable
 > runtime SDK finalization slice without third-party callbacks, TOOL-024, permission, product or
@@ -21,9 +21,9 @@
 | Governance Claim PR | #347 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 exact head `3253abb5` passed CI `32471570214`, both validators, independent runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. Shared-account review establishes Agent-role separation only. |
-| Implementation PR | Not started |
+| Implementation PR | #348 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Keep I217 Active until one stable implementation candidate passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS; completion requires a later closeout naming the pre-existing implementation commit. |
+| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Implementation PR #348 is in Review at implementation commit `44e840d7`; require exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Completion requires a later closeout naming this pre-existing implementation commit. |
 
 ## Published Baseline
 
@@ -135,3 +135,12 @@ external SDK fixture. Full locked release preflight and three consecutive focuse
 passed. The Published Baseline above remains byte-preserved. I217 stays Active until this locally
 converged stage is published once and receives fresh exact-head CI, independent runtime
 architecture review and merge-time CAS; Completion Commit remains Pending.
+
+## 2026-08-21 Stable Review Submission
+
+Implementation commit `44e840d7` was created directly from claim merge `bb6f5ed9` after local
+convergence and full locked preflight passed. Draft PR #348 was opened only to obtain and backfill
+its number; I217 now moves to Review / Claimed. This metadata-only follow-up does not change the
+Published Baseline or implementation behavior. Exact-head Unix/Windows CI, both validators,
+independent runtime architecture review and merge-time CAS remain required, and Completion Commit
+stays Pending until a later closeout.

@@ -1,16 +1,16 @@
 # RUNTIME-005-C: Ordered Finalizer Registry And Durable Closure
 
-**Status**: Active / Claimed
+**Status**: Review / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-005-C |
 | Type | Runtime / Public SDK Story |
 | Priority | P0 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Parent Epic | RUNTIME-005 |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
-| Selected Iteration | I217 - Active / Claimed |
+| Selected Iteration | I217 - Review / Claimed |
 | Depends On | RUNTIME-005-B / I216 Complete; ADR-063 Accepted; SESSION-008-B Complete; RUNTIME-001 Complete |
 
 ## Collaboration Claim
@@ -26,9 +26,9 @@
 | Governance Claim PR | #347 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | The maintainer directed continuation of the mainline long task after I216 closeout. PR #347 exact head `3253abb5` passed CI `32471570214`, both validators, independent runtime architecture review `5368607605` and merge-time CAS, then merged as `bb6f5ed9`. Shared-account review establishes Agent-role separation only. |
-| Implementation PR | Not started |
+| Implementation PR | #348 |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Keep I217 Active until one stable implementation candidate passes exact-head CI, both validators, independent runtime architecture review and merge-time CAS; completion requires a later closeout naming the pre-existing implementation commit. |
+| Handoff / Release Condition | Claim and activation are effective through PR #347 merge `bb6f5ed9`. Implementation PR #348 is in Review at implementation commit `44e840d7`; require exact-head CI, both validators, independent runtime architecture review and merge-time CAS. Completion requires a later closeout naming this pre-existing implementation commit. |
 
 ## Goal And User Value
 
@@ -138,3 +138,11 @@ fixture modes and the full locked release preflight passed. The default producti
 intentionally empty, and no public arbitrary callback registration surface was added. I217 remains
 Active pending publication as one stable implementation PR, exact-head Unix/Windows CI,
 independent runtime architecture review and merge-time CAS.
+
+## 2026-08-21 Stable Review Submission
+
+Implementation commit `44e840d7` was created directly from claim merge `bb6f5ed9` after local
+convergence and full locked preflight passed. Draft PR #348 was opened only to obtain and backfill
+its number; I217 now moves to Review / Claimed. The metadata backfill adds no implementation
+behavior. Exact-head Unix/Windows CI, both validators, independent runtime architecture review and
+merge-time CAS remain required, and this implementation PR cannot mark the iteration Complete.

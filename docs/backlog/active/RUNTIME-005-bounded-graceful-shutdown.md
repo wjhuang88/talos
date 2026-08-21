@@ -5,7 +5,7 @@
 | Story ID | RUNTIME-005 |
 | Type | Runtime / Lifecycle Story |
 | Priority | P1 |
-| Status | In Progress / Unclaimed — A/B Complete; C Active/Claimed |
+| Status | In Progress / Unclaimed — A/B Complete; C Review/Claimed |
 | Source | [GitHub Issue #49](https://github.com/wjhuang88/talos/issues/49) |
 | Selected Iteration | None |
 | Depends On | SESSION-008 partial persistence; RUNTIME-001 embedded API |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-21 |
-| Handoff / Release Condition | Epic parent is not an implementation unit. C/I217 is Active/Claimed through PR #347 merge `bb6f5ed9`; keep Issue #49 open through independently reviewed C completion. |
+| Handoff / Release Condition | Epic parent is not an implementation unit. C/I217 is Review/Claimed in implementation PR #348 at `44e840d7`; keep Issue #49 open through independently reviewed C completion. |
 
 ## Identity / Goal / Value
 
@@ -65,7 +65,7 @@ completed shutdown/finalizer boundary and must not be a dependency of this Story
 |---|---|---|---|
 | RUNTIME-005-A | Shutdown policy, arbitration, finalizer and report ADR | Complete / Closed through I214; Completion Commit `6719c876` | SESSION-008-A/B Complete; RUNTIME-001 Complete |
 | RUNTIME-005-B | Shared admission/start arbiter, bounded active-turn policy and structured report | Complete / Closed through I216; Completion Commit `c123328d`; PR #345 merge `020de694` | RUNTIME-005-A Accepted; SESSION-008-B Complete |
-| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Active / Claimed through I217; PR #347 merged as `bb6f5ed9` | RUNTIME-005-B Complete |
+| RUNTIME-005-C | Ordered bounded finalizer registry, durable reconciliation and compatibility wrapper | Review / Claimed through I217; implementation PR #348 at `44e840d7` | RUNTIME-005-B Complete |
 
 RUNTIME-005-A Completion Commit: `6719c876fe9f190e47fba5ef62f3263e782d6e8b`. This is child
 decision evidence only; parent RUNTIME-005 remains In Progress/Unclaimed until B and C complete.
@@ -202,3 +202,11 @@ converged implementation passed full locked preflight plus repeated focused fina
 remains Active until one stable implementation PR passes exact-head CI, independent runtime
 architecture review and merge-time CAS. Parent RUNTIME-005 stays Unclaimed/In Progress, Issue #49
 stays open, and no TOOL-024, permission, I189, release or publication authority transfers.
+
+## 2026-08-21 C Stable Review Submission
+
+The locally converged C implementation was committed as `44e840d7` directly on claim merge
+`bb6f5ed9`; Draft PR #348 was opened only to obtain and backfill the implementation PR number.
+C/I217 now moves to Review / Claimed. Exact-head Unix/Windows CI, both validators, independent
+runtime architecture review and merge-time CAS remain required before merge. Parent RUNTIME-005
+stays Unclaimed/In Progress and Issue #49 remains open until an evidence-bearing closeout.

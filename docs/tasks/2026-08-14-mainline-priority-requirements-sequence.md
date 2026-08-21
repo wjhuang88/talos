@@ -897,3 +897,15 @@ passed locally. The default production registry remains empty and no public arbi
 was introduced. I217 stays Active pending one stable implementation PR, exact-head Unix/Windows
 CI, independent runtime architecture review and merge-time CAS. Issue #49 and T10/#59 remain open
 and Blocked respectively; I189, TOOL-024, release and publication remain unauthorized.
+
+## 2026-08-21 I217 Stable Review Submission
+
+Implementation commit `44e840d7` was created directly from effective claim merge `bb6f5ed9` after
+the full local convergence checkpoint passed. Draft PR #348 was opened only to obtain and backfill
+its number; the metadata-only follow-up moves RUNTIME-005-C/I217 to Review / Claimed without
+changing implementation behavior or the Published Baseline.
+
+The next stage is exact-head Unix/Windows CI, both validators, independent runtime architecture
+review and merge-time CAS. This implementation PR cannot mark I217 Complete; a later closeout must
+name pre-existing implementation commit `44e840d7`. Issue #49 and T10/#59 remain open/Blocked, and
+I189, TOOL-024, release and publication remain unauthorized.
