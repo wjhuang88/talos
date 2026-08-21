@@ -25,10 +25,10 @@
 | Source Issue | #188 |
 | Governance Claim PR | #352 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer explicitly requested early ADR acceptance for unattended continuity. Claim PR #352 must pass exact-head independent security review and merge-time CAS; the claim becomes effective only after target-branch merge. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer requested early ADR acceptance for unattended continuity. Claim PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance review `5372605087` and merge-time CAS, then merged as `ca30081a`. |
+| Implementation PR | #353 (decision documentation only; ADR not yet accepted) |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Claim and activation become effective only when PR #352 reaches `main`; the decision head then requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
+| Handoff / Release Condition | Active from claim merge `ca30081a`. The decision head requires exact-head independent security review before ADR acceptance. Implementation remains blocked until PERM-006-A/B/C close and separate child claims become effective. |
 
 ## Claim Activation Checkpoint — 2026-08-22
 
@@ -36,6 +36,12 @@ PR #352 proposes one atomic claim and activation for decision-only PERM-007-A/I2
 reaches `main`, this Claimed/Active record is proposal metadata and grants no authority. After merge,
 the executing Agent may create only the threat matrix and Proposed ADR described by the Work Slice.
 No executable permission, configuration, command, model-call or grant behavior is authorized.
+
+## Claim Effective Checkpoint — 2026-08-22
+
+PR #352 exact head `13ecbdfa` passed CI `32503441611`, independent Agent-role security/governance
+review `5372605087` and merge-time CAS, then merged to `main` as `ca30081a`. PERM-007-A/I218 is
+Active/Claimed from that merge. Authority remains limited to the threat matrix and Proposed ADR.
 
 ## Identity / Goal / Value
 
@@ -93,6 +99,19 @@ reviewed threat model and accepted decision, not permission behavior.
       headless, migration and rollback semantics and defines runnable B-D children.
 - [ ] Independent exact-head security review covers every matrix row and accepts the decision.
 - [ ] Both governance validators, YAML parsing and `git diff --check` pass with no behavior change.
+
+## Decision Execution Evidence
+
+- Current-path and threat matrix:
+  `docs/reference/I218-AUTO-PERMISSION-THREAT-MATRIX.md`.
+- Proposed decision: `docs/decisions/064-bounded-model-assisted-auto-permission.md`.
+- Decision documentation PR: #353; its exact head still requires independent security review.
+- ADR-064 proposes default-on *attempted* assistance, not default Allow; only one-shot atomic
+  no-clobber creation of a new structured text file under a typed managed-workspace lease is
+  initially eligible. Existing-file modification remains human-mediated.
+- Execute, Network, external paths, secrets, destructive/binary mutations, sandbox fallback,
+  plugin/MCP calls, persistent grants and unmanaged/user-dirty work remain human/headless-Deny.
+- This documentation changes no executable behavior and does not authorize PERM-007-B/C/D.
 
 ## Residual Destination
 
