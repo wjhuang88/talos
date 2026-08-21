@@ -861,3 +861,22 @@ status-only closeout cannot self-certify. The reviewer noted that Tokio `time` i
 on the existing dependency, not a new dependency, and `Cargo.lock` remains unchanged. C becomes
 Ready/Unclaimed only and still needs a separate child owner, runnable iteration and effective claim.
 I189, TOOL-024, release and publication remain unauthorized, so T10/#59 stays Blocked.
+
+## 2026-08-21 I217 RUNTIME-005-C Claim Preparation
+
+Current `main@e88a2347` contains the I216 closeout. RUNTIME-005-C now has a separate child owner and
+I217 runnable baseline for only ADR-063's build-time frozen runtime-owned finalizer registry,
+fixed/unique ordering, one-global-deadline execution and containment, durable-reconciliation-before-
+finalizer order, typed redacted report closure, legacy compatibility and deterministic fixtures.
+
+This governance-only Draft remains Planned/Unclaimed until its actual PR number is backfilled. The
+finalized atomic claim+activation must then pass exact-head CI, both validators, independent runtime
+architecture review and merge-time CAS before reaching `main`. Parent RUNTIME-005 remains
+Unclaimed/In Progress and Issue #49 remains open. No implementation branch, arbitrary third-party
+callback API, TOOL-024, permission/sandbox, I189, persistence-format, dependency, version, release
+or publication action is authorized by this preparation; T10/#59 stays Blocked.
+
+PR #347 is now the atomic C/I217 claim+activation proposal. Its branch records Claimed/Active, but
+both remain ineffective while the PR is open. The next action is exact-head CI, both validators,
+independent runtime architecture review and merge-time CAS; implementation must start from the
+resulting merge or later `main`.
