@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — A/I189 Complete/Closed; B/I219 Review/Claimed at the locally converged stable-candidate stage; C-E remain blocked/unclaimed |
+| Status | In Progress — A/I189 and B/I219 Complete/Closed; C-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | Child I219 selects PERM-006-B; parent Epic remains unclaimed |
+| Selected Iteration | None; completed children A/I189 and B/I219; parent Epic remains unclaimed |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -133,3 +133,11 @@ Epic completion requires all children; partial implementation remains owned by t
 - The first stable candidate has not been pushed and has no implementation PR or Completion Commit.
   Exact-head CI, Windows validation, independent protected-scope review and merge-time CAS remain.
   C-E stay blocked/unclaimed and I213 retains only its separate Dashboard authority.
+
+## 2026-08-22 PERM-006-B / I219 Completion
+
+- B/I219 completed through pre-existing implementation commits `56436027` and `d0c96048`.
+  Corrected exact head `97028ac0` passed CI `32579790496` and independent Agent-role delta review
+  `5381051760`, then PR #368 merged as `de79ad46` after merge-time CAS.
+- The parent Epic remains In Progress/Unclaimed. C-E remain blocked/unclaimed and receive no
+  implementation authority; I213 retains only its separate Dashboard lane.

@@ -1,6 +1,6 @@
 # Iteration I219: PERM-006-B First-Class Scoped Grants
 
-> Document status: Review / Claimed; Windows portability correction locally converged pending next stable candidate
+> Document status: Complete / Closed
 > Published plan date: 2026-08-22
 > Planned objective: replace compatibility runtime permission rules with one first-class scoped
 > grant compiler, explicit in-memory Session store and revision-safe approval/admission contract
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-22 |
 | Work Slice | Implement only PERM-006-B / I219: first-class grant/compiler/store types in `talos-permission`; explicit in-memory Session ownership; proposal/approval revision and restriction CAS; consuming Once and pre-admission fencing; exact-only path scope; full provenance and multi-facet matching; all-policy Deny dominance; existing Bash classifier descriptor reuse; shared CLI/TUI/Runtime compilation, preview and official wrapper integration; session transition clearing; and the ADR-066 v0.9 public API/schema migration with automated and real preflight evidence. Preserve the existing agent-owned pipeline boundary for PERM-006-C. No persistent/task/cross-process grants, typed-effect migration, model-assisted auto or `/auto`, sandbox/fallback policy change, TOOL-024/background jobs, release, version, tag, publication, Desktop or Dashboard work. |
@@ -24,9 +24,9 @@
 | Governance Claim PR | #359 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role permission/security/API review `5378949775`, then merged as `781bb112`. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | Not started |
+| Implementation PR | #368 |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. PR #368 remains the implementation carrier. The locally corrected candidate requires a next stable push, fresh exact-head CI including Windows, independent delta review and merge-time CAS before merge. |
+| Handoff / Release Condition | Closed through implementation commits `56436027` and `d0c96048`, exact-head CI `32579790496`, independent Agent-role delta review `5381051760`, merge-time CAS and PR #368 merge `de79ad46`. PERM-006-C and later work require separate claims. |
 
 ## Published Baseline
 
@@ -155,6 +155,7 @@ PR #358 merge `17e0b648`; PERM-006-A/I189 is Complete/Closed at Completion Commi
 | 2026-08-22 | Local convergence | The first-class grant/compiler/store implementation, official CLI/TUI/Runtime adapters, public API migration and documentation converged locally from `781bb112`. I219 moves to Review for one stable candidate; no implementation PR or Completion Commit exists yet. |
 | 2026-08-22 | First remote stable stage | PR #368 at `45a4990d` passed Unix release preflight and received independent Agent-role permission/Runtime/CLI/TUI technical approval. Remote reconciliation failed because Issue #366's owner-first matrix update was still isolated in non-overlapping I213 PR #367. Windows format/check/Clippy/focused permission gates passed, then workspace tests exposed one test-only canonical-path expectation mismatch. No merge or completion is claimed. |
 | 2026-08-22 | Batched correction | PR #367 passed independent review and CAS, then merged as `94df427c`, clearing the #366 matrix dependency without transferring Dashboard authority. I219 rebased without conflict. Commit `d0c96048` changes only the preflight test expectation to use the public exact-path normalizer; production canonicalization and permission behavior are unchanged. Focused CLI test/check, format and diff checks passed locally. |
+| 2026-08-22 | Completion | Corrected exact head `97028ac0` passed all five CI jobs in run `32579790496`, including Windows workspace. Independent Agent-role delta review `5381051760` approved the exact head; merge-time CAS confirmed base `94df427c`, head stability, clean mergeability and zero Dashboard/I213 overlap. PR #368 merged as `de79ad46`. |
 
 ## Verification Evidence
 
@@ -179,12 +180,18 @@ PR #358 merge `17e0b648`; PERM-006-A/I189 is Complete/Closed at Completion Commi
   waited for #367 and Windows found the test-only path expectation mismatch described above.
   The rebased corrected head still requires one next stable push, fresh exact-head CI including
   Windows, independent delta/evidence review, fresh I213 overlap inventory and merge-time CAS.
+- Corrected exact head `97028ac0` passed CI run `32579790496` with all five jobs successful,
+  including the formerly failing Windows workspace suite. Independent Agent-role delta review
+  `5381051760` approved that head. Merge-time CAS fixed base `94df427c`, head `97028ac0`,
+  `MERGEABLE/CLEAN`, and no active open-PR or Dashboard/I213 path overlap; PR #368 merged as
+  `de79ad46`.
 
 ## Completion Evidence
 
-- Completion Commit: Pending
-- A later status-only closeout must cite pre-existing implementation commit(s); this claim record
-  cannot certify implementation completion.
+- Completion Commit: `56436027b2ceae256d8c2741ad789b6492ec9918`,
+  `d0c96048a49949801c13e9cfff5841abc926f76b`
+- These pre-existing implementation and test-correction commits, not this status-only closeout,
+  certify completion.
 
 ## Variance And Residuals
 
