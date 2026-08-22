@@ -1,8 +1,8 @@
 # Iteration I213: Dashboard Live Activity And Log Viewer
 
-> Document status: Active / Claimed
+> Document status: Active / Claimed proposed via activation PR #363; ineffective until target-branch merge
 > Published plan date: 2026-08-20
-> Activation date: 2026-08-22
+> Proposed activation date: 2026-08-22
 > Planned objective: deliver one bounded, loopback-only, GET/read-only realtime Dashboard observation
 > workspace over authoritative Session/logging facts, with SSE reconnect/bounds and no
 > write/control/remote/session-authority expansion.
@@ -22,15 +22,17 @@
 | Claimed At | 2026-08-20 |
 | Source Issue | None |
 | Governance Claim PR | #327 |
+| Activation PR | #363 — proposed; ineffective until target-branch merge |
 | Authorization Mode | Independent claim review + explicit maintainer parallel-activation authorization |
-| Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly authorized I213 to run in parallel provided parallel protections are enforced. |
+| Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly authorized I213 to run in parallel provided parallel protections are enforced. Activation PR #363 records that exception and remains implementation-ineffective while open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Implementation starts only after this activation reaches `main`. Preserve the I219 non-overlap guards below, exact-head CI/security review, fresh open-PR/file-overlap inventory and merge-time CAS before any implementation merge. |
+| Handoff / Release Condition | PR #363 must merge to `main` before any implementation branch is created. After activation, preserve the I219 non-overlap guards below, exact-head CI/security review, fresh open-PR/file-overlap inventory and merge-time CAS before any implementation merge. |
 
-The Collaboration Claim is effective on `main` through merge `66747214`. This activation authorizes
-only the bounded WEB-001-B implementation described here; it does not transfer authority from any
-permission, Session, runtime, logging, security or remote-access owner.
+The Collaboration Claim is effective on `main` through merge `66747214`. Activation PR #363 is a
+governance-only proposal and grants **no implementation authority while open**. If #363 reaches
+`main`, it authorizes only the bounded WEB-001-B implementation described here and transfers no
+authority from any permission, Session, runtime, logging, security or remote-access owner.
 
 ## Published Baseline
 
@@ -91,9 +93,9 @@ Fresh inventory immediately before creating the activation branch established:
 - the maintainer explicitly authorized I213 to run in parallel on 2026-08-22 with a requirement to
   enforce parallel protections.
 
-The START-ITERATION one-active rule is therefore overridden **only** for the explicit I219/I213
-non-overlapping pair. This is not a general multi-Active waiver and does not authorize a third Active
-iteration.
+If PR #363 merges, the START-ITERATION one-active rule is overridden **only** for the explicit
+I219/I213 non-overlapping pair. This is not a general multi-Active waiver and does not authorize a
+third Active iteration.
 
 ### Parallel Protection Contract — I219 ↔ I213
 
@@ -130,7 +132,7 @@ File-overlap protection:
 
 Merge/CAS protection:
 
-- implementation must branch from this activation merge or a later fresh `main`.
+- implementation must branch from the #363 activation merge or a later fresh `main`.
 - every I213 implementation exact head requires its own full CI plus independent security-focused
   review; the claim review does not approve code.
 - immediately before implementation merge, re-fetch `main`, open PRs and changed-file inventory. If
@@ -146,12 +148,12 @@ Merge/CAS protection:
 
 ### Readiness
 
-**Active / Claimed. Implementation is authorized only within the bounded scope and parallel guards
-recorded here.**
+**Ready for activation merge. Not yet implementation-active.**
 
 The slice has one runnable/testable deliverable, explicit authoritative sources, fixed SSE/memory
 bounds, explicit security exclusions, no current Dashboard implementation owner, and a rollback that
-leaves I195 intact.
+leaves I195 intact. Implementation authority begins only if #363 reaches `main`, and remains bounded
+by the parallel protection contract above.
 
 ## Scope
 
@@ -275,6 +277,7 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
 | 2026-08-20 | Claim effective | #327 exact head `a50a43ab` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `66747214`. |
 | 2026-08-22 | Activation inventory | Refreshed at `main@781bb112`; I211 Complete/Closed; I219 active permission lane identified; only archival PRs #120/#121 open; no Dashboard implementation owner. |
 | 2026-08-22 | Parallel authorization | Maintainer explicitly approved I213 running in parallel with the active non-overlapping lane, conditioned on parallel protection. I219/I213 authority, file-overlap and merge-CAS guards recorded above. |
+| 2026-08-22 | Activation proposal | Draft PR #363 opened as governance-only activation. It is ineffective for implementation while open. |
 
 ## Verification Evidence
 
@@ -284,7 +287,7 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
 - Claim merge-time CAS: passed; #327 merged as `667472145ffa7644a7f049472d7389876b8aaaf9`.
 - Activation inventory: `main@781bb1122d2c323854d5d65aed354d35d045e383`; only #120/#121 open,
   both archival Drafts; I219 is the explicit parallel Active owner.
-- Activation governance CI/validators: pending activation PR exact head.
+- Activation governance CI/validators: pending #363 exact head.
 - Runtime evidence: not started; no production code belongs to the activation branch.
 
 ## Completion Evidence
