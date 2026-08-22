@@ -5,7 +5,7 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — A/I189 Complete/Closed; B/I219 Active/Claimed proposed by PR #359; C-E remain blocked/unclaimed |
+| Status | In Progress — A/I189 Complete/Closed; B/I219 Review/Claimed at the locally converged stable-candidate stage; C-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
 | Selected Iteration | Child I219 selects PERM-006-B; parent Epic remains unclaimed |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
@@ -118,3 +118,18 @@ Epic completion requires all children; partial implementation remains owned by t
   PERM-006-B as Claimed/Active for the bounded first-class grant/compiler/store delivery.
 - The parent Epic remains Unclaimed. The open proposal is ineffective before merge; PERM-006-C/D/E,
   PERM-007 behavior, TOOL-024, release and publication remain blocked or separately unauthorized.
+
+## 2026-08-22 PERM-006-B / I219 Claim Effectiveness
+
+- PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role
+  permission/security/API review `5378949775`, then merged as `781bb112`.
+- B/I219 is the effective Active/Claimed permission child. C-E remain blocked/unclaimed; the parent
+  Epic remains unclaimed. Parallel I213 retains only its separate Dashboard authority.
+
+## 2026-08-22 PERM-006-B / I219 Local Convergence
+
+- B/I219 reached Review/Claimed after its bounded implementation, official adapters, public API
+  migration, documentation and local validation converged from claim merge `781bb112`.
+- The first stable candidate has not been pushed and has no implementation PR or Completion Commit.
+  Exact-head CI, Windows validation, independent protected-scope review and merge-time CAS remain.
+  C-E stay blocked/unclaimed and I213 retains only its separate Dashboard authority.

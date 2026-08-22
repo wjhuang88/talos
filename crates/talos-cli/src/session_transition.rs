@@ -7,7 +7,7 @@
 //! This is SESSION-001-A: the infrastructure that SESSION-001-B (new/resume)
 //! and SESSION-001-C (fork) consume.
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use talos_agent::{PendingSchedulerActor, session::AppServerSession};
 use talos_core::session::{SessionHandle, SessionOp};
@@ -178,6 +178,7 @@ struct PreparedSession {
 pub struct SessionTransition {
     active_target: SessionCommandTarget,
     active_session: Session,
+    permission_state: Option<Arc<talos_permission::PermissionSessionState>>,
     active_runtime: Option<ActiveRuntime>,
     prepared: Option<PreparedSession>,
     quiesced_generation: Option<u64>,
@@ -196,11 +197,21 @@ impl SessionTransition {
         Ok(Self {
             active_target: SessionCommandTarget::new(sq_tx, generation),
             active_session: session,
+            permission_state: None,
             active_runtime: None,
             prepared: None,
             quiesced_generation: None,
             prepared_mcp_runtime: None,
         })
+    }
+
+    /// Installs the TUI permission state reset by each successful runtime
+    /// publication boundary.
+    pub fn attach_permission_state(
+        &mut self,
+        state: Arc<talos_permission::PermissionSessionState>,
+    ) {
+        self.permission_state = Some(state);
     }
 
     /// Returns the authoritative generation of the currently active Actor.
@@ -461,7 +472,7 @@ impl SessionTransition {
         } = result;
         let SessionHandle { sq_tx, eq_rx } = new_handle;
 
-        let publication = (|| {
+        let publish_routes = || {
             bridge_rx_update_tx
                 .send((session.clone(), eq_rx))
                 .map_err(|_| "Bridge event route receiver is unavailable".to_string())?;
@@ -472,7 +483,13 @@ impl SessionTransition {
                 .send(sq_tx)
                 .map_err(|_| "command-route watch receiver is unavailable".to_string())?;
             Ok::<(), String>(())
-        })();
+        };
+        let publication = match &self.permission_state {
+            Some(permission_state) => permission_state
+                .publish_and_rebind(publish_routes)
+                .map_err(|error| format!("permission Session reset failed: {error}"))?,
+            None => publish_routes(),
+        };
 
         match publication {
             Ok(()) => {
@@ -582,6 +599,41 @@ mod tests {
         assert_eq!(transition.active_generation(), 1);
     }
 
+    fn permission_state_with_session_grant(
+        root: &std::path::Path,
+    ) -> Arc<talos_permission::PermissionSessionState> {
+        use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+        use talos_permission::{
+            GrantScope, GrantSource, InteractionCapability, PermissionContext, PermissionEngine,
+            PermissionMode, PermissionRequest, PermissionSessionState,
+        };
+
+        let target = root.join("grant-target.txt");
+        std::fs::write(&target, b"test").expect("operation should succeed");
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.to_path_buf()),
+        ));
+        let input = serde_json::json!({"path": target});
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            target.display().to_string(),
+            ToolResourceKind::Path,
+        )];
+        let request = PermissionRequest::new("write", ToolProvenance::Native, &facets, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let proposal = state
+            .propose(&request, &context, GrantScope::Session)
+            .expect("proposal");
+        state
+            .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
+            .expect("Session grant approval");
+        assert_eq!(state.grant_count().expect("grant count"), 1);
+        state
+    }
+
     async fn publication_failure_fixture(
         name: &str,
     ) -> (
@@ -689,8 +741,10 @@ mod tests {
 
     #[tokio::test]
     async fn bridge_publication_failure_stops_replacement_without_success() {
-        let (_temp, manager, mut transition, result, old_session, new_session, raw_new_sender) =
+        let (temp, manager, mut transition, result, old_session, new_session, raw_new_sender) =
             publication_failure_fixture("bridge-publication-failure").await;
+        let permission_state = permission_state_with_session_grant(temp.path());
+        transition.attach_permission_state(permission_state.clone());
         let (session_watch_tx, session_watch_rx) = watch::channel(old_session.clone());
         let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
@@ -720,6 +774,51 @@ mod tests {
         )
         .await;
         assert_eq!(session_watch_rx.borrow().id, old_session.id);
+        assert_eq!(
+            permission_state.grant_count().expect("grant count"),
+            1,
+            "failed publication must retain the active Session grant store"
+        );
+    }
+
+    #[tokio::test]
+    async fn successful_publication_clears_grants_before_starting_replacement() {
+        let (temp, _manager, mut transition, result, old_session, new_session, _raw_new_sender) =
+            publication_failure_fixture("permission-publication-success").await;
+        let permission_state = permission_state_with_session_grant(temp.path());
+        let old_permission_session = permission_state
+            .session_id()
+            .expect("permission Session ID");
+        transition.attach_permission_state(permission_state.clone());
+        let (session_watch_tx, _session_watch_rx) = watch::channel(old_session);
+        let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
+        let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
+        let (bridge_tx, _bridge_rx) = mpsc::unbounded_channel();
+
+        transition
+            .publish_commit(
+                result,
+                new_session,
+                &session_watch_tx,
+                &sq_watch_tx,
+                &bridge_tx,
+            )
+            .await
+            .expect("publication should succeed");
+
+        assert_eq!(
+            permission_state.grant_count().expect("grant count"),
+            0,
+            "successful runtime publication must clear Session grants"
+        );
+        assert_ne!(
+            permission_state
+                .session_id()
+                .expect("permission Session ID"),
+            old_permission_session,
+            "successful runtime publication must establish a new permission Session identity"
+        );
+        transition.shutdown().await;
     }
 
     #[tokio::test]

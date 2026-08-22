@@ -172,6 +172,16 @@ impl Tui {
         );
         bottom_panel.max_height = compressed.panel_max_height;
         preview.max_height = compressed.preview_max_height;
+        self.approval_preview_fully_visible = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::Approval { preview, .. }) => {
+                crate::scrollback::approval_preview_fully_visible(
+                    width,
+                    compressed.panel_max_height,
+                    preview.as_deref(),
+                )
+            }
+            _ => true,
+        };
 
         let input = crate::scrollback::InputComponent {
             state,

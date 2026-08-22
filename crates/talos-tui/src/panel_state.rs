@@ -105,6 +105,7 @@ pub(crate) enum PanelKind {
     Approval {
         tool_name: String,
         arguments: String,
+        preview: Option<String>,
     },
     /// `/model` Level 3: variants for a single `(provider, model)`.
     VariantPicker {
@@ -559,12 +560,22 @@ impl BottomPanelState {
         matches!(self.kind, Some(PanelKind::ModelList { .. }))
     }
 
+    #[cfg(test)]
     pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
+        Self::open_approval_with_preview(tool_name, arguments, None)
+    }
+
+    pub(crate) fn open_approval_with_preview(
+        tool_name: &str,
+        arguments: &str,
+        preview: Option<String>,
+    ) -> Self {
         Self {
             is_open: true,
             kind: Some(PanelKind::Approval {
                 tool_name: tool_name.to_string(),
                 arguments: arguments.to_string(),
+                preview,
             }),
             items: vec![
                 PanelItem {

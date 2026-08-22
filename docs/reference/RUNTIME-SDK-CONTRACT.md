@@ -62,6 +62,7 @@ origin crate; that crate's own pre-1.0 support boundary applies, not this runtim
 | `Message` | `talos-core` | Used by `RuntimeBuilder::initial_history`; not re-exported unless later added |
 | `ApprovalChoice` | `talos-core` | Enum returned by `ApprovalHandler::request_approval`; not re-exported |
 | `PermissionRule` | `talos-permission` | A rule type (not a trait); accepted by `RuntimeBuilder::permission_rule` |
+| `GrantPreview` | `talos-permission` | Bounded exact scope passed to `ApprovalHandler::request_scoped_approval`; not re-exported |
 | `SandboxProvider` | `talos-sandbox` | Trait; accepted by `RuntimeBuilder::sandbox` |
 
 ### Extension types and traits used by embedders
@@ -76,6 +77,7 @@ dependencies above.
 | `AgentTool` | `talos-core` | `RuntimeBuilder::tool` |
 | `ApprovalHandler` | `talos-runtime` | `RuntimeBuilder::approval_handler` |
 | `PermissionRule` | `talos-permission` | `RuntimeBuilder::permission_rule` (rule, not a trait) |
+| `GrantPreview` | `talos-permission` | `ApprovalHandler::request_scoped_approval` |
 | `SandboxProvider` | `talos-sandbox` | `RuntimeBuilder::sandbox` |
 
 ## Implementation Surface (NOT Supported)
@@ -256,6 +258,30 @@ handle.preview_request("What would you send for this?")?;
 
 `PermissionRule` entries are evaluated before the engine's default fallback. Rules can `Allow`,
 `Deny`, or `Ask` for specific tools, paths, or operation types.
+
+### Scoped approval and runtime lifetime
+
+`RuntimeBuilder::approval_handler` receives `Ask` decisions through
+`ApprovalHandler::request_scoped_approval`. Its `GrantPreview` is compiled by `talos-permission`
+from the authoritative tool profile; handlers should render that preview instead of reconstructing
+scope from raw arguments. The default method delegates to `request_approval`, so existing handlers
+remain source-compatible.
+
+- `ApprovalChoice::ApproveOnce` produces non-stored authority consumed at one official adapter
+  admission.
+- `ApprovalChoice::AlwaysApprove` installs a first-class in-memory Session grant. It is separate
+  from `PermissionRule`, is never serialized, and belongs only to the `RuntimeHandle` built by that
+  `RuntimeBuilder::build()` call.
+- A new runtime, including one built around the same durable transcript, starts with an unrelated
+  empty grant store. Durable resume does not restore grants.
+- Every matching Session grant binds complete tool provenance and all compiled facets. Policy deny
+  and restriction state are rechecked at the final admission fence; clearing or changing relevant
+  state before admission invalidates pending authority.
+
+Direct consumers that need to construct or inspect first-class grant state must depend on
+`talos-permission`. See
+[I219 Scoped Grant Migration](I219-PERM006B-SCOPED-GRANT-MIGRATION.md) for the v0.9+ source and
+schema migration.
 
 ## Planned Additions (ADR-052 — Not Yet Implemented)
 

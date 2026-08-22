@@ -10,12 +10,17 @@ rust-version.workspace = true
 
 [dependencies]
 glob = "0.3"
-schemars = "1.2.1"
+schemars = { version = "1.2.1", features = ["uuid1"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.11"
 talos-core = { version = "0.8.0", path = "../talos-core" }
 thiserror = "2"
 url = "2"
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

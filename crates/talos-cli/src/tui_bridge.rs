@@ -160,7 +160,7 @@ pub(crate) struct ConversationLoopIo {
     /// `/attach` path against this engine and prompts the user for
     /// external paths. When `None`, the bridge skips authorization
     /// (test fixtures only).
-    pub permission_engine: Option<Arc<std::sync::Mutex<talos_permission::PermissionEngine>>>,
+    pub permission_engine: Option<Arc<talos_permission::PermissionSessionState>>,
 }
 
 pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: ConversationLoopIo) {
@@ -1597,6 +1597,42 @@ fn attachment_summary(path: &std::path::Path, mime: &str, byte_count: u64) -> St
     )
 }
 
+fn propose_attach_grants(
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    state: &talos_permission::PermissionSessionState,
+    request: &talos_permission::PermissionRequest<'_>,
+    context: &talos_permission::PermissionContext,
+) -> Option<(
+    talos_permission::ProposedGrant,
+    talos_permission::ProposedGrant,
+)> {
+    let once = match state.propose(request, context, talos_permission::GrantScope::Once) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text: format!(
+                    "[Error] /attach permission proposal failed: {error}. No file was read.\n"
+                ),
+            }));
+            return None;
+        }
+    };
+    let session = match state.propose(request, context, talos_permission::GrantScope::Session) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text: format!(
+                    "[Error] /attach permission proposal failed: {error}. No file was read.\n"
+                ),
+            }));
+            return None;
+        }
+    };
+    Some((once, session))
+}
+
 /// P1-A: evaluates an image attachment path against the SEC-001
 /// permission pipeline before any filesystem probe. Returns the
 /// authorized canonical PathBuf on success, or None when rejected
@@ -1606,13 +1642,15 @@ fn attachment_summary(path: &std::path::Path, mime: &str, byte_count: u64) -> St
 /// between authorization and ingestion is impossible.
 async fn authorize_attach_image(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
-    permission_engine: &Option<Arc<std::sync::Mutex<talos_permission::PermissionEngine>>>,
+    permission_engine: &Option<Arc<talos_permission::PermissionSessionState>>,
     path: &str,
 ) -> Option<std::path::PathBuf> {
-    use crate::image_authorization::{
-        ATTACH_IMAGE_TOOL_NAME, ImageAuthorization, add_attach_image_allow_rule,
-    };
+    use crate::image_authorization::{ATTACH_IMAGE_TOOL_NAME, ImageAuthorization};
     use talos_core::ApprovalChoice;
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+    use talos_permission::{
+        GrantSource, InteractionCapability, PermissionContext, PermissionMode, PermissionRequest,
+    };
 
     let Some(engine_ref) = permission_engine else {
         let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
@@ -1636,15 +1674,79 @@ async fn authorize_attach_image(
             return None;
         }
     };
-    let canonical_str = canonical.display().to_string();
+    let Some(canonical_str) = canonical.to_str() else {
+        let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Error,
+            text: format!(
+                "[Error] /attach {path} has a non-UTF-8 canonical path that cannot be represented safely. No file was read.\n"
+            ),
+        }));
+        return None;
+    };
 
-    let decision = {
-        let engine = engine_ref.lock().expect("permission engine lock poisoned");
-        ImageAuthorization::evaluate(&canonical, &engine)
+    let context = PermissionContext::new(
+        PermissionMode::Interactive,
+        InteractionCapability::Available,
+    );
+    let input = serde_json::json!({ "path": canonical_str });
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Read,
+        canonical_str,
+        ToolResourceKind::Path,
+    )];
+    let request = PermissionRequest::new(
+        ATTACH_IMAGE_TOOL_NAME,
+        ToolProvenance::Native,
+        &facets,
+        &input,
+    );
+    let decision = match ImageAuthorization::evaluate(&canonical, engine_ref, &context) {
+        Ok(decision) => decision,
+        Err(error) => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text: format!(
+                    "[Error] /attach permission evaluation failed: {error}. No file was read.\n"
+                ),
+            }));
+            return None;
+        }
     };
 
     match decision {
-        ImageAuthorization::Allow => Some(canonical),
+        ImageAuthorization::Allow => {
+            let pending = match engine_ref.prepare_authorized(&request, &context) {
+                Ok(Some(pending)) => pending,
+                Ok(None) => {
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text:
+                            "[Error] /attach authorization is no longer valid. No file was read.\n"
+                                .to_string(),
+                    }));
+                    return None;
+                }
+                Err(error) => {
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text: format!(
+                            "[Error] /attach authorization failed: {error}. No file was read.\n"
+                        ),
+                    }));
+                    return None;
+                }
+            };
+            match engine_ref.admit(pending, &request, &context) {
+                Ok(_) => Some(canonical),
+                Err(error) => {
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text: format!("[Error] /attach authorization became stale: {error}. No file was read.\n"),
+                    }));
+                    None
+                }
+            }
+        }
         ImageAuthorization::Deny(reason) => {
             let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                 source: MessageSource::Error,
@@ -1655,6 +1757,7 @@ async fn authorize_attach_image(
             None
         }
         ImageAuthorization::Ask => {
+            let (once, session) = propose_attach_grants(ui_tx, engine_ref, &request, &context)?;
             let (response_tx, response_rx) =
                 tokio::sync::oneshot::channel::<talos_core::ApprovalChoice>();
             let summary_fields = vec!["path".to_string()];
@@ -1663,6 +1766,7 @@ async fn authorize_attach_image(
                     tool_name: ATTACH_IMAGE_TOOL_NAME.to_string(),
                     arguments: serde_json::json!({ "path": canonical_str }),
                     summary_fields,
+                    preview: Some(crate::approval::format_grant_preview(session.preview())),
                     response: response_tx,
                 })
                 .is_err()
@@ -1679,12 +1783,31 @@ async fn authorize_attach_image(
                     }));
                     None
                 }
-                Ok(ApprovalChoice::AlwaysApprove) => {
-                    let mut engine = engine_ref.lock().expect("permission engine lock poisoned");
-                    add_attach_image_allow_rule(&mut engine, canonical.clone());
-                    Some(canonical)
+                Ok(choice @ (ApprovalChoice::AlwaysApprove | ApprovalChoice::ApproveOnce)) => {
+                    let result = match choice {
+                        ApprovalChoice::AlwaysApprove => engine_ref.approve_session(
+                            session,
+                            &request,
+                            &context,
+                            GrantSource::InteractiveHuman,
+                        ),
+                        ApprovalChoice::ApproveOnce => {
+                            engine_ref.approve_once(once, &request, &context)
+                        }
+                        ApprovalChoice::Deny => unreachable!(),
+                    }
+                    .and_then(|pending| engine_ref.admit(pending, &request, &context));
+                    match result {
+                        Ok(_) => Some(canonical),
+                        Err(error) => {
+                            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                source: MessageSource::Error,
+                                text: format!("[Error] /attach authorization became stale: {error}. No file was read.\n"),
+                            }));
+                            None
+                        }
+                    }
                 }
-                Ok(_) => Some(canonical),
                 Err(_) => {
                     let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                         source: MessageSource::Error,
@@ -1804,6 +1927,47 @@ mod attachment_authorization_tests {
         );
     }
 
+    #[test]
+    fn attachment_proposal_failure_is_visible_and_fail_closed() {
+        use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+        use talos_permission::{
+            InteractionCapability, PermissionContext, PermissionMode, PermissionRequest,
+        };
+
+        let state = talos_permission::PermissionSessionState::new(
+            talos_permission::PermissionEngine::new(),
+        );
+        let input = serde_json::json!({ "path": "/private/tmp/not-read.png" });
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "/private/tmp/not-read.png",
+            ToolResourceKind::Path,
+        )];
+        let request = PermissionRequest::new(
+            crate::image_authorization::ATTACH_IMAGE_TOOL_NAME,
+            ToolProvenance::Native,
+            &facets,
+            &input,
+        );
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        assert!(propose_attach_grants(&ui_tx, &state, &request, &context).is_none());
+        let output = ui_rx.try_recv().expect("visible proposal failure");
+        let UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Error,
+            text,
+        }) = output
+        else {
+            panic!("expected visible attachment error");
+        };
+        assert!(text.contains("permission proposal failed"));
+        assert!(text.contains("No file was read"));
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn approved_symlink_drift_cannot_redirect_attachment_ingestion() {
@@ -1818,7 +1982,7 @@ mod attachment_authorization_tests {
         std::os::unix::fs::symlink(&approved, &link).expect("operation should succeed");
         let approved_canonical = approved.canonicalize().expect("operation should succeed");
 
-        let permission_engine = Some(Arc::new(std::sync::Mutex::new(
+        let permission_engine = Some(Arc::new(talos_permission::PermissionSessionState::new(
             talos_permission::PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
         )));
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -1850,5 +2014,50 @@ mod attachment_authorization_tests {
             panic!("expected image content part");
         };
         assert_eq!(path, approved_canonical);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn stale_attachment_approval_reports_error_without_reading() {
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
+        let target = external.path().join("stale.png");
+        write_png(&target, 2);
+        let permission_state = Arc::new(talos_permission::PermissionSessionState::new(
+            talos_permission::PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+        ));
+        let permission_engine = Some(permission_state.clone());
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut authorization = Box::pin(authorize_attach_image(
+            &ui_tx,
+            &permission_engine,
+            target.to_str().expect("operation should succeed"),
+        ));
+
+        let approval = tokio::select! {
+            output = ui_rx.recv() => output.expect("authorization output"),
+            _ = &mut authorization => panic!("external attachment must request approval"),
+        };
+        let UiOutput::ToolApprovalRequest { response, .. } = approval else {
+            panic!("expected attachment approval request");
+        };
+        permission_state
+            .rebind_session()
+            .expect("invalidate approval");
+        response
+            .send(ApprovalChoice::ApproveOnce)
+            .expect("operation should succeed");
+        assert!(authorization.await.is_none());
+
+        let error = ui_rx.recv().await.expect("visible stale error");
+        let UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Error,
+            text,
+        }) = error
+        else {
+            panic!("expected visible attachment error");
+        };
+        assert!(text.contains("authorization became stale"));
+        assert!(text.contains("No file was read"));
     }
 }

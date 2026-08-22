@@ -293,8 +293,13 @@ fn build_print_submit_op(
     // before any file probe. Print mode is headless — unresolved Ask
     // fails closed. Canonicalize BEFORE authorization so the approval
     // identity matches the attachment identity (P1-A: no path-alias drift).
-    let auth_engine =
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
+    let auth_state = talos_permission::PermissionSessionState::new(
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
+    );
+    let auth_context = talos_permission::PermissionContext::new(
+        talos_permission::PermissionMode::Headless,
+        talos_permission::InteractionCapability::Unavailable,
+    );
 
     let mut attachments = Vec::with_capacity(cli.attach.len());
     let mut total_bytes: u64 = 0;
@@ -303,9 +308,36 @@ fn build_print_submit_op(
             "--attach {} failed to canonicalize: path may not exist",
             path.display()
         ))?;
-        match crate::image_authorization::ImageAuthorization::evaluate(&canonical, &auth_engine) {
-            crate::image_authorization::ImageAuthorization::Allow => {}
-            crate::image_authorization::ImageAuthorization::Ask => {
+        match crate::image_authorization::ImageAuthorization::evaluate(
+            &canonical,
+            &auth_state,
+            &auth_context,
+        ) {
+            Ok(crate::image_authorization::ImageAuthorization::Allow) => {
+                use talos_core::tool::{
+                    ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind,
+                };
+                let input = serde_json::json!({ "path": canonical.display().to_string() });
+                let facets = [ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    canonical.display().to_string(),
+                    ToolResourceKind::Path,
+                )];
+                let request = talos_permission::PermissionRequest::new(
+                    crate::image_authorization::ATTACH_IMAGE_TOOL_NAME,
+                    ToolProvenance::Native,
+                    &facets,
+                    &input,
+                );
+                let pending = auth_state
+                    .prepare_authorized(&request, &auth_context)
+                    .map_err(|error| anyhow!("--attach permission preparation failed: {error}"))?
+                    .ok_or_else(|| anyhow!("--attach permission changed before admission"))?;
+                auth_state
+                    .admit(pending, &request, &auth_context)
+                    .map_err(|error| anyhow!("--attach permission admission failed: {error}"))?;
+            }
+            Ok(crate::image_authorization::ImageAuthorization::Ask) => {
                 bail!(
                     "--attach {} (canonical: {}) is outside the workspace and there is no \
                      interactive approval in print mode. Run in TUI mode to approve external \
@@ -314,7 +346,7 @@ fn build_print_submit_op(
                     canonical.display()
                 );
             }
-            crate::image_authorization::ImageAuthorization::Deny(reason) => {
+            Ok(crate::image_authorization::ImageAuthorization::Deny(reason)) => {
                 bail!(
                     "--attach {} (canonical: {}) denied by permission rule: {}",
                     path.display(),
@@ -322,6 +354,7 @@ fn build_print_submit_op(
                     reason
                 );
             }
+            Err(error) => bail!("--attach permission evaluation failed: {error}"),
         }
         let part = create_image_content_part(&canonical, attachments.len(), total_bytes)
             .map_err(|e| anyhow!(attachment_error_message(&e, &canonical)))?;

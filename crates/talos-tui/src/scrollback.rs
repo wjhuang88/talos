@@ -895,10 +895,14 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             return 0;
         }
         if self.menu.is_approval() {
-            let Some(crate::state::PanelKind::Approval { arguments, .. }) = &self.menu.kind else {
+            let Some(crate::state::PanelKind::Approval {
+                arguments, preview, ..
+            }) = &self.menu.kind
+            else {
                 return 0;
             };
-            return approval_natural_height(w, arguments).min(self.max_height);
+            return approval_natural_height_with_preview(w, arguments, preview.as_deref())
+                .min(self.max_height);
         }
         if self.menu.is_credential_input() {
             let (is_connect, has_default_endpoint) = match &self.menu.kind {
@@ -1334,6 +1338,7 @@ impl BottomPanelComponent<'_> {
         let Some(crate::state::PanelKind::Approval {
             tool_name,
             arguments,
+            preview,
         }) = &self.menu.kind
         else {
             return;
@@ -1353,6 +1358,8 @@ impl BottomPanelComponent<'_> {
         let width = area.width;
         let height = area.height as usize;
         let wide = width >= 60;
+        let preview_fully_visible =
+            approval_preview_fully_visible(width, area.height, preview.as_deref());
 
         let mut lines: Vec<Line<'static>> = Vec::new();
 
@@ -1380,9 +1387,27 @@ impl BottomPanelComponent<'_> {
         let mandatory = 1 + 1 + options_count;
         let budget = height.saturating_sub(mandatory);
 
-        if !wide && !arguments.trim().is_empty() && budget > 0 {
+        if let Some(preview) = preview.as_deref().filter(|value| !value.trim().is_empty()) {
+            let scope_width = (width as usize).saturating_sub(4).max(1);
+            let scope_lines = wrap_text_to_lines(preview, scope_width, budget);
+            if !scope_lines.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "  Always approve scope:",
+                    Style::default().fg(accent).bg(input_bg).bold(),
+                )));
+                for line in scope_lines.into_iter().take(budget.saturating_sub(1)) {
+                    lines.push(Line::from(Span::styled(
+                        format!("  {line}"),
+                        Style::default().fg(semantic::TEXT_PRIMARY).bg(input_bg),
+                    )));
+                }
+            }
+        }
+
+        let remaining_budget = height.saturating_sub(mandatory + lines.len().saturating_sub(2));
+        if !wide && !arguments.trim().is_empty() && remaining_budget > 0 {
             let arg_w = (width as usize).saturating_sub(4).max(1);
-            let arg_max = budget.min(2);
+            let arg_max = remaining_budget.min(2);
             let wrapped = wrap_text_to_lines(arguments, arg_w, arg_max);
             for wl in &wrapped {
                 lines.push(Line::from(Span::styled(
@@ -1402,7 +1427,12 @@ impl BottomPanelComponent<'_> {
             } else {
                 unselected_style
             };
-            lines.push(Line::from(Span::styled(format!("  {}", item.label), style)));
+            let label = if i == 1 && !preview_fully_visible {
+                "[a] resize to review full scope"
+            } else {
+                item.label.as_str()
+            };
+            lines.push(Line::from(Span::styled(format!("  {label}"), style)));
         }
 
         if lines.len() < height {
@@ -1440,15 +1470,47 @@ fn truncate_one_line(value: &str, max_width: usize) -> String {
     result + "…"
 }
 
+#[cfg(test)]
 pub(crate) fn approval_natural_height(width: u16, arguments: &str) -> u16 {
+    approval_natural_height_with_preview(width, arguments, None)
+}
+
+fn approval_natural_height_with_preview(width: u16, arguments: &str, preview: Option<&str>) -> u16 {
     const BASE: u16 = 6;
-    if width >= 60 || arguments.trim().is_empty() {
-        BASE
+    let argument_rows = if width >= 60 || arguments.trim().is_empty() {
+        0
     } else {
         let arg_w = (width as usize).saturating_sub(4).max(1);
         let wrapped = wrap_text_to_lines(arguments, arg_w, 2);
-        BASE + wrapped.len() as u16
-    }
+        u16::try_from(wrapped.len()).unwrap_or(u16::MAX)
+    };
+    let preview_rows = preview
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            let scope_width = (width as usize).saturating_sub(4).max(1);
+            let scope_rows =
+                u16::try_from(wrap_text_to_lines(value, scope_width, usize::MAX).len())
+                    .unwrap_or(u16::MAX);
+            1u16.saturating_add(scope_rows)
+        })
+        .unwrap_or(0);
+    BASE.saturating_add(argument_rows)
+        .saturating_add(preview_rows)
+}
+
+pub(crate) fn approval_preview_fully_visible(
+    width: u16,
+    available_height: u16,
+    preview: Option<&str>,
+) -> bool {
+    let Some(preview) = preview.filter(|value| !value.trim().is_empty()) else {
+        return true;
+    };
+    let scope_width = (width as usize).saturating_sub(4).max(1);
+    let scope_rows = wrap_text_to_lines(preview, scope_width, usize::MAX).len();
+
+    // Keep the separator, tool header, scope title, and all three decisions visible.
+    usize::from(available_height) >= 6usize.saturating_add(scope_rows)
 }
 
 pub(crate) fn wrap_text_to_lines(text: &str, max_width: usize, max_lines: usize) -> Vec<String> {

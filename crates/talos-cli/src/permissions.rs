@@ -1,12 +1,13 @@
 //! Permission planning and inspection commands.
 
+use crate::registry::build_print_tool_registry;
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use serde_json::{Value, json};
-use talos_permission::{PermissionDecision, PermissionEngine};
-
-use crate::approval::{always_allow_rule_descriptions, always_allow_scope_entries};
-use crate::registry::build_print_tool_registry;
+use talos_permission::{
+    GrantScope, InteractionCapability, PermissionContext, PermissionDecision, PermissionEngine,
+    PermissionMode, PermissionRequest, PermissionSessionState,
+};
 
 /// Subcommands for `talos permissions`.
 #[derive(Subcommand, Clone)]
@@ -157,7 +158,13 @@ fn parse_operation(raw: &str) -> Result<ParsedOperation> {
 
 fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPreflightPacket> {
     let registry = build_print_tool_registry(Vec::new());
-    let engine = PermissionEngine::with_workspace_root(std::env::current_dir()?);
+    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+        std::env::current_dir()?,
+    ));
+    let context = PermissionContext::new(
+        PermissionMode::Interactive,
+        InteractionCapability::Available,
+    );
 
     let mut entries = Vec::new();
     for operation in operations {
@@ -166,21 +173,44 @@ fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPr
             .ok_or_else(|| anyhow::anyhow!("tool not found: {}", operation.tool))?;
         registry.validate_input(&operation.tool, &operation.input)?;
         let profile = tool.permission_profile(&operation.input);
-        let current_decision = permission_decision_label(engine.evaluate_profile(
+        let request = PermissionRequest::new(
             &operation.tool,
+            tool.provenance(),
             &profile,
             &operation.input,
-        ));
-        let always_scopes = always_allow_scope_entries(&operation.tool, &profile, &operation.input)
-            .into_iter()
-            .map(|entry| PermissionPreflightScope {
-                nature: entry.nature,
-                resource_kind: entry.resource_kind,
-                resource: entry.resource,
+        );
+        let evaluation = state
+            .evaluate(&request, &context)
+            .map_err(|error| anyhow::anyhow!(error))?;
+        let current_decision = permission_decision_label(evaluation.decision());
+        let preview = (evaluation.decision() == PermissionDecision::Ask)
+            .then(|| state.propose(&request, &context, GrantScope::Session))
+            .transpose()
+            .map_err(|error| anyhow::anyhow!(error))?;
+        let always_scopes = preview
+            .as_ref()
+            .map(|proposal| {
+                proposal
+                    .preview()
+                    .facets()
+                    .iter()
+                    .map(|facet| PermissionPreflightScope {
+                        nature: format!("{:?}", facet.nature).to_ascii_lowercase(),
+                        resource_kind: format!("{:?}", facet.resource_kind).to_ascii_lowercase(),
+                        resource: facet.normalized_scope.clone(),
+                    })
+                    .collect::<Vec<_>>()
             })
-            .collect::<Vec<_>>();
-        let descriptions =
-            always_allow_rule_descriptions(&operation.tool, &profile, &operation.input);
+            .unwrap_or_default();
+        let descriptions = always_scopes
+            .iter()
+            .map(|scope| {
+                format!(
+                    "session allow: {} {} `{}`; configured deny rules still win",
+                    scope.nature, scope.resource_kind, scope.resource
+                )
+            })
+            .collect();
 
         entries.push(PermissionPreflightOperation {
             tool: operation.tool.clone(),
@@ -202,7 +232,7 @@ fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPr
         operations: entries,
         notes: vec![
             "Preflight is read-only: it does not execute tools or install allow rules.".to_string(),
-            "Choosing always later installs session-scoped allow rules; configured deny rules still win.".to_string(),
+            "Choosing always later installs a first-class in-memory Session grant; configured deny rules still win.".to_string(),
             "High-risk shell commands stay exact unless their audited template policy says otherwise.".to_string(),
         ],
     })
@@ -337,6 +367,31 @@ mod tests {
                 .resource
                 .contains(":exact:")
         );
+    }
+
+    #[test]
+    fn preflight_packet_keeps_write_scope_exact() {
+        let current_dir = std::env::current_dir().expect("current directory");
+        let target = current_dir.join("i219-preflight-output.txt");
+        let target_text = target.to_string_lossy();
+        let expected_scope =
+            talos_core::tool::normalize_authorized_path(&current_dir, target_text.as_ref())
+                .expect("target path should have a canonical existing ancestor");
+        let operations = vec![ParsedOperation {
+            tool: "write".to_string(),
+            input: json!({"path": target, "content": "not executed"}),
+        }];
+
+        let packet = build_preflight_packet(&operations).expect("operation should succeed");
+
+        assert_eq!(packet.operations[0].current_decision, "ask");
+        assert_eq!(packet.operations[0].always_scopes.len(), 1);
+        assert_eq!(packet.operations[0].always_scopes[0].resource_kind, "path");
+        assert_eq!(
+            packet.operations[0].always_scopes[0].resource,
+            expected_scope.display().to_string()
+        );
+        assert!(!target.exists(), "preflight must not execute write");
     }
 
     #[test]

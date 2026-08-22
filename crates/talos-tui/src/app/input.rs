@@ -107,6 +107,15 @@ impl Tui {
     }
 
     pub(super) fn resolve_approval(&mut self, choice: ApprovalChoice) {
+        if matches!(choice, ApprovalChoice::AlwaysApprove) && !self.approval_preview_fully_visible {
+            self.state.tip = Some(Tip {
+                kind: TipKind::Info,
+                text: "Resize the terminal to review the full reusable scope".to_string(),
+                ttl: Duration::from_secs(3),
+                created_at: Instant::now(),
+            });
+            return;
+        }
         let (icon, color, msg) = match &choice {
             ApprovalChoice::ApproveOnce => (
                 "\u{2713}",

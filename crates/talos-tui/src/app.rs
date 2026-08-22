@@ -160,6 +160,7 @@ pub struct Tui {
     selection: Option<SelectionState>,
     dashboard_availability: Option<crate::splash::DashboardAvailability>,
     approval_viewport_snapshot: Option<ApprovalViewportSnapshot>,
+    approval_preview_fully_visible: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -240,6 +241,7 @@ impl Tui {
             selection: None,
             dashboard_availability: None,
             approval_viewport_snapshot: None,
+            approval_preview_fully_visible: true,
         })
     }
 
@@ -283,6 +285,7 @@ impl Tui {
             selection: None,
             dashboard_availability: None,
             approval_viewport_snapshot: None,
+            approval_preview_fully_visible: true,
         }
     }
 
@@ -481,6 +484,18 @@ impl Tui {
     }
 
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
+        self.show_approval_with_preview(tool_name, arguments, None);
+    }
+
+    pub fn show_approval_with_preview(
+        &mut self,
+        tool_name: &str,
+        arguments: &str,
+        preview: Option<String>,
+    ) {
+        self.approval_preview_fully_visible = preview
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty());
         if self.approval_viewport_snapshot.is_none() {
             self.approval_viewport_snapshot = Some(ApprovalViewportSnapshot {
                 history_scroll: self.history_scroll.clone(),
@@ -498,11 +513,14 @@ impl Tui {
             }
         }
         self.state.activate_approval(tool_name, arguments);
-        self.state.slash_menu = crate::state::BottomPanelState::open_approval(tool_name, arguments);
+        self.state.slash_menu = crate::state::BottomPanelState::open_approval_with_preview(
+            tool_name, arguments, preview,
+        );
     }
 
     pub fn hide_approval(&mut self) {
         self.state.approval_state = ApprovalState::Hidden;
+        self.approval_preview_fully_visible = true;
         if let Some(snapshot) = self.approval_viewport_snapshot.take() {
             self.history_scroll = snapshot.history_scroll;
             self.history_prefix_start = snapshot.history_prefix_start;

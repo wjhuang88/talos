@@ -13,10 +13,25 @@
 //! - Execute → [`PermissionDecision::Ask`]
 //! - Network → [`PermissionDecision::Ask`]
 //!
+//! # First-Class Scoped Grants
+//!
+//! [`PermissionSessionState`] keeps configured policy separate from explicit
+//! approval authority. Call [`PermissionSessionState::propose`] only for an
+//! unresolved `Ask`, render its compiler-derived [`GrantPreview`], then commit
+//! either consuming [`GrantScope::Once`] or in-memory [`GrantScope::Session`]
+//! authority. Official adapters must call [`PermissionSessionState::admit`]
+//! immediately before execution. Current policy denies and state generations
+//! are rechecked at that fence.
+//!
+//! Session grants are not serialized, do not appear in
+//! [`PermissionEngine::rules`], and never cross a newly constructed
+//! [`PermissionSessionState`].
+//!
 //! # Rule Precedence
 //!
-//! Rules are evaluated in order. The first matching rule wins. If no rule matches,
-//! the default decision is applied based on the tool name.
+//! Every matching policy `Deny` is authoritative. When no `Deny` matches, the
+//! first matching non-deny rule wins for backward compatibility. If no rule
+//! matches, the default decision is applied based on the tool nature.
 //!
 //! # Path Patterns
 //!
@@ -55,8 +70,10 @@
 
 mod access_evidence;
 mod decision;
+mod grant;
 mod resource;
 mod rule;
+mod session;
 mod workspace_trust;
 
 pub use access_evidence::{AccessEvidence, AccessKind, EvidenceState, classify_command_access};
@@ -65,6 +82,12 @@ pub use decision::{
     PermissionFacetDecision, PermissionMode, PermissionOutcome, PermissionReason,
     PermissionRequest, PermissionResourceState, PermissionRuleId, PermissionRuleSource,
     PermissionToolSource,
+};
+pub use grant::{
+    GrantError, GrantId, GrantPreview, GrantPreviewFacet, GrantScope, GrantSource, ProposedGrant,
+};
+pub use session::{
+    PendingInvocation, PermissionEvaluation, PermissionSessionId, PermissionSessionState,
 };
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
@@ -131,9 +154,9 @@ impl<'de> Deserialize<'de> for PermissionDecision {
 /// The permission rules engine.
 ///
 /// Evaluates tool calls against a set of rules and returns a
-/// [`PermissionDecision`]. Rules are evaluated in insertion order; the first
-/// match wins. If no rule matches, a default decision is applied based on
-/// the tool name.
+/// [`PermissionDecision`]. Every matching policy `Deny` wins. Otherwise rules
+/// are evaluated in insertion order and the first match wins. If no rule
+/// matches, a default decision is applied based on the tool nature.
 pub struct PermissionEngine {
     rules: Vec<PermissionRule>,
     rule_metadata: Vec<PermissionRuleMetadata>,
@@ -250,43 +273,19 @@ impl PermissionEngine {
         PermissionRuleMetadata { id, source }
     }
 
-    /// Adds a runtime "always allow" rule ahead of the default catch-all rule.
-    ///
-    /// This is used for user-approved session rules. It preserves existing
-    /// deny rules and other custom policy rules that appear before the default
-    /// catch-all ask rule for the same nature, while ensuring the newly approved
-    /// resource is not shadowed by the default read-allow or mutating ask rule.
-    pub fn add_runtime_allow_rule(&mut self, rule: PermissionRule) {
-        let insert_at = rule
-            .nature
-            .and_then(|nature| {
-                self.rules.iter().position(|existing| {
-                    existing.nature == Some(nature)
-                        && existing.resource.is_none()
-                        && existing.path_pattern.is_none()
-                        && !matches!(existing.decision, PermissionDecision::Deny(_))
-                })
-            })
-            .unwrap_or(self.rules.len());
-        let metadata = self.allocate_rule_metadata(PermissionRuleSource::RuntimeGrant);
-        self.rules.insert(insert_at, rule);
-        self.rule_metadata.insert(insert_at, metadata);
-    }
-
     /// Evaluates a tool call against the ruleset and returns a decision.
     ///
-    /// Rules are checked in order. The first rule whose `tool_name` matches and
-    /// whose `path_pattern` (if present) matches the `path` field in `input`
-    /// determines the result.
+    /// Matching policy Deny rules are terminal and dominate all matching allows;
+    /// within the non-Deny class, legacy first-match behavior is preserved.
     ///
     /// If no rule matches, the default decision is applied:
     /// - Tools with names containing "read" or "list" → [`PermissionDecision::Allow`]
     /// - Tools with names containing "write" or "edit" → [`PermissionDecision::Ask`]
     /// - All other tools → [`PermissionDecision::Ask`]
     ///
-    /// When a [`workspace_root`](Self::workspace_root) is set, file operations
-    /// (read/write/edit/list) targeting paths within that directory are
-    /// auto-allowed before rule evaluation.
+    /// When a [`workspace_root`](Self::workspace_root) is set, workspace paths
+    /// receive the existing trusted-workspace default only after terminal
+    /// policy Deny rules have been checked.
     pub fn evaluate(&self, tool_name: &str, input: &Value) -> PermissionDecision {
         let nature = infer_nature(tool_name);
         self.evaluate_with_nature(tool_name, nature, input)
@@ -398,11 +397,17 @@ impl PermissionEngine {
         let nature = facet.nature;
 
         let mut matched_rule = None;
+        let mut matched_deny = None;
         for (index, rule) in self.rules.iter().enumerate() {
             match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
                 Ok(true) => {
-                    matched_rule = Some((rule, self.rule_metadata[index]));
-                    break;
+                    if matched_rule.is_none() {
+                        matched_rule = Some((rule, self.rule_metadata[index]));
+                    }
+                    if matches!(rule.decision, PermissionDecision::Deny(_)) {
+                        matched_deny = Some((rule, self.rule_metadata[index]));
+                        break;
+                    }
                 }
                 Ok(false) | Err(_) => continue,
             }
@@ -422,7 +427,7 @@ impl PermissionEngine {
                 ..
             },
             metadata,
-        )) = matched_rule
+        )) = matched_deny
         {
             return (
                 PermissionDecision::Deny(reason.clone()),
@@ -551,18 +556,24 @@ impl PermissionEngine {
         let nature = talos_core::tool::ToolNature::Execute;
 
         let mut matched_rule = None;
+        let mut matched_deny = None;
         for rule in &self.rules {
             match rule.matches(tool_name, nature, input, None) {
                 Ok(true) => {
-                    matched_rule = Some(rule.decision.clone());
-                    break;
+                    if matched_rule.is_none() {
+                        matched_rule = Some(rule.decision.clone());
+                    }
+                    if matches!(rule.decision, PermissionDecision::Deny(_)) {
+                        matched_deny = Some(rule.decision.clone());
+                        break;
+                    }
                 }
                 Ok(false) => continue,
                 Err(_) => continue,
             }
         }
 
-        if let Some(PermissionDecision::Deny(reason)) = &matched_rule {
+        if let Some(PermissionDecision::Deny(reason)) = &matched_deny {
             return PermissionDecision::Deny(reason.clone());
         }
 

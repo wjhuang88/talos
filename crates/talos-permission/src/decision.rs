@@ -8,6 +8,7 @@ use serde_json::Value;
 use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
 
 use crate::PermissionDecision;
+use crate::grant::{GrantId, GrantSource};
 
 /// Runtime mode recorded with a permission evaluation.
 ///
@@ -214,8 +215,6 @@ pub enum PermissionRuleSource {
     Default,
     /// A rule loaded from serialized configuration.
     Configured,
-    /// A session/runtime grant inserted through `add_runtime_allow_rule`.
-    RuntimeGrant,
     /// A rule supplied directly through the Rust API.
     Explicit,
 }
@@ -242,6 +241,8 @@ pub enum PermissionReason {
     RuleAsk,
     /// A matched rule explicitly denied the facet.
     RuleDeny,
+    /// A first-class in-memory Session grant allowed the facet.
+    SessionGrantAllow,
     /// Trusted-workspace handling allowed a repo-contained write.
     TrustedWorkspaceWrite,
     /// A concrete path was outside the configured workspace boundary.
@@ -262,6 +263,7 @@ impl PermissionReason {
             Self::RuleAllow => "matched rule allows this facet",
             Self::RuleAsk => "matched rule requires approval",
             Self::RuleDeny => "matched rule denies this facet",
+            Self::SessionGrantAllow => "matching Session grant allows this facet",
             Self::TrustedWorkspaceWrite => "trusted workspace allows this contained write",
             Self::ExternalPathRequiresApproval => {
                 "path is outside the configured workspace and requires approval"
@@ -283,6 +285,13 @@ pub enum PermissionDecisionSource {
         rule_id: PermissionRuleId,
         /// Source assigned by the rule insertion path.
         rule_source: PermissionRuleSource,
+    },
+    /// A first-class Session grant matched the complete request identity.
+    Grant {
+        /// Opaque Session-local grant identifier.
+        grant_id: GrantId,
+        /// Closed class of explicit approver that created the grant.
+        grant_source: GrantSource,
     },
     /// Trusted-workspace repo-contained write handling applied.
     WorkspaceTrust,
@@ -393,6 +402,7 @@ fn permission_reason(
             PermissionOutcome::Ask => PermissionReason::RuleAsk,
             PermissionOutcome::Deny => PermissionReason::RuleDeny,
         },
+        PermissionDecisionSource::Grant { .. } => PermissionReason::SessionGrantAllow,
         PermissionDecisionSource::WorkspaceTrust => PermissionReason::TrustedWorkspaceWrite,
         PermissionDecisionSource::WorkspaceBoundary => {
             PermissionReason::ExternalPathRequiresApproval
@@ -489,6 +499,26 @@ impl PermissionDecisionReport {
     #[must_use]
     pub fn decision(&self) -> PermissionDecision {
         self.compatibility_decision.clone()
+    }
+
+    pub(crate) fn resolve_asks_with_grant(
+        mut self,
+        grant_id: GrantId,
+        grant_source: GrantSource,
+    ) -> Self {
+        for facet in &mut self.facets {
+            if facet.outcome == PermissionOutcome::Ask {
+                facet.outcome = PermissionOutcome::Allow;
+                facet.reason = PermissionReason::SessionGrantAllow;
+                facet.source = PermissionDecisionSource::Grant {
+                    grant_id,
+                    grant_source,
+                };
+            }
+        }
+        self.outcome = PermissionOutcome::Allow;
+        self.compatibility_decision = PermissionDecision::Allow;
+        self
     }
 }
 

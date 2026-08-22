@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolPermissionFacet,
+    ToolResourceKind, ToolResult,
+};
 use talos_core::tool_parameters;
 
 use super::{FileSnapshotRegistry, FileToolError, resolve_authorized_path};
@@ -115,6 +118,20 @@ impl AgentTool for WriteTool {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        input
+            .get("path")
+            .and_then(Value::as_str)
+            .map(|path| {
+                vec![ToolPermissionFacet::with_resource(
+                    ToolNature::Write,
+                    path,
+                    ToolResourceKind::Path,
+                )]
+            })
+            .unwrap_or_else(|| vec![ToolPermissionFacet::new(ToolNature::Write)])
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
@@ -385,6 +402,20 @@ impl AgentTool for EditTool {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        input
+            .get("path")
+            .and_then(Value::as_str)
+            .map(|path| {
+                vec![ToolPermissionFacet::with_resource(
+                    ToolNature::Write,
+                    path,
+                    ToolResourceKind::Path,
+                )]
+            })
+            .unwrap_or_else(|| vec![ToolPermissionFacet::new(ToolNature::Write)])
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
