@@ -1,6 +1,6 @@
 # Iteration I219: PERM-006-B First-Class Scoped Grants
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by PR #359; ineffective until merge)
 > Published plan date: 2026-08-22
 > Planned objective: replace compatibility runtime permission rules with one first-class scoped
 > grant compiler, explicit in-memory Session store and revision-safe approval/admission contract
@@ -15,15 +15,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Codex / GPT-5.6 mainline governance session 2026-08-22 |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-22 |
 | Work Slice | Implement only PERM-006-B / I219: first-class grant/compiler/store types in `talos-permission`; explicit in-memory Session ownership; proposal/approval revision and restriction CAS; consuming Once and pre-admission fencing; exact-only path scope; full provenance and multi-facet matching; all-policy Deny dominance; existing Bash classifier descriptor reuse; shared CLI/TUI/Runtime compilation, preview and official wrapper integration; session transition clearing; and the ADR-066 v0.9 public API/schema migration with automated and real preflight evidence. Preserve the existing agent-owned pipeline boundary for PERM-006-C. No persistent/task/cross-process grants, typed-effect migration, model-assisted auto or `/auto`, sandbox/fallback policy change, TOOL-024/background jobs, release, version, tag, publication, Desktop or Dashboard work. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-22 |
 | Source Issue | #54 (dependency for #55 and #59; related #188) |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #359 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head CI, independent Agent-role permission/security/API review and merge-time CAS. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | PR #359 exact-head CI, independent Agent-role permission/security/API review and merge-time CAS are required before merge. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
 | Handoff / Release Condition | Claim and activation remain ineffective until this governance record reaches `main`. After merge, implementation must start from that merge or later and requires a separate exact-head permission/security/code review before merge. |
@@ -150,10 +150,11 @@ PR #358 merge `17e0b648`; PERM-006-A/I189 is Complete/Closed at Completion Commi
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-22 | Selection proposal | I219 is the only proposed Active iteration. This open governance branch has no claim or activation effect; no implementation branch or Rust/Cargo edit is authorized before reviewed exact-head merge to `main`. |
+| 2026-08-22 | Atomic claim and activation proposal | Governance PR #359 proposes Claimed/Active together. The proposal remains ineffective until exact-head CI, independent protected-scope review, merge-time CAS and target-branch merge. |
 
 ## Verification Evidence
 
-- Claim candidate: pending governance PR number, exact-head CI, independent permission/security/API
+- Claim candidate: PR #359; pending exact-head CI, independent permission/security/API
   review and merge-time CAS.
 - Implementation and runtime evidence: pending effective claim and later stable implementation PR.
 

@@ -1003,3 +1003,16 @@ PERM-006-B is Ready/Unclaimed with Selected Iteration None. Resume by preparing 
 testable B iteration and effective protected-scope claim; do not create its implementation branch
 before that claim reaches `main`. PERM-006-C/D/E, PERM-007-B/C/D, TOOL-024-B/C/D, release,
 publication, Desktop and Dashboard remain unauthorized. Issue #59 stays blocked until C completes.
+
+## 2026-08-22 ADR-066 Acceptance And I219 Claim Proposal
+
+ADR-066 was accepted through decision commit `17088d88`, Proposed-head review `5376959300`,
+repository-owner acceptance `5378407820`, exact Accepted-head CI `32557884541`, independent
+Accepted-head review `5378742594`, merge-time CAS and PR #358 merge `17e0b648`. This clears the
+PERM-006-B decision gate only.
+
+PR #359 now atomically proposes runnable I219/PERM-006-B as Claimed/Active. The open proposal is
+ineffective before its own exact-head CI, independent permission/security/API review, CAS and merge
+to `main`; no implementation branch or Rust/Cargo edit is yet authorized. I197/I198/I201/I210 stay
+Review, I206-I208 stay Planned/Unclaimed, I213 stays the independent Planned/Claimed Dashboard lane,
+and I164 stays Paused/superseded. PERM-006-C and Issue #59 remain blocked in order.

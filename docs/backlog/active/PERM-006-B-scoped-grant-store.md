@@ -5,27 +5,27 @@
 | Story ID | PERM-006-B |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Ready / Unclaimed — PERM-006-A completed through I189 |
+| Status | Active / Claimed through I219 (proposed by PR #359; ineffective until merge) |
 | Source | [GitHub Issue #54](https://github.com/wjhuang88/talos/issues/54) |
-| Selected Iteration | None |
+| Selected Iteration | I219 |
 | Depends On | PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-22 |
+| Work Slice | Implement only PERM-006-B / I219: first-class grant/compiler/store types in `talos-permission`; explicit in-memory Session ownership; proposal/approval revision and restriction CAS; consuming Once and pre-admission fencing; exact-only path scope; full provenance and multi-facet matching; all-policy Deny dominance; existing Bash classifier descriptor reuse; shared CLI/TUI/Runtime compilation, preview and official wrapper integration; session transition clearing; and the ADR-066 v0.9 public API/schema migration with automated and real preflight evidence. Preserve the existing agent-owned pipeline boundary for PERM-006-C. No persistent/task/cross-process grants, typed-effect migration, model-assisted auto or `/auto`, sandbox/fallback policy change, TOOL-024/background jobs, release, version, tag, publication, Desktop or Dashboard work. |
+| Claimed At | 2026-08-22 |
 | Source Issue | #54 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #359 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | PR #359 exact-head CI, independent Agent-role permission/security/API review and merge-time CAS are required before merge. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Select a runnable/testable iteration and establish an effective protected-scope claim before implementation. Readiness does not authorize a branch or code change. |
+| Handoff / Release Condition | Claim and activation remain ineffective until PR #359 reaches `main`. Implementation must then start from that merge or later and retain independent exact-head protected-scope review. |
 
 ## Identity / Goal / Value
 
@@ -70,7 +70,7 @@ scope-equivalence and approval-preview contract in the selected iteration before
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Ready/Unclaimed.
+Do not present this Story as shipped while it remains an unmerged claim proposal or Active.
 
 ## Required Reads
 
@@ -115,3 +115,11 @@ ADR-066 decision content commit `17088d88` was independently approved at exact P
 is recorded in comment `5378407820`. The ADR is Accepted, clearing only this Story's decision gate.
 PERM-006-B remains Ready/Unclaimed with Selected Iteration None until a separate runnable/testable
 iteration and effective protected-scope Collaboration Claim reach `main`.
+
+## 2026-08-22 I219 Claim And Activation Proposal
+
+I219 selects one runnable cross-surface grant deliverable and PR #359 atomically proposes this
+Story and iteration as Claimed/Active. The Work Slice is bounded by ADR-066 and explicitly excludes
+PERM-006-C, persistent grants, typed effects, model-assisted `/auto`, TOOL-024, releases and product
+lanes. This open proposal has no target-branch ownership or implementation effect before exact-head
+CI, independent permission/security/API review, merge-time CAS and merge to `main`.
