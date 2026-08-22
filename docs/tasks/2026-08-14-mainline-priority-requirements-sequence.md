@@ -990,3 +990,16 @@ performing merge-time CAS and merging only that implementation. A later owner-fi
 name pre-existing implementation commit `6b577d6a`; only after that closeout may PERM-006-B be
 prepared through a separate runnable iteration and effective protected-scope claim. PERM-006-C,
 PERM-007-B/C/D, TOOL-024-B/C/D, release, publication, Desktop and Dashboard remain unauthorized.
+
+## 2026-08-22 I189 Completion And PERM-006-B Readiness Checkpoint
+
+PR #356 exact head `d7e651b329a8f61a4ea714ccc0a9251c18a3370e` passed CI
+`32511672926`, independent Agent-role permission/security/code review `5376591491` and merge-time
+CAS, then merged as `54241bdde83141f5f40e1ee477210217df55e2e9`. I189/PERM-006-A is
+Complete/Closed at pre-existing implementation commit `6b577d6afcb05230c821214902b9067c45c767a9`;
+this status-only closeout does not self-certify implementation.
+
+PERM-006-B is Ready/Unclaimed with Selected Iteration None. Resume by preparing one runnable,
+testable B iteration and effective protected-scope claim; do not create its implementation branch
+before that claim reaches `main`. PERM-006-C/D/E, PERM-007-B/C/D, TOOL-024-B/C/D, release,
+publication, Desktop and Dashboard remain unauthorized. Issue #59 stays blocked until C completes.

@@ -5,10 +5,10 @@
 | Story ID | PERM-006-B |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Blocked — PERM-006-A must be accepted and complete |
+| Status | Ready / Unclaimed — PERM-006-A completed through I189 |
 | Source | [GitHub Issue #54](https://github.com/wjhuang88/talos/issues/54) |
 | Selected Iteration | None |
-| Depends On | Blocked by PERM-006-A; preserves PERM-004/PERM-005 and SEC-001 |
+| Depends On | PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001 |
 
 ## Collaboration Claim
 
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | Select a runnable/testable iteration and establish an effective protected-scope claim before implementation. Readiness does not authorize a branch or code change. |
 
 ## Identity / Goal / Value
 
@@ -43,7 +43,7 @@ Separate configured policy from user-approved runtime grants and make one compil
 
 ## Dependencies
 
-Blocked by PERM-006-A; preserves PERM-004/PERM-005 and SEC-001
+PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001
 
 ## Decision Links And Constraints
 
@@ -53,7 +53,8 @@ Blocked by PERM-006-A; preserves PERM-004/PERM-005 and SEC-001
 
 ## Uncertainty And Validation Path
 
-Activate only after PERM-006-A supplies authoritative requests and provenance.
+PERM-006-A now supplies authoritative requests and provenance. Refine the compiler/store lifetime,
+scope-equivalence and approval-preview contract in the selected iteration before implementation.
 
 ## State / Status Owners
 
@@ -65,7 +66,7 @@ Activate only after PERM-006-A supplies authoritative requests and provenance.
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Blocked.
+Do not present this Story as shipped while it remains Ready/Unclaimed.
 
 ## Required Reads
 
@@ -85,3 +86,11 @@ Do not present this Story as shipped while it remains Blocked.
 ## Residual Destination
 
 Persistent or task-scoped grants require a separate owner and ADR.
+
+## 2026-08-22 Dependency Clearance Checkpoint
+
+PERM-006-A/I189 is Complete/Closed at Completion Commit `6b577d6a`; implementation PR #356
+merged as `54241bdd` after exact-head CI and independent permission/security/code review. This
+clears PERM-006-B's dependency only. PERM-006-B is Ready/Unclaimed with Selected Iteration None;
+no implementation branch or code change is authorized before a separate runnable iteration and
+effective protected-scope Collaboration Claim reach `main`.

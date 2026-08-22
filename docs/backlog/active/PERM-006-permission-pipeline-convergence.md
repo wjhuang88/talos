@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — PERM-006-A/I189 is in Review; B-E remain blocked/unclaimed |
+| Status | In Progress — PERM-006-A/I189 is Complete/Closed; B is Ready/Unclaimed; C-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | I189 for PERM-006-A only (Review through implementation PR #356) |
+| Selected Iteration | None; I189/PERM-006-A is Complete/Closed and B awaits a separate selection |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -103,3 +103,11 @@ Epic completion requires all children; partial implementation remains owned by t
   merge-time CAS and owner-first closeout.
 - PERM-006-B/C/D/E remain blocked/unclaimed. This Review candidate transfers no implementation
   authority to them, PERM-007 behavior or TOOL-024.
+
+## 2026-08-22 PERM-006-A Completion Checkpoint
+
+- PERM-006-A/I189 completed at implementation commit `6b577d6a`; PR #356 merged as `54241bdd`
+  after exact-head CI `32511672926`, independent Agent-role permission/security/code review
+  `5376591491` and merge-time CAS.
+- PERM-006-B is now Ready/Unclaimed. C/D/E remain blocked in order, and no later child may start
+  without its own runnable iteration and effective protected-scope claim.
