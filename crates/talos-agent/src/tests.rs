@@ -2416,10 +2416,10 @@ async fn sandbox_fallback_ask_rejection_denies() {
 }
 
 #[tokio::test]
-async fn ordinary_always_approve_rule_does_not_approve_sandbox_fallback() {
+async fn ordinary_permission_allow_does_not_approve_sandbox_fallback() {
     let log = Arc::new(Mutex::new(Vec::new()));
     let mut engine = PermissionEngine::empty();
-    engine.add_runtime_allow_rule(talos_permission::PermissionRule::new(
+    engine.add_rule(talos_permission::PermissionRule::new(
         "bash",
         None,
         PermissionDecision::Allow,

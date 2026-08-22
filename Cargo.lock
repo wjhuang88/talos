@@ -5037,6 +5037,7 @@ dependencies = [
  "schemars_derive",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -5825,9 +5826,12 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "talos-core",
+ "tempfile",
  "thiserror 2.0.18",
  "url",
+ "uuid",
 ]
 
 [[package]]

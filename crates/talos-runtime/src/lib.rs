@@ -6,7 +6,7 @@
 #[cfg(feature = "shared-composition")]
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
@@ -19,10 +19,13 @@ use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
 };
 use talos_core::tool::{
-    AgentTool, ToolAuthorizationScope, ToolPermissionFacet, ToolRegistry, ToolResult,
+    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolPermissionFacet, ToolRegistry,
+    ToolResult,
 };
 use talos_permission::{
-    PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
+    GrantPreview, GrantScope, GrantSource, InteractionCapability, PermissionContext,
+    PermissionDecision, PermissionEngine, PermissionMode, PermissionRequest, PermissionRule,
+    PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
 use talos_sandbox::SandboxProvider;
@@ -135,6 +138,20 @@ pub trait ApprovalHandler: Send + Sync {
         arguments: &Value,
         summary_fields: &[String],
     ) -> ApprovalChoice;
+
+    /// Requests approval using the exact bounded scope compiled by the
+    /// permission layer. Existing handlers remain source-compatible through
+    /// the projection-only default implementation.
+    async fn request_scoped_approval(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+        summary_fields: &[String],
+        _preview: &GrantPreview,
+    ) -> ApprovalChoice {
+        self.request_approval(tool_name, arguments, summary_fields)
+            .await
+    }
 
     /// Requests a one-invocation approval to continue without sandbox
     /// isolation. This is distinct from normal tool permission approval and
@@ -317,8 +334,8 @@ impl RuntimeBuilder {
     /// `Ask`.
     ///
     /// Without a handler, `Ask` decisions are denied. `AlwaysApprove` choices
-    /// install in-memory allow rules for the current runtime only; they are not
-    /// persisted to user configuration.
+    /// install first-class in-memory Session grants for this runtime build
+    /// only; they are not persisted to user configuration or durable sessions.
     #[must_use]
     pub fn approval_handler(mut self, handler: Arc<dyn ApprovalHandler>) -> Self {
         self.approval_handler = Some(handler);
@@ -429,7 +446,7 @@ impl RuntimeBuilder {
             #[cfg(not(feature = "shared-composition"))]
             return Err(RuntimeError::CodingPresetRequiresFeature);
         }
-        let tool_engine = Arc::new(Mutex::new(build_permission_engine(
+        let permission_state = Arc::new(PermissionSessionState::new(build_permission_engine(
             self.workspace_root.clone(),
             &self.permission_rules,
         )));
@@ -441,7 +458,7 @@ impl RuntimeBuilder {
         for tool in tools {
             registry.register(Arc::new(RuntimePermissionAwareTool {
                 inner: tool,
-                engine: tool_engine.clone(),
+                permission_state: permission_state.clone(),
                 approval_handler: self.approval_handler.clone(),
             }));
         }
@@ -645,34 +662,92 @@ fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> Permissio
 
 struct RuntimePermissionAwareTool {
     inner: Arc<dyn AgentTool>,
-    engine: Arc<Mutex<PermissionEngine>>,
+    permission_state: Arc<PermissionSessionState>,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
 }
 
 impl RuntimePermissionAwareTool {
-    async fn execute_with_authorization(
+    async fn authorize(
         &self,
-        input: Value,
+        input: &Value,
         profile: &[ToolPermissionFacet],
-        scope: ToolAuthorizationScope,
-    ) -> ToolResult {
-        let authorizations = match self.engine.lock() {
-            Ok(engine) => {
-                match engine.execution_authorizations(self.inner.name(), profile, &input, scope) {
-                    Ok(authorizations) => authorizations,
-                    Err(error) => {
-                        return ToolResult::error(format!(
-                            "Permission denied: invalid execution authorization: {error}"
-                        ));
-                    }
+    ) -> Result<Vec<ToolExecutionAuthorization>, ToolResult> {
+        let interaction = if self.approval_handler.is_some() {
+            InteractionCapability::Available
+        } else {
+            InteractionCapability::Unavailable
+        };
+        let context = PermissionContext::new(PermissionMode::Headless, interaction);
+        let provenance = self.inner.provenance();
+        let request = PermissionRequest::new(self.inner.name(), provenance, profile, input);
+        let evaluation = self
+            .permission_state
+            .evaluate(&request, &context)
+            .map_err(permission_error)?;
+
+        let pending = match evaluation.decision() {
+            PermissionDecision::Allow => self
+                .permission_state
+                .prepare_authorized(&request, &context)
+                .map_err(permission_error)?
+                .ok_or_else(|| permission_denied("request is not authorized"))?,
+            PermissionDecision::Deny(reason) => {
+                return Err(permission_denied(&reason));
+            }
+            PermissionDecision::Ask => {
+                let Some(handler) = &self.approval_handler else {
+                    return Err(permission_denied(
+                        "approval required but no runtime approval handler is configured",
+                    ));
+                };
+                let once = self
+                    .permission_state
+                    .propose(&request, &context, GrantScope::Once)
+                    .map_err(permission_error)?;
+                let session = self
+                    .permission_state
+                    .propose(&request, &context, GrantScope::Session)
+                    .map_err(permission_error)?;
+                let summary_fields = self
+                    .inner
+                    .summary_fields()
+                    .iter()
+                    .map(|field| (*field).to_string())
+                    .collect::<Vec<_>>();
+                match handler
+                    .request_scoped_approval(
+                        self.inner.name(),
+                        &self.inner.project_input(input),
+                        &summary_fields,
+                        session.preview(),
+                    )
+                    .await
+                {
+                    ApprovalChoice::ApproveOnce => self
+                        .permission_state
+                        .approve_once(once, &request, &context)
+                        .map_err(permission_error)?,
+                    ApprovalChoice::AlwaysApprove => self
+                        .permission_state
+                        .approve_session(session, &request, &context, GrantSource::SdkHostApproval)
+                        .map_err(permission_error)?,
+                    ApprovalChoice::Deny => return Err(permission_denied("User denied")),
                 }
             }
-            Err(_) => {
-                return ToolResult::error("Permission denied: permission engine lock poisoned");
-            }
         };
-        self.inner.execute_authorized(input, &authorizations).await
+
+        self.permission_state
+            .admit(pending, &request, &context)
+            .map_err(permission_error)
     }
+}
+
+fn permission_error(error: impl std::fmt::Display) -> ToolResult {
+    permission_denied(&error.to_string())
+}
+
+fn permission_denied(reason: &str) -> ToolResult {
+    ToolResult::error(format!("Permission denied: {reason}"))
 }
 
 #[async_trait]
@@ -691,64 +766,22 @@ impl AgentTool for RuntimePermissionAwareTool {
 
     async fn execute(&self, input: Value) -> ToolResult {
         let profile = self.inner.permission_profile(&input);
-        let decision = {
-            match self.engine.lock() {
-                Ok(engine) => engine.evaluate_profile(self.inner.name(), &profile, &input),
-                Err(_) => {
-                    return ToolResult::error("Permission denied: permission engine lock poisoned");
-                }
-            }
+        let authorizations = match self.authorize(&input, &profile).await {
+            Ok(authorizations) => authorizations,
+            Err(error) => return error,
         };
+        self.inner.execute_authorized(input, &authorizations).await
+    }
 
-        match decision {
-            PermissionDecision::Allow => {
-                self.execute_with_authorization(input, &profile, ToolAuthorizationScope::Persisted)
-                    .await
-            }
-            PermissionDecision::Deny(reason) => {
-                ToolResult::error(format!("Permission denied: {reason}"))
-            }
-            PermissionDecision::Ask => {
-                let Some(handler) = &self.approval_handler else {
-                    return ToolResult::error(
-                        "Permission denied: approval required but no runtime approval handler is configured",
-                    );
-                };
-                let summary_fields = self
-                    .inner
-                    .summary_fields()
-                    .iter()
-                    .map(|field| (*field).to_string())
-                    .collect::<Vec<_>>();
-                match handler
-                    .request_approval(
-                        self.inner.name(),
-                        &self.inner.project_input(&input),
-                        &summary_fields,
-                    )
-                    .await
-                {
-                    ApprovalChoice::ApproveOnce => {
-                        self.execute_with_authorization(
-                            input,
-                            &profile,
-                            ToolAuthorizationScope::Once,
-                        )
-                        .await
-                    }
-                    ApprovalChoice::AlwaysApprove => {
-                        add_always_allow_rules(&self.engine, &profile, &input);
-                        self.execute_with_authorization(
-                            input,
-                            &profile,
-                            ToolAuthorizationScope::Persisted,
-                        )
-                        .await
-                    }
-                    ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied"),
-                }
-            }
-        }
+    async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
+        let profile = self.inner.permission_profile(&input);
+        let authorizations = match self.authorize(&input, &profile).await {
+            Ok(authorizations) => authorizations,
+            Err(error) => return ToolExecutionOutput::from_result(error),
+        };
+        self.inner
+            .execute_authorized_with_output(input, &authorizations)
+            .await
     }
 
     fn is_read_only(&self) -> bool {
@@ -785,41 +818,6 @@ impl AgentTool for RuntimePermissionAwareTool {
 
     fn provenance(&self) -> talos_core::tool::ToolProvenance {
         self.inner.provenance()
-    }
-}
-
-fn add_always_allow_rules(
-    engine: &Arc<Mutex<PermissionEngine>>,
-    profile: &[ToolPermissionFacet],
-    input: &Value,
-) {
-    let Ok(mut engine) = engine.lock() else {
-        return;
-    };
-    for facet in profile {
-        let resource = facet
-            .resource
-            .clone()
-            .or_else(|| ResourceExtractor::extract(facet.nature, input));
-        let resource_kind = facet
-            .resource_kind
-            .map(ResourceKind::from)
-            .or_else(|| Some(default_resource_kind(facet.nature)));
-        engine.add_runtime_allow_rule(PermissionRule::new_nature(
-            facet.nature,
-            resource,
-            resource_kind,
-            PermissionDecision::Allow,
-        ));
-    }
-}
-
-fn default_resource_kind(nature: ToolNature) -> ResourceKind {
-    match nature {
-        ToolNature::Network => ResourceKind::Domain,
-        ToolNature::Execute => ResourceKind::Command,
-        ToolNature::Read | ToolNature::Write => ResourceKind::Path,
-        ToolNature::Internal => ResourceKind::Remote,
     }
 }
 
@@ -2016,6 +2014,14 @@ mod tests {
             ToolNature::Write
         }
 
+        fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+            vec![ToolPermissionFacet::with_resource(
+                ToolNature::Write,
+                ".talos-runtime-record",
+                ToolResourceKind::Path,
+            )]
+        }
+
         fn summary_fields(&self) -> &'static [&'static str] {
             &["message"]
         }
@@ -2116,6 +2122,20 @@ mod tests {
 
         fn nature(&self) -> ToolNature {
             ToolNature::Write
+        }
+
+        fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+            input
+                .get("path")
+                .and_then(Value::as_str)
+                .map(|path| {
+                    vec![ToolPermissionFacet::with_resource(
+                        ToolNature::Write,
+                        path,
+                        ToolResourceKind::Path,
+                    )]
+                })
+                .unwrap_or_else(|| vec![ToolPermissionFacet::new(ToolNature::Write)])
         }
 
         fn project_input(&self, input: &Value) -> Value {
@@ -2321,9 +2341,9 @@ mod tests {
         ));
         let tool = RuntimePermissionAwareTool {
             inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
-            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
-                workspace.path().to_path_buf(),
-            ))),
+            permission_state: Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+            )),
             approval_handler: Some(handler),
         };
 
@@ -2343,9 +2363,9 @@ mod tests {
         std::fs::write(external.path(), "must not be read").expect("write fixture");
         let tool = RuntimePermissionAwareTool {
             inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
-            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
-                workspace.path().to_path_buf(),
-            ))),
+            permission_state: Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+            )),
             approval_handler: None,
         };
 
@@ -2369,9 +2389,9 @@ mod tests {
         ));
         let tool = RuntimePermissionAwareTool {
             inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
-            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
-                workspace.path().to_path_buf(),
-            ))),
+            permission_state: Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+            )),
             approval_handler: Some(handler),
         };
 
@@ -2385,7 +2405,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn external_read_always_approve_reuses_exact_rule_without_second_prompt() {
+    async fn external_read_always_approve_reuses_exact_session_grant_without_second_prompt() {
         let workspace = tempfile::tempdir().expect("workspace");
         let external = tempfile::NamedTempFile::new().expect("external file");
         std::fs::write(external.path(), "external content").expect("write fixture");
@@ -2396,9 +2416,9 @@ mod tests {
         ));
         let tool = RuntimePermissionAwareTool {
             inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
-            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
-                workspace.path().to_path_buf(),
-            ))),
+            permission_state: Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+            )),
             approval_handler: Some(handler),
         };
         let input = serde_json::json!({"path": external.path().to_string_lossy()});
@@ -2411,7 +2431,7 @@ mod tests {
         assert_eq!(
             records.lock().expect("records lock").len(),
             1,
-            "persisted exact-path Allow must suppress the second prompt"
+            "exact Session grant must suppress the second prompt"
         );
     }
 
@@ -2455,7 +2475,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn runtime_always_approve_installs_in_memory_rule() {
+    async fn runtime_always_approve_installs_in_memory_session_grant() {
         let provider = Arc::new(
             MockProvider::new()
                 .with_tool_call("record_write", serde_json::json!({"message": "first"}))

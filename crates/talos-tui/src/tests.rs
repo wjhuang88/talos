@@ -14,8 +14,9 @@ mod tests {
     use crate::panel_state::PanelItem;
     use crate::scrollback::{
         BottomPanelComponent, BottomPanelPlacement, approval_natural_height,
-        bottom_panel_placement, bottom_panel_rows, build_input_text, build_status_text,
-        cursor_line_col, input_line_count, stream_padding_for, truncate_str, wrap_text_to_lines,
+        approval_preview_fully_visible, bottom_panel_placement, bottom_panel_rows,
+        build_input_text, build_status_text, cursor_line_col, input_line_count, stream_padding_for,
+        truncate_str, wrap_text_to_lines,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, BottomPanelState, CtrlCState, Tip, TuiState};
@@ -1331,6 +1332,30 @@ mod tests {
         (buf, h)
     }
 
+    fn render_scoped_approval_to_buffer(
+        tool_name: &str,
+        arguments: &str,
+        preview: &str,
+        width: u16,
+    ) -> (ratatui::buffer::Buffer, u16) {
+        let menu = BottomPanelState::open_approval_with_preview(
+            tool_name,
+            arguments,
+            Some(preview.to_string()),
+        );
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(width);
+        let area = ratatui::layout::Rect::new(0, 0, width, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+        (buf, h)
+    }
+
     fn buffer_line_content(buf: &ratatui::buffer::Buffer, y: u16, width: u16) -> String {
         (0..width)
             .map(|x| buf[(x, y)].symbol().to_string())
@@ -1366,6 +1391,69 @@ mod tests {
             "always option must be visible"
         );
         assert!(all.contains("[n] deny"), "deny option must be visible");
+    }
+
+    #[test]
+    fn scoped_approval_renders_compiler_preview_separately_with_all_choices() {
+        let scope = "Write Path: /private/tmp/example/exact-file.txt";
+        let (buf, h) = render_scoped_approval_to_buffer("write", "path: exact-file.txt", scope, 80);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 80))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("Always approve scope:"));
+        assert!(all.contains("/private/tmp/example/exact-file.txt"));
+        assert!(all.contains("[y] approve"));
+        assert!(all.contains("[a] always approve"));
+        assert!(all.contains("[n] deny"));
+    }
+
+    #[test]
+    fn scoped_approval_disables_reusable_choice_when_preview_is_clipped() {
+        let preview = format!("Write Path: /private/tmp/{}", "long-scope/".repeat(20));
+        let menu = BottomPanelState::open_approval_with_preview(
+            "write",
+            "path: exact-file.txt",
+            Some(preview),
+        );
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: 8,
+        };
+        let h = comp.height_hint(40);
+        let area = ratatui::layout::Rect::new(0, 0, 40, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 40))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let scope = match &menu.kind {
+            Some(crate::state::PanelKind::Approval { preview, .. }) => preview.as_deref(),
+            _ => None,
+        };
+
+        assert!(!approval_preview_fully_visible(40, h, scope));
+        assert!(all.contains("[a] resize to review full scope"));
+        assert!(all.contains("[y] approve"));
+        assert!(all.contains("[n] deny"));
+    }
+
+    #[test]
+    fn scoped_approval_visibility_does_not_wrap_at_u16_row_count() {
+        let preview = "x".repeat(36 * usize::from(u16::MAX).saturating_add(1));
+
+        assert!(!approval_preview_fully_visible(40, 8, Some(&preview)));
+
+        let menu = BottomPanelState::open_approval_with_preview("write", "", Some(preview));
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: 8,
+        };
+        assert_eq!(comp.height_hint(40), 8);
     }
 
     #[test]

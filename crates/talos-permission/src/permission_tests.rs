@@ -225,7 +225,7 @@ fn test_path_pattern_src_glob_no_match() {
 }
 
 #[test]
-fn test_path_pattern_deny_outside_src() {
+fn test_general_deny_dominates_specific_path_allow() {
     let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "write".to_owned(),
@@ -251,13 +251,16 @@ fn test_path_pattern_deny_outside_src() {
     );
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "src/lib.rs"}));
-    assert_eq!(decision, PermissionDecision::Allow);
+    assert_eq!(
+        decision,
+        PermissionDecision::Deny("only src allowed".to_owned())
+    );
 }
 
 // --- Rule precedence tests ---
 
 #[test]
-fn test_first_match_wins() {
+fn test_first_non_deny_match_wins() {
     let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "bash".to_owned(),
@@ -270,7 +273,7 @@ fn test_first_match_wins() {
     engine.add_rule(PermissionRule {
         tool_name: "bash".to_owned(),
         path_pattern: None,
-        decision: PermissionDecision::Deny("blocked".to_owned()),
+        decision: PermissionDecision::Ask,
         nature: None,
         resource: None,
         resource_kind: None,
@@ -301,7 +304,11 @@ fn test_specific_rule_before_general() {
     });
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "tmp/out.txt"}));
-    assert_eq!(decision, PermissionDecision::Allow);
+    assert_eq!(
+        decision,
+        PermissionDecision::Deny("write not allowed".to_owned()),
+        "every matching policy Deny must dominate an earlier Allow"
+    );
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
     assert_eq!(
@@ -311,57 +318,75 @@ fn test_specific_rule_before_general() {
 }
 
 #[test]
-fn test_runtime_allow_rule_bypasses_default_ask() {
-    let mut engine = PermissionEngine::new();
-    engine.add_runtime_allow_rule(PermissionRule::new_nature(
-        ToolNature::Execute,
-        Some("bash:read_only_inspection:abc".to_string()),
-        Some(ResourceKind::Command),
-        PermissionDecision::Allow,
-    ));
-
+fn test_session_grant_resolves_default_ask() {
+    let state = PermissionSessionState::new(PermissionEngine::new());
     let profile = vec![ToolPermissionFacet::with_resource(
         ToolNature::Execute,
         "bash:read_only_inspection:abc",
         talos_core::tool::ToolResourceKind::Command,
     )];
-    let decision = engine.evaluate_profile("bash", &profile, &serde_json::json!({}));
+    let input = serde_json::json!({"command": "git status"});
+    let request = PermissionRequest::native("bash", &profile, &input);
+    let context = PermissionContext::compatibility();
+    let proposal = state
+        .propose(&request, &context, GrantScope::Session)
+        .expect("proposal");
+    let pending = state
+        .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
+        .expect("session approval");
+    state.admit(pending, &request, &context).expect("admission");
 
-    assert_eq!(decision, PermissionDecision::Allow);
+    assert_eq!(
+        state
+            .evaluate(&request, &context)
+            .expect("evaluation")
+            .decision(),
+        PermissionDecision::Allow
+    );
 }
 
 #[test]
-fn test_runtime_allow_rule_does_not_override_deny() {
+fn test_session_grant_does_not_override_later_deny() {
     let mut engine = PermissionEngine::new();
-    engine
-        .load_from_config(&serde_json::json!({
-            "rules": [
-                {
-                    "decision": { "Deny": "shell blocked" },
-                    "nature": "Execute",
-                    "resource": "bash:*",
-                    "resource_kind": "command"
-                }
-            ]
-        }))
-        .expect("deny rule config should load");
-    engine.add_runtime_allow_rule(PermissionRule::new_nature(
+    engine.add_rule(PermissionRule::new_nature(
         ToolNature::Execute,
         Some("bash:read_only_inspection:abc".to_string()),
         Some(ResourceKind::Command),
-        PermissionDecision::Allow,
+        PermissionDecision::Ask,
     ));
-
     let profile = vec![ToolPermissionFacet::with_resource(
         ToolNature::Execute,
         "bash:read_only_inspection:abc",
         talos_core::tool::ToolResourceKind::Command,
     )];
-    let decision = engine.evaluate_profile("bash", &profile, &serde_json::json!({}));
+    let input = serde_json::json!({"command": "git status"});
+    let request = PermissionRequest::native("bash", &profile, &input);
+    let context = PermissionContext::compatibility();
+    let state = PermissionSessionState::new(engine);
+    let proposal = state
+        .propose(&request, &context, GrantScope::Session)
+        .expect("proposal");
+    state
+        .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
+        .expect("session approval");
+    state
+        .replace_policy(PermissionEngine::from_rules(vec![
+            PermissionRule::new_nature(
+                ToolNature::Execute,
+                Some("bash:read_only_inspection:abc".to_string()),
+                Some(ResourceKind::Command),
+                PermissionDecision::Deny("shell blocked".to_string()),
+            ),
+        ]))
+        .expect("policy replacement");
 
     assert_eq!(
-        decision,
-        PermissionDecision::Deny("shell blocked".to_string())
+        state
+            .evaluate(&request, &context)
+            .expect("evaluation")
+            .decision(),
+        PermissionDecision::Deny("shell blocked".to_string()),
+        "a later matching policy Deny must shadow an installed Session grant"
     );
 }
 
@@ -400,7 +425,7 @@ fn test_nature_path_resource_match() {
         ToolNature::Write,
         None,
         None,
-        PermissionDecision::Deny("write not allowed".to_owned()),
+        PermissionDecision::Ask,
     ));
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
@@ -410,10 +435,7 @@ fn test_nature_path_resource_match() {
     assert_eq!(decision, PermissionDecision::Allow);
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
-    assert_eq!(
-        decision,
-        PermissionDecision::Deny("write not allowed".to_owned())
-    );
+    assert_eq!(decision, PermissionDecision::Ask);
 }
 
 #[test]
@@ -529,24 +551,17 @@ fn test_legacy_tool_name_rule_still_works() {
         Some("src/**".to_owned()),
         PermissionDecision::Allow,
     ));
-    engine.add_rule(PermissionRule::new(
-        "write",
-        None,
-        PermissionDecision::Deny("write not allowed".to_owned()),
-    ));
+    engine.add_rule(PermissionRule::new("write", None, PermissionDecision::Ask));
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
     assert_eq!(decision, PermissionDecision::Allow);
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
-    assert_eq!(
-        decision,
-        PermissionDecision::Deny("write not allowed".to_owned())
-    );
+    assert_eq!(decision, PermissionDecision::Ask);
 }
 
 #[test]
-fn test_first_match_wins_nature_rules() {
+fn test_first_non_deny_match_wins_for_nature_rules() {
     let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Write,
@@ -558,17 +573,14 @@ fn test_first_match_wins_nature_rules() {
         ToolNature::Write,
         None,
         None,
-        PermissionDecision::Deny("write not allowed".to_owned()),
+        PermissionDecision::Ask,
     ));
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
     assert_eq!(decision, PermissionDecision::Allow);
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
-    assert_eq!(
-        decision,
-        PermissionDecision::Deny("write not allowed".to_owned())
-    );
+    assert_eq!(decision, PermissionDecision::Ask);
 }
 
 // --- ResourceExtractor tests (T2) ---
@@ -748,7 +760,7 @@ fn test_load_new_config_format_nature_form() {
             },
             {
                 "nature": "Write",
-                "decision": "Deny"
+                "decision": "Ask"
             }
         ]
     });
@@ -765,7 +777,7 @@ fn test_load_new_config_format_nature_form() {
     assert_eq!(decision, PermissionDecision::Allow);
 
     let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
-    assert_eq!(decision, PermissionDecision::Deny("".to_owned()));
+    assert_eq!(decision, PermissionDecision::Ask);
 }
 
 #[test]
@@ -1223,7 +1235,7 @@ fn deny_rule_still_wins_for_external_path() {
 }
 
 #[test]
-fn exact_allow_rule_is_reused_for_external_path() {
+fn exact_session_grant_is_reused_for_external_path() {
     use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
 
     let root = std::env::temp_dir().join(format!("talos-sec001-allow-{}", std::process::id()));
@@ -1232,13 +1244,7 @@ fn exact_allow_rule_is_reused_for_external_path() {
     std::fs::create_dir_all(&root).expect("workspace");
     std::fs::write(&external, "data").expect("external file");
 
-    let mut engine = PermissionEngine::with_workspace_root(root);
-    engine.add_runtime_allow_rule(PermissionRule::new_nature(
-        ToolNature::Read,
-        Some(external.to_string_lossy().to_string()),
-        Some(ResourceKind::Path),
-        PermissionDecision::Allow,
-    ));
+    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(root));
     let facet = ToolPermissionFacet::with_resource(
         ToolNature::Read,
         external.to_string_lossy(),
@@ -1246,10 +1252,21 @@ fn exact_allow_rule_is_reused_for_external_path() {
     );
     let input = serde_json::json!({"path": external.to_string_lossy()});
 
+    let facets = [facet];
+    let request = PermissionRequest::native("read", &facets, &input);
+    let context = PermissionContext::compatibility();
+    let proposal = state
+        .propose(&request, &context, GrantScope::Session)
+        .expect("external path proposal");
+    state
+        .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
+        .expect("external path approval");
     assert_eq!(
-        engine.evaluate_facet("read", &facet, &input),
-        PermissionDecision::Allow,
-        "an exact persisted external-path Allow must suppress repeated prompts"
+        state
+            .evaluate(&request, &context)
+            .expect("evaluation")
+            .decision(),
+        PermissionDecision::Allow
     );
 
     std::fs::remove_file(&external).ok();
@@ -1286,7 +1303,7 @@ fn report_rule_source(report: &PermissionDecisionReport) -> PermissionRuleSource
 }
 
 #[test]
-fn structured_report_distinguishes_all_rule_insertion_sources() {
+fn structured_report_distinguishes_policy_rule_sources() {
     let input = serde_json::json!({"path": "src/lib.rs"});
     let facets = [ToolPermissionFacet::with_resource(
         ToolNature::Read,
@@ -1331,22 +1348,6 @@ fn structured_report_distinguishes_all_rule_insertion_sources() {
         &context,
     );
     assert_eq!(report_rule_source(&report), PermissionRuleSource::Explicit);
-
-    let mut runtime_engine = PermissionEngine::empty();
-    runtime_engine.add_runtime_allow_rule(PermissionRule::new_nature(
-        ToolNature::Read,
-        Some("src/lib.rs".to_string()),
-        Some(ResourceKind::Path),
-        PermissionDecision::Allow,
-    ));
-    let report = runtime_engine.evaluate_request(
-        &PermissionRequest::native("read", &facets, &input),
-        &context,
-    );
-    assert_eq!(
-        report_rule_source(&report),
-        PermissionRuleSource::RuntimeGrant
-    );
 }
 
 #[test]

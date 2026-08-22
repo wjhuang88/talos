@@ -401,6 +401,25 @@ mod file_tool_tests {
         assert_eq!(content, "hello world");
     }
 
+    #[test]
+    fn write_and_edit_profiles_expose_exact_path_resources() {
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let input = json!({"path": "nested/output.txt", "content": "test"});
+
+        for profile in [
+            WriteTool::new(workspace.path().to_path_buf()).permission_profile(&input),
+            EditTool::new(workspace.path().to_path_buf()).permission_profile(&input),
+        ] {
+            assert_eq!(profile.len(), 1);
+            assert_eq!(profile[0].nature, talos_core::tool::ToolNature::Write);
+            assert_eq!(
+                profile[0].resource_kind,
+                Some(talos_core::tool::ToolResourceKind::Path)
+            );
+            assert_eq!(profile[0].resource.as_deref(), Some("nested/output.txt"));
+        }
+    }
+
     #[tokio::test]
     async fn test_write_tool_large_preview_is_bounded() {
         let temp_dir = tempfile::tempdir().expect("operation should succeed");

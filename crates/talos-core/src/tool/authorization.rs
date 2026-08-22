@@ -26,10 +26,12 @@ pub enum ToolResourceKind {
 /// not itself persist permission policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolAuthorizationScope {
+    /// Authorization was produced by configured/default policy or workspace trust.
+    Policy,
     /// Authorization applies only to the current invocation.
     Once,
-    /// Authorization was produced from a reusable permission rule.
-    Persisted,
+    /// Authorization was produced by an in-memory grant owned by the current Session.
+    Session,
 }
 
 /// A concrete, path-bound authorization for one tool operation.
@@ -99,12 +101,21 @@ impl ToolExecutionAuthorization {
     }
 }
 
-fn normalize_authorized_path(workspace_root: &Path, resource: &str) -> io::Result<PathBuf> {
+/// Normalizes a path for exact permission matching and execution authorization.
+///
+/// Grant compilation and execution authorization share this function so the
+/// reviewed scope cannot drift between preview, storage, and admission.
+pub fn normalize_authorized_path(workspace_root: &Path, resource: &str) -> io::Result<PathBuf> {
     let requested = Path::new(resource);
     let candidate = if requested.is_absolute() {
         requested.to_path_buf()
     } else {
-        workspace_root.join(requested)
+        let absolute_root = if workspace_root.is_absolute() {
+            workspace_root.to_path_buf()
+        } else {
+            std::env::current_dir()?.join(workspace_root)
+        };
+        absolute_root.join(requested)
     };
 
     let mut lexical = PathBuf::new();

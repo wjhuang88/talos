@@ -12,18 +12,20 @@ use serde_json::Value;
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
-    AgentTool, ToolAuthorizationScope, ToolBackend, ToolContribution, ToolContributionSource,
-    ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolPermissionFacet, ToolRegistry,
-    ToolResult,
+    AgentTool, ToolBackend, ToolContribution, ToolContributionSource, ToolExecutionAuthorization,
+    ToolExecutionOutput, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
-use talos_permission::{PermissionDecision, PermissionEngine};
+use talos_permission::{
+    GrantScope, GrantSource, InteractionCapability, PermissionContext, PermissionDecision,
+    PermissionEngine, PermissionMode, PermissionRequest, PermissionSessionState,
+};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_runtime::composition::{SharedToolProfile, contribution_groups};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
+use crate::approval::ApprovalPrompt;
 use crate::colors;
 
 /// Non-blocking approval handler for TUI mode.
@@ -33,7 +35,7 @@ use crate::colors;
 /// on stdin — the TUI renders an overlay and handles user interaction.
 pub(crate) struct TuiApprovalHandler {
     ui_output_tx: mpsc::UnboundedSender<UiOutput>,
-    engine: Arc<Mutex<PermissionEngine>>,
+    state: Arc<PermissionSessionState>,
 }
 
 impl TuiApprovalHandler {
@@ -44,9 +46,9 @@ impl TuiApprovalHandler {
     ) -> Self {
         Self {
             ui_output_tx,
-            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
-                workspace_root,
-            ))),
+            state: Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(workspace_root),
+            )),
         }
     }
 
@@ -79,96 +81,86 @@ impl TuiApprovalHandler {
 
         Self {
             ui_output_tx,
-            engine: Arc::new(Mutex::new(engine)),
+            state: Arc::new(PermissionSessionState::new(engine)),
         }
     }
 
     /// Returns a shared handle to the permission engine so callers like
     /// the TUI bridge can evaluate image-attachment paths against the
     /// same SEC-001 rule set (P1-A).
-    pub(crate) fn shared_engine(&self) -> Arc<Mutex<PermissionEngine>> {
-        self.engine.clone()
+    pub(crate) fn shared_engine(&self) -> Arc<PermissionSessionState> {
+        self.state.clone()
     }
 
-    async fn request_approval(
+    async fn authorize(
         &self,
         tool_name: &str,
+        provenance: talos_core::tool::ToolProvenance,
         profile: &[ToolPermissionFacet],
         evaluation_input: &serde_json::Value,
         presentation_input: &serde_json::Value,
         summary_fields: Vec<String>,
-    ) -> ApprovalChoice {
-        let decision = {
-            let engine = self.engine.lock().expect("engine lock poisoned");
-            engine.evaluate_profile(tool_name, profile, evaluation_input)
-        };
-        match decision {
-            PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
-            PermissionDecision::Deny(_) => ApprovalChoice::Deny,
+    ) -> Result<Vec<ToolExecutionAuthorization>, String> {
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let request = PermissionRequest::new(tool_name, provenance, profile, evaluation_input);
+        let evaluation = self
+            .state
+            .evaluate(&request, &context)
+            .map_err(|e| e.to_string())?;
+        let pending = match evaluation.decision() {
+            PermissionDecision::Allow => self
+                .state
+                .prepare_authorized(&request, &context)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "request is not authorized".to_string())?,
+            PermissionDecision::Deny(reason) => return Err(reason),
             PermissionDecision::Ask => {
+                let once = self
+                    .state
+                    .propose(&request, &context, GrantScope::Once)
+                    .map_err(|e| e.to_string())?;
+                let session = self
+                    .state
+                    .propose(&request, &context, GrantScope::Session)
+                    .map_err(|e| e.to_string())?;
                 let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-                let always_scopes =
-                    always_allow_rule_descriptions(tool_name, profile, evaluation_input);
-                let mut approval_arguments = presentation_input.clone();
-                let mut approval_summary_fields = summary_fields;
-                if !always_scopes.is_empty()
-                    && let Some(obj) = approval_arguments.as_object_mut()
-                {
-                    obj.insert(
-                        "_always_approve_scope".to_string(),
-                        serde_json::Value::Array(
-                            always_scopes
-                                .into_iter()
-                                .map(serde_json::Value::String)
-                                .collect(),
-                        ),
-                    );
-                    approval_summary_fields.push("_always_approve_scope".to_string());
-                }
 
                 if self
                     .ui_output_tx
                     .send(UiOutput::ToolApprovalRequest {
                         tool_name: tool_name.to_string(),
-                        arguments: approval_arguments,
-                        summary_fields: approval_summary_fields,
+                        arguments: presentation_input.clone(),
+                        summary_fields,
+                        preview: Some(crate::approval::format_grant_preview(session.preview())),
                         response: response_tx,
                     })
                     .is_err()
                 {
-                    return ApprovalChoice::Deny;
+                    return Err("approval channel is unavailable".to_string());
                 }
 
-                match response_rx.await {
-                    Ok(choice) => choice,
-                    Err(_) => ApprovalChoice::Deny,
+                match response_rx
+                    .await
+                    .map_err(|_| "approval channel closed".to_string())?
+                {
+                    ApprovalChoice::ApproveOnce => self
+                        .state
+                        .approve_once(once, &request, &context)
+                        .map_err(|e| e.to_string())?,
+                    ApprovalChoice::AlwaysApprove => self
+                        .state
+                        .approve_session(session, &request, &context, GrantSource::InteractiveHuman)
+                        .map_err(|e| e.to_string())?,
+                    ApprovalChoice::Deny => return Err("User denied".to_string()),
                 }
             }
-        }
-    }
-
-    fn add_always_allow_rules(
-        &self,
-        tool_name: &str,
-        profile: &[ToolPermissionFacet],
-        input: &serde_json::Value,
-    ) {
-        let mut engine = self.engine.lock().expect("engine lock poisoned");
-        add_always_allow_rules(&mut engine, tool_name, profile, input);
-    }
-
-    fn execution_authorizations(
-        &self,
-        tool_name: &str,
-        profile: &[ToolPermissionFacet],
-        input: &Value,
-        scope: ToolAuthorizationScope,
-    ) -> Result<Vec<ToolExecutionAuthorization>, String> {
-        self.engine
-            .lock()
-            .map_err(|_| "permission engine lock poisoned".to_string())?
-            .execution_authorizations(tool_name, profile, input, scope)
-            .map_err(|error| error.to_string())
+        };
+        self.state
+            .admit(pending, &request, &context)
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -211,60 +203,25 @@ impl AgentTool for TuiPermissionAwareTool {
             .map(|field| (*field).to_string())
             .collect();
         let profile = self.inner.permission_profile(&input);
-        let choice = self
+        let authorizations = match self
             .approval
-            .request_approval(
+            .authorize(
                 &tool_name,
+                self.inner.provenance(),
                 &profile,
                 &input,
                 &self.inner.project_input(&input),
                 summary_fields,
             )
-            .await;
-
-        match choice {
-            ApprovalChoice::ApproveOnce => {
-                let authorizations = match self.approval.execution_authorizations(
-                    &tool_name,
-                    &profile,
-                    &input,
-                    ToolAuthorizationScope::Once,
-                ) {
-                    Ok(authorizations) => authorizations,
-                    Err(error) => {
-                        return ToolResult::error(format!(
-                            "Permission denied: invalid execution authorization: {error}"
-                        ));
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-                    .result
-            }
-            ApprovalChoice::AlwaysApprove => {
-                self.approval
-                    .add_always_allow_rules(&tool_name, &profile, &input);
-                let authorizations = match self.approval.execution_authorizations(
-                    &tool_name,
-                    &profile,
-                    &input,
-                    ToolAuthorizationScope::Persisted,
-                ) {
-                    Ok(authorizations) => authorizations,
-                    Err(error) => {
-                        return ToolResult::error(format!(
-                            "Permission denied: invalid execution authorization: {error}"
-                        ));
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-                    .result
-            }
-            ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
-        }
+            .await
+        {
+            Ok(authorizations) => authorizations,
+            Err(error) => return ToolResult::error(format!("Permission denied: {error}")),
+        };
+        self.inner
+            .execute_authorized_with_output(input, &authorizations)
+            .await
+            .result
     }
 
     async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
@@ -276,60 +233,24 @@ impl AgentTool for TuiPermissionAwareTool {
             .map(|field| (*field).to_string())
             .collect();
         let profile = self.inner.permission_profile(&input);
-        let choice = self
+        let authorizations = match self
             .approval
-            .request_approval(
+            .authorize(
                 &tool_name,
+                self.inner.provenance(),
                 &profile,
                 &input,
                 &self.inner.project_input(&input),
                 summary_fields,
             )
-            .await;
-
-        match choice {
-            ApprovalChoice::ApproveOnce => {
-                let authorizations = match self.approval.execution_authorizations(
-                    &tool_name,
-                    &profile,
-                    &input,
-                    ToolAuthorizationScope::Once,
-                ) {
-                    Ok(authorizations) => authorizations,
-                    Err(error) => {
-                        return ToolExecutionOutput::error(format!(
-                            "Permission denied: invalid execution authorization: {error}"
-                        ));
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-            }
-            ApprovalChoice::AlwaysApprove => {
-                self.approval
-                    .add_always_allow_rules(&tool_name, &profile, &input);
-                let authorizations = match self.approval.execution_authorizations(
-                    &tool_name,
-                    &profile,
-                    &input,
-                    ToolAuthorizationScope::Persisted,
-                ) {
-                    Ok(authorizations) => authorizations,
-                    Err(error) => {
-                        return ToolExecutionOutput::error(format!(
-                            "Permission denied: invalid execution authorization: {error}"
-                        ));
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-            }
-            ApprovalChoice::Deny => {
-                ToolExecutionOutput::error("Permission denied: User denied".to_string())
-            }
-        }
+            .await
+        {
+            Ok(authorizations) => authorizations,
+            Err(error) => return ToolExecutionOutput::error(format!("Permission denied: {error}")),
+        };
+        self.inner
+            .execute_authorized_with_output(input, &authorizations)
+            .await
     }
 
     fn is_read_only(&self) -> bool {
@@ -394,6 +315,72 @@ pub(crate) struct PermissionAwareTool {
     pub(crate) print_mode: bool,
 }
 
+impl PermissionAwareTool {
+    fn authorize(
+        &self,
+        input: &Value,
+        profile: &[ToolPermissionFacet],
+    ) -> Result<Vec<ToolExecutionAuthorization>, String> {
+        let state = self
+            .approval
+            .lock()
+            .map_err(|_| "approval lock poisoned".to_string())?
+            .session_state();
+        let interaction = if self.print_mode {
+            InteractionCapability::Unavailable
+        } else {
+            InteractionCapability::Available
+        };
+        let mode = if self.print_mode {
+            PermissionMode::Headless
+        } else {
+            PermissionMode::Interactive
+        };
+        let context = PermissionContext::new(mode, interaction);
+        let tool_name = self.inner.name();
+        let request = PermissionRequest::new(tool_name, self.inner.provenance(), profile, input);
+        let evaluation = state
+            .evaluate(&request, &context)
+            .map_err(|e| e.to_string())?;
+        let pending = match evaluation.decision() {
+            PermissionDecision::Allow => state
+                .prepare_authorized(&request, &context)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "request is not authorized".to_string())?,
+            PermissionDecision::Deny(reason) => return Err(reason),
+            PermissionDecision::Ask if self.print_mode => {
+                return Err("Print mode: interactive approval unavailable".to_string());
+            }
+            PermissionDecision::Ask => {
+                let once = state
+                    .propose(&request, &context, GrantScope::Once)
+                    .map_err(|e| e.to_string())?;
+                let session = state
+                    .propose(&request, &context, GrantScope::Session)
+                    .map_err(|e| e.to_string())?;
+                let choice = ApprovalPrompt::prompt_choice(
+                    tool_name,
+                    &self.inner.project_input(input),
+                    session.preview(),
+                )
+                .map_err(|e| format!("Approval error: {e}"))?;
+                match choice {
+                    ApprovalChoice::ApproveOnce => state
+                        .approve_once(once, &request, &context)
+                        .map_err(|e| e.to_string())?,
+                    ApprovalChoice::AlwaysApprove => state
+                        .approve_session(session, &request, &context, GrantSource::InteractiveHuman)
+                        .map_err(|e| e.to_string())?,
+                    ApprovalChoice::Deny => return Err("User denied".to_string()),
+                }
+            }
+        };
+        state
+            .admit(pending, &request, &context)
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[async_trait]
 impl AgentTool for PermissionAwareTool {
     fn name(&self) -> &str {
@@ -409,138 +396,26 @@ impl AgentTool for PermissionAwareTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        let tool_name = self.inner.name().to_owned();
         let profile = self.inner.permission_profile(&input);
-        let decision = {
-            let mut approval = self.approval.lock().expect("approval lock poisoned");
-            let engine_decision = approval
-                .engine()
-                .evaluate_profile(&tool_name, &profile, &input);
-
-            match engine_decision {
-                PermissionDecision::Allow => PermissionDecision::Allow,
-                PermissionDecision::Deny(reason) => PermissionDecision::Deny(reason),
-                PermissionDecision::Ask => {
-                    if self.print_mode {
-                        PermissionDecision::Deny(
-                            "Print mode: interactive approval unavailable".to_string(),
-                        )
-                    } else {
-                        let presentation_input = self.inner.project_input(&input);
-                        match approval.prompt_profile(&tool_name, &profile, &presentation_input) {
-                            Ok(decision) => decision,
-                            Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
-                        }
-                    }
-                }
-            }
+        let authorizations = match self.authorize(&input, &profile) {
+            Ok(authorizations) => authorizations,
+            Err(error) => return ToolResult::error(format!("Permission denied: {error}")),
         };
-
-        match decision {
-            PermissionDecision::Allow => {
-                let authorizations = {
-                    let approval = match self.approval.lock() {
-                        Ok(approval) => approval,
-                        Err(_) => {
-                            return ToolResult::error("Permission denied: approval lock poisoned");
-                        }
-                    };
-                    match approval.engine().execution_authorizations(
-                        &tool_name,
-                        &profile,
-                        &input,
-                        ToolAuthorizationScope::Persisted,
-                    ) {
-                        Ok(authorizations) => authorizations,
-                        Err(error) => {
-                            return ToolResult::error(format!(
-                                "Permission denied: invalid execution authorization: {error}"
-                            ));
-                        }
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-                    .result
-            }
-            PermissionDecision::Deny(reason) => {
-                ToolResult::error(format!("Permission denied: {reason}"))
-            }
-            PermissionDecision::Ask => {
-                unreachable!(
-                    "Ask decision should have been resolved by prompt or print-mode default"
-                )
-            }
-        }
+        self.inner
+            .execute_authorized_with_output(input, &authorizations)
+            .await
+            .result
     }
 
     async fn execute_with_output(&self, input: Value) -> ToolExecutionOutput {
-        let tool_name = self.inner.name().to_owned();
         let profile = self.inner.permission_profile(&input);
-        let decision = {
-            let mut approval = self.approval.lock().expect("approval lock poisoned");
-            let engine_decision = approval
-                .engine()
-                .evaluate_profile(&tool_name, &profile, &input);
-
-            match engine_decision {
-                PermissionDecision::Allow => PermissionDecision::Allow,
-                PermissionDecision::Deny(reason) => PermissionDecision::Deny(reason),
-                PermissionDecision::Ask => {
-                    if self.print_mode {
-                        PermissionDecision::Deny(
-                            "Print mode: interactive approval unavailable".to_string(),
-                        )
-                    } else {
-                        let presentation_input = self.inner.project_input(&input);
-                        match approval.prompt_profile(&tool_name, &profile, &presentation_input) {
-                            Ok(decision) => decision,
-                            Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
-                        }
-                    }
-                }
-            }
+        let authorizations = match self.authorize(&input, &profile) {
+            Ok(authorizations) => authorizations,
+            Err(error) => return ToolExecutionOutput::error(format!("Permission denied: {error}")),
         };
-
-        match decision {
-            PermissionDecision::Allow => {
-                let authorizations = {
-                    let approval = match self.approval.lock() {
-                        Ok(approval) => approval,
-                        Err(_) => {
-                            return ToolExecutionOutput::error(
-                                "Permission denied: approval lock poisoned",
-                            );
-                        }
-                    };
-                    match approval.engine().execution_authorizations(
-                        &tool_name,
-                        &profile,
-                        &input,
-                        ToolAuthorizationScope::Persisted,
-                    ) {
-                        Ok(authorizations) => authorizations,
-                        Err(error) => {
-                            return ToolExecutionOutput::error(format!(
-                                "Permission denied: invalid execution authorization: {error}"
-                            ));
-                        }
-                    }
-                };
-                self.inner
-                    .execute_authorized_with_output(input, &authorizations)
-                    .await
-            }
-            PermissionDecision::Deny(reason) => {
-                ToolExecutionOutput::error(format!("Permission denied: {reason}"))
-            }
-            PermissionDecision::Ask => {
-                unreachable!(
-                    "Ask decision should have been resolved by prompt or print-mode default"
-                )
-            }
-        }
+        self.inner
+            .execute_authorized_with_output(input, &authorizations)
+            .await
     }
 
     fn is_read_only(&self) -> bool {
@@ -2063,7 +1938,12 @@ mod tests {
 
     #[tokio::test]
     async fn read_image_ask_in_print_mode_auto_denies() {
-        let mut engine = PermissionEngine::new();
+        let workspace = tempfile::tempdir().expect("operation should succeed");
+        let external = tempfile::tempdir().expect("operation should succeed");
+        let image = external.path().join("test.png");
+        std::fs::write(&image, MINIMAL_PNG).expect("operation should succeed");
+
+        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_path_buf());
         engine
             .load_from_config(&serde_json::json!({
                 "rules": [{
@@ -2075,14 +1955,12 @@ mod tests {
 
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
         let wrapped = PermissionAwareTool {
-            inner: Arc::new(ReadImageTool::new(PathBuf::from("."))),
+            inner: Arc::new(ReadImageTool::new(workspace.path().to_path_buf())),
             approval,
             print_mode: true,
         };
 
-        let result = wrapped
-            .execute(serde_json::json!({"path": "test.png"}))
-            .await;
+        let result = wrapped.execute(serde_json::json!({"path": image})).await;
         assert!(result.is_error);
         assert!(
             result.content.to_lowercase().contains("unavailable")
@@ -2106,13 +1984,16 @@ mod tests {
             workspace.path().to_path_buf(),
         ));
         {
-            let engine = handler.shared_engine();
-            let mut guard = engine.lock().expect("engine lock");
-            guard
+            let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_path_buf());
+            engine
                 .load_from_config(&serde_json::json!({
                     "rules": [{"decision": "Ask", "nature": "Read"}]
                 }))
                 .expect("operation should succeed");
+            handler
+                .shared_engine()
+                .replace_policy(engine)
+                .expect("policy replacement");
         }
         let wrapped = TuiPermissionAwareTool {
             inner: Arc::new(ReadImageTool::new(workspace.path().to_path_buf())),

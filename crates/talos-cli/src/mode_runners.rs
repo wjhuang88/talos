@@ -306,6 +306,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let mut transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
         .map_err(anyhow::Error::msg)?;
+    transition_owner.attach_permission_state(approval_handler.shared_engine());
     let session_generation = transition_owner.active_generation();
     actor.set_generation(session_generation);
     handle.sq_tx = transition_owner.bind_active_sender();

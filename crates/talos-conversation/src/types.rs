@@ -270,6 +270,8 @@ pub enum UiOutput {
         tool_name: String,
         arguments: serde_json::Value,
         summary_fields: Vec<String>,
+        /// Compiler-derived Session scope, kept separate from caller-supplied arguments.
+        preview: Option<String>,
         response: tokio::sync::oneshot::Sender<talos_core::ApprovalChoice>,
     },
     /// Request the TUI/bridge to copy text to clipboard.

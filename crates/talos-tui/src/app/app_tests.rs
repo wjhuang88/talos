@@ -3410,6 +3410,32 @@ fn entry_point_esc_approval_denies_without_turn_cancel() {
 }
 
 #[test]
+fn clipped_scope_cannot_resolve_always_approval() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let (resp_tx, mut resp_rx) = tokio::sync::oneshot::channel();
+    tui.state.pending_approval_response = Some(resp_tx);
+    tui.show_approval_with_preview(
+        "write",
+        "path: exact-file.txt",
+        Some("Write Path: /private/tmp/exact-file.txt".to_string()),
+    );
+
+    tui.handle_pending_approval_input(KeyCode::Char('a'));
+
+    assert!(matches!(
+        tui.state.approval_state,
+        ApprovalState::Visible { .. }
+    ));
+    assert!(resp_rx.try_recv().is_err());
+    assert!(
+        tui.state
+            .tip
+            .as_ref()
+            .is_some_and(|tip| tip.text.contains("review the full reusable scope"))
+    );
+}
+
+#[test]
 fn entry_point_ctrl_c_active_draft_clears_without_cancel_or_exit() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut state = TuiState::new();

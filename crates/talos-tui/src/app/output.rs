@@ -343,6 +343,7 @@ mod tests {
             tool_name: "write_file".into(),
             arguments: serde_json::json!({"path": "README.md"}),
             summary_fields: vec!["path".into()],
+            preview: None,
             response,
         });
 
@@ -515,6 +516,7 @@ impl Tui {
                 tool_name,
                 arguments,
                 summary_fields,
+                preview,
                 response,
             } => {
                 self.finalize_ordered_content();
@@ -526,7 +528,11 @@ impl Tui {
                     &args_str,
                     &summary_fields,
                 );
-                self.show_approval(&tool_name, &summary);
+                self.show_approval_with_preview(
+                    &tool_name,
+                    &summary,
+                    preview.filter(|value| !value.is_empty()),
+                );
             }
             UiOutput::Status(snapshot) => {
                 if !snapshot.is_processing {

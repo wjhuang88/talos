@@ -370,7 +370,7 @@ accept arbitrary commands, edit repository files, push, publish, or tag releases
 ### Permission Preflight
 
 Preview permission scopes for expected long-task tool operations without executing tools or
-installing allow rules:
+installing permission authority:
 
 ```bash
 talos permissions preflight \
@@ -381,9 +381,11 @@ talos permissions preflight --json \
   --operation 'bash={"command":"rm generated.txt"}'
 ```
 
-The preflight packet uses the real tool permission profile and shows the reusable `always` scope
-that would be offered later. Configured deny rules still win, and high-risk shell commands remain
-exact unless the audited bash template policy classifies them as reusable.
+The preflight packet uses the real tool permission profile and the same compiler used by approval
+surfaces. It shows the reusable Session scope that would be offered later: file writes remain exact
+paths, safe shell operations may reuse an audited template descriptor, and high-risk shell commands
+remain exact. Preflight neither executes a tool nor installs a grant. Configured deny rules always
+win.
 
 ### Governance Mutation Preview
 
@@ -572,6 +574,12 @@ an external path, Talos asks the operator; approval carries only the selected to
 normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed
 symlink targets fail closed.
 
+Approval choices are explicit authority classes. Approve once is consumed by one official adapter
+invocation and is never stored. Always approve creates an in-memory grant for the active Talos
+Session only; it is not written into permission policy or session history, does not survive
+new/resume/fork/runtime replacement, and never overrides a configured deny. A different path, tool
+provenance, provider identity, or uncovered permission facet still requires approval.
+
 Load a confined local read-only plugin package explicitly:
 
 ```bash
@@ -736,7 +744,9 @@ contains only fixed identifiers and typed outcomes; arbitrary embedder callbacks
 report text are not supported. The current default composition installs no resource finalizers.
 
 Registered tools are permission-wrapped by default. In headless embedding, unresolved `Ask`
-decisions are denied unless the embedder supplies narrower allow-list rules.
+decisions are denied unless the embedder supplies policy or an approval handler. `AlwaysApprove`
+from an SDK handler installs only an in-memory grant owned by that `RuntimeHandle`; each new runtime
+starts with an empty grant store, and current policy denies are rechecked before every admission.
 
 This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `talos-runtime`
 plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
