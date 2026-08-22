@@ -1016,3 +1016,30 @@ ineffective before its own exact-head CI, independent permission/security/API re
 to `main`; no implementation branch or Rust/Cargo edit is yet authorized. I197/I198/I201/I210 stay
 Review, I206-I208 stay Planned/Unclaimed, I213 stays the independent Planned/Claimed Dashboard lane,
 and I164 stays Paused/superseded. PERM-006-C and Issue #59 remain blocked in order.
+
+## 2026-08-22 I219 Claim Effectiveness And Local Convergence Checkpoint
+
+PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role
+permission/security/API review `5378949775`, then merged as `781bb112`. I219/PERM-006-B is now
+Active/Claimed; its implementation branch and worktree start exactly at that merge and follow the
+GOV-008 local-convergence loop before any stable candidate push. I213 may proceed concurrently only
+within its separate Dashboard owner. I219 must not edit Dashboard owners or
+`crates/talos-dashboard/**`; its first implementation PR must publish a clear changed-file
+inventory before I213 makes any shared CLI change.
+
+## 2026-08-22 I219 Local Convergence And Stable Candidate Checkpoint
+
+I219/PERM-006-B converged locally from claim merge `781bb112` without an intermediate remote
+implementation push. The first-class Once/Session grant compiler and store, policy/grant authority
+separation, proposal/revision/context CAS, pre-admission fence, official CLI/TUI/Runtime adapters,
+real read-only preflight, public API/schema migration and documentation are now one reviewable
+candidate. Locked full-workspace tests, focused feature tests, Clippy with warnings denied, both
+governance validators, YAML/diff/Rust API-removal checks and Dashboard changed-file inventory
+passed.
+
+I219 is Review/Claimed with `Completion Commit: Pending`; the first stable candidate has no remote
+implementation PR yet. Resume by staging and reviewing the complete diff, creating logical
+conventional commit(s), pushing once, opening the implementation PR with a changed-file inventory,
+and obtaining exact-head Unix/Windows CI plus independent permission/security/API/code review.
+I213 keeps only its non-overlapping Dashboard authority. PERM-006-C/D/E, Issue #188 behavior,
+TOOL-024/#59, release and publication remain unauthorized or blocked.
