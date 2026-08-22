@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell Complete (2026-08-18). WEB-001-B/I213 is a bounded live-activity/log-SSE claim proposed in PR #327 and remains ineffective while open. Config editor, web approvals, session actions, remote/LAN and other control residuals remain separately governed. |
+| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell Complete (2026-08-18). WEB-001-B/I213 claim is effective through PR #327 merge `66747214`; activation PR #363 proposes the bounded live-activity/log-SSE child as Active under explicit I219 parallel protection. Config editor, web approvals, session actions, remote/LAN and other control residuals remain separately governed. |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | live log viewer; web config editor; later write/control surfaces |
@@ -18,8 +18,9 @@ capabilities remain future separately governed work rather than being implied by
 
 WEB-001 remains Partial because the completed read-only shell does not authorize or complete live
 logs, configuration writes, approvals, session actions, remote/LAN access or other control-plane
-behavior. WEB-001-B/I213 now owns only a proposed bounded live observation slice; its PR #327 claim is
-not effective until merged to `main` and it does not authorize implementation while open.
+behavior. WEB-001-B/I213 owns only the bounded live observation slice. Its Collaboration Claim is
+effective through #327 merge `66747214`; activation PR #363 is governance-only and must reach
+`main` before implementation begins.
 
 ## Gate Status
 
@@ -51,8 +52,9 @@ WEB-001-A/I195 completed through PR #233 merge
 technical review `5323625004`, human browser acceptance `5323801564`, and maintainer review-policy
 override `5326076971`.
 
-Still not implemented: the WEB-001-B live activity/log SSE slice proposed in #327, config editing,
-approvals, session actions, WebSocket control, or remote/LAN access.
+Still not implemented on the target branch: the WEB-001-B live activity/log SSE slice, config
+editing, approvals, session actions, WebSocket control, or remote/LAN access. #363 authorizes only
+WEB-001-B activation; it contains no production implementation.
 
 ## Governed Dashboard Child Outcomes
 
@@ -67,12 +69,26 @@ keyboard/focus behavior, useful empty states, and HTML presentation parity for `
 preserving JSON/plain-text negotiation, config masking, output redaction, and HTML escaping.
 
 [WEB-001-B](WEB-001-B-dashboard-live-activity-log-viewer.md) and
-[I213](../../iterations/I213-dashboard-live-activity-log-viewer.md) propose the next bounded child:
+[I213](../../iterations/I213-dashboard-live-activity-log-viewer.md) own the next bounded child:
 default-loopback GET/read-only semantic live activity plus bounded existing-log observation over SSE.
-PR #327 owns the proposed claim only and is ineffective while open. The child explicitly excludes
-config writes, approvals, prompt/session actions, WebSocket, remote/LAN, SEC-002 token delivery,
-SESSION-009 multi-client authority, PERM-006 behavior, a global event bus, and new
+The #327 claim is effective through merge `66747214`; activation PR #363 records the fresh
+2026-08-22 inventory and the maintainer-approved I219/I213 parallel exception. The child explicitly
+excludes config writes, approvals, prompt/session actions, WebSocket, remote/LAN, SEC-002 token
+delivery, SESSION-009 multi-client authority, PERM-006 behavior, a global event bus, and new
 runtime/Session/persistence authority.
+
+### I219 / I213 Parallel Protection
+
+I219 / PERM-006-B owns permission/grant/proposal/store semantics, permission API/schema migration and
+permission runtime behavior. I213 remains observation-only and may not edit those authorities or
+synthesize permission state. If an I213 implementation needs `crates/talos-permission/**`, permission
+wrappers, I219 owner documents or a permission-runtime API change, that work stops and returns to
+governance.
+
+Shared CLI production files are not pre-owned by I213. Before any such edit and before implementation
+merge, I213 must refresh I219/open-PR changed-file inventory. Same-file production overlap is a stop
+gate unless the Dashboard integration can be isolated behind a separate Dashboard-specific boundary.
+Shared Board/Backlog/Iteration-index/current-state documents are union-only.
 
 ## Opt-In Token Delivery Security Residual
 
@@ -93,14 +109,14 @@ implementation. It does not alter WEB-001-A/I195 completion or transfer authorit
 ```
 
 The diagram remains a target-space sketch only; WebSocket/control behavior is not implemented or
-authorized by I195 or the proposed I213 claim.
+authorized by I195 or I213.
 
 ## Product MVP Target (Not Complete)
 
 - In-process loopback-only HTTP server serving the completed read-only visual shell.
-- Read-only status/history/governance/config/extensions presentation is delivered; a bounded
-  live-activity/log-tail SSE view is selected only through WEB-001-B/I213 and remains unimplemented
-  until that claim is effective and activated.
+- Read-only status/history/governance/config/extensions presentation is delivered; WEB-001-B/I213
+  selects only the bounded live-activity/log-tail SSE view, with implementation permitted after
+  activation PR #363 reaches `main`.
 - Config editing via CONF-001 primitives (secret masking), only after an explicit write/permission
   design is accepted.
 - Any future web-driven action must use the same permission pipeline as the TUI and receive separate
