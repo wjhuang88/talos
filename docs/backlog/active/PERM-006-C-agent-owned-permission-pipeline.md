@@ -5,10 +5,10 @@
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Blocked — PERM-006-A and PERM-006-B must complete |
+| Status | Blocked / Unclaimed — A/B gates satisfied; ADR-067 decision prerequisite pending through planned I220 |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | None |
-| Depends On | Blocked by PERM-006-A/B; prerequisite for PERM-006-D/E |
+| Selected Iteration | None for implementation; I220 planned/unclaimed for decision prerequisite |
+| Depends On | PERM-006-A/I189 and B/I219 Complete; blocked on Accepted ADR-067 and later I221 claim; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
 
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-01 |
-| Handoff / Release Condition | Establish an effective claim and select an iteration before implementation. |
+| Last Updated | 2026-08-23 |
+| Handoff / Release Condition | Finish decision-only I220 and accept ADR-067, then establish a separate effective I221 claim before implementation. I213 scheduling/non-overlap must be explicitly resolved. |
 
 ## Identity / Goal / Value
 
@@ -43,13 +43,16 @@ Move permission evaluation, Ask resolution, grant installation, exact authorizat
 
 ## Dependencies
 
-Blocked by PERM-006-A/B; prerequisite for PERM-006-D/E
+PERM-006-A/I189 and PERM-006-B/I219 are Complete. Implementation remains blocked on Accepted
+ADR-067 and a separate effective I221 claim; C remains the prerequisite for PERM-006-D/E.
 
 ## Decision Links And Constraints
 
 - Approval failure, channel closure, cancellation, timeout, or poisoned state fails closed.
 - Permission-relevant normalization happens before approval and the approved value is executed.
 - Private input projection remains separate from authoritative evaluation/execution.
+- ADR-065 deferred final hook transport/version semantics to this child; ADR-067 must resolve them
+  before code changes.
 
 ## Uncertainty And Validation Path
 
@@ -85,3 +88,15 @@ Do not present this Story as shipped while it remains Blocked.
 ## Residual Destination
 
 Retained wrappers must be documented as policy-free compatibility adapters with a removal issue.
+
+## 2026-08-23 Dependency And Decision Checkpoint
+
+PERM-006-A/I189 and PERM-006-B/I219 are Complete/Closed through their recorded implementation
+evidence. That clears the old dependency blocker but does not make C implementation-ready.
+
+Read-only cross-surface analysis found two unresolved architecture/security contracts: current
+composition roots still own multiple evaluation/wrapper paths, and `AfterPermissionCheck` does not
+yet represent the final execution-gating decision. ADR-065 explicitly deferred that public hook
+migration. Planned decision-only I220 therefore owns ADR-067 and the current-path/migration matrix;
+PERM-006-C remains Blocked/Unclaimed, and later I221 must obtain its own claim before any Rust,
+Cargo, wrapper, hook, Runtime, MCP or behavior change.
