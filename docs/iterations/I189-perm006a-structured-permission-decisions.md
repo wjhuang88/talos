@@ -1,6 +1,6 @@
 # Iteration I189: PERM-006-A Structured Permission Decisions
 
-> Document status: Review
+> Document status: Complete / Closed
 > Published plan date: 2026-08-11
 > Planned objective: add one behavior-preserving structured permission request, evaluation context and per-facet decision-report contract as the implementation source for existing permission entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-21 |
 | Work Slice | Implement only PERM-006-A / I189: add one structured permission request/context/per-facet decision-report evaluator, delegate existing permission entrypoints to it, preserve current Deny/Ask/Allow outcomes and compatibility-visible Deny messages, and add provenance, redaction, fail-closed and order-independence tests. No approval routing, wrapper removal, grant/store, AlwaysApprove, typed-resource, policy, sandbox, PERM-006-B/C/D/E, PERM-007, TOOL-024, ACP or release change. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 merged as `20cfcce4e72be3da4e3efc1190ee498975e7476b` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921`, and merge-time CAS. |
 | Implementation PR | #356 |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Review implementation commit `6b577d6afcb05230c821214902b9067c45c767a9` through PR #356 with fresh exact-head CI, independent security/code review and merge-time CAS. A later owner-first closeout may cite that pre-existing implementation commit; this Review state does not authorize PERM-006-B/C/D/E or PERM-007 behavior. |
+| Handoff / Release Condition | Closed at Completion Commit `6b577d6afcb05230c821214902b9067c45c767a9`; PR #356 merged as `54241bdd` after exact-head CI `32511672926`, independent Agent-role permission/security/code review `5376591491` and merge-time CAS. PERM-006-B is Ready/Unclaimed and requires a separate runnable iteration and effective protected-scope claim. |
 
 ## Published Baseline
 
@@ -110,6 +110,8 @@ wording without rewriting it.
 | 2026-08-22 | API blocker | Read-only assessment proved that configured rules and runtime grants are indistinguishable in the public mutable `PermissionEngine.rules` vector. ADR-065 decision content commit `dae98460` records the required pre-1.0 encapsulation and migration boundary; no provenance guess or hidden sentinel is permitted. Its Accepted status is ineffective until exact-head review, CI, CAS and target-branch merge. |
 | 2026-08-22 | ADR prerequisite complete | ADR-065 was Accepted through PR #355 merge `9579df7a` after exact-head CI `32508015164`, independent Agent-role security/API review `5373150265` and merge-time CAS. |
 | 2026-08-22 | Implementation candidate | Commit `6b577d6afcb05230c821214902b9067c45c767a9` implements the bounded structured evaluator and moves I189 to Review through PR #356. It does not mark the iteration Complete or authorize a later child. |
+| 2026-08-22 | Implementation merged | PR #356 exact head `d7e651b3` passed CI `32511672926`, independent Agent-role permission/security/code review `5376591491` and merge-time CAS, then merged as `54241bdd`. |
+| 2026-08-22 | Owner-first closeout | I189/PERM-006-A is Complete/Closed at pre-existing implementation commit `6b577d6a`. PERM-006-B becomes Ready/Unclaimed; later children remain separately gated. |
 
 ## Verification Evidence
 
@@ -125,16 +127,24 @@ wording without rewriting it.
   missing reason/redaction coverage; it is not claimed as final evidence. After correction,
   `./scripts/release_preflight.sh` completed successfully across the full workspace. Exact-head CI
   and independent implementation review remain pending.
+- Exact-head CI `32511672926` completed successfully on `d7e651b3`, including Linux full release
+  preflight and Windows workspace validation. Independent Agent-role review `5376591491` approved
+  the same head after permission/security/source inspection and focused tests.
 
 ## Completion Evidence
 
-- No completion evidence. A status-only commit cannot certify this iteration.
+- Completion Commit: `6b577d6afcb05230c821214902b9067c45c767a9`
+- This pre-existing implementation commit, not the status-only closeout, certifies the structured
+  evaluator, migration and tests. PR #356 merged it as `54241bdd`.
 
 ## Variance And Residuals
 
-- PERM-006-B/C/D/E remain blocked in their recorded order; the parent Epic and Issues #52/#53 remain open.
+- PERM-006-B is Ready/Unclaimed; C/D/E remain blocked in their recorded order. Parent Issue #52
+  remains open; Issue #53 may close after this owner-first closeout reaches `main`.
 - Any behavior correction, grant-scope change or breaking API migration discovered during implementation must use a separate reviewed owner/change record.
 
 ## Retrospective
 
-- Implementation is in Review; exact-head remote evidence and owner-first closeout remain pending.
+- Delivered the behavior-preserving structured evaluator with truthful provenance and redaction-safe
+  diagnostics. No user-facing README change was needed because approval behavior and surfaces did
+  not change. Later grant and pipeline behavior remains separately governed.
