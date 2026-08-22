@@ -2418,11 +2418,7 @@ async fn sandbox_fallback_ask_rejection_denies() {
 #[tokio::test]
 async fn ordinary_always_approve_rule_does_not_approve_sandbox_fallback() {
     let log = Arc::new(Mutex::new(Vec::new()));
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_runtime_allow_rule(talos_permission::PermissionRule::new(
         "bash",
         None,
@@ -2445,11 +2441,7 @@ async fn ordinary_always_approve_rule_does_not_approve_sandbox_fallback() {
 #[tokio::test]
 async fn sandbox_fallback_allow_unsandboxed_does_not_bypass_permission_deny() {
     let log = Arc::new(Mutex::new(Vec::new()));
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "bash".into(),
         path_pattern: None,
@@ -2477,11 +2469,7 @@ async fn sandbox_fallback_allow_unsandboxed_does_not_bypass_permission_deny() {
 #[tokio::test]
 async fn sandbox_fallback_allow_unsandboxed_denies_unresolved_permission() {
     let log = Arc::new(Mutex::new(Vec::new()));
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "bash".into(),
         path_pattern: None,
@@ -2532,11 +2520,7 @@ async fn allow_unsandboxed_preserves_path_network_and_execute_denials() {
             profile: vec![facet.clone()],
             execution_log: log.clone(),
         }));
-        let mut engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-            trusted_workspace: false,
-        };
+        let mut engine = PermissionEngine::empty();
         engine.add_rule(talos_permission::PermissionRule::new_nature(
             facet.nature,
             None,
@@ -2564,11 +2548,7 @@ async fn allow_unsandboxed_preserves_path_network_and_execute_denials() {
 
 #[tokio::test]
 async fn test_permission_check_blocks_denied_tool() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -2631,11 +2611,7 @@ async fn test_permission_check_blocks_denied_tool() {
 
 #[tokio::test]
 async fn test_permission_check_allows_permitted_tool() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -2698,11 +2674,7 @@ async fn test_permission_check_allows_permitted_tool() {
 
 #[tokio::test]
 async fn test_permission_ask_defaults_to_deny() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -3430,11 +3402,7 @@ async fn test_disclosed_browser_backend_still_requires_permission_allow() {
         execution_log: execution_log.clone(),
     }));
 
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(talos_permission::PermissionRule::new_nature(
         ToolNature::Network,
         None,

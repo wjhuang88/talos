@@ -1,6 +1,6 @@
 # Iteration I189: PERM-006-A Structured Permission Decisions
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-08-11
 > Planned objective: add one behavior-preserving structured permission request, evaluation context and per-facet decision-report contract as the implementation source for existing permission entrypoints.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #197 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #197 merged as `0df88638409027849e5bf4ba13ef72d2e96b9b90` after exact-head CI `31554958547`, independent security approval comment `5261239200` bound to `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, and merge-time CAS. Activation PR #351 merged as `20cfcce4e72be3da4e3efc1190ee498975e7476b` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921`, and merge-time CAS. |
-| Implementation PR | Not started |
+| Implementation PR | #356 |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | I189 implementation begins from activation merge `20cfcce4` or later `main`. ADR-065 must be Accepted after independent exact-head security/API review before the source-compatible migration implementation begins; retain a second independent security review for the implementation candidate. |
+| Handoff / Release Condition | Review implementation commit `6b577d6afcb05230c821214902b9067c45c767a9` through PR #356 with fresh exact-head CI, independent security/code review and merge-time CAS. A later owner-first closeout may cite that pre-existing implementation commit; this Review state does not authorize PERM-006-B/C/D/E or PERM-007 behavior. |
 
 ## Published Baseline
 
@@ -108,12 +108,23 @@ wording without rewriting it.
 | 2026-08-22 | Activation PR | Governance-only activation PR #351 is the proposed record. Its open branch has no activation effect; only the reviewed exact head reaching `main` authorizes implementation. |
 | 2026-08-22 | Activation effective | PR #351 merged as `20cfcce4` after exact-head CI `32500829272`, independent Agent-role security/governance approval `5372336921` and merge-time CAS. I189 is Active/Claimed. |
 | 2026-08-22 | API blocker | Read-only assessment proved that configured rules and runtime grants are indistinguishable in the public mutable `PermissionEngine.rules` vector. ADR-065 decision content commit `dae98460` records the required pre-1.0 encapsulation and migration boundary; no provenance guess or hidden sentinel is permitted. Its Accepted status is ineffective until exact-head review, CI, CAS and target-branch merge. |
+| 2026-08-22 | ADR prerequisite complete | ADR-065 was Accepted through PR #355 merge `9579df7a` after exact-head CI `32508015164`, independent Agent-role security/API review `5373150265` and merge-time CAS. |
+| 2026-08-22 | Implementation candidate | Commit `6b577d6afcb05230c821214902b9067c45c767a9` implements the bounded structured evaluator and moves I189 to Review through PR #356. It does not mark the iteration Complete or authorize a later child. |
 
 ## Verification Evidence
 
 - PR #197 claim evidence: exact head `b4f23ec2255c60723c7d1abae3084a24c3bb5899`, CI `31554958547`, independent security approval comment `5261239200`, merge `0df88638409027849e5bf4ba13ef72d2e96b9b90`.
 - Activation PR #351 evidence: exact head `c025f7b94cf71fb12650f24ad8f1fe1d2467f7bf`, CI `32500829272`, independent Agent-role security/governance approval `5372336921`, merge `20cfcce4e72be3da4e3efc1190ee498975e7476b`.
 - ADR-065 decision content commit `dae98460c29c72cb61da391ddf998630e67d6f15` pre-exists its status commit. Acceptance remains ineffective until exact-head independent security/API review, CI, CAS and target-branch merge.
+- ADR-065 acceptance superseded that pending checkpoint through PR #355 merge `9579df7a`, exact-head CI `32508015164` and independent Agent-role review `5373150265`.
+- Local implementation evidence for `6b577d6a`: `cargo fmt --all --check`, locked workspace check,
+  locked permission tests, permission Clippy with warnings denied, and locked dependent
+  agent/runtime/CLI/MCP/plugin tests passed. Independent local red-team review approved after the
+  closed reason dimension and MCP/plugin redaction coverage were added.
+- A pre-correction full preflight run was intentionally interrupted after the red-team identified
+  missing reason/redaction coverage; it is not claimed as final evidence. After correction,
+  `./scripts/release_preflight.sh` completed successfully across the full workspace. Exact-head CI
+  and independent implementation review remain pending.
 
 ## Completion Evidence
 
@@ -126,4 +137,4 @@ wording without rewriting it.
 
 ## Retrospective
 
-- Pending activation and execution.
+- Implementation is in Review; exact-head remote evidence and owner-first closeout remain pending.

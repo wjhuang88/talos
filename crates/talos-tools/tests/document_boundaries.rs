@@ -201,11 +201,7 @@ fn test_permission_profile_denies_save_url_when_write_facet_is_denied() {
         "destination": "downloads/archive.zip"
     }));
 
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Network,
         None,

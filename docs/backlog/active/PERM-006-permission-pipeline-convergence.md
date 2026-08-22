@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — PERM-006-A/I189 is the only Active child; B-E remain blocked/unclaimed |
+| Status | In Progress — PERM-006-A/I189 is in Review; B-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | I189 for PERM-006-A only (Active after PR #351 merge `20cfcce4`) |
+| Selected Iteration | I189 for PERM-006-A only (Review through implementation PR #356) |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -69,7 +69,7 @@ Refine each child independently, accept any required ADR, and select only one bo
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Refinement.
+Do not present this Epic as shipped before every child reaches reviewed completion.
 
 ## Required Reads
 
@@ -95,3 +95,11 @@ Epic completion requires all children; partial implementation remains owned by t
 - PR #351 merged as `20cfcce4`; I189/PERM-006-A is the sole Active child under its effective claim.
 - ADR-065 is an in-scope public API/migration prerequisite for truthful rule/grant provenance. It
   changes no decision behavior or child ordering. PERM-006-B/C/D/E remain blocked/unclaimed.
+
+## 2026-08-22 I189 Implementation Review Checkpoint
+
+- ADR-065 was Accepted through PR #355 merge `9579df7a`. I189 implementation commit `6b577d6a`
+  is in Review through PR #356 pending fresh exact-head CI, independent security/code review,
+  merge-time CAS and owner-first closeout.
+- PERM-006-B/C/D/E remain blocked/unclaimed. This Review candidate transfers no implementation
+  authority to them, PERM-007 behavior or TOOL-024.

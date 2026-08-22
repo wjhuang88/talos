@@ -1,5 +1,5 @@
 use super::*;
-use talos_core::tool::ToolResourceKind;
+use talos_core::tool::{ToolProvenance, ToolResourceKind};
 
 // --- Default ruleset tests ---
 
@@ -140,11 +140,7 @@ fn test_custom_rule_allow_bash() {
 
     // Custom rule is appended, so default bash rule still matches first
     // We need to test with a new engine where we control rule order
-    let mut engine2 = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine2 = PermissionEngine::empty();
     engine2.add_rule(PermissionRule {
         tool_name: "bash".to_owned(),
         path_pattern: None,
@@ -160,11 +156,7 @@ fn test_custom_rule_allow_bash() {
 
 #[test]
 fn test_custom_rule_deny_write_to_sensitive_path() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "write".to_owned(),
         path_pattern: Some(".env".to_owned()),
@@ -185,11 +177,7 @@ fn test_custom_rule_deny_write_to_sensitive_path() {
 
 #[test]
 fn test_path_pattern_src_glob_matches() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "read".to_owned(),
         path_pattern: Some("src/**/*.rs".to_owned()),
@@ -205,11 +193,7 @@ fn test_path_pattern_src_glob_matches() {
 
 #[test]
 fn test_path_pattern_src_glob_nested() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "read".to_owned(),
         path_pattern: Some("src/**/*.rs".to_owned()),
@@ -225,11 +209,7 @@ fn test_path_pattern_src_glob_nested() {
 
 #[test]
 fn test_path_pattern_src_glob_no_match() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "read".to_owned(),
         path_pattern: Some("src/**/*.rs".to_owned()),
@@ -246,11 +226,7 @@ fn test_path_pattern_src_glob_no_match() {
 
 #[test]
 fn test_path_pattern_deny_outside_src() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "write".to_owned(),
         path_pattern: Some("src/**/*.rs".to_owned()),
@@ -282,11 +258,7 @@ fn test_path_pattern_deny_outside_src() {
 
 #[test]
 fn test_first_match_wins() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "bash".to_owned(),
         path_pattern: None,
@@ -310,11 +282,7 @@ fn test_first_match_wins() {
 
 #[test]
 fn test_specific_rule_before_general() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "write".to_owned(),
         path_pattern: Some("tmp/**".to_owned()),
@@ -401,11 +369,7 @@ fn test_runtime_allow_rule_does_not_override_deny() {
 
 #[test]
 fn test_nature_match_without_resource_matches_all() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Write,
         None,
@@ -425,11 +389,7 @@ fn test_nature_match_without_resource_matches_all() {
 
 #[test]
 fn test_nature_path_resource_match() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Write,
         Some("src/**".to_owned()),
@@ -458,11 +418,7 @@ fn test_nature_path_resource_match() {
 
 #[test]
 fn test_nature_domain_resource_match() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Network,
         Some("api.github.com".to_owned()),
@@ -491,11 +447,7 @@ fn test_nature_domain_resource_match() {
 
 #[test]
 fn test_profile_denies_when_any_facet_is_denied() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Network,
         Some("example.com".to_owned()),
@@ -531,11 +483,7 @@ fn test_profile_denies_when_any_facet_is_denied() {
 
 #[test]
 fn test_profile_asks_when_any_facet_requires_approval() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Network,
         Some("example.com".to_owned()),
@@ -575,11 +523,7 @@ fn test_extractor_write_from_destination() {
 
 #[test]
 fn test_legacy_tool_name_rule_still_works() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new(
         "write",
         Some("src/**".to_owned()),
@@ -603,11 +547,7 @@ fn test_legacy_tool_name_rule_still_works() {
 
 #[test]
 fn test_first_match_wins_nature_rules() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Write,
         Some("src/**".to_owned()),
@@ -768,11 +708,7 @@ fn test_load_from_config_malformed_rule() {
 
 #[test]
 fn test_load_old_config_format_tool_name_only() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     let config = serde_json::json!({
         "rules": [
             {
@@ -801,11 +737,7 @@ fn test_load_old_config_format_tool_name_only() {
 
 #[test]
 fn test_load_new_config_format_nature_form() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     let config = serde_json::json!({
         "rules": [
             {
@@ -840,8 +772,8 @@ fn test_load_new_config_format_nature_form() {
 fn test_default_ruleset_is_nature_form() {
     let engine = PermissionEngine::new();
     // Default ruleset should have exactly 5 rules (one per ToolNature variant)
-    assert_eq!(engine.rules.len(), 5);
-    for rule in &engine.rules {
+    assert_eq!(engine.rules().len(), 5);
+    for rule in engine.rules() {
         assert!(
             rule.nature.is_some(),
             "default rules should use nature form"
@@ -859,11 +791,7 @@ fn test_default_internal_tool_allowed() {
 
 #[test]
 fn test_config_with_both_tool_name_and_nature_prefers_nature() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     // Rule has both tool_name AND nature set — nature should take precedence
     let config = serde_json::json!({
         "rules": [
@@ -905,11 +833,7 @@ fn test_tool_name_case_insensitive_default() {
 
 #[test]
 fn test_tool_name_exact_match_in_rules() {
-    let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule {
         tool_name: "read".to_owned(),
         path_pattern: None,
@@ -927,11 +851,7 @@ fn test_tool_name_exact_match_in_rules() {
 
 #[test]
 fn test_empty_rules_falls_to_default() {
-    let engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-        trusted_workspace: false,
-    };
+    let engine = PermissionEngine::empty();
     let decision = engine.evaluate("read", &serde_json::json!({}));
     assert_eq!(decision, PermissionDecision::Allow);
 
@@ -1354,4 +1274,404 @@ fn read_facet_without_path_keeps_default_allow() {
     );
 
     std::fs::remove_dir_all(root).ok();
+}
+
+// --- I189 structured decision report tests ---
+
+fn report_rule_source(report: &PermissionDecisionReport) -> PermissionRuleSource {
+    match report.facets()[0].source() {
+        PermissionDecisionSource::Rule { rule_source, .. } => *rule_source,
+        other => panic!("expected rule source, got {other:?}"),
+    }
+}
+
+#[test]
+fn structured_report_distinguishes_all_rule_insertion_sources() {
+    let input = serde_json::json!({"path": "src/lib.rs"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Read,
+        "src/lib.rs",
+        ToolResourceKind::Path,
+    )];
+    let context = PermissionContext::compatibility();
+
+    let default_engine = PermissionEngine::new();
+    let report = default_engine.evaluate_request(
+        &PermissionRequest::native("read", &facets, &input),
+        &context,
+    );
+    assert_eq!(report_rule_source(&report), PermissionRuleSource::Default);
+    assert_eq!(report.facets()[0].reason(), PermissionReason::RuleAllow);
+
+    let mut configured_engine = PermissionEngine::empty();
+    configured_engine
+        .load_from_config(&serde_json::json!({"rules": [{
+            "nature": "Read",
+            "decision": "Allow"
+        }]}))
+        .expect("configured rule");
+    let report = configured_engine.evaluate_request(
+        &PermissionRequest::native("read", &facets, &input),
+        &context,
+    );
+    assert_eq!(
+        report_rule_source(&report),
+        PermissionRuleSource::Configured
+    );
+
+    let mut explicit_engine = PermissionEngine::empty();
+    explicit_engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    let report = explicit_engine.evaluate_request(
+        &PermissionRequest::native("read", &facets, &input),
+        &context,
+    );
+    assert_eq!(report_rule_source(&report), PermissionRuleSource::Explicit);
+
+    let mut runtime_engine = PermissionEngine::empty();
+    runtime_engine.add_runtime_allow_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        Some("src/lib.rs".to_string()),
+        Some(ResourceKind::Path),
+        PermissionDecision::Allow,
+    ));
+    let report = runtime_engine.evaluate_request(
+        &PermissionRequest::native("read", &facets, &input),
+        &context,
+    );
+    assert_eq!(
+        report_rule_source(&report),
+        PermissionRuleSource::RuntimeGrant
+    );
+}
+
+#[test]
+fn structured_report_identifies_workspace_sources() {
+    let root = std::env::temp_dir().join(format!("talos-i189-ws-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let input = serde_json::json!({"path": "inside.txt"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Write,
+        "inside.txt",
+        ToolResourceKind::Path,
+    )];
+
+    let mut trusted = PermissionEngine::with_workspace_root(root.clone());
+    trusted.set_trusted_workspace(true);
+    let report = trusted.evaluate_request(
+        &PermissionRequest::native("write", &facets, &input),
+        &PermissionContext::compatibility(),
+    );
+    assert_eq!(report.outcome(), PermissionOutcome::Allow);
+    assert_eq!(
+        report.facets()[0].reason(),
+        PermissionReason::TrustedWorkspaceWrite
+    );
+    assert_eq!(
+        report.facets()[0].source(),
+        &PermissionDecisionSource::WorkspaceTrust
+    );
+
+    let external = std::env::temp_dir().join(format!("talos-i189-external-{}", std::process::id()));
+    let external_input = serde_json::json!({"path": external.to_string_lossy()});
+    let external_facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Read,
+        external.to_string_lossy(),
+        ToolResourceKind::Path,
+    )];
+    let bounded = PermissionEngine::with_workspace_root(root.clone());
+    let report = bounded.evaluate_request(
+        &PermissionRequest::native("read", &external_facets, &external_input),
+        &PermissionContext::compatibility(),
+    );
+    assert_eq!(report.outcome(), PermissionOutcome::Ask);
+    assert_eq!(
+        report.facets()[0].reason(),
+        PermissionReason::ExternalPathRequiresApproval
+    );
+    assert_eq!(
+        report.facets()[0].source(),
+        &PermissionDecisionSource::WorkspaceBoundary
+    );
+
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn compatibility_entrypoints_equal_structured_projection() {
+    let engine = PermissionEngine::new();
+    let cases = [
+        ("read", ToolNature::Read, serde_json::json!({"path": "a"})),
+        ("write", ToolNature::Write, serde_json::json!({"path": "b"})),
+        (
+            "bash",
+            ToolNature::Execute,
+            serde_json::json!({"command": "true"}),
+        ),
+        (
+            "http_request",
+            ToolNature::Network,
+            serde_json::json!({"url": "https://example.com"}),
+        ),
+        ("todo_create", ToolNature::Internal, serde_json::json!({})),
+    ];
+
+    for (tool_name, nature, input) in cases {
+        let facets = [ToolPermissionFacet::new(nature)];
+        let structured = engine.evaluate_request(
+            &PermissionRequest::native(tool_name, &facets, &input),
+            &PermissionContext::compatibility(),
+        );
+        assert_eq!(
+            engine.evaluate_with_nature(tool_name, nature, &input),
+            structured.decision()
+        );
+        assert_eq!(
+            engine.evaluate_profile(tool_name, &facets, &input),
+            structured.decision()
+        );
+        assert_eq!(engine.evaluate(tool_name, &input), structured.decision());
+    }
+}
+
+#[test]
+fn structured_aggregate_severity_is_order_independent_and_complete() {
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Execute,
+        None,
+        None,
+        PermissionDecision::Ask,
+    ));
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Write,
+        None,
+        None,
+        PermissionDecision::Deny("write blocked".to_string()),
+    ));
+    let read = ToolPermissionFacet::new(ToolNature::Read);
+    let execute = ToolPermissionFacet::new(ToolNature::Execute);
+    let write = ToolPermissionFacet::new(ToolNature::Write);
+    let permutations = [
+        [read.clone(), execute.clone(), write.clone()],
+        [read.clone(), write.clone(), execute.clone()],
+        [execute.clone(), read.clone(), write.clone()],
+        [execute.clone(), write.clone(), read.clone()],
+        [write.clone(), read.clone(), execute.clone()],
+        [write, execute, read],
+    ];
+    let input = serde_json::json!({});
+
+    for facets in permutations {
+        let report = engine.evaluate_request(
+            &PermissionRequest::native("hybrid", &facets, &input),
+            &PermissionContext::compatibility(),
+        );
+        assert_eq!(report.outcome(), PermissionOutcome::Deny);
+        assert_eq!(
+            report.decision(),
+            PermissionDecision::Deny("write blocked".to_string())
+        );
+        assert_eq!(report.facets().len(), 3, "all facets must be reported");
+    }
+}
+
+#[test]
+fn compatibility_projection_preserves_first_deny_message() {
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        None,
+        None,
+        PermissionDecision::Deny("read blocked".to_string()),
+    ));
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Write,
+        None,
+        None,
+        PermissionDecision::Deny("write blocked".to_string()),
+    ));
+    let input = serde_json::json!({});
+    let read_first = [
+        ToolPermissionFacet::new(ToolNature::Read),
+        ToolPermissionFacet::new(ToolNature::Write),
+    ];
+    let write_first = [
+        ToolPermissionFacet::new(ToolNature::Write),
+        ToolPermissionFacet::new(ToolNature::Read),
+    ];
+
+    assert_eq!(
+        engine.evaluate_profile("hybrid", &read_first, &input),
+        PermissionDecision::Deny("read blocked".to_string())
+    );
+    assert_eq!(
+        engine.evaluate_profile("hybrid", &write_first, &input),
+        PermissionDecision::Deny("write blocked".to_string())
+    );
+}
+
+#[test]
+fn observer_report_and_debug_exclude_private_values() {
+    let sentinels = [
+        "secret-tool-name",
+        "secret-server-name",
+        "secret-plugin-name",
+        "secret-plugin-version",
+        "secret-plugin-carrier",
+        "secret-resource-path",
+        "secret-description",
+        "secret-input-token",
+        "secret-deny-reason",
+    ];
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Write,
+        None,
+        None,
+        PermissionDecision::Deny("secret-deny-reason".to_string()),
+    ));
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Write,
+        "secret-resource-path",
+        ToolResourceKind::Path,
+    )
+    .with_description("secret-description")];
+    let input = serde_json::json!({
+        "path": "secret-resource-path",
+        "api_key": "secret-input-token"
+    });
+    let provenances = [
+        ToolProvenance::McpRemote {
+            server: "secret-server-name".to_string(),
+        },
+        ToolProvenance::Plugin {
+            name: "secret-plugin-name".to_string(),
+            version: "secret-plugin-version".to_string(),
+            carrier: "secret-plugin-carrier".to_string(),
+        },
+    ];
+
+    for provenance in provenances {
+        let request = PermissionRequest::new("secret-tool-name", provenance, &facets, &input);
+        let report = engine.evaluate_request(&request, &PermissionContext::compatibility());
+        let surfaces = [
+            serde_json::to_string(&report).expect("serialize safe report"),
+            format!("{report:?}"),
+            format!("{request:?}"),
+        ];
+
+        for surface in surfaces {
+            for sentinel in sentinels {
+                assert!(!surface.contains(sentinel), "leaked {sentinel}: {surface}");
+            }
+        }
+        assert_eq!(
+            report.decision(),
+            PermissionDecision::Deny("secret-deny-reason".to_string()),
+            "compatibility projection must retain the original denial"
+        );
+    }
+}
+
+#[test]
+fn missing_consequential_resource_stays_ask_and_is_reported() {
+    let engine = PermissionEngine::empty();
+    let input = serde_json::json!({"url": "not a URL"});
+    let facets = [ToolPermissionFacet::new(ToolNature::Network)];
+    let report = engine.evaluate_request(
+        &PermissionRequest::native("http_request", &facets, &input),
+        &PermissionContext::compatibility(),
+    );
+
+    assert_eq!(report.decision(), PermissionDecision::Ask);
+    assert_eq!(
+        report.facets()[0].resource_state(),
+        PermissionResourceState::MissingOrInvalid
+    );
+    assert_eq!(
+        report.facets()[0].reason(),
+        PermissionReason::MissingOrInvalidResource
+    );
+    assert_eq!(
+        report.facets()[0].reason().message(),
+        "consequential facet has no usable concrete resource"
+    );
+    assert_eq!(
+        report.facets()[0].source(),
+        &PermissionDecisionSource::DefaultBehavior
+    );
+}
+
+#[test]
+fn empty_profile_inference_and_modes_do_not_change_policy() {
+    let engine = PermissionEngine::new();
+    let input = serde_json::json!({"path": "out.txt"});
+    let modes = [
+        PermissionMode::ReadOnly,
+        PermissionMode::Interactive,
+        PermissionMode::Headless,
+        PermissionMode::TrustedWorkspace,
+        PermissionMode::Auto,
+    ];
+
+    for mode in modes {
+        let report = engine.evaluate_request(
+            &PermissionRequest::native("write", &[], &input),
+            &PermissionContext::new(mode, InteractionCapability::Unavailable),
+        );
+        assert_eq!(report.mode(), mode);
+        assert_eq!(report.interaction(), InteractionCapability::Unavailable);
+        assert_eq!(report.decision(), PermissionDecision::Ask);
+        assert_eq!(report.facets().len(), 1);
+        assert_eq!(report.facets()[0].nature(), ToolNature::Write);
+    }
+}
+
+#[test]
+fn rule_ids_survive_unrelated_insertions() {
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    let input = serde_json::json!({});
+    let facets = [ToolPermissionFacet::new(ToolNature::Read)];
+    let evaluate_id = |engine: &PermissionEngine| {
+        let report = engine.evaluate_request(
+            &PermissionRequest::native("read", &facets, &input),
+            &PermissionContext::compatibility(),
+        );
+        match report.facets()[0].source() {
+            PermissionDecisionSource::Rule { rule_id, .. } => *rule_id,
+            other => panic!("expected rule, got {other:?}"),
+        }
+    };
+    let before = evaluate_id(&engine);
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Write,
+        None,
+        None,
+        PermissionDecision::Ask,
+    ));
+    assert_eq!(evaluate_id(&engine), before);
+    engine
+        .load_from_config(&serde_json::json!({"rules": [{
+            "nature": "Network",
+            "decision": "Ask"
+        }]}))
+        .expect("prepend unrelated configured rule");
+    assert_eq!(evaluate_id(&engine), before);
 }

@@ -202,10 +202,15 @@ Talos uses traits to decouple logic and allow for alternative implementations.
 *   `HookHandler`: Interface for lifecycle hook handlers managed by `talos-plugin::HookRegistry`.
 *   `Runtime`: RPC runtime contract implemented by the CLI adapter.
 
-`PermissionEngine` is a concrete policy evaluator rather than a trait. Skill loading is provided
-by concrete `talos-skill` loaders/managers, and plugin execution is exposed through explicit
-`HookRegistry` and WASM adapter types; there are no `SkillProvider` or `PluginHost` traits in the
-current source.
+`PermissionEngine` is a concrete policy evaluator rather than a trait. Its rules are encapsulated
+so the engine can retain truthful engine-local provenance for built-in defaults, serialized
+configuration, runtime grants, and explicit Rust API rules. Embedders construct it through
+`new`, `empty`, or `from_rules`, mutate it through the matching insertion method, and inspect the
+ordered policy through `rules()`. This is the ADR-065 migration from v0.8.x public struct literals;
+serialized `PermissionRule` and `PermissionDecision` formats remain unchanged. Skill loading is
+provided by concrete `talos-skill` loaders/managers, and plugin execution is exposed through
+explicit `HookRegistry` and WASM adapter types; there are no `SkillProvider` or `PluginHost` traits
+in the current source.
 
 ## Tool Presentation
 
@@ -482,7 +487,14 @@ Permission checks use invocation-specific profiles. A simple tool exposes one fa
 resource kind such as path, domain, command, or remote. The permission engine evaluates all facets
 conservatively: any denied facet denies the call, otherwise any ask facet requires approval, and
 only an all-allow profile executes. Agent, CLI/TUI, MCP, and `talos-runtime` use the same profile
-evaluation path.
+evaluation path. `PermissionRequest` plus diagnostic-only `PermissionContext` enter the structured
+evaluator, which returns a `PermissionDecisionReport` containing every per-facet outcome and a
+closed redaction-safe reason/source pair. Legacy `evaluate`, `evaluate_with_nature`,
+`evaluate_profile`, and `evaluate_facet` delegate to that evaluator and project the unchanged
+`PermissionDecision`.
+Serialized/Debug report surfaces omit raw input, resource and description values, provenance names,
+and free-form denial text. Runtime mode and interaction capability are recorded but do not resolve
+`Ask`; composition roots retain their existing behavior until PERM-006-C.
 
 ## Context Compaction Pipeline
 

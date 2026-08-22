@@ -638,11 +638,9 @@ impl Drop for RuntimeHandle {
 }
 
 fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> PermissionEngine {
-    PermissionEngine {
-        rules: rules.to_vec(),
-        workspace_root: Some(root),
-        trusted_workspace: false,
-    }
+    let mut engine = PermissionEngine::from_rules(rules.to_vec());
+    engine.set_workspace_root(root);
+    engine
 }
 
 struct RuntimePermissionAwareTool {

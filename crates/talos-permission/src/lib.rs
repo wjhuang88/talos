@@ -54,11 +54,18 @@
 //! ```
 
 mod access_evidence;
+mod decision;
 mod resource;
 mod rule;
 mod workspace_trust;
 
 pub use access_evidence::{AccessEvidence, AccessKind, EvidenceState, classify_command_access};
+pub use decision::{
+    InteractionCapability, PermissionContext, PermissionDecisionReport, PermissionDecisionSource,
+    PermissionFacetDecision, PermissionMode, PermissionOutcome, PermissionReason,
+    PermissionRequest, PermissionResourceState, PermissionRuleId, PermissionRuleSource,
+    PermissionToolSource,
+};
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
 pub use resource::{ResourceExtractor, ResourceKind};
@@ -70,6 +77,12 @@ use std::path::{Path, PathBuf};
 use talos_core::tool::{
     ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature, ToolPermissionFacet,
 };
+
+#[derive(Debug, Clone, Copy)]
+struct PermissionRuleMetadata {
+    id: PermissionRuleId,
+    source: PermissionRuleSource,
+}
 
 /// The decision produced by the permission engine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -122,19 +135,39 @@ impl<'de> Deserialize<'de> for PermissionDecision {
 /// match wins. If no rule matches, a default decision is applied based on
 /// the tool name.
 pub struct PermissionEngine {
-    pub rules: Vec<PermissionRule>,
-    pub workspace_root: Option<PathBuf>,
-    pub trusted_workspace: bool,
+    rules: Vec<PermissionRule>,
+    rule_metadata: Vec<PermissionRuleMetadata>,
+    workspace_root: Option<PathBuf>,
+    trusted_workspace: bool,
+    next_rule_id: u64,
 }
 
 impl PermissionEngine {
     pub fn new() -> Self {
-        let mut engine = Self {
+        let mut engine = Self::empty();
+        engine.add_default_rules();
+        engine
+    }
+
+    /// Creates an engine without built-in rules.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
             rules: Vec::new(),
+            rule_metadata: Vec::new(),
             workspace_root: None,
             trusted_workspace: false,
-        };
-        engine.add_default_rules();
+            next_rule_id: 0,
+        }
+    }
+
+    /// Creates an engine from explicit rules in evaluation order.
+    #[must_use]
+    pub fn from_rules(rules: Vec<PermissionRule>) -> Self {
+        let mut engine = Self::empty();
+        for rule in rules {
+            engine.add_rule(rule);
+        }
         engine
     }
 
@@ -152,6 +185,18 @@ impl PermissionEngine {
         self.trusted_workspace = trusted;
     }
 
+    /// Returns whether trusted-workspace behavior is enabled.
+    #[must_use]
+    pub const fn is_trusted_workspace(&self) -> bool {
+        self.trusted_workspace
+    }
+
+    /// Returns the ordered rules without exposing provenance mutation.
+    #[must_use]
+    pub fn rules(&self) -> &[PermissionRule] {
+        &self.rules
+    }
+
     /// Adds the default ruleset to the engine.
     ///
     /// Default rules use nature form (one rule per ToolNature variant):
@@ -161,36 +206,26 @@ impl PermissionEngine {
     /// - Network → Ask
     /// - Internal → Allow (session plumbing, not user-visible)
     fn add_default_rules(&mut self) {
-        self.rules.push(PermissionRule::new_nature(
-            ToolNature::Read,
-            None,
-            None,
-            PermissionDecision::Allow,
-        ));
-        self.rules.push(PermissionRule::new_nature(
-            ToolNature::Write,
-            None,
-            None,
-            PermissionDecision::Ask,
-        ));
-        self.rules.push(PermissionRule::new_nature(
-            ToolNature::Execute,
-            None,
-            None,
-            PermissionDecision::Ask,
-        ));
-        self.rules.push(PermissionRule::new_nature(
-            ToolNature::Network,
-            None,
-            None,
-            PermissionDecision::Ask,
-        ));
-        self.rules.push(PermissionRule::new_nature(
-            ToolNature::Internal,
-            None,
-            None,
-            PermissionDecision::Allow,
-        ));
+        self.add_rule_with_source(
+            PermissionRule::new_nature(ToolNature::Read, None, None, PermissionDecision::Allow),
+            PermissionRuleSource::Default,
+        );
+        self.add_rule_with_source(
+            PermissionRule::new_nature(ToolNature::Write, None, None, PermissionDecision::Ask),
+            PermissionRuleSource::Default,
+        );
+        self.add_rule_with_source(
+            PermissionRule::new_nature(ToolNature::Execute, None, None, PermissionDecision::Ask),
+            PermissionRuleSource::Default,
+        );
+        self.add_rule_with_source(
+            PermissionRule::new_nature(ToolNature::Network, None, None, PermissionDecision::Ask),
+            PermissionRuleSource::Default,
+        );
+        self.add_rule_with_source(
+            PermissionRule::new_nature(ToolNature::Internal, None, None, PermissionDecision::Allow),
+            PermissionRuleSource::Default,
+        );
     }
 
     /// Adds a custom rule to the engine.
@@ -200,7 +235,19 @@ impl PermissionEngine {
     /// before calling [`Self::new`] or use [`Self::load_from_config`] which
     /// prepends custom rules.
     pub fn add_rule(&mut self, rule: PermissionRule) {
+        self.add_rule_with_source(rule, PermissionRuleSource::Explicit);
+    }
+
+    fn add_rule_with_source(&mut self, rule: PermissionRule, source: PermissionRuleSource) {
+        let metadata = self.allocate_rule_metadata(source);
         self.rules.push(rule);
+        self.rule_metadata.push(metadata);
+    }
+
+    fn allocate_rule_metadata(&mut self, source: PermissionRuleSource) -> PermissionRuleMetadata {
+        let id = PermissionRuleId(self.next_rule_id);
+        self.next_rule_id = self.next_rule_id.saturating_add(1);
+        PermissionRuleMetadata { id, source }
     }
 
     /// Adds a runtime "always allow" rule ahead of the default catch-all rule.
@@ -221,7 +268,9 @@ impl PermissionEngine {
                 })
             })
             .unwrap_or(self.rules.len());
+        let metadata = self.allocate_rule_metadata(PermissionRuleSource::RuntimeGrant);
         self.rules.insert(insert_at, rule);
+        self.rule_metadata.insert(insert_at, metadata);
     }
 
     /// Evaluates a tool call against the ruleset and returns a decision.
@@ -263,66 +312,133 @@ impl PermissionEngine {
         profile: &[ToolPermissionFacet],
         input: &Value,
     ) -> PermissionDecision {
-        let facets = if profile.is_empty() {
-            vec![ToolPermissionFacet::new(infer_nature(tool_name))]
-        } else {
-            profile.to_vec()
-        };
-
-        let mut saw_ask = false;
-        for facet in facets {
-            match self.evaluate_facet(tool_name, &facet, input) {
-                PermissionDecision::Allow => {}
-                PermissionDecision::Ask => saw_ask = true,
-                PermissionDecision::Deny(reason) => return PermissionDecision::Deny(reason),
-            }
-        }
-
-        if saw_ask {
-            PermissionDecision::Ask
-        } else {
-            PermissionDecision::Allow
-        }
+        let request = PermissionRequest::native(tool_name, profile, input);
+        self.evaluate_request(&request, &PermissionContext::compatibility())
+            .decision()
     }
 
-    /// Evaluates one explicit permission facet.
+    /// Evaluates one explicit permission facet through the structured evaluator.
     pub fn evaluate_facet(
         &self,
         tool_name: &str,
         facet: &ToolPermissionFacet,
         input: &Value,
     ) -> PermissionDecision {
+        self.evaluate_profile(tool_name, std::slice::from_ref(facet), input)
+    }
+
+    /// Evaluates one structured request and returns the authoritative report.
+    ///
+    /// Every facet is evaluated so observer diagnostics remain complete even
+    /// after a Deny is found. Aggregate severity is conservative and the first
+    /// input-order Deny message remains the compatibility projection.
+    #[must_use]
+    pub fn evaluate_request(
+        &self,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> PermissionDecisionReport {
+        let inferred_facet;
+        let facets = if request.facets().is_empty() {
+            inferred_facet = [ToolPermissionFacet::new(infer_nature(request.tool_name()))];
+            &inferred_facet[..]
+        } else {
+            request.facets()
+        };
+
+        let mut first_deny = None;
+        let mut saw_ask = false;
+        let mut reports = Vec::with_capacity(facets.len());
+
+        for (facet_index, facet) in facets.iter().enumerate() {
+            let (decision, source) =
+                self.evaluate_facet_structured(request.tool_name(), facet, request.input());
+            match &decision {
+                PermissionDecision::Allow => {}
+                PermissionDecision::Ask => saw_ask = true,
+                PermissionDecision::Deny(reason) if first_deny.is_none() => {
+                    first_deny = Some(reason.clone());
+                }
+                PermissionDecision::Deny(_) => {}
+            }
+            reports.push(PermissionFacetDecision::new(
+                facet_index,
+                facet,
+                resource_state(facet, request.input()),
+                &decision,
+                source,
+            ));
+        }
+
+        let decision = if let Some(reason) = first_deny {
+            PermissionDecision::Deny(reason)
+        } else if saw_ask {
+            PermissionDecision::Ask
+        } else {
+            PermissionDecision::Allow
+        };
+
+        PermissionDecisionReport::new(
+            decision,
+            context,
+            request.provenance(),
+            self.workspace_root.is_some(),
+            self.trusted_workspace,
+            reports,
+        )
+    }
+
+    fn evaluate_facet_structured(
+        &self,
+        tool_name: &str,
+        facet: &ToolPermissionFacet,
+        input: &Value,
+    ) -> (PermissionDecision, PermissionDecisionSource) {
+        debug_assert_eq!(self.rules.len(), self.rule_metadata.len());
         let nature = facet.nature;
 
         let mut matched_rule = None;
-        for rule in &self.rules {
+        for (index, rule) in self.rules.iter().enumerate() {
             match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
                 Ok(true) => {
-                    matched_rule = Some(rule);
+                    matched_rule = Some((rule, self.rule_metadata[index]));
                     break;
                 }
-                Ok(false) => continue,
-                Err(_) => continue,
+                Ok(false) | Err(_) => continue,
             }
         }
+
+        let matched_source = |metadata: PermissionRuleMetadata| PermissionDecisionSource::Rule {
+            rule_id: metadata.id,
+            rule_source: metadata.source,
+        };
 
         // A persisted workspace trust decision is deliberately narrower than a
         // general permission Allow: it applies only to repo-contained writes.
         // Explicit Deny rules remain authoritative.
-        if let Some(PermissionRule {
-            decision: PermissionDecision::Deny(reason),
-            ..
-        }) = matched_rule
+        if let Some((
+            PermissionRule {
+                decision: PermissionDecision::Deny(reason),
+                ..
+            },
+            metadata,
+        )) = matched_rule
         {
-            return PermissionDecision::Deny(reason.clone());
+            return (
+                PermissionDecision::Deny(reason.clone()),
+                matched_source(metadata),
+            );
         }
 
         if self.trusted_workspace
             && let Some(ref root) = self.workspace_root
-            && nature == talos_core::tool::ToolNature::Write
+            && nature == ToolNature::Write
             && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
         {
-            return PermissionDecision::Allow;
+            return (
+                PermissionDecision::Allow,
+                PermissionDecisionSource::WorkspaceTrust,
+            );
         }
 
         // SEC-001: only concrete path resources participate in the workspace
@@ -334,28 +450,30 @@ impl PermissionEngine {
             let in_workspace =
                 is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
             if !in_workspace {
-                if let Some(rule) = matched_rule
+                if let Some((rule, metadata)) = matched_rule
                     && rule_has_concrete_path_scope(rule)
                     && rule.decision == PermissionDecision::Allow
                 {
-                    return PermissionDecision::Allow;
+                    return (rule.decision.clone(), matched_source(metadata));
                 }
-                return PermissionDecision::Ask;
+                return (
+                    PermissionDecision::Ask,
+                    PermissionDecisionSource::WorkspaceBoundary,
+                );
             }
         }
 
-        if let Some(rule) = matched_rule {
-            return rule.decision.clone();
+        if let Some((rule, metadata)) = matched_rule {
+            return (rule.decision.clone(), matched_source(metadata));
         }
 
-        match nature {
-            talos_core::tool::ToolNature::Read | talos_core::tool::ToolNature::Internal => {
-                PermissionDecision::Allow
+        let decision = match nature {
+            ToolNature::Read | ToolNature::Internal => PermissionDecision::Allow,
+            ToolNature::Write | ToolNature::Execute | ToolNature::Network => {
+                PermissionDecision::Ask
             }
-            talos_core::tool::ToolNature::Write
-            | talos_core::tool::ToolNature::Execute
-            | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
-        }
+        };
+        (decision, PermissionDecisionSource::DefaultBehavior)
     }
 
     /// Returns the configured workspace root, if any.
@@ -491,6 +609,7 @@ impl PermissionEngine {
             })?;
 
         let mut custom_rules = Vec::new();
+        let mut custom_metadata = Vec::new();
         for (i, rule_value) in rules_array.iter().enumerate() {
             let mut rule: PermissionRule = serde_json::from_value(rule_value.clone())
                 .map_err(|e| PermissionError::InvalidRule(format!("rule at index {i}: {e}")))?;
@@ -506,12 +625,16 @@ impl PermissionEngine {
             }
 
             custom_rules.push(rule);
+            custom_metadata.push(self.allocate_rule_metadata(PermissionRuleSource::Configured));
         }
 
         // Prepend custom rules so they take precedence over defaults
         let mut all_rules = custom_rules;
         all_rules.append(&mut self.rules);
         self.rules = all_rules;
+        let mut all_metadata = custom_metadata;
+        all_metadata.append(&mut self.rule_metadata);
+        self.rule_metadata = all_metadata;
 
         Ok(())
     }
@@ -576,6 +699,33 @@ fn facet_uses_path_resource(facet: &ToolPermissionFacet, input: &Value) -> bool 
         });
     kind == ResourceKind::Path
         && (facet.resource.is_some() || ResourceExtractor::extract(facet.nature, input).is_some())
+}
+
+fn resource_state(facet: &ToolPermissionFacet, input: &Value) -> PermissionResourceState {
+    if facet.resource.is_some() || ResourceExtractor::extract(facet.nature, input).is_some() {
+        return PermissionResourceState::Present;
+    }
+
+    let kind = facet
+        .resource_kind
+        .map(ResourceKind::from)
+        .unwrap_or_else(|| match facet.nature {
+            ToolNature::Read | ToolNature::Write => ResourceKind::Path,
+            ToolNature::Execute => ResourceKind::Command,
+            ToolNature::Network => ResourceKind::Domain,
+            ToolNature::Internal => ResourceKind::Remote,
+        });
+
+    if matches!(
+        facet.nature,
+        ToolNature::Write | ToolNature::Execute | ToolNature::Network
+    ) || facet.resource_kind.is_some()
+        || matches!(kind, ResourceKind::Command | ResourceKind::Domain)
+    {
+        PermissionResourceState::MissingOrInvalid
+    } else {
+        PermissionResourceState::NotRequired
+    }
 }
 
 fn rule_has_concrete_path_scope(rule: &PermissionRule) -> bool {
