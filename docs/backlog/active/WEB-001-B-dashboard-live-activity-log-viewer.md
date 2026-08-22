@@ -1,10 +1,10 @@
 # WEB-001-B: Dashboard Live Activity And Log Viewer
 
-**Status**: In Progress — I213 Active / Claimed via activation PR #363; effective only when the activation record reaches `main`
+**Status**: In Progress — I213 Active / Claimed; activation PR #363 merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`
 **Priority**: P1
 **Type**: Product / Observability Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I213 — Active / Claimed via activation PR #363
+**Selected Iteration**: I213 — Active / Claimed; activation effective through #363 merge `e578f419`
 
 ## Collaboration Claim
 
@@ -15,17 +15,17 @@
 | Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard live activity governance/implementation session 2026-08-22 |
 | Work Slice | Implement WEB-001-B / I213 as one bounded default-loopback GET/read-only Dashboard Live Activity workspace: project safe semantic Session/Agent activity from the existing CLI bridge, expose bounded existing-log observations over SSE with deterministic reconnect/reset/memory/client limits, and preserve current auth/redaction/Session/permission/logging authorities. No write/control/remote/token-delivery/WebSocket/global-bus or new Session/runtime/persistence authority. |
 | Claimed At | 2026-08-20 |
-| Source Issue | None |
+| Source Issue | #366 |
 | Governance Claim PR | #327 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced; activation PR #363 records those guards. |
+| Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced. Activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`; those guards are now effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Activation PR #363 must reach `main` before any implementation branch exists. Implementation then remains gated by I219/I213 authority/file-overlap protection, exact-head CI/security review and merge-time CAS. |
+| Handoff / Release Condition | Implementation must start from #363 merge `e578f419` or a later fresh `main`, preserve I219/I213 authority/file-overlap protection, locally converge under GOV-008 before the first implementation push, and later pass exact-head CI/security review plus merge-time CAS. |
 
-The claim is effective through #327 merge `66747214`. This Story becomes implementation-active only
-when activation PR #363 reaches `main`; until then no Rust/Cargo/runtime/UI implementation is
-authorized.
+The claim is effective through #327 merge `66747214` and implementation activation is effective
+through #363 merge `e578f419`. Issue #366 is the execution-coordination surface for this existing
+owner; it creates no second claim or wider authority.
 
 ## Goal And Value
 
@@ -227,13 +227,15 @@ than widening WEB-001-B.
 
 ## Readiness Decision
 
-**Active / Claimed once activation PR #363 reaches `main`; implementation remains bounded by the
-parallel protection contract above.**
+**Active / Claimed; implementation authority is effective through #363 merge `e578f419`, subject to
+the parallel protection contract above and GOV-008 local-convergence/stage gates.**
 
 Fresh 2026-08-22 inventory found no overlapping Dashboard implementation PR. I211 is Complete/Closed;
 I219 is the explicit non-overlapping Active permission lane; only archival #120/#121 were open at
-activation-branch creation. The deliverable remains runnable/testable in default loopback mode with
-explicit SSE, memory, client, redaction, auth, CSP, reconnect, accessibility and rollback bounds.
+activation-branch creation. Issue #366 now carries implementation coordination and must refresh
+changing PR/branch overlap facts before shared CLI edits and merge. The deliverable remains
+runnable/testable in default loopback mode with explicit SSE, memory, client, redaction, auth, CSP,
+reconnect, accessibility and rollback bounds.
 
 ## Acceptance Matrix
 
