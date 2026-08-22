@@ -23,7 +23,7 @@
 | Source Issue | None |
 | Governance Claim PR | #327 |
 | Activation PR | #363 — proposed; ineffective until target-branch merge |
-| Authorization Mode | Independent claim review + explicit maintainer parallel-activation authorization |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly authorized I213 to run in parallel provided parallel protections are enforced. Activation PR #363 records that exception and remains implementation-ineffective while open. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |

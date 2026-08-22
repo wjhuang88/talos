@@ -17,7 +17,7 @@
 | Claimed At | 2026-08-20 |
 | Source Issue | None |
 | Governance Claim PR | #327 |
-| Authorization Mode | Independent claim review + explicit maintainer parallel-activation authorization |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced; activation PR #363 records those guards. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
