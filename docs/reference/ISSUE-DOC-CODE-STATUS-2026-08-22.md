@@ -1,7 +1,7 @@
 # GitHub Issue / Owner Document Status Reconciliation — 2026-08-22
 
-**Repository baseline**: `main@781bb1122d2c323854d5d65aed354d35d045e383`
-**Purpose**: refresh the latest open-Issue owner snapshot after server/S3 intake Issues #360–#362.
+**Repository baseline**: `main@e578f4196092d0884ab7dd3321fb62acb3b88257`
+**Purpose**: refresh the latest open-Issue owner snapshot after server/S3 intake Issues #360–#362 and I213 execution coordination Issue #366.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 This is a synchronization snapshot only. Registering an Issue here does not select an iteration,
@@ -63,11 +63,14 @@ in earlier reconciliation snapshots.
 | [#360](https://github.com/wjhuang88/talos/issues/360) | server remote relational persistence profile | [SERVER-002](../backlog/active/SERVER-002-remote-relational-persistence-profile.md) | Intake / Unclaimed | New server persistence intake; separate refinement/ADR/iteration/claim required before database or schema work. |
 | [#361](https://github.com/wjhuang88/talos/issues/361) | standalone `talos-server` host composition | [SERVER-001-C](../backlog/active/SERVER-001-C-standalone-server-host-composition.md) | Intake / Unclaimed | Reuse existing Talos runtime authorities; no production server/API implementation before separate governance. |
 | [#362](https://github.com/wjhuang88/talos/issues/362) | optional S3-compatible object-storage workspace | [TOOL-027](../backlog/active/TOOL-027-s3-object-workspace-backend.md) | Intake / Unclaimed | Optional object-workspace tools only; no local-filesystem emulation, remote SQL authority, or implementation claim. |
+| [#366](https://github.com/wjhuang88/talos/issues/366) | I213 live activity/log viewer implementation handoff | [WEB-001-B](../backlog/active/WEB-001-B-dashboard-live-activity-log-viewer.md) | In Progress / Claimed | Execution coordination only under the existing #327 claim and #363 activation; no second owner or widened authority. Tool-equipped implementation must follow the I219 non-overlap and GOV-008 local-convergence gates. |
 
 ## Synchronization Notes
 
 - #360–#362 are registered as separate Intake / Unclaimed owners so SERVER-001 composition does not
   duplicate persistence or workspace-tool logic.
+- #366 is mapped to the existing WEB-001-B/I213 owner chain as execution coordination only; it does
+  not create a new claim, owner or implementation authority.
 - Existing rows, including the 2026-08-17 open-Issue addendum, are preserved from the previous latest
   reconciliation snapshot so their established owners/status comments remain authoritative.
 - This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
