@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — PERM-006-A/I189 is Complete/Closed; B is Ready/Unclaimed; C-E remain blocked/unclaimed |
+| Status | In Progress — A/I189 Complete/Closed; B/I219 Active/Claimed proposed by PR #359; C-E remain blocked/unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | None; I189/PERM-006-A is Complete/Closed and B awaits a separate selection |
+| Selected Iteration | Child I219 selects PERM-006-B; parent Epic remains unclaimed |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -111,3 +111,10 @@ Epic completion requires all children; partial implementation remains owned by t
   `5376591491` and merge-time CAS.
 - PERM-006-B is now Ready/Unclaimed. C/D/E remain blocked in order, and no later child may start
   without its own runnable iteration and effective protected-scope claim.
+
+## 2026-08-22 PERM-006-B / I219 Claim Proposal
+
+- ADR-066 is Accepted through PR #358 merge `17e0b648`. PR #359 atomically proposes I219 and
+  PERM-006-B as Claimed/Active for the bounded first-class grant/compiler/store delivery.
+- The parent Epic remains Unclaimed. The open proposal is ineffective before merge; PERM-006-C/D/E,
+  PERM-007 behavior, TOOL-024, release and publication remain blocked or separately unauthorized.
