@@ -1073,3 +1073,25 @@ I219/PERM-006-B is Complete/Closed through pre-existing implementation commits `
 `d0c96048`; this status-only closeout does not self-certify completion. PERM-006-C-E, `/auto`,
 TOOL-024/#59, release and product lanes remain separately blocked or governed. Resume the ordered
 permission chain only by preparing PERM-006-C readiness/claim governance; do not reuse I219.
+
+## 2026-08-23 PERM-006-C Decision-Prerequisite Preparation
+
+Main remains `6fbb5550` after I219 closeout, with a clean workspace, no stash, only the main
+worktree and only archival Draft PRs #120/#121 open. Nonterminal iterations are I213 Active;
+I197/I198/I201/I210 Review; I206-I208 Planned; and I164 Paused/superseded.
+
+A/I189 and B/I219 are Complete, so PERM-006-C's old dependency text is retired. Read-only
+cross-surface analysis found that ADR-065 explicitly deferred the final permission-hook transport
+and version migration, while current CLI/TUI/Runtime/MCP paths retain multiple permission
+authorities. Planned/unclaimed I220 therefore owns only ADR-067 plus the current-path/migration
+matrix. It changes no executable behavior and cannot be reused for I221 implementation.
+
+I213 is still the sole Active iteration. Its recorded exception names only I219 and explicitly is
+not a general multi-Active waiver. Final I220 claim/activation must wait for a new maintainer-approved
+I213/I220 non-overlap disposition or for I213 to leave Active. Until then no implementation branch,
+Rust/Cargo/dependency, wrapper, hook, Runtime, MCP, TOOL-024 or `/auto` work is authorized.
+
+I213's iteration owner also retains stale pre-merge wording for activation PR #363 even though the
+Dashboard backlog owner, derived views and Git ancestry record merge `e578f419`. The Dashboard lane
+must reconcile that owner before I220 claim finalization. Mainline does not edit the Dashboard owner
+or `crates/talos-dashboard/**`.
