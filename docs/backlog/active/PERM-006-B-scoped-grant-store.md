@@ -5,7 +5,7 @@
 | Story ID | PERM-006-B |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Review / Claimed; locally converged stable candidate pending first push |
+| Status | Review / Claimed; Windows portability correction locally converged pending next stable candidate |
 | Source | [GitHub Issue #54](https://github.com/wjhuang88/talos/issues/54) |
 | Selected Iteration | I219 |
 | Depends On | PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001 |
@@ -25,7 +25,7 @@
 | Authorization Evidence | PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role permission/security/API review `5378949775`, then merged as `781bb112`. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. The locally converged stable candidate still requires first push, exact-head CI including Windows, independent protected-scope review and merge-time CAS. |
+| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. PR #368 is the implementation carrier; the locally corrected candidate requires a next stable push, fresh exact-head CI including Windows, independent delta review and merge-time CAS. |
 
 ## Identity / Goal / Value
 
@@ -141,3 +141,13 @@ validators and diff/inventory checks passed. PERM-006-B/I219 is Review/Claimed p
 candidate push, exact-head Unix/Windows CI, independent permission/security/API/code review and
 merge-time CAS. `Completion Commit` remains Pending; C and later permission children, Issue #188
 behavior, TOOL-024, release, publication and Dashboard remain outside this candidate.
+
+## 2026-08-22 First Stable Stage And Correction Checkpoint
+
+PR #368 first head `45a4990d` passed Unix release preflight and independent Agent-role technical
+review. Remote reconciliation waited for non-overlapping I213 PR #367 to register Issue #366, and
+Windows workspace tests found one test-only canonical-path expectation mismatch after its format,
+check, Clippy and focused permission steps passed. PR #367 later merged as `94df427c`; I219 rebased
+without conflict and commit `d0c96048` corrected only the cross-platform test expectation. The
+corrected candidate remains Review/Claimed and requires a next stable push, exact-head CI/review,
+fresh overlap inventory and CAS. Production permission semantics and all exclusions are unchanged.

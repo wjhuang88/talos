@@ -1,6 +1,6 @@
 # Iteration I219: PERM-006-B First-Class Scoped Grants
 
-> Document status: Review / Claimed; locally converged stable candidate pending first push
+> Document status: Review / Claimed; Windows portability correction locally converged pending next stable candidate
 > Published plan date: 2026-08-22
 > Planned objective: replace compatibility runtime permission rules with one first-class scoped
 > grant compiler, explicit in-memory Session store and revision-safe approval/admission contract
@@ -26,7 +26,7 @@
 | Authorization Evidence | PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role permission/security/API review `5378949775`, then merged as `781bb112`. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. The locally converged stable candidate requires first push, exact-head CI including Windows, independent permission/security/API/code review and merge-time CAS before merge. |
+| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. PR #368 remains the implementation carrier. The locally corrected candidate requires a next stable push, fresh exact-head CI including Windows, independent delta review and merge-time CAS before merge. |
 
 ## Published Baseline
 
@@ -153,6 +153,8 @@ PR #358 merge `17e0b648`; PERM-006-A/I189 is Complete/Closed at Completion Commi
 | 2026-08-22 | Atomic claim and activation proposal | Governance PR #359 proposes Claimed/Active together. The proposal remains ineffective until exact-head CI, independent protected-scope review, merge-time CAS and target-branch merge. |
 | 2026-08-22 | Claim effective and implementation started | PR #359 candidate `96816eb9` passed CI `32558607899` and independent Agent-role review `5378949775`, then merged as `781bb112`. The implementation worktree and branch start exactly at that merge. I219 and I213 may proceed concurrently only within their non-overlapping owners; I219 does not modify Dashboard owners or `crates/talos-dashboard/**`. |
 | 2026-08-22 | Local convergence | The first-class grant/compiler/store implementation, official CLI/TUI/Runtime adapters, public API migration and documentation converged locally from `781bb112`. I219 moves to Review for one stable candidate; no implementation PR or Completion Commit exists yet. |
+| 2026-08-22 | First remote stable stage | PR #368 at `45a4990d` passed Unix release preflight and received independent Agent-role permission/Runtime/CLI/TUI technical approval. Remote reconciliation failed because Issue #366's owner-first matrix update was still isolated in non-overlapping I213 PR #367. Windows format/check/Clippy/focused permission gates passed, then workspace tests exposed one test-only canonical-path expectation mismatch. No merge or completion is claimed. |
+| 2026-08-22 | Batched correction | PR #367 passed independent review and CAS, then merged as `94df427c`, clearing the #366 matrix dependency without transferring Dashboard authority. I219 rebased without conflict. Commit `d0c96048` changes only the preflight test expectation to use the public exact-path normalizer; production canonicalization and permission behavior are unchanged. Focused CLI test/check, format and diff checks passed locally. |
 
 ## Verification Evidence
 
@@ -172,8 +174,11 @@ PR #358 merge `17e0b648`; PERM-006-A/I189 is Complete/Closed at Completion Commi
   redacted observer/schema surfaces, compiler-preview TUI rendering and stale attachment approval.
 - Both governance validators passed against explicit base `781bb112`; YAML parsing,
   `git diff --check`, removed-API Rust-source search and Dashboard changed-file inventory passed.
-- No implementation PR exists yet. Exact-head CI, Windows validation and independent protected-
-  scope review remain remote stable-candidate gates.
+- PR #368 is the implementation carrier. Its first exact head `45a4990d` passed Unix release
+  preflight and independent technical review but did not pass all merge gates: remote reconciliation
+  waited for #367 and Windows found the test-only path expectation mismatch described above.
+  The rebased corrected head still requires one next stable push, fresh exact-head CI including
+  Windows, independent delta/evidence review, fresh I213 overlap inventory and merge-time CAS.
 
 ## Completion Evidence
 

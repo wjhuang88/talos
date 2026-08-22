@@ -1043,3 +1043,20 @@ conventional commit(s), pushing once, opening the implementation PR with a chang
 and obtaining exact-head Unix/Windows CI plus independent permission/security/API/code review.
 I213 keeps only its non-overlapping Dashboard authority. PERM-006-C/D/E, Issue #188 behavior,
 TOOL-024/#59, release and publication remain unauthorized or blocked.
+
+## 2026-08-22 I219 First Stable Stage And Windows Correction Checkpoint
+
+PR #368 first head `45a4990d` passed Unix release preflight and independent Agent-role
+permission/Runtime/CLI/TUI technical review. Remote reconciliation failed because Issue #366's
+owner-first matrix update remained isolated in non-overlapping I213 PR #367. Windows format,
+workspace check, Clippy, focused permission/process tests and the direct walkthrough passed before
+the workspace suite exposed one test-only mismatch between the canonical verbatim Windows path and
+an uncanonicalized expected display string.
+
+The #367 exact head `0cb4bbc4` passed independent governance review `5380925626`, merge-time CAS
+and merge as `94df427c`, clearing the matrix dependency without transferring I213 authority. I219
+rebased without conflict. Commit `d0c96048` changes only the preflight test expectation to derive
+the expected exact path through `normalize_authorized_path`; production permission behavior is
+unchanged. Focused CLI test/check, format and diff checks passed locally. Resume by running the full
+post-rebase local checkpoint, verifying zero I213/open-PR overlap, pushing one next PR #368 stable
+head, then obtaining fresh exact-head Unix/Windows CI, independent delta review and merge-time CAS.
