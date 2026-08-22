@@ -371,9 +371,12 @@ mod tests {
 
     #[test]
     fn preflight_packet_keeps_write_scope_exact() {
-        let target = std::env::current_dir()
-            .expect("current directory")
-            .join("i219-preflight-output.txt");
+        let current_dir = std::env::current_dir().expect("current directory");
+        let target = current_dir.join("i219-preflight-output.txt");
+        let target_text = target.to_string_lossy();
+        let expected_scope =
+            talos_core::tool::normalize_authorized_path(&current_dir, target_text.as_ref())
+                .expect("target path should have a canonical existing ancestor");
         let operations = vec![ParsedOperation {
             tool: "write".to_string(),
             input: json!({"path": target, "content": "not executed"}),
@@ -386,7 +389,7 @@ mod tests {
         assert_eq!(packet.operations[0].always_scopes[0].resource_kind, "path");
         assert_eq!(
             packet.operations[0].always_scopes[0].resource,
-            target.display().to_string()
+            expected_scope.display().to_string()
         );
         assert!(!target.exists(), "preflight must not execute write");
     }
