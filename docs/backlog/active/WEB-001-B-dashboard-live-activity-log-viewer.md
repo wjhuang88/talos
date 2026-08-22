@@ -1,10 +1,10 @@
 # WEB-001-B: Dashboard Live Activity And Log Viewer
 
-**Status**: Ready — I213 Planned / Claimed via governance PR #327; ineffective while open
+**Status**: In Progress — I213 Active / Claimed via activation PR #363; effective only when the activation record reaches `main`
 **Priority**: P1
 **Type**: Product / Observability Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I213 — Planned / Claimed via governance PR #327; ineffective while open
+**Selected Iteration**: I213 — Active / Claimed via activation PR #363
 
 ## Collaboration Claim
 
@@ -12,19 +12,20 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard live activity governance session 2026-08-20 |
-| Work Slice | Define and, only after target-branch claim activation, implement WEB-001-B / I213 as one bounded default-loopback GET/read-only Dashboard Live Activity workspace: project safe semantic Session/Agent activity from the existing CLI bridge, expose bounded existing-log observations over SSE with deterministic reconnect/reset/memory/client limits, and preserve current auth/redaction/Session/permission/logging authorities. No write/control/remote/token-delivery/WebSocket/global-bus or new Session/runtime/persistence authority. |
+| Executing Agent | ChatGPT / GPT-5.6 Sol — Dashboard live activity governance/implementation session 2026-08-22 |
+| Work Slice | Implement WEB-001-B / I213 as one bounded default-loopback GET/read-only Dashboard Live Activity workspace: project safe semantic Session/Agent activity from the existing CLI bridge, expose bounded existing-log observations over SSE with deterministic reconnect/reset/memory/client limits, and preserve current auth/redaction/Session/permission/logging authorities. No write/control/remote/token-delivery/WebSocket/global-bus or new Session/runtime/persistence authority. |
 | Claimed At | 2026-08-20 |
 | Source Issue | None |
 | Governance Claim PR | #327 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | PR #327 proposes this exact bounded claim. Exact-head CI, independent claim review, both governance validators, and merge-time CAS are required before target-branch effect; while #327 is open this record is not effective authority. |
+| Authorization Mode | Independent claim review + explicit maintainer parallel-activation authorization |
+| Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced; activation PR #363 records those guards. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Merge the finalized governance-only claim to `main`, refresh inventory, and activate I213 before creating any implementation branch. |
+| Last Updated | 2026-08-22 |
+| Handoff / Release Condition | Activation PR #363 must reach `main` before any implementation branch exists. Implementation then remains gated by I219/I213 authority/file-overlap protection, exact-head CI/security review and merge-time CAS. |
 
-This proposed `Claimed` record is **ineffective while PR #327 is open**. It authorizes no Rust,
-dependency, runtime, protocol, or UI implementation before target-branch merge and later activation.
+The claim is effective through #327 merge `66747214`. This Story becomes implementation-active only
+when activation PR #363 reaches `main`; until then no Rust/Cargo/runtime/UI implementation is
+authorized.
 
 ## Goal And Value
 
@@ -161,6 +162,27 @@ No durable replay or SESSION-009 multi-client attachment guarantee is claimed.
 Because I213 adds live web transport and a page-specific CSP, its exact implementation head requires
 an independent security-focused review. I195's one-off review override is not reused.
 
+## Parallel Protection — I219 / PERM-006-B
+
+The maintainer explicitly authorized I213 to run in parallel with the active I219 permission lane on
+2026-08-22, conditioned on parallel protection. The exception is narrow and expires when I213 leaves
+Active.
+
+- I219 exclusively owns permission/grant/proposal/store semantics, policy precedence, approval
+  authority, permission API/schema migration and permission-runtime behavior.
+- I213 must not modify `crates/talos-permission/**`, permission/grant/store policy, permission wrappers,
+  I219/PERM-006 owner documents or any permission persistence/authorization semantics.
+- I213 remains read-only. Existing permission/sandbox facts may be projected only when an already
+  authoritative safe source exists; no inference or synthesized permission truth is allowed.
+- Production work should remain primarily in `crates/talos-dashboard/**` plus additive,
+  Dashboard-specific CLI observation glue. Before any shared `talos-cli` production file is edited,
+  refresh I219/open-PR changed-file inventory. Same-file overlap is a stop gate: rebase and isolate
+  the Dashboard boundary or pause the overlapping portion rather than mixing ownership.
+- Before implementation merge, refresh `main`, open PRs and changed files again. Any production-file
+  or public-authority overlap blocks merge until eliminated or separately governed.
+- shared Board/Backlog/Iteration-index/current-state files are union-only: preserve all I219 and
+  current-main facts while adding I213 state.
+
 ## UI Information Architecture
 
 Use the existing light-first, quiet, Nord-derived compact shell. Do not copy Desktop Mission /
@@ -205,15 +227,13 @@ than widening WEB-001-B.
 
 ## Readiness Decision
 
-**Ready for governance claim; not authorized for implementation.**
+**Active / Claimed once activation PR #363 reaches `main`; implementation remains bounded by the
+parallel protection contract above.**
 
-Fresh inventory found no existing `WEB-001-B`, `I213`, or overlapping Dashboard PR. The deliverable
-is runnable/testable in the default loopback mode; dependencies and exclusions are explicit; SSE,
-memory, client, redaction, auth, CSP, reconnect, accessibility, and rollback boundaries are testable.
-
-Activation remains gated on an effective target-branch claim and another fresh non-terminal
-iteration/open-PR inventory. If another iteration is Active then, I213 waits or requires explicit
-non-overlapping parallel authorization.
+Fresh 2026-08-22 inventory found no overlapping Dashboard implementation PR. I211 is Complete/Closed;
+I219 is the explicit non-overlapping Active permission lane; only archival #120/#121 were open at
+activation-branch creation. The deliverable remains runnable/testable in default loopback mode with
+explicit SSE, memory, client, redaction, auth, CSP, reconnect, accessibility and rollback bounds.
 
 ## Acceptance Matrix
 
