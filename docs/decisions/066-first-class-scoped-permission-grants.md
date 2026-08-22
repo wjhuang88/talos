@@ -1,6 +1,6 @@
 # ADR-066: First-Class Scoped Permission Grants
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-22
 - Owner: PERM-006-B / Issue #54
 - Related: ADR-026, ADR-047, ADR-064, ADR-065; Issues #52, #54, #59 and #188
@@ -316,6 +316,19 @@ Before this ADR becomes Accepted:
 Acceptance authorizes only this decision. PERM-006-B still requires a separate runnable/testable
 iteration and effective protected-scope Collaboration Claim before any implementation branch or
 Rust/Cargo change.
+
+## Acceptance Evidence
+
+The decision content is fixed at commit
+`17088d88ed263cb9a66776182a897e0ca39772e0`. Independent Agent-role permission/security/API review
+approved the Proposed candidate at exact head
+`33199bd88bd2e8487385b8406514129087170e3d` in PR #358 comment `5376959300`, after exact-head CI
+run `32541156457` and the required governance checks passed. Repository-owner acceptance is
+recorded in PR #358 comment `5378407820` against the unchanged candidate.
+
+This Accepted status activates only the decision boundary. PERM-006-B remains Ready/Unclaimed with
+Selected Iteration None; no implementation, release, version, tag or publication authority follows
+from ADR acceptance.
 
 ## Implementation Validation Required Later
 

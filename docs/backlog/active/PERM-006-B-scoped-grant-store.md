@@ -48,8 +48,8 @@ PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001
 ## Decision Links And Constraints
 
 - [ADR-066](../../decisions/066-first-class-scoped-permission-grants.md) is the required
-  first-class grant, session-lifetime, precedence and public API decision. Its Proposed status
-  authorizes no implementation.
+  first-class grant, session-lifetime, precedence and public API decision. Its Accepted status
+  clears the decision gate only and authorizes no implementation.
 - All effective policy Deny, including Configured and SDK/Runtime Explicit rules, plus hard
   boundaries override every grant.
 - External paths never gain directory-wide reusable grants.
@@ -107,3 +107,11 @@ Runtime exact-scope behavior, and replaces legacy runtime-rule/lifetime APIs. AD
 required decision, compatibility and rollback boundary. It remains Proposed until exact-head
 independent permission/security/API review, CI, CAS and target-branch merge; this checkpoint does
 not select an iteration, establish a claim or authorize implementation.
+
+## 2026-08-22 ADR-066 Acceptance Checkpoint
+
+ADR-066 decision content commit `17088d88` was independently approved at exact Proposed head
+`33199bd8` in PR #358 comment `5376959300`, with CI run `32541156457`; repository-owner acceptance
+is recorded in comment `5378407820`. The ADR is Accepted, clearing only this Story's decision gate.
+PERM-006-B remains Ready/Unclaimed with Selected Iteration None until a separate runnable/testable
+iteration and effective protected-scope Collaboration Claim reach `main`.
