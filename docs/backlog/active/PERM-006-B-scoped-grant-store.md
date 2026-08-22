@@ -1,11 +1,13 @@
 # PERM-006-B: Centralized Grant Compiler And Scoped Grant Store
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-006-B |
 | Type | Permission / Technical Story |
 | Priority | P0 |
-| Status | Review / Claimed; Windows portability correction locally converged pending next stable candidate |
+| Status | Complete |
 | Source | [GitHub Issue #54](https://github.com/wjhuang88/talos/issues/54) |
 | Selected Iteration | I219 |
 | Depends On | PERM-006-A Complete; preserves PERM-004/PERM-005 and SEC-001 |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-22 |
 | Work Slice | Implement only PERM-006-B / I219: first-class grant/compiler/store types in `talos-permission`; explicit in-memory Session ownership; proposal/approval revision and restriction CAS; consuming Once and pre-admission fencing; exact-only path scope; full provenance and multi-facet matching; all-policy Deny dominance; existing Bash classifier descriptor reuse; shared CLI/TUI/Runtime compilation, preview and official wrapper integration; session transition clearing; and the ADR-066 v0.9 public API/schema migration with automated and real preflight evidence. Preserve the existing agent-owned pipeline boundary for PERM-006-C. No persistent/task/cross-process grants, typed-effect migration, model-assisted auto or `/auto`, sandbox/fallback policy change, TOOL-024/background jobs, release, version, tag, publication, Desktop or Dashboard work. |
@@ -23,9 +25,9 @@
 | Governance Claim PR | #359 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #359 candidate `96816eb9` passed exact-head CI `32558607899` and independent Agent-role permission/security/API review `5378949775`, then merged as `781bb112`. Shared GitHub identity proves Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | Not started |
+| Implementation PR | #368 |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Effective through PR #359 merge `781bb112`. PR #368 is the implementation carrier; the locally corrected candidate requires a next stable push, fresh exact-head CI including Windows, independent delta review and merge-time CAS. |
+| Handoff / Release Condition | Closed through Completion Commits `56436027` and `d0c96048`, exact-head CI `32579790496`, independent Agent-role delta review `5381051760`, CAS and PR #368 merge `de79ad46`. C-E remain separately governed. |
 
 ## Identity / Goal / Value
 
@@ -151,3 +153,19 @@ check, Clippy and focused permission steps passed. PR #367 later merged as `94df
 without conflict and commit `d0c96048` corrected only the cross-platform test expectation. The
 corrected candidate remains Review/Claimed and requires a next stable push, exact-head CI/review,
 fresh overlap inventory and CAS. Production permission semantics and all exclusions are unchanged.
+
+## 2026-08-22 Completion Checkpoint
+
+Corrected exact head `97028ac0` passed all five CI jobs in run `32579790496`, including Windows
+workspace, and independent Agent-role delta review `5381051760` approved that exact head. Merge-
+time CAS confirmed base `94df427c`, stable head, `MERGEABLE/CLEAN`, and zero Dashboard/I213 overlap;
+PR #368 merged as `de79ad46`. Completion Commits are pre-existing implementation `56436027` and
+Windows test correction `d0c96048`. PERM-006-C-E, `/auto`, TOOL-024/#59, release and product lanes
+remain separately blocked or governed.
+
+## Completion Evidence
+
+- Completion Commit: `56436027b2ceae256d8c2741ad789b6492ec9918`,
+  `d0c96048a49949801c13e9cfff5841abc926f76b`
+- These pre-existing implementation and test-correction commits, not this status-only closeout,
+  certify completion.

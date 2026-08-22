@@ -86,7 +86,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I216 | Bounded Shutdown Coordinator And Admission Fence | Complete / Closed | Completion Commit `c123328d`; PR #345 merged as `020de694` after exact-head CI `32459530911`, independent runtime review `5367434951` and CAS. C/I217 later completed at `44e840d7`. |
 | I217 | Ordered Finalizer Registry And Durable Closure | Complete / Closed | Completion Commit `44e840d7`; PR #348 merged as `6e5fa8c3`; exact-head CI `32475052535`; independent runtime architecture review `5369328072`. |
 | I218 | Auto Permission Security Decision | Complete / Closed | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent Agent-role security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. ADR-064 Accepted; no behavior or later child authority. |
-| I219 | PERM-006-B First-Class Scoped Grants | Review / Claimed; corrected candidate pending next stable push | PR #368 first head passed Unix/review but exposed a Windows test-only canonical-path expectation; local correction `d0c96048` awaits fresh exact-head CI/review/CAS. I219 retains exclusive permission authority; C and TOOL-024 stay blocked. |
+| I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
 
 ## Completed This Closeout
 
