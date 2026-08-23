@@ -151,3 +151,11 @@ Epic completion requires all children; partial implementation remains owned by t
 - I220 cannot activate alongside Active I213 until a new explicit non-overlap authorization is
   recorded; the earlier I219/I213 exception is not reusable. I221 will separately own C
   implementation after ADR-067 acceptance and its own effective claim.
+
+## 2026-08-23 I220 Claim And Decision Work Activation
+
+- I220 claim PR #370 merged to `main` as `5b8b1488`; its decision-only scope is now effective.
+- I220 owns ADR-067 and the current-path/migration matrix. PERM-006-C remains Blocked/Unclaimed
+  until ADR-067 is Accepted and I221 obtains a separate implementation claim.
+- The explicit I213/I220 decision-only non-overlap is effective; no permission implementation,
+  Runtime/MCP behavior, wrapper or hook change is authorized by I220.

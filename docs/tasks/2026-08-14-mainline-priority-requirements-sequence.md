@@ -1095,3 +1095,11 @@ I213's iteration owner also retains stale pre-merge wording for activation PR #3
 Dashboard backlog owner, derived views and Git ancestry record merge `e578f419`. The Dashboard lane
 must reconcile that owner before I220 claim finalization. Mainline does not edit the Dashboard owner
 or `crates/talos-dashboard/**`.
+
+## 2026-08-23 I220 Claim Effective And ADR-067 In Progress
+
+PR #370 merged as `5b8b1488` after exact-head CI `32618286980`, independent review `5384266183`,
+governance validation and merge-time CAS. I220 is now active for ADR-067 and the current-path /
+migration matrix only. ADR-067 acceptance, I221 activation and all PERM-006-C/TOOL-024
+implementation remain separate gates. The preceding planning text is retained as a dated
+checkpoint; current owner state is authoritative.

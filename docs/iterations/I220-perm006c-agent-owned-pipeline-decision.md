@@ -1,6 +1,6 @@
 # Iteration I220: Agent-Owned Permission Pipeline Decision
 
-> Document status: Active / Claimed proposed by PR #370; ineffective until target-branch merge
+> Document status: Active / Claimed; claim effective through PR #370 merge `5b8b1488`
 > Published plan date: 2026-08-23
 > Planned objective: decide the single-owner permission orchestration, final-decision hook,
 > compatibility and migration contract required before PERM-006-C implementation.
@@ -20,10 +20,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #370 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Candidate head `c0e658821f2c467d21019d559f410fa4526330fa` passed exact-head CI `32617473549`; independent review `5384196365` is bound to that head and requested the synchronized Backlog/evidence correction. A fresh review of the correction head and merge-time CAS remain required. |
+| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Claim PR #370 exact head `068dbaa0d3d3ce6f6de199bfcb2bf5f90eea958f` passed CI `32618286980`, independent approval `5384266183`, merge-time CAS and merged to `main` as `5b8b148810d64cc1ef572c702eae41d638a29ec2`. ADR-067 acceptance remains separately gated. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | I213 owner-first drift was repaired by PR #371; merge-time CAS must re-confirm `main@836b1714` or a descendant. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
+| Handoff / Release Condition | I213 owner-first drift was repaired by PR #371. I220 now produces only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
 
 ## Published Baseline
 
@@ -40,12 +40,13 @@ Planning target: `main@6fbb5550bc3b4b7b5827b77bc57a152d0636c339`.
 | I206-I208 | Planned / Unclaimed | Preserve the ordered steering sequence; do not activate. |
 | I210 | Review / Claimed | Preserve TUI-060 corrective owner and deferred acceptance. |
 | I213 | Active / Claimed | Continue only in its Dashboard observation owner. The prior I219 exception is not reusable; I220 requires an explicit new non-overlap authorization or must wait. |
-| I220 | Active / Claimed proposed by PR #370 | Decision-only claim is proposed; no authority exists before finalized claim/activation merge. |
+| I220 | Active / Claimed effective through PR #370 | Decision-only claim is effective; ADR-067 acceptance is still required before I221 implementation. |
 
 Open PRs #120/#121 are archival Drafts and remain untouched. Fresh remote inventory found no open
 I220, PERM-006-C or permission-pipeline implementation PR. I213 owns Dashboard observation only,
 and the maintainer has now explicitly authorized this non-overlapping decision-only I220 pair.
-The claim remains ineffective until merge-time CAS succeeds.
+The claim became effective after merge-time CAS as `5b8b1488`; ADR-067 acceptance remains a
+separate gate.
 
 I213's owner-first record was repaired by PR #371 and is effective on `main@836b1714`;
 activation PR #363 merge `e578f419` is now consistently recorded. I220 does not modify the
@@ -110,12 +111,14 @@ unauthorized. I220 cannot be reused as their implementation iteration.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-23 | Selection prepared | A/B dependencies are Complete. Read-only current-path analysis found ADR-067 mandatory before C implementation; I220 is decision-only and requires no Rust/Cargo behavior change. |
-| 2026-08-23 | Claim proposed | PR #370 backfills the actual governance claim and proposes Active I220. Maintainer authorization permits the I213/I220 non-overlap, but the claim is ineffective until merge. |
+| 2026-08-23 | Claim effective | PR #370 claim merged as `5b8b1488`; maintainer authorization permits the I213/I220 non-overlap. I220 decision work is now active; ADR-067 acceptance and I221 remain separately gated. |
 | 2026-08-23 | Owner-drift gate | I213's iteration owner still states that merged activation PR #363 is ineffective. Dashboard owner-first reconciliation remains required before I220 merge-time CAS; this lane does not edit the Dashboard owner. |
 
 ## Verification Evidence
 
-Pending finalized claim, claim merge, decision evidence, exact-head CI and independent review.
+Claim effectiveness is recorded above. The ADR-067 decision PR must provide exact-head CI,
+independent permission/security/API review, both governance validators and merge-time CAS before
+acceptance.
 
 ## Completion Evidence
 
