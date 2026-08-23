@@ -87,7 +87,8 @@ pub use grant::{
     GrantError, GrantId, GrantPreview, GrantPreviewFacet, GrantScope, GrantSource, ProposedGrant,
 };
 pub use session::{
-    PendingInvocation, PermissionEvaluation, PermissionSessionId, PermissionSessionState,
+    PendingInvocation, PermissionEvaluation, PermissionInvocation, PermissionSessionId,
+    PermissionSessionState,
 };
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
@@ -157,6 +158,7 @@ impl<'de> Deserialize<'de> for PermissionDecision {
 /// [`PermissionDecision`]. Every matching policy `Deny` wins. Otherwise rules
 /// are evaluated in insertion order and the first match wins. If no rule
 /// matches, a default decision is applied based on the tool nature.
+#[derive(Clone)]
 pub struct PermissionEngine {
     rules: Vec<PermissionRule>,
     rule_metadata: Vec<PermissionRuleMetadata>,

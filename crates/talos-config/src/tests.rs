@@ -1065,7 +1065,18 @@ fn test_credentials_default_path() {
 
 #[test]
 fn test_credentials_load_nonexistent_returns_empty() {
-    let creds = Credentials::load().expect("operation should succeed");
+    let dir = std::env::temp_dir().join(format!(
+        "talos-credentials-nonexistent-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("operation should succeed")
+            .as_nanos()
+    ));
+    let store = ConfigStore::with_paths(dir.join("config.toml"), dir.join("credentials.toml"));
+    let creds = store
+        .load_credentials_snapshot()
+        .expect("operation should succeed");
     assert!(creds.keys.is_empty());
 }
 

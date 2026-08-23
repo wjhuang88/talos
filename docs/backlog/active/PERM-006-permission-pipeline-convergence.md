@@ -173,3 +173,10 @@ Epic completion requires all children; partial implementation remains owned by t
 - Claim PR #375 proposes Active/Claimed I221; it remains ineffective until target-branch merge.
 - PERM-006-C implementation, Runtime/MCP migration and permission behavior remain unauthorized
   until that claim is effective and its implementation branch starts from the claim merge or later.
+
+## 2026-08-23 I221 Activation And Implementation Checkpoint
+
+Claim PR #375 merged as `d662501c` after exact-head CI `32620749103`, independent
+permission/security/API review `5384445091` and merge-time CAS. I221 is therefore effective and
+owns only the Accepted ADR-067 implementation. The implementation candidate is in Review/Claimed;
+PERM-006-D/E, `/auto`, TOOL-024 and Dashboard authority remain excluded.

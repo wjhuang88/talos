@@ -457,6 +457,45 @@ struct ProjectionCaptureHook {
     payloads: Arc<Mutex<Vec<String>>>,
 }
 
+struct PermissionDecisionCaptureHook {
+    decisions: Arc<Mutex<Vec<PermissionDecision>>>,
+}
+
+struct SkipFinalPermissionHook;
+
+#[async_trait]
+impl HookHandler for SkipFinalPermissionHook {
+    fn name(&self) -> &str {
+        "skip-final-permission"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
+        HookResult::Skip
+    }
+}
+
+#[async_trait]
+impl HookHandler for PermissionDecisionCaptureHook {
+    fn name(&self) -> &str {
+        "permission-decision-capture"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
+        if let HookEvent::AfterPermissionCheck { decision, .. } = event {
+            self.decisions.lock().await.push(decision.clone());
+        }
+        HookResult::Continue
+    }
+}
+
 #[async_trait]
 impl HookHandler for ProjectionCaptureHook {
     fn name(&self) -> &str {
@@ -612,7 +651,9 @@ async fn test_turn_start_hook_fires_once_for_tool_turn() {
     let agent = Agent::with_security_and_hooks(
         Arc::new(MockModel::new(responses)),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(hooks),
@@ -2053,7 +2094,9 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
     let agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(hooks),
@@ -2093,7 +2136,8 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
     let hook_payloads = hook_payloads.lock().await;
     assert!(!hook_payloads.is_empty());
     for payload in hook_payloads.iter() {
-        assert!(!payload.contains("snapshot_id"));
+        // Permission hooks may retain the key for structural context, but never its value.
+        assert!(!payload.contains("\"snapshot_id\":\"s1\""));
         assert!(!payload.contains("snapshot:s1"));
         assert!(!payload.contains("1:aa|"));
     }
@@ -2736,24 +2780,147 @@ async fn test_permission_ask_defaults_to_deny() {
 }
 
 #[tokio::test]
-async fn unresolved_permission_ask_reaches_wrapped_tool_without_sandbox_fallback() {
+async fn agent_pipeline_no_resolver_emits_one_final_deny_and_executes_nothing() {
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call_1".into(),
+                    name: "echo".into(),
+                    input: serde_json::json!({ "message": "hello" }),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "Denied".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "echo".into(),
+        read_only: false,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("should not execute"),
+        execution_log: execution_log.clone(),
+    }));
+    let decisions = Arc::new(Mutex::new(Vec::new()));
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(PermissionDecisionCaptureHook {
+        decisions: decisions.clone(),
+    }));
+    let state = Arc::new(talos_permission::PermissionSessionState::new(
+        PermissionEngine::new(),
+    ));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(hooks),
+    )
+    .with_permission_pipeline(
+        state,
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Headless,
+            talos_permission::InteractionCapability::Unavailable,
+        ),
+        None,
+    );
+
+    assert_eq!(agent.run("Test".into()).await.unwrap(), "Denied");
+    assert!(execution_log.lock().await.is_empty());
+    let decisions = decisions.lock().await;
+    assert_eq!(decisions.len(), 1);
+    assert!(matches!(decisions[0], PermissionDecision::Deny(_)));
+}
+
+#[tokio::test]
+async fn unresolved_permission_ask_is_denied_by_the_single_agent_pipeline() {
     let log = Arc::new(Mutex::new(Vec::new()));
     let agent = Agent::with_security(
         Arc::new(MockModel::new(sandbox_fallback_responses("Done"))),
         bash_registry(log.clone()),
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
     );
 
     assert_eq!(agent.run("Test".into()).await.unwrap(), "Done");
     assert!(
-        log.lock()
-            .await
-            .iter()
-            .any(|entry| entry.starts_with("start:bash:")),
-        "unresolved Ask should remain available to the permission-aware wrapper"
+        log.lock().await.is_empty(),
+        "unresolved Ask must not reach a second evaluator or tool execution"
     );
+}
+
+#[tokio::test]
+async fn final_permission_hook_skip_executes_zero_tools() {
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "echo".into(),
+        read_only: false,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("should not execute"),
+        execution_log: execution_log.clone(),
+    }));
+    let responses = vec![
+        vec![
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call".into(),
+                    name: "echo".into(),
+                    input: serde_json::json!({}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        text_done_events("done"),
+    ];
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(SkipFinalPermissionHook));
+    let mut engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
+    engine.add_rule(talos_permission::PermissionRule::new(
+        "echo",
+        None,
+        PermissionDecision::Allow,
+    ));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        Some(Arc::new(engine)),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(hooks),
+    );
+
+    assert_eq!(
+        agent.run("test".into()).await.expect("recoverable turn"),
+        "done"
+    );
+    assert!(execution_log.lock().await.is_empty());
 }
 
 #[tokio::test]
@@ -4063,6 +4230,14 @@ impl AgentTool for TestReadImageTool {
             }],
         }
     }
+
+    async fn execute_authorized_with_output(
+        &self,
+        input: Value,
+        _authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> ToolExecutionOutput {
+        self.execute_with_output(input).await
+    }
 }
 
 fn image_continuation_events() -> Vec<AgentEvent> {
@@ -4104,7 +4279,9 @@ async fn continuation_image_appears_once_in_next_provider_request() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4174,7 +4351,9 @@ async fn continuation_image_consumed_after_second_call() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4240,7 +4419,9 @@ async fn batch_limit_rejects_second_read_image_before_execution() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4289,7 +4470,9 @@ async fn continuation_image_not_in_persisted_messages() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4319,7 +4502,9 @@ async fn continuation_image_safe_summary_persisted_in_tool_result() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4405,7 +4590,9 @@ async fn continuation_image_consumed_on_provider_failure() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4453,7 +4640,9 @@ async fn continuation_not_resent_in_separate_turn_messages() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4532,7 +4721,9 @@ async fn continuation_not_resent_after_stream_interruption() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(model),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),
@@ -4590,7 +4781,9 @@ async fn capability_gate_hides_read_image_when_unsupported() {
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(MockModel::new(vec![text_done_events("ok")])),
         registry,
-        Some(Arc::new(PermissionEngine::new())),
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("/tmp"),
+        ))),
         None,
         PathBuf::from("/tmp"),
         Arc::new(HookRegistry::new()),

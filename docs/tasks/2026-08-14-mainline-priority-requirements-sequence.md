@@ -1116,3 +1116,12 @@ I221 / PERM-006-C claim PR #375 proposes the Accepted ADR-067 implementation sli
 `main@055e5c6b`. It is ineffective until merge; no Rust, Runtime, MCP, wrapper or hook
 implementation starts before that claim merge. TOOL-024, `/auto`, Dashboard and release lanes stay
 separate.
+
+## 2026-08-23 I221 Effective Claim And Local Implementation
+
+I221 claim #375 merged as `d662501c` after exact-head CI `32620749103`, independent review
+`5384445091` and CAS. The isolated implementation branch starts at that exact merge. Its local
+candidate centralizes normalized permission evaluation, bounded approval, revision-CAS admission,
+final hook gating and exact authorization across CLI, TUI, Runtime and MCP without modifying
+Dashboard/I213, TOOL-024, `/auto` or release surfaces. I221 remains Review/Claimed until its own
+implementation PR, exact-head CI, independent permission/security/API review and CAS complete.

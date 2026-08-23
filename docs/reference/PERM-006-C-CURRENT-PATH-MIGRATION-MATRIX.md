@@ -1,7 +1,7 @@
 # PERM-006-C Current-Path And Migration Matrix
 
-Status: Proposed through I220; implementation remains unauthorized until ADR-067 is Accepted and
-a separate I221 claim is effective.
+Status: ADR-067 Accepted; I221 implementation is Active/Claimed through governance PR #375 and is
+locally converging toward its first stable Review candidate.
 
 This matrix records the current permission authorities and the target migration boundary. It is
 normative together with ADR-067. It does not authorize code changes.
@@ -48,3 +48,29 @@ and final-hook dispatch.
 
 Rollback at any stage is to keep the prior adapter active and reject the stage's claim; no
 persistent permission data is rewritten and no approval is widened by rollback.
+
+## 2026-08-23 I221 Implementation Facts
+
+- Production CLI print, interactive, TUI, inline/RPC, Runtime and MCP composition roots register
+  raw tools and supply Session/context/resolver inputs to the Agent-owned pipeline.
+- `PermissionSessionState::begin_invocation` performs the single authoritative evaluation and
+  emits either admitted policy authority or revision-bound Once/Session proposals. Approval and
+  execution admission use request identity and revision CAS without a second policy evaluation.
+- Agent and standalone MCP normalize and validate the exact input before the permission profile,
+  preview, authorization and execution path; the admitted authorization is passed to
+  `execute_authorized_with_output`.
+- Proposal, pre-check and final permission hooks are strict gates: Deny, Skip, panic or timeout
+  prevents execution. Hook/log projections are structure-only and contain no raw value or concrete
+  resource path; Runtime and interactive resolvers retain the tool-defined safe presentation for
+  compatibility, without authority to replace the normalized request.
+- Resolver absence, denial, timeout, cancellation, channel closure, error, panic and stale revision
+  fail closed. Every call site supplies one total deadline; Session lock contention uses a
+  non-blocking fence and resolver wait receives only the remaining budget. The non-TUI terminal
+  resolver delegates to the existing event-loop stdin reader, so cancellation closes the pending
+  response without leaving a detached reader. The final `AfterPermissionCheck` projection is Deny
+  for every failed pipeline result.
+- Standalone MCP retains the existing `evaluate_call` signature and adds `authorize_call` for exact
+  execution authorization; no old caller is forced onto a breaking API.
+- Legacy policy-bearing wrappers remain compiled only as test compatibility fixtures; production
+  builds cannot select them. Serialized permission config, Runtime `ApprovalHandler`, sandbox
+  fallback and TUI `/attach` boundaries are unchanged.

@@ -6,7 +6,8 @@ use talos_core::message::{
     AgentEvent, ContentPart, Message, MessageToolResult, StopReason, ToolCall,
 };
 use talos_core::tool::{
-    ToolPresentationPolicy, ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult,
+    ToolExecutionAuthorization, ToolPresentationPolicy, ToolProvenance, ToolRegistry,
+    ToolResult as ToolExecutionResult,
 };
 use talos_permission::PermissionDecision;
 use talos_plugin::{
@@ -17,6 +18,7 @@ use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 
 use crate::compression::BashOutputCompressor;
+use crate::permission_pipeline::PermissionAuthorizationRequest;
 use crate::{
     Agent, AgentError, AgentResult, MAX_CONCURRENT_READ_ONLY, PendingToolCall,
     SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
@@ -382,7 +384,7 @@ impl Agent {
             Ok(_) => Some(original_call),
             Err(error) => return Err(error),
         };
-        let call = effective_call.expect("tool call should be present");
+        let mut call = effective_call.expect("tool call should be present");
 
         let tool = match registry.get(&call.name) {
             Some(t) => t,
@@ -402,6 +404,13 @@ impl Agent {
                 Vec::new(),
             ));
         }
+        call.input = crate::permission_pipeline::normalize_permission_input(&call.name, call.input);
+        if let Err(e) = registry.validate_input(&call.name, &call.input) {
+            return Ok((
+                ToolExecutionResult::error(format!("invalid input for {e}")),
+                Vec::new(),
+            ));
+        }
         if self.enforce_tool_presentation_policy
             && let Some(backend) = tool.backend_for_input(&call.input)
             && !policy.allows_backend(&call.name, &backend)
@@ -415,68 +424,122 @@ impl Agent {
             ));
         }
 
-        let mut permission_allowed = true;
-        if let Some(engine) = self.permission_engine.as_deref() {
-            let projected_call = self.project_tool_call(&call);
-            self.run_hook(
-                hook_ctx,
-                HookEvent::BeforePermissionCheck {
-                    call: &projected_call,
+        let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
+        let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
+            let permission_deadline_at = tokio::time::Instant::now() + self.permission_deadline;
+            let permission_call = ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                input: crate::permission_pipeline::project_permission_input(&call.input),
+            };
+            for event in [
+                HookEvent::OnToolCallProposed {
+                    call: &permission_call,
                 },
-            )
-            .await?;
+                HookEvent::BeforePermissionCheck {
+                    call: &permission_call,
+                },
+            ] {
+                match tokio::time::timeout_at(
+                    permission_deadline_at,
+                    self.hook_registry.dispatch_permission_gate(hook_ctx, event),
+                )
+                .await
+                {
+                    Ok(HookOutcome::Continue(_)) => {}
+                    Ok(HookOutcome::Deny { reason, .. }) => {
+                        return Ok((
+                            ToolExecutionResult::error(format!("Permission denied: {reason}")),
+                            Vec::new(),
+                        ));
+                    }
+                    Ok(HookOutcome::Skip(_)) => {
+                        return Ok((
+                            ToolExecutionResult::error(
+                                "Permission denied: permission hook failed closed",
+                            ),
+                            Vec::new(),
+                        ));
+                    }
+                    Err(_) => {
+                        return Ok((
+                            ToolExecutionResult::error(
+                                "Permission denied: approval deadline exceeded",
+                            ),
+                            Vec::new(),
+                        ));
+                    }
+                }
+            }
 
             let profile = tool.permission_profile(&call.input);
-            let decision = engine.evaluate_profile(&call.name, &profile, &call.input);
-
-            let evidence_diagnostics = collect_access_evidence_diagnostics(&call)
-                .into_iter()
-                .map(|(command, evidence)| {
-                    let _ = engine.evaluate_command_with_evidence(
-                        &call.name,
-                        &command,
-                        &evidence,
-                        &call.input,
-                    );
-                    format!(
-                        "{} => {}",
-                        command,
-                        format_access_evidence_diagnostic(&evidence)
-                    )
+            let authorization = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: &call.name,
+                    provenance: tool.provenance(),
+                    profile: &profile,
+                    input: &call.input,
+                    presentation_input: tool.project_input(&call.input),
+                    summary_fields: tool
+                        .summary_fields()
+                        .iter()
+                        .map(|field| (*field).to_string())
+                        .collect(),
+                    deadline: permission_deadline_at
+                        .saturating_duration_since(tokio::time::Instant::now()),
                 })
-                .collect::<Vec<_>>();
+                .await;
+            let decision = authorization
+                .as_ref()
+                .err()
+                .map_or(PermissionDecision::Allow, |error| error.final_decision());
 
-            self.run_hook(
-                hook_ctx,
-                HookEvent::AfterPermissionCheck {
-                    call: &projected_call,
-                    decision: decision.clone(),
-                },
+            match tokio::time::timeout_at(
+                permission_deadline_at,
+                self.hook_registry.dispatch_permission_gate(
+                    hook_ctx,
+                    HookEvent::AfterPermissionCheck {
+                        call: &permission_call,
+                        decision: decision.clone(),
+                    },
+                ),
             )
-            .await?;
-
-            match decision {
-                PermissionDecision::Allow => {}
-                PermissionDecision::Deny(reason) => {
+            .await
+            {
+                Ok(HookOutcome::Continue(_)) => {}
+                Ok(HookOutcome::Deny { reason, .. }) => {
                     return Ok((
-                        ToolExecutionResult::error(format!("permission denied: {reason}")),
+                        ToolExecutionResult::error(format!("Permission denied: {reason}")),
                         Vec::new(),
                     ));
                 }
-                PermissionDecision::Ask => permission_allowed = false,
+                Ok(HookOutcome::Skip(_)) => {
+                    return Ok((
+                        ToolExecutionResult::error("Permission denied: final hook failed closed"),
+                        Vec::new(),
+                    ));
+                }
+                Err(_) => {
+                    return Ok((
+                        ToolExecutionResult::error("Permission denied: approval deadline exceeded"),
+                        Vec::new(),
+                    ));
+                }
             }
 
-            for diag in evidence_diagnostics {
-                tracing::debug!("access evidence for {}: {}", call.name, diag);
+            match authorization {
+                Ok(grants) => authorizations = Some(grants),
+                Err(error) => {
+                    return Ok((
+                        ToolExecutionResult::error(format!("Permission denied: {error}")),
+                        Vec::new(),
+                    ));
+                }
             }
-        }
-
-        if let Err(e) = registry.validate_input(&call.name, &call.input) {
-            return Ok((
-                ToolExecutionResult::error(format!("invalid input for {e}")),
-                Vec::new(),
-            ));
-        }
+            true
+        } else {
+            true
+        };
 
         if call.name == "read_image" && !self.image_input_supported {
             return Ok((
@@ -502,7 +565,7 @@ impl Agent {
             }
         }
 
-        let normalized_input = crate::helpers::normalize_tool_input(&call.name, call.input.clone());
+        let normalized_input = call.input.clone();
 
         let (result, parts) = if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
@@ -545,7 +608,13 @@ impl Agent {
                         SandboxFallbackPolicy::Ask => false,
                     };
                     if fallback {
-                        let output = tool.execute_with_output(normalized_input).await;
+                        let output = match authorizations.as_deref() {
+                            Some(grants) => {
+                                tool.execute_authorized_with_output(normalized_input, grants)
+                                    .await
+                            }
+                            None => tool.execute_with_output(normalized_input).await,
+                        };
                         (output.result, output.next_provider_parts)
                     } else {
                         (
@@ -558,11 +627,23 @@ impl Agent {
                     }
                 }
             } else {
-                let output = tool.execute_with_output(normalized_input).await;
+                let output = match authorizations.as_deref() {
+                    Some(grants) => {
+                        tool.execute_authorized_with_output(normalized_input, grants)
+                            .await
+                    }
+                    None => tool.execute_with_output(normalized_input).await,
+                };
                 (output.result, output.next_provider_parts)
             }
         } else {
-            let output = tool.execute_with_output(normalized_input).await;
+            let output = match authorizations.as_deref() {
+                Some(grants) => {
+                    tool.execute_authorized_with_output(normalized_input, grants)
+                        .await
+                }
+                None => tool.execute_with_output(normalized_input).await,
+            };
             (output.result, output.next_provider_parts)
         };
 
@@ -740,6 +821,7 @@ fn redacted_fallback_arguments(
     })
 }
 
+#[allow(dead_code)]
 fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> String {
     use talos_permission::{AccessKind, EvidenceState};
     let kind_str = match ev.kind {
@@ -770,6 +852,7 @@ fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> S
     format!("{kind_str}:{state_str}{paths_str}")
 }
 
+#[allow(dead_code)]
 fn collect_access_evidence_diagnostics(
     call: &ToolCall,
 ) -> Vec<(String, talos_permission::AccessEvidence)> {
@@ -819,6 +902,7 @@ fn collect_access_evidence_diagnostics(
     commands
 }
 
+#[allow(dead_code)]
 fn classify_exec_step(
     step: &serde_json::Value,
 ) -> Option<(String, talos_permission::AccessEvidence)> {
@@ -826,6 +910,7 @@ fn classify_exec_step(
     Some(classify_exec_argv(command, step.get("args")))
 }
 
+#[allow(dead_code)]
 fn classify_exec_argv(
     command: &str,
     args: Option<&serde_json::Value>,

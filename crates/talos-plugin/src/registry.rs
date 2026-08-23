@@ -94,10 +94,28 @@ impl HookRegistry {
     }
 
     /// Dispatches a hook event sequentially to all subscribed handlers.
-    pub async fn dispatch<'a>(
+    pub async fn dispatch<'a>(&self, ctx: &HookContext, event: HookEvent<'a>) -> HookOutcome<'a> {
+        self.dispatch_inner(ctx, event, false).await
+    }
+
+    /// Dispatches the final permission gate with fail-closed failure semantics.
+    ///
+    /// Unlike general lifecycle dispatch, `Skip`, panic, and timeout deny the operation. Callers
+    /// may execute only when this method returns [`HookOutcome::Continue`].
+    pub async fn dispatch_permission_gate<'a>(
+        &self,
+        ctx: &HookContext,
+        event: HookEvent<'a>,
+    ) -> HookOutcome<'a> {
+        debug_assert!(event.is_permission_boundary());
+        self.dispatch_inner(ctx, event, true).await
+    }
+
+    async fn dispatch_inner<'a>(
         &self,
         ctx: &HookContext,
         mut event: HookEvent<'a>,
+        fail_closed: bool,
     ) -> HookOutcome<'a> {
         let kind = event.kind();
         let Some(handlers) = self.handlers.get(&kind) else {
@@ -110,6 +128,12 @@ impl HookRegistry {
 
             match timeout(handler.timeout(), handler_future).await {
                 Ok(Ok(HookResult::Continue)) => {}
+                Ok(Ok(HookResult::Skip)) if fail_closed => {
+                    return HookOutcome::Deny {
+                        event,
+                        reason: format!("permission hook '{handler_name}' skipped final gate"),
+                    };
+                }
                 Ok(Ok(HookResult::Skip)) => return HookOutcome::Skip(event),
                 Ok(Ok(HookResult::Deny { reason })) => {
                     let error = HookError::Denied {
@@ -135,6 +159,12 @@ impl HookRegistry {
                         handler: handler_name,
                     };
                     tracing::error!(error = %error, event = %kind, "hook panicked; aborting hook chain");
+                    if fail_closed {
+                        return HookOutcome::Deny {
+                            event,
+                            reason: "permission hook panicked".to_owned(),
+                        };
+                    }
                     return HookOutcome::Continue(event);
                 }
                 Err(_) => {
@@ -143,6 +173,12 @@ impl HookRegistry {
                         timeout: handler.timeout(),
                     };
                     tracing::warn!(error = %error, event = %kind, "hook timed out");
+                    if fail_closed {
+                        return HookOutcome::Deny {
+                            event,
+                            reason: "permission hook timed out".to_owned(),
+                        };
+                    }
                 }
             }
         }

@@ -1,13 +1,27 @@
 use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+
+fn isolated_home() -> (tempfile::TempDir, PathBuf) {
+    let temp = tempfile::TempDir::new().expect("create isolated HOME");
+    let home = temp.path().join("home");
+    let talos_dir = home.join(".talos");
+    fs::create_dir_all(&talos_dir).expect("create isolated ~/.talos");
+    fs::write(talos_dir.join("config.toml"), "").expect("write isolated config");
+    (temp, home)
+}
 
 #[test]
 fn rpc_mode_system_version_roundtrip() {
     let fixture = fs::read_to_string("tests/fixtures/rpc_hello.json").expect("read fixture");
+    let (_temp, home) = isolated_home();
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_talos"))
         .args(["--mode", "rpc", "--mock"])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", "")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -40,8 +54,12 @@ fn rpc_mode_system_version_roundtrip() {
 
 #[test]
 fn rpc_mode_agent_run_uses_session_runtime_and_returns_final_text() {
+    let (_temp, home) = isolated_home();
     let mut child = Command::new(env!("CARGO_BIN_EXE_talos"))
         .args(["--mode", "rpc", "--mock"])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", "")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

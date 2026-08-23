@@ -173,6 +173,14 @@ impl TuiRuntimeBuilder {
             None,
             self.workspace_root.clone(),
             self.hooks.clone(),
+        )
+        .with_permission_pipeline(
+            self.approval_handler.shared_engine(),
+            talos_permission::PermissionContext::new(
+                talos_permission::PermissionMode::Interactive,
+                talos_permission::InteractionCapability::Available,
+            ),
+            Some(self.approval_handler.clone()),
         );
         agent.set_tool_protocol(runtime_config.tool_protocol());
         set_image_input_capability(&mut agent, &runtime_config);

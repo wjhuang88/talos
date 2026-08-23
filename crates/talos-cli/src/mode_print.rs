@@ -98,15 +98,25 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         build_provider(&config, &api_key, cli.mock)
     };
 
+    let permission_engine =
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
     let mut agent = Agent::with_security_and_hooks(
         provider,
         registry,
-        Some(Arc::new(
-            talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
-        )),
+        None,
         None,
         workspace_root.to_path_buf(),
         hooks,
+    )
+    .with_permission_pipeline(
+        Arc::new(talos_permission::PermissionSessionState::new(
+            permission_engine,
+        )),
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Headless,
+            talos_permission::InteractionCapability::Unavailable,
+        ),
+        None,
     );
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);

@@ -67,10 +67,6 @@ impl ServerHandler for TalosMcpHandler {
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
     ) -> Result<CallToolResult, McpError> {
         let hook_context = HookContext::new(TurnId::new(), std::path::PathBuf::from("."));
-        let talos_request = crate::types::McpCallRequest {
-            name: request.name.to_string(),
-            arguments: request.arguments.clone(),
-        };
         let Some(tool) = self.tool_registry.get(request.name.as_ref()) else {
             return Err(McpError::new(
                 ErrorCode::METHOD_NOT_FOUND,
@@ -84,12 +80,33 @@ impl ServerHandler for TalosMcpHandler {
             .clone()
             .map(serde_json::Value::Object)
             .unwrap_or_else(|| serde_json::json!({}));
+        let input = talos_agent::permission_pipeline::normalize_permission_input(
+            request.name.as_ref(),
+            input,
+        );
+        self.tool_registry
+            .validate_input(request.name.as_ref(), &input)
+            .map_err(|error| {
+                McpError::new(
+                    ErrorCode::INVALID_PARAMS,
+                    format!("invalid tool input: {error}"),
+                    None,
+                )
+            })?;
+        let talos_request = crate::types::McpCallRequest {
+            name: request.name.to_string(),
+            arguments: input.as_object().cloned(),
+        };
         let profile = tool.permission_profile(&input);
-        self.permission_gate
-            .evaluate_call(&hook_context, &talos_request, &profile)
+        let authorizations = self
+            .permission_gate
+            .authorize_call(&hook_context, &talos_request, &profile)
             .await?;
 
-        let result = tool.execute(input).await;
+        let result = tool
+            .execute_authorized_with_output(input, &authorizations)
+            .await
+            .result;
 
         let content = vec![Content::text(result.content)];
         if result.is_error {

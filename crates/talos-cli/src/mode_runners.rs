@@ -47,7 +47,7 @@ use crate::model_lifecycle::{
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
-    PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
+    TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
     register_explicit_permission_aware_plugins, register_permission_aware_tools,
 };
 use crate::runtime_adapter;
@@ -111,13 +111,25 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     )
     .map_err(anyhow::Error::msg)?;
     let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
+    let permission_engine =
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone());
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
         None,
         workspace_root.clone(),
         hooks,
+    )
+    .with_permission_pipeline(
+        Arc::new(talos_permission::PermissionSessionState::new(
+            permission_engine,
+        )),
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Headless,
+            talos_permission::InteractionCapability::Unavailable,
+        ),
+        None,
     );
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_image_input_capability(&mut agent, &config);
