@@ -1109,3 +1109,10 @@ checkpoint; current owner state is authoritative.
 ADR-067 is Accepted through PR #373 merge `5d2d2dcf`, with decision commits `c21bb7f3` and
 `820586ea`, exact-head CI `32619757871` and independent review `5384374028`. I220 is Complete /
 Closed; PERM-006-C is Ready/Unclaimed and awaits a separate effective I221 implementation claim.
+
+## 2026-08-23 I221 Implementation Claim Preparation
+
+I221 / PERM-006-C claim PR #375 proposes the Accepted ADR-067 implementation slice from
+`main@055e5c6b`. It is ineffective until merge; no Rust, Runtime, MCP, wrapper or hook
+implementation starts before that claim merge. TOOL-024, `/auto`, Dashboard and release lanes stay
+separate.

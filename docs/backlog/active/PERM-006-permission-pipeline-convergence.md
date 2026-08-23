@@ -166,3 +166,10 @@ Epic completion requires all children; partial implementation remains owned by t
 - I220 is Complete/Closed with decision commits `c21bb7f3` and `820586ea`.
 - PERM-006-C is Ready/Unclaimed. I221 must establish a separate effective implementation claim;
   no Rust, Runtime, MCP, wrapper or hook implementation is authorized by this closeout.
+
+## 2026-08-23 I221 Implementation Claim Preparation
+
+- I221 is the separate runnable implementation iteration for PERM-006-C under Accepted ADR-067.
+- Claim PR #375 proposes Active/Claimed I221; it remains ineffective until target-branch merge.
+- PERM-006-C implementation, Runtime/MCP migration and permission behavior remain unauthorized
+  until that claim is effective and its implementation branch starts from the claim merge or later.

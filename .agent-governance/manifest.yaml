@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-22"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "Issue #59 remains blocked on PERM-006-C implementation and later TOOL-024 authority. A/I189, B/I219 and I220 are Complete/Closed. ADR-067 is Accepted through PR #373 merge `5d2d2dcf`; C is Ready/Unclaimed and I221 must obtain a separate implementation claim. The maintainer's I213/I220 decision-only non-overlap remains historical; I213 owner reconciliation is effective at main@836b1714. I197/I198/I201/I210 remain Review and I206-I208 remain Planned/Unclaimed."
+current_execution_note: "Issue #59 remains blocked on PERM-006-C implementation and later TOOL-024 authority. A/I189, B/I219 and I220 are Complete/Closed. ADR-067 is Accepted through PR #373 merge `5d2d2dcf`; I221/PERM-006-C claim #375 is Active/Claimed proposed and ineffective until merge. The maintainer's I213/I220 decision-only non-overlap remains historical; I213 owner reconciliation is effective at main@836b1714. I197/I198/I201/I210 remain Review and I206-I208 remain Planned/Unclaimed."
 
 governance:
   skill_name: "agent-project-governance"
@@ -65,7 +65,7 @@ migration:
   legacy_assets: []
   next_actions:
     - "Use Deferred Human Validation Mode only when the long-task startup/change record links a validation Issue and cleanup iteration; keep source owners Review, preserve exact implementation heads, never defer AGENTS.md security-review gates, and resolve every required row before long-task completion"
-    - "Keep Issue #59 production work blocked until PERM-006-C is Complete and a separate TOOL-024 child claim is effective. Preserve RUNTIME-005 and A/I189/B/I219 completion. I220 and ADR-067 are Complete/Accepted through PR #373 merge `5d2d2dcf`; C is Ready/Unclaimed and I221 separately owns implementation"
+    - "Keep Issue #59 production work blocked until PERM-006-C is Complete and a separate TOOL-024 child claim is effective. Preserve RUNTIME-005 and A/I189/B/I219 completion. I220 and ADR-067 are Complete/Accepted through PR #373 merge `5d2d2dcf`; I221 claim #375 is proposed and ineffective until merge, then implementation proceeds only within its recorded slice"
     - "Keep GOV-008/I215 completion bound to implementation `06e61e3c`, PR #341 merge `81a603b4`, CI `32442052401`, independent Agent-role review `5365129718` and merge-time CAS; use its local-convergence/stable-stage workflow for later work"
     - "Preserve the separately authorized WEB-001-A/I195 read-only Dashboard slice. A/I189 is Complete/Closed at `6b577d6a`; B/I219 is Complete/Closed at `56436027`/`d0c96048`, and all later children remain blocked unless separately authorized. Preserve completed I196 P0 without product changes"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
