@@ -5,10 +5,10 @@
 | Story ID | PERM-006-D |
 | Type | Permission / Public API Story |
 | Priority | P0 |
-| Status | Blocked — PERM-006-C pipeline must complete first |
+| Status | Ready / Unclaimed — PERM-006-C is Complete; no iteration or claim selected |
 | Source | [GitHub Issue #56](https://github.com/wjhuang88/talos/issues/56) |
 | Selected Iteration | None |
-| Depends On | Blocked by PERM-006-C; feeds PERM-006-E |
+| Depends On | PERM-006-C Complete; feeds PERM-006-E |
 
 ## Collaboration Claim
 
@@ -44,7 +44,7 @@ Replace in-tree tool-name and JSON-field inference with explicit typed effects a
 
 ## Dependencies
 
-Blocked by PERM-006-C; feeds PERM-006-E
+PERM-006-C Complete; feeds PERM-006-E
 
 ## Decision Links And Constraints
 
@@ -67,7 +67,7 @@ Accept an ADR and migration plan before changing public pre-1.0 types or configu
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Blocked.
+Do not present this Story as shipped while it remains Ready / Unclaimed.
 
 ## Required Reads
 
@@ -86,3 +86,10 @@ Do not present this Story as shipped while it remains Blocked.
 ## Residual Destination
 
 Future scope/effect additions use additive variants or a new ADR, not implicit string inference.
+
+## 2026-08-23 PERM-006-C Dependency Completion Checkpoint
+
+PERM-006-C / I221 completed at implementation commit `49d1546c` through PR #376 merge `f9e6706d`.
+D is now Ready / Unclaimed because its prerequisite is satisfied. No iteration, claim, API change
+or implementation is authorized by this status correction; D must obtain its own decision/migration
+contract where required, runnable iteration and effective protected-scope claim before work starts.

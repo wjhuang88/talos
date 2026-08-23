@@ -6,8 +6,9 @@
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
 long-running `bash`, Windows PowerShell, and `exec` work must not block an interactive conversation;
 bounded completion output must remain model-readable through supervised job controls.
-**Depends on**: TOOL-023-C for Windows PowerShell identity; TOOL-024-A decision output; RUNTIME-005
-for bounded resource finalization; PERM-006-C before any background process may spawn.
+**Depends on**: Completed TOOL-023-C for Windows PowerShell identity, TOOL-024-A decision output,
+RUNTIME-005 bounded resource finalization and PERM-006-C permission orchestration. Production work
+still requires a separate child owner, runnable iteration and effective claim.
 
 ## Outcome
 
@@ -57,7 +58,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
-| TOOL-024-B | Managed Background Execution Core | Product/State Story | Blocked | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit shell/single-exec background input, bounded capture, process-group cleanup, and exact-once terminal state; Windows fails closed. |
+| TOOL-024-B | Managed Background Execution Core | Product/State Story | Ready / Unclaimed | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit shell/single-exec background input, bounded capture, process-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
@@ -133,3 +134,13 @@ D, and Issue #59 stays open.
 
 - [ADR-060: Supervised Background Command Job Lifecycle](../../decisions/060-supervised-background-command-jobs.md)
 - [I188 current-path characterization](../../reference/I188-BACKGROUND-JOB-CURRENT-PATH.md)
+
+## PERM-006-C Dependency Completion Checkpoint (2026-08-23)
+
+PERM-006-C / I221 completed at implementation commit `49d1546c`; PR #376 merged as `f9e6706d`
+after exact-head CI `32640691772`, independent permission/security/API approval `5386153429` and
+merge-time CAS. All recorded TOOL-024-B prerequisites are therefore Complete, so B is Ready /
+Unclaimed rather than Blocked. This readiness does not activate work: production B still requires
+its own child owner, runnable/testable iteration, effective Collaboration Claim, implementation PR,
+security review and exact-head evidence. C/D remain blocked in order, Windows spawn remains
+fail-closed until D, and Issue #59 stays open.

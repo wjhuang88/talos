@@ -5,7 +5,7 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — A/I189, B/I219 and C/I221 Complete/Closed; D/E remain blocked/unclaimed |
+| Status | In Progress — A/I189, B/I219 and C/I221 Complete/Closed; D Ready/Unclaimed; E Blocked/Unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
 | Selected Iteration | None; completed children A/I189, B/I219 and C/I221; parent Epic remains unclaimed |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
