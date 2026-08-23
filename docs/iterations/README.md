@@ -89,7 +89,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
 | I220 | PERM-006-C Agent-Owned Pipeline Decision | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf`; ADR-067 Accepted. I221 separately owns implementation. |
 | I221 | PERM-006-C Agent-Owned Pipeline Implementation | Complete / Closed | Completion Commit `49d1546c`; PR #376 merged as `f9e6706d` after exact-head CI `32640691772`, independent permission/security/API approval `5386153429` and CAS. |
-| I222 | TOOL-024-B Managed Background Execution Core | Planned / Unclaimed Draft | Technical prerequisites are Complete. Final activation requires an effective claim plus explicit I213 scheduling; scope is Unix non-daemonizing supervisor core with no CLI/Dashboard/Windows spawn. |
+| I222 | TOOL-024-B Managed Background Execution Core | Active / Claimed proposed by #379; ineffective until merge | Bounded parallel pair with I213 under `5386904546`; Unix non-daemonizing core with no CLI/Dashboard/Windows spawn. |
 | I223 | Issue #59 Deferred Human Validation Cleanup | Planned / Unclaimed | Evidence-only Issue #378 cleanup after B/C/D implementation heads exist; no behavior implementation authority. |
 
 ## Completed This Closeout

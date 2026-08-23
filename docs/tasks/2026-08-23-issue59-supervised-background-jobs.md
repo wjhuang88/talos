@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Planned / Unclaimed; coordination claim and I222 activation are ineffective until the
+> Status: Claimed coordination and I222 Active/Claimed proposed by PR #379; ineffective until the
 > finalized atomic claim PR reaches `main`.
 
 ## Startup Contract
@@ -67,15 +67,15 @@ work; new corrective owners for failed Issue #378 rows; release and Desktop owne
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
+| Work Slice | Coordinate the complete ordered Issue #59 closure chain while granting production authority only through each child owner. This claim activates only I222/TOOL-024-B's recorded Unix core; C, Windows D1 decision/implementation, D2 and I223 require their own later gates. |
+| Claimed At | 2026-08-23 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #379 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer active goal selects complete Issue #59 delivery; bounded I213/I222-B parallel authorization is recorded in Issue #366 comment `5386904546`. Exact-head governance/process-security review and CAS remain required. |
 | Implementation PR | None; child-specific PRs only |
 | Last Updated | 2026-08-23 |
 | Handoff / Release Condition | Coordination claim grants no production authority; every child requires its own effective claim. |
@@ -97,29 +97,30 @@ work; new corrective owners for failed Issue #378 rows; release and Desktop owne
 
 ## Current Coordination And Overlap Boundary
 
-I213 is the only Active iteration at planning time. I222/B excludes all I213 Dashboard and CLI
-production files, but this Draft does not itself authorize parallel Active work. Before I222
-activation, either I213 must be terminal or the maintainer must explicitly authorize the exact
-I213/I222 non-overlap/shared-file-stop/CAS contract. C/D2 activation must recompute overlap against
-I213's then-current changed-file inventory. Any shared production authority pauses the later #59
-child until one lane is terminal or a new explicit non-overlap authorization is recorded.
+Maintainer authorization `5386904546` permits only the exact I213/I222-B pair to run concurrently.
+I213 retains its existing 17-file Dashboard/CLI/README/owner inventory; B is restricted to
+core/agent/tools/runtime and excludes every I213 production file. Shared derived governance files
+use union semantics. Before stable push and merge, compare exact inventories; same production file
+or authority overlap pauses only the overlapping work. C/D2 must recompute overlap and cannot reuse
+this authorization.
 
 ## Checkpoint
 
 Completed task items: dependency chain through PERM-006-C and validation tracker #378 creation.
 
-Current state and artifacts: TOOL-024-B is Ready/Unclaimed; Draft claim artifacts for I222 and this
-task are being prepared from `main@e1c375e6`; I223 is Planned/Unclaimed.
+Current state and artifacts: PR #379 proposes TOOL-024-B/I222 Active/Claimed from
+`main@e1c375e6`; the proposal is ineffective until merge. I223 remains Planned/Unclaimed.
 
 Commands/checks and actual results: repository/worktree/open-PR and nonterminal iteration inventory
 completed; governance validation pending finalized Draft claim.
 
 Open risks or deviations: Unix process-group unsafe boundary and Runtime finalizer/API seam require
 independent review; self-daemonizing commands are unsupported because a child can escape a Unix
-process group; I213 scheduling/overlap must be resolved explicitly; Windows remains fail closed.
+process group; I213/I222-B inventory overlap must remain zero under `5386904546`; Windows remains
+fail closed.
 
-Next task item: open Draft governance PR, backfill its number, finalize Claimed/Active records, run
-validators/CI/review/CAS and merge before implementation.
+Next task item: run final exact-head validators/CI and independent process/permission/API review,
+then merge-time CAS and #379 merge before implementation.
 
 Recovery or resume instruction: use this task, TOOL-024-B and I222 owners; implementation starts
 from the eventual claim merge commit or later main, never this pre-merge governance branch.

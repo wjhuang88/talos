@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A Complete; B Ready / Unclaimed, 2026-08-23)
+**Status**: Partial (A Complete; B Active / Claimed proposed by PR #379, ineffective until merge)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -58,7 +58,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
-| [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Ready / Unclaimed | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
+| [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Active / Claimed proposed by #379; ineffective until merge | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
@@ -147,10 +147,10 @@ fail-closed until D, and Issue #59 stays open.
 
 ## Issue #59 Long-Task Planning Checkpoint (2026-08-23)
 
-The separate TOOL-024-B owner, planned I222 iteration and Issue #59 long-task record are prepared
-from `main@e1c375e6`; I223 and Issue #378 own deferred human/device evidence. They remain
-Ready/Planned and Unclaimed in the Draft. No implementation authority exists until a finalized
-atomic claim/activation reaches `main`, and I213/I222 parallel execution additionally requires an
-explicit maintainer scheduling disposition. The B contract excludes self-daemonizing/detached
-commands and documents ADR-060's 32-terminal oldest-first/session-end retention policy rather than
-adding an unapproved clock TTL.
+The separate TOOL-024-B owner, I222 iteration and Issue #59 long-task record are finalized in claim
+PR #379 from `main@e1c375e6`; I223 and Issue #378 own deferred human/device evidence. B/I222 is
+Active/Claimed only as a proposal and has no implementation authority until #379 merges. Maintainer
+authorization `5386904546` permits only the exact non-overlapping I213/I222-B pair with stable
+changed-file inventory and CAS gates; C/D cannot reuse it. The B contract excludes
+self-daemonizing/detached commands and documents ADR-060's 32-terminal oldest-first/session-end
+retention policy rather than adding an unapproved clock TTL.

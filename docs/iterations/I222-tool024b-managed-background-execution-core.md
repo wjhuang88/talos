@@ -1,6 +1,6 @@
 # Iteration I222: TOOL-024-B Managed Background Execution Core
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed proposed by PR #379; ineffective until target-branch merge
 > Published plan date: 2026-08-23
 > Planned objective: implement ADR-060's bounded Unix Agent/session-owned background execution core
 > without starting TOOL-024-C/D or overlapping I213 Dashboard/CLI production authority.
@@ -13,18 +13,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
+| Work Slice | Implement only TOOL-024-B under Accepted ADR-060: Unix Agent/session-owned supervisor, semantic pre-admission, exact background permission, bounded receipt/output/state/event, checked same-process-group cancellation/reap, and ordinary Session plus Runtime finalizer cleanup. Windows/detached/unsupported shapes fail closed. Exclude TOOL-024-C/D, CLI/TUI/Dashboard/I213 production files, persistence, `/auto`, release and unrelated permission behavior. |
+| Claimed At | 2026-08-23 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #379 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Exact-head CI, independent process/permission/unsafe/API review and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim/activation is ineffective until this finalized record reaches `main`. |
+| Handoff / Release Condition | Claim/activation is ineffective until #379 reaches `main`; implementation starts from that merge or later main. |
 
 ## Published Baseline
 
@@ -113,7 +113,7 @@ authorization.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-23 | Draft atomic claim+activation preparation | Owner/iteration/task/Issue #378 prepared from `main@e1c375e6`; proposed claim and Active state remain ineffective until finalized claim PR merge and an I213/I222 scheduling disposition is explicit. |
+| 2026-08-23 | Atomic claim+activation candidate | PR #379 proposes Claimed/Active from `main@e1c375e6`; maintainer authorization `5386904546` permits only the exact non-overlapping I213/I222-B pair with stable-inventory/CAS gates. The proposal remains ineffective until merge. |
 
 ## Verification Evidence
 

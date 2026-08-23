@@ -1,34 +1,34 @@
 # TOOL-024-B: Managed Background Execution Core
 
-> Document status: Ready / Unclaimed
+> Document status: Active / Claimed proposed by PR #379; ineffective until target-branch merge
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-B |
 | Type | Product / Runtime / Process-Security Story |
 | Priority | P0 |
-| Status | Ready / Unclaimed |
+| Status | Active / Claimed proposed by PR #379; ineffective until target-branch merge |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I222 proposed; ineffective until claim PR merge |
+| Selected Iteration | I222 Active / Claimed proposed by PR #379; ineffective until merge |
 | Depends On | TOOL-024-A/I188, TOOL-023-C, RUNTIME-005 and PERM-006-C/I221 Complete; ADR-060 Accepted |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
+| Work Slice | Implement only TOOL-024-B/I222 under Accepted ADR-060: Agent/session-owned Unix supervisor; default-false background input for bash and one top-level exec; semantic pre-admission; exact background permission facet; bounded receipt, state, output and terminal event; checked process-group termination/reap; ordinary AppServerSession and Runtime finalizer cleanup; Windows and unsupported/detached shapes fail closed. No process tool, CLI/TUI/Dashboard projection, Windows spawn, persistence, `/auto`, release or later TOOL-024 child. |
+| Claimed At | 2026-08-23 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #379 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Exact-head CI, independent process/permission/unsafe/API review and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | A finalized atomic claim and activation must reach `main` before implementation. |
+| Handoff / Release Condition | Claim/activation is ineffective until #379 reaches `main`; implementation starts from that merge or later main and remains inside the recorded file/authority boundary. |
 
 ## Identity / Goal / Value
 
@@ -75,11 +75,12 @@ permission authority, duplicating provider results or weakening foreground behav
 
 ## Dependencies
 
-All technical prerequisites are Complete/Accepted on `main@e1c375e6`. I213 remains the only other
-Active iteration. This Draft does not create an I213/I222 parallel exception: final activation must
-either record explicit maintainer authorization for the non-overlap contract or wait until I213 is
-terminal. If authorized, any need to edit an I213 production file, `crates/talos-cli/**` or Dashboard
-authority pauses I222 and requires new coordination.
+All technical prerequisites are Complete/Accepted on `main@e1c375e6`. Maintainer authorization
+`5386904546` permits the exact I213/I222-B non-overlapping pair. I222 owns no file in I213 PR #372's
+17-file production inventory and may not edit `crates/talos-cli/**`, `crates/talos-dashboard/**`,
+README files or I213/WEB product authority. Shared derived governance views use union semantics.
+Same production-file or authority overlap pauses only the overlapping work and requires new
+coordination.
 
 ## Decision Links And Constraints
 
@@ -163,3 +164,11 @@ implementation; TOOL-024-D2 owns CLI/TUI projection and integrated platform acce
 Unix containment for deliberately escaping/self-daemonizing children is outside Issue #59's
 supervised-child contract and requires a separate decision/owner. Any public finalizer compatibility
 residual receives its own owner before B closeout.
+
+## 2026-08-23 Proposed Activation Checkpoint
+
+Governance PR #379 proposes the TOOL-024-B/I222 atomic claim and activation from
+`main@e1c375e6`. Maintainer authorization `5386904546` permits I213 and I222-B to run in parallel
+under exact authority/file/CAS boundaries; it supersedes the earlier serial note `5386854800` and
+cannot be reused for C/D. I223 remains Planned/Unclaimed. This proposed state has no target-branch
+effect before #379 merge and grants no C/D, CLI, Dashboard, Windows, release or `/auto` authority.
