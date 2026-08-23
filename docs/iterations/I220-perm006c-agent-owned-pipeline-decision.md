@@ -20,10 +20,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #370 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Exact-head independent Agent-role review `5381371813`; exact-head CI `32583844243`; final governance review and CAS remain required. |
+| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Exact-head CI `32616966092` and independent Agent-role approval `5384136045` are bound to candidate head `434de513d5dd088b1b354e8a3e05ca869a425f01`; merge-time CAS remains required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | I213 owner-first drift must be repaired before merge-time CAS. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
+| Handoff / Release Condition | I213 owner-first drift was repaired by PR #371; merge-time CAS must re-confirm `main@836b1714` or a descendant. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
 
 ## Published Baseline
 
@@ -47,11 +47,9 @@ I220, PERM-006-C or permission-pipeline implementation PR. I213 owns Dashboard o
 and the maintainer has now explicitly authorized this non-overlapping decision-only I220 pair.
 The claim remains ineffective until merge-time CAS succeeds.
 
-I213's iteration owner still contains pre-merge wording that says activation PR #363 is proposed
-and ineffective, while its backlog owner, derived views and Git ancestry record #363 merge
-`e578f419` as effective. The Dashboard lane must repair that owner-first drift before this I220
-claim can be finalized or merged. I220 does not modify the Dashboard owner or
-`crates/talos-dashboard/**`.
+I213's owner-first record was repaired by PR #371 and is effective on `main@836b1714`;
+activation PR #363 merge `e578f419` is now consistently recorded. I220 does not modify the
+Dashboard owner or `crates/talos-dashboard/**`.
 
 ### Dependency And Decision Gate
 
