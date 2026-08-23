@@ -1,6 +1,6 @@
 # Iteration I220: Agent-Owned Permission Pipeline Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed proposed by PR #370; ineffective until target-branch merge
 > Published plan date: 2026-08-23
 > Planned objective: decide the single-owner permission orchestration, final-decision hook,
 > compatibility and migration contract required before PERM-006-C implementation.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 mainline governance session 2026-08-23 |
 | Work Slice | Decide only the PERM-006-C prerequisite contract: inventory current CLI/TUI/print/inline/Runtime/MCP permission authorities; define Agent-owned orchestration, bounded approval resolver authority, authoritative normalized input, final `AfterPermissionCheck` semantics, concurrency/deadline/cancellation/fail-closed behavior, additive public compatibility, migration, rollback and the separate I221 implementation boundary. No Rust/Cargo/dependency, permission behavior, hook implementation, wrapper removal, background process, `/auto`, Dashboard, Desktop, release or publication change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-23 |
 | Source Issue | #55 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #370 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head permission/security/API governance review. I213 is already Active; I220 cannot activate until the maintainer explicitly authorizes the non-overlapping I213/I220 pair or I213 leaves Active. |
+| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Exact-head independent Agent-role review `5381371813`; exact-head CI `32583844243`; final governance review and CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Finalize the claim and Active state in this governance PR only after the I213 scheduling gate is satisfied. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
+| Handoff / Release Condition | I213 owner-first drift must be repaired before merge-time CAS. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
 
 ## Published Baseline
 
@@ -40,12 +40,12 @@ Planning target: `main@6fbb5550bc3b4b7b5827b77bc57a152d0636c339`.
 | I206-I208 | Planned / Unclaimed | Preserve the ordered steering sequence; do not activate. |
 | I210 | Review / Claimed | Preserve TUI-060 corrective owner and deferred acceptance. |
 | I213 | Active / Claimed | Continue only in its Dashboard observation owner. The prior I219 exception is not reusable; I220 requires an explicit new non-overlap authorization or must wait. |
-| I220 | Planned / Unclaimed | Prepare this decision-only claim; no authority exists before finalized claim/activation merge. |
+| I220 | Active / Claimed proposed by PR #370 | Decision-only claim is proposed; no authority exists before finalized claim/activation merge. |
 
 Open PRs #120/#121 are archival Drafts and remain untouched. Fresh remote inventory found no open
 I220, PERM-006-C or permission-pipeline implementation PR. I213 owns Dashboard observation only,
-but the repository's one-Active rule still blocks I220 activation until its scheduling disposition
-is explicitly recorded.
+and the maintainer has now explicitly authorized this non-overlapping decision-only I220 pair.
+The claim remains ineffective until merge-time CAS succeeds.
 
 I213's iteration owner still contains pre-merge wording that says activation PR #363 is proposed
 and ineffective, while its backlog owner, derived views and Git ancestry record #363 merge
@@ -111,8 +111,9 @@ unauthorized. I220 cannot be reused as their implementation iteration.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-23 | Selection prepared | A/B dependencies are Complete. Read-only current-path analysis found ADR-067 mandatory before C implementation; I220 is decision-only and remains Planned/Unclaimed pending scheduling authorization and finalized claim merge. |
-| 2026-08-23 | Owner-drift gate | I213's iteration owner still states that merged activation PR #363 is ineffective. Dashboard owner-first reconciliation is required before I220 claim finalization; this lane does not edit the Dashboard owner. |
+| 2026-08-23 | Selection prepared | A/B dependencies are Complete. Read-only current-path analysis found ADR-067 mandatory before C implementation; I220 is decision-only and requires no Rust/Cargo behavior change. |
+| 2026-08-23 | Claim proposed | PR #370 backfills the actual governance claim and proposes Active I220. Maintainer authorization permits the I213/I220 non-overlap, but the claim is ineffective until merge. |
+| 2026-08-23 | Owner-drift gate | I213's iteration owner still states that merged activation PR #363 is ineffective. Dashboard owner-first reconciliation remains required before I220 merge-time CAS; this lane does not edit the Dashboard owner. |
 
 ## Verification Evidence
 

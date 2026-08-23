@@ -1086,9 +1086,9 @@ and version migration, while current CLI/TUI/Runtime/MCP paths retain multiple p
 authorities. Planned/unclaimed I220 therefore owns only ADR-067 plus the current-path/migration
 matrix. It changes no executable behavior and cannot be reused for I221 implementation.
 
-I213 is still the sole Active iteration. Its recorded exception names only I219 and explicitly is
-not a general multi-Active waiver. Final I220 claim/activation must wait for a new maintainer-approved
-I213/I220 non-overlap disposition or for I213 to leave Active. Until then no implementation branch,
+I213 remains Active. The maintainer has now explicitly authorized decision-only I220 to run in
+parallel under a new non-overlap/file/CAS contract; this does not authorize any I220 implementation
+or reuse the old I219 exception. Until the claim merges, no implementation branch,
 Rust/Cargo/dependency, wrapper, hook, Runtime, MCP, TOOL-024 or `/auto` work is authorized.
 
 I213's iteration owner also retains stale pre-merge wording for activation PR #363 even though the
