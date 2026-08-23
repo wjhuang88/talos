@@ -5,9 +5,9 @@
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Blocked / Unclaimed — A/B gates satisfied; ADR-067 decision prerequisite pending through planned I220 |
+| Status | Blocked / Unclaimed — A/B gates satisfied; ADR-067 Proposed through effective I220, awaiting acceptance and separate I221 implementation claim |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | None for implementation; I220 planned/unclaimed for decision prerequisite |
+| Selected Iteration | None for implementation; I220 Active/Claimed owns the decision prerequisite |
 | Depends On | PERM-006-A/I189 and B/I219 Complete; blocked on Accepted ADR-067 and later I221 claim; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Finish decision-only I220 and accept ADR-067, then establish a separate effective I221 claim before implementation. I213 scheduling/non-overlap must be explicitly resolved. |
+| Handoff / Release Condition | Accept ADR-067 from I220, then establish a separate effective I221 claim before implementation. I213/I220 decision-only non-overlap is effective through the recorded I220 claim merge. |
 
 ## Identity / Goal / Value
 
