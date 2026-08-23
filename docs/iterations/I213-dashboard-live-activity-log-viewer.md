@@ -27,7 +27,7 @@
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. The maintainer authorized bounded I219/I213 parallel execution on 2026-08-22; activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS under the recorded single-maintainer activation path, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Preserve both controlled parallel exceptions recorded in the appended activation checkpoint. Before implementation merge, obtain I213 exact-head CI and independent security review, refresh open-PR/file-overlap inventory, and repeat merge-time CAS. |
+| Handoff / Release Condition | Preserve all controlled pairwise exceptions recorded in the appended checkpoints. Before implementation merge, obtain I213 exact-head CI and independent security review, refresh open-PR/file-overlap inventory, and repeat merge-time CAS. |
 
 The Collaboration Claim is effective on `main` through merge `66747214`; implementation activation
 is effective through #363 merge `e578f419`. Issue #366 coordinates execution only and creates no
@@ -367,8 +367,9 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
 SEC-002, SESSION-009, SERVER-001, PERM-006, ACP/future AG-UI, History Explorer, governance UI,
 Dashboard i18n, remote/LAN and structured-log evolution remain separately owned residuals.
 
-The explicit parallel authorization is a scheduling variance only. It does not change any of those
-owner boundaries and expires when I213 leaves Active; it must not be reused for another iteration.
+The explicit pairwise parallel authorizations are scheduling variances only. They do not change any
+owner boundary, expire when either named pair is no longer eligible, and must not be reused for
+another iteration.
 
 ## Retrospective
 
