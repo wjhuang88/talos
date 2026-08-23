@@ -48,10 +48,12 @@ must restart evaluation rather than silently reusing approval.
 ### 3. Bounded resolver authority
 
 An `ApprovalResolver` is a surface adapter with one operation: resolve an already-evaluated
-`Ask`. It may return `Once`, `Session` or `Deny`. It cannot evaluate policy, compile a grant,
-change a rule, issue execution authorization or execute a tool. `Deny` remains dominant over any
-resolver result. `AlwaysApprove` is retained only as a compatibility label mapped to the bounded
-Session scope; it is not a general bypass.
+`Ask`. It may return `Once`, `Session` or `Deny`. `Session` is an exact, capability-relative grant
+for the evaluated request; it cannot create a permanent broad allow rule or widen a resource,
+nature, workspace or tool facet. The resolver cannot evaluate policy, compile a grant, change a
+rule, issue execution authorization or execute a tool. `Deny` remains dominant over any resolver
+result. `AlwaysApprove` is retained only as a compatibility label mapped to the bounded Session
+scope; it is not a general bypass.
 
 The resolver runs outside the Session lock. Its result is committed only if the proposal identity,
 permission revision, Session lifecycle and normalized-request digest still match. A mismatch,
