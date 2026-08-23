@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -9,17 +10,19 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::approval::{ApprovalPrompt, TerminalApprovalRequest};
 use crate::event_loop::AppEvent::{
-    AgentCompleted, AgentError, AgentTextDelta, AgentToolCall, AgentToolResult, UserInput,
-    UserInterrupt,
+    AgentCompleted, AgentError, AgentTextDelta, AgentToolCall, AgentToolResult, ApprovalRequested,
+    UserInput, UserInterrupt,
 };
 use crate::mode_runtime::request_preview_payload;
 
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
-pub enum AppEvent {
+pub(crate) enum AppEvent {
     UserInput(String),
     UserInterrupt,
+    ApprovalRequested(TerminalApprovalRequest),
     AgentTextDelta(String),
     AgentToolCall(String),
     AgentToolResult(bool),
@@ -36,7 +39,7 @@ pub enum AppEvent {
     },
 }
 
-pub enum AppState {
+pub(crate) enum AppState {
     WaitingForInput,
     AgentRunning {
         cancel_token: CancellationToken,
@@ -45,7 +48,7 @@ pub enum AppState {
     ShuttingDown,
 }
 
-pub struct EventLoop {
+pub(crate) struct EventLoop {
     event_tx: mpsc::UnboundedSender<AppEvent>,
     event_rx: mpsc::UnboundedReceiver<AppEvent>,
     state: AppState,
@@ -56,14 +59,18 @@ pub struct EventLoop {
     session_manager: SessionManager,
     /// Clone-able sender for submitting turns to the session actor.
     sq_tx: mpsc::Sender<SessionOp>,
+    approval_queue: VecDeque<TerminalApprovalRequest>,
+    displayed_approval: Option<uuid::Uuid>,
+    approval_rollover_barrier: bool,
 }
 
 impl EventLoop {
-    pub fn new(
+    pub(crate) fn new(
         workspace_root: PathBuf,
         session: Session,
         session_manager: SessionManager,
         handle: talos_core::session::SessionHandle,
+        mut approval_rx: mpsc::UnboundedReceiver<TerminalApprovalRequest>,
     ) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let sq_tx = handle.sq_tx;
@@ -124,6 +131,14 @@ impl EventLoop {
                 }
             }
         });
+        let event_tx_approval = event_tx.clone();
+        tokio::spawn(async move {
+            while let Some(request) = approval_rx.recv().await {
+                if event_tx_approval.send(ApprovalRequested(request)).is_err() {
+                    break;
+                }
+            }
+        });
 
         Self {
             event_tx,
@@ -135,6 +150,9 @@ impl EventLoop {
             branch_id: None,
             session_manager,
             sq_tx,
+            approval_queue: VecDeque::new(),
+            displayed_approval: None,
+            approval_rollover_barrier: false,
         }
     }
 
@@ -206,6 +224,43 @@ impl EventLoop {
     }
 
     fn handle_event(&mut self, event: AppEvent) {
+        let event = match event {
+            ApprovalRequested(request) => {
+                if matches!(self.state, AppState::AgentRunning { .. }) {
+                    self.approval_queue.push_back(request);
+                    self.render_active_approval();
+                } else {
+                    let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+                }
+                return;
+            }
+            UserInput(input)
+                if matches!(self.state, AppState::AgentRunning { .. })
+                    && (self.displayed_approval.is_some() || !self.approval_queue.is_empty()) =>
+            {
+                match resolve_displayed_approval(
+                    &mut self.approval_queue,
+                    &mut self.displayed_approval,
+                    &mut self.approval_rollover_barrier,
+                    &input,
+                ) {
+                    ApprovalInputOutcome::Resolved => {}
+                    ApprovalInputOutcome::Invalid => {
+                        eprintln!("Invalid input. Please enter y, a, or n.");
+                        self.displayed_approval = None;
+                    }
+                    ApprovalInputOutcome::Stale => {
+                        eprintln!("Approval request expired; review the current request.");
+                    }
+                }
+                self.render_active_approval();
+                return;
+            }
+            event => {
+                self.render_active_approval();
+                event
+            }
+        };
         match (&mut self.state, event) {
             (AppState::WaitingForInput, UserInput(input)) => {
                 if input.is_empty() {
@@ -253,6 +308,7 @@ impl EventLoop {
                 });
                 // Abort the dummy task handle (no-op, but keeps the enum contract).
                 task_handle.abort();
+                self.deny_pending_approvals();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
                 self.first_ctrl_c_time = None;
@@ -275,6 +331,7 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
+                self.deny_pending_approvals();
                 println!();
                 if let Err(e) = self.session_manager.update_index(&self.session) {
                     eprintln!("Warning: failed to refresh session index: {e}");
@@ -283,6 +340,7 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentError(msg)) => {
+                self.deny_pending_approvals();
                 eprintln!("Error: {msg}");
                 self.state = AppState::WaitingForInput;
             }
@@ -327,6 +385,38 @@ impl EventLoop {
             }
 
             _ => {}
+        }
+    }
+
+    fn deny_pending_approvals(&mut self) {
+        self.displayed_approval = None;
+        self.approval_rollover_barrier = false;
+        while let Some(request) = self.approval_queue.pop_front() {
+            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+        }
+    }
+
+    fn render_active_approval(&mut self) {
+        if select_active_approval(
+            &mut self.approval_queue,
+            &mut self.displayed_approval,
+            &mut self.approval_rollover_barrier,
+        ) {
+            return;
+        }
+        let Some(request) = self.approval_queue.front() else {
+            return;
+        };
+        if ApprovalPrompt::render_choice_prompt(
+            &request.request.tool_name,
+            &request.request.arguments,
+            &request.request.preview,
+        )
+        .is_err()
+            && let Some(request) = self.approval_queue.pop_front()
+        {
+            self.displayed_approval = None;
+            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
         }
     }
 
@@ -476,5 +566,202 @@ impl EventLoop {
             task_handle.abort();
             let _ = task_handle.await;
         }
+    }
+}
+
+enum ApprovalInputOutcome {
+    Resolved,
+    Invalid,
+    Stale,
+}
+
+fn resolve_displayed_approval(
+    queue: &mut VecDeque<TerminalApprovalRequest>,
+    displayed: &mut Option<uuid::Uuid>,
+    rollover_barrier: &mut bool,
+    input: &str,
+) -> ApprovalInputOutcome {
+    if *rollover_barrier {
+        *rollover_barrier = false;
+        return ApprovalInputOutcome::Stale;
+    }
+    let Some(displayed_id) = *displayed else {
+        return ApprovalInputOutcome::Stale;
+    };
+    let current_is_displayed = queue
+        .front()
+        .is_some_and(|request| request.id == displayed_id && !request.response.is_closed());
+    if !current_is_displayed {
+        *displayed = None;
+        return ApprovalInputOutcome::Stale;
+    }
+    let choice = match input.trim() {
+        "y" | "Y" => talos_core::ApprovalChoice::ApproveOnce,
+        "a" | "A" => talos_core::ApprovalChoice::AlwaysApprove,
+        "n" | "N" => talos_core::ApprovalChoice::Deny,
+        _ => return ApprovalInputOutcome::Invalid,
+    };
+    let request = queue.pop_front().expect("displayed request is present");
+    *displayed = None;
+    let _ = request.response.send(choice);
+    ApprovalInputOutcome::Resolved
+}
+
+fn select_active_approval(
+    queue: &mut VecDeque<TerminalApprovalRequest>,
+    displayed: &mut Option<uuid::Uuid>,
+    rollover_barrier: &mut bool,
+) -> bool {
+    let displayed_is_current = displayed.is_some_and(|id| {
+        queue
+            .front()
+            .is_some_and(|request| request.id == id && !request.response.is_closed())
+    });
+    if displayed_is_current {
+        return true;
+    }
+    let replaced_displayed = displayed.take().is_some();
+    if replaced_displayed {
+        *rollover_barrier = true;
+    }
+    queue.retain(|request| !request.response.is_closed());
+    if let Some(request) = queue.front() {
+        *displayed = Some(request.id);
+    }
+    false
+}
+
+#[cfg(test)]
+mod approval_queue_tests {
+    use super::*;
+    use talos_agent::permission_pipeline::PermissionApprovalRequest;
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+    use talos_permission::{
+        InteractionCapability, PermissionContext, PermissionEngine, PermissionInvocation,
+        PermissionMode, PermissionRequest, PermissionSessionState,
+    };
+
+    fn queued_request() -> (
+        TerminalApprovalRequest,
+        tokio::sync::oneshot::Receiver<talos_core::ApprovalChoice>,
+    ) {
+        let root = tempfile::tempdir().expect("tempdir");
+        let target = root.path().join("target.txt");
+        std::fs::write(&target, b"fixture").expect("fixture");
+        let target_text = target.display().to_string();
+        let input = serde_json::json!({"path": target_text.clone()});
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            target_text,
+            ToolResourceKind::Path,
+        )];
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let request = PermissionRequest::new("write", ToolProvenance::Native, &profile, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let PermissionInvocation::Ask { session, .. } = state
+            .begin_invocation(&request, &context)
+            .expect("approval proposal")
+        else {
+            panic!("write should require approval")
+        };
+        let (response, response_rx) = tokio::sync::oneshot::channel();
+        (
+            TerminalApprovalRequest {
+                id: uuid::Uuid::new_v4(),
+                request: PermissionApprovalRequest {
+                    tool_name: "write".to_owned(),
+                    arguments: input,
+                    summary_fields: vec!["path".to_owned()],
+                    preview: session.preview().clone(),
+                },
+                response,
+            },
+            response_rx,
+        )
+    }
+
+    #[test]
+    fn input_for_expired_displayed_request_never_approves_next_request() {
+        let (expired, expired_rx) = queued_request();
+        let expired_id = expired.id;
+        drop(expired_rx);
+        let (current, mut current_rx) = queued_request();
+        let current_id = current.id;
+        let mut queue = VecDeque::from([expired, current]);
+        let mut displayed = Some(expired_id);
+        let mut rollover_barrier = false;
+
+        assert!(!select_active_approval(
+            &mut queue,
+            &mut displayed,
+            &mut rollover_barrier,
+        ));
+        assert_eq!(displayed, Some(current_id));
+
+        assert!(matches!(
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            ApprovalInputOutcome::Stale
+        ));
+        assert!(matches!(
+            current_rx.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+
+        assert!(matches!(
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            ApprovalInputOutcome::Resolved
+        ));
+        assert_eq!(
+            current_rx.try_recv().expect("current request response"),
+            talos_core::ApprovalChoice::ApproveOnce
+        );
+    }
+
+    #[test]
+    fn rollover_barrier_survives_an_empty_queue_before_next_request() {
+        let (expired, expired_rx) = queued_request();
+        let expired_id = expired.id;
+        drop(expired_rx);
+        let mut queue = VecDeque::from([expired]);
+        let mut displayed = Some(expired_id);
+        let mut rollover_barrier = false;
+
+        assert!(!select_active_approval(
+            &mut queue,
+            &mut displayed,
+            &mut rollover_barrier,
+        ));
+        assert!(queue.is_empty());
+        assert!(displayed.is_none());
+        assert!(rollover_barrier);
+
+        let (current, mut current_rx) = queued_request();
+        queue.push_back(current);
+        assert!(!select_active_approval(
+            &mut queue,
+            &mut displayed,
+            &mut rollover_barrier,
+        ));
+        assert!(matches!(
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            ApprovalInputOutcome::Stale
+        ));
+        assert!(matches!(
+            current_rx.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+        assert!(matches!(
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            ApprovalInputOutcome::Resolved
+        ));
+        assert_eq!(
+            current_rx.try_recv().expect("current request response"),
+            talos_core::ApprovalChoice::ApproveOnce
+        );
     }
 }

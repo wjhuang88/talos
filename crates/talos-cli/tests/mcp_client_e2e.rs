@@ -1,9 +1,15 @@
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
 fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
     let fixture_bin = build_fixture_binary();
+    let temp = tempfile::TempDir::new().expect("create isolated HOME");
+    let home = temp.path().join("home");
+    let talos_dir = home.join(".talos");
+    fs::create_dir_all(&talos_dir).expect("create isolated ~/.talos");
+    fs::write(talos_dir.join("config.toml"), "").expect("write isolated config");
 
     let output = Command::new(env!("CARGO_BIN_EXE_talos"))
         .args([
@@ -13,6 +19,9 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
             fixture_bin.to_string_lossy().as_ref(),
             "call fixture echo",
         ])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", "")
         .env("RUST_LOG", "debug")
         .output()
         .expect("run talos binary with MCP fixture");
@@ -56,6 +65,9 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
             fixture_bin.to_string_lossy().as_ref(),
             "/mock-request inspect MCP tools",
         ])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", "")
         .output()
         .expect("run talos request preview with MCP fixture");
     assert!(

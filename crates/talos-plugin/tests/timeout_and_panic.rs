@@ -72,6 +72,42 @@ impl HookHandler for PanicHandler {
     }
 }
 
+struct PermissionHandler {
+    result: PermissionHandlerResult,
+}
+
+enum PermissionHandlerResult {
+    Skip,
+    Panic,
+    Timeout,
+}
+
+#[async_trait]
+impl HookHandler for PermissionHandler {
+    fn name(&self) -> &str {
+        "permission-failure"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+
+    fn timeout(&self) -> Duration {
+        Duration::from_millis(5)
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
+        match self.result {
+            PermissionHandlerResult::Skip => HookResult::Skip,
+            PermissionHandlerResult::Panic => panic!("permission hook panic"),
+            PermissionHandlerResult::Timeout => {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                HookResult::Continue
+            }
+        }
+    }
+}
+
 fn hook_context() -> HookContext {
     HookContext::new(TurnId::new(), PathBuf::from("."))
 }
@@ -117,4 +153,31 @@ async fn panic_aborts_chain_fail_safe() {
 
     assert!(matches!(outcome, talos_plugin::HookOutcome::Continue(_)));
     assert!(log.lock().expect("log lock").is_empty());
+}
+
+#[tokio::test]
+async fn final_permission_gate_fails_closed_for_skip_panic_and_timeout() {
+    for result in [
+        PermissionHandlerResult::Skip,
+        PermissionHandlerResult::Panic,
+        PermissionHandlerResult::Timeout,
+    ] {
+        let mut registry = HookRegistry::new();
+        registry.register(Arc::new(PermissionHandler { result }));
+        let call = talos_core::message::ToolCall {
+            id: "call".to_owned(),
+            name: "write".to_owned(),
+            input: serde_json::json!({"path": "<redacted>"}),
+        };
+        let outcome = registry
+            .dispatch_permission_gate(
+                &hook_context(),
+                HookEvent::AfterPermissionCheck {
+                    call: &call,
+                    decision: talos_permission::PermissionDecision::Allow,
+                },
+            )
+            .await;
+        assert!(matches!(outcome, talos_plugin::HookOutcome::Deny { .. }));
+    }
 }

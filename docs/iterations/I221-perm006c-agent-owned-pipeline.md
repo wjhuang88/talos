@@ -1,6 +1,6 @@
 # Iteration I221: PERM-006-C Agent-Owned Permission Pipeline Implementation
 
-> Document status: Active / Claimed proposed by PR #375; ineffective until target-branch merge
+> Document status: Review / Claimed; implementation candidate is locally converged, exact-head review pending
 > Published plan date: 2026-08-23
 > Planned objective: implement the Accepted ADR-067 single-owner permission orchestration and
 > cross-surface migration without widening authorization or changing unrelated product lanes.
@@ -21,10 +21,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; exact decision CI `32619757871`; independent permission/security/API review `5384374028`. Maintainer authorization for the mainline permission chain remains limited to this bounded I221 slice; fresh exact-head claim CI/review/CAS are required. |
+| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; claim #375 exact head `de99de1c`, base `055e5c6b`, CI `32620749103`, independent permission/security/API review `5384445091`, merge-time CAS and merge `d662501c`. Maintainer authorization remains limited to this bounded I221 slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim is ineffective until merge. After merge, create the implementation branch from the claim merge or later `main`; do not modify implementation before claim effectiveness. Completion requires pre-existing implementation commit evidence, exact-head CI, independent permission/security/API review and merge-time CAS. |
+| Handoff / Release Condition | Claim #375 is effective at `main@d662501c`; this implementation branch starts at that merge. Completion requires pre-existing implementation commit evidence, exact-head CI, independent permission/security/API review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -85,3 +85,28 @@ semantics; a production authority overlap with I213 stops I221 immediately.
 Implementation PR: Not started. Completion Commit: pending.
 The claim/activation status commit cannot self-certify implementation. Any residual compatibility
 adapter or un-migrated surface must be recorded in this owner or a declared follow-up story.
+
+## 2026-08-23 Activation And Local Candidate Checkpoint
+
+I221 claim #375 is effective on `main@d662501c` (claim head `de99de1c`, base `055e5c6b`, CI
+`32620749103`, independent review `5384445091`, successful merge-time CAS and merge `d662501c`).
+A local implementation candidate converged from that exact main and remains unsubmitted pending
+final changed-file and staged-diff review. Production CLI, TUI, Runtime and MCP composition roots
+register raw tools and use the Agent-owned pipeline; legacy policy-bearing wrappers are test-only
+compatibility fixtures and cannot be reached by production builds. Hooks and logs receive a
+structure-only projection, while approval resolvers receive the tool-defined safe presentation;
+authorization and execution retain the exact normalized request.
+
+The permission pipeline requires one total deadline at every call site and uses non-blocking
+Session fences so lock contention fails closed instead of extending that budget. Non-TUI
+interactive approval is serialized by the existing event-loop stdin reader; an expired or
+cancelled oneshot is discarded before later user input, and no detached blocking stdin task
+survives cancellation.
+
+Focused permission/Agent/CLI/TUI/Runtime/MCP/plugin tests passed before and after the deadline,
+strict MCP proposal-hook and terminal cancellation corrections. The final exact-base command
+`COLLABORATION_VALIDATION_BASE=d662501c94621f54066de2ebdc62840645d32b0f
+./scripts/release_preflight.sh` passed outside the outer execution sandbox, including the macOS
+Seatbelt tests that cannot nest inside that sandbox. Three existing CLI/config tests were made
+deterministic by isolating their home/config paths after the sandbox exposed their dependence on
+the executing user's home. No Dashboard file or I213 owner artifact is changed.

@@ -300,7 +300,9 @@ impl HookEvent<'_> {
     pub fn is_permission_boundary(&self) -> bool {
         matches!(
             self,
-            Self::BeforePermissionCheck { .. } | Self::AfterPermissionCheck { .. }
+            Self::OnToolCallProposed { .. }
+                | Self::BeforePermissionCheck { .. }
+                | Self::AfterPermissionCheck { .. }
         )
     }
 }

@@ -1,44 +1,21 @@
 //! Interactive REPL mode.
 
 use super::*;
+use crate::approval::terminal_approval_channel;
 
 fn register_interactive_builtin_contributions(
     registry: &mut ToolRegistry,
-    approval: Arc<std::sync::Mutex<ApprovalPrompt>>,
+    _approval: Arc<std::sync::Mutex<ApprovalPrompt>>,
     workspace_root: &Path,
 ) -> Result<()> {
-    let bash = bash_tool_contribution(workspace_root.to_path_buf()).map_tool(|tool| {
-        Arc::new(PermissionAwareTool {
-            inner: tool,
-            approval: approval.clone(),
-            print_mode: false,
-        })
-    });
+    let bash = bash_tool_contribution(workspace_root.to_path_buf());
     registry.register_contribution(bash)?;
 
     for contribution in snapshot_aware_file_tool_contributions(workspace_root.to_path_buf()) {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: false,
-            })
-        });
         registry.register_contribution(contribution)?;
     }
 
     for contribution in workspace_non_document_tool_contributions(workspace_root.to_path_buf()) {
-        let contribution = if contribution.name() == "tree" {
-            contribution
-        } else {
-            contribution.map_tool(|tool| {
-                Arc::new(PermissionAwareTool {
-                    inner: tool,
-                    approval: approval.clone(),
-                    print_mode: false,
-                })
-            })
-        };
         registry.register_contribution(contribution)?;
     }
 
@@ -46,13 +23,6 @@ fn register_interactive_builtin_contributions(
         registry.register_contribution(contribution)?;
     }
     for contribution in git_mutation_tool_contributions(workspace_root.to_path_buf()) {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: false,
-            })
-        });
         registry.register_contribution(contribution)?;
     }
 
@@ -97,17 +67,13 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     };
 
     let approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::new(),
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
     )));
 
     let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
     let mut registry = ToolRegistry::new();
     for tool in sched_tools {
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: tool,
-            approval: approval.clone(),
-            print_mode: false,
-        }));
+        registry.register(tool);
     }
     register_interactive_builtin_contributions(&mut registry, approval.clone(), &workspace_root)?;
 
@@ -119,18 +85,31 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let loaded_plugin_packages = register_explicit_permission_aware_plugins(
         &mut registry,
         &cli.plugin_packages,
-        approval,
+        approval.clone(),
         false,
     )
     .map_err(anyhow::Error::msg)?;
 
+    let permission_state = approval
+        .lock()
+        .map_err(|_| anyhow!("approval lock poisoned"))?
+        .session_state();
+    let (terminal_approval, terminal_approval_rx) = terminal_approval_channel();
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
         None,
         workspace_root.to_path_buf(),
         hooks,
+    )
+    .with_permission_pipeline(
+        permission_state,
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Interactive,
+            talos_permission::InteractionCapability::Available,
+        ),
+        Some(terminal_approval),
     );
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
@@ -192,7 +171,13 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     );
     tokio::spawn(async move { actor.run().await });
 
-    let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
+    let event_loop = event_loop::EventLoop::new(
+        workspace_root,
+        session,
+        session_manager,
+        handle,
+        terminal_approval_rx,
+    );
     event_loop.run().await
 }
 

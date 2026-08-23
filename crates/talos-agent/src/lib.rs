@@ -7,10 +7,12 @@
 //! # Security Pipeline
 //!
 //! Every tool call goes through a security pipeline:
-//! 1. **Permission check** — the [`PermissionEngine`] evaluates the call
-//! 2. **Sandbox execution** — bash tools run through the sandbox when available
-//! 3. **Execute** — the tool is invoked directly
-//! 4. **Retry on denial** — denied calls return an error result
+//! 1. **Permission pipeline** — the Agent normalizes, evaluates, resolves and
+//!    admits the exact request through [`permission_pipeline::PermissionPipeline`]
+//! 2. **Final permission hook** — the admitted Allow or final Deny gates execution
+//! 3. **Sandbox execution** — bash tools run through the sandbox when available
+//! 4. **Execute** — the tool receives the admitted authorization
+//! 5. **Retry on denial** — denied calls return an error result
 //!
 //! The `Ask` decision defaults to `Deny` at the agent level. Both the CLI layer
 //! and an embedded runtime may bridge `Ask` to an interactive approval handler;
@@ -50,6 +52,7 @@ pub mod caching;
 mod configuration;
 pub mod context;
 mod helpers;
+pub mod permission_pipeline;
 pub mod prompt;
 mod request_plan;
 mod scheduler;
@@ -66,7 +69,6 @@ use talos_core::message::{
 };
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
-use talos_permission::PermissionEngine;
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnId,
     TurnStatus,
@@ -259,8 +261,10 @@ type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 pub struct Agent {
     provider: Arc<dyn LanguageModel>,
     tools: ToolRegistry,
-    /// Optional permission engine for gating tool execution.
-    permission_engine: Option<Arc<PermissionEngine>>,
+    /// Agent-owned permission pipeline used by migrated composition roots.
+    permission_pipeline: Option<Arc<permission_pipeline::PermissionPipeline>>,
+    /// Total budget for permission hooks, resolution, and admission.
+    permission_deadline: std::time::Duration,
     /// Optional sandbox provider for bash tool execution.
     sandbox: Option<Arc<dyn SandboxProvider>>,
     /// Policy used only when a configured sandbox reports unavailable.
@@ -783,38 +787,13 @@ impl Agent {
                         }
                     }
                     AgentEvent::ToolCall {
-                        call, provenance, ..
+                        mut call,
+                        provenance,
+                        ..
                     } => {
-                        let projected_call = self.project_tool_call(&call);
-                        match self
-                            .run_hook(
-                                &hook_ctx,
-                                HookEvent::OnToolCallProposed {
-                                    call: &projected_call,
-                                },
-                            )
-                            .await
-                        {
-                            Ok(HookOutcome::Continue(HookEvent::OnToolCallProposed {
-                                call: observed_call,
-                            }))
-                            | Ok(HookOutcome::Skip(HookEvent::OnToolCallProposed {
-                                call: observed_call,
-                            })) => {
-                                turn_tool_calls.push(PendingToolCall {
-                                    call: Self::restore_private_call_if_unchanged(
-                                        &call,
-                                        &projected_call,
-                                        observed_call,
-                                    ),
-                                    provenance,
-                                });
-                            }
-                            Ok(_) => turn_tool_calls.push(PendingToolCall { call, provenance }),
-                            Err(error) => {
-                                break 'turn_loop (Err(error), TurnStatus::Denied);
-                            }
-                        }
+                        call.input =
+                            permission_pipeline::normalize_permission_input(&call.name, call.input);
+                        turn_tool_calls.push(PendingToolCall { call, provenance });
                     }
                     AgentEvent::TurnEnd {
                         stop_reason,

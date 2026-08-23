@@ -5,10 +5,10 @@
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Active / Claimed proposed by PR #375; ineffective until target-branch merge |
+| Status | Review / Claimed; implementation candidate locally converged, exact-head review pending |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | I221 implementation claim proposed; ineffective until merge |
-| Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; awaiting I221 claim; prerequisite for PERM-006-D/E |
+| Selected Iteration | I221 implementation claim effective at `main@d662501c` |
+| Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; I221 claim effective; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
 
@@ -22,10 +22,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; fresh exact-head claim CI/review/CAS required for I221. |
+| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; I221 claim #375 merged as `d662501c` after exact-head CI `32620749103`, independent review `5384445091` and CAS. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim #375 is ineffective until merge. After merge, implement only I221 from the claim merge or later `main`; I213/I220 boundaries remain protected. |
+| Handoff / Release Condition | Claim #375 is effective. Implementation must start from `main@d662501c` or later; I213/I220 boundaries remain protected. |
 
 ## Identity / Goal / Value
 
@@ -68,7 +68,7 @@ Characterize current cross-surface behavior before migration; retain compatibili
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Blocked.
+Do not present this Story as shipped while it remains Review.
 
 ## Required Reads
 
@@ -76,6 +76,7 @@ Do not present this Story as shipped while it remains Blocked.
 - docs/backlog/active/PERM-006-B-scoped-grant-store.md
 - crates/talos-agent/src/tool_execution.rs
 - crates/talos-cli/src/approval.rs
+- crates/talos-cli/src/event_loop.rs
 - crates/talos-runtime/src/
 
 ## Acceptance For Behavior / Technical Work
@@ -106,3 +107,14 @@ Cargo, wrapper, hook, Runtime, MCP or behavior change.
 ADR-067 and its current-path/migration matrix were Accepted through PR #373 merge `5d2d2dcf`.
 PERM-006-C is now Ready/Unclaimed; no implementation authority exists until a separate I221 claim
 is effective. The historical checkpoint above is retained unchanged.
+
+## 2026-08-23 I221 Activation Checkpoint
+
+I221 claim #375 is effective at `main@d662501c` after exact head `de99de1c`, base `055e5c6b`, CI
+`32620749103`, independent review `5384445091`, successful merge-time CAS and merge `d662501c`;
+implementation is now authorized only within the I221 slice. The owner is in Review/Claimed while
+the local candidate is converged. The non-TUI interactive resolver now delegates approval input to
+the existing event-loop stdin reader, so timeout or cancellation closes the pending response
+without leaving a competing reader that can consume later input. Completion remains pending a
+pre-existing implementation commit, exact-head CI, independent
+permission/security/API review and merge-time CAS.

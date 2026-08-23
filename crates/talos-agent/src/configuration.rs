@@ -6,7 +6,10 @@ use std::sync::Arc;
 
 use talos_core::provider::ToolDefinition;
 use talos_core::tool::{AgentTool, ToolPresentationPolicy, ToolProtocol, ToolRegistry};
-use talos_permission::PermissionEngine;
+use talos_permission::{
+    InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
+    PermissionSessionState,
+};
 use talos_plugin::HookRegistry;
 use talos_sandbox::SandboxProvider;
 use talos_skill::SkillIndex;
@@ -19,6 +22,46 @@ use crate::{
 };
 
 impl Agent {
+    /// Sets the total budget for one permission decision and final hook gate.
+    #[must_use]
+    pub fn with_permission_deadline(mut self, deadline: std::time::Duration) -> Self {
+        self.permission_deadline = deadline;
+        self
+    }
+    /// Installs the authoritative permission Session and optional surface resolver.
+    #[must_use]
+    pub fn with_permission_pipeline(
+        mut self,
+        state: Arc<PermissionSessionState>,
+        context: PermissionContext,
+        resolver: Option<Arc<dyn crate::permission_pipeline::ApprovalResolver>>,
+    ) -> Self {
+        self.permission_pipeline = Some(Arc::new(
+            crate::permission_pipeline::PermissionPipeline::new(state, context, resolver),
+        ));
+        self
+    }
+
+    /// Attaches a bounded surface approval resolver to the Agent-owned pipeline.
+    #[must_use]
+    pub fn with_approval_resolver(
+        mut self,
+        resolver: Arc<dyn crate::permission_pipeline::ApprovalResolver>,
+    ) -> Self {
+        let state = self
+            .permission_pipeline
+            .as_ref()
+            .map(|pipeline| pipeline.state());
+        if let Some(state) = state {
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            self = self.with_permission_pipeline(state, context, Some(resolver));
+        }
+        self
+    }
+
     /// Creates a new agent with the given language model provider and tool
     /// registry.
     ///
@@ -43,7 +86,8 @@ impl Agent {
         Self {
             provider,
             tools,
-            permission_engine: None,
+            permission_pipeline: None,
+            permission_deadline: std::time::Duration::from_secs(300),
             sandbox: None,
             sandbox_fallback_policy: SandboxFallbackPolicy::Deny,
             sandbox_fallback_handler: None,
@@ -180,10 +224,22 @@ impl Agent {
             .with_workspace_info(format!("Workspace root: {}", workspace_root.display()))
             .with_tools(descriptions.clone());
 
+        let permission_pipeline = permission_engine.map(|engine| {
+            Arc::new(crate::permission_pipeline::PermissionPipeline::new(
+                Arc::new(PermissionSessionState::new((*engine).clone())),
+                PermissionContext::new(
+                    PermissionMode::Headless,
+                    InteractionCapability::Unavailable,
+                ),
+                None,
+            ))
+        });
+
         Self {
             provider,
             tools,
-            permission_engine,
+            permission_pipeline,
+            permission_deadline: std::time::Duration::from_secs(300),
             sandbox: sandbox.map(Arc::from),
             sandbox_fallback_policy,
             sandbox_fallback_handler,

@@ -10,6 +10,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
+use talos_agent::permission_pipeline::{
+    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+};
 use talos_agent::session::{AppServerSession, RuntimeAdmissionControl};
 use talos_agent::{Agent, AgentError, SandboxFallbackHandler};
 use talos_core::ApprovalChoice;
@@ -18,15 +21,17 @@ use talos_core::provider::LanguageModel;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
 };
+use talos_core::tool::{AgentTool, ToolRegistry};
+#[cfg(test)]
 use talos_core::tool::{
-    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolPermissionFacet, ToolRegistry,
-    ToolResult,
+    ToolExecutionAuthorization, ToolExecutionOutput, ToolPermissionFacet, ToolResult,
 };
 use talos_permission::{
-    GrantPreview, GrantScope, GrantSource, InteractionCapability, PermissionContext,
-    PermissionDecision, PermissionEngine, PermissionMode, PermissionRequest, PermissionRule,
-    PermissionSessionState,
+    GrantPreview, GrantSource, InteractionCapability, PermissionContext, PermissionEngine,
+    PermissionMode, PermissionRule, PermissionSessionState,
 };
+#[cfg(test)]
+use talos_permission::{GrantScope, PermissionDecision, PermissionRequest};
 use talos_plugin::HookRegistry;
 use talos_sandbox::SandboxProvider;
 use talos_session::{DurableSession, PersistencePolicy};
@@ -166,6 +171,33 @@ pub trait ApprovalHandler: Send + Sync {
 
 struct RuntimeSandboxFallbackHandler {
     inner: Arc<dyn ApprovalHandler>,
+}
+
+struct RuntimeApprovalResolver {
+    inner: Arc<dyn ApprovalHandler>,
+}
+
+#[async_trait]
+impl ApprovalResolver for RuntimeApprovalResolver {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        Ok(self
+            .inner
+            .request_scoped_approval(
+                &request.tool_name,
+                &request.arguments,
+                &request.summary_fields,
+                &request.preview,
+            )
+            .await)
+    }
+
+    fn grant_source(&self) -> GrantSource {
+        GrantSource::SdkHostApproval
+    }
 }
 
 struct RuntimeActorExitGuard {
@@ -446,21 +478,14 @@ impl RuntimeBuilder {
             #[cfg(not(feature = "shared-composition"))]
             return Err(RuntimeError::CodingPresetRequiresFeature);
         }
-        let permission_state = Arc::new(PermissionSessionState::new(build_permission_engine(
-            self.workspace_root.clone(),
-            &self.permission_rules,
-        )));
         let agent_engine = Arc::new(build_permission_engine(
             self.workspace_root.clone(),
             &self.permission_rules,
         ));
         let mut registry = ToolRegistry::new();
+        let approval_handler = self.approval_handler.clone();
         for tool in tools {
-            registry.register(Arc::new(RuntimePermissionAwareTool {
-                inner: tool,
-                permission_state: permission_state.clone(),
-                approval_handler: self.approval_handler.clone(),
-            }));
+            registry.register(tool);
         }
 
         let fallback_handler = self.approval_handler.as_ref().map(|handler| {
@@ -472,7 +497,7 @@ impl RuntimeBuilder {
             Agent::with_security_and_hooks_and_sandbox_fallback(
                 provider,
                 registry,
-                Some(agent_engine.clone()),
+                None,
                 self.sandbox,
                 self.workspace_root.clone(),
                 hooks,
@@ -483,13 +508,28 @@ impl RuntimeBuilder {
             Agent::with_security_and_sandbox_fallback(
                 provider,
                 registry,
-                Some(agent_engine),
+                None,
                 self.sandbox,
                 self.workspace_root.clone(),
                 self.sandbox_fallback_policy,
                 fallback_handler,
             )
         };
+        let resolver = approval_handler.map(|handler| {
+            Arc::new(RuntimeApprovalResolver { inner: handler }) as Arc<dyn ApprovalResolver>
+        });
+        agent = agent.with_permission_pipeline(
+            Arc::new(PermissionSessionState::new((*agent_engine).clone())),
+            PermissionContext::new(
+                PermissionMode::Headless,
+                if resolver.is_some() {
+                    InteractionCapability::Available
+                } else {
+                    InteractionCapability::Unavailable
+                },
+            ),
+            resolver,
+        );
         if let Some(prompt) = self.custom_prompt {
             agent.set_custom_prompt(prompt);
         }
@@ -660,12 +700,14 @@ fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> Permissio
     engine
 }
 
+#[cfg(test)]
 struct RuntimePermissionAwareTool {
     inner: Arc<dyn AgentTool>,
     permission_state: Arc<PermissionSessionState>,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
 }
 
+#[cfg(test)]
 impl RuntimePermissionAwareTool {
     async fn authorize(
         &self,
@@ -742,15 +784,18 @@ impl RuntimePermissionAwareTool {
     }
 }
 
+#[cfg(test)]
 fn permission_error(error: impl std::fmt::Display) -> ToolResult {
     permission_denied(&error.to_string())
 }
 
+#[cfg(test)]
 fn permission_denied(reason: &str) -> ToolResult {
     ToolResult::error(format!("Permission denied: {reason}"))
 }
 
 #[async_trait]
+#[cfg(test)]
 impl AgentTool for RuntimePermissionAwareTool {
     fn name(&self) -> &str {
         self.inner.name()

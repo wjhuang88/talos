@@ -5778,6 +5778,7 @@ dependencies = [
  "rmcp",
  "serde",
  "serde_json",
+ "talos-agent",
  "talos-core",
  "talos-permission",
  "talos-plugin",

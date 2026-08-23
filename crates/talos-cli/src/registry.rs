@@ -3,22 +3,31 @@
 //! Contains the permission-aware tool wrappers for interactive/TUI modes
 //! and functions that build tool registries for different runtime modes.
 
+#[cfg(test)]
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
+use talos_agent::permission_pipeline::{
+    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+};
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
-    AgentTool, ToolBackend, ToolContribution, ToolContributionSource, ToolExecutionAuthorization,
-    ToolExecutionOutput, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
+    AgentTool, ToolContribution, ToolContributionSource, ToolFamily, ToolRegistry, ToolResult,
 };
+#[cfg(test)]
+use talos_core::tool::{
+    ToolBackend, ToolExecutionAuthorization, ToolExecutionOutput, ToolPermissionFacet,
+};
+#[cfg(test)]
 use talos_permission::{
     GrantScope, GrantSource, InteractionCapability, PermissionContext, PermissionDecision,
-    PermissionEngine, PermissionMode, PermissionRequest, PermissionSessionState,
+    PermissionMode, PermissionRequest,
 };
+use talos_permission::{PermissionEngine, PermissionSessionState};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_runtime::composition::{SharedToolProfile, contribution_groups};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
@@ -92,6 +101,7 @@ impl TuiApprovalHandler {
         self.state.clone()
     }
 
+    #[cfg(test)]
     async fn authorize(
         &self,
         tool_name: &str,
@@ -164,6 +174,35 @@ impl TuiApprovalHandler {
     }
 }
 
+#[async_trait]
+impl ApprovalResolver for TuiApprovalHandler {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+        if self
+            .ui_output_tx
+            .send(UiOutput::ToolApprovalRequest {
+                tool_name: request.tool_name,
+                arguments: request.arguments,
+                summary_fields: request.summary_fields,
+                preview: Some(crate::approval::format_grant_preview(&request.preview)),
+                response: response_tx,
+            })
+            .is_err()
+        {
+            return Err(ApprovalResolverError::new(
+                "approval channel is unavailable",
+            ));
+        }
+        response_rx
+            .await
+            .map_err(|_| ApprovalResolverError::new("approval channel closed"))
+    }
+}
+
 fn default_todo_tool_contributions(session_id: Uuid) -> Vec<ToolContribution> {
     let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
         return Vec::new();
@@ -175,12 +214,14 @@ fn default_todo_tool_contributions(session_id: Uuid) -> Vec<ToolContribution> {
 ///
 /// Unlike [`PermissionAwareTool`], this uses [`TuiApprovalHandler`] for
 /// non-blocking approval via channels instead of blocking on stdin.
+#[cfg(test)]
 pub(crate) struct TuiPermissionAwareTool {
     inner: Arc<dyn AgentTool>,
     approval: Arc<TuiApprovalHandler>,
 }
 
 #[async_trait]
+#[cfg(test)]
 impl AgentTool for TuiPermissionAwareTool {
     fn name(&self) -> &str {
         self.inner.name()
@@ -309,12 +350,14 @@ impl AgentTool for TuiPermissionAwareTool {
 /// Permission-aware tool wrapper that checks the permission engine before
 /// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
 /// triggers a user prompt. In print mode, it defaults to deny.
+#[cfg(test)]
 pub(crate) struct PermissionAwareTool {
     pub(crate) inner: Arc<dyn AgentTool>,
     pub(crate) approval: Arc<Mutex<ApprovalPrompt>>,
     pub(crate) print_mode: bool,
 }
 
+#[cfg(test)]
 impl PermissionAwareTool {
     fn authorize(
         &self,
@@ -382,6 +425,7 @@ impl PermissionAwareTool {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl AgentTool for PermissionAwareTool {
     fn name(&self) -> &str {
         self.inner.name()
@@ -474,28 +518,21 @@ impl AgentTool for PermissionAwareTool {
 pub(crate) fn register_permission_aware_tools(
     registry: &mut ToolRegistry,
     tools: &[Arc<dyn AgentTool>],
-    approval: Arc<Mutex<ApprovalPrompt>>,
-    print_mode: bool,
+    _approval: Arc<Mutex<ApprovalPrompt>>,
+    _print_mode: bool,
 ) {
     for tool in tools {
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: tool.clone(),
-            approval: approval.clone(),
-            print_mode,
-        }));
+        registry.register(tool.clone());
     }
 }
 
 pub(crate) fn register_tui_permission_aware_tools(
     registry: &mut ToolRegistry,
     tools: &[Arc<dyn AgentTool>],
-    approval: Arc<TuiApprovalHandler>,
+    _approval: Arc<TuiApprovalHandler>,
 ) {
     for tool in tools {
-        registry.register(Arc::new(TuiPermissionAwareTool {
-            inner: tool.clone(),
-            approval: approval.clone(),
-        }));
+        registry.register(tool.clone());
     }
 }
 
@@ -532,23 +569,19 @@ fn plugin_source(package: &LoadedPluginPackage) -> ToolContributionSource {
 pub(crate) fn register_explicit_permission_aware_plugins(
     registry: &mut ToolRegistry,
     package_roots: &[PathBuf],
-    approval: Arc<Mutex<ApprovalPrompt>>,
-    print_mode: bool,
+    _approval: Arc<Mutex<ApprovalPrompt>>,
+    _print_mode: bool,
 ) -> Result<Vec<LoadedPluginPackage>, String> {
     let loaded = load_explicit_plugin_tools(package_roots)?;
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
     for (tools, package) in loaded {
         let source = plugin_source(&package);
-        contributions.extend(tools.into_iter().map(|tool| {
-            ToolContribution::new(source.clone(), tool).map_tool(|tool| {
-                Arc::new(PermissionAwareTool {
-                    inner: tool,
-                    approval: approval.clone(),
-                    print_mode,
-                })
-            })
-        }));
+        contributions.extend(
+            tools
+                .into_iter()
+                .map(|tool| ToolContribution::new(source.clone(), tool)),
+        );
         packages.push(package);
     }
     registry
@@ -562,21 +595,18 @@ pub(crate) fn register_explicit_permission_aware_plugins(
 pub(crate) fn register_explicit_tui_plugins(
     registry: &mut ToolRegistry,
     package_roots: &[PathBuf],
-    approval: Arc<TuiApprovalHandler>,
+    _approval: Arc<TuiApprovalHandler>,
 ) -> Result<Vec<LoadedPluginPackage>, String> {
     let loaded = load_explicit_plugin_tools(package_roots)?;
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
     for (tools, package) in loaded {
         let source = plugin_source(&package);
-        contributions.extend(tools.into_iter().map(|tool| {
-            ToolContribution::new(source.clone(), tool).map_tool(|tool| {
-                Arc::new(TuiPermissionAwareTool {
-                    inner: tool,
-                    approval: approval.clone(),
-                })
-            })
-        }));
+        contributions.extend(
+            tools
+                .into_iter()
+                .map(|tool| ToolContribution::new(source.clone(), tool)),
+        );
         packages.push(package);
     }
     registry
@@ -618,6 +648,7 @@ impl AgentTool for StatusTool {
     }
 }
 
+#[cfg(test)]
 fn map_workspace_contribution(
     contribution: ToolContribution,
     wrap: impl FnOnce(Arc<dyn AgentTool>) -> Arc<dyn AgentTool>,
@@ -659,107 +690,28 @@ fn build_print_tool_registry_with_todo_contributions(
     scheduler_tools: Vec<Arc<dyn AgentTool>>,
     todo_contributions: Vec<ToolContribution>,
 ) -> ToolRegistry {
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
-
     let mut registry = ToolRegistry::new();
     let shared = contribution_groups(SharedToolProfile::Product, PathBuf::from("."));
-    for contribution in shared.shell {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.files {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    let read_image = shared
-        .image
-        .expect("product profile must include read_image")
-        .map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-    registry
-        .register_contribution(read_image)
-        .unwrap_or_else(|error| panic!("{error}"));
-    for contribution in shared.workspace {
-        let contribution = map_workspace_contribution(contribution, |tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.network {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    register_symbol_tool_contributions(&mut registry, shared.symbols, |tool| tool);
-    for contribution in shared.git_read {
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.git_mutation {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in todo_contributions {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(PermissionAwareTool {
-                inner: tool,
-                approval: approval.clone(),
-                print_mode: true,
-            })
-        });
+    let mut contributions = shared.shell;
+    contributions.extend(shared.files);
+    contributions.push(
+        shared
+            .image
+            .expect("product profile must include read_image"),
+    );
+    contributions.extend(shared.workspace);
+    contributions.extend(shared.network);
+    contributions.extend(shared.symbols);
+    contributions.extend(shared.git_read);
+    contributions.extend(shared.git_mutation);
+    contributions.extend(todo_contributions);
+    for contribution in contributions {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in scheduler_tools {
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: tool,
-            approval: approval.clone(),
-            print_mode: true,
-        }));
+        registry.register(tool);
     }
 
     registry
@@ -780,111 +732,33 @@ pub(crate) fn build_tui_tool_registry(
 }
 
 fn build_tui_tool_registry_with_todo_contributions(
-    approval_handler: Arc<TuiApprovalHandler>,
+    _approval_handler: Arc<TuiApprovalHandler>,
     workspace_root: PathBuf,
     delay_tool: Vec<Arc<dyn AgentTool>>,
     todo_contributions: Vec<ToolContribution>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     let shared = contribution_groups(SharedToolProfile::Product, workspace_root);
-    for contribution in shared.shell {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.files {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    let read_image = shared
-        .image
-        .expect("product profile must include read_image")
-        .map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-    registry
-        .register_contribution(read_image)
-        .unwrap_or_else(|error| panic!("{error}"));
-    for contribution in shared.workspace {
-        let contribution = map_workspace_contribution(contribution, |tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.network {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    register_symbol_tool_contributions(
-        &mut registry,
-        shared.symbols,
-        |tool| -> Arc<dyn AgentTool> {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        },
+    let mut contributions = shared.shell;
+    contributions.extend(shared.files);
+    contributions.push(
+        shared
+            .image
+            .expect("product profile must include read_image"),
     );
-    for contribution in shared.git_read {
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in shared.git_mutation {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
-        registry
-            .register_contribution(contribution)
-            .unwrap_or_else(|error| panic!("{error}"));
-    }
-    for contribution in todo_contributions {
-        let contribution = contribution.map_tool(|tool| {
-            Arc::new(TuiPermissionAwareTool {
-                inner: tool,
-                approval: approval_handler.clone(),
-            })
-        });
+    contributions.extend(shared.workspace);
+    contributions.extend(shared.network);
+    contributions.extend(shared.symbols);
+    contributions.extend(shared.git_read);
+    contributions.extend(shared.git_mutation);
+    contributions.extend(todo_contributions);
+    for contribution in contributions {
         registry
             .register_contribution(contribution)
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in delay_tool {
-        registry.register(Arc::new(TuiPermissionAwareTool {
-            inner: tool,
-            approval: approval_handler.clone(),
-        }));
+        registry.register(tool);
     }
     registry
 }

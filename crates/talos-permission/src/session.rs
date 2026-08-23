@@ -1,7 +1,7 @@
 //! Explicit in-memory permission Session state and approval fencing.
 
 use std::fmt;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization};
 use uuid::Uuid;
@@ -72,6 +72,21 @@ pub struct PermissionEvaluation {
     matched_grant: Option<(GrantId, GrantSource)>,
 }
 
+/// Result of the single authoritative evaluation for one invocation.
+pub enum PermissionInvocation {
+    /// Current policy or an existing Session grant authorizes the request.
+    Allow(Box<PendingInvocation>),
+    /// The exact request requires a bounded approval decision.
+    Ask {
+        /// Invocation-local approval proposal.
+        once: Box<ProposedGrant>,
+        /// Capability-relative Session approval proposal.
+        session: Box<ProposedGrant>,
+    },
+    /// Current policy denies the request.
+    Deny(PermissionDecision),
+}
+
 impl PermissionEvaluation {
     /// Returns the authoritative structured report.
     #[must_use]
@@ -138,6 +153,137 @@ impl PermissionSessionState {
         evaluate_locked(&state, request, context)
     }
 
+    /// Begins one invocation with exactly one policy evaluation.
+    pub fn begin_invocation(
+        &self,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<PermissionInvocation, GrantError> {
+        let state = self.lock_state()?;
+        begin_invocation_locked(&state, request, context)
+    }
+
+    /// Begins one invocation without waiting for a contended Session fence.
+    ///
+    /// Deadline-bound orchestration uses this entry point so lock contention fails closed instead
+    /// of extending the caller's total permission budget.
+    pub fn try_begin_invocation(
+        &self,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<PermissionInvocation, GrantError> {
+        let state = self.try_lock_state()?;
+        begin_invocation_locked(&state, request, context)
+    }
+
+    fn lock_state(&self) -> Result<MutexGuard<'_, State>, GrantError> {
+        self.state.lock().map_err(|_| GrantError::StateUnavailable)
+    }
+
+    fn try_lock_state(&self) -> Result<MutexGuard<'_, State>, GrantError> {
+        self.state
+            .try_lock()
+            .map_err(|_| GrantError::StateUnavailable)
+    }
+
+    /// Commits an invocation-local proposal without waiting for a contended Session fence.
+    pub fn try_approve_once(
+        &self,
+        proposal: ProposedGrant,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<PendingInvocation, GrantError> {
+        if proposal.scope != GrantScope::Once {
+            return Err(GrantError::ScopeMismatch);
+        }
+        let state = self.try_lock_state()?;
+        approve_once_locked(&state, proposal, request, context)
+    }
+
+    /// Commits a Session proposal without waiting for a contended Session fence.
+    pub fn try_approve_session(
+        &self,
+        proposal: ProposedGrant,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+        source: GrantSource,
+    ) -> Result<PendingInvocation, GrantError> {
+        if proposal.scope != GrantScope::Session {
+            return Err(GrantError::ScopeMismatch);
+        }
+        let mut state = self.try_lock_state()?;
+        approve_session_locked(&mut state, proposal, request, context, source)
+    }
+
+    /// Consumes an invocation without waiting for a contended Session fence.
+    pub fn try_admit(
+        &self,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
+        let state = self.try_lock_state()?;
+        admit_locked(&state, pending, request, context)
+    }
+
+    #[cfg(test)]
+    fn with_state_fence_held(&self, check: impl FnOnce()) {
+        let _state = self.state.lock().expect("state fence");
+        check();
+    }
+}
+
+fn begin_invocation_locked(
+    state: &State,
+    request: &PermissionRequest<'_>,
+    context: &PermissionContext,
+) -> Result<PermissionInvocation, GrantError> {
+    let evaluation = evaluate_locked(state, request, context)?;
+    match evaluation.decision() {
+        PermissionDecision::Allow => {
+            let (facets, fingerprint) = compiled_identity(request, state.engine.workspace_root())?;
+            let authority = match evaluation.matched_grant {
+                Some((id, source)) => PendingAuthority::Session { id, source },
+                None => PendingAuthority::Policy,
+            };
+            Ok(PermissionInvocation::Allow(Box::new(PendingInvocation {
+                session_id: state.session_id,
+                revisions: state.revisions,
+                context: *context,
+                tool_name: request.tool_name().to_string(),
+                provenance: request.provenance().clone(),
+                facets,
+                fingerprint,
+                authority,
+            })))
+        }
+        PermissionDecision::Ask => {
+            let snapshot = ProposalSnapshot {
+                session_id: state.session_id.0,
+                revisions: state.revisions.as_array(),
+                mode: context.mode(),
+                interaction: context.interaction(),
+            };
+            Ok(PermissionInvocation::Ask {
+                once: Box::new(compile_proposal(
+                    request,
+                    state.engine.workspace_root(),
+                    GrantScope::Once,
+                    snapshot,
+                )?),
+                session: Box::new(compile_proposal(
+                    request,
+                    state.engine.workspace_root(),
+                    GrantScope::Session,
+                    snapshot,
+                )?),
+            })
+        }
+        decision @ PermissionDecision::Deny(_) => Ok(PermissionInvocation::Deny(decision)),
+    }
+}
+
+impl PermissionSessionState {
     /// Compiles one non-authoritative approval proposal from the current state.
     pub fn propose(
         &self,
@@ -175,23 +321,8 @@ impl PermissionSessionState {
         if proposal.scope != GrantScope::Once {
             return Err(GrantError::ScopeMismatch);
         }
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
-        validate_proposal(&state, &proposal, request, context)?;
-        let approved = ApprovedOnce {
-            tool_name: proposal.tool_name,
-            provenance: proposal.provenance,
-            facets: proposal.facets,
-            fingerprint: proposal.fingerprint,
-        };
-        Ok(PendingInvocation::once(
-            state.session_id,
-            state.revisions,
-            *context,
-            approved,
-        ))
+        let state = self.lock_state()?;
+        approve_once_locked(&state, proposal, request, context)
     }
 
     /// Atomically installs a Session grant and returns authority for the current invocation.
@@ -205,37 +336,8 @@ impl PermissionSessionState {
         if proposal.scope != GrantScope::Session {
             return Err(GrantError::ScopeMismatch);
         }
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
-        validate_proposal(&state, &proposal, request, context)?;
-        let id = GrantId::new();
-        let next_store = next_generation(state.revisions.store)?;
-        let next_revisions = PermissionStateRevisions {
-            store: next_store,
-            ..state.revisions
-        };
-        let pending = PendingInvocation {
-            session_id: state.session_id,
-            revisions: next_revisions,
-            context: *context,
-            tool_name: proposal.tool_name.clone(),
-            provenance: proposal.provenance.clone(),
-            facets: proposal.facets.clone(),
-            fingerprint: proposal.fingerprint,
-            authority: PendingAuthority::Session { id, source },
-        };
-        let grant = PermissionGrant {
-            id,
-            source,
-            tool_name: proposal.tool_name,
-            provenance: proposal.provenance,
-            facets: proposal.facets,
-        };
-        state.grants.push(grant);
-        state.revisions = next_revisions;
-        Ok(pending)
+        let mut state = self.lock_state()?;
+        approve_session_locked(&mut state, proposal, request, context, source)
     }
 
     /// Prepares an already-authorized policy or matching Session request.
@@ -416,56 +518,110 @@ impl PermissionSessionState {
         request: &PermissionRequest<'_>,
         context: &PermissionContext,
     ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
-        if pending.session_id != state.session_id || pending.revisions != state.revisions {
-            return Err(GrantError::AdmissionInvalidated);
-        }
-        if pending.context != *context {
-            return Err(GrantError::AdmissionInvalidated);
-        }
-        let (facets, fingerprint) = compiled_identity(request, state.engine.workspace_root())?;
-        if pending.tool_name != request.tool_name()
-            || pending.provenance != *request.provenance()
-            || pending.facets != facets
-            || pending.fingerprint != fingerprint
-        {
-            return Err(GrantError::AdmissionInvalidated);
-        }
-        let report = state.engine.evaluate_request(request, context);
-        if matches!(report.decision(), PermissionDecision::Deny(_)) {
-            return Err(GrantError::AdmissionInvalidated);
-        }
-        let scope = match pending.authority {
-            PendingAuthority::Policy if report.decision() == PermissionDecision::Allow => {
-                ToolAuthorizationScope::Policy
-            }
-            PendingAuthority::Once if report.decision() == PermissionDecision::Ask => {
-                ToolAuthorizationScope::Once
-            }
-            PendingAuthority::Session { id, source }
-                if state.grants.iter().any(|grant| {
-                    grant.id == id
-                        && grant.source == source
-                        && grant_matches(grant, request.tool_name(), request.provenance(), &facets)
-                }) =>
-            {
-                ToolAuthorizationScope::Session
-            }
-            _ => return Err(GrantError::AdmissionInvalidated),
-        };
-        state
-            .engine
-            .execution_authorizations(
-                request.tool_name(),
-                request.facets(),
-                request.input(),
-                scope,
-            )
-            .map_err(|_| GrantError::AdmissionInvalidated)
+        let state = self.lock_state()?;
+        admit_locked(&state, pending, request, context)
     }
+}
+
+fn approve_once_locked(
+    state: &State,
+    proposal: ProposedGrant,
+    request: &PermissionRequest<'_>,
+    context: &PermissionContext,
+) -> Result<PendingInvocation, GrantError> {
+    validate_proposal(state, &proposal, request, context)?;
+    let approved = ApprovedOnce {
+        tool_name: proposal.tool_name,
+        provenance: proposal.provenance,
+        facets: proposal.facets,
+        fingerprint: proposal.fingerprint,
+    };
+    Ok(PendingInvocation::once(
+        state.session_id,
+        state.revisions,
+        *context,
+        approved,
+    ))
+}
+
+fn approve_session_locked(
+    state: &mut State,
+    proposal: ProposedGrant,
+    request: &PermissionRequest<'_>,
+    context: &PermissionContext,
+    source: GrantSource,
+) -> Result<PendingInvocation, GrantError> {
+    validate_proposal(state, &proposal, request, context)?;
+    let id = GrantId::new();
+    let next_store = next_generation(state.revisions.store)?;
+    let next_revisions = PermissionStateRevisions {
+        store: next_store,
+        ..state.revisions
+    };
+    let pending = PendingInvocation {
+        session_id: state.session_id,
+        revisions: next_revisions,
+        context: *context,
+        tool_name: proposal.tool_name.clone(),
+        provenance: proposal.provenance.clone(),
+        facets: proposal.facets.clone(),
+        fingerprint: proposal.fingerprint,
+        authority: PendingAuthority::Session { id, source },
+    };
+    state.grants.push(PermissionGrant {
+        id,
+        source,
+        tool_name: proposal.tool_name,
+        provenance: proposal.provenance,
+        facets: proposal.facets,
+    });
+    state.revisions = next_revisions;
+    Ok(pending)
+}
+
+fn admit_locked(
+    state: &State,
+    pending: PendingInvocation,
+    request: &PermissionRequest<'_>,
+    context: &PermissionContext,
+) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
+    if pending.session_id != state.session_id || pending.revisions != state.revisions {
+        return Err(GrantError::AdmissionInvalidated);
+    }
+    if pending.context != *context {
+        return Err(GrantError::AdmissionInvalidated);
+    }
+    let (facets, fingerprint) = compiled_identity(request, state.engine.workspace_root())?;
+    if pending.tool_name != request.tool_name()
+        || pending.provenance != *request.provenance()
+        || pending.facets != facets
+        || pending.fingerprint != fingerprint
+    {
+        return Err(GrantError::AdmissionInvalidated);
+    }
+    let scope = match pending.authority {
+        PendingAuthority::Policy => ToolAuthorizationScope::Policy,
+        PendingAuthority::Once => ToolAuthorizationScope::Once,
+        PendingAuthority::Session { id, source }
+            if state.grants.iter().any(|grant| {
+                grant.id == id
+                    && grant.source == source
+                    && grant_matches(grant, request.tool_name(), request.provenance(), &facets)
+            }) =>
+        {
+            ToolAuthorizationScope::Session
+        }
+        _ => return Err(GrantError::AdmissionInvalidated),
+    };
+    state
+        .engine
+        .execution_authorizations(
+            request.tool_name(),
+            request.facets(),
+            request.input(),
+            scope,
+        )
+        .map_err(|_| GrantError::AdmissionInvalidated)
 }
 
 /// Non-clone authority waiting at the official tool admission fence.
@@ -579,7 +735,6 @@ fn validate_proposal(
         || proposal.provenance != *request.provenance()
         || proposal.facets != facets
         || proposal.fingerprint != fingerprint
-        || state.engine.evaluate_request(request, context).decision() != PermissionDecision::Ask
     {
         return Err(GrantError::StaleApproval);
     }
@@ -611,6 +766,21 @@ mod tests {
             path.display().to_string(),
             ToolResourceKind::Path,
         )
+    }
+
+    #[test]
+    fn deadline_bound_begin_fails_closed_when_state_fence_is_contended() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let input = json!({});
+        let facets = [ToolPermissionFacet::new(ToolNature::Read)];
+        let request = PermissionRequest::new("read", ToolProvenance::Native, &facets, &input);
+
+        state.with_state_fence_held(|| {
+            assert!(matches!(
+                state.try_begin_invocation(&request, &context()),
+                Err(GrantError::StateUnavailable)
+            ));
+        });
     }
 
     fn stale_after_mutation(root: &std::path::Path, mutate: impl FnOnce(&PermissionSessionState)) {

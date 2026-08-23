@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+talos-agent = { version = "0.8.0", path = "../talos-agent" }
 talos-core = { version = "0.8.0", path = "../talos-core" }
 talos-plugin = { version = "0.8.0", path = "../talos-plugin" }
 # I009-S4 begin

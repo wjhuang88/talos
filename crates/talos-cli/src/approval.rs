@@ -10,13 +10,21 @@
 //! should treat [`PermissionDecision::Ask`] as [`PermissionDecision::Deny`]
 //! without invoking [`ApprovalPrompt::prompt`].
 
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
+use talos_agent::permission_pipeline::{
+    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+};
 use talos_core::ApprovalChoice;
 use talos_core::tool::ToolNature;
 use talos_permission::{GrantPreview, PermissionEngine, PermissionSessionState};
+
+#[cfg(test)]
+use std::io::BufRead;
 
 /// Maximum length for formatted tool input before truncation.
 const MAX_INPUT_LENGTH: usize = 200;
@@ -38,7 +46,77 @@ pub struct ApprovalPrompt {
     state: Arc<PermissionSessionState>,
 }
 
+/// One approval request consumed by the interactive event loop's sole stdin reader.
+pub(crate) struct TerminalApprovalRequest {
+    pub(crate) id: uuid::Uuid,
+    pub(crate) request: PermissionApprovalRequest,
+    pub(crate) response: tokio::sync::oneshot::Sender<ApprovalChoice>,
+}
+
+/// Terminal adapter that delegates input ownership to the interactive event loop.
+pub(crate) struct TerminalApprovalResolver {
+    request_tx: tokio::sync::mpsc::UnboundedSender<TerminalApprovalRequest>,
+}
+
+pub(crate) fn terminal_approval_channel() -> (
+    Arc<TerminalApprovalResolver>,
+    tokio::sync::mpsc::UnboundedReceiver<TerminalApprovalRequest>,
+) {
+    let (request_tx, request_rx) = tokio::sync::mpsc::unbounded_channel();
+    (
+        Arc::new(TerminalApprovalResolver { request_tx }),
+        request_rx,
+    )
+}
+
+#[async_trait]
+impl ApprovalResolver for TerminalApprovalResolver {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        let (response, response_rx) = tokio::sync::oneshot::channel();
+        self.request_tx
+            .send(TerminalApprovalRequest {
+                id: uuid::Uuid::new_v4(),
+                request,
+                response,
+            })
+            .map_err(|_| ApprovalResolverError::new("terminal approval channel unavailable"))?;
+        tokio::time::timeout(remaining, response_rx)
+            .await
+            .map_err(|_| ApprovalResolverError::new("terminal approval deadline exceeded"))?
+            .map_err(|_| ApprovalResolverError::new("terminal approval cancelled"))
+    }
+}
+
 impl ApprovalPrompt {
+    pub(crate) fn render_choice_prompt(
+        tool_name: &str,
+        input: &serde_json::Value,
+        preview: &GrantPreview,
+    ) -> Result<()> {
+        let formatted = Self::format_input(input);
+        eprintln!();
+        eprintln!("⚠ Tool requires approval: {tool_name}");
+        eprintln!("Arguments: {formatted}");
+        if !preview.facets().is_empty() {
+            eprintln!("Always approve scope:");
+            for facet in preview.facets() {
+                eprintln!(
+                    "  - session allow: {:?} {:?} `{}`; configured deny rules still win",
+                    facet.nature, facet.resource_kind, facet.normalized_scope
+                );
+            }
+        }
+        eprintln!();
+        eprintln!("[y] Approve once  [a] Always approve  [n] Deny");
+        eprint!("> ");
+        io::stderr().flush().context("failed to flush stderr")?;
+        Ok(())
+    }
+
     /// Creates a new approval prompt with the given permission engine.
     pub fn new(engine: PermissionEngine) -> Self {
         Self {
@@ -65,30 +143,14 @@ impl ApprovalPrompt {
     /// # Errors
     ///
     /// Returns an error if reading from stdin fails.
+    #[cfg(test)]
     pub fn prompt_choice(
         tool_name: &str,
         input: &serde_json::Value,
         preview: &GrantPreview,
     ) -> Result<ApprovalChoice> {
-        let formatted = Self::format_input(input);
-
         loop {
-            eprintln!();
-            eprintln!("⚠ Tool requires approval: {tool_name}");
-            eprintln!("Arguments: {formatted}");
-            if !preview.facets().is_empty() {
-                eprintln!("Always approve scope:");
-                for facet in preview.facets() {
-                    eprintln!(
-                        "  - session allow: {:?} {:?} `{}`; configured deny rules still win",
-                        facet.nature, facet.resource_kind, facet.normalized_scope
-                    );
-                }
-            }
-            eprintln!();
-            eprintln!("[y] Approve once  [a] Always approve  [n] Deny");
-            eprint!("> ");
-            io::stderr().flush().context("failed to flush stderr")?;
+            Self::render_choice_prompt(tool_name, input, preview)?;
 
             let mut line = String::new();
             io::stdin()
@@ -166,6 +228,45 @@ pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+    use talos_permission::{
+        InteractionCapability, PermissionContext, PermissionInvocation, PermissionMode,
+        PermissionRequest,
+    };
+
+    fn approval_request() -> PermissionApprovalRequest {
+        let root = tempfile::tempdir().expect("tempdir");
+        let target = root.path().join("target.txt");
+        std::fs::write(&target, b"fixture").expect("fixture");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let target_text = target.display().to_string();
+        let input = serde_json::json!({"path": target_text.clone()});
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            target_text,
+            ToolResourceKind::Path,
+        )];
+        let permission_request =
+            PermissionRequest::new("write", ToolProvenance::Native, &profile, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let PermissionInvocation::Ask { session, .. } = state
+            .begin_invocation(&permission_request, &context)
+            .expect("approval proposal")
+        else {
+            panic!("write should require approval")
+        };
+        PermissionApprovalRequest {
+            tool_name: "write".to_owned(),
+            arguments: input,
+            summary_fields: vec!["path".to_owned()],
+            preview: session.preview().clone(),
+        }
+    }
 
     #[test]
     fn test_format_input_simple_object() {
@@ -178,6 +279,44 @@ mod tests {
         assert!(formatted.contains("src/main.rs"));
         assert!(formatted.contains("content"));
         assert!(formatted.contains("hello world"));
+    }
+
+    #[tokio::test]
+    async fn expired_terminal_request_cannot_consume_input_and_next_request_resolves() {
+        let (resolver, mut requests) = terminal_approval_channel();
+        let first_resolver = resolver.clone();
+        let first_request = approval_request();
+        let first = tokio::spawn(async move {
+            first_resolver
+                .resolve(first_request, Duration::from_millis(5))
+                .await
+        });
+        let expired = tokio::time::timeout(Duration::from_secs(1), requests.recv())
+            .await
+            .expect("first request arrives")
+            .expect("first request queued");
+        assert!(first.await.expect("first task").is_err());
+        assert!(expired.response.is_closed());
+
+        let second_resolver = resolver.clone();
+        let second_request = approval_request();
+        let second = tokio::spawn(async move {
+            second_resolver
+                .resolve(second_request, Duration::from_secs(1))
+                .await
+        });
+        let current = tokio::time::timeout(Duration::from_secs(1), requests.recv())
+            .await
+            .expect("second request arrives")
+            .expect("second request queued");
+        current
+            .response
+            .send(ApprovalChoice::ApproveOnce)
+            .expect("second response accepted");
+        assert_eq!(
+            second.await.expect("second task").expect("approval"),
+            ApprovalChoice::ApproveOnce
+        );
     }
 
     #[test]
