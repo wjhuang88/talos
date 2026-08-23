@@ -7,7 +7,7 @@
 | Priority | P0 |
 | Status | Ready / Unclaimed — A/B gates and ADR-067 decision are complete; awaiting separate I221 implementation claim |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | None for implementation; I220 Active/Claimed owns the decision prerequisite |
+| Selected Iteration | None for implementation; I220 Complete/Closed delivered the decision prerequisite |
 | Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; awaiting I221 claim; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
