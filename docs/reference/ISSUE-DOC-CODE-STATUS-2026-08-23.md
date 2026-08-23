@@ -25,7 +25,7 @@ in earlier reconciliation snapshots.
 | [#52](https://github.com/wjhuang88/talos/issues/52) | permission pipeline convergence | [PERM-006](../backlog/active/PERM-006-permission-pipeline-convergence.md) | In Progress | A-C are Complete/Closed; D is Ready/Unclaimed and E is Blocked on D. |
 | [#56](https://github.com/wjhuang88/talos/issues/56) | typed effects/resources | [PERM-006-D](../backlog/active/PERM-006-D-typed-effects-and-resources.md) | Ready | C is Complete; D still requires its own iteration and effective claim. |
 | [#57](https://github.com/wjhuang88/talos/issues/57) | cross-surface permission conformance | [PERM-006-E](../backlog/active/PERM-006-E-cross-surface-conformance.md) | Blocked | Completion blocked by D. |
-| [#59](https://github.com/wjhuang88/talos/issues/59) | supervised background command jobs | [TOOL-024](../backlog/active/TOOL-024-background-command-jobs.md) | Partial | A and all B prerequisites are Complete; B is Ready/Unclaimed with Draft I222, while C/D and Issue #378/I223 remain ordered. |
+| [#59](https://github.com/wjhuang88/talos/issues/59) | supervised background command jobs | [TOOL-024](../backlog/active/TOOL-024-background-command-jobs.md) | Partial; B/I222 Active / Claimed | PR #379 merged as `48e8ae9b` after exact-head CI, independent Agent-role claim review and CAS; C/D and Issue #378/I223 remain ordered. |
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Review / Claimed | I201 implementation merged as `7f5a6df2`; permission-mediated suppression failed terminal validation and is now owned by Ready/Unclaimed TUI-058/#329. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
@@ -69,8 +69,8 @@ in earlier reconciliation snapshots.
 
 - Issue #55 closed after I221/PERM-006-C implementation and owner-first closeout reached
   `main@e1c375e6`; its historical evidence remains in the 2026-08-22 snapshot and owner documents.
-- Issue #59 is Partial: A and technical prerequisites are complete, while B-D remain separately
-  governed. Draft #379 and this snapshot create no implementation authority.
+- Issue #59 is Partial: A and technical prerequisites are complete, and B/I222 is Active/Claimed
+  through PR #379 merge `48e8ae9b`; C/D remain separately governed.
 - Issue #378 is mapped to planned evidence-only I223 and cannot substitute for mandatory process,
   permission, unsafe or API security review.
 - This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
