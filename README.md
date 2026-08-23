@@ -53,13 +53,19 @@ Currently shipped:
   share a light, compact Nord-derived read-only shell with keyboard-visible navigation, responsive
   layouts, and deterministic empty states. Explicit `Accept: text/html` selects the rendered
   representation for all five data routes; requests without explicit HTML acceptance keep the
-  existing JSON/plain-text API. The first Dashboard UI slice is English-only even though the user
+  existing JSON/plain-text API. `/activity` adds a GET/read-only live workspace over bounded SSE:
+  it shows the current Session/model/Turn, allowlisted semantic activity, authoritative usage, and
+  a secondary filtered view of successfully written, re-redacted runtime logs. Prompt/message text,
+  thinking/reasoning, approval arguments, raw tool inputs/results, credentials, and unknown event
+  variants are not projected. Reconnect uses process-local IDs and bounded replay/reset; it is not
+  durable Session history. The Dashboard UI is English-only even though the user
   documentation is bilingual. Dynamic content is HTML-escaped and redacted before presentation,
   and configuration remains masked. The server binds to `127.0.0.1` and registers no write/action
   route; the per-process bearer token is off by default. Set `[dashboard] loopback_only = false` to
   require the token; the Logo entry then shows the token-free base URL plus
   `authentication required` and never displays or logs the credential. The current TUI emits no
-  terminal hyperlink escape sequence.
+  terminal hyperlink escape sequence. The default loopback mode is the supported browser-live path;
+  auth-required mode remains explicit-header-only and adds no browser token-delivery mechanism.
 - Local provider configuration with masked secrets.
 - Parameterless provider/model pickers, custom compatible-provider registration, bounded model discovery, and structured session switching.
 - Explicit local-image attachments for catalog-confirmed vision-capable models, with exact-path authorization and safe history summaries. Anthropic-compatible wire behavior is covered by fixtures; live-provider validation depends on operator credentials.

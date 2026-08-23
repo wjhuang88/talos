@@ -195,7 +195,10 @@ pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
+pub(crate) async fn run_tui_mode(
+    cli: Cli,
+    dashboard_activity: talos_dashboard::DashboardActivityFeed,
+) -> Result<()> {
     if !cli.attach.is_empty() {
         bail!(
             "--attach is not supported in TUI mode. Use the /attach slash command inside the TUI \
@@ -242,6 +245,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     if !config.model.is_empty() {
         ensure_session_runtime_identity(&config, &session)?;
     }
+    dashboard_activity.project_session(&session.id.to_string());
+    dashboard_activity.project_model(&config.provider, &config.model);
 
     let startup_action = resolve_startup_model_action(&config, cli.mock, cli.no_init);
     let (needs_model_setup, needs_api_key) = match &startup_action {
@@ -351,11 +356,19 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
     let (sq_tx_watch_tx, sq_tx_watch_rx) = tokio::sync::watch::channel(handle.sq_tx.clone());
     let (model_info_tx, model_info_rx) = tokio::sync::watch::channel(resolve_model_info(&config));
+    let mut dashboard_model_rx = model_info_rx.clone();
+    let dashboard_activity_for_model = dashboard_activity.clone();
+    tokio::spawn(async move {
+        while dashboard_model_rx.changed().await.is_ok() {
+            let info = dashboard_model_rx.borrow().clone();
+            dashboard_activity_for_model.project_model(&info.provider, &info.model_name);
+        }
+    });
     // Dedicated channel for handing off the new eq_rx + old_session to the
     // bridge forwarder after a session switch. The bridge must keep persisting
     // any in-flight events for the previous session until that actor's eq_rx
     // is exhausted (SESSION-002-D).
-    let (bridge_rx_update_tx, mut bridge_rx_update_rx) = mpsc::unbounded_channel::<(
+    let (bridge_rx_update_tx, bridge_rx_update_rx) = mpsc::unbounded_channel::<(
         talos_session::Session,
         tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     )>();
@@ -523,55 +536,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<SessionEvent>();
     let session_manager_for_persist = session_manager.clone();
-    let mut bridge_forwarder = handle.eq_rx;
     // Cached snapshot of the session that owns the *current* eq_rx stream.
     // Until the inner `while let` exhausts, every event arriving on
     // `bridge_forwarder` belongs to this session, even if the watch channel
     // has already been updated to the next session. This is the SESSION-002-D
     // ordering invariant: in-flight events for the old actor must persist to
     // the old actor's session.
-    let mut owning_session: talos_session::Session = session.clone();
-    tokio::spawn(async move {
-        loop {
-            while let Some(session_event) = bridge_forwarder.recv().await {
-                if let SessionEvent::TurnEvent {
-                    payload:
-                        TurnEventPayload::Completed {
-                            status:
-                                talos_core::session::TurnCompletionStatus::Success {
-                                    final_text: _,
-                                    new_messages: _,
-                                },
-                        },
-                    ..
-                } = &session_event
-                {
-                    if let Err(e) = session_manager_for_persist.update_index(&owning_session) {
-                        eprintln!("Warning: failed to update session index: {e}");
-                    }
-                    // Keep on-disk session logs bounded after persistence. The session owns
-                    // the write lock, so archival cannot race an append from this bridge.
-                    if owning_session
-                        .read_entries()
-                        .map(|entries| entries.len() > 200)
-                        .unwrap_or(false)
-                        && let Err(e) = owning_session.compact_archived(50)
-                    {
-                        eprintln!("Warning: failed to archive session: {e}");
-                    }
-                }
-                let _ = bridge_tx.send(session_event);
-            }
-            // Old actor's event stream exhausted — switch persistence to the new session.
-            match bridge_rx_update_rx.recv().await {
-                Some((old_session, new_rx)) => {
-                    owning_session = old_session;
-                    bridge_forwarder = new_rx;
-                }
-                None => break,
-            }
-        }
-    });
+    tokio::spawn(forward_session_events(
+        session_manager_for_persist,
+        session.clone(),
+        handle.eq_rx,
+        bridge_rx_update_rx,
+        bridge_tx,
+        dashboard_activity.clone(),
+    ));
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
     tui.hydrate_history(&visible_history);
@@ -668,9 +646,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             &workspace_root_str,
             extensions,
         );
-        let server = talos_dashboard::DashboardServer::with_loopback_only(
+        let server = talos_dashboard::DashboardServer::with_activity(
             snapshot,
             config.dashboard.loopback_only,
+            dashboard_activity,
         );
         match server.serve().await {
             Ok((addr, _)) => {
@@ -692,6 +671,62 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let cleanup_result = cleanup_empty_tui_session(&session_manager, &active_session);
     tui_result?;
     cleanup_result
+}
+
+async fn forward_session_events(
+    session_manager: talos_session::SessionManager,
+    mut owning_session: talos_session::Session,
+    mut bridge_forwarder: mpsc::UnboundedReceiver<SessionEvent>,
+    mut bridge_rx_update_rx: mpsc::UnboundedReceiver<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<SessionEvent>,
+    )>,
+    bridge_tx: mpsc::UnboundedSender<SessionEvent>,
+    dashboard_activity: talos_dashboard::DashboardActivityFeed,
+) {
+    loop {
+        while let Some(session_event) = bridge_forwarder.recv().await {
+            if let SessionEvent::TurnEvent {
+                payload:
+                    TurnEventPayload::Completed {
+                        status:
+                            talos_core::session::TurnCompletionStatus::Success {
+                                final_text: _,
+                                new_messages: _,
+                            },
+                    },
+                ..
+            } = &session_event
+            {
+                if let Err(e) = session_manager.update_index(&owning_session) {
+                    eprintln!("Warning: failed to update session index: {e}");
+                }
+                // Keep on-disk session logs bounded after persistence. The session owns
+                // the write lock, so archival cannot race an append from this bridge.
+                if owning_session
+                    .read_entries()
+                    .map(|entries| entries.len() > 200)
+                    .unwrap_or(false)
+                    && let Err(e) = owning_session.compact_archived(50)
+                {
+                    eprintln!("Warning: failed to archive session: {e}");
+                }
+            }
+            dashboard_activity
+                .project_session_event(&owning_session.id.to_string(), &session_event);
+            let _ = bridge_tx.send(session_event);
+        }
+        // The old actor's event stream must exhaust before persistence and the
+        // Dashboard projection move to the replacement Session.
+        match bridge_rx_update_rx.recv().await {
+            Some((new_session, new_rx)) => {
+                owning_session = new_session;
+                dashboard_activity.project_session(&owning_session.id.to_string());
+                bridge_forwarder = new_rx;
+            }
+            None => break,
+        }
+    }
 }
 
 fn cleanup_empty_tui_session(
@@ -735,7 +770,11 @@ pub(crate) fn dashboard_failure_tip(message: &str) -> UiOutput {
 
 pub(crate) async fn run_mcp_server() -> Result<()> {
     let config_for_logging = Config::load().ok();
-    init_logger(config_for_logging.as_ref().map(|config| &config.log), false);
+    init_logger(
+        config_for_logging.as_ref().map(|config| &config.log),
+        false,
+        None,
+    );
 
     let tool_registry = Arc::new(build_mcp_tool_registry());
     let permission_engine = Arc::new(talos_permission::PermissionEngine::new());

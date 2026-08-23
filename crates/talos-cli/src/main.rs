@@ -505,9 +505,15 @@ async fn main() -> Result<()> {
             && !matches!(cli.mode, Some(Mode::Rpc))
             && io::stdin().is_terminal());
     let config_for_logging = Config::load().ok();
+    let dashboard_activity = (terminal_ui
+        && config_for_logging
+            .as_ref()
+            .is_some_and(|config| config.dashboard.enabled))
+    .then(talos_dashboard::DashboardActivityFeed::new);
     init_logger(
         config_for_logging.as_ref().map(|config| &config.log),
         terminal_ui,
+        dashboard_activity.clone(),
     );
 
     if cli.search.is_some() {
@@ -531,7 +537,7 @@ async fn main() -> Result<()> {
     }
 
     if cli.tui {
-        return run_tui_mode(cli).await;
+        return run_tui_mode(cli, dashboard_activity.unwrap_or_default()).await;
     }
 
     if cli.inline {
@@ -546,7 +552,7 @@ async fn main() -> Result<()> {
         return run_print_mode(cli).await;
     }
 
-    run_tui_mode(cli).await
+    run_tui_mode(cli, dashboard_activity.unwrap_or_default()).await
 }
 
 pub(crate) fn build_hook_registry(include_evolution: bool) -> Arc<HookRegistry> {

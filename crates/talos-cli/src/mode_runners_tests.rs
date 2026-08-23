@@ -1451,6 +1451,103 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
     );
 }
 
+#[tokio::test]
+async fn dashboard_projection_switches_only_after_old_session_queue_drains() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let session_manager =
+        talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
+    let old_session = session_manager
+        .create_session("old", "test-ws")
+        .expect("old session");
+    let new_session = session_manager
+        .create_session("new", "test-ws")
+        .expect("new session");
+    let old_id = old_session.id.to_string();
+    let new_id = new_session.id.to_string();
+
+    let feed = talos_dashboard::DashboardActivityFeed::new();
+    feed.project_session(&old_id);
+    let (old_tx, old_rx) = mpsc::unbounded_channel();
+    let (new_tx, new_rx) = mpsc::unbounded_channel();
+    let (update_tx, update_rx) = mpsc::unbounded_channel();
+    let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+
+    let forwarder = tokio::spawn(forward_session_events(
+        session_manager,
+        old_session,
+        old_rx,
+        update_rx,
+        bridge_tx,
+        feed.clone(),
+    ));
+    update_tx
+        .send((new_session, new_rx))
+        .expect("queue replacement");
+    drop(update_tx);
+    old_tx
+        .send(SessionEvent::TurnStarted {
+            turn_id: "old-turn-1".to_string(),
+        })
+        .expect("old event one");
+    old_tx
+        .send(SessionEvent::TurnStarted {
+            turn_id: "old-turn-2".to_string(),
+        })
+        .expect("old event two");
+    drop(old_tx);
+    new_tx
+        .send(SessionEvent::TurnStarted {
+            turn_id: "new-turn-1".to_string(),
+        })
+        .expect("new event");
+    drop(new_tx);
+    forwarder.await.expect("forwarder joins");
+
+    assert!(bridge_rx.recv().await.is_some());
+    assert!(bridge_rx.recv().await.is_some());
+    assert!(bridge_rx.recv().await.is_some());
+    assert!(bridge_rx.recv().await.is_none());
+
+    let server = talos_dashboard::DashboardServer::with_activity(
+        talos_dashboard::DashboardSnapshot {
+            config_masked: String::new(),
+            status: serde_json::json!({}),
+            history: serde_json::json!([]),
+            governance: String::new(),
+            extensions: serde_json::json!({}),
+        },
+        true,
+        feed,
+    );
+    let (addr, server_handle) = server.serve().await.expect("dashboard starts");
+    let mut response = reqwest::get(format!("http://{addr}/activity/events"))
+        .await
+        .expect("SSE request");
+    let mut events = String::new();
+    while !events.contains("new-turn-1") {
+        let chunk = tokio::time::timeout(std::time::Duration::from_secs(1), response.chunk())
+            .await
+            .expect("SSE timeout")
+            .expect("SSE read")
+            .expect("SSE chunk");
+        events.push_str(&String::from_utf8_lossy(&chunk));
+    }
+    server_handle.abort();
+
+    let old_session_pos = events.find(&old_id).expect("old Session projection");
+    let old_one_pos = events.find("old-turn-1").expect("old turn one");
+    let old_two_pos = events.find("old-turn-2").expect("old turn two");
+    let new_session_pos = events.rfind(&new_id).expect("new Session projection");
+    let new_turn_pos = events.find("new-turn-1").expect("new turn");
+    assert!(
+        old_session_pos < old_one_pos
+            && old_one_pos < old_two_pos
+            && old_two_pos < new_session_pos
+            && new_session_pos < new_turn_pos,
+        "projection order changed: {events}"
+    );
+}
+
 #[test]
 fn empty_tui_shutdown_removes_owned_transcript_and_sidecar() {
     let dir = tempfile::tempdir().expect("tempdir");

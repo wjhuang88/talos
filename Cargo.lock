@@ -5723,8 +5723,11 @@ name = "talos-dashboard"
 version = "0.8.0"
 dependencies = [
  "axum",
+ "futures-core",
+ "schemars",
  "serde",
  "serde_json",
+ "talos-core",
  "thiserror 2.0.18",
  "tokio",
  "tower",

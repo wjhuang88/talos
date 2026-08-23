@@ -1,6 +1,6 @@
 # Iteration I213: Dashboard Live Activity And Log Viewer
 
-> Document status: Active / Claimed — activation PR #363 merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`
+> Document status: Review / Claimed — implementation PR #372 locally rebased onto `main@7fd813e8`; refreshed exact-head gates pending
 > Published plan date: 2026-08-20
 > Proposed activation date: 2026-08-22
 > Planned objective: deliver one bounded, loopback-only, GET/read-only realtime Dashboard observation
@@ -25,9 +25,9 @@
 | Activation PR | #363 — merged as `e578f4196092d0884ab7dd3321fb62acb3b88257` |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. The maintainer authorized bounded I219/I213 parallel execution on 2026-08-22; activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS under the recorded single-maintainer activation path, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Preserve all controlled pairwise exceptions recorded in the appended checkpoints. Before implementation merge, obtain I213 exact-head CI and independent security review, refresh open-PR/file-overlap inventory, and repeat merge-time CAS. |
+| Implementation PR | #372 — stable candidate submitted; local owner-first union rebased onto `main@7fd813e8` |
+| Last Updated | 2026-08-24 |
+| Handoff / Release Condition | Finish local convergence on `main@7fd813e8`, push the refreshed stable candidate to #372, obtain fresh exact-head CI and independent security review, then repeat ownership/file-overlap CAS before merge. Preserve all controlled pairwise exceptions and do not mark Complete in the implementation PR. |
 
 The Collaboration Claim is effective on `main` through merge `66747214`; implementation activation
 is effective through #363 merge `e578f419`. Issue #366 coordinates execution only and creates no
@@ -359,6 +359,15 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
 | 2026-08-22 | Activation inventory | Refreshed at `main@781bb112`; I211 Complete/Closed; I219 active permission lane identified; only archival PRs #120/#121 open; no Dashboard implementation owner. |
 | 2026-08-22 | Parallel authorization | Maintainer explicitly approved I213 running in parallel with the active non-overlapping lane, conditioned on parallel protection. I219/I213 authority, file-overlap and merge-CAS guards recorded above. |
 | 2026-08-22 | Activation proposal | Draft PR #363 opened as governance-only activation. It is ineffective for implementation while open. |
+| 2026-08-22 | Activation effective | #363 exact head `5835a97e` passed CI `32572881761` and merge-time CAS, then merged as `e578f419`. |
+| 2026-08-23 | Local implementation convergence | Branch `feat/i213-dashboard-live-activity` started at fresh `main@6fbb5550`. The bounded Dashboard feed/SSE/live page and additive CLI bridge/log observer were implemented and locally exercised without any push. I219 is Complete/Closed and no permission/runtime authority was changed. |
+| 2026-08-23 | Review candidate | Rebuilt mock TUI and browser evidence passed; focused tests and the locked workspace/preflight/governance checkpoint passed. I213 moved to Review with first stable push, exact-head CI, independent security review and merge-time CAS still pending. |
+| 2026-08-23 | I220 coordination | Issue #366 and Draft #370 recorded maintainer authorization for decision-only I220 alongside I213. Fresh inventory at `main@6fbb5550` found no production overlap; shared derived-file overlap is union-only and must be refreshed before either merge. I220 remains ineffective until its own claim merge. |
+| 2026-08-23 | Post-review CAS refresh | #372 head `00f558e1` passed CI `32617464228` and independent security review `5384278292` against `main@836b1714`, but #370 then merged as `5b8b1488`. The old exact-head evidence was not reused: #372 was rebased onto the new main with owner-first union, while I220/PERM-006-C owners, ADR-067 and permission implementation files remained untouched. Fresh exact-head CI, independent review and merge-time CAS are required. |
+| 2026-08-23 | Second CAS refresh | Rebased #372 head `97e431dc` passed CI `32619772832` against `main@5b8b1488`, but #373 merged as `5d2d2dcf` during the Windows job. That CI was not reused for merge: #372 was rebased again with owner-first union. #374 is a separate I220 closeout lane with shared derived-file overlap only; fresh I213 exact-head CI, review and CAS remain required. |
+| 2026-08-23 | I220 closeout union | #374 merged as `055e5c6b`, closing I220 and accepting ADR-067 through the already-existing #373 decision commits. The I213 lane preserved those owner/derived facts, changed no I220/PERM-006-C owner, ADR-067 or permission implementation file, and rebased #372 onto the closeout merge. Fresh I213 exact-head CI, independent security review and CAS remain required. |
+| 2026-08-24 | I221/I222 latest-main union | I221/PERM-006-C implementation and owner-first closeout are Complete through merges `f9e6706d`/`e1c375e6`. Maintainer comment `5386904546` superseded the temporary I222 serial pause; claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role review `5386970071` and merge-time CAS, then merged as `48e8ae9b`. The unpublished I213 17-file candidate was rebased onto that merge while preserving I222 owners and excluding every I222 production authority. Fresh local convergence and new #372 exact-head evidence remain required. |
+| 2026-08-24 | GOV-008 latest-main rebase | Candidate `b78a71ee99ade90ddeac796fae74e5a1b9138df7` is based on `main@7fd813e8322621b3ecc7c12c09a728c3762b0b67`. The exact 17-file inventory remains Dashboard implementation, additive Dashboard-specific CLI observation glue/tests, bilingual README updates and I213/WEB owner/derived synchronization; it contains no permission, Runtime, I222, TOOL-024, ADR-060 or other I222 production file. The rebase preserved the merged I222 permission-boundary amendment and changed no I222 production or permission implementation file. Latest-main `./scripts/release_preflight.sh` and `git diff --check` passed locally; fresh exact-head CI, independent security review and merge-time CAS remain pending. |
 
 ## Verification Evidence
 
@@ -368,8 +377,30 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
 - Claim merge-time CAS: passed; #327 merged as `667472145ffa7644a7f049472d7389876b8aaaf9`.
 - Activation inventory: `main@781bb1122d2c323854d5d65aed354d35d045e383`; only #120/#121 open,
   both archival Drafts; I219 is the explicit parallel Active owner.
-- Activation governance CI/validators: pending #363 exact head.
-- Runtime evidence: not started; no production code belongs to the activation branch.
+- Activation governance CI: `32572881761` success at `5835a97e`; #363 merged as `e578f419`.
+- Focused evidence: `cargo test --locked -p talos-dashboard` and focused CLI logger/Session-switch
+  tests passed; final locked workspace checks, Clippy, tests, release preflight and both governance
+  validators passed locally before the first push.
+- Runtime evidence: rebuilt mock TUI emitted one semantic Turn start/completion plus authoritative
+  usage and bounded logs; old-stream reset and sensitive prompt/response absence were verified.
+  Safe tool lifecycle with raw input/result exclusion is covered by projection tests.
+- Browser evidence: 320x568, 768x1024, 1440x900, 200% equivalent reflow, keyboard-only Logs,
+  minimum CSP, no external resources, no initial console errors and reconnect recovery passed.
+- Superseded remote evidence: #372 head `00f558e1b897c85b93ce6ca3fbd42d8f601bc767`
+  passed CI `32617464228` and independent security review `5384278292` against
+  `main@836b1714fb5e608a24282b566fe1068bd7fae998`; #370 then advanced main, so this evidence does not
+  authorize the rebased head.
+- I220 overlap evidence: #370 merged as `5b8b148810d64cc1ef572c702eae41d638a29ec2`, #373
+  merged as `5d2d2dcfcef772319cf11012ad20c24d0bc88105`, and closeout #374 merged as
+  `055e5c6bd716b24896b6d30a8db0d98992e7c458`. They changed only governance/permission-decision
+  documents and no Dashboard/CLI/Rust/Cargo file. I220 is now Complete/Closed; I221 separately owns
+  any later implementation.
+- I221/I222 union evidence: I221 completed through implementation merge `f9e6706d` and closeout
+  `e1c375e6`; #379 head `5f0816aa` passed CI `32650593056`, independent review `5386970071` and
+  merge-time CAS before merge `48e8ae9b`. I222-B excludes CLI/Dashboard/README and the I213
+  17-file production inventory; shared derived files retain union semantics.
+- Remote evidence: fresh exact-head CI and independent security-focused review pending after the
+  latest-main rebase push.
 
 ## Completion Evidence
 
