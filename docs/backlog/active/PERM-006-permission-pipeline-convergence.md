@@ -141,3 +141,13 @@ Epic completion requires all children; partial implementation remains owned by t
   `5381051760`, then PR #368 merged as `de79ad46` after merge-time CAS.
 - The parent Epic remains In Progress/Unclaimed. C-E remain blocked/unclaimed and receive no
   implementation authority; I213 retains only its separate Dashboard lane.
+
+## 2026-08-23 PERM-006-C Decision-Prerequisite Checkpoint
+
+- A/I189 and B/I219 are Complete, so C is no longer blocked by those dependencies.
+- C is still Blocked/Unclaimed because ADR-065 deferred the final hook transport/version contract
+  and current cross-surface paths retain multiple permission authorities. Planned/unclaimed I220
+  owns only the ADR-067 decision and current-path/migration matrix.
+- I220 cannot activate alongside Active I213 until a new explicit non-overlap authorization is
+  recorded; the earlier I219/I213 exception is not reusable. I221 will separately own C
+  implementation after ADR-067 acceptance and its own effective claim.

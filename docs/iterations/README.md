@@ -87,6 +87,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I217 | Ordered Finalizer Registry And Durable Closure | Complete / Closed | Completion Commit `44e840d7`; PR #348 merged as `6e5fa8c3`; exact-head CI `32475052535`; independent runtime architecture review `5369328072`. |
 | I218 | Auto Permission Security Decision | Complete / Closed | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent Agent-role security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. ADR-064 Accepted; no behavior or later child authority. |
 | I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
+| I220 | PERM-006-C Agent-Owned Pipeline Decision | Active / Claimed proposed by PR #370; ineffective until merge | Decision-only ADR-067/current-path/migration contract. Maintainer authorization permits non-overlap with I213; I213 owner reconciliation is effective at `main@836b1714`. I221 separately owns later implementation. |
 
 ## Completed This Closeout
 
