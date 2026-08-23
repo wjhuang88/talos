@@ -1,6 +1,6 @@
 # Iteration I222: TOOL-024-B Managed Background Execution Core
 
-> Document status: Active / Claimed proposed by PR #379; ineffective until target-branch merge
+> Document status: Active / Claimed through PR #379 merge `48e8ae9b`
 > Published plan date: 2026-08-23
 > Planned objective: implement ADR-060's bounded Unix Agent/session-owned background execution core
 > without starting TOOL-024-C/D or overlapping I213 Dashboard/CLI production authority.
@@ -21,10 +21,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Exact-head CI, independent process/permission/unsafe/API review and merge-time CAS remain required. |
+| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim/activation is ineffective until #379 reaches `main`; implementation starts from that merge or later main. |
+| Last Updated | 2026-08-24 |
+| Handoff / Release Condition | Claim/activation is effective through #379 merge `48e8ae9b`; implementation starts from that merge or later main and remains inside the recorded authority/file boundary. |
 
 ## Published Baseline
 
@@ -114,6 +114,7 @@ authorization.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-23 | Atomic claim+activation candidate | PR #379 proposes Claimed/Active from `main@e1c375e6`; maintainer authorization `5386904546` permits only the exact non-overlapping I213/I222-B pair with stable-inventory/CAS gates. The proposal remains ineffective until merge. |
+| 2026-08-24 | Claim+activation effective | PR #379 exact head `5f0816aa` passed docs-route CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. I222 is Active/Claimed on `main`; implementation must start from this merge or later `main`, preserve the I213/I222-B pairwise boundary, and obtain fresh implementation-head process/permission/unsafe/API review. |
 
 ## Verification Evidence
 

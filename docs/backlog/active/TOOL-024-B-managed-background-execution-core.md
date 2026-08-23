@@ -1,16 +1,16 @@
 # TOOL-024-B: Managed Background Execution Core
 
-> Document status: Active / Claimed proposed by PR #379; ineffective until target-branch merge
+> Document status: Active / Claimed through PR #379 merge `48e8ae9b`
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-B |
 | Type | Product / Runtime / Process-Security Story |
 | Priority | P0 |
-| Status | Active / Claimed proposed by PR #379; ineffective until target-branch merge |
+| Status | Active / Claimed through PR #379 merge `48e8ae9b` |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I222 Active / Claimed proposed by PR #379; ineffective until merge |
+| Selected Iteration | I222 Active / Claimed through PR #379 merge `48e8ae9b` |
 | Depends On | TOOL-024-A/I188, TOOL-023-C, RUNTIME-005 and PERM-006-C/I221 Complete; ADR-060 Accepted |
 
 ## Collaboration Claim
@@ -25,10 +25,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Exact-head CI, independent process/permission/unsafe/API review and merge-time CAS remain required. |
+| Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim/activation is ineffective until #379 reaches `main`; implementation starts from that merge or later main and remains inside the recorded file/authority boundary. |
+| Last Updated | 2026-08-24 |
+| Handoff / Release Condition | Claim/activation is effective through #379 merge `48e8ae9b`; implementation starts from that merge or later main and remains inside the recorded file/authority boundary. |
 
 ## Identity / Goal / Value
 
@@ -172,3 +172,12 @@ Governance PR #379 proposes the TOOL-024-B/I222 atomic claim and activation from
 under exact authority/file/CAS boundaries; it supersedes the earlier serial note `5386854800` and
 cannot be reused for C/D. I223 remains Planned/Unclaimed. This proposed state has no target-branch
 effect before #379 merge and grants no C/D, CLI, Dashboard, Windows, release or `/auto` authority.
+
+## 2026-08-24 Effective Activation Checkpoint
+
+PR #379 exact head `5f0816aa` passed docs-route CI `32650593056`, independent Agent-role claim
+review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. TOOL-024-B/I222
+is therefore Active/Claimed on `main`. Implementation must start from that merge or later `main`,
+preserve the exact I213/I222-B authority and file boundary, and obtain fresh exact-head process,
+permission, `unsafe` and public-API review. This activation grants no C/D, CLI, Dashboard, Windows,
+release or `/auto` authority.

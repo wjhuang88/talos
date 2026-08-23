@@ -1,7 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Claimed coordination and I222 Active/Claimed proposed by PR #379; ineffective until the
-> finalized atomic claim PR reaches `main`.
+> Status: Claimed coordination and I222 Active/Claimed through PR #379 merge `48e8ae9b`.
 
 ## Startup Contract
 
@@ -75,9 +74,9 @@ work; new corrective owners for failed Issue #378 rows; release and Desktop owne
 | Source Issue | #59 |
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer active goal selects complete Issue #59 delivery; bounded I213/I222-B parallel authorization is recorded in Issue #366 comment `5386904546`. Exact-head governance/process-security review and CAS remain required. |
+| Authorization Evidence | Maintainer active goal selects complete Issue #59 delivery; bounded I213/I222-B parallel authorization is recorded in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and CAS `5386973729`, then merged as `48e8ae9b`; every implementation child still requires its own exact-head protected-scope review and CAS. |
 | Implementation PR | None; child-specific PRs only |
-| Last Updated | 2026-08-23 |
+| Last Updated | 2026-08-24 |
 | Handoff / Release Condition | Coordination claim grants no production authority; every child requires its own effective claim. |
 
 ## Ordered Task Items
@@ -124,3 +123,11 @@ then merge-time CAS and #379 merge before implementation.
 
 Recovery or resume instruction: use this task, TOOL-024-B and I222 owners; implementation starts
 from the eventual claim merge commit or later main, never this pre-merge governance branch.
+
+## Claim Activation Checkpoint (2026-08-24)
+
+PR #379 exact head `5f0816aa` passed docs-route CI `32650593056`, independent Agent-role claim
+review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. This supersedes
+the pre-merge recovery instruction above: G0 is complete, I222/TOOL-024-B is Active/Claimed, and B
+implementation may start only from `48e8ae9b` or later `main`. The I213/I222-B pairwise boundary in
+`5386904546` remains mandatory; C/D and I223 still require their own ordered gates.
