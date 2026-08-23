@@ -16,7 +16,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
-| Work Slice | Implement only TOOL-024-B under Accepted ADR-060: Unix Agent/session-owned supervisor, semantic pre-admission, exact background permission, bounded receipt/output/state/event, checked same-process-group cancellation/reap, and ordinary Session plus Runtime finalizer cleanup. Windows/detached/unsupported shapes fail closed. Exclude TOOL-024-C/D, CLI/TUI/Dashboard/I213 production files, persistence, `/auto`, release and unrelated permission behavior. |
+| Work Slice | Implement only TOOL-024-B under Accepted ADR-060: Unix Agent/session-owned supervisor, semantic pre-admission, exact background permission, bounded receipt/output/state/event, checked same-process-group cancellation/reap, and ordinary Session plus Runtime finalizer cleanup. Permission authority is limited to making a resource-less generic Execute Allow degrade to Ask for the reserved `background:` Command namespace, with explicit Deny precedence and focused tests; no public permission schema or PERM-006-D/E behavior. Windows/detached/unsupported shapes fail closed. Exclude TOOL-024-C/D, CLI/TUI/Dashboard/I213 production files, persistence, `/auto`, release and unrelated permission behavior. |
 | Claimed At | 2026-08-23 |
 | Source Issue | #59 |
 | Governance Claim PR | #379 |
@@ -129,7 +129,36 @@ authorization.
 
 ## Variance And Residuals
 
-- None at planning time. C/D and Issue #378 remain explicitly separate.
+- The 2026-08-24 permission-namespace checkpoint below records one necessary scope correction.
+  C/D and Issue #378 remain explicitly separate.
+
+## Permission Namespace Change-Control Checkpoint — 2026-08-24
+
+Local design inspection after activation proved that a resource-less nature-based Execute Allow
+currently matches every Command facet, including `background:<tool>:<resource>`. Merely adding the
+ADR-060 background facet would therefore let a foreground/generic policy Allow authorize a
+longer-lived process, violating the Accepted decision.
+
+I222 adds only the minimum permission-engine authority required to close that gap:
+
+- for a Command facet whose concrete resource starts with reserved `background:`, a resource-less
+  generic Execute Allow cannot satisfy that facet and evaluation degrades to Ask;
+- explicit Deny rules retain precedence, and an explicit matching `background:` resource rule or
+  exact Session grant may authorize it;
+- focused tests prove foreground generic Allow is insufficient and exact background approval does
+  not widen to generic Execute;
+- no permission config/schema/API change, typed-effect work, PERM-006-D/E behavior, `/auto`,
+  Dashboard, CLI or persistence change is authorized.
+
+For current execution, this checkpoint supersedes only the historical Production authority row in
+the preserved Published Baseline. The added production inventory is limited to
+`crates/talos-permission/src/rule.rs` and focused permission tests in
+`crates/talos-permission/src/permission_tests.rs`; it does not reopen the rest of
+`crates/talos-permission/**`.
+
+No `talos-permission` production edit may start until this owner amendment reaches `main` with
+exact-head CI, independent permission/security/API review and merge-time CAS. The already local,
+uncommitted core/agent protocol sketch remains paused and is not implementation evidence.
 
 ## Retrospective
 

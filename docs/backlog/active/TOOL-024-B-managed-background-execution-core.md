@@ -20,7 +20,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
-| Work Slice | Implement only TOOL-024-B/I222 under Accepted ADR-060: Agent/session-owned Unix supervisor; default-false background input for bash and one top-level exec; semantic pre-admission; exact background permission facet; bounded receipt, state, output and terminal event; checked process-group termination/reap; ordinary AppServerSession and Runtime finalizer cleanup; Windows and unsupported/detached shapes fail closed. No process tool, CLI/TUI/Dashboard projection, Windows spawn, persistence, `/auto`, release or later TOOL-024 child. |
+| Work Slice | Implement only TOOL-024-B/I222 under Accepted ADR-060: Agent/session-owned Unix supervisor; default-false background input for bash and one top-level exec; semantic pre-admission; exact background permission facet; bounded receipt, state, output and terminal event; checked process-group termination/reap; ordinary AppServerSession and Runtime finalizer cleanup. Permission authority is limited to making a resource-less generic Execute Allow degrade to Ask for the reserved `background:` Command namespace, with Deny precedence and focused tests; no public permission schema or PERM-006-D/E behavior. Windows and unsupported/detached shapes fail closed. No process tool, CLI/TUI/Dashboard projection, Windows spawn, persistence, `/auto`, release or later TOOL-024 child. |
 | Claimed At | 2026-08-23 |
 | Source Issue | #59 |
 | Governance Claim PR | #379 |
@@ -136,6 +136,8 @@ new ADR and migration plan.
 - `crates/talos-agent/src/session.rs`
 - `crates/talos-runtime/src/shutdown.rs`
 - `crates/talos-core/src/session.rs`
+- `crates/talos-permission/src/rule.rs`
+- `crates/talos-permission/src/permission_tests.rs`
 
 ## Acceptance For Behavior / Technical Work
 
@@ -181,3 +183,16 @@ is therefore Active/Claimed on `main`. Implementation must start from that merge
 preserve the exact I213/I222-B authority and file boundary, and obtain fresh exact-head process,
 permission, `unsafe` and public-API review. This activation grants no C/D, CLI, Dashboard, Windows,
 release or `/auto` authority.
+
+## 2026-08-24 Permission Namespace Change Control
+
+Post-activation code inspection found that the current permission matcher lets a resource-less
+generic Execute Allow match the reserved `background:` Command facet. That would violate ADR-060's
+hard foreground-vs-background separation even though the facet text is distinct.
+
+This Story therefore adds one narrow `talos-permission` authority: generic resource-less Execute
+Allow must degrade to Ask for `background:` Command resources, while explicit Deny retains
+precedence and explicit matching background rules/exact grants remain usable. Focused permission
+tests are mandatory. Public permission schema/config, PERM-006-D/E, `/auto`, Dashboard, CLI and
+unrelated matching behavior remain excluded. This amendment is ineffective until its governance PR
+reaches `main` after exact-head CI, independent permission/security/API review and CAS.

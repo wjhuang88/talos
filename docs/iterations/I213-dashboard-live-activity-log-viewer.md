@@ -222,6 +222,20 @@ parallel. This scheduling checkpoint does not change I213's published objective,
 I213 may resume from fresh `main` under its existing effective claim and GOV-008 local-convergence
 gates. I222-B may begin implementation only after its own finalized claim reaches `main`.
 
+## I222-B Permission Namespace Amendment Checkpoint — 2026-08-24
+
+PR #379 remains the sole original atomic source of the I213/I222-B parallel scheduling contract. The I213
+maintainer withdrew its uncommitted same-meaning local checkpoint so later rebase work does not
+duplicate or compete with that target-branch record.
+
+Post-activation inspection found one ADR-060 blocker inside permission matching. I222-B may amend
+only the reserved `background:` Command namespace so a resource-less generic Execute Allow degrades
+to Ask for that facet, while Deny precedence and explicit matching background rules/exact grants are
+preserved. This adds focused `talos-permission` matcher/tests to I222-B without transferring public
+permission schema, PERM-006-D/E, `/auto`, CLI, Dashboard, README or I213 authority. The original
+production-file overlap and independent evidence/CAS gates remain unchanged. This amendment is
+ineffective until its governance PR reaches `main`.
+
 ## Scope
 
 - `GET /activity` in the existing Dashboard shell.

@@ -298,3 +298,14 @@ core/agent/tools/runtime plus focused API/runtime docs and tests, with no CLI, D
 WEB authority. Shared governance views use union semantics. Same production-file or authority
 overlap pauses the affected work and requires re-governance. This pairwise authorization expires
 with B and cannot authorize TOOL-024-C/D.
+
+## 2026-08-24 I222-B Permission Namespace Amendment Checkpoint
+
+PR #379 remains the sole original atomic source of the I213/I222-B parallel scheduling contract; the I213
+maintainer withdrew its uncommitted same-meaning local addition to avoid a duplicate checkpoint on
+rebase. A later I222-B change-control amendment may add only focused `talos-permission` matcher and
+test authority for the reserved `background:` Command namespace: a resource-less generic Execute
+Allow must degrade to Ask, explicit Deny keeps precedence, and explicit matching background rules or
+exact grants remain valid. This does not transfer public permission schema, PERM-006-D/E, `/auto`,
+CLI, Dashboard, README, WEB or I213 authority. All #379 inventory, overlap, exact-head evidence and
+CAS protections remain mandatory, and the amendment has no target-branch effect until merged.
