@@ -1,6 +1,6 @@
 # ADR-067: Agent-Owned Permission Pipeline And Migration Contract
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-23
 - Owners: PERM-006-C / I220; implementation reserved for I221
 - Related: Issues #55 and #59; ADR-064; ADR-065; ADR-066
@@ -129,6 +129,18 @@ Acceptance requires an independent permission/security/API review of this ADR an
 governance validators, YAML/diff/EOF checks, and exact-head CI. Acceptance authorizes only the
 decision and I221 implementation boundary; it does not activate I221, change permission behavior,
 modify Runtime/MCP code, implement TOOL-024, alter `/auto`, release or publish crates.
+
+## Acceptance Evidence
+
+- Decision content commits: `c21bb7f305aff26deea600f8c7f8de5f732afe1a` and
+  `820586eab44e50c23a9ac79cb993ebda39569714`.
+- PR #373 exact head `820586eab44e50c23a9ac79cb993ebda39569714` passed CI `32619757871`,
+  governance validators and independent Agent-role permission/security/API review `5384374028`.
+- Merge-time CAS held against `main@5b8b1488`; PR #373 merged as `5d2d2dcf`.
+- Shared GitHub identity establishes Agent-role separation only and does not claim natural-person
+  identity separation.
+- This acceptance authorizes only the decision and the I221 implementation boundary. It does not
+  activate I221, PERM-006-C code, TOOL-024, `/auto`, release or publication.
 
 ## Reversal Triggers
 

@@ -159,3 +159,10 @@ Epic completion requires all children; partial implementation remains owned by t
   until ADR-067 is Accepted and I221 obtains a separate implementation claim.
 - The explicit I213/I220 decision-only non-overlap is effective; no permission implementation,
   Runtime/MCP behavior, wrapper or hook change is authorized by I220.
+
+## 2026-08-23 ADR-067 Accepted / I221 Handoff
+
+- ADR-067 and the current-path/migration matrix are Accepted through PR #373 merge `5d2d2dcf`.
+- I220 is Complete/Closed with decision commits `c21bb7f3` and `820586ea`.
+- PERM-006-C is Ready/Unclaimed. I221 must establish a separate effective implementation claim;
+  no Rust, Runtime, MCP, wrapper or hook implementation is authorized by this closeout.

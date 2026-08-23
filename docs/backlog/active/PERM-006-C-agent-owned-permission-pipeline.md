@@ -5,10 +5,10 @@
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Blocked / Unclaimed — A/B gates satisfied; ADR-067 Proposed through effective I220, awaiting acceptance and separate I221 implementation claim |
+| Status | Ready / Unclaimed — A/B gates and ADR-067 decision are complete; awaiting separate I221 implementation claim |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | None for implementation; I220 Active/Claimed owns the decision prerequisite |
-| Depends On | PERM-006-A/I189 and B/I219 Complete; blocked on Accepted ADR-067 and later I221 claim; prerequisite for PERM-006-D/E |
+| Selected Iteration | None for implementation; I220 Complete/Closed delivered the decision prerequisite |
+| Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; awaiting I221 claim; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
 
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Accept ADR-067 from I220, then establish a separate effective I221 claim before implementation. I213/I220 decision-only non-overlap is effective through the recorded I220 claim merge. |
+| Handoff / Release Condition | ADR-067 is Accepted through I220; establish a separate effective I221 claim before implementation. I213/I220 decision-only non-overlap remains historical and does not authorize C code. |
 
 ## Identity / Goal / Value
 
@@ -43,8 +43,8 @@ Move permission evaluation, Ask resolution, grant installation, exact authorizat
 
 ## Dependencies
 
-PERM-006-A/I189 and PERM-006-B/I219 are Complete. Implementation remains blocked on Accepted
-ADR-067 and a separate effective I221 claim; C remains the prerequisite for PERM-006-D/E.
+PERM-006-A/I189, PERM-006-B/I219 and ADR-067/I220 are Complete. Implementation remains gated by
+a separate effective I221 claim; C remains the prerequisite for PERM-006-D/E.
 
 ## Decision Links And Constraints
 
@@ -100,3 +100,9 @@ yet represent the final execution-gating decision. ADR-065 explicitly deferred t
 migration. Planned decision-only I220 therefore owns ADR-067 and the current-path/migration matrix;
 PERM-006-C remains Blocked/Unclaimed, and later I221 must obtain its own claim before any Rust,
 Cargo, wrapper, hook, Runtime, MCP or behavior change.
+
+## 2026-08-23 ADR-067 Acceptance And I221 Readiness
+
+ADR-067 and its current-path/migration matrix were Accepted through PR #373 merge `5d2d2dcf`.
+PERM-006-C is now Ready/Unclaimed; no implementation authority exists until a separate I221 claim
+is effective. The historical checkpoint above is retained unchanged.
