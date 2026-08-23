@@ -21,7 +21,7 @@
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced. Activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`; those guards are now effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Implementation must start from #363 merge `e578f419` or a later fresh `main`, preserve all recorded pairwise authority/file-overlap protections, locally converge under GOV-008 before the first implementation push, and later pass exact-head CI/security review plus merge-time CAS. |
+| Handoff / Release Condition | Implementation must start from #363 merge `e578f419` or a later fresh `main`, preserve I219/I213 authority/file-overlap protection, locally converge under GOV-008 before the first implementation push, and later pass exact-head CI/security review plus merge-time CAS. |
 
 The claim is effective through #327 merge `66747214` and implementation activation is effective
 through #363 merge `e578f419`. Issue #366 is the execution-coordination surface for this existing
@@ -288,13 +288,3 @@ reconnect, accessibility and rollback bounds.
 `docs/sop/AGENT-COLLABORATION.md`; `docs/sop/GIT-WORKFLOW.md`; `docs/sop/TESTING.md`; WEB-001;
 WEB-001-A/I195; ADR-031; ADR-006; SEC-002; OBS-001; ADR-014; CONF-001; SERVER-001; SESSION-009;
 `docs/design/talos-desktop/DESIGN.md`; current Dashboard/CLI bridge/logging/Session event code.
-
-## 2026-08-23 I222-B Parallel Scheduling Checkpoint
-
-Maintainer authorization `5386904546` permits I213 and I222-B to run concurrently while their
-production inventories and authorities remain disjoint. I213 keeps the existing PR #372 Dashboard,
-Dashboard-specific CLI glue, README and WEB/I213 owner scope. I222-B may use only
-core/agent/tools/runtime plus focused API/runtime docs and tests, with no CLI, Dashboard, README or
-WEB authority. Shared governance views use union semantics. Same production-file or authority
-overlap pauses the affected work and requires re-governance. This pairwise authorization expires
-with B and cannot authorize TOOL-024-C/D.
