@@ -1103,3 +1103,9 @@ governance validation and merge-time CAS. I220 is now active for ADR-067 and the
 migration matrix only. ADR-067 acceptance, I221 activation and all PERM-006-C/TOOL-024
 implementation remain separate gates. The preceding planning text is retained as a dated
 checkpoint; current owner state is authoritative.
+
+## 2026-08-23 I220 Decision Closeout
+
+ADR-067 is Accepted through PR #373 merge `5d2d2dcf`, with decision commits `c21bb7f3` and
+`820586ea`, exact-head CI `32619757871` and independent review `5384374028`. I220 is Complete /
+Closed; PERM-006-C is Ready/Unclaimed and awaits a separate effective I221 implementation claim.
