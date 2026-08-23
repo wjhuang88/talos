@@ -5,9 +5,9 @@
 | Story ID | PERM-006 |
 | Type | Architecture / Permission Epic |
 | Priority | P0 |
-| Status | In Progress — A/I189 and B/I219 Complete/Closed; C-E remain blocked/unclaimed |
+| Status | In Progress — A/I189, B/I219 and C/I221 Complete/Closed; D Ready/Unclaimed; E Blocked/Unclaimed |
 | Source | [GitHub Issue #52](https://github.com/wjhuang88/talos/issues/52) |
-| Selected Iteration | None; completed children A/I189 and B/I219; parent Epic remains unclaimed |
+| Selected Iteration | None; completed children A/I189, B/I219 and C/I221; parent Epic remains unclaimed |
 | Depends On | PERM-004/PERM-005 security boundaries; child order A → B → C → D → E |
 
 ## Collaboration Claim
@@ -180,3 +180,12 @@ Claim PR #375 merged as `d662501c` after exact-head CI `32620749103`, independen
 permission/security/API review `5384445091` and merge-time CAS. I221 is therefore effective and
 owns only the Accepted ADR-067 implementation. The implementation candidate is in Review/Claimed;
 PERM-006-D/E, `/auto`, TOOL-024 and Dashboard authority remain excluded.
+
+## 2026-08-23 PERM-006-C / I221 Completion
+
+I221 implementation commit `49d1546c` reached `main` through PR #376 merge `f9e6706d` after final
+exact head `aed71fb4` passed CI `32640691772`, independent permission/security/API approval
+`5386153429` and merge-time CAS. C/I221 is Complete/Closed; the parent Epic remains In Progress and
+Unclaimed because D/E are not delivered. PERM-006-E owns the later conformance/documentation gate
+for third-party secret-bearing tools to override the default `AgentTool::project_input()`.
+TOOL-024, `/auto`, Dashboard, release and publication remain separately governed.

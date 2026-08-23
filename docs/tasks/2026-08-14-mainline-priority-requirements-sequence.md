@@ -351,7 +351,7 @@ implementation/deferred-validation disposition and its own claim becomes effecti
 | T7B | Claim and deliver I210 / PROVIDER-006 implementation | Typed provider progress with `Connecting…` then truthful `Reconnecting… (attempt n/m)` | T7A implementation/deferred-validation disposition | Accepted ADR, effective claim, exact-head CI, Agent technical review and CAS; add live retry-status row to #302 | Preserve static connecting behavior and retry policy; do not fabricate progress | Review / Claimed; implementation merged as `9d5c8a71`; I211 passed retry ordinals and assigned remaining sequencing defects to TUI-060/#332 |
 | T8 | Claim and deliver I198 / SKILL-004 implementation | Confirmed optional-trigger contract, fixtures and skill-author docs | T7B implementation/deferred-validation disposition | Effective claim, contract checkpoint, exact-head CI, Agent technical review and CAS; add natural-person row to #302 | Preserve parser behavior; create ADR/migration owner if breaking | Review / Claimed; PR #325 merged as `15a3d424`; I211 assigned the real-CLI diagnostic failure to SKILL-005/#333 |
 | T9 | Execute I211 / VALIDATION-002 | One human review/manual evidence packet for every Issue #302 row | T5-T8 implementation dispositions, including T7A/T7B | Effective evidence-only claim; all rows pass or have corrective owners; source owners synchronized first | Keep failed source owners Review and register corrective owners | Complete / Completion Commits `b7d55a0d`/`7c333d98` |
-| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / reassessed; RUNTIME-005 Complete, PERM-006-C incomplete |
+| T10 | Revisit Issue #59 production slices | Separately numbered runnable TOOL-024 child iteration(s) only when gates are true | T3 and T9 | Every new owner/iteration/claim independently satisfies collaboration and security gates | Leave #59 open with exact blocked owners | Blocked / dependencies complete; awaits separate TOOL-024 owner, iteration and effective claim |
 | T11 | Close the long-running task | Final checkpoint, synchronized owners/views/issues and explicit residual packet | T1-T10 terminal dispositions | Delivered children cite pre-existing evidence; Issue #302 rows resolved; every residual has an owner | Mark task Partial/Blocked with exact recovery instructions | Complete |
 
 ### Change-Control Checkpoint
@@ -1125,3 +1125,17 @@ candidate centralizes normalized permission evaluation, bounded approval, revisi
 final hook gating and exact authorization across CLI, TUI, Runtime and MCP without modifying
 Dashboard/I213, TOOL-024, `/auto` or release surfaces. I221 remains Review/Claimed until its own
 implementation PR, exact-head CI, independent permission/security/API review and CAS complete.
+
+## 2026-08-23 I221 Implementation Merge And Closeout
+
+PR #376 final exact head `aed71fb4`, base `d662501c`, passed CI `32640691772` (5/5) and independent
+permission/security/API approval `5386153429`. Merge-time CAS confirmed the stable evidence and
+the explicit serial pause of I213 / PR #372; #376 merged as `f9e6706d`. I221/PERM-006-C is
+Complete/Closed at pre-existing implementation commit `49d1546c`; this status-only closeout does
+not self-certify completion.
+
+Issue #59 remains open and blocked only until a separate TOOL-024 child owner, iteration and claim
+become effective. PERM-006-D/E and `/auto` remain separate; PERM-006-E owns the third-party
+secret-bearing `AgentTool::project_input()` conformance/documentation residual. I213 stays paused
+until this closeout reaches main, then must rebase from fresh main, preserve owner-first union,
+rerun full local convergence and obtain new exact-head CI, independent security review and CAS.
