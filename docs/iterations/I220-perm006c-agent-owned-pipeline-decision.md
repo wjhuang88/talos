@@ -20,7 +20,7 @@
 | Source Issue | #55 |
 | Governance Claim PR | #370 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Candidate head `c612c9d1017a4b1d2b898c35f7ba329051499670` passed exact-head CI `32617347315`; a fresh independent exact-head review is pending, followed by merge-time CAS. |
+| Authorization Evidence | Maintainer authorization in the active session on 2026-08-23 explicitly permits I213 and decision-only I220 to run in parallel under the non-overlap, shared-file stop and merge-time CAS contract. Candidate head `c0e658821f2c467d21019d559f410fa4526330fa` passed exact-head CI `32617473549`; independent review `5384196365` is bound to that head and requested the synchronized Backlog/evidence correction. A fresh review of the correction head and merge-time CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
 | Handoff / Release Condition | I213 owner-first drift was repaired by PR #371; merge-time CAS must re-confirm `main@836b1714` or a descendant. After merge, produce only ADR-067 and its evidence; I221 needs a later effective claim before any implementation. |
