@@ -55,7 +55,10 @@ Session scope; it is not a general bypass.
 
 The resolver runs outside the Session lock. Its result is committed only if the proposal identity,
 permission revision, Session lifecycle and normalized-request digest still match. A mismatch,
-closed channel, timeout, cancellation, resolver error or poisoned state fails closed.
+closed channel, timeout, cancellation, resolver error or poisoned state fails closed. Each
+invocation has one caller-provided total deadline; evaluation, resolver wait, admission and final
+hook dispatch consume that same deadline. The resolver receives only the remaining budget, may not
+reset or extend it, and cancellation propagates through every stage.
 
 ### 4. Final execution gate and hook semantics
 

@@ -32,6 +32,9 @@ Every surface must converge to one ordered flow:
 
 No surface may evaluate a second time after approval, mutate permission-relevant input after
 approval, or execute from a projected value that differs from the normalized authoritative value.
+Every invocation uses one total caller deadline. The resolver receives only the remaining budget;
+no stage may reset or extend it, and cancellation propagates through evaluation, approval, admission
+and final-hook dispatch.
 
 ## Migration Stages
 
