@@ -98,10 +98,12 @@ work; new corrective owners for failed Issue #378 rows; release and Desktop owne
 
 Maintainer authorization `5386904546` permits only the exact I213/I222-B pair to run concurrently.
 I213 retains its existing 17-file Dashboard/CLI/README/owner inventory; B is restricted to
-core/agent/tools/runtime and excludes every I213 production file. Shared derived governance files
-use union semantics. Before stable push and merge, compare exact inventories; same production file
-or authority overlap pauses only the overlapping work. C/D2 must recompute overlap and cannot reuse
-this authorization.
+core/agent/tools/runtime plus one narrowly amended `talos-permission` matcher/test seam for the
+reserved `background:` Command namespace, and excludes every I213 production file. PR #379 remains
+the sole original pairwise-contract source; the permission addition is ineffective until its
+change-control PR reaches `main`. Shared derived governance files use union semantics. Before stable
+push and merge, compare exact inventories; same production file or authority overlap pauses only the
+overlapping work. C/D2 must recompute overlap and cannot reuse this authorization.
 
 ## Checkpoint
 
@@ -131,3 +133,12 @@ review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. 
 the pre-merge recovery instruction above: G0 is complete, I222/TOOL-024-B is Active/Claimed, and B
 implementation may start only from `48e8ae9b` or later `main`. The I213/I222-B pairwise boundary in
 `5386904546` remains mandatory; C/D and I223 still require their own ordered gates.
+
+## Permission Namespace Change-Control Checkpoint (2026-08-24)
+
+Code inspection proved that current resource-less Execute Allow rules match the proposed
+`background:` Command facet, so distinct facet text alone does not enforce ADR-060. B implementation
+is paused before permission production edits. The minimum accepted correction is limited to the
+reserved background namespace, preserves explicit Deny and exact background authorization, changes
+no public schema or other permission behavior, and requires focused tests plus independent
+permission/security/API review. The local uncommitted core/agent sketch is not completion evidence.
