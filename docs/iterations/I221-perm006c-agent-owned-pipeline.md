@@ -22,7 +22,7 @@
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; claim #375 exact head `de99de1c`, base `055e5c6b`, CI `32620749103`, independent permission/security/API review `5384445091`, merge-time CAS and merge `d662501c`. Maintainer authorization remains limited to this bounded I221 slice. |
-| Implementation PR | Not started |
+| Implementation PR | #376 |
 | Last Updated | 2026-08-23 |
 | Handoff / Release Condition | Claim #375 is effective at `main@d662501c`; this implementation branch starts at that merge. Completion requires pre-existing implementation commit evidence, exact-head CI, independent permission/security/API review and merge-time CAS. |
 
@@ -82,7 +82,7 @@ semantics; a production authority overlap with I213 stops I221 immediately.
 
 ## Verification And Completion
 
-Implementation PR: Not started. Completion Commit: pending.
+Implementation PR: #376. Completion Commit: pending.
 The claim/activation status commit cannot self-certify implementation. Any residual compatibility
 adapter or un-migrated surface must be recorded in this owner or a declared follow-up story.
 

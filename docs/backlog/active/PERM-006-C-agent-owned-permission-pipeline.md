@@ -23,7 +23,7 @@
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; I221 claim #375 merged as `d662501c` after exact-head CI `32620749103`, independent review `5384445091` and CAS. |
-| Implementation PR | Not started |
+| Implementation PR | #376 |
 | Last Updated | 2026-08-23 |
 | Handoff / Release Condition | Claim #375 is effective. Implementation must start from `main@d662501c` or later; I213/I220 boundaries remain protected. |
 
