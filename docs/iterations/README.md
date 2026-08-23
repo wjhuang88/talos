@@ -87,7 +87,8 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I217 | Ordered Finalizer Registry And Durable Closure | Complete / Closed | Completion Commit `44e840d7`; PR #348 merged as `6e5fa8c3`; exact-head CI `32475052535`; independent runtime architecture review `5369328072`. |
 | I218 | Auto Permission Security Decision | Complete / Closed | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent Agent-role security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. ADR-064 Accepted; no behavior or later child authority. |
 | I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
-| I220 | PERM-006-C Agent-Owned Pipeline Decision | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf` after CI `32619757871`, independent review `5384374028` and CAS. ADR-067 Accepted; I221 separately owns implementation. |
+| I220 | PERM-006-C Agent-Owned Pipeline Decision | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf`; ADR-067 Accepted. I221 separately owns implementation. |
+| I221 | PERM-006-C Agent-Owned Pipeline Implementation | Active / Claimed proposed by PR #375; ineffective until merge | Accepted ADR-067 implementation boundary only. No code before claim merge; separate implementation PR, exact-head CI, permission/security/API review and CAS required. |
 
 ## Completed This Closeout
 

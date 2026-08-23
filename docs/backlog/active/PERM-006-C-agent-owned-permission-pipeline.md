@@ -5,27 +5,27 @@
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Ready / Unclaimed — A/B gates and ADR-067 decision are complete; awaiting separate I221 implementation claim |
+| Status | Active / Claimed proposed by PR #375; ineffective until target-branch merge |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | None for implementation; I220 Complete/Closed delivered the decision prerequisite |
+| Selected Iteration | I221 implementation claim proposed; ineffective until merge |
 | Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; awaiting I221 claim; prerequisite for PERM-006-D/E |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-23 |
+| Work Slice | PERM-006-C implementation under Accepted ADR-067; see I221 owner for exact boundaries |
+| Claimed At | 2026-08-23 |
 | Source Issue | #55 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #375 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; fresh exact-head claim CI/review/CAS required for I221. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | ADR-067 is Accepted through I220; establish a separate effective I221 claim before implementation. I213/I220 decision-only non-overlap remains historical and does not authorize C code. |
+| Handoff / Release Condition | Claim #375 is ineffective until merge. After merge, implement only I221 from the claim merge or later `main`; I213/I220 boundaries remain protected. |
 
 ## Identity / Goal / Value
 
