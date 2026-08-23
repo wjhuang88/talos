@@ -1,20 +1,22 @@
 # PERM-006-C: Agent-Owned Permission, Approval, Authorization, And Execution Pipeline
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-006-C |
 | Type | Agent / Architecture Story |
 | Priority | P0 |
-| Status | Review / Claimed; implementation candidate locally converged, exact-head review pending |
+| Status | Complete |
 | Source | [GitHub Issue #55](https://github.com/wjhuang88/talos/issues/55) |
-| Selected Iteration | I221 implementation claim effective at `main@d662501c` |
-| Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; I221 claim effective; prerequisite for PERM-006-D/E |
+| Selected Iteration | I221 Complete / Closed |
+| Depends On | PERM-006-A/I189, B/I219 and ADR-067/I220 Complete; prerequisite for PERM-006-D/E satisfied |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-23 |
 | Work Slice | PERM-006-C implementation under Accepted ADR-067; see I221 owner for exact boundaries |
@@ -22,10 +24,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; I221 claim #375 merged as `d662501c` after exact-head CI `32620749103`, independent review `5384445091` and CAS. |
+| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; claim #375 merged as `d662501c`; implementation PR #376 exact head `aed71fb4` passed CI `32640691772`, independent review `5386153429`, merge-time CAS and merge `f9e6706d`. |
 | Implementation PR | #376 |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim #375 is effective. Implementation must start from `main@d662501c` or later; I213/I220 boundaries remain protected. |
+| Handoff / Release Condition | Closed; PERM-006-D/E and TOOL-024 require separate owners and effective claims. |
 
 ## Identity / Goal / Value
 
@@ -43,8 +45,8 @@ Move permission evaluation, Ask resolution, grant installation, exact authorizat
 
 ## Dependencies
 
-PERM-006-A/I189, PERM-006-B/I219 and ADR-067/I220 are Complete. Implementation remains gated by
-a separate effective I221 claim; C remains the prerequisite for PERM-006-D/E.
+PERM-006-A/I189, PERM-006-B/I219, ADR-067/I220 and implementation I221 are Complete. C's
+prerequisite gate for PERM-006-D/E is satisfied; those children remain separately governed.
 
 ## Decision Links And Constraints
 
@@ -68,7 +70,7 @@ Characterize current cross-surface behavior before migration; retain compatibili
 ## User-Facing Documentation
 
 Update user or SDK documentation only when observable behavior or a public integration contract changes.
-Do not present this Story as shipped while it remains Review.
+Present this Story as shipped only with implementation commit `49d1546c` and merge `f9e6706d`.
 
 ## Required Reads
 
@@ -118,3 +120,19 @@ the existing event-loop stdin reader, so timeout or cancellation closes the pend
 without leaving a competing reader that can consume later input. Completion remains pending a
 pre-existing implementation commit, exact-head CI, independent
 permission/security/API review and merge-time CAS.
+
+## 2026-08-23 I221 Completion Checkpoint
+
+Completion Commit: `49d1546c3748930177655dbedc7f3665780d92ab`.
+
+I221 implementation commit `49d1546c3748930177655dbedc7f3665780d92ab` reached `main` through
+PR #376 merge `f9e6706d39a3c612061c6a1fb68e31bd24c29904`. Final exact head
+`aed71fb432086a20d1fdf2a927e0d7bf7b1f672c` passed CI `32640691772`, independent
+permission/security/API approval `5386153429` and merge-time CAS. The implementation satisfies
+the exactly-once evaluator, bounded resolver, final gate, fail-closed concurrency/deadline and
+cross-surface compatibility acceptance without changing Dashboard/I213 or excluded product lanes.
+
+The non-blocking third-party projection contract is assigned to PERM-006-E: tools whose arguments
+contain secrets must override the default `AgentTool::project_input()` before that conformance
+child can close. This status closeout cites the pre-existing implementation commit and does not
+self-certify completion.

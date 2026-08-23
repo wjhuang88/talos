@@ -1,7 +1,7 @@
 # PERM-006-C Current-Path And Migration Matrix
 
-Status: ADR-067 Accepted; I221 implementation is Active/Claimed through governance PR #375 and is
-locally converging toward its first stable Review candidate.
+Status: ADR-067 Accepted; I221 / PERM-006-C is Complete/Closed through implementation commit
+`49d1546c` and PR #376 merge `f9e6706d`.
 
 This matrix records the current permission authorities and the target migration boundary. It is
 normative together with ADR-067. It does not authorize code changes.
@@ -74,3 +74,5 @@ persistent permission data is rewritten and no approval is widened by rollback.
 - Legacy policy-bearing wrappers remain compiled only as test compatibility fixtures; production
   builds cannot select them. Serialized permission config, Runtime `ApprovalHandler`, sandbox
   fallback and TUI `/attach` boundaries are unchanged.
+- Third-party tools with secret-bearing arguments must override the default
+  `AgentTool::project_input()`; PERM-006-E owns the later documentation/conformance gate.

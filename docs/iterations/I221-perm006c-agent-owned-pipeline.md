@@ -1,6 +1,6 @@
 # Iteration I221: PERM-006-C Agent-Owned Permission Pipeline Implementation
 
-> Document status: Review / Claimed; implementation candidate is locally converged, exact-head review pending
+> Document status: Complete / Closed
 > Published plan date: 2026-08-23
 > Planned objective: implement the Accepted ADR-067 single-owner permission orchestration and
 > cross-surface migration without widening authorization or changing unrelated product lanes.
@@ -13,7 +13,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 mainline implementation session 2026-08-23 |
 | Work Slice | Implement only PERM-006-C under Accepted ADR-067: Agent-owned controller/resolver contracts; one normalized authoritative request; exactly-once evaluation; Once/Session/Deny bounded resolver; proposal/revision CAS and admission fencing; one final `AfterPermissionCheck` execution gate; fail-closed deadline/cancellation/error handling; policy-free compatibility adapters and cross-surface migration for CLI print/headless, interactive TUI, inline/RPC, embedded Runtime and standalone MCP. Preserve existing serialized configuration, Runtime `ApprovalHandler` compatibility and sandbox fallback boundary. |
@@ -21,10 +21,10 @@
 | Source Issue | #55 |
 | Governance Claim PR | #375 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; claim #375 exact head `de99de1c`, base `055e5c6b`, CI `32620749103`, independent permission/security/API review `5384445091`, merge-time CAS and merge `d662501c`. Maintainer authorization remains limited to this bounded I221 slice. |
+| Authorization Evidence | ADR-067 Accepted through PR #373 merge `5d2d2dcf`; claim #375 merged as `d662501c`; implementation PR #376 exact head `aed71fb4`, base `d662501c`, CI `32640691772`, independent permission/security/API approval `5386153429`, merge-time CAS and merge `f9e6706d`. Shared GitHub identity establishes Agent-role separation only. |
 | Implementation PR | #376 |
 | Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Claim #375 is effective at `main@d662501c`; this implementation branch starts at that merge. Completion requires pre-existing implementation commit evidence, exact-head CI, independent permission/security/API review and merge-time CAS. |
+| Handoff / Release Condition | Closed after owner-first closeout; PERM-006-D/E and TOOL-024 require separate owners and claims. |
 
 ## Published Baseline
 
@@ -82,7 +82,7 @@ semantics; a production authority overlap with I213 stops I221 immediately.
 
 ## Verification And Completion
 
-Implementation PR: #376. Completion Commit: pending.
+Implementation PR: #376. Completion Commit: `49d1546c3748930177655dbedc7f3665780d92ab`.
 The claim/activation status commit cannot self-certify implementation. Any residual compatibility
 adapter or un-migrated surface must be recorded in this owner or a declared follow-up story.
 
@@ -110,3 +110,26 @@ strict MCP proposal-hook and terminal cancellation corrections. The final exact-
 Seatbelt tests that cannot nest inside that sandbox. Three existing CLI/config tests were made
 deterministic by isolating their home/config paths after the sandbox exposed their dependence on
 the executing user's home. No Dashboard file or I213 owner artifact is changed.
+
+## 2026-08-23 Implementation Merge And Completion Checkpoint
+
+PR #376 final exact head `aed71fb432086a20d1fdf2a927e0d7bf7b1f672c`, base
+`d662501c94621f54066de2ebdc62840645d32b0f`, passed exact-head CI `32640691772` (5/5,
+including the Windows workspace) and independent permission/security/API review `5386153429`.
+Merge-time CAS confirmed the effective claim and Accepted ADR-067, stable head/base, CLEAN merge
+state, no unresolved blocking feedback and the explicit serial pause of I213 / PR #372. PR #376
+merged as `f9e6706d39a3c612061c6a1fb68e31bd24c29904`.
+
+All published acceptance rows are satisfied by pre-existing implementation commit
+`49d1546c3748930177655dbedc7f3665780d92ab`: one Agent-owned evaluator/final gate is used by the
+in-scope surfaces; exact normalized authorization and revision/request/context CAS are enforced;
+Once/Session/Deny, strict hooks, deadlines, cancellation, closure, resolver failure and stale
+state fail closed; Runtime `ApprovalHandler`, serialized permission configuration and MCP
+compatibility remain covered. No Dashboard/I213, TOOL-024, `/auto`, release or publication file
+was changed.
+
+The independent review recorded one non-blocking API residual: `AgentTool::project_input()` keeps
+the complete input by default, so a third-party tool with secret-bearing arguments must override
+that projection. PERM-006-E owns the later cross-surface documentation/conformance gate for this
+contract. Legacy policy-aware wrappers remain test-only compatibility fixtures and are not
+production-selectable. This closeout records status only and does not self-certify completion.

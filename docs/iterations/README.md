@@ -88,7 +88,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I218 | Auto Permission Security Decision | Complete / Closed | Completion Commit `a289a07f`; exact-head CI `32505438495`, independent Agent-role security review `5372825090`, CAS and PR #353 merge `c129d4a5` passed. ADR-064 Accepted; no behavior or later child authority. |
 | I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
 | I220 | PERM-006-C Agent-Owned Pipeline Decision | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf`; ADR-067 Accepted. I221 separately owns implementation. |
-| I221 | PERM-006-C Agent-Owned Pipeline Implementation | Review / Claimed | Claim #375 is effective at `main@d662501c`; local implementation candidate is converged and awaits stable candidate review, exact-head CI, permission/security/API review and CAS. |
+| I221 | PERM-006-C Agent-Owned Pipeline Implementation | Complete / Closed | Completion Commit `49d1546c`; PR #376 merged as `f9e6706d` after exact-head CI `32640691772`, independent permission/security/API approval `5386153429` and CAS. |
 
 ## Completed This Closeout
 
