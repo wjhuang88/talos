@@ -45,6 +45,7 @@ struct RetainedChunk {
 struct JobRecord {
     id: BackgroundJobId,
     tool_name: String,
+    background_resource: String,
     state: BackgroundJobState,
     chunks: VecDeque<RetainedChunk>,
     retained_bytes: usize,
@@ -62,10 +63,16 @@ struct JobRecord {
 }
 
 impl JobRecord {
-    fn starting(id: BackgroundJobId, tool_name: String, started_at_unix_ms: u64) -> Self {
+    fn starting(
+        id: BackgroundJobId,
+        tool_name: String,
+        background_resource: String,
+        started_at_unix_ms: u64,
+    ) -> Self {
         Self {
             id,
             tool_name,
+            background_resource,
             state: BackgroundJobState::Starting,
             chunks: VecDeque::new(),
             retained_bytes: 0,
@@ -350,25 +357,47 @@ impl BackgroundJobSupervisor {
         timeout_secs: u64,
         launcher: Box<dyn BackgroundJobLauncher>,
     ) -> ToolResult {
-        let can_launch = {
+        let launch_disposition = {
             match self.inner.state.lock() {
                 Ok(mut state) => {
                     state.reserved = state.reserved.saturating_sub(1);
                     if state.closing || state.shutdown_requested {
                         state.jobs.remove(&id);
-                        false
+                        0
                     } else {
                         state.active = state.active.saturating_add(1);
-                        state.launching = state.launching.saturating_add(1);
-                        true
+                        let cancelled = state
+                            .jobs
+                            .get(&id)
+                            .and_then(|job| job.cancel_token.as_ref())
+                            .is_some_and(CancellationToken::is_cancelled);
+                        if cancelled {
+                            1
+                        } else {
+                            state.launching = state.launching.saturating_add(1);
+                            2
+                        }
                     }
                 }
-                Err(_) => false,
+                Err(_) => 0,
             }
         };
-        if !can_launch {
+        if launch_disposition == 0 {
             self.inner.state_changed.notify_waiters();
             return ToolResult::error("background job admission is closed");
+        }
+        if launch_disposition == 1 {
+            let summary = self.terminalize(
+                &id,
+                BackgroundJobState::Cancelled,
+                None,
+                BackgroundCleanupOutcome::Natural,
+                None,
+            );
+            self.emit_summary(summary);
+            return ToolResult::success(
+                serde_json::json!({"job_id": id.as_str(), "state": "cancelled"}).to_string(),
+            );
         }
 
         let mut launched = match launcher.launch().await {
@@ -403,10 +432,6 @@ impl BackgroundJobSupervisor {
             .and_then(|state| state.jobs.get(&id).and_then(|job| job.cancel_token.clone()))
             .unwrap_or_default();
         if cancel_token.is_cancelled() {
-            if let Ok(mut state) = self.inner.state.lock() {
-                state.launching = state.launching.saturating_sub(1);
-            }
-            self.inner.state_changed.notify_waiters();
             let (state_value, exit_code, cleanup_outcome, cleanup_error) = self
                 .cleanup_after_signal(
                     &id,
@@ -620,7 +645,7 @@ impl BackgroundJobSupervisor {
         max_bytes: Option<usize>,
         wait_ms: Option<u64>,
     ) -> ToolResult {
-        const MAX_READ_BYTES: usize = 64 * 1024;
+        const MAX_READ_BYTES: usize = 32 * 1024;
         const MAX_WAIT_MS: u64 = 5_000;
         let max_bytes = max_bytes.unwrap_or(16 * 1024).clamp(1, MAX_READ_BYTES);
         let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
@@ -722,7 +747,7 @@ impl BackgroundJobSupervisor {
         let dropped_before = (cursor < earliest).then_some(earliest);
         let mut used = 0usize;
         let mut events = Vec::new();
-        let mut read_cursor = cursor;
+        let mut read_cursor = cursor.max(earliest);
         let mut partial = false;
         for chunk in &job.chunks {
             if chunk.cursor.saturating_add(chunk.bytes.len() as u64) <= read_cursor {
@@ -902,7 +927,12 @@ impl BackgroundJobHost for BackgroundJobSupervisor {
         state.reserved = state.reserved.saturating_add(1);
         state.jobs.insert(
             id.clone(),
-            JobRecord::starting(id.clone(), request.tool_name.clone(), started_at_unix_ms),
+            JobRecord::starting(
+                id.clone(),
+                request.tool_name.clone(),
+                request.background_resource.clone(),
+                started_at_unix_ms,
+            ),
         );
         drop(state);
         Ok(Box::new(BackgroundStartPermit {
@@ -912,6 +942,26 @@ impl BackgroundJobHost for BackgroundJobSupervisor {
             timeout_secs,
             committed: false,
         }))
+    }
+}
+
+impl BackgroundJobSupervisor {
+    pub(crate) fn permission_resource(&self, job_id: &str) -> Option<String> {
+        self.inner.state.lock().ok().and_then(|state| {
+            state
+                .jobs
+                .get(&BackgroundJobId::new(job_id))
+                .map(|job| job.background_resource.clone())
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn first_job_id(&self) -> Option<String> {
+        self.inner
+            .state
+            .lock()
+            .ok()
+            .and_then(|state| state.jobs.keys().next().map(ToString::to_string))
     }
 }
 
@@ -998,6 +1048,19 @@ fn unix_millis(time: SystemTime) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct CountingLauncher(Arc<AtomicUsize>);
+
+    #[async_trait]
+    impl BackgroundJobLauncher for CountingLauncher {
+        async fn launch(
+            self: Box<Self>,
+        ) -> Result<talos_core::background_job::LaunchedBackgroundJob, String> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err("launcher must not run".to_owned())
+        }
+    }
 
     #[test]
     fn retained_chunk_fields_remain_available_for_process_tool_follow_up() {
@@ -1040,7 +1103,12 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let id = BackgroundJobId::new("job_test");
-        let mut job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        let mut job = JobRecord::starting(
+            id.clone(),
+            "bash".to_owned(),
+            "background:bash:test".to_owned(),
+            1,
+        );
         job.state = BackgroundJobState::Running;
         job.push_output(BackgroundOutputChunk {
             stream: BackgroundOutputStream::Stdout,
@@ -1086,7 +1154,12 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let id = BackgroundJobId::new("job_large");
-        let mut job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        let mut job = JobRecord::starting(
+            id.clone(),
+            "bash".to_owned(),
+            "background:bash:test".to_owned(),
+            1,
+        );
         job.state = BackgroundJobState::Running;
         job.push_output(BackgroundOutputChunk {
             stream: BackgroundOutputStream::Stdout,
@@ -1124,11 +1197,87 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn process_read_clamps_evicted_cursor_and_single_read_to_32_kib() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = BackgroundJobId::new("job_evicted");
+        let mut job = JobRecord::starting(
+            id.clone(),
+            "bash".to_owned(),
+            "background:bash:test".to_owned(),
+            1,
+        );
+        job.state = BackgroundJobState::Running;
+        job.next_cursor = 10;
+        job.push_output(BackgroundOutputChunk {
+            stream: BackgroundOutputStream::Stdout,
+            bytes: vec![b'x'; 40 * 1024],
+            captured_at: SystemTime::UNIX_EPOCH,
+        });
+        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+
+        let result = supervisor
+            .process_action(
+                ProcessAction::Read,
+                Some("job_evicted"),
+                Some(0),
+                Some(usize::MAX),
+                None,
+            )
+            .await;
+        let value: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+        assert_eq!(value["dropped_before"], 10);
+        assert_eq!(value["events"][0]["cursor"], 10);
+        assert_eq!(value["next_cursor"], 10 + 32 * 1024);
+        assert_eq!(
+            value["events"][0]["text"].as_str().unwrap().len(),
+            32 * 1024
+        );
+    }
+
+    #[tokio::test]
+    async fn cancel_before_permit_commit_executes_zero_launchers() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let permit = supervisor
+            .reserve(BackgroundJobRequest {
+                tool_name: "bash".to_owned(),
+                timeout: Duration::from_secs(5),
+                background_resource: "background:bash:test".to_owned(),
+            })
+            .await
+            .unwrap();
+        let id = supervisor
+            .inner
+            .state
+            .lock()
+            .unwrap()
+            .jobs
+            .keys()
+            .next()
+            .unwrap()
+            .clone();
+        supervisor.process_cancel(id.as_str(), 0).await;
+        let launches = Arc::new(AtomicUsize::new(0));
+        let result = permit
+            .launch(Box::new(CountingLauncher(launches.clone())))
+            .await;
+        assert!(!result.is_error);
+        assert_eq!(launches.load(Ordering::SeqCst), 0);
+        assert_eq!(supervisor.inner.state.lock().unwrap().launching, 0);
+    }
+
+    #[tokio::test]
     async fn process_cancel_marks_starting_job_without_launching_it() {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let id = BackgroundJobId::new("job_starting");
-        let job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        let job = JobRecord::starting(
+            id.clone(),
+            "bash".to_owned(),
+            "background:bash:test".to_owned(),
+            1,
+        );
         supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
 
         let result = supervisor

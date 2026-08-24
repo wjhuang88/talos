@@ -157,6 +157,8 @@ pub struct BackgroundJobRequest {
     pub tool_name: String,
     /// Absolute lifetime, clamped by the tool to 1-600 seconds.
     pub timeout: Duration,
+    /// Exact permission resource required to control this job.
+    pub background_resource: String,
 }
 
 /// One non-cloneable capacity reservation created before permission evaluation.

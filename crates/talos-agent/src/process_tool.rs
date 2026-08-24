@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 
 use crate::background_jobs::{BackgroundJobSupervisor, ProcessAction};
 
@@ -55,12 +57,39 @@ impl AgentTool for ProcessTool {
     }
 
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
-        let nature = match input.get("action").and_then(Value::as_str) {
-            Some("cancel") => ToolNature::Execute,
-            _ => ToolNature::Read,
-        };
+        if input.get("action").and_then(Value::as_str) == Some("cancel") {
+            return input
+                .get("job_id")
+                .and_then(Value::as_str)
+                .and_then(|id| self.supervisor.permission_resource(id))
+                .map_or_else(
+                    || {
+                        vec![ToolPermissionFacet::with_resource(
+                            ToolNature::Execute,
+                            format!(
+                                "background:unknown:{}",
+                                input
+                                    .get("job_id")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("missing")
+                            ),
+                            ToolResourceKind::Command,
+                        )]
+                    },
+                    |resource| {
+                        vec![
+                            ToolPermissionFacet::with_resource(
+                                ToolNature::Execute,
+                                resource,
+                                ToolResourceKind::Command,
+                            )
+                            .with_description("cancel session-owned background job"),
+                        ]
+                    },
+                );
+        }
         vec![
-            ToolPermissionFacet::new(nature)
+            ToolPermissionFacet::new(ToolNature::Read)
                 .with_description("session-owned background job control"),
         ]
     }
@@ -99,6 +128,8 @@ impl AgentTool for ProcessTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+    use talos_core::background_job::{BackgroundJobHost, BackgroundJobRequest};
     use tokio::sync::mpsc;
 
     #[test]
@@ -125,5 +156,30 @@ mod tests {
             tool.permission_profile(&serde_json::json!({"action": "read"}))[0].nature,
             ToolNature::Read
         );
+    }
+
+    #[tokio::test]
+    async fn cancel_uses_the_exact_jobs_background_command_resource() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let _permit = supervisor
+            .reserve(BackgroundJobRequest {
+                tool_name: "bash".to_owned(),
+                timeout: Duration::from_secs(5),
+                background_resource: "background:bash:exact:test".to_owned(),
+            })
+            .await
+            .unwrap();
+        let job_id = supervisor.first_job_id().unwrap();
+        let tool = ProcessTool::new(supervisor);
+        let facet = tool
+            .permission_profile(&serde_json::json!({"action": "cancel", "job_id": job_id}))
+            .remove(0);
+        assert_eq!(facet.nature, ToolNature::Execute);
+        assert_eq!(
+            facet.resource.as_deref(),
+            Some("background:bash:exact:test")
+        );
+        assert_eq!(facet.resource_kind, Some(ToolResourceKind::Command));
     }
 }
