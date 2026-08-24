@@ -59,7 +59,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
 | [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Complete / Closed; PR #382 merged | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
-| TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
+| [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Active / Claimed through #385; ineffective until merge | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
 ## Major Risks
