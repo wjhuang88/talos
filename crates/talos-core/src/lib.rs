@@ -1,6 +1,7 @@
 //! Talos core — foundation types, core traits, and error definitions.
 
 pub mod approval;
+pub mod background_job;
 pub mod message;
 pub mod model;
 pub mod provider;

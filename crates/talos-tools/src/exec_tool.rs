@@ -9,8 +9,12 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
+use talos_core::background_job::{
+    BackgroundJobPermit, BackgroundJobRequest, ToolExecutionAdmission,
+};
 use talos_core::tool::{
-    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
+    ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -68,6 +72,9 @@ pub struct ExecInput {
     #[serde(default)]
     #[schemars(range(min = 1, max = 600))]
     pub timeout_secs: Option<u64>,
+    /// Starts one supervised live-session job instead of waiting for completion.
+    #[serde(default)]
+    pub background: bool,
     /// Sequential execution steps. When provided, top-level command fields must be omitted.
     #[serde(default)]
     pub steps: Vec<ExecStep>,
@@ -605,11 +612,92 @@ impl AgentTool for ExecTool {
         } else {
             push_step_permission_profile(&mut profile, input);
         }
+        if input.get("background").and_then(Value::as_bool) == Some(true)
+            && let Some(foreground_resource) =
+                profile.first().and_then(|facet| facet.resource.as_deref())
+        {
+            profile.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    format!("background:{}:{foreground_resource}", self.name()),
+                    ToolResourceKind::Command,
+                )
+                .with_description("exec supervised background"),
+            );
+        }
         profile
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
-        &["command", "steps", "cwd"]
+        &["command", "steps", "cwd", "background"]
+    }
+
+    fn execution_admission(&self, input: &Value) -> Result<ToolExecutionAdmission, String> {
+        let parsed = self
+            .parse_input(input.clone())
+            .map_err(|error| error.to_string())?;
+        if !parsed.background {
+            return Ok(ToolExecutionAdmission::Foreground);
+        }
+        #[cfg(windows)]
+        {
+            return Err("background_process_tree_unsupported".to_owned());
+        }
+        #[cfg(unix)]
+        {
+            if !parsed.steps.is_empty()
+                || !parsed.pipes.is_empty()
+                || parsed.mode == ExecMode::Parallel
+            {
+                return Err(
+                    "unsupported_background_shape: exec requires one top-level command".to_owned(),
+                );
+            }
+            let command = parsed.command.as_deref().unwrap_or_default();
+            if has_detached_exec_shape(command, &parsed.args) {
+                return Err("unsupported_background_shape: detached command".to_owned());
+            }
+            let timeout = parsed
+                .timeout_secs
+                .map(|seconds| Duration::from_secs(seconds.clamp(1, MAX_TIMEOUT_SECS)))
+                .unwrap_or(self.timeout);
+            Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
+                tool_name: self.name().to_owned(),
+                timeout,
+            }))
+        }
+    }
+
+    async fn execute_background_authorized_with_output(
+        &self,
+        input: Value,
+        permit: Box<dyn BackgroundJobPermit>,
+        _authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolExecutionOutput {
+        #[cfg(windows)]
+        {
+            let _ = (input, permit);
+            return ToolExecutionOutput::error("background_process_tree_unsupported");
+        }
+        #[cfg(unix)]
+        {
+            let parsed = match self.parse_input(input) {
+                Ok(parsed) if parsed.background => parsed,
+                Ok(_) => return ToolExecutionOutput::error("background intent is missing"),
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let command_name = parsed.command.as_deref().unwrap_or_default();
+            let cwd = match self.resolve_cwd(parsed.cwd.as_deref()) {
+                Ok(cwd) => cwd,
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let mut command = Command::new(command_name);
+            command.args(&parsed.args).current_dir(cwd);
+            scrub_and_apply_env(&mut command, &parsed.env);
+            crate::process_boundary::apply_process_hardening(&mut command);
+            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command);
+            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+        }
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
@@ -619,6 +707,20 @@ impl AgentTool for ExecTool {
         };
         self.run(parsed).await
     }
+}
+
+fn has_detached_exec_shape(command: &str, args: &[String]) -> bool {
+    let program = std::path::Path::new(command)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(command);
+    matches!(program, "nohup" | "daemon" | "daemonize" | "setsid")
+        || args.iter().any(|arg| {
+            matches!(
+                arg.as_str(),
+                "--daemon" | "--daemonize" | "--detach" | "--background" | "-d"
+            )
+        })
 }
 
 struct StepExecution {

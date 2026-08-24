@@ -401,7 +401,13 @@ impl PermissionEngine {
         let mut matched_rule = None;
         let mut matched_deny = None;
         for (index, rule) in self.rules.iter().enumerate() {
-            match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
+            match rule.matches(
+                tool_name,
+                nature,
+                input,
+                facet.resource.as_deref(),
+                facet.resource_kind,
+            ) {
                 Ok(true) => {
                     if matched_rule.is_none() {
                         matched_rule = Some((rule, self.rule_metadata[index]));
@@ -560,7 +566,7 @@ impl PermissionEngine {
         let mut matched_rule = None;
         let mut matched_deny = None;
         for rule in &self.rules {
-            match rule.matches(tool_name, nature, input, None) {
+            match rule.matches(tool_name, nature, input, None, None) {
                 Ok(true) => {
                     if matched_rule.is_none() {
                         matched_rule = Some(rule.decision.clone());

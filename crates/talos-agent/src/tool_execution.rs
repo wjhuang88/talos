@@ -2,6 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use futures_util::future::join_all;
+use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::message::{
     AgentEvent, ContentPart, Message, MessageToolResult, StopReason, ToolCall,
 };
@@ -424,6 +425,50 @@ impl Agent {
             ));
         }
 
+        let mut background_permit: Option<Box<dyn BackgroundJobPermit>> = match tool
+            .execution_admission(&call.input)
+        {
+            Ok(ToolExecutionAdmission::Foreground) => None,
+            Ok(ToolExecutionAdmission::Background(request)) => {
+                if self.permission_pipeline.is_none() {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "background execution requires the Agent permission pipeline",
+                        ),
+                        Vec::new(),
+                    ));
+                }
+                if call.name == "bash"
+                    && self
+                        .sandbox
+                        .as_deref()
+                        .is_some_and(SandboxProvider::is_available)
+                {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "background execution is unavailable because the configured sandbox does not expose a managed process handle",
+                        ),
+                        Vec::new(),
+                    ));
+                }
+                let Some(host) = self.background_jobs.as_deref() else {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "background execution requires a live AppServerSession",
+                        ),
+                        Vec::new(),
+                    ));
+                };
+                match host.reserve(request).await {
+                    Ok(permit) => Some(permit),
+                    Err(error) => {
+                        return Ok((ToolExecutionResult::error(error), Vec::new()));
+                    }
+                }
+            }
+            Err(error) => return Ok((ToolExecutionResult::error(error), Vec::new())),
+        };
+
         let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
         let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
             let permission_deadline_at = tokio::time::Instant::now() + self.permission_deadline;
@@ -608,12 +653,22 @@ impl Agent {
                         SandboxFallbackPolicy::Ask => false,
                     };
                     if fallback {
-                        let output = match authorizations.as_deref() {
-                            Some(grants) => {
-                                tool.execute_authorized_with_output(normalized_input, grants)
-                                    .await
+                        let output = match background_permit.take() {
+                            Some(permit) => {
+                                tool.execute_background_authorized_with_output(
+                                    normalized_input,
+                                    permit,
+                                    authorizations.as_deref().unwrap_or(&[]),
+                                )
+                                .await
                             }
-                            None => tool.execute_with_output(normalized_input).await,
+                            None => match authorizations.as_deref() {
+                                Some(grants) => {
+                                    tool.execute_authorized_with_output(normalized_input, grants)
+                                        .await
+                                }
+                                None => tool.execute_with_output(normalized_input).await,
+                            },
                         };
                         (output.result, output.next_provider_parts)
                     } else {
@@ -627,22 +682,42 @@ impl Agent {
                     }
                 }
             } else {
-                let output = match authorizations.as_deref() {
+                let output = match background_permit.take() {
+                    Some(permit) => {
+                        tool.execute_background_authorized_with_output(
+                            normalized_input,
+                            permit,
+                            authorizations.as_deref().unwrap_or(&[]),
+                        )
+                        .await
+                    }
+                    None => match authorizations.as_deref() {
+                        Some(grants) => {
+                            tool.execute_authorized_with_output(normalized_input, grants)
+                                .await
+                        }
+                        None => tool.execute_with_output(normalized_input).await,
+                    },
+                };
+                (output.result, output.next_provider_parts)
+            }
+        } else {
+            let output = match background_permit.take() {
+                Some(permit) => {
+                    tool.execute_background_authorized_with_output(
+                        normalized_input,
+                        permit,
+                        authorizations.as_deref().unwrap_or(&[]),
+                    )
+                    .await
+                }
+                None => match authorizations.as_deref() {
                     Some(grants) => {
                         tool.execute_authorized_with_output(normalized_input, grants)
                             .await
                     }
                     None => tool.execute_with_output(normalized_input).await,
-                };
-                (output.result, output.next_provider_parts)
-            }
-        } else {
-            let output = match authorizations.as_deref() {
-                Some(grants) => {
-                    tool.execute_authorized_with_output(normalized_input, grants)
-                        .await
-                }
-                None => tool.execute_with_output(normalized_input).await,
+                },
             };
             (output.result, output.next_provider_parts)
         };

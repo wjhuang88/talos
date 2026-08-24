@@ -1,16 +1,16 @@
 # TOOL-024-B: Managed Background Execution Core
 
-> Document status: Active / Claimed through PR #379 merge `48e8ae9b`
+> Document status: Review / Claimed — local stable candidate converged; implementation PR not started
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-B |
 | Type | Product / Runtime / Process-Security Story |
 | Priority | P0 |
-| Status | Active / Claimed through PR #379 merge `48e8ae9b` |
+| Status | Review / Claimed — local stable candidate converged; implementation PR not started |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I222 Active / Claimed through PR #379 merge `48e8ae9b` |
+| Selected Iteration | I222 Review / Claimed; implementation PR not started |
 | Depends On | TOOL-024-A/I188, TOOL-023-C, RUNTIME-005 and PERM-006-C/I221 Complete; ADR-060 Accepted |
 
 ## Collaboration Claim
@@ -196,3 +196,17 @@ precedence and explicit matching background rules/exact grants remain usable. Fo
 tests are mandatory. Public permission schema/config, PERM-006-D/E, `/auto`, Dashboard, CLI and
 unrelated matching behavior remain excluded. This amendment is ineffective until its governance PR
 reaches `main` after exact-head CI, independent permission/security/API review and CAS.
+
+## 2026-08-24 Local Stable Candidate Checkpoint
+
+The I222 implementation candidate is locally converged from `main@7fd813e8` after the #381
+permission amendment. It remains unpushed and is recorded as `Review / Claimed` until a stable
+remote implementation candidate receives fresh exact-head evidence.
+
+The candidate adds the Agent/session supervisor, bounded Unix launcher and Runtime finalizer,
+keeps foreground behavior default when `background` is omitted/false, applies the reserved
+`background:` permission separation, rejects Windows/detached/unsupported shapes before spawn,
+and bounds force-reap cleanup. Focused locked checks and tests pass locally; full locked
+preflight, exact-head CI, independent process/permission/unsafe/API review and CAS remain pending.
+The complete changed-file inventory is recorded in I222 and contains no CLI, Dashboard, README,
+process-tool, Windows, persistence, release or `/auto` authority.

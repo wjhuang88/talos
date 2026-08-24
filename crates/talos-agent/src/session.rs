@@ -29,6 +29,8 @@ use talos_core::session::{
 };
 use talos_session::PendingSubmissionStore;
 
+#[doc(hidden)]
+pub use crate::background_jobs::BackgroundJobFinalizerHandle;
 use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
 use crate::{ActivatedSkillContext, Agent};
@@ -112,6 +114,7 @@ fn immediate_started_turn(
 /// for the UI layer and the actor itself for spawning on a tokio task.
 pub struct AppServerSession {
     agent: Arc<Agent>,
+    background_jobs: crate::background_jobs::BackgroundJobSupervisor,
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
@@ -135,7 +138,7 @@ impl AppServerSession {
     ///
     /// Product composition roots that replace an Actor must call [`Self::set_generation`]
     /// before spawning it. Returns a [`SessionHandle`] and the actor itself.
-    pub fn new(agent: Agent, config: SessionConfig) -> (SessionHandle, Self) {
+    pub fn new(mut agent: Agent, config: SessionConfig) -> (SessionHandle, Self) {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
@@ -143,6 +146,12 @@ impl AppServerSession {
         let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
+        let background_jobs = crate::background_jobs::BackgroundJobSupervisor::new(
+            eq_tx.clone(),
+            session_id.clone(),
+            0,
+        );
+        agent.set_background_job_host(Arc::new(background_jobs.clone()));
         let pending_session_file = config
             .workspace_root
             .join(".talos")
@@ -153,6 +162,7 @@ impl AppServerSession {
 
         let actor = Self {
             agent: Arc::new(agent),
+            background_jobs,
             sq_rx,
             eq_tx,
             history: config.initial_history,
@@ -177,6 +187,8 @@ impl AppServerSession {
     /// Assigns the authoritative generation before this Actor is spawned.
     pub fn set_generation(&mut self, generation: u64) {
         self.session_generation = generation;
+        self.background_jobs
+            .set_identity(self.session_id.clone(), generation);
     }
 
     /// Installs the runtime facade's admission/start linearization seam.
@@ -200,6 +212,13 @@ impl AppServerSession {
         self.session_generation
     }
 
+    /// Returns the built-in background-job finalizer owned by this Session.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn background_job_finalizer(&self) -> BackgroundJobFinalizerHandle {
+        self.background_jobs.finalizer_handle()
+    }
+
     pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
         self.session_file = Some(file);
         self.session_dir = Some(dir);
@@ -213,6 +232,8 @@ impl AppServerSession {
     ) {
         self.pending_store = PendingSubmissionStore::for_session(&session);
         self.session_id = session.id.to_string();
+        self.background_jobs
+            .set_identity(self.session_id.clone(), self.session_generation);
         self.persistence = Some(TurnPersistence { session, metadata });
     }
 
@@ -226,6 +247,8 @@ impl AppServerSession {
         self.pending_store =
             PendingSubmissionStore::for_session_file(session.file_path(), &session_id);
         self.session_id = session_id;
+        self.background_jobs
+            .set_identity(self.session_id.clone(), self.session_generation);
         self.durable_persistence = Some(DurableTurnPersistence { session, policy });
     }
 
@@ -594,6 +617,14 @@ impl AppServerSession {
                     }
                 }
             }
+        }
+
+        if self.runtime_admission.is_none()
+            && let Err(error) = self.background_jobs.finalize().await
+        {
+            let _ = self.eq_tx.send(SessionEvent::Error {
+                message: format!("background cleanup incomplete: {error}"),
+            });
         }
     }
 
@@ -985,6 +1016,12 @@ impl AppServerSession {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for AppServerSession {
+    fn drop(&mut self) {
+        self.background_jobs.begin_shutdown();
     }
 }
 

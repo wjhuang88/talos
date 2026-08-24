@@ -85,6 +85,13 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// One live-session background job reached its unique terminal state.
+    /// This event is not persisted and never starts a provider turn.
+    BackgroundJobTerminal {
+        session_id: String,
+        session_generation: u64,
+        summary: crate::background_job::BackgroundJobTerminalSummary,
+    },
     SubmissionQueued {
         session_id: String,
         submission_id: String,

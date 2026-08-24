@@ -142,3 +142,20 @@ is paused before permission production edits. The minimum accepted correction is
 reserved background namespace, preserves explicit Deny and exact background authorization, changes
 no public schema or other permission behavior, and requires focused tests plus independent
 permission/security/API review. The local uncommitted core/agent sketch is not completion evidence.
+
+## Local Convergence Checkpoint (2026-08-24)
+
+I222/TOOL-024-B is locally converged from `main@7fd813e8` after the #381 permission amendment.
+The owner-first records are `Review / Claimed`; no implementation PR or remote candidate exists.
+Focused locked checks passed for permission (137 tests), Agent (281 tests plus integration
+fixtures), Runtime (38 tests), and Unix process-boundary launcher tests. `cargo fmt --all` and the
+focused locked check also passed. The candidate changed-file inventory is recorded in I222 and
+contains only core/agent/tools/runtime, Cargo lock/dependency metadata and the narrowly amended
+permission matcher/tests; it contains no CLI, Dashboard, README, process-tool, Windows,
+persistence, `/auto` or release authority.
+
+Next task item: run full local locked workspace/preflight, both governance validators with explicit
+`origin/main`, YAML/diff/EOF/secret/generated-residual audit, then create one stable implementation
+candidate. First push still requires fresh exact-head CI, independent process/permission/unsafe/API
+review and merge-time CAS. I213 remains independently Review/Claimed and its local duplicate
+checkpoint was withdrawn; PR #379 is the sole original pairwise contract source.

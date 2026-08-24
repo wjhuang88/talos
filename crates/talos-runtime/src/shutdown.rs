@@ -171,7 +171,6 @@ pub enum ShutdownActorOutcome {
 pub struct ShutdownFinalizerId(&'static str);
 
 impl ShutdownFinalizerId {
-    #[cfg(test)]
     pub(crate) const fn new(value: &'static str) -> Self {
         Self(value)
     }

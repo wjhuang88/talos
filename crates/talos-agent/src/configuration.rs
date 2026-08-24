@@ -109,6 +109,7 @@ impl Agent {
             tool_output_threshold: 4000,
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
+            background_jobs: None,
         }
     }
 
@@ -261,6 +262,7 @@ impl Agent {
             tool_output_threshold: 4000,
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
+            background_jobs: None,
         }
     }
 

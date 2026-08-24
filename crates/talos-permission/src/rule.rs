@@ -3,7 +3,7 @@
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::ToolNature;
+use talos_core::tool::{ToolNature, ToolResourceKind};
 use thiserror::Error;
 
 use crate::PermissionDecision;
@@ -95,10 +95,22 @@ impl PermissionRule {
         nature: ToolNature,
         input: &Value,
         explicit_resource: Option<&str>,
+        explicit_resource_kind: Option<ToolResourceKind>,
     ) -> Result<bool, PermissionError> {
+        let generic_allow_cannot_cover_background = self.decision == PermissionDecision::Allow
+            && self.resource.is_none()
+            && self.path_pattern.is_none()
+            && nature == ToolNature::Execute
+            && explicit_resource_kind == Some(ToolResourceKind::Command)
+            && explicit_resource.is_some_and(|resource| resource.starts_with("background:"));
+
         // Nature-based matching (new form)
         if let Some(rule_nature) = self.nature {
             if rule_nature != nature {
+                return Ok(false);
+            }
+
+            if generic_allow_cannot_cover_background {
                 return Ok(false);
             }
 
@@ -126,6 +138,10 @@ impl PermissionRule {
 
         // Legacy tool_name-based matching
         if self.tool_name != tool_name {
+            return Ok(false);
+        }
+
+        if generic_allow_cannot_cover_background {
             return Ok(false);
         }
 

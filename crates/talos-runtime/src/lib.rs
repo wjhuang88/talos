@@ -49,6 +49,34 @@ pub use shutdown::{
 };
 use shutdown::{RuntimeFinalizer, RuntimeFinalizerRegistry, ShutdownCoordinator};
 
+struct BackgroundJobsRuntimeFinalizer {
+    handle: talos_agent::session::BackgroundJobFinalizerHandle,
+}
+
+impl RuntimeFinalizer for BackgroundJobsRuntimeFinalizer {
+    fn identifier(&self) -> ShutdownFinalizerId {
+        ShutdownFinalizerId::new("background_jobs")
+    }
+
+    fn order(&self) -> u16 {
+        100
+    }
+
+    fn cap(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(3)
+    }
+
+    fn finalize(&self) -> shutdown::RuntimeFinalizerFuture {
+        let handle = self.handle.clone();
+        Box::pin(async move {
+            handle
+                .finalize()
+                .await
+                .map_err(|_| shutdown::RuntimeFinalizerError)
+        })
+    }
+}
+
 #[cfg(feature = "shared-composition")]
 #[doc(hidden)]
 pub mod composition;
@@ -454,8 +482,7 @@ impl RuntimeBuilder {
     /// it initiates the non-blocking default shutdown plan; use
     /// [`RuntimeHandle::shutdown`] or [`RuntimeHandle::shutdown_with`] when the
     /// host must observe terminal cleanup.
-    pub fn build(self) -> RuntimeResult<RuntimeHandle> {
-        let finalizers = RuntimeFinalizerRegistry::freeze(self.shutdown_finalizers)?;
+    pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
         #[allow(unused_mut)]
         let mut tools = self.tools;
@@ -551,6 +578,11 @@ impl RuntimeBuilder {
             model_context_limit: self.model_context_limit,
         };
         let (handle, mut actor) = AppServerSession::new(agent, config);
+        self.shutdown_finalizers
+            .push(Arc::new(BackgroundJobsRuntimeFinalizer {
+                handle: actor.background_job_finalizer(),
+            }));
+        let finalizers = RuntimeFinalizerRegistry::freeze(self.shutdown_finalizers)?;
         let admission = talos_agent::session::RuntimeAdmissionControl::new();
         actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
@@ -1233,6 +1265,7 @@ mod tests {
                 ShutdownFinalizerOutcome::Failed,
                 ShutdownFinalizerOutcome::Panicked,
                 ShutdownFinalizerOutcome::Completed,
+                ShutdownFinalizerOutcome::Completed,
             ]
         );
         assert!(!report.is_complete());
@@ -1295,6 +1328,7 @@ mod tests {
             vec![
                 ShutdownFinalizerOutcome::TimedOut,
                 ShutdownFinalizerOutcome::Completed,
+                ShutdownFinalizerOutcome::Completed,
             ]
         );
         assert!(!report.deadline_exhausted());
@@ -1350,6 +1384,7 @@ mod tests {
             vec![
                 ShutdownFinalizerOutcome::Completed,
                 ShutdownFinalizerOutcome::TimedOut,
+                ShutdownFinalizerOutcome::NotRunDeadline,
                 ShutdownFinalizerOutcome::NotRunDeadline,
             ]
         );

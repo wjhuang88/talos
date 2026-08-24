@@ -12,8 +12,12 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
+use talos_core::background_job::{
+    BackgroundJobPermit, BackgroundJobRequest, ToolExecutionAdmission,
+};
 use talos_core::tool::{
-    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+    AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
+    ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -36,6 +40,9 @@ pub struct BashInput {
     #[serde(default)]
     #[schemars(range(min = 1, max = 600))]
     pub timeout_secs: Option<u64>,
+    /// Starts one supervised live-session job instead of waiting for completion.
+    #[serde(default)]
+    pub background: bool,
 }
 
 /// A tool that executes commands via PowerShell on Windows and `sh -c` elsewhere.
@@ -133,55 +140,8 @@ impl BashTool {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         crate::process_boundary::isolate_terminal_input(&mut cmd, false);
-
         #[cfg(unix)]
-        {
-            let c_names: Vec<std::ffi::CString> =
-                talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names()
-                    .into_iter()
-                    .map(|s| std::ffi::CString::new(s).expect("valid env var name"))
-                    .collect();
-
-            // SAFETY: pre_exec closure runs post-fork/pre-exec, async-signal-safe per ADR-007.
-            // Only libc::unsetenv and libc::setrlimit are called — both async-signal-safe.
-            // No allocation, locking, formatting, or panics inside the closure.
-            unsafe {
-                cmd.pre_exec(move || {
-                    for c_name in &c_names {
-                        // SAFETY: c_name.as_ptr() is a valid NUL-terminated pointer.
-                        // libc::unsetenv is async-signal-safe (POSIX.1-2008).
-                        // ADR-007 pre-authorizes this unsafe site.
-                        libc::unsetenv(c_name.as_ptr());
-                    }
-
-                    let rlim = libc::rlimit {
-                        rlim_cur: 0,
-                        rlim_max: 0,
-                    };
-                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
-                    // ADR-007 pre-authorizes this unsafe site.
-                    libc::setrlimit(libc::RLIMIT_CORE, &rlim as *const _);
-
-                    let rlim = libc::rlimit {
-                        rlim_cur: 300,
-                        rlim_max: 300,
-                    };
-                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
-                    // ADR-007 pre-authorizes this unsafe site.
-                    libc::setrlimit(libc::RLIMIT_CPU, &rlim as *const _);
-
-                    let rlim = libc::rlimit {
-                        rlim_cur: 2 * 1024 * 1024 * 1024,
-                        rlim_max: 2 * 1024 * 1024 * 1024,
-                    };
-                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
-                    // ADR-007 pre-authorizes this unsafe site.
-                    libc::setrlimit(libc::RLIMIT_AS, &rlim as *const _);
-
-                    Ok(())
-                });
-            }
-        }
+        crate::process_boundary::apply_process_hardening(&mut cmd);
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
@@ -310,18 +270,84 @@ impl AgentTool for BashTool {
             .and_then(Value::as_str)
             .unwrap_or_default();
         let class = classify_bash_command(command);
-        vec![
-            ToolPermissionFacet::with_resource(
-                ToolNature::Execute,
-                self.permission_resource_for_command(command),
-                ToolResourceKind::Command,
-            )
-            .with_description(format!("{} {}", self.name(), class.as_str())),
-        ]
+        let foreground = ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            self.permission_resource_for_command(command),
+            ToolResourceKind::Command,
+        )
+        .with_description(format!("{} {}", self.name(), class.as_str()));
+        if input.get("background").and_then(Value::as_bool) == Some(true) {
+            let background_resource = format!(
+                "background:{}:{}",
+                self.name(),
+                self.permission_resource_for_command(command)
+            );
+            vec![
+                foreground,
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    background_resource,
+                    ToolResourceKind::Command,
+                )
+                .with_description(format!("{} supervised background", self.name())),
+            ]
+        } else {
+            vec![foreground]
+        }
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
-        &["command"]
+        &["command", "background"]
+    }
+
+    fn execution_admission(&self, input: &Value) -> Result<ToolExecutionAdmission, String> {
+        let parsed = parse_input(input.clone()).map_err(|error| error.to_string())?;
+        if !parsed.background {
+            return Ok(ToolExecutionAdmission::Foreground);
+        }
+        #[cfg(windows)]
+        {
+            return Err("background_process_tree_unsupported".to_owned());
+        }
+        #[cfg(unix)]
+        {
+            if has_detached_process_shape(&parsed.command) {
+                return Err("unsupported_background_shape: detached command".to_owned());
+            }
+            let timeout = parsed
+                .timeout_secs
+                .map(|seconds| Duration::from_secs(seconds.clamp(1, 600)))
+                .unwrap_or(self.timeout);
+            Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
+                tool_name: self.name().to_owned(),
+                timeout,
+            }))
+        }
+    }
+
+    async fn execute_background_authorized_with_output(
+        &self,
+        input: Value,
+        permit: Box<dyn BackgroundJobPermit>,
+        _authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolExecutionOutput {
+        #[cfg(windows)]
+        {
+            let _ = (input, permit);
+            return ToolExecutionOutput::error("background_process_tree_unsupported");
+        }
+        #[cfg(unix)]
+        {
+            let parsed = match parse_input(input) {
+                Ok(parsed) if parsed.background => parsed,
+                Ok(_) => return ToolExecutionOutput::error("background intent is missing"),
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let mut command = platform_shell_command(&parsed.command);
+            command.current_dir(&self.working_dir);
+            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command);
+            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+        }
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
@@ -357,7 +383,22 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
     Ok(BashInput {
         command: command.to_owned(),
         timeout_secs,
+        background: obj
+            .get("background")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     })
+}
+
+fn has_detached_process_shape(command: &str) -> bool {
+    let normalized = command.trim();
+    normalized.ends_with('&')
+        || normalized.split_whitespace().any(|token| {
+            matches!(
+                token,
+                "nohup" | "disown" | "daemon" | "daemonize" | "setsid"
+            )
+        })
 }
 
 fn bash_permission_resource(command: &str, cwd: &PathBuf) -> String {
