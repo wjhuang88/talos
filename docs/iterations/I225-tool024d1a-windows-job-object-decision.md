@@ -1,6 +1,6 @@
 # Iteration I225: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by PR #388; ineffective until merge)
 > Published plan date: 2026-08-24
 > Planned objective: decide the assigned-before-exec Windows Job Object ownership, bounded OS-ABI,
 > compatibility, migration, rollback and validation contract required before TOOL-024-D1-B.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 decision session 2026-08-24 |
+| Work Slice | Decide only the Windows Job Object prerequisite: current-path inventory; assigned-before-exec process/Job Object/primary-thread sequence; handle RAII, kill-on-close, nesting and fail-closed partial failures; bounded dependency/OS-ABI/`unsafe`; compatibility, migration, rollback, reversal triggers, exact D1-B authority inventory and Windows test matrix in ADR-068/current-path docs. No production or product behavior change. |
+| Claimed At | 2026-08-24 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #388 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer's persistent active goal authorizes Issue #59 delivery. I224 closed through PR #387 merge `3cb4eff8`; proposed #388 must pass fresh exact-head CI, independent Windows/process/unsafe/API governance review and merge-time CAS. Shared-account review proves Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim and activation are ineffective until this governance record reaches `main`; no ADR-068 decision work or production implementation begins before then. |
+| Handoff / Release Condition | Claim and activation are ineffective until #388 reaches `main`; decision work then starts from that merge or later main. D1-B implementation remains separately claimed. |
 
 ## Published Baseline
 
@@ -40,7 +40,7 @@ Planning target: `main@3cb4eff8a7e70e9b8f2c3ed1b667b2ce58f41fe4`.
 | I206-I208 | Planned / Unclaimed | Preserve ordered steering work; do not activate. |
 | I210 | Review / Claimed; corrective validation incomplete | Preserve TUI-060/#332; no overlap. |
 | I223 | Planned / Unclaimed | Keep evidence-only cleanup inactive until B/C/D heads and final integrated main exist. |
-| I225 | Planned / Unclaimed | This proposed decision-only slice; ineffective until its atomic claim reaches `main`. |
+| I225 | Active / Claimed proposal | This decision-only slice becomes effective only if #388 reaches `main`; no decision work starts from the proposal branch. |
 
 I213/Dashboard and I224/TOOL-024-C are Complete/Closed. At selection, the only open PRs targeting
 `main` are archival Drafts #120/#121; PR #387 has merged. No open D1/D2 implementation PR, D1
@@ -51,7 +51,7 @@ authority and are not reused.
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| TOOL-024-D1-A | TOOL-024 / Issue #59 | Planned / Unclaimed | I224 Complete; ADR-060 and ADR-057 Accepted | Accepted Windows Job Object/OS-ABI decision and runnable D1-B boundary; zero behavior change |
+| TOOL-024-D1-A | TOOL-024 / Issue #59 | Active / Claimed proposal | I224 Complete; ADR-060 and ADR-057 Accepted | Accepted Windows Job Object/OS-ABI decision and runnable D1-B boundary; zero behavior change |
 
 ### Scope
 
@@ -114,6 +114,7 @@ authority and are not reused.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-24 | Selection prepared | I224 closed through PR #387 merge `3cb4eff8`; fresh inventory found no D1 owner or competing proposal. I225 remains inactive pending an effective claim. |
+| 2026-08-24 | Atomic claim proposed | PR #388 binds the decision-only Work Slice and proposed Active/Claimed state. It remains ineffective until exact-head review, CI, CAS and target-branch merge. |
 
 ## Verification Evidence
 

@@ -1,33 +1,33 @@
 # TOOL-024-D1-A: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by PR #388; ineffective until merge)
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D1-A |
 | Type | Architecture / Process-Security Decision |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed (proposed; ineffective until PR #388 merges) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I225 (proposed; inactive until an effective claim reaches `main`) |
+| Selected Iteration | I225 Active / Claimed (proposed by PR #388; ineffective until merge) |
 | Depends On | TOOL-024-C / I224 Complete; ADR-060 and ADR-057 Accepted |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 decision session 2026-08-24 |
+| Work Slice | Decide only the Windows Job Object prerequisite: inventory the current Windows process path; define assigned-before-exec creation/assignment/resume, handle RAII, kill-on-close, nested-job and partial-failure semantics; select a bounded dependency/OS-ABI/`unsafe` boundary; freeze compatibility, migration, rollback, reversal triggers, D1-B authority inventory and Windows test matrix in ADR-068/current-path documentation. No Rust/Cargo/dependency, process behavior, Windows enablement, CLI/TUI, I223 execution, Dashboard/I213, permission, `/auto`, release, publication or Desktop change. |
+| Claimed At | 2026-08-24 |
 | Source Issue | #59 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #388 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer's persistent active goal authorizes completion of Issue #59. I224 closed through reviewed PR #387 merge `3cb4eff8`; #388 requires fresh exact-head CI, independent Windows/process/unsafe/API governance review and merge-time CAS before this proposed claim becomes effective. Shared GitHub account establishes Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Merge an independently reviewed atomic I225 claim before decision work; later D1-B implementation needs a separate owner, iteration and effective claim. |
+| Handoff / Release Condition | Claim and activation are ineffective until #388 merges. Decision work starts from that merge or later `main`; later D1-B implementation needs a separate owner, iteration and effective claim. |
 
 ## Identity / Goal / Value
 

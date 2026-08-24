@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B and I224/C Complete; D1-A/I225 claim proposed; D1-B/D2 and I223 remain.
+> Status: Active long task; I222/B and I224/C Complete; D1-A/I225 Active/Claimed proposed by #388 but ineffective until merge; D1-B/D2 and I223 remain.
 
 ## Startup Contract
 
@@ -221,7 +221,7 @@ open implementation PR. I213 is Complete/Closed, so there is no Dashboard concur
 reuse or reconcile.
 
 I225 and TOOL-024-D1-A now propose only the prerequisite Windows Job Object security/OS-ABI
-decision. Before claim merge they remain Planned/Unclaimed and ineffective. The decision phase must
+decision through atomic claim PR #388. Their Active/Claimed record is ineffective until merge. The decision phase must
 produce an independently reviewed current-path matrix and Accepted ADR-068 covering assigned-before-
 exec ownership, handle RAII, kill-on-close, nested Job Objects, fail-closed partial failures,
 bounded dependency/`unsafe`, compatibility, migration, rollback and the exact D1-B test/authority
