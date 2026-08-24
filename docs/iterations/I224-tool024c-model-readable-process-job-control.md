@@ -1,6 +1,6 @@
 # Iteration I224: TOOL-024-C Model-Readable Process Job Control
 
-> Document status: Review / Claimed — implementation candidate locally converged; protected review pending
+> Document status: Complete / Closed — implementation merged via PR #386; owner-first closeout pending
 > Published plan date: 2026-08-24
 > Planned objective: expose bounded session-owned `process` controls over the completed I222
 > supervisor without adding Windows, UI, persistence or autonomous-turn behavior.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-24 |
 | Work Slice | Model-visible session-scoped `process` read/status/list/cancel over I222's manager, with bounded cursors/wait/output, ownership/redaction, idempotent cancel and runtime fixture/docs; no supervisor redesign, Windows/D1, TUI/D2, Dashboard/I213, I223, persistence, `/auto`, release or Desktop. |
@@ -17,10 +17,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #385 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Protected permission/security/API review and exact-head evidence remain mandatory for implementation. |
-| Implementation PR | #386 — open; exact head is bound by PR API and CI evidence |
+| Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Protected permission/security/API review and exact-head evidence are recorded below. |
+| Implementation PR | #386 — merged as `60b0367cf749397bf1167e189e820e82e32baf03` |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Implementation started from #385 merge; keep I224 Review / Claimed until a real implementation commit and independent exact-head review exist. |
+| Handoff / Release Condition | I224 is closed with pre-existing implementation evidence. TOOL-024-D1/D2 and I223 remain separate; Windows remains fail-closed. |
 
 ## Published Baseline
 
@@ -63,11 +63,19 @@ disable only the new process-tool registration.
 
 ## Verification Evidence
 
-Pending claim and implementation.
+- Implementation PR #386 exact head `d42c060d618e61218c4c1efe0651e74830807256` was based on
+  `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`, passed exact-head CI `32719779528` (5/5), and
+  received independent permission/security/API/process approval `5394777902`.
+- It merged into `main` as `60b0367cf749397bf1167e189e820e82e32baf03` after merge-time CAS.
+  Local locked Agent/tools/runtime tests, focused check/clippy, full release preflight, both
+  governance validators and `git diff --check` passed before push.
+- The changed-file inventory remained within the agent/core/tools process-control slice; no
+  Dashboard/I213, Windows Job Object, release/publication, persistence or I223 authority was used.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot self-certify a behavior implementation.
+Completion Commit: `60b0367cf749397bf1167e189e820e82e32baf03`. This pre-existing implementation
+merge is the evidence; the closeout status commit cannot self-certify the behavior implementation.
 
 ## Execution Checkpoint (2026-08-24)
 
@@ -79,3 +87,16 @@ the candidate contains no Windows Job Object, Dashboard/I213, TUI, persistence, 
 authority. Full exact-head CI and independent review remain pending.
 Stable implementation commit: `dcdffc56` plus launch-cancel reap fix `eabb7d3a`; implementation PR #386 is open. Its exact head is resolved by PR API and bound by CI/review evidence rather than self-referential owner text.
 Completion remains pending; this status record is not implementation evidence.
+
+The preceding execution checkpoint is a preserved pre-merge record. It is superseded by the
+Completion Checkpoint below; current status and evidence are authoritative there.
+
+## Completion Checkpoint (2026-08-24)
+
+PR #386 implementation head `d42c060d618e61218c4c1efe0651e74830807256` merged into `main` as
+`60b0367cf749397bf1167e189e820e82e32baf03` after exact-head CI `32719779528`, independent
+permission/security/API/process approval `5394777902`, and merge-time CAS. The final corrective
+head isolated cancel resources by opaque job ID and preserved `BackgroundJobRequest` compatibility.
+I224 is Complete / Closed. TOOL-024-D1/D2 and I223 remain separately governed, and Issue #59
+remains open until those children and deferred validation reach their own evidence-bearing terminal
+states.
