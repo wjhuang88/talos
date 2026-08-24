@@ -22,7 +22,7 @@
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
-| Implementation PR | Not started — local stable candidate only |
+| Implementation PR | #382 — stable candidate submitted; exact-head gates pending |
 | Last Updated | 2026-08-24 |
 | Handoff / Release Condition | Local convergence is complete under GOV-008. Before the first push, finish full locked preflight, staged inventory/secret review and owner-first derived sync; then obtain fresh exact-head CI plus independent process/permission/unsafe/API review and merge-time CAS. |
 
@@ -118,8 +118,8 @@ authorization.
 
 ## Verification Evidence
 
-- Local stable candidate is based on `main@7fd813e8322621b3ecc7c12c09a728c3762b0b67` (the #381
-  merge) and has not been pushed.
+- Local stable candidate was based on `main@7fd813e8322621b3ecc7c12c09a728c3762b0b67` (the #381
+  merge); implementation PR #382 now carries the submitted candidate.
 - `cargo check --offline --locked -p talos-core -p talos-permission -p talos-tools --features shell -p talos-agent -p talos-runtime --features shared-composition` passed.
 - `cargo test --offline --locked -p talos-permission -p talos-agent -p talos-runtime` passed:
   permission 137, Agent 281 plus its integration fixtures, Runtime 38.

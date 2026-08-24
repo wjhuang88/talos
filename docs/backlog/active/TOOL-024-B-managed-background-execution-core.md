@@ -7,7 +7,7 @@
 | Story ID | TOOL-024-B |
 | Type | Product / Runtime / Process-Security Story |
 | Priority | P0 |
-| Status | Review / Claimed — local stable candidate converged; implementation PR not started |
+| Status | Review / Claimed — implementation PR #382; exact-head gates pending |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
 | Selected Iteration | I222 Review / Claimed; implementation PR not started |
@@ -28,7 +28,7 @@
 | Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim/activation is effective through #379 merge `48e8ae9b`; implementation starts from that merge or later main and remains inside the recorded file/authority boundary. |
+| Handoff / Release Condition | Implementation PR #382 is a stable candidate; obtain fresh exact-head CI, independent process/permission/unsafe/API review and merge-time CAS before merge. Preserve the recorded file/authority boundary and keep I222 in Review until owner-first closeout. |
 
 ## Identity / Goal / Value
 
