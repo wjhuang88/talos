@@ -40,7 +40,7 @@ Planning target: `main@3cb4eff8a7e70e9b8f2c3ed1b667b2ce58f41fe4`.
 | I206-I208 | Planned / Unclaimed | Preserve ordered steering work; do not activate. |
 | I210 | Review / Claimed; corrective validation incomplete | Preserve TUI-060/#332; no overlap. |
 | I223 | Planned / Unclaimed | Keep evidence-only cleanup inactive until B/C/D heads and final integrated main exist. |
-| I225 | Active / Claimed | Effective on `main@2afcdc3e` after claim PR #388 merge; decision work starts from this merge or later. |
+| I225 | Planned / Unclaimed | This proposed decision-only slice; ineffective until its atomic claim reaches `main`. |
 
 I213/Dashboard and I224/TOOL-024-C are Complete/Closed. At selection, the only open PRs targeting
 `main` are archival Drafts #120/#121; PR #387 has merged. No open D1/D2 implementation PR, D1
@@ -125,7 +125,10 @@ authority and are not reused.
 
 ## Verification Evidence
 
-- Pending atomic claim merge and later decision evidence.
+- Claim activation is evidenced by PR #388 exact head `e0c65c52`, base `3cb4eff8`, CI
+  `32729210800`, independent approval `5395556844`, merge-time CAS and merge `2afcdc3e`.
+- ADR-068 and the current-path/authority decision evidence remain pending; no implementation or
+  Windows background enablement is authorized by I225.
 
 ## Completion Evidence
 

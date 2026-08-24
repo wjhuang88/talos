@@ -27,7 +27,7 @@
 | Authorization Evidence | Maintainer's persistent active goal authorizes completion of Issue #59. I224 closed through reviewed PR #387 merge `3cb4eff8`; claim PR #388 exact head `e0c65c52`, CI `32729210800`, independent Windows/process/unsafe/API governance approval `5395556844`, merge-time CAS and merge `2afcdc3e` establish this claim on `main`. Shared GitHub account establishes Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Decision work starts from `main@2afcdc3e` or later; later D1-B implementation needs a separate owner, iteration and effective claim. |
+| Handoff / Release Condition | Claim is effective on `main@2afcdc3e`; ADR-068/current-path decision evidence is pending. Later D1-B implementation needs a separate owner, iteration and effective claim. |
 
 ## Identity / Goal / Value
 
