@@ -1,23 +1,23 @@
 # TOOL-024-B: Managed Background Execution Core
 
-> Document status: Review / Claimed — local stable candidate converged; implementation PR not started
+> Document status: Complete / Closed — implementation merged via PR #382; owner-first closeout recorded
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-B |
 | Type | Product / Runtime / Process-Security Story |
 | Priority | P0 |
-| Status | Review / Claimed — implementation PR #382; exact-head gates pending |
+| Status | Complete / Closed — implementation PR #382 merged |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I222 Review / Claimed; implementation PR not started |
+| Selected Iteration | I222 Complete / Closed |
 | Depends On | TOOL-024-A/I188, TOOL-023-C, RUNTIME-005 and PERM-006-C/I221 Complete; ADR-060 Accepted |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
 | Work Slice | Implement only TOOL-024-B/I222 under Accepted ADR-060: Agent/session-owned Unix supervisor; default-false background input for bash and one top-level exec; semantic pre-admission; exact background permission facet; bounded receipt, state, output and terminal event; checked process-group termination/reap; ordinary AppServerSession and Runtime finalizer cleanup. Permission authority is limited to making a resource-less generic Execute Allow degrade to Ask for the reserved `background:` Command namespace, with Deny precedence and focused tests; no public permission schema or PERM-006-D/E behavior. Windows and unsupported/detached shapes fail closed. No process tool, CLI/TUI/Dashboard projection, Windows spawn, persistence, `/auto`, release or later TOOL-024 child. |
@@ -26,9 +26,13 @@
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
-| Implementation PR | Not started |
+| Implementation PR | #382 — merged as `8671edf45c168612bfa4a4bbb65a9847026e1b96` |
+| Completion Commit | `8671edf45c168612bfa4a4bbb65a9847026e1b96` |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Implementation PR #382 is a stable candidate; obtain fresh exact-head CI, independent process/permission/unsafe/API review and merge-time CAS before merge. Preserve the recorded file/authority boundary and keep I222 in Review until owner-first closeout. |
+| Handoff / Release Condition | B is closed with pre-existing implementation evidence. TOOL-024-C, D1, D2 and I223 require separate ordered governance and remain outside this owner. |
+
+Completion Commit: `8671edf45c168612bfa4a4bbb65a9847026e1b96`. This pre-existing implementation
+merge is the evidence for closure; the closeout status commit cannot serve as its own evidence.
 
 ## Identity / Goal / Value
 

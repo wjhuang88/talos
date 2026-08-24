@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Claimed coordination and I222 Active/Claimed through PR #379 merge `48e8ae9b`.
+> Status: Active long task; I222/TOOL-024-B Complete through implementation merge `8671edf4`; C/D and I223 remain.
 
 ## Startup Contract
 
@@ -85,7 +85,7 @@ work; new corrective owners for failed Issue #378 rows; release and Desktop owne
 |---|---|---|---|---|
 | G0 | Effective task coordination plus TOOL-024-B/I222 claim and activation | Governance-only PR on main; validators/CI/review/CAS | Current main inventory | Leave all work Unclaimed |
 | B | Unix Agent/session supervisor core | Implementation merge plus exact-head security/CI/CAS; V59-B1 queued | G0 | Fail closed; no background spawn |
-| B-close | I222/TOOL-024-B owner-first Review disposition | Pre-existing implementation SHA and Issue #378 head binding | B | Keep Review; do not start C if machine/security gates fail |
+| B-close | I222/TOOL-024-B owner-first closeout | Pre-existing implementation merge `8671edf4`, exact-head evidence and review | B | Keep B Review only if implementation evidence or protected gates fail |
 | C-claim | Separate TOOL-024-C owner/iteration/effective claim | Governance-only merge | B machine/security merge disposition | Keep C Blocked |
 | C | Model-readable session-scoped `process` tool | Implementation merge plus exact-head security/CI/CAS; V59-C1 queued | C-claim | Keep B receipts only; no model control |
 | D1-decision | Accepted Windows Job Object/OS-ABI ADR under separate owner | Decision PR CI/security review/CAS | C | Windows stays fail closed |
@@ -109,8 +109,9 @@ overlapping work. C/D2 must recompute overlap and cannot reuse this authorizatio
 
 Completed task items: dependency chain through PERM-006-C and validation tracker #378 creation.
 
-Current state and artifacts: PR #379 proposes TOOL-024-B/I222 Active/Claimed from
-`main@e1c375e6`; the proposal is ineffective until merge. I223 remains Planned/Unclaimed.
+Current state and artifacts: PR #379 activated TOOL-024-B/I222, and implementation PR #382 merged
+as `8671edf45c168612bfa4a4bbb65a9847026e1b96`. I222/TOOL-024-B are now Complete/Closed through
+owner-first closeout; I223 remains Planned/Unclaimed and C/D require separate claims.
 
 Commands/checks and actual results: repository/worktree/open-PR and nonterminal iteration inventory
 completed; governance validation pending finalized Draft claim.
@@ -146,7 +147,8 @@ permission/security/API review. The local uncommitted core/agent sketch is not c
 ## Local Convergence Checkpoint (2026-08-24)
 
 I222/TOOL-024-B is locally converged from `main@7fd813e8` after the #381 permission amendment.
-The owner-first records are `Review / Claimed`; no implementation PR or remote candidate exists.
+The owner-first records were `Review / Claimed` before PR #382; that candidate is now merged and
+the closeout records the pre-existing implementation merge as Completion Commit.
 Focused locked checks passed for permission (137 tests), Agent (281 tests plus integration
 fixtures), Runtime (38 tests), and Unix process-boundary launcher tests. `cargo fmt --all` and the
 focused locked check also passed. The candidate changed-file inventory is recorded in I222 and
@@ -154,8 +156,23 @@ contains only core/agent/tools/runtime, Cargo lock/dependency metadata and the n
 permission matcher/tests; it contains no CLI, Dashboard, README, process-tool, Windows,
 persistence, `/auto` or release authority.
 
+## I222 Completion Checkpoint (2026-08-24)
+
+PR #382 implementation merged into latest `main` as `8671edf45c168612bfa4a4bbb65a9847026e1b96`.
+Exact head `01aa8b6a` passed CI `32690533253` 5/5; independent process/permission/unsafe/API
+review and final exact-head governance review approved. B is complete; C-claim is the next
+ordered item, while Windows D1/D2 and I223 remain gated and Issue #59 stays open.
+
 Next task item: run full local locked workspace/preflight, both governance validators with explicit
 `origin/main`, YAML/diff/EOF/secret/generated-residual audit, then create one stable implementation
 candidate. First push still requires fresh exact-head CI, independent process/permission/unsafe/API
 review and merge-time CAS. I213 remains independently Review/Claimed and its local duplicate
 checkpoint was withdrawn; PR #379 is the sole original pairwise contract source.
+
+## Post-merge Closeout Supersession (2026-08-24)
+
+The preceding local-convergence "next task" instruction is historical and is superseded by the
+merged implementation and owner-first closeout above. Do not create another I222 implementation
+candidate or repeat its CI/review. The next ordered governance action is a separately claimed
+TOOL-024-C owner/iteration; Windows D1/D2 and I223 remain independent gates, and Issue #59 stays
+open until all required children reach their own evidence-bearing terminal states.

@@ -1,6 +1,6 @@
 # Iteration I222: TOOL-024-B Managed Background Execution Core
 
-> Document status: Review / Claimed — local stable candidate converged; implementation PR not started
+> Document status: Complete / Closed — implementation merged via PR #382; owner-first closeout recorded
 > Published plan date: 2026-08-23
 > Planned objective: implement ADR-060's bounded Unix Agent/session-owned background execution core
 > without starting TOOL-024-C/D or overlapping I213 Dashboard/CLI production authority.
@@ -13,7 +13,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-23 |
 | Work Slice | Implement only TOOL-024-B under Accepted ADR-060: Unix Agent/session-owned supervisor, semantic pre-admission, exact background permission, bounded receipt/output/state/event, checked same-process-group cancellation/reap, and ordinary Session plus Runtime finalizer cleanup. Permission authority is limited to making a resource-less generic Execute Allow degrade to Ask for the reserved `background:` Command namespace, with explicit Deny precedence and focused tests; no public permission schema or PERM-006-D/E behavior. Windows/detached/unsupported shapes fail closed. Exclude TOOL-024-C/D, CLI/TUI/Dashboard/I213 production files, persistence, `/auto`, release and unrelated permission behavior. |
@@ -22,9 +22,9 @@
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
-| Implementation PR | #382 — stable candidate submitted; exact-head gates pending |
+| Implementation PR | #382 — merged as `8671edf45c168612bfa4a4bbb65a9847026e1b96` |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Local convergence is complete under GOV-008. Before the first push, finish full locked preflight, staged inventory/secret review and owner-first derived sync; then obtain fresh exact-head CI plus independent process/permission/unsafe/API review and merge-time CAS. |
+| Handoff / Release Condition | I222 is closed with implementation evidence. TOOL-024-C requires its own owner, runnable iteration and effective claim; Windows D1/D2 and I223 remain separate. |
 
 ## Published Baseline
 
@@ -149,10 +149,10 @@ tool, Windows implementation, persistence or release file is in this candidate.
 
 ## Completion Evidence
 
-- Implementation PR: Not started.
-- Completion Commit: Pending.
-- A status-only commit cannot self-certify implementation; Deferred Human Validation keeps I222 in
-  Review until I223 resolves V59-B1.
+- Implementation PR: #382 (merged as `8671edf45c168612bfa4a4bbb65a9847026e1b96`).
+- Completion Commit: `8671edf45c168612bfa4a4bbb65a9847026e1b96` (pre-existing implementation merge).
+- I223/Issue #378 remains a separate deferred validation cleanup and does not block this B owner
+  closeout; it remains required for final Issue #59 closure.
 
 ## Variance And Residuals
 
