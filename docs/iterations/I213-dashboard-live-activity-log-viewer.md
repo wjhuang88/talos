@@ -1,6 +1,6 @@
 # Iteration I213: Dashboard Live Activity And Log Viewer
 
-> Document status: Review / Claimed — implementation PR #372 locally rebased onto `main@7fd813e8`; refreshed exact-head gates pending
+> Document status: Complete / Closed — implementation PR #372 merged as `9f963d0ca662f334fe007d0fcfc857640a2a5bd6`; owner-first closeout recorded
 > Published plan date: 2026-08-20
 > Proposed activation date: 2026-08-22
 > Planned objective: deliver one bounded, loopback-only, GET/read-only realtime Dashboard observation
@@ -25,9 +25,9 @@
 | Activation PR | #363 — merged as `e578f4196092d0884ab7dd3321fb62acb3b88257` |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent GLM-5.3 / OhMyOpenCode claim review, merge-time inventory/CAS, and merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. The maintainer authorized bounded I219/I213 parallel execution on 2026-08-22; activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS under the recorded single-maintainer activation path, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`. |
-| Implementation PR | #372 — stable candidate submitted; local owner-first union rebased onto `main@7fd813e8` |
+| Implementation PR | #372 — merged as `9f963d0ca662f334fe007d0fcfc857640a2a5bd6` |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Finish local convergence on `main@7fd813e8`, push the refreshed stable candidate to #372, obtain fresh exact-head CI and independent security review, then repeat ownership/file-overlap CAS before merge. Preserve all controlled pairwise exceptions and do not mark Complete in the implementation PR. |
+| Handoff / Release Condition | Implementation is merged. Completion evidence is recorded below; residual Dashboard control, remote and token-delivery work remains separately owned. |
 
 The Collaboration Claim is effective on `main` through merge `66747214`; implementation activation
 is effective through #363 merge `e578f419`. Issue #366 coordinates execution only and creates no
@@ -399,13 +399,22 @@ WEB-001-B/I213 owners, and union-preserving derived views in `docs/backlog/PRODU
   `e1c375e6`; #379 head `5f0816aa` passed CI `32650593056`, independent review `5386970071` and
   merge-time CAS before merge `48e8ae9b`. I222-B excludes CLI/Dashboard/README and the I213
   17-file production inventory; shared derived files retain union semantics.
-- Remote evidence: fresh exact-head CI and independent security-focused review pending after the
-  latest-main rebase push.
+- Final remote evidence: exact-head CI run `32680547034` passed 5/5; independent security-focused APPROVE `5390029881` is bound to head `a64a4470102983eb67b8f5cd14f46396ce8bcff1` / base `7fd813e8`; implementation merge `9f963d0ca662f334fe007d0fcfc857640a2a5bd6` completed the slice.
+
+## Completion Checkpoint — 2026-08-24
+
+- Exact implementation head: `a64a4470102983eb67b8f5cd14f46396ce8bcff1` (the implementation merge is `9f963d0ca662f334fe007d0fcfc857640a2a5bd6`).
+- Implementation PR #372 exact head `a64a4470102983eb67b8f5cd14f46396ce8bcff1` was merged to `main@7fd813e8322621b3ecc7c12c09a728c3762b0b67` as merge commit `9f963d0ca662f334fe007d0fcfc857640a2a5bd6`.
+- Exact-head CI run `32680547034` passed 5/5, including Linux, Windows, governance and installer checks.
+- Independent security-focused exact-head APPROVE is recorded in review comment `5390029881`, bound to the exact head/base; shared Agent-role identity disclosure is retained.
+- Merge-time CAS was recorded on Issue #366 before merge: latest main unchanged, PR head unchanged, I222-B #382 remained within the bounded non-overlapping contract, and the 17-file I213 inventory contained no I222/TOOL-024 production or permission implementation files.
+- The implementation scope remains exactly the bounded Dashboard/live-activity deliverable. No permission, Runtime, I222, TOOL-024 or ADR-060 implementation authority was transferred.
 
 ## Completion Evidence
 
-- Completion Commit: Pending
-- Future closeout must cite an already-existing implementation/merge SHA; it may not self-certify.
+- Completion Commit: `9f963d0ca662f334fe007d0fcfc857640a2a5bd6` (implementation merge for PR #372)
+- Implementation PR: #372; exact head `a64a4470102983eb67b8f5cd14f46396ce8bcff1` merged to `main@7fd813e8` as the completion commit above.
+- Owner-first closeout PR #383 carries this evidence; it does not self-certify the implementation.
 
 ## Variance And Residuals
 
