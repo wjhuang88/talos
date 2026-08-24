@@ -909,10 +909,32 @@ impl BackgroundJobHost for BackgroundJobSupervisor {
         &self,
         request: BackgroundJobRequest,
     ) -> Result<Box<dyn BackgroundJobPermit>, String> {
+        self.reserve_inner(request, None)
+    }
+
+    async fn reserve_with_permission_resource(
+        &self,
+        request: BackgroundJobRequest,
+        start_resource: Option<String>,
+    ) -> Result<Box<dyn BackgroundJobPermit>, String> {
+        self.reserve_inner(request, start_resource)
+    }
+}
+
+impl BackgroundJobSupervisor {
+    fn reserve_inner(
+        &self,
+        request: BackgroundJobRequest,
+        start_resource: Option<String>,
+    ) -> Result<Box<dyn BackgroundJobPermit>, String> {
         let id = BackgroundJobId::new(format!("job_{}", uuid::Uuid::new_v4()));
         let deadline = Instant::now() + request.timeout;
         let timeout_secs = request.timeout.as_secs();
         let started_at_unix_ms = unix_millis(SystemTime::now());
+        let control_resource = start_resource.map_or_else(
+            || format!("background:{}:job:{}", request.tool_name, id.as_str()),
+            |resource| format!("{resource}:job:{}", id.as_str()),
+        );
         let mut state = self
             .inner
             .state
@@ -930,7 +952,7 @@ impl BackgroundJobHost for BackgroundJobSupervisor {
             JobRecord::starting(
                 id.clone(),
                 request.tool_name.clone(),
-                request.background_resource.clone(),
+                control_resource,
                 started_at_unix_ms,
             ),
         );
@@ -956,12 +978,12 @@ impl BackgroundJobSupervisor {
     }
 
     #[cfg(test)]
-    pub(crate) fn first_job_id(&self) -> Option<String> {
+    pub(crate) fn job_ids(&self) -> Vec<String> {
         self.inner
             .state
             .lock()
-            .ok()
-            .and_then(|state| state.jobs.keys().next().map(ToString::to_string))
+            .map(|state| state.jobs.keys().map(ToString::to_string).collect())
+            .unwrap_or_default()
     }
 }
 
@@ -1243,7 +1265,6 @@ mod tests {
             .reserve(BackgroundJobRequest {
                 tool_name: "bash".to_owned(),
                 timeout: Duration::from_secs(5),
-                background_resource: "background:bash:test".to_owned(),
             })
             .await
             .unwrap();

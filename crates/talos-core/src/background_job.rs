@@ -157,8 +157,6 @@ pub struct BackgroundJobRequest {
     pub tool_name: String,
     /// Absolute lifetime, clamped by the tool to 1-600 seconds.
     pub timeout: Duration,
-    /// Exact permission resource required to control this job.
-    pub background_resource: String,
 }
 
 /// One non-cloneable capacity reservation created before permission evaluation.
@@ -176,6 +174,18 @@ pub trait BackgroundJobHost: Send + Sync {
         &self,
         request: BackgroundJobRequest,
     ) -> Result<Box<dyn BackgroundJobPermit>, String>;
+
+    /// Reserves capacity while retaining the already-normalized start permission resource.
+    ///
+    /// The default preserves compatibility for external hosts. Hosts that expose later job
+    /// control should override this method and derive a job-unique control resource.
+    async fn reserve_with_permission_resource(
+        &self,
+        request: BackgroundJobRequest,
+        _start_resource: Option<String>,
+    ) -> Result<Box<dyn BackgroundJobPermit>, String> {
+        self.reserve(request).await
+    }
 }
 
 /// Observable cleanup result for one terminal job.

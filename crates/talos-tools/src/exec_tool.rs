@@ -664,15 +664,6 @@ impl AgentTool for ExecTool {
             Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
                 tool_name: self.name().to_owned(),
                 timeout,
-                background_resource: self
-                    .permission_profile(input)
-                    .into_iter()
-                    .find_map(|facet| {
-                        facet
-                            .resource
-                            .filter(|resource| resource.starts_with("background:"))
-                    })
-                    .ok_or_else(|| "background permission resource unavailable".to_owned())?,
             }))
         }
     }

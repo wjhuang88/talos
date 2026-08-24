@@ -321,11 +321,6 @@ impl AgentTool for BashTool {
             Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
                 tool_name: self.name().to_owned(),
                 timeout,
-                background_resource: format!(
-                    "background:{}:{}",
-                    self.name(),
-                    self.permission_resource_for_command(&parsed.command)
-                ),
             }))
         }
     }

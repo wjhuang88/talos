@@ -162,24 +162,48 @@ mod tests {
     async fn cancel_uses_the_exact_jobs_background_command_resource() {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
-        let _permit = supervisor
-            .reserve(BackgroundJobRequest {
-                tool_name: "bash".to_owned(),
-                timeout: Duration::from_secs(5),
-                background_resource: "background:bash:exact:test".to_owned(),
-            })
+        let _permit1 = supervisor
+            .reserve_with_permission_resource(
+                BackgroundJobRequest {
+                    tool_name: "bash".to_owned(),
+                    timeout: Duration::from_secs(5),
+                },
+                Some("background:bash:exact:test".to_owned()),
+            )
             .await
             .unwrap();
-        let job_id = supervisor.first_job_id().unwrap();
+        let _permit2 = supervisor
+            .reserve_with_permission_resource(
+                BackgroundJobRequest {
+                    tool_name: "bash".to_owned(),
+                    timeout: Duration::from_secs(5),
+                },
+                Some("background:bash:exact:test".to_owned()),
+            )
+            .await
+            .unwrap();
+        let job_ids = supervisor.job_ids();
+        assert_eq!(job_ids.len(), 2);
         let tool = ProcessTool::new(supervisor);
-        let facet = tool
-            .permission_profile(&serde_json::json!({"action": "cancel", "job_id": job_id}))
-            .remove(0);
-        assert_eq!(facet.nature, ToolNature::Execute);
-        assert_eq!(
-            facet.resource.as_deref(),
-            Some("background:bash:exact:test")
+        let resources = job_ids
+            .iter()
+            .map(|job_id| {
+                let facet = tool
+                    .permission_profile(&serde_json::json!({
+                        "action": "cancel",
+                        "job_id": job_id,
+                    }))
+                    .remove(0);
+                assert_eq!(facet.nature, ToolNature::Execute);
+                assert_eq!(facet.resource_kind, Some(ToolResourceKind::Command));
+                facet.resource.unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_ne!(resources[0], resources[1]);
+        assert!(
+            resources
+                .iter()
+                .all(|resource| resource.starts_with("background:bash:exact:test:job:"))
         );
-        assert_eq!(facet.resource_kind, Some(ToolResourceKind::Command));
     }
 }

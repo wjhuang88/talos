@@ -425,6 +425,14 @@ impl Agent {
             ));
         }
 
+        let permission_profile = tool.permission_profile(&call.input);
+        let background_start_resource = permission_profile.iter().find_map(|facet| {
+            facet
+                .resource
+                .as_ref()
+                .filter(|resource| resource.starts_with("background:"))
+                .cloned()
+        });
         let mut background_permit: Option<Box<dyn BackgroundJobPermit>> = match tool
             .execution_admission(&call.input)
         {
@@ -459,7 +467,10 @@ impl Agent {
                         Vec::new(),
                     ));
                 };
-                match host.reserve(request).await {
+                match host
+                    .reserve_with_permission_resource(request, background_start_resource.clone())
+                    .await
+                {
                     Ok(permit) => Some(permit),
                     Err(error) => {
                         return Ok((ToolExecutionResult::error(error), Vec::new()));
@@ -517,12 +528,11 @@ impl Agent {
                 }
             }
 
-            let profile = tool.permission_profile(&call.input);
             let authorization = pipeline
                 .authorize(PermissionAuthorizationRequest {
                     tool_name: &call.name,
                     provenance: tool.provenance(),
-                    profile: &profile,
+                    profile: &permission_profile,
                     input: &call.input,
                     presentation_input: tool.project_input(&call.input),
                     summary_fields: tool
