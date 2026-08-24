@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A Complete; B Review / Claimed with local stable candidate; implementation PR not started)
+**Status**: Partial (A/B Complete; C/D and deferred validation remain)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -58,7 +58,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | ID | Title | Type | Status | Depends On | Deliverable |
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
-| [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Review / Claimed; local stable candidate, implementation PR not started | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
+| [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Complete / Closed; PR #382 merged | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
 | TOOL-024-C | Model-Readable Process Job Control | Product/Tool Story | Blocked | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
@@ -111,7 +111,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
   `1db1211e2fedeab277db366c3c76db0239691732` from independently reviewed exact head `d7d4fe7a`.
 - ADR-060 is Accepted as a decision contract only. No production background process, tool/API,
   permission-policy, persistence, dependency, `unsafe`, Desktop or Dashboard behavior was added.
-- TOOL-024-B remains Blocked until RUNTIME-005 and PERM-006-C are Complete. TOOL-024-C remains
+- TOOL-024-B is Complete / Closed through PR #382 merge `8671edf45c168612bfa4a4bbb65a9847026e1b96`. TOOL-024-C remains
   blocked on B, and Windows spawn remains fail-closed until D's separate Job Object/OS-ABI gate.
 
 ## Completion Condition
@@ -161,3 +161,11 @@ Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-r
 `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. B/I222 is now
 Active/Claimed. Implementation starts from that merge or later `main`; the authorization remains
 limited to the exact I213/I222-B non-overlapping pair and does not activate C/D or Windows spawn.
+
+## TOOL-024-B Completion Checkpoint (2026-08-24)
+
+Implementation PR #382 was merged into `main` as `8671edf45c168612bfa4a4bbb65a9847026e1b96`.
+The I222 and TOOL-024-B owners record that pre-existing merge as their Completion Commit. Exact-head
+CI `32690533253` passed 5/5 for head `01aa8b6a`; independent process/permission/unsafe/API review
+approved the implementation at `fc28d821`, and the final governance-only exact-head review approved
+`01aa8b6a` with both validators passing. TOOL-024-C/D and I223 remain separately governed.
