@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
+
 use super::{
     ToolBackend, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolProvenance, ToolResult, ToolResultProjection,
@@ -27,6 +29,29 @@ pub trait AgentTool: Send + Sync {
     /// the associated `Parameters` type. Override this method to provide a
     /// custom schema.
     fn parameters(&self) -> Value;
+
+    /// Selects and validates the execution mode before permission evaluation.
+    ///
+    /// Schema validation remains owned by [`ToolRegistry`](super::ToolRegistry).
+    /// Tools use this hook only for constraints that must fail before an
+    /// approval/grant can be installed, such as unsupported background process
+    /// shapes or platforms. The default preserves existing behavior.
+    fn execution_admission(&self, _input: &Value) -> Result<ToolExecutionAdmission, String> {
+        Ok(ToolExecutionAdmission::Foreground)
+    }
+
+    /// Commits a semantically admitted background execution after permission succeeds.
+    ///
+    /// Only tools with an explicit background contract override this method. The default fails
+    /// closed so remote or standalone composition roots cannot start unmanaged processes.
+    async fn execute_background_authorized_with_output(
+        &self,
+        _input: Value,
+        _permit: Box<dyn BackgroundJobPermit>,
+        _authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolExecutionOutput {
+        ToolExecutionOutput::error("background execution is not supported for this tool")
+    }
 
     /// Executes the tool with the given input and returns a result.
     ///

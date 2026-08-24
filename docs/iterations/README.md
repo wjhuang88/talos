@@ -89,7 +89,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I219 | PERM-006-B First-Class Scoped Grants | Complete / Closed | Completion Commits `56436027`/`d0c96048`; exact head `97028ac0` passed CI `32579790496`, independent Agent-role review `5381051760`, CAS and PR #368 merge `de79ad46`. C and TOOL-024 stay blocked. |
 | I220 | PERM-006-C Agent-Owned Pipeline Decision | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf`; ADR-067 Accepted. I221 separately owns implementation. |
 | I221 | PERM-006-C Agent-Owned Pipeline Implementation | Complete / Closed | Completion Commit `49d1546c`; PR #376 merged as `f9e6706d` after exact-head CI `32640691772`, independent permission/security/API approval `5386153429` and CAS. |
-| I222 | TOOL-024-B Managed Background Execution Core | Active / Claimed; permission amendment pending | PR #379 merged as `48e8ae9b`; implementation is paused before permission edits until the narrow reserved-`background:` matcher/test amendment reaches `main`. No public permission schema, CLI/Dashboard/I213 or Windows spawn authority. |
+| I222 | TOOL-024-B Managed Background Execution Core | Review / Claimed; local stable candidate, implementation PR not started | PR #379 merged as `48e8ae9b`; local locked focused checks pass from `main@7fd813e8`. Full preflight, fresh exact-head CI, independent process/permission/unsafe/API review and CAS remain pending. No public permission schema, CLI/Dashboard/I213 or Windows spawn authority. |
 | I223 | Issue #59 Deferred Human Validation Cleanup | Planned / Unclaimed | Evidence-only Issue #378 cleanup after B/C/D implementation heads exist; no behavior implementation authority. |
 
 ## Completed This Closeout

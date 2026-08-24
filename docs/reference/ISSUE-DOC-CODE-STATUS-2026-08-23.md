@@ -62,7 +62,6 @@ in earlier reconciliation snapshots.
 | [#360](https://github.com/wjhuang88/talos/issues/360) | server remote relational persistence profile | [SERVER-002](../backlog/active/SERVER-002-remote-relational-persistence-profile.md) | Intake / Unclaimed | Separate refinement/ADR/iteration/claim required. |
 | [#361](https://github.com/wjhuang88/talos/issues/361) | standalone `talos-server` host composition | [SERVER-001-C](../backlog/active/SERVER-001-C-standalone-server-host-composition.md) | Intake / Unclaimed | Reuse existing runtime authorities; no implementation before separate governance. |
 | [#362](https://github.com/wjhuang88/talos/issues/362) | optional S3-compatible object-storage workspace | [TOOL-027](../backlog/active/TOOL-027-s3-object-workspace-backend.md) | Intake / Unclaimed | Optional object-workspace tools only; no implementation claim. |
-| [#366](https://github.com/wjhuang88/talos/issues/366) | I213 live activity/log viewer implementation handoff | [WEB-001-B](../backlog/active/WEB-001-B-dashboard-live-activity-log-viewer.md) | In Progress / Claimed | I221 is terminal; I213 may resume only from fresh main with local convergence and fresh evidence. |
 | [#378](https://github.com/wjhuang88/talos/issues/378) | Issue #59 deferred cross-platform acceptance | [I223](../iterations/I223-issue59-deferred-human-validation-cleanup.md) | Planned / Unclaimed | Evidence-only tracker; activate after exact B/C/D implementation heads exist. |
 
 ## Synchronization Notes

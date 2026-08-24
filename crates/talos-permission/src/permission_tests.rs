@@ -1488,6 +1488,94 @@ fn structured_aggregate_severity_is_order_independent_and_complete() {
 }
 
 #[test]
+fn resource_less_nature_allow_does_not_cover_background_command() {
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Execute,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        "background:bash:bash:validation_build:template:abc:cargo:check",
+        ToolResourceKind::Command,
+    )];
+    let input = serde_json::json!({"command": "cargo check", "background": true});
+
+    let report = engine.evaluate_request(
+        &PermissionRequest::native("bash", &facets, &input),
+        &PermissionContext::compatibility(),
+    );
+
+    assert_eq!(report.outcome(), PermissionOutcome::Ask);
+}
+
+#[test]
+fn resource_less_legacy_allow_does_not_cover_background_command() {
+    let mut engine = PermissionEngine::empty();
+    engine.add_rule(PermissionRule::new("bash", None, PermissionDecision::Allow));
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        "background:bash:bash:complex_shell:exact:abc",
+        ToolResourceKind::Command,
+    )];
+    let input = serde_json::json!({"command": "sleep 1", "background": true});
+
+    let report = engine.evaluate_request(
+        &PermissionRequest::native("bash", &facets, &input),
+        &PermissionContext::compatibility(),
+    );
+
+    assert_eq!(report.outcome(), PermissionOutcome::Ask);
+}
+
+#[test]
+fn background_command_preserves_deny_and_explicit_allow_rules() {
+    let resource = "background:exec:exec:pwd:/usr/bin/sleep";
+    let facet = ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        resource,
+        ToolResourceKind::Command,
+    );
+    let input = serde_json::json!({"command": "sleep", "args": ["1"], "background": true});
+
+    let mut denied = PermissionEngine::empty();
+    denied.add_rule(PermissionRule::new_nature(
+        ToolNature::Execute,
+        None,
+        None,
+        PermissionDecision::Deny("execute disabled".to_owned()),
+    ));
+    assert_eq!(
+        denied
+            .evaluate_request(
+                &PermissionRequest::native("exec", std::slice::from_ref(&facet), &input),
+                &PermissionContext::compatibility(),
+            )
+            .decision(),
+        PermissionDecision::Deny("execute disabled".to_owned())
+    );
+
+    let mut allowed = PermissionEngine::empty();
+    allowed.add_rule(PermissionRule::new_nature(
+        ToolNature::Execute,
+        Some(resource.to_owned()),
+        Some(crate::resource::ResourceKind::Command),
+        PermissionDecision::Allow,
+    ));
+    assert_eq!(
+        allowed
+            .evaluate_request(
+                &PermissionRequest::native("exec", &[facet], &input),
+                &PermissionContext::compatibility(),
+            )
+            .outcome(),
+        PermissionOutcome::Allow
+    );
+}
+
+#[test]
 fn compatibility_projection_preserves_first_deny_message() {
     let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(

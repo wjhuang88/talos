@@ -1,6 +1,6 @@
 # Iteration I222: TOOL-024-B Managed Background Execution Core
 
-> Document status: Active / Claimed through PR #379 merge `48e8ae9b`
+> Document status: Review / Claimed — local stable candidate converged; implementation PR not started
 > Published plan date: 2026-08-23
 > Planned objective: implement ADR-060's bounded Unix Agent/session-owned background execution core
 > without starting TOOL-024-C/D or overlapping I213 Dashboard/CLI production authority.
@@ -22,9 +22,9 @@
 | Governance Claim PR | #379 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer long-task objective selects Issue #59 and explicitly authorizes the bounded I213/I222-B parallel pair in Issue #366 comment `5386904546`. Claim PR #379 exact head `5f0816aa` passed CI `32650593056`, independent Agent-role claim review `5386970071` and merge-time CAS `5386973729`, then merged as `48e8ae9b`. Implementation still requires fresh exact-head process/permission/unsafe/API review. |
-| Implementation PR | Not started |
+| Implementation PR | #382 — stable candidate submitted; exact-head gates pending |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim/activation is effective through #379 merge `48e8ae9b`; implementation starts from that merge or later main and remains inside the recorded authority/file boundary. |
+| Handoff / Release Condition | Local convergence is complete under GOV-008. Before the first push, finish full locked preflight, staged inventory/secret review and owner-first derived sync; then obtain fresh exact-head CI plus independent process/permission/unsafe/API review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -118,7 +118,34 @@ authorization.
 
 ## Verification Evidence
 
-- Pending implementation after effective claim.
+- Local stable candidate was based on `main@7fd813e8322621b3ecc7c12c09a728c3762b0b67` (the #381
+  merge); implementation PR #382 now carries the submitted candidate.
+- `cargo check --offline --locked -p talos-core -p talos-permission -p talos-tools --features shell -p talos-agent -p talos-runtime --features shared-composition` passed.
+- `cargo test --offline --locked -p talos-permission -p talos-agent -p talos-runtime` passed:
+  permission 137, Agent 281 plus its integration fixtures, Runtime 38.
+- `cargo test --offline --locked -p talos-tools --features shell process_boundary` passed, including
+  Unix launcher output/reap and ESRCH cleanup tests.
+- `cargo fmt --all` passed. Full workspace locked preflight, both governance validators, staged
+  diff/secret audit and the exact changed-file inventory remain before first push.
+
+## Local Stable Candidate Inventory
+
+All current uncommitted production changes are within the effective I222 authority:
+
+- `Cargo.lock` (required lockfile resolution for the existing workspace dependency graph)
+- `crates/talos-core/src/background_job.rs`, `crates/talos-core/src/lib.rs`,
+  `crates/talos-core/src/session.rs`, `crates/talos-core/src/tool/agent_tool.rs`
+- `crates/talos-agent/src/background_jobs.rs`, `crates/talos-agent/src/lib.rs`,
+  `crates/talos-agent/src/configuration.rs`, `crates/talos-agent/src/session.rs`,
+  `crates/talos-agent/src/tool_execution.rs`
+- `crates/talos-tools/src/process_boundary.rs`, `crates/talos-tools/src/bash_tool.rs`,
+  `crates/talos-tools/src/exec_tool.rs`
+- `crates/talos-permission/src/rule.rs`, `crates/talos-permission/src/lib.rs`,
+  `crates/talos-permission/src/permission_tests.rs` (the #381-amended permission namespace)
+- `crates/talos-runtime/src/lib.rs`, `crates/talos-runtime/src/shutdown.rs`
+
+No `crates/talos-cli/**`, `crates/talos-dashboard/**`, README, I213/WEB owner, `/auto`, process
+tool, Windows implementation, persistence or release file is in this candidate.
 
 ## Completion Evidence
 

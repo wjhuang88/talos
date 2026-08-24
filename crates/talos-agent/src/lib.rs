@@ -38,6 +38,7 @@
 //! See `docs/reference/RUNTIME-SDK-CONTRACT.md` for the supported embedding
 //! surface.
 
+mod background_jobs;
 pub mod compaction;
 pub mod compression;
 pub mod token;
@@ -310,8 +311,16 @@ pub struct Agent {
     image_input_supported: bool,
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
+    background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
 }
 impl Agent {
+    pub(crate) fn set_background_job_host(
+        &mut self,
+        host: Arc<dyn talos_core::background_job::BackgroundJobHost>,
+    ) {
+        self.background_jobs = Some(host);
+    }
+
     pub fn provider(&self) -> &dyn LanguageModel {
         self.provider.as_ref()
     }
