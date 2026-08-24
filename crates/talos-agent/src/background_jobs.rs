@@ -371,7 +371,7 @@ impl BackgroundJobSupervisor {
             return ToolResult::error("background job admission is closed");
         }
 
-        let launched = match launcher.launch().await {
+        let mut launched = match launcher.launch().await {
             Ok(launched) => launched,
             Err(error) => {
                 if let Ok(mut state) = self.inner.state.lock() {
@@ -407,13 +407,17 @@ impl BackgroundJobSupervisor {
                 state.launching = state.launching.saturating_sub(1);
             }
             self.inner.state_changed.notify_waiters();
-            let summary = self.terminalize(
-                &id,
-                BackgroundJobState::Cancelled,
-                None,
-                BackgroundCleanupOutcome::Natural,
-                None,
-            );
+            let (state_value, exit_code, cleanup_outcome, cleanup_error) = self
+                .cleanup_after_signal(
+                    &id,
+                    BackgroundJobState::Cancelled,
+                    launched.control.as_ref(),
+                    &mut launched.events,
+                    None,
+                )
+                .await;
+            let summary =
+                self.terminalize(&id, state_value, exit_code, cleanup_outcome, cleanup_error);
             self.emit_summary(summary);
             return ToolResult::success(
                 serde_json::json!({"job_id": id.as_str(), "state": "cancelled"}).to_string(),
