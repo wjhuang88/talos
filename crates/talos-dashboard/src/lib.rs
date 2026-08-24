@@ -14,12 +14,17 @@ use axum::Router;
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
+use axum::response::sse::Sse;
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::get;
 use serde::Serialize;
 use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
+
+mod activity;
+
+pub use activity::{ActivityPayload, DashboardActivityFeed};
 
 #[derive(Debug, Error)]
 pub enum DashboardError {
@@ -40,6 +45,7 @@ pub struct DashboardSnapshot {
 struct AppState {
     token: String,
     snapshot: Arc<DashboardSnapshot>,
+    activity: DashboardActivityFeed,
     loopback_only: bool,
 }
 
@@ -58,10 +64,20 @@ impl DashboardServer {
     /// and the server relies on the `127.0.0.1` bind as the only access
     /// control. Set this to `false` to require a per-process bearer token.
     pub fn with_loopback_only(snapshot: DashboardSnapshot, loopback_only: bool) -> Self {
+        Self::with_activity(snapshot, loopback_only, DashboardActivityFeed::new())
+    }
+
+    /// Create a dashboard server backed by an existing process-local activity feed.
+    pub fn with_activity(
+        snapshot: DashboardSnapshot,
+        loopback_only: bool,
+        activity: DashboardActivityFeed,
+    ) -> Self {
         Self {
             state: AppState {
                 token: Uuid::new_v4().simple().to_string(),
                 snapshot: Arc::new(redact_snapshot(snapshot)),
+                activity,
                 loopback_only,
             },
         }
@@ -84,6 +100,9 @@ impl DashboardServer {
     fn build_router(&self) -> Router {
         let state = self.state.clone();
         let router = Router::new()
+            .route("/activity", get(activity_handler))
+            .route("/activity/events", get(activity_events_handler))
+            .route("/activity.js", get(activity_script_handler))
             .route("/status", get(status_handler))
             .route("/history", get(history_handler))
             .route("/governance", get(governance_handler))
@@ -138,10 +157,57 @@ fn apply_security_headers(resp: &mut Response, content_type: &'static str) {
     }
 }
 
+fn apply_activity_security_headers(resp: &mut Response, content_type: &'static str) {
+    apply_security_headers(resp, content_type);
+    if content_type.starts_with("text/html") {
+        resp.headers_mut().insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static(
+                "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'",
+            ),
+        );
+    }
+}
+
 async fn root_handler() -> Response {
     let mut resp = render_root_html().into_response();
     apply_security_headers(&mut resp, "text/html; charset=utf-8");
     resp
+}
+
+async fn activity_handler() -> Response {
+    let mut resp = render_activity_html().into_response();
+    apply_activity_security_headers(&mut resp, "text/html; charset=utf-8");
+    resp
+}
+
+async fn activity_script_handler() -> Response {
+    let mut resp = ACTIVITY_SCRIPT.into_response();
+    apply_security_headers(&mut resp, "text/javascript; charset=utf-8");
+    resp
+}
+
+async fn activity_events_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let last_event_id = headers
+        .get("last-event-id")
+        .and_then(|value| value.to_str().ok());
+    let Some(stream) = state.activity.try_stream(last_event_id) else {
+        let mut response = StatusCode::SERVICE_UNAVAILABLE.into_response();
+        response
+            .headers_mut()
+            .insert(header::RETRY_AFTER, HeaderValue::from_static("2"));
+        apply_security_headers(&mut response, "text/plain; charset=utf-8");
+        return response;
+    };
+    let mut response = Sse::new(stream).into_response();
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    response
 }
 
 async fn status_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -250,24 +316,52 @@ fn is_sensitive_key(key: &str) -> bool {
         || key == "key"
 }
 
-fn redact_text(input: &str) -> String {
+pub(crate) fn redact_text(input: &str) -> String {
     const KEYS: &[&str] = &[
+        "x-api-key",
+        "api-key",
         "api_key",
         "access_token",
         "refresh_token",
         "token",
         "secret",
         "password",
+        "authorization",
+        "credential",
+        "set-cookie",
+        "cookie",
         "auth",
         "sig",
         "signature",
         "key",
     ];
 
-    let mut output = input.to_string();
+    let mut output = redact_prefixed_secret(input, "bearer ");
+    for prefix in ["sk-", "ghp_", "github_pat_"] {
+        output = redact_prefixed_secret(&output, prefix);
+    }
     for key in KEYS {
         output = redact_assignment_values(&output, key);
     }
+    output
+}
+
+fn redact_prefixed_secret(input: &str, prefix: &str) -> String {
+    let lower = input.to_ascii_lowercase();
+    let mut output = String::with_capacity(input.len());
+    let mut cursor = 0;
+    while let Some(offset) = lower[cursor..].find(prefix) {
+        let start = cursor + offset;
+        let secret_start = start + prefix.len();
+        let secret_end = input[secret_start..]
+            .find(['&', ';', ',', '"', '\'', '\n', '\r', '\t', ' ', '}', ']'])
+            .map(|end| secret_start + end)
+            .unwrap_or(input.len());
+        output.push_str(&input[cursor..secret_start]);
+        output.push_str("***");
+        cursor = secret_end;
+    }
+    output.push_str(&input[cursor..]);
     output
 }
 
@@ -281,44 +375,56 @@ fn redact_assignment_values(input: &str, key: &str) -> String {
         let key_start_ok = start == 0
             || matches!(
                 input.as_bytes().get(start - 1),
-                Some(b'?' | b'&' | b';' | b' ' | b'\n' | b'\t' | b'"' | b'\'')
+                Some(b'?' | b'&' | b';' | b',' | b' ' | b'\n' | b'\t' | b'"' | b'\'' | b'{' | b'[')
             );
         let key_end = start + key.len();
-        let Some(eq_relative) = input[key_end..].find('=') else {
-            output.push_str(&input[cursor..key_end]);
-            cursor = key_end;
-            continue;
-        };
-        let eq_pos = key_end + eq_relative;
-        let only_space_before_equals = input[key_end..eq_pos]
-            .chars()
-            .all(|c| matches!(c, ' ' | '\t'));
-
         if !key_start_ok {
             output.push_str(&input[cursor..key_end]);
             cursor = key_end;
             continue;
         }
-        if !only_space_before_equals {
-            output.push_str(&input[cursor..eq_pos + 1]);
-            cursor = eq_pos + 1;
+        let mut delimiter_pos = key_end;
+        while matches!(
+            input.as_bytes().get(delimiter_pos),
+            Some(b' ' | b'\t' | b'"' | b'\'')
+        ) {
+            delimiter_pos += 1;
+        }
+        if !matches!(input.as_bytes().get(delimiter_pos), Some(b'=' | b':')) {
+            output.push_str(&input[cursor..key_end]);
+            cursor = key_end;
             continue;
         }
 
-        let value_prefix_start = eq_pos + 1;
+        let value_prefix_start = delimiter_pos + 1;
         let value_start = value_prefix_start
             + input[value_prefix_start..]
                 .find(|c: char| !matches!(c, ' ' | '\t'))
                 .unwrap_or(0);
-        let value_mask_start = if matches!(input.as_bytes().get(value_start), Some(b'"' | b'\'')) {
-            value_start + 1
-        } else {
-            value_start
+        let quote = match input.as_bytes().get(value_start) {
+            Some(b'"') => Some('"'),
+            Some(b'\'') => Some('\''),
+            _ => None,
         };
-        let value_end = input[value_mask_start..]
-            .find(['&', ';', '"', '\'', '\n', '\r', '\t', ' '])
-            .map(|end| value_mask_start + end)
-            .unwrap_or(input.len());
+        let value_mask_start = value_start + usize::from(quote.is_some());
+        let value_end = if let Some(quote) = quote {
+            input[value_mask_start..]
+                .find(quote)
+                .map(|end| value_mask_start + end)
+                .unwrap_or(input.len())
+        } else if matches!(key, "authorization" | "cookie" | "set-cookie")
+            && matches!(input.as_bytes().get(delimiter_pos), Some(b':'))
+        {
+            input[value_mask_start..]
+                .find(['\n', '\r'])
+                .map(|end| value_mask_start + end)
+                .unwrap_or(input.len())
+        } else {
+            input[value_mask_start..]
+                .find(['&', ';', ',', '"', '\'', '\n', '\r', '\t', ' ', '}', ']'])
+                .map(|end| value_mask_start + end)
+                .unwrap_or(input.len())
+        };
 
         output.push_str(&input[cursor..value_mask_start]);
         output.push_str("***");
@@ -396,6 +502,7 @@ fn render_value_html(value: &Value) -> String {
 
 const DASHBOARD_NAV: &[(&str, &str)] = &[
     ("/", "Overview"),
+    ("/activity", "Activity"),
     ("/status", "Status"),
     ("/history", "History"),
     ("/governance", "Governance"),
@@ -407,6 +514,9 @@ fn nav_icon(path: &str) -> &'static str {
     match path {
         "/" => {
             r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/><path d="M9.5 20v-5h5v5"/></svg>"#
+        }
+        "/activity" => {
+            r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>"#
         }
         "/status" => {
             r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>"#
@@ -602,6 +712,7 @@ fn render_root_html() -> String {
 <div>
   <p class="section-heading">Read-only surfaces</p>
   <div class="section-links">
+    <a class="section-link" href="/activity"><span><span class="link-title">Activity</span><p>Current Session activity and bounded logs.</p></span><span class="arrow" aria-hidden="true">→</span></a>
     <a class="section-link" href="/status"><span><span class="link-title">Status</span><p>Current runtime and session state.</p></span><span class="arrow" aria-hidden="true">→</span></a>
     <a class="section-link" href="/history"><span><span class="link-title">History</span><p>Recent session history from existing Talos state.</p></span><span class="arrow" aria-hidden="true">→</span></a>
     <a class="section-link" href="/governance"><span><span class="link-title">Governance</span><p>Current project governance summary.</p></span><span class="arrow" aria-hidden="true">→</span></a>
@@ -613,10 +724,143 @@ fn render_root_html() -> String {
     render_html_page(
         "Local state, without controls.",
         "/",
-        "Inspect Talos through five existing loopback surfaces. The Dashboard stays presentation-only and keeps the underlying runtime, configuration, and governance sources authoritative.",
+        "Inspect Talos through its existing loopback surfaces. The Dashboard stays presentation-only and keeps the underlying runtime, configuration, and governance sources authoritative.",
         links,
     )
 }
+
+fn render_activity_html() -> String {
+    let content = r#"<section class="activity-layout" aria-label="Live activity">
+<div class="activity-primary">
+  <div class="connection-row"><span id="connection-dot" class="connection-dot" aria-hidden="true"></span><strong id="connection-state">Connecting</strong></div>
+  <dl class="activity-facts">
+    <div><dt>Session</dt><dd id="current-session" class="machine-value">None</dd></div>
+    <div><dt>Provider / model</dt><dd id="current-model" class="machine-value">None</dd></div>
+    <div><dt>Turn</dt><dd id="current-turn" class="machine-value">Idle</dd></div>
+  </dl>
+  <section aria-labelledby="recent-heading"><h2 id="recent-heading">Recent activity</h2><ol id="activity-list" class="activity-list"></ol></section>
+  <section aria-labelledby="usage-heading"><h2 id="usage-heading">Usage</h2><p id="usage-value" class="machine-value">No usage yet</p></section>
+</div>
+<details class="logs-panel">
+  <summary>Logs <span id="log-count" class="muted">0</span></summary>
+  <label class="filter-label" for="log-filter">Filter</label>
+  <input id="log-filter" type="search" autocomplete="off">
+  <pre id="log-output" tabindex="0" aria-label="Live logs"></pre>
+</details>
+<p id="activity-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+</section>
+<style>
+.activity-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(18rem,.42fr); gap:2rem; align-items:start; }
+.activity-primary { min-width:0; display:grid; gap:1.6rem; }
+.connection-row { display:flex; align-items:center; gap:.55rem; min-height:1.5rem; color:var(--nord1); }
+.connection-dot { width:.62rem; height:.62rem; border-radius:50%; background:#8b95a5; border:1px solid currentColor; }
+.connection-dot[data-state="connected"] { background:#4f7b69; }
+.connection-dot[data-state="reconnecting"] { background:#b06f2e; }
+.activity-facts { margin:0; border-top:1px solid var(--nord5); }
+.activity-facts div { display:grid; grid-template-columns:minmax(7.5rem,.3fr) minmax(0,1fr); gap:1rem; padding:.72rem 0; border-bottom:1px solid var(--nord5); }
+h2 { margin:0 0 .65rem; color:var(--nord1); font-size:.86rem; font-weight:700; }
+.activity-list { margin:0; padding:0; list-style:none; border-top:1px solid var(--nord5); }
+.activity-list li { display:grid; grid-template-columns:6.5rem minmax(0,1fr); gap:.8rem; padding:.7rem 0; border-bottom:1px solid var(--nord5); }
+.activity-kind { color:var(--muted); font-size:.76rem; font-weight:700; text-transform:uppercase; }
+.logs-panel { min-width:0; border-left:1px solid var(--nord5); padding-left:1.5rem; }
+.logs-panel summary { cursor:pointer; color:var(--nord1); font-weight:700; }
+.filter-label { display:block; margin:1rem 0 .35rem; color:var(--muted); font-size:.78rem; font-weight:700; }
+#log-filter { width:100%; min-height:2.35rem; border:1px solid #c7d0dc; border-radius:.35rem; padding:.45rem .6rem; background:#fff; color:var(--nord0); font:inherit; }
+#log-output { margin-top:.75rem; max-height:32rem; min-height:12rem; white-space:pre-wrap; overflow-wrap:anywhere; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media (max-width:54rem) { .activity-layout { grid-template-columns:1fr; } .logs-panel { border-left:0; border-top:1px solid var(--nord5); padding:1.2rem 0 0; } }
+@media (max-width:26rem) { .activity-facts div, .activity-list li { grid-template-columns:1fr; gap:.2rem; } }
+</style>"#;
+    let mut page = render_html_page(
+        "Live Activity",
+        "/activity",
+        "Current Session activity and recent runtime logs.",
+        content,
+    );
+    page = page.replace(
+        "</body>",
+        r#"<script src="/activity.js"></script>
+</body>"#,
+    );
+    page
+}
+
+const ACTIVITY_SCRIPT: &str = r#"(() => {
+  'use strict';
+  const byId = (id) => document.getElementById(id);
+  const connection = byId('connection-state');
+  const dot = byId('connection-dot');
+  const session = byId('current-session');
+  const model = byId('current-model');
+  const turn = byId('current-turn');
+  const list = byId('activity-list');
+  const usage = byId('usage-value');
+  const logs = byId('log-output');
+  const count = byId('log-count');
+  const filter = byId('log-filter');
+  const announcer = byId('activity-announcer');
+  const logLines = [];
+  const setConnection = (label, value) => {
+    connection.textContent = label;
+    dot.dataset.state = value;
+  };
+  const describe = (item) => {
+    if (item.kind === 'turn') return `Turn ${item.turn_id || ''}: ${item.state}`;
+    if (item.kind === 'provider') return `${item.phase} ${item.attempt + 1}/${item.max_attempts + 1}`;
+    if (item.kind === 'tool') return `${item.name}: ${item.state}`;
+    if (item.kind === 'error') return item.message;
+    if (item.kind === 'model') return `${item.provider} / ${item.model}`;
+    if (item.kind === 'session') return item.session_id;
+    return item.kind;
+  };
+  const appendActivity = (item) => {
+    const row = document.createElement('li');
+    const kind = document.createElement('span');
+    const detail = document.createElement('span');
+    kind.className = 'activity-kind';
+    kind.textContent = item.kind;
+    detail.textContent = describe(item);
+    row.append(kind, detail);
+    list.prepend(row);
+    while (list.children.length > 6) list.lastElementChild.remove();
+    announcer.textContent = detail.textContent;
+  };
+  const renderLogs = () => {
+    const query = filter.value.toLocaleLowerCase();
+    const visible = query ? logLines.filter((line) => line.toLocaleLowerCase().includes(query)) : logLines;
+    logs.textContent = visible.join('\n');
+    count.textContent = String(logLines.length);
+  };
+  const applyActivity = (item) => {
+    if (item.session_id) session.textContent = item.session_id;
+    if (item.kind === 'model') model.textContent = `${item.provider} / ${item.model}`;
+    if (item.kind === 'turn') turn.textContent = `${item.turn_id || 'Turn'} · ${item.state}`;
+    if (item.kind === 'usage') usage.textContent = `Input ${item.input_tokens} · Output ${item.output_tokens} · Cache read ${item.cache_read_tokens} · Cache write ${item.cache_write_tokens}`;
+    appendActivity(item);
+  };
+  const source = new EventSource('/activity/events');
+  source.onopen = () => setConnection('Connected', 'connected');
+  source.onerror = () => setConnection('Reconnecting', 'reconnecting');
+  source.addEventListener('activity', (event) => {
+    try { applyActivity(JSON.parse(event.data)); } catch (_) { setConnection('Invalid event dropped', 'reconnecting'); }
+  });
+  source.addEventListener('log', (event) => {
+    try {
+      const item = JSON.parse(event.data);
+      logLines.push(item.line);
+      while (logLines.length > 512) logLines.shift();
+      renderLogs();
+    } catch (_) { setConnection('Invalid event dropped', 'reconnecting'); }
+  });
+  source.addEventListener('reset', () => {
+    list.replaceChildren();
+    logLines.length = 0;
+    renderLogs();
+    setConnection('Stream reset', 'reconnecting');
+  });
+  filter.addEventListener('input', renderLogs);
+})();
+"#;
 
 fn render_focus_section(label: &str, content: &str) -> String {
     format!(
@@ -734,7 +978,10 @@ fn render_extensions_html(snapshot: &DashboardSnapshot) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::BodyDataStream;
     use axum::http::Method;
+    use futures_core::Stream;
+    use std::pin::Pin;
 
     fn test_snapshot() -> DashboardSnapshot {
         DashboardSnapshot {
@@ -814,6 +1061,49 @@ mod tests {
         (status, String::from_utf8_lossy(&bytes).to_string())
     }
 
+    async fn request_response(
+        app: &Router,
+        method: Method,
+        path: &str,
+        token: Option<&str>,
+        last_event_id: Option<&str>,
+    ) -> Response {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(path)
+            .body(axum::body::Body::empty())
+            .expect("failed to build request");
+        if let Some(token) = token {
+            req.headers_mut().insert(
+                header::AUTHORIZATION,
+                format!("Bearer {token}")
+                    .parse()
+                    .expect("valid auth header"),
+            );
+        }
+        if let Some(last_event_id) = last_event_id {
+            req.headers_mut().insert(
+                "last-event-id",
+                last_event_id.parse().expect("valid event id header"),
+            );
+        }
+        tower::ServiceExt::oneshot(app.clone(), req)
+            .await
+            .expect("request failed")
+    }
+
+    async fn next_stream_chunk(stream: &mut BodyDataStream) -> String {
+        let bytes = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            std::future::poll_fn(|cx| Pin::new(&mut *stream).poll_next(cx)),
+        )
+        .await
+        .expect("SSE chunk timed out")
+        .expect("SSE stream ended")
+        .expect("SSE body failed");
+        String::from_utf8_lossy(&bytes).to_string()
+    }
+
     #[tokio::test]
     async fn token_rejection_no_auth_header() {
         let (app, _token) = build_test_app();
@@ -883,6 +1173,9 @@ mod tests {
         for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
             for path in [
                 "/",
+                "/activity",
+                "/activity/events",
+                "/activity.js",
                 "/status",
                 "/history",
                 "/governance",
@@ -897,6 +1190,144 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn activity_page_and_script_use_minimum_live_csp_and_text_dom() {
+        let (app, token) = build_test_app();
+        let response = request_response(&app, Method::GET, "/activity", Some(&token), None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_SECURITY_POLICY),
+            Some(&HeaderValue::from_static(
+                "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+            ))
+        );
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("activity body");
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains(r#"<script src="/activity.js"></script>"#));
+        assert!(body.contains(r#"aria-live="polite""#));
+        assert!(body.contains(r#"href="/activity" aria-current="page""#));
+
+        let response =
+            request_response(&app, Method::GET, "/activity.js", Some(&token), None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE),
+            Some(&HeaderValue::from_static("text/javascript; charset=utf-8"))
+        );
+        let script = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("script body");
+        let script = String::from_utf8_lossy(&script);
+        assert!(script.contains("textContent"));
+        assert!(script.contains("replaceChildren"));
+        for forbidden in [
+            "innerHTML",
+            "localStorage",
+            "sessionStorage",
+            "document.cookie",
+            "window.opener",
+            "navigator.clipboard",
+        ] {
+            assert!(!script.contains(forbidden), "script contains {forbidden}");
+        }
+    }
+
+    #[tokio::test]
+    async fn activity_routes_preserve_auth_order_and_explicit_header_access() {
+        let (app, token) = build_test_app();
+        for path in ["/activity", "/activity.js", "/activity/events"] {
+            let unauthorized = request_response(&app, Method::GET, path, None, None).await;
+            assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED, "{path}");
+            let authorized = request_response(&app, Method::GET, path, Some(&token), None).await;
+            assert_eq!(authorized.status(), StatusCode::OK, "{path}");
+        }
+        let unknown = request_response(&app, Method::GET, "/activity/private", None, None).await;
+        assert_eq!(unknown.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn sse_headers_ids_retry_replay_and_reset_are_bounded() {
+        let feed = DashboardActivityFeed::new();
+        feed.project_model("mock", "first");
+        feed.project_model("mock", "second");
+        let server = DashboardServer::with_activity(test_snapshot(), true, feed);
+        let app = server.build_router();
+
+        let response = request_response(&app, Method::GET, "/activity/events", None, None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE),
+            Some(&HeaderValue::from_static("text/event-stream"))
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL),
+            Some(&HeaderValue::from_static("no-cache"))
+        );
+        let mut stream = response.into_body().into_data_stream();
+        let first = next_stream_chunk(&mut stream).await;
+        assert!(first.contains("event: activity"), "{first}");
+        assert!(first.contains("retry: 2000"), "{first}");
+        let first_id = first
+            .lines()
+            .find_map(|line| line.strip_prefix("id: "))
+            .expect("event id");
+
+        let replay =
+            request_response(&app, Method::GET, "/activity/events", None, Some(first_id)).await;
+        let mut replay_stream = replay.into_body().into_data_stream();
+        let replay_chunk = next_stream_chunk(&mut replay_stream).await;
+        assert!(replay_chunk.contains("second"), "{replay_chunk}");
+        assert!(!replay_chunk.contains("first"), "{replay_chunk}");
+
+        let reset = request_response(
+            &app,
+            Method::GET,
+            "/activity/events",
+            None,
+            Some("old-process:999"),
+        )
+        .await;
+        let mut reset_stream = reset.into_body().into_data_stream();
+        let reset_chunk = next_stream_chunk(&mut reset_stream).await;
+        assert!(reset_chunk.contains("event: reset"), "{reset_chunk}");
+        assert!(reset_chunk.contains("stream_changed"), "{reset_chunk}");
+    }
+
+    #[tokio::test]
+    async fn sse_client_limit_rejects_and_disconnect_releases_permit() {
+        let server = DashboardServer::new(test_snapshot());
+        let app = server.build_router();
+        let mut clients = Vec::new();
+        for _ in 0..activity::SSE_CLIENT_LIMIT {
+            let response =
+                request_response(&app, Method::GET, "/activity/events", None, None).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            clients.push(response);
+        }
+        let rejected = request_response(&app, Method::GET, "/activity/events", None, None).await;
+        assert_eq!(rejected.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            rejected.headers().get(header::RETRY_AFTER),
+            Some(&HeaderValue::from_static("2"))
+        );
+        drop(clients.pop());
+        let admitted = request_response(&app, Method::GET, "/activity/events", None, None).await;
+        assert_eq!(admitted.status(), StatusCode::OK);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sse_emits_heartbeat_after_fixed_idle_interval() {
+        let server = DashboardServer::new(test_snapshot());
+        let app = server.build_router();
+        let response = request_response(&app, Method::GET, "/activity/events", None, None).await;
+        let mut stream = response.into_body().into_data_stream();
+        tokio::time::advance(activity::HEARTBEAT_INTERVAL).await;
+        let heartbeat = next_stream_chunk(&mut stream).await;
+        assert!(heartbeat.contains(": heartbeat"), "{heartbeat}");
     }
 
     #[tokio::test]
@@ -962,6 +1393,34 @@ mod tests {
             );
             assert!(body.contains("***"), "{path} did not redact: {body}");
         }
+    }
+
+    #[test]
+    fn text_redaction_masks_quoted_values_and_complete_sensitive_headers() {
+        let input = r#"password="correct horse battery staple"
+Authorization: Bearer header-secret extra
+Cookie: sid=abc; theme=dark
+Set-Cookie: session=xyz; Path=/
+"credential":"alpha beta gamma"
+X-API-Key: key-material
+visible=true"#;
+
+        let redacted = redact_text(input);
+
+        for secret in [
+            "correct horse battery staple",
+            "header-secret",
+            "extra",
+            "sid=abc",
+            "theme=dark",
+            "session=xyz",
+            "Path=/",
+            "alpha beta gamma",
+            "key-material",
+        ] {
+            assert!(!redacted.contains(secret), "leaked {secret}: {redacted}");
+        }
+        assert!(redacted.contains("visible=true"), "{redacted}");
     }
 
     #[tokio::test]

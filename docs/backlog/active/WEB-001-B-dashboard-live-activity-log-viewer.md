@@ -1,10 +1,10 @@
 # WEB-001-B: Dashboard Live Activity And Log Viewer
 
-**Status**: In Progress — I213 Active / Claimed; activation PR #363 merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`
+**Status**: Review / Claimed — implementation PR #372 locally rebased onto `main@7fd813e8`; refreshed exact-head CI and independent security review pending
 **Priority**: P1
 **Type**: Product / Observability Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I213 — Active / Claimed; activation effective through #363 merge `e578f419`
+**Selected Iteration**: I213 — Review / Claimed; activation effective through #363 merge `e578f419`
 
 ## Collaboration Claim
 
@@ -19,9 +19,9 @@
 | Governance Claim PR | #327 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced. Activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`; those guards are now effective. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-22 |
-| Handoff / Release Condition | Implementation must start from #363 merge `e578f419` or a later fresh `main`, preserve all recorded pairwise authority/file-overlap protections, locally converge under GOV-008 before the first implementation push, and later pass exact-head CI/security review plus merge-time CAS. |
+| Implementation PR | #372 — stable candidate `2cd0cc45` locally converged on `main@7fd813e8`; not yet pushed |
+| Last Updated | 2026-08-24 |
+| Handoff / Release Condition | Finish local convergence on `main@7fd813e8`, push the refreshed stable candidate to #372, obtain fresh exact-head CI and independent security review, then repeat merge-time ownership/file-overlap CAS. Preserve all recorded pairwise protections; no completion is claimed. |
 
 The claim is effective through #327 merge `66747214` and implementation activation is effective
 through #363 merge `e578f419`. Issue #366 is the execution-coordination surface for this existing
@@ -227,8 +227,9 @@ than widening WEB-001-B.
 
 ## Readiness Decision
 
-**Active / Claimed; implementation authority is effective through #363 merge `e578f419`, subject to
-the parallel protection contract above and GOV-008 local-convergence/stage gates.**
+**Review / Claimed; the local stable candidate is converged under GOV-008 and implementation
+authority remains effective through #363 merge `e578f419`. First push, exact-head CI, independent
+security review and merge-time CAS remain pending.**
 
 Fresh 2026-08-22 inventory found no overlapping Dashboard implementation PR. I211 is Complete/Closed;
 I219 is the explicit non-overlapping Active permission lane; only archival #120/#121 were open at
@@ -271,6 +272,22 @@ reconnect, accessibility and rollback bounds.
 | Governance | both governance validators and `git diff --check`. |
 | Runtime/browser | real rebuilt mock TUI: Turn/tool activity, logs, disconnect/reconnect/stale reset, no sensitive payload; responsive/zoom/keyboard/CSP acceptance. |
 | Review | independent security-focused exact-head review before implementation merge. |
+
+## Local Stable Candidate Evidence
+
+- Branch `feat/i213-dashboard-live-activity` starts at fresh `main@6fbb5550`, after activation merge
+  `e578f419`; no implementation push or PR existed while the candidate was converging.
+- The Dashboard owns bounded activity/log rings, cursor-based SSE, page-specific CSP/static client,
+  and strict safe projection; CLI changes are additive observation glue at the existing bridge and
+  successfully written tracing output.
+- Rebuilt mock TUI evidence showed one semantic `started`, `completed`, and `usage` event for the
+  exercised Turn, bounded logs, explicit old-stream reset, and absence of prompt/response text from
+  SSE. Tool lifecycle and forbidden raw tool payload behavior are covered by projection tests.
+- Browser acceptance passed at 320x568, 768x1024, 1440x900 and 200% equivalent reflow, including
+  keyboard-only Logs expansion/filter focus, CSP/no-external-resource checks and deterministic
+  reconnect from `Reconnecting` to `Connected`.
+- Focused Dashboard/CLI tests and the final locked workspace/preflight/governance checkpoint are
+  recorded in I213. Exact-head CI and independent security review remain remote gates.
 
 ## State / Documentation Owners
 

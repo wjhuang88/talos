@@ -5,7 +5,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use talos_config::{LogConfig, LogFileConfig, LogFormat};
+use talos_dashboard::DashboardActivityFeed;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::MakeWriter;
 
 const DEFAULT_LOG_LEVEL: &str = "info";
 
@@ -13,7 +15,11 @@ const DEFAULT_LOG_LEVEL: &str = "info";
 ///
 /// Terminal UI modes route logs to the existing log file sink to avoid corrupting
 /// the alternate-screen display. Other modes write to stderr.
-pub(crate) fn init_logger(config: Option<&LogConfig>, terminal_ui: bool) {
+pub(crate) fn init_logger(
+    config: Option<&LogConfig>,
+    terminal_ui: bool,
+    dashboard_activity: Option<DashboardActivityFeed>,
+) {
     let filter = env_filter(config);
     let format = config
         .map(|config| &config.format)
@@ -21,11 +27,11 @@ pub(crate) fn init_logger(config: Option<&LogConfig>, terminal_ui: bool) {
 
     let file_config = resolve_file_config(config, terminal_ui);
     if let Some(writer) = file_config.and_then(|fc| open_log_writer(&fc)) {
-        init_with_file(filter, format, writer);
+        init_with_file(filter, format, writer, dashboard_activity);
         return;
     }
 
-    init_with_stderr(filter, format);
+    init_with_stderr(filter, format, dashboard_activity);
 }
 
 fn resolve_file_config(config: Option<&LogConfig>, terminal_ui: bool) -> Option<LogFileConfig> {
@@ -74,7 +80,13 @@ fn default_filter(level: &str) -> String {
     )
 }
 
-fn init_with_file(filter: EnvFilter, format: &LogFormat, writer: Arc<RotatingWriter>) {
+fn init_with_file(
+    filter: EnvFilter,
+    format: &LogFormat,
+    writer: Arc<RotatingWriter>,
+    dashboard_activity: Option<DashboardActivityFeed>,
+) {
+    let writer = ObservedMakeWriter::new(writer, dashboard_activity);
     match format {
         LogFormat::Pretty => {
             let _ = tracing_subscriber::fmt()
@@ -95,22 +107,74 @@ fn init_with_file(filter: EnvFilter, format: &LogFormat, writer: Arc<RotatingWri
     }
 }
 
-fn init_with_stderr(filter: EnvFilter, format: &LogFormat) {
+fn init_with_stderr(
+    filter: EnvFilter,
+    format: &LogFormat,
+    dashboard_activity: Option<DashboardActivityFeed>,
+) {
+    let writer = ObservedMakeWriter::new(std::io::stderr, dashboard_activity);
     match format {
         LogFormat::Pretty => {
             let _ = tracing_subscriber::fmt()
                 .with_env_filter(filter)
                 .pretty()
-                .with_writer(std::io::stderr)
+                .with_writer(writer)
                 .try_init();
         }
         LogFormat::Compact => {
             let _ = tracing_subscriber::fmt()
                 .with_env_filter(filter)
                 .compact()
-                .with_writer(std::io::stderr)
+                .with_writer(writer)
                 .try_init();
         }
+    }
+}
+
+struct ObservedMakeWriter<M> {
+    inner: M,
+    dashboard_activity: Option<DashboardActivityFeed>,
+}
+
+impl<M> ObservedMakeWriter<M> {
+    fn new(inner: M, dashboard_activity: Option<DashboardActivityFeed>) -> Self {
+        Self {
+            inner,
+            dashboard_activity,
+        }
+    }
+}
+
+impl<'a, M> MakeWriter<'a> for ObservedMakeWriter<M>
+where
+    M: MakeWriter<'a>,
+{
+    type Writer = ObservedWriter<M::Writer>;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        ObservedWriter {
+            inner: self.inner.make_writer(),
+            dashboard_activity: self.dashboard_activity.clone(),
+        }
+    }
+}
+
+struct ObservedWriter<W> {
+    inner: W,
+    dashboard_activity: Option<DashboardActivityFeed>,
+}
+
+impl<W: Write> Write for ObservedWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let written = self.inner.write(buf)?;
+        if let Some(activity) = &self.dashboard_activity {
+            activity.observe_written_log_bytes(&buf[..written]);
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
     }
 }
 
@@ -221,7 +285,9 @@ fn expand_path(path: &Path) -> PathBuf {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     use talos_config::LogRotation;
+    use talos_dashboard::{DashboardServer, DashboardSnapshot};
     use tempfile::tempdir;
 
     #[test]
@@ -342,5 +408,61 @@ mod tests {
         let config = resolve_file_config(Some(&log_config), false);
         assert!(config.is_some());
         assert_eq!(config.expect("operation should succeed").max_size_mb, 32);
+    }
+
+    #[tokio::test]
+    async fn dashboard_observer_records_only_successfully_written_bytes() {
+        struct FailingWriter;
+
+        impl Write for FailingWriter {
+            fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("expected failure"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let feed = DashboardActivityFeed::new();
+        let mut successful = ObservedWriter {
+            inner: Vec::new(),
+            dashboard_activity: Some(feed.clone()),
+        };
+        successful
+            .write_all(b"written token=secret-value\n")
+            .expect("underlying write succeeds");
+
+        let mut failed = ObservedWriter {
+            inner: FailingWriter,
+            dashboard_activity: Some(feed.clone()),
+        };
+        assert!(failed.write_all(b"failed-line-must-not-appear\n").is_err());
+
+        let server = DashboardServer::with_activity(
+            DashboardSnapshot {
+                config_masked: String::new(),
+                status: serde_json::json!({}),
+                history: serde_json::json!([]),
+                governance: String::new(),
+                extensions: serde_json::json!({}),
+            },
+            true,
+            feed,
+        );
+        let (addr, handle) = server.serve().await.expect("dashboard starts");
+        let mut response = reqwest::get(format!("http://{addr}/activity/events"))
+            .await
+            .expect("SSE request succeeds");
+        let chunk = tokio::time::timeout(Duration::from_secs(1), response.chunk())
+            .await
+            .expect("SSE response timeout")
+            .expect("SSE body read")
+            .expect("SSE first chunk");
+        let chunk = String::from_utf8_lossy(&chunk);
+        assert!(chunk.contains("written token=***"), "{chunk}");
+        assert!(!chunk.contains("secret-value"), "{chunk}");
+        assert!(!chunk.contains("failed-line-must-not-appear"), "{chunk}");
+        handle.abort();
     }
 }
