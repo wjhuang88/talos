@@ -25,7 +25,7 @@
 | Governance Claim PR | #385 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent permission/security/API review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Independent permission/security/API review, exact-head CI and merge-time CAS remain required before implementation merge. |
-| Implementation PR | Not started |
+| Implementation PR | #386 — exact head `a2abb599` |
 | Last Updated | 2026-08-24 |
 | Handoff / Release Condition | Implementation started from the #385 claim merge or later `main`; owner must remain Review / Claimed until implementation evidence and protected review exist. TOOL-024-D and I223 remain separate. |
 
@@ -103,5 +103,5 @@ and the real AppServerSession registration fixture pass. `talos-tools` and `talo
 tests pass; workspace library validation reached the macOS Seatbelt tests, which are blocked in
 this host by `sandbox_apply: Operation not permitted`. Full exact-head CI and independent review
 remain required before implementation merge.
-Stable implementation commit: `dcdffc56`; implementation PR is not started until this candidate is
-pushed. Owner status is Review / Claimed pending exact-head CI and independent permission/security/API review.
+Stable implementation commit: `dcdffc56`; implementation PR #386 is open at exact head `a2abb599`.
+Owner status is Review / Claimed pending exact-head CI and independent permission/security/API review.
