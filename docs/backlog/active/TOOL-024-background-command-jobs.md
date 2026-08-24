@@ -59,7 +59,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 |---|---|---|---|---|---|
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
 | [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Complete / Closed; PR #382 merged | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
-| [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Active / Claimed through #385; ineffective until merge | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
+| [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Complete / Closed; PR #386 merged | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | TOOL-024-D | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked | TOOL-024-C Complete; separately Accepted Windows Job Object/OS-ABI decision | Windows process-tree ownership, non-blocking projection, lifecycle controls, docs and real Unix/Windows acceptance. |
 
 ## Major Risks
@@ -169,3 +169,15 @@ The I222 and TOOL-024-B owners record that pre-existing merge as their Completio
 CI `32690533253` passed 5/5 for head `01aa8b6a`; independent process/permission/unsafe/API review
 approved the implementation at `fc28d821`, and the final governance-only exact-head review approved
 `01aa8b6a` with both validators passing. TOOL-024-C/D and I223 remain separately governed.
+
+The preceding checkpoint is a preserved pre-C-merge record. TOOL-024-C is now Complete / Closed
+under the completion checkpoint below; D1/D2 and I223 remain separately governed.
+
+## TOOL-024-C Completion Checkpoint (2026-08-24)
+
+Implementation PR #386 exact head `d42c060d618e61218c4c1efe0651e74830807256` was based on
+`ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`, passed exact-head CI `32719779528` 5/5, and received
+independent permission/security/API/process approval `5394777902`. It merged as
+`60b0367cf749397bf1167e189e820e82e32baf03` after merge-time CAS. TOOL-024-C/I224 is now
+Complete / Closed. TOOL-024-D1/D2 and I223 remain separately governed, Windows remains fail-closed,
+and Issue #59 remains open until the remaining child and deferred-validation evidence is complete.

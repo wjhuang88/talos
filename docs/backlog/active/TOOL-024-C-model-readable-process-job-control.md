@@ -1,6 +1,6 @@
 # TOOL-024-C: Model-Readable Process Job Control
 
-> Document status: Review / Claimed — implementation candidate locally converged; protected review pending
+> Document status: Complete / Closed — implementation merged via PR #386; owner-first closeout pending
 
 | Field | Value |
 |---|---|
@@ -9,14 +9,14 @@
 | Priority | P0 |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I224 Active / Claimed through governance PR #385; claim effective on `main` |
+| Selected Iteration | I224 Complete / Closed |
 | Depends On | TOOL-024-A/I188 Accepted; TOOL-024-B/I222 Complete; RUNTIME-005 Complete; PERM-006-C/I221 Complete |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session 2026-08-24 |
 | Work Slice | Implement only the model-visible session-scoped `process` tool over the existing I222 manager: typed read/status/list/cancel actions, bounded cursor/output/wait responses, ownership and redaction checks, idempotent cancel, existing permission pipeline and runtime fixture/docs. Exclude I222 supervisor redesign, Windows Job Object/D1, TUI/D2, Dashboard/I213, I223, persistence, `/auto`, release/publication, Desktop and PERM-006-D/E. |
@@ -24,10 +24,14 @@
 | Source Issue | #59 |
 | Governance Claim PR | #385 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent permission/security/API review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Independent permission/security/API review, exact-head CI and merge-time CAS remain required before implementation merge. |
-| Implementation PR | #386 — open; exact head is bound by PR API and CI evidence |
+| Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent permission/security/API review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Implementation evidence is recorded below. |
+| Implementation PR | #386 — merged as `60b0367cf749397bf1167e189e820e82e32baf03` |
+| Completion Commit | `60b0367cf749397bf1167e189e820e82e32baf03` |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Implementation started from the #385 claim merge or later `main`; owner must remain Review / Claimed until implementation evidence and protected review exist. TOOL-024-D and I223 remain separate. |
+| Handoff / Release Condition | C is closed with pre-existing implementation evidence. TOOL-024-D1/D2 and I223 remain separate; Windows remains fail-closed. |
+
+Completion Commit: `60b0367cf749397bf1167e189e820e82e32baf03`. This pre-existing implementation
+merge is the evidence; the closeout status commit cannot self-certify the behavior implementation.
 
 ## Goal And Deliverable
 
@@ -61,17 +65,17 @@ permission behavior.
 
 ## Acceptance
 
-- [ ] A real `process(read)` call returns only events after the supplied cursor and advances it.
-- [ ] `status` reports every terminal state and safe exit metadata without replaying output.
-- [ ] `list` is session-scoped, bounded, stable, and redacts environment/secrets/raw arguments.
-- [ ] `cancel` is idempotent, ownership-checked, bounded, and reaps through the I222 manager.
-- [ ] Unknown/foreign IDs fail closed without revealing whether a job exists.
-- [ ] Per-read bytes, wait duration, job count and retained output are hard bounded and explicit.
-- [ ] Permission denial/rejected admission starts no process and creates no control authority.
-- [ ] Foreground and I222 background start behavior regressions remain green.
-- [ ] Unix runtime fixture exercises start, read, status and cancel through the actual tool registry.
-- [ ] Public tool/model guidance documents bounded reads, non-busy polling and explicit cancellation.
-- [ ] Focused locked tests, full workspace checks, Clippy, release preflight, governance validators,
+- [x] A real `process(read)` call returns only events after the supplied cursor and advances it.
+- [x] `status` reports every terminal state and safe exit metadata without replaying output.
+- [x] `list` is session-scoped, bounded, stable, and redacts environment/secrets/raw arguments.
+- [x] `cancel` is idempotent, ownership-checked, bounded, and reaps through the I222 manager.
+- [x] Unknown/foreign IDs fail closed without revealing whether a job exists.
+- [x] Per-read bytes, wait duration, job count and retained output are hard bounded and explicit.
+- [x] Permission denial/rejected admission starts no process and creates no control authority.
+- [x] Foreground and I222 background start behavior regressions remain green.
+- [x] Unix runtime fixture exercises start, read, status and cancel through the actual tool registry.
+- [x] Public tool/model guidance documents bounded reads, non-busy polling and explicit cancellation.
+- [x] Focused locked tests, full workspace checks, Clippy, release preflight, governance validators,
   exact-head CI and independent security/API review pass.
 
 ## Validation And Review Gates
@@ -105,3 +109,16 @@ this host by `sandbox_apply: Operation not permitted`. Full exact-head CI and in
 remain required before implementation merge.
 Stable implementation commit: `dcdffc56` plus launch-cancel reap fix `eabb7d3a`; implementation PR #386 is open. Its exact head is resolved by PR API and bound by CI/review evidence rather than self-referential owner text.
 Owner status is Review / Claimed pending exact-head CI and independent permission/security/API review.
+
+The preceding execution checkpoint is a preserved pre-merge record. It is superseded by the
+Completion Checkpoint below; current status and evidence are authoritative there.
+
+## Completion Checkpoint (2026-08-24)
+
+PR #386 exact head `d42c060d618e61218c4c1efe0651e74830807256` was based on
+`ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`, passed exact-head CI `32719779528` (5/5), and received
+independent permission/security/API/process approval `5394777902`. It merged as
+`60b0367cf749397bf1167e189e820e82e32baf03` after merge-time CAS. Focused locked tests, full release
+preflight and both governance validators passed locally. The delivered scope is complete; no
+Dashboard/I213, Windows D1/D2, release/publication, persistence or I223 authority was added.
+TOOL-024-C is Complete / Closed. A status-only closeout commit is not its Completion Commit.

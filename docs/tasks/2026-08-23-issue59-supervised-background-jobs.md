@@ -107,6 +107,9 @@ overlapping work. C/D2 must recompute overlap and cannot reuse this authorizatio
 
 ## Checkpoint
 
+The following baseline checkpoint records the pre-I224-merge state and is retained for recovery
+history; the current state is in the dated checkpoints appended below.
+
 Completed task items: dependency chain through PERM-006-C and validation tracker #378 creation.
 
 Current state and artifacts: PR #379 activated TOOL-024-B/I222, implementation PR #382 merged as
@@ -187,3 +190,24 @@ read/status/list/cancel contract over I222; it excludes Windows Job Object/D1, T
 Dashboard/I213, persistence, `/auto`, release and publication. The proposed Active/Claimed record
 remains ineffective until #385 merges to `main`; no implementation branch or production code is
 authorized before that merge.
+
+This claim-preparation checkpoint is historical and is superseded by the I224 implementation and
+closeout checkpoint below; it remains preserved as the pre-merge record.
+
+## I224 Implementation And Closeout Checkpoint (2026-08-24)
+
+I224/TOOL-024-C implementation PR #386 was locally converged from claim merge
+`ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Exact head
+`d42c060d618e61218c4c1efe0651e74830807256` passed CI `32719779528` 5/5 and independent
+permission/security/API/process review `5394777902`; merge-time CAS then merged it as
+`60b0367cf749397bf1167e189e820e82e32baf03`. The C child is now Complete / Closed with that
+pre-existing implementation merge as Completion Commit. The corrective implementation keeps
+cancel resources job-unique and preserves the public `BackgroundJobRequest` construction contract.
+
+The ordered long task is not complete: TOOL-024-D1 Windows Job Object decision/implementation,
+TOOL-024-D2 CLI/TUI and integrated platform acceptance, and I223/Issue #378 deferred validation
+remain separately governed. Windows remains fail-closed, Issue #59 stays open, and no release,
+publication, Dashboard/I213, `/auto` or Desktop authority was added by I224.
+
+Next task item: prepare a separate D1 decision/claim from current `main`, after a fresh nonterminal
+inventory and overlap check. Do not reuse I224, its implementation branch, or its exact-head evidence.
