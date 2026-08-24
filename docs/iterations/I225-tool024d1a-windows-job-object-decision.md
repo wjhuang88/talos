@@ -15,7 +15,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 decision session 2026-08-24 |
-| Work Slice | Decide only the Windows Job Object prerequisite: current-path inventory; assigned-before-exec process/Job Object/primary-thread sequence; handle RAII, kill-on-close, nesting and fail-closed partial failures; bounded dependency/OS-ABI/`unsafe`; compatibility, migration, rollback, reversal triggers, exact D1-B authority inventory and Windows test matrix in ADR-068/current-path docs. No production or product behavior change. |
+| Work Slice | Decide only the Windows Job Object prerequisite: current-path inventory; assigned-before-exec process/Job Object/primary-thread sequence; allowlisted child-handle inheritance; handle RAII, kill-on-close, nesting and fail-closed partial failures; bounded dependency/OS-ABI/`unsafe`; compatibility, migration, rollback, reversal triggers, exact D1-B authority inventory and Windows test matrix in ADR-068/current-path docs. No production or product behavior change. |
 | Claimed At | 2026-08-24 |
 | Source Issue | #59 |
 | Governance Claim PR | #388 |
@@ -59,6 +59,9 @@ authority and are not reused.
   shutdown paths after I224.
 - Decide assigned-before-exec Job Object creation/configuration/assignment/resume and handle
   lifetime semantics, including nested Job Object and partial-failure behavior.
+- Decide a race-free allowlisted child-handle inheritance boundary for raw/suspended creation and
+  stdio pipes, using `STARTUPINFOEX`/`PROC_THREAD_ATTRIBUTE_HANDLE_LIST` or an equivalently proven
+  safe binding; unrelated inheritable handles must never enter the child.
 - Select the minimal dependency and bounded `unsafe`/OS-ABI surface with checked rights,
   conversions and errors.
 - Freeze compatibility, migration, rollback, reversal triggers, exact D1-B authority inventory and
@@ -78,9 +81,11 @@ authority and are not reused.
   proposed change.
 - ADR-068 selects a race-free assigned-before-exec sequence and complete fail-closed state machine.
 - Handle RAII, kill-on-close, nested Job Object behavior, deadline/cancel/shutdown races,
-  dependency/`unsafe` bounds, compatibility, migration and rollback are explicit.
+  allowlisted handle inheritance, dependency/`unsafe` bounds, compatibility, migration and rollback
+  are explicit.
 - D1-B has a runnable Windows test plan proving child/grandchild cleanup and no pre-assignment
-  execution; D2 and I223 remain separately gated.
+  execution, no unrelated inherited-handle disclosure under concurrent spawn, and complete
+  attribute-list/pipe/duplicate cleanup on partial failures; D2 and I223 remain separately gated.
 - Exact-head CI, both validators, YAML/diff checks and independent Windows/process/unsafe/API review
   pass; the decision PR changes no production code.
 
@@ -103,6 +108,8 @@ authority and are not reused.
 
 - A spawn-then-assign design permits code execution before ownership and is unacceptable.
 - A suspended child without complete failure cleanup can leak a process or handle.
+- Broad `bInheritHandles` process creation can disclose an unrelated concurrently inheritable
+  handle; post-create RAII cannot repair that leak.
 - Tokio/std process abstractions may not expose the primary-thread handle required for safe resume;
   the decision must prove its selected boundary rather than assume it.
 - Host Job Object nesting can reject assignment; unsupported configurations remain fail-closed.

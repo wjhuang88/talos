@@ -19,7 +19,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 decision session 2026-08-24 |
-| Work Slice | Decide only the Windows Job Object prerequisite: inventory the current Windows process path; define assigned-before-exec creation/assignment/resume, handle RAII, kill-on-close, nested-job and partial-failure semantics; select a bounded dependency/OS-ABI/`unsafe` boundary; freeze compatibility, migration, rollback, reversal triggers, D1-B authority inventory and Windows test matrix in ADR-068/current-path documentation. No Rust/Cargo/dependency, process behavior, Windows enablement, CLI/TUI, I223 execution, Dashboard/I213, permission, `/auto`, release, publication or Desktop change. |
+| Work Slice | Decide only the Windows Job Object prerequisite: inventory the current Windows process path; define assigned-before-exec creation/assignment/resume, allowlisted child-handle inheritance, handle RAII, kill-on-close, nested-job and partial-failure semantics; select a bounded dependency/OS-ABI/`unsafe` boundary; freeze compatibility, migration, rollback, reversal triggers, D1-B authority inventory and Windows test matrix in ADR-068/current-path documentation. No Rust/Cargo/dependency, process behavior, Windows enablement, CLI/TUI, I223 execution, Dashboard/I213, permission, `/auto`, release, publication or Desktop change. |
 | Claimed At | 2026-08-24 |
 | Source Issue | #59 |
 | Governance Claim PR | #388 |
@@ -47,6 +47,12 @@ implementation runnable without weakening ADR-060's no-unmanaged-child invariant
 - Decide an assigned-before-exec process-creation sequence. The contract must address suspended
   creation, Job Object creation/configuration, assignment, primary-thread resume, async stdout/
   stderr/wait integration and ownership transfer.
+- Decide an allowlisted child-handle inheritance boundary for suspended/raw process creation and
+  stdio integration in a multithreaded host. ADR-068 must select `STARTUPINFOEX` with
+  `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` or an equivalently proven safe binding, inherit only the
+  required child stdio handles, prevent unrelated inheritable-handle disclosure, close every
+  parent/child duplicate on partial failure, and reject any design whose inheritance set cannot be
+  proven.
 - Define handle ownership and RAII for process, primary thread and Job Object handles, including
   partial-construction cleanup and exactly-once close/terminate behavior.
 - Define `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, explicit cancel/timeout/shutdown behavior, and how
@@ -79,6 +85,9 @@ implementation runnable without weakening ADR-060's no-unmanaged-child invariant
   including spawn-then-assign, direct-child-only kill and `taskkill`.
 - The decision defines fail-closed behavior for every pre-assignment, post-assignment/pre-resume,
   resume, monitor, cancellation and teardown failure state.
+- The decision and D1-B test matrix prove that only explicitly allowlisted child stdio handles are
+  inherited during concurrent process creation; unrelated inheritable handles cannot leak, and all
+  attribute-list/pipe/duplicate handles close on every partial-failure path.
 - The decision defines a bounded `unsafe`/dependency contract, compatibility and migration plan,
   rollback path, exact D1-B authority inventory and independent Windows/process-security test
   matrix.
@@ -98,9 +107,14 @@ implementation runnable without weakening ADR-060's no-unmanaged-child invariant
 - `docs/backlog/active/TOOL-024-B-managed-background-execution-core.md`
 - `docs/backlog/active/TOOL-024-C-model-readable-process-job-control.md`
 - `crates/talos-tools/src/process_boundary.rs`
-- `crates/talos-tools/src/background_jobs.rs`
 - `crates/talos-tools/src/bash_tool.rs`
 - `crates/talos-tools/src/exec_tool.rs`
+- `crates/talos-agent/src/background_jobs.rs`
+- `crates/talos-agent/src/process_tool.rs`
+- `crates/talos-agent/src/tool_execution.rs`
+- `crates/talos-agent/src/session.rs`
+- `crates/talos-core/src/background_job.rs`
+- `crates/talos-runtime/src/lib.rs`
 
 ## User-Facing Documentation
 
