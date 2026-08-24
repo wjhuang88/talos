@@ -1,6 +1,6 @@
 # TOOL-024-C: Model-Readable Process Job Control
 
-> Document status: Active / Claimed — proposed through governance PR #385; ineffective until merge
+> Document status: Review / Claimed — implementation candidate locally converged; protected review pending
 
 | Field | Value |
 |---|---|
@@ -9,7 +9,7 @@
 | Priority | P0 |
 | Parent Epic | [TOOL-024](TOOL-024-background-command-jobs.md) |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I224 Active / Claimed through governance PR #385; ineffective until merge |
+| Selected Iteration | I224 Active / Claimed through governance PR #385; claim effective on `main` |
 | Depends On | TOOL-024-A/I188 Accepted; TOOL-024-B/I222 Complete; RUNTIME-005 Complete; PERM-006-C/I221 Complete |
 
 ## Collaboration Claim
@@ -24,10 +24,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #385 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer Issue #59 long-task objective selects the ordered C child after I222/B completion. Draft claim PR #385 proposes this bounded slice; claim and activation are ineffective until merge. Independent permission/security/API review, exact-head CI and merge-time CAS are required before implementation merge. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #385 exact head `12931fef1400f7ce53fe82f3d3453036d2227c56` passed CI `32699927266`, independent permission/security/API review `5391959581`, merge-time CAS, and merged as `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`. Independent permission/security/API review, exact-head CI and merge-time CAS remain required before implementation merge. |
+| Implementation PR | #386 — open; exact head is bound by PR API and CI evidence |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Implementation starts only from the #385 claim merge or later `main`; owner must remain Review / Claimed until implementation evidence and protected review exist. TOOL-024-D and I223 remain separate. |
+| Handoff / Release Condition | Implementation started from the #385 claim merge or later `main`; owner must remain Review / Claimed until implementation evidence and protected review exist. TOOL-024-D and I223 remain separate. |
 
 ## Goal And Deliverable
 
@@ -93,3 +93,15 @@ all residual manual/device rows remain with I223 / Issue #378.
 - Iteration execution: `docs/iterations/I224-tool024c-model-readable-process-job-control.md`.
 - Parent sequencing: `docs/backlog/active/TOOL-024-background-command-jobs.md`.
 - Deferred evidence: `docs/iterations/I223-issue59-deferred-human-validation-cleanup.md` and Issue #378.
+
+## Execution Checkpoint (2026-08-24)
+
+Implementation locally converged from claim merge `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`.
+The current candidate adds only the session-owned `process` tool and supervisor projection seam;
+Windows, Dashboard/I213, TUI, persistence, release and I223 remain excluded. Focused agent checks
+and the real AppServerSession registration fixture pass. `talos-tools` and `talos-runtime` locked
+tests pass; workspace library validation reached the macOS Seatbelt tests, which are blocked in
+this host by `sandbox_apply: Operation not permitted`. Full exact-head CI and independent review
+remain required before implementation merge.
+Stable implementation commit: `dcdffc56` plus launch-cancel reap fix `eabb7d3a`; implementation PR #386 is open. Its exact head is resolved by PR API and bound by CI/review evidence rather than self-referential owner text.
+Owner status is Review / Claimed pending exact-head CI and independent permission/security/API review.
