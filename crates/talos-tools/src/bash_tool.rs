@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::background_job::{
-    BackgroundJobPermit, BackgroundJobRequest, ToolExecutionAdmission,
-};
+#[cfg(unix)]
+use talos_core::background_job::BackgroundJobRequest;
+use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
     AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult,
@@ -307,7 +307,7 @@ impl AgentTool for BashTool {
         }
         #[cfg(windows)]
         {
-            return Err("background_process_tree_unsupported".to_owned());
+            Err("background_process_tree_unsupported".to_owned())
         }
         #[cfg(unix)]
         {
@@ -390,6 +390,7 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
     })
 }
 
+#[cfg(unix)]
 fn has_detached_process_shape(command: &str) -> bool {
     let normalized = command.trim();
     normalized.ends_with('&')

@@ -9,9 +9,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::background_job::{
-    BackgroundJobPermit, BackgroundJobRequest, ToolExecutionAdmission,
-};
+#[cfg(unix)]
+use talos_core::background_job::BackgroundJobRequest;
+use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
     AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult,
@@ -641,7 +641,7 @@ impl AgentTool for ExecTool {
         }
         #[cfg(windows)]
         {
-            return Err("background_process_tree_unsupported".to_owned());
+            Err("background_process_tree_unsupported".to_owned())
         }
         #[cfg(unix)]
         {
@@ -709,6 +709,7 @@ impl AgentTool for ExecTool {
     }
 }
 
+#[cfg(unix)]
 fn has_detached_exec_shape(command: &str, args: &[String]) -> bool {
     let program = std::path::Path::new(command)
         .file_name()
