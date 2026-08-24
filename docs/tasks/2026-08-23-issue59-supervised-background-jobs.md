@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/TOOL-024-B Complete through implementation merge `8671edf4`; C/D and I223 remain.
+> Status: Active long task; I222/B and I224/C Complete; D1-A/I225 claim proposed; D1-B/D2 and I223 remain.
 
 ## Startup Contract
 
@@ -211,3 +211,22 @@ publication, Dashboard/I213, `/auto` or Desktop authority was added by I224.
 
 Next task item: prepare a separate D1 decision/claim from current `main`, after a fresh nonterminal
 inventory and overlap check. Do not reuse I224, its implementation branch, or its exact-head evidence.
+
+## I225 / TOOL-024-D1-A Claim Preparation Checkpoint (2026-08-24)
+
+I224 owner-first closeout PR #387 merged as `3cb4eff8a7e70e9b8f2c3ed1b667b2ce58f41fe4`.
+A fresh inventory found I164 Paused; I197/I198/I201/I210 Review/Claimed; I206-I208 and I223
+Planned/Unclaimed; no Active iteration, D1 owner, ADR-068, competing I225 proposal or non-archival
+open implementation PR. I213 is Complete/Closed, so there is no Dashboard concurrency exception to
+reuse or reconcile.
+
+I225 and TOOL-024-D1-A now propose only the prerequisite Windows Job Object security/OS-ABI
+decision. Before claim merge they remain Planned/Unclaimed and ineffective. The decision phase must
+produce an independently reviewed current-path matrix and Accepted ADR-068 covering assigned-before-
+exec ownership, handle RAII, kill-on-close, nested Job Objects, fail-closed partial failures,
+bounded dependency/`unsafe`, compatibility, migration, rollback and the exact D1-B test/authority
+boundary.
+
+No Rust, Cargo, dependency, lockfile, Windows runtime, CLI/TUI, Dashboard/I213, `/auto`, release,
+publication or Desktop authority is included. D1-B implementation, D2 projection and I223/#378
+remain separately governed; Windows background start stays fail-closed.
