@@ -109,9 +109,11 @@ overlapping work. C/D2 must recompute overlap and cannot reuse this authorizatio
 
 Completed task items: dependency chain through PERM-006-C and validation tracker #378 creation.
 
-Current state and artifacts: PR #379 activated TOOL-024-B/I222, and implementation PR #382 merged
-as `8671edf45c168612bfa4a4bbb65a9847026e1b96`. I222/TOOL-024-B are now Complete/Closed through
-owner-first closeout; I223 remains Planned/Unclaimed and C/D require separate claims.
+Current state and artifacts: PR #379 activated TOOL-024-B/I222, implementation PR #382 merged as
+`8671edf45c168612bfa4a4bbb65a9847026e1b96`, and closeout PR #384 merged as `faf7c0e8`.
+I222/TOOL-024-B are Complete/Closed through owner-first closeout. I224/TOOL-024-C is now a
+governance-only Planned/Unclaimed candidate; its claim is ineffective until target-branch merge.
+I223 remains Planned/Unclaimed and D requires a separate claim/decision.
 
 Commands/checks and actual results: repository/worktree/open-PR and nonterminal iteration inventory
 completed; governance validation pending finalized Draft claim.
@@ -176,3 +178,12 @@ merged implementation and owner-first closeout above. Do not create another I222
 candidate or repeat its CI/review. The next ordered governance action is a separately claimed
 TOOL-024-C owner/iteration; Windows D1/D2 and I223 remain independent gates, and Issue #59 stays
 open until all required children reach their own evidence-bearing terminal states.
+
+## I224 Claim Preparation Checkpoint (2026-08-24)
+
+I224/TOOL-024-C owner and iteration were prepared from `main@faf7c0e8` as a governance-only
+candidate, with claim PR #385. The slice is limited to the model-visible session-scoped `process`
+read/status/list/cancel contract over I222; it excludes Windows Job Object/D1, TUI/D2, I223,
+Dashboard/I213, persistence, `/auto`, release and publication. The proposed Active/Claimed record
+remains ineffective until #385 merges to `main`; no implementation branch or production code is
+authorized before that merge.
