@@ -270,6 +270,9 @@ impl BackgroundJobSupervisor {
 
     async fn close_admission_after_launches(&self) {
         loop {
+            // Register the notification before observing state so a final launcher completion
+            // cannot slip between the check and subscription.
+            let notified = self.inner.state_changed.notified();
             let closed = self
                 .inner
                 .state
@@ -287,7 +290,7 @@ impl BackgroundJobSupervisor {
                 self.inner.state_changed.notify_waiters();
                 return;
             }
-            self.inner.state_changed.notified().await;
+            notified.await;
         }
     }
 
