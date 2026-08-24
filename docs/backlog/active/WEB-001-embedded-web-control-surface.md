@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell are Complete. WEB-001-B/I213 has a bounded live-activity/log-SSE candidate in Review in PR #372 under the effective #327 claim and #363 activation; refreshed exact-head gates remain pending after local rebase onto `main@7fd813e8`. Config editor, web approvals, session actions, remote/LAN and other control residuals remain separately governed. |
+| Status | Partial — I129 rendered pages and WEB-001-A/I195 cohesive read-only visual shell are Complete. WEB-001-B/I213 is Complete / Closed through implementation merge `9f963d0ca662f334fe007d0fcfc857640a2a5bd6`; config editor, web approvals, session actions, remote/LAN and other control residuals remain separately governed. |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | live log viewer; web config editor; later write/control surfaces |

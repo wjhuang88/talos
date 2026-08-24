@@ -1,10 +1,11 @@
 # WEB-001-B: Dashboard Live Activity And Log Viewer
 
-**Status**: Review / Claimed — implementation PR #372 locally rebased onto `main@7fd813e8`; refreshed exact-head CI and independent security review pending
+**Status**: Complete / Closed — implementation merged via PR #372 merge `9f963d0c`; owner-first closeout recorded
+**Completion Commit**: `9f963d0ca662f334fe007d0fcfc857640a2a5bd6`
 **Priority**: P1
 **Type**: Product / Observability Story
 **Parent Epic**: WEB-001
-**Selected Iteration**: I213 — Review / Claimed; activation effective through #363 merge `e578f419`
+**Selected Iteration**: I213 — Complete / Closed; implementation merge `9f963d0c`; activation effective through #363 merge `e578f419`
 
 ## Collaboration Claim
 
@@ -19,7 +20,7 @@
 | Governance Claim PR | #327 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #327 exact head `a50a43ab8f34db046c9bc369c03b7413a0e6bbd9` passed CI `32347020700`, independent claim review and merge-time CAS, then merged as `667472145ffa7644a7f049472d7389876b8aaaf9`. On 2026-08-22 the maintainer explicitly approved parallel execution provided parallel protections are enforced. Activation PR #363 exact head `5835a97e053e2fdfb4a13f93136af5641ff20d8b` passed CI `32572881761` and merge-time CAS, then merged as `e578f4196092d0884ab7dd3321fb62acb3b88257`; those guards are now effective. |
-| Implementation PR | #372 — stable candidate `2cd0cc45` locally converged on `main@7fd813e8`; not yet pushed |
+| Implementation PR | #372 — merged as `9f963d0ca662f334fe007d0fcfc857640a2a5bd6` |
 | Last Updated | 2026-08-24 |
 | Handoff / Release Condition | Finish local convergence on `main@7fd813e8`, push the refreshed stable candidate to #372, obtain fresh exact-head CI and independent security review, then repeat merge-time ownership/file-overlap CAS. Preserve all recorded pairwise protections; no completion is claimed. |
 
@@ -227,9 +228,7 @@ than widening WEB-001-B.
 
 ## Readiness Decision
 
-**Review / Claimed; the local stable candidate is converged under GOV-008 and implementation
-authority remains effective through #363 merge `e578f419`. First push, exact-head CI, independent
-security review and merge-time CAS remain pending.**
+**Complete / Closed; implementation merge `9f963d0c` and owner-first evidence are recorded under GOV-008.**
 
 Fresh 2026-08-22 inventory found no overlapping Dashboard implementation PR. I211 is Complete/Closed;
 I219 is the explicit non-overlapping Active permission lane; only archival #120/#121 were open at
