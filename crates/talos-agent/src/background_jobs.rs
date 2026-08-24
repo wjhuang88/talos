@@ -119,9 +119,11 @@ impl JobRecord {
 }
 
 struct SupervisorState {
+    shutdown_requested: bool,
     closing: bool,
     reserved: usize,
     active: usize,
+    launching: usize,
     jobs: HashMap<BackgroundJobId, JobRecord>,
     terminal_order: VecDeque<BackgroundJobId>,
 }
@@ -156,9 +158,11 @@ impl BackgroundJobSupervisor {
         Self {
             inner: Arc::new(SupervisorInner {
                 state: Mutex::new(SupervisorState {
+                    shutdown_requested: false,
                     closing: false,
                     reserved: 0,
                     active: 0,
+                    launching: 0,
                     jobs: HashMap::new(),
                     terminal_order: VecDeque::new(),
                 }),
@@ -210,13 +214,14 @@ impl BackgroundJobSupervisor {
         }
 
         if let Ok(mut state) = self.inner.state.lock() {
-            state.closing = true;
+            state.shutdown_requested = true;
         }
         self.inner.shutdown_token.cancel();
 
         let supervisor = self.clone();
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
+                supervisor.close_admission_after_launches().await;
                 let result = supervisor.wait_for_shutdown_completion().await;
                 if let Ok(mut state) = supervisor.inner.shutdown_state.lock() {
                     state.result = Some(result);
@@ -263,6 +268,29 @@ impl BackgroundJobSupervisor {
         }
     }
 
+    async fn close_admission_after_launches(&self) {
+        loop {
+            let closed = self
+                .inner
+                .state
+                .lock()
+                .map(|mut state| {
+                    if state.launching == 0 {
+                        state.closing = true;
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(true);
+            if closed {
+                self.inner.state_changed.notify_waiters();
+                return;
+            }
+            self.inner.state_changed.notified().await;
+        }
+    }
+
     pub(crate) async fn finalize(&self) -> Result<(), String> {
         self.begin_shutdown();
         loop {
@@ -299,11 +327,12 @@ impl BackgroundJobSupervisor {
             match self.inner.state.lock() {
                 Ok(mut state) => {
                     state.reserved = state.reserved.saturating_sub(1);
-                    if state.closing {
+                    if state.closing || state.shutdown_requested {
                         state.jobs.remove(&id);
                         false
                     } else {
                         state.active = state.active.saturating_add(1);
+                        state.launching = state.launching.saturating_add(1);
                         true
                     }
                 }
@@ -318,6 +347,10 @@ impl BackgroundJobSupervisor {
         let launched = match launcher.launch().await {
             Ok(launched) => launched,
             Err(error) => {
+                if let Ok(mut state) = self.inner.state.lock() {
+                    state.launching = state.launching.saturating_sub(1);
+                }
+                self.inner.state_changed.notify_waiters();
                 let summary = self.terminalize(
                     &id,
                     BackgroundJobState::SpawnFailed,
@@ -329,6 +362,11 @@ impl BackgroundJobSupervisor {
                 return ToolResult::error(format!("background spawn failed ({id}): {error}"));
             }
         };
+
+        if let Ok(mut state) = self.inner.state.lock() {
+            state.launching = state.launching.saturating_sub(1);
+        }
+        self.inner.state_changed.notify_waiters();
 
         if let Ok(mut state) = self.inner.state.lock()
             && let Some(job) = state.jobs.get_mut(&id)
@@ -570,7 +608,7 @@ impl BackgroundJobHost for BackgroundJobSupervisor {
             .state
             .lock()
             .map_err(|_| "background supervisor state is unavailable".to_owned())?;
-        if state.closing {
+        if state.closing || state.shutdown_requested {
             return Err("background job admission is closed".to_owned());
         }
         if state.reserved.saturating_add(state.active) >= MAX_NONTERMINAL_BACKGROUND_JOBS {
@@ -670,5 +708,28 @@ mod tests {
         assert_eq!(chunk.cursor, 3);
         assert_eq!(chunk.stream, BackgroundOutputStream::Stderr);
         assert_eq!(chunk.captured_at_unix_ms, 7);
+    }
+
+    #[tokio::test]
+    async fn shutdown_fence_waits_for_in_flight_launch_before_closing_admission() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        {
+            let mut state = supervisor.inner.state.lock().unwrap();
+            state.shutdown_requested = true;
+            state.launching = 1;
+        }
+
+        let waiter = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move { supervisor.close_admission_after_launches().await })
+        };
+        tokio::task::yield_now().await;
+        assert!(!supervisor.inner.state.lock().unwrap().closing);
+
+        supervisor.inner.state.lock().unwrap().launching = 0;
+        supervisor.inner.state_changed.notify_waiters();
+        waiter.await.unwrap();
+        assert!(supervisor.inner.state.lock().unwrap().closing);
     }
 }
