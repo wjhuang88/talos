@@ -1,6 +1,6 @@
 # TOOL-024-C: Model-Readable Process Job Control
 
-> Document status: Active / Claimed — claim effective through merge `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`
+> Document status: Review / Claimed — implementation candidate locally converged; protected review pending
 
 | Field | Value |
 |---|---|
@@ -96,10 +96,12 @@ all residual manual/device rows remain with I223 / Issue #378.
 
 ## Execution Checkpoint (2026-08-24)
 
-Implementation is locally converging from claim merge `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`.
+Implementation locally converged from claim merge `ae009ce68f4f3f5d49803e7d8978a021c2c9d3da`.
 The current candidate adds only the session-owned `process` tool and supervisor projection seam;
 Windows, Dashboard/I213, TUI, persistence, release and I223 remain excluded. Focused agent checks
 and the real AppServerSession registration fixture pass. `talos-tools` and `talos-runtime` locked
 tests pass; workspace library validation reached the macOS Seatbelt tests, which are blocked in
 this host by `sandbox_apply: Operation not permitted`. Full exact-head CI and independent review
 remain required before implementation merge.
+Stable implementation commit: `dcdffc56`; implementation PR is not started until this candidate is
+pushed. Owner status is Review / Claimed pending exact-head CI and independent permission/security/API review.
