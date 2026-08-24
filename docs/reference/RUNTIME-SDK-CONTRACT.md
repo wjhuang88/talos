@@ -135,6 +135,22 @@ handle.shutdown()?;
 bounded Session queue; it does not mean the model turn completed. Once shutdown closes admission,
 new submissions return `RuntimeError::RuntimeClosing` without enqueueing.
 
+### Session-Owned Background Process Controls
+
+When a live `AppServerSession` is constructed, the model-visible `process` tool is registered for
+that session. It can inspect or cancel only jobs admitted by the same session's existing permission
+pipeline. The supported actions are `read`, `status`, `list`, and `cancel`.
+
+`process(read)` returns bounded output events and a byte cursor. Pass the returned `next_cursor` to
+the next read; a cursor may resume inside one output chunk, and `dropped_before` reports output
+evicted by the fixed retention bound. `wait_ms` is a bounded long-poll hint, not a reason to busy-
+poll. `max_bytes`, wait duration, retained output, and the number of retained terminal jobs are
+all hard bounded. `process(cancel)` is idempotent and uses the supervisor's existing termination
+and reap path. Unknown or foreign job identifiers fail closed without metadata disclosure.
+
+This control surface does not attach to arbitrary PIDs, persist across restarts, provide stdin/PTY
+control, add scheduling or autonomous follow-up turns, or change Windows background support.
+
 ### Pattern 1a: Bounded Shared Shutdown
 
 ```rust,ignore

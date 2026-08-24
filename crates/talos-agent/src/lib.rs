@@ -41,6 +41,7 @@
 mod background_jobs;
 pub mod compaction;
 pub mod compression;
+mod process_tool;
 pub mod token;
 mod tool_output;
 
@@ -319,6 +320,21 @@ impl Agent {
         host: Arc<dyn talos_core::background_job::BackgroundJobHost>,
     ) {
         self.background_jobs = Some(host);
+    }
+
+    pub(crate) fn register_process_tool(
+        &mut self,
+        supervisor: crate::background_jobs::BackgroundJobSupervisor,
+    ) {
+        self.tools
+            .register(Arc::new(crate::process_tool::ProcessTool::new(supervisor)));
+        let (descriptions, definitions, names) = crate::configuration::describe_presented_tools(
+            &self.tools,
+            &self.tool_presentation_policy,
+        );
+        self.tool_definitions = definitions;
+        self.presented_tool_names = names;
+        self.update_prompt_builder(true, |builder| builder.with_tools(descriptions));
     }
 
     pub fn provider(&self) -> &dyn LanguageModel {

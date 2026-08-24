@@ -17,6 +17,15 @@ use talos_core::tool::ToolResult;
 use tokio::sync::{Notify, mpsc};
 use tokio_util::sync::CancellationToken;
 
+/// Model-visible action for a live session-owned background job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProcessAction {
+    Read,
+    Status,
+    List,
+    Cancel,
+}
+
 #[derive(Clone)]
 struct SessionIdentity {
     id: String,
@@ -24,6 +33,7 @@ struct SessionIdentity {
 }
 
 struct RetainedChunk {
+    /// Monotonic byte offset within this job's combined output stream.
     cursor: u64,
     #[allow(dead_code)] // Exposed to TOOL-024-C's explicit process read projection.
     stream: BackgroundOutputStream,
@@ -47,6 +57,8 @@ struct JobRecord {
     finished_at_unix_ms: Option<u64>,
     cleanup_outcome: BackgroundCleanupOutcome,
     cleanup_error: Option<String>,
+    control: Option<Arc<dyn BackgroundProcessControl>>,
+    cancel_token: Option<CancellationToken>,
 }
 
 impl JobRecord {
@@ -66,10 +78,18 @@ impl JobRecord {
             finished_at_unix_ms: None,
             cleanup_outcome: BackgroundCleanupOutcome::Natural,
             cleanup_error: None,
+            control: None,
+            // Cancellation begins at reservation time so a queued launch can be
+            // cancelled before the platform launcher is invoked.
+            cancel_token: Some(CancellationToken::new()),
         }
     }
 
+    /// Appends one output chunk and advances the byte cursor by its exact size.
     fn push_output(&mut self, chunk: BackgroundOutputChunk) {
+        if chunk.bytes.is_empty() {
+            return;
+        }
         let byte_count = chunk.bytes.len() as u64;
         match chunk.stream {
             BackgroundOutputStream::Stdout => {
@@ -86,7 +106,7 @@ impl JobRecord {
             bytes: chunk.bytes,
             captured_at_unix_ms: unix_millis(chunk.captured_at),
         });
-        self.next_cursor = self.next_cursor.saturating_add(1);
+        self.next_cursor = self.next_cursor.saturating_add(byte_count);
         while self.retained_bytes > MAX_BACKGROUND_OUTPUT_BYTES {
             let Some(chunk) = self.chunks.pop_front() else {
                 break;
@@ -94,6 +114,10 @@ impl JobRecord {
             self.retained_bytes = self.retained_bytes.saturating_sub(chunk.bytes.len());
             self.truncated = true;
         }
+    }
+
+    fn is_terminal(&self) -> bool {
+        self.state.is_terminal()
     }
 
     fn summary(&self) -> BackgroundJobTerminalSummary {
@@ -371,17 +395,49 @@ impl BackgroundJobSupervisor {
         }
         self.inner.state_changed.notify_waiters();
 
+        let cancel_token = self
+            .inner
+            .state
+            .lock()
+            .ok()
+            .and_then(|state| state.jobs.get(&id).and_then(|job| job.cancel_token.clone()))
+            .unwrap_or_default();
+        if cancel_token.is_cancelled() {
+            if let Ok(mut state) = self.inner.state.lock() {
+                state.launching = state.launching.saturating_sub(1);
+            }
+            self.inner.state_changed.notify_waiters();
+            let summary = self.terminalize(
+                &id,
+                BackgroundJobState::Cancelled,
+                None,
+                BackgroundCleanupOutcome::Natural,
+                None,
+            );
+            self.emit_summary(summary);
+            return ToolResult::success(
+                serde_json::json!({"job_id": id.as_str(), "state": "cancelled"}).to_string(),
+            );
+        }
         if let Ok(mut state) = self.inner.state.lock()
             && let Some(job) = state.jobs.get_mut(&id)
         {
             job.state = BackgroundJobState::Running;
+            job.control = Some(launched.control.clone());
+            job.cancel_token = Some(cancel_token.clone());
         }
 
         let supervisor = self.clone();
         let task_id = id.clone();
         tokio::spawn(async move {
             supervisor
-                .supervise(task_id, deadline, launched.control, launched.events)
+                .supervise(
+                    task_id,
+                    deadline,
+                    launched.control,
+                    cancel_token,
+                    launched.events,
+                )
                 .await;
         });
 
@@ -408,12 +464,22 @@ impl BackgroundJobSupervisor {
         id: BackgroundJobId,
         deadline: Instant,
         control: Arc<dyn BackgroundProcessControl>,
+        cancel_token: CancellationToken,
         mut events: mpsc::Receiver<BackgroundProcessEvent>,
     ) {
         let terminal = loop {
             tokio::select! {
                 biased;
                 _ = self.inner.shutdown_token.cancelled() => {
+                    break self.cleanup_after_signal(
+                        &id,
+                        BackgroundJobState::Cancelled,
+                        control.as_ref(),
+                        &mut events,
+                        None,
+                    ).await;
+                }
+                _ = cancel_token.cancelled() => {
                     break self.cleanup_after_signal(
                         &id,
                         BackgroundJobState::Cancelled,
@@ -538,6 +604,218 @@ impl BackgroundJobSupervisor {
             && let Some(job) = state.jobs.get_mut(id)
         {
             job.push_output(chunk);
+        }
+        self.inner.state_changed.notify_waiters();
+    }
+
+    pub(crate) async fn process_action(
+        &self,
+        action: ProcessAction,
+        job_id: Option<&str>,
+        cursor: Option<u64>,
+        max_bytes: Option<usize>,
+        wait_ms: Option<u64>,
+    ) -> ToolResult {
+        const MAX_READ_BYTES: usize = 64 * 1024;
+        const MAX_WAIT_MS: u64 = 5_000;
+        let max_bytes = max_bytes.unwrap_or(16 * 1024).clamp(1, MAX_READ_BYTES);
+        let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
+        match action {
+            ProcessAction::List => self.process_list(max_bytes),
+            ProcessAction::Status => job_id.map_or_else(
+                || ToolResult::error("process status requires job_id"),
+                |id| self.process_status(id),
+            ),
+            ProcessAction::Read => match job_id {
+                Some(id) => {
+                    self.process_read(id, cursor.unwrap_or(0), max_bytes, wait_ms)
+                        .await
+                }
+                None => ToolResult::error("process read requires job_id"),
+            },
+            ProcessAction::Cancel => match job_id {
+                Some(id) => self.process_cancel(id, wait_ms.max(5_000)).await,
+                None => ToolResult::error("process cancel requires job_id"),
+            },
+        }
+    }
+
+    fn process_list(&self, max_bytes: usize) -> ToolResult {
+        let mut jobs = self.inner.state.lock().ok().map_or_else(Vec::new, |state| {
+            state.jobs.values().map(job_status_json).collect::<Vec<_>>()
+        });
+        jobs.sort_by(|a, b| {
+            a.get("job_id")
+                .and_then(serde_json::Value::as_str)
+                .cmp(&b.get("job_id").and_then(serde_json::Value::as_str))
+        });
+        let mut truncated = false;
+        while serde_json::to_vec(&jobs).is_ok_and(|bytes| bytes.len() > max_bytes) {
+            truncated = true;
+            if jobs.pop().is_none() {
+                break;
+            }
+        }
+        ToolResult::success(serde_json::json!({"jobs": jobs, "truncated": truncated}).to_string())
+    }
+
+    fn process_status(&self, job_id: &str) -> ToolResult {
+        let Some(job) = self.inner.state.lock().ok().and_then(|state| {
+            state
+                .jobs
+                .get(&BackgroundJobId::new(job_id))
+                .map(job_status_json)
+        }) else {
+            return ToolResult::error("unknown background job");
+        };
+        ToolResult::success(job.to_string())
+    }
+
+    async fn process_read(
+        &self,
+        job_id: &str,
+        cursor: u64,
+        max_bytes: usize,
+        wait_ms: u64,
+    ) -> ToolResult {
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(wait_ms);
+        loop {
+            let notified = self.inner.state_changed.notified();
+            match self.read_snapshot(job_id, cursor, max_bytes) {
+                Ok((value, has_data, terminal)) if has_data || terminal || wait_ms == 0 => {
+                    return ToolResult::success(value.to_string());
+                }
+                Err(error) => return ToolResult::error(error),
+                Ok(_) => {}
+            }
+            if tokio::time::timeout_at(deadline, notified).await.is_err() {
+                return self
+                    .read_snapshot(job_id, cursor, max_bytes)
+                    .map(|(value, _, _)| ToolResult::success(value.to_string()))
+                    .unwrap_or_else(ToolResult::error);
+            }
+        }
+    }
+
+    fn read_snapshot(
+        &self,
+        job_id: &str,
+        cursor: u64,
+        max_bytes: usize,
+    ) -> Result<(serde_json::Value, bool, bool), String> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| "background supervisor state is unavailable".to_owned())?;
+        let Some(job) = state.jobs.get(&BackgroundJobId::new(job_id)) else {
+            return Err("unknown background job".to_owned());
+        };
+        let earliest = job
+            .chunks
+            .front()
+            .map_or(job.next_cursor, |chunk| chunk.cursor);
+        let dropped_before = (cursor < earliest).then_some(earliest);
+        let mut used = 0usize;
+        let mut events = Vec::new();
+        let mut read_cursor = cursor;
+        let mut partial = false;
+        for chunk in &job.chunks {
+            if chunk.cursor.saturating_add(chunk.bytes.len() as u64) <= read_cursor {
+                continue;
+            }
+            if used >= max_bytes {
+                break;
+            }
+            let remaining = max_bytes - used;
+            let offset = read_cursor.saturating_sub(chunk.cursor) as usize;
+            let bytes = &chunk.bytes[offset..];
+            let bytes = &bytes[..bytes.len().min(remaining)];
+            let event_cursor = read_cursor;
+            used = used.saturating_add(bytes.len());
+            events.push(serde_json::json!({
+                "seq": chunk.cursor,
+                "cursor": event_cursor,
+                "stream": chunk.stream,
+                "text": String::from_utf8_lossy(bytes),
+                "captured_at_unix_ms": chunk.captured_at_unix_ms,
+            }));
+            read_cursor = read_cursor.saturating_add(bytes.len() as u64);
+            if bytes.len() < chunk.bytes.len() {
+                partial = offset.saturating_add(bytes.len()) < chunk.bytes.len();
+            }
+            if partial {
+                break;
+            }
+        }
+        let next_cursor = read_cursor;
+        let terminal = job.is_terminal();
+        let value = serde_json::json!({
+            "job_id": job.id,
+            "state": job.state,
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "events": events,
+            "partial": partial,
+            "dropped_before": dropped_before,
+            "exit_code": job.exit_code,
+            "eof": terminal,
+            "truncated": job.truncated,
+        });
+        let has_data = value
+            .get("events")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|events| !events.is_empty());
+        Ok((value, has_data, terminal))
+    }
+
+    async fn process_cancel(&self, job_id: &str, wait_ms: u64) -> ToolResult {
+        let (token, starting) = self
+            .inner
+            .state
+            .lock()
+            .ok()
+            .and_then(|state| {
+                state.jobs.get(&BackgroundJobId::new(job_id)).map(|job| {
+                    (
+                        job.cancel_token.clone(),
+                        job.state == BackgroundJobState::Starting,
+                    )
+                })
+            })
+            .unwrap_or((None, false));
+        let Some(token) = token else {
+            return self.process_status(job_id);
+        };
+        token.cancel();
+        if starting {
+            let mut result = self.process_status(job_id);
+            if !result.is_error
+                && let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&result.content)
+            {
+                value["cancellation_requested"] = serde_json::Value::Bool(true);
+                result.content = value.to_string();
+            }
+            return result;
+        }
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(wait_ms.min(5_000));
+        loop {
+            let notified = self.inner.state_changed.notified();
+            if let Some(status) = self.inner.state.lock().ok().and_then(|state| {
+                state
+                    .jobs
+                    .get(&BackgroundJobId::new(job_id))
+                    .map(job_status_json)
+            }) && status
+                .get("state")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|state| state != "running" && state != "starting")
+            {
+                return ToolResult::success(status.to_string());
+            }
+            if tokio::time::timeout_at(deadline, notified).await.is_err() {
+                return self.process_status(job_id);
+            }
         }
     }
 
@@ -688,6 +966,23 @@ fn append_error(target: &mut Option<String>, error: String) {
     }
 }
 
+fn job_status_json(job: &JobRecord) -> serde_json::Value {
+    serde_json::json!({
+        "job_id": job.id,
+        "tool": job.tool_name,
+        "state": job.state,
+        "exit_code": job.exit_code,
+        "stdout_bytes": job.stdout_bytes,
+        "stderr_bytes": job.stderr_bytes,
+        "earliest_cursor": job.chunks.front().map_or(job.next_cursor, |chunk| chunk.cursor),
+        "next_cursor": job.next_cursor,
+        "truncated": job.truncated,
+        "started_at_unix_ms": job.started_at_unix_ms,
+        "finished_at_unix_ms": job.finished_at_unix_ms,
+        "cleanup_outcome": job.cleanup_outcome,
+    })
+}
+
 fn unix_millis(time: SystemTime) -> u64 {
     time.duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -734,5 +1029,140 @@ mod tests {
         supervisor.inner.state_changed.notify_waiters();
         waiter.await.unwrap();
         assert!(supervisor.inner.state.lock().unwrap().closing);
+    }
+
+    #[tokio::test]
+    async fn process_read_advances_cursor_without_repeating_chunks() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = BackgroundJobId::new("job_test");
+        let mut job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        job.state = BackgroundJobState::Running;
+        job.push_output(BackgroundOutputChunk {
+            stream: BackgroundOutputStream::Stdout,
+            bytes: b"one".to_vec(),
+            captured_at: SystemTime::UNIX_EPOCH,
+        });
+        job.push_output(BackgroundOutputChunk {
+            stream: BackgroundOutputStream::Stderr,
+            bytes: b"two".to_vec(),
+            captured_at: SystemTime::UNIX_EPOCH,
+        });
+        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+
+        let first = supervisor
+            .process_action(
+                ProcessAction::Read,
+                Some("job_test"),
+                Some(0),
+                Some(3),
+                None,
+            )
+            .await;
+        let first: serde_json::Value = serde_json::from_str(&first.content).unwrap();
+        assert_eq!(first["events"][0]["text"], "one");
+        assert_eq!(first["next_cursor"], 3);
+
+        let second = supervisor
+            .process_action(
+                ProcessAction::Read,
+                Some("job_test"),
+                Some(3),
+                Some(3),
+                None,
+            )
+            .await;
+        let second: serde_json::Value = serde_json::from_str(&second.content).unwrap();
+        assert_eq!(second["events"][0]["text"], "two");
+        assert_eq!(second["next_cursor"], 6);
+    }
+
+    #[tokio::test]
+    async fn process_read_resumes_inside_a_large_chunk_without_repeating_bytes() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = BackgroundJobId::new("job_large");
+        let mut job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        job.state = BackgroundJobState::Running;
+        job.push_output(BackgroundOutputChunk {
+            stream: BackgroundOutputStream::Stdout,
+            bytes: b"abcdef".to_vec(),
+            captured_at: SystemTime::UNIX_EPOCH,
+        });
+        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+
+        let first = supervisor
+            .process_action(
+                ProcessAction::Read,
+                Some("job_large"),
+                Some(0),
+                Some(2),
+                None,
+            )
+            .await;
+        let first: serde_json::Value = serde_json::from_str(&first.content).unwrap();
+        assert_eq!(first["events"][0]["text"], "ab");
+        assert_eq!(first["next_cursor"], 2);
+        assert_eq!(first["partial"], true);
+
+        let second = supervisor
+            .process_action(
+                ProcessAction::Read,
+                Some("job_large"),
+                first["next_cursor"].as_u64(),
+                Some(2),
+                None,
+            )
+            .await;
+        let second: serde_json::Value = serde_json::from_str(&second.content).unwrap();
+        assert_eq!(second["events"][0]["text"], "cd");
+        assert_eq!(second["next_cursor"], 4);
+    }
+
+    #[tokio::test]
+    async fn process_cancel_marks_starting_job_without_launching_it() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = BackgroundJobId::new("job_starting");
+        let job = JobRecord::starting(id.clone(), "bash".to_owned(), 1);
+        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+
+        let result = supervisor
+            .process_action(
+                ProcessAction::Cancel,
+                Some("job_starting"),
+                None,
+                None,
+                None,
+            )
+            .await;
+        let result: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+        assert_eq!(result["state"], "starting");
+        assert_eq!(result["cancellation_requested"], true);
+        assert!(
+            supervisor
+                .inner
+                .state
+                .lock()
+                .unwrap()
+                .jobs
+                .get(&BackgroundJobId::new("job_starting"))
+                .unwrap()
+                .cancel_token
+                .as_ref()
+                .unwrap()
+                .is_cancelled()
+        );
+    }
+
+    #[tokio::test]
+    async fn process_unknown_job_does_not_reveal_foreign_state() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let result = supervisor
+            .process_action(ProcessAction::Status, Some("job_foreign"), None, None, None)
+            .await;
+        assert!(result.is_error);
+        assert_eq!(result.content, "unknown background job");
     }
 }

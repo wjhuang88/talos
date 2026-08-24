@@ -377,6 +377,30 @@ async fn test_submit_and_receive() {
 }
 
 #[tokio::test]
+async fn app_server_session_registers_session_owned_process_tool() {
+    let agent = make_agent(MockModel::new(vec![]));
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (_handle, actor) = AppServerSession::new(agent, config);
+    let process = actor
+        .agent
+        .tools
+        .get("process")
+        .expect("session composition must register process");
+
+    let result = process
+        .execute(serde_json::json!({"action": "list", "max_bytes": 1024}))
+        .await;
+    assert!(!result.is_error);
+    let value: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+    assert_eq!(value["jobs"].as_array().map(Vec::len), Some(0));
+}
+
+#[tokio::test]
 async fn shutdown_before_start_commit_performs_no_provider_work() {
     let calls = Arc::new(AtomicUsize::new(0));
     let agent = make_agent(CountingModel {

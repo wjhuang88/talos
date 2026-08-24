@@ -152,6 +152,7 @@ impl AppServerSession {
             0,
         );
         agent.set_background_job_host(Arc::new(background_jobs.clone()));
+        agent.register_process_tool(background_jobs.clone());
         let pending_session_file = config
             .workspace_root
             .join(".talos")

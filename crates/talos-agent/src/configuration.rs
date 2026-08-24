@@ -465,7 +465,7 @@ impl Agent {
         CancellationToken::new()
     }
 
-    fn update_prompt_builder(
+    pub(crate) fn update_prompt_builder(
         &mut self,
         invalidate_stable_prefix: bool,
         update: impl FnOnce(SystemPromptBuilder) -> SystemPromptBuilder,
