@@ -7,7 +7,7 @@
 | Priority | P1 |
 | Status | Ready / Unclaimed |
 | Source | [GitHub Issue #396](https://github.com/wjhuang88/talos/issues/396) |
-| Selected Iteration | None |
+| Selected Iteration | I227 |
 | Depends On | Existing pending-submission idempotency and tombstone-pruning contract |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Select a runnable iteration and establish an effective claim before changing the fixture or pending-submission storage helpers. |
+| Handoff / Release Condition | I227 is selected but remains unactivated until its atomic claim reaches `main`; do not change the fixture or storage helpers before then. |
 
 ## Identity / Goal / Value
 
