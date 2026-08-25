@@ -1,6 +1,6 @@
 # Iteration I225: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Active / Claimed (proposed by PR #388; ineffective until merge)
+> Document status: Active / Claimed
 > Published plan date: 2026-08-24
 > Planned objective: decide the assigned-before-exec Windows Job Object ownership, bounded OS-ABI,
 > compatibility, migration, rollback and validation contract required before TOOL-024-D1-B.
@@ -20,10 +20,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #388 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer's persistent active goal authorizes Issue #59 delivery. I224 closed through PR #387 merge `3cb4eff8`; proposed #388 must pass fresh exact-head CI, independent Windows/process/unsafe/API governance review and merge-time CAS. Shared-account review proves Agent-role separation only. |
+| Authorization Evidence | Maintainer's persistent active goal authorizes Issue #59 delivery. I224 closed through PR #387 merge `3cb4eff8`; claim PR #388 exact head `e0c65c52`, CI `32729210800`, independent Windows/process/unsafe/API governance approval `5395556844`, merge-time CAS and merge `2afcdc3e` establish this claim on `main`. Shared-account review proves Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim and activation are ineffective until #388 reaches `main`; decision work then starts from that merge or later main. D1-B implementation remains separately claimed. |
+| Handoff / Release Condition | Decision work starts from `main@2afcdc3e` or later. D1-B implementation remains separately claimed. |
 
 ## Published Baseline
 
@@ -120,12 +120,15 @@ authority and are not reused.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-24 | Selection prepared | I224 closed through PR #387 merge `3cb4eff8`; fresh inventory found no D1 owner or competing proposal. I225 remains inactive pending an effective claim. |
-| 2026-08-24 | Atomic claim proposed | PR #388 binds the decision-only Work Slice and proposed Active/Claimed state. It remains ineffective until exact-head review, CI, CAS and target-branch merge. |
+| 2026-08-24 | Selection prepared | I224 closed through PR #387 merge `3cb4eff8`; fresh inventory found no D1 owner or competing proposal. |
+| 2026-08-24 | Claim activated | PR #388 exact head `e0c65c52`, CI `32729210800`, independent approval `5395556844` and merge-time CAS passed; merge `2afcdc3e` makes I225 Active/Claimed on `main`. |
 
 ## Verification Evidence
 
-- Pending atomic claim merge and later decision evidence.
+- Claim activation is evidenced by PR #388 exact head `e0c65c52`, base `3cb4eff8`, CI
+  `32729210800`, independent approval `5395556844`, merge-time CAS and merge `2afcdc3e`.
+- ADR-068 and the current-path/authority decision evidence remain pending; no implementation or
+  Windows background enablement is authorized by I225.
 
 ## Completion Evidence
 

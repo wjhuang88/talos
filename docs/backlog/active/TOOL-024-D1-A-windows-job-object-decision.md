@@ -1,15 +1,15 @@
 # TOOL-024-D1-A: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Active / Claimed (proposed by PR #388; ineffective until merge)
+> Document status: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D1-A |
 | Type | Architecture / Process-Security Decision |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until PR #388 merges) |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I225 Active / Claimed (proposed by PR #388; ineffective until merge) |
+| Selected Iteration | I225 Active / Claimed |
 | Depends On | TOOL-024-C / I224 Complete; ADR-060 and ADR-057 Accepted |
 
 ## Collaboration Claim
@@ -24,10 +24,10 @@
 | Source Issue | #59 |
 | Governance Claim PR | #388 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer's persistent active goal authorizes completion of Issue #59. I224 closed through reviewed PR #387 merge `3cb4eff8`; #388 requires fresh exact-head CI, independent Windows/process/unsafe/API governance review and merge-time CAS before this proposed claim becomes effective. Shared GitHub account establishes Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | Maintainer's persistent active goal authorizes completion of Issue #59. I224 closed through reviewed PR #387 merge `3cb4eff8`; claim PR #388 exact head `e0c65c52`, CI `32729210800`, independent Windows/process/unsafe/API governance approval `5395556844`, merge-time CAS and merge `2afcdc3e` establish this claim on `main`. Shared GitHub account establishes Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim and activation are ineffective until #388 merges. Decision work starts from that merge or later `main`; later D1-B implementation needs a separate owner, iteration and effective claim. |
+| Handoff / Release Condition | Claim is effective on `main@2afcdc3e`; ADR-068/current-path decision evidence is pending. Later D1-B implementation needs a separate owner, iteration and effective claim. |
 
 ## Identity / Goal / Value
 

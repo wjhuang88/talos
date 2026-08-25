@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A/B/C Complete; D1-A/I225 Active/Claimed proposed by #388; D1-B/D2 and deferred validation remain)
+**Status**: Partial (A/B/C Complete; D1-A/I225 Active/Claimed; D1-B/D2 and deferred validation remain)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -60,7 +60,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | TOOL-024-A | Background Job Lifecycle And Permission Contract Spike | Spike | Complete / I188 / PR #228 | None | Accepted ADR-060 and current-path matrix for ownership, approval, cancellation, result delivery, and persistence; Completion Commit `245eddeb`. |
 | [TOOL-024-B](TOOL-024-B-managed-background-execution-core.md) | Managed Background Execution Core | Product/State Story | Complete / Closed; PR #382 merged | TOOL-024-A Accepted; TOOL-023-C Complete; RUNTIME-005 Complete; PERM-006-C Complete | Unix session-owned supervisor, explicit non-daemonizing shell/single-exec background input, bounded capture, same-group cleanup, and exact-once terminal state; Windows fails closed. |
 | [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Complete / Closed; PR #386 merged | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
-| [TOOL-024-D1-A](TOOL-024-D1-A-windows-job-object-decision.md) | Windows Job Object Security And OS-ABI Decision | Architecture/Process-Security Decision | Active / Claimed proposed by #388; ineffective until merge | TOOL-024-C Complete; ADR-060/057 Accepted | Current-path matrix and Accepted ADR-068 defining assigned-before-exec ownership, bounded OS-ABI, migration, rollback and D1-B test contract; no behavior change. |
+| [TOOL-024-D1-A](TOOL-024-D1-A-windows-job-object-decision.md) | Windows Job Object Security And OS-ABI Decision | Architecture/Process-Security Decision | Active / Claimed | TOOL-024-C Complete; ADR-060/057 Accepted | Current-path matrix and Accepted ADR-068 defining assigned-before-exec ownership, bounded OS-ABI, migration, rollback and D1-B test contract; no behavior change. |
 | TOOL-024-D1-B | Windows Job Object Process-Tree Ownership | Product/Process-Security Story | Blocked / Unclaimed | TOOL-024-D1-A Complete; ADR-068 Accepted | Assigned-before-exec Job Object implementation with kill-on-close and real Windows child/grandchild cleanup evidence. |
 | TOOL-024-D2 | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked / Unclaimed | TOOL-024-D1-B Complete | CLI/TUI lifecycle projection, controls, docs and integrated real Unix/Windows acceptance. |
 
@@ -188,8 +188,8 @@ and Issue #59 remains open until the remaining child and deferred-validation evi
 
 I224/TOOL-024-C is Complete/Closed through owner-first closeout PR #387 merge `3cb4eff8`. A fresh
 inventory found no D1 owner, ADR-068 or competing implementation PR, so TOOL-024-D1-A and I225 now
-propose only the prerequisite Windows Job Object security/OS-ABI decision in claim PR #388. The
-proposed Active/Claimed record is ineffective until #388 reaches `main`.
+own only the prerequisite Windows Job Object security/OS-ABI decision. Claim PR #388 merged as
+`2afcdc3e` after exact-head review/CI/CAS; decision work starts from that merge or later `main`.
 
 This decision slice changes no Rust, Cargo, dependency, `unsafe`, Windows process behavior,
 CLI/TUI, Dashboard/I213, `/auto`, release or publication surface. D1-B implementation, D2 projection
