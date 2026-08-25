@@ -1,6 +1,6 @@
 # Iteration I227: Tombstone-Pruning Fixture Performance
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-25
 > Planned objective: preserve permanent submission idempotency coverage while removing the production-sized SQLite setup from the pruning fixture.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline performance slice |
 | Work Slice | TEST-002 test-only pruning-threshold injection or equivalently bounded storage fixture, focused timing evidence, and owner synchronization only. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
 | Implementation PR | #399 |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
+| Handoff / Release Condition | Closed after implementation PR #399 merge; production pending-submission authority remains unchanged. |
 
 ## Published Baseline
 
@@ -103,6 +103,8 @@ I226 facts. A shared derived file is not permission to overwrite the other owner
 | 2026-08-25 | Atomic claim+activation proposal | PR #398 proposes one bounded TEST-002 claimant and Active state. It contains no implementation and has no effect before target-branch merge. |
 | 2026-08-25 | Activation effective | PR #398 merged as `c3f083ffc77574041cb8b0d985b2c426b672c432`; I227 claim and Active state became effective from that target-branch merge. |
 | 2026-08-25 | Implementation candidate | PR #399 proposes implementation from the claim merge; exact-head CI and independent review remain pending. |
+| 2026-08-25 | Implementation merged | PR #399 merged as `d02915e044e4f652e4ca7c605c2d9ec48927d0e8`; source implementation commit `7b64a08b` is the completion evidence. |
+| 2026-08-25 | Exact-head validation | Head `6429febf`, base `c3f083ff`, CI `32839820741` passed 5/5 including Windows Rust workspace; Agent-role independent review `5409698923` APPROVE. |
 
 ## Verification Evidence
 
@@ -110,11 +112,12 @@ I226 facts. A shared derived file is not permission to overwrite the other owner
 - `cargo fmt --all -- --check`: passed.
 - `cargo test -p talos-session pruned_terminal_payload_retains_permanent_idempotency_identity --locked -- --nocapture`: passed in `0.02s`.
 - `cargo test -p talos-session --locked`: 176 tests passed in `0.65s`.
-- Full workspace/Windows CI: pending for PR #399.
+- `./scripts/release_preflight.sh`: passed in exact-head CI `32839820741`.
+- Full workspace/Windows CI: passed 5/5 on exact head `6429febf` (Windows workspace completed successfully).
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `7b64a08b13cd75bd0ad43843707770919dc9ebec`
 - A status-only documentation commit cannot self-certify completion.
 
 ## Variance And Residuals
@@ -123,4 +126,6 @@ I226 facts. A shared derived file is not permission to overwrite the other owner
 
 ## Retrospective
 
-- Pending implementation.
+- Outcome: met. The test-only seam reduced the focused fixture to `0.02s` locally while preserving production defaults and the permanent idempotency assertions.
+- No user-facing documentation was required; this is test-infrastructure-only.
+- Lesson: production-capacity persistence tests should inject a bounded test fixture rather than materialize every production retention slot.
