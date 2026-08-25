@@ -1,6 +1,6 @@
 # Iteration I227: Tombstone-Pruning Fixture Performance
 
-> Document status: Planned
+> Document status: Active / Claimed proposal
 > Published plan date: 2026-08-25
 > Planned objective: preserve permanent submission idempotency coverage while removing the production-sized SQLite setup from the pruning fixture.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline performance slice |
 | Work Slice | TEST-002 test-only pruning-threshold injection or equivalently bounded storage fixture, focused timing evidence, and owner synchronization only. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-25 |
 | Source Issue | #396 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #398 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay; exact-head CI and both governance validators are required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Establish an effective atomic claim and activation before changing pending-submission tests or storage helpers. |
+| Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
 
 ## Published Baseline
 
@@ -98,6 +98,7 @@ changed-file set are disjoint.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-25 | Planning | Selected TEST-002 from `main@64d5ad4c`; claim and activation remain ineffective until the finalized governance PR merges. |
+| 2026-08-25 | Atomic claim+activation proposal | PR #398 proposes one bounded TEST-002 claimant and Active state. It contains no implementation and has no effect before target-branch merge. |
 
 ## Verification Evidence
 

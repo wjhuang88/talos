@@ -94,7 +94,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I224 | TOOL-024-C Model-Readable Process Job Control | Complete / Closed | Completion Commit `60b0367cf749397bf1167e189e820e82e32baf03`; PR #386 merged after exact-head CI `32719779528`, independent approval `5394777902` and merge-time CAS. D1/D2 and I223 remain separate. |
 | I225 | TOOL-024-D1-A Windows Job Object Decision | Complete / Closed | ADR-068 accepted by PR #391 merge `0021690e`; Completion Commit `fca45c46`; D1-B remains separately governed. |
 | I226 | TOOL-024-D1-B Windows Job Object Process-Tree Ownership | Planned / Claimed proposal | Claim proposal prepared from `main@93ee3253`; becomes effective only when its governance PR merges; no implementation authority yet. |
-| I227 | Tombstone-Pruning Fixture Performance | Planned / Unclaimed | TEST-002 / Issue #396; selected to remove the Windows 60-second fixture delay without changing production retention or behavior. Atomic claim and activation are still required. |
+| I227 | Tombstone-Pruning Fixture Performance | Active / Claimed proposal | PR #398 atomically proposes the TEST-002 claim and activation. It remains ineffective until merge and is strictly disjoint from I226 / PR #394. |
 
 ## Completed This Closeout
 
