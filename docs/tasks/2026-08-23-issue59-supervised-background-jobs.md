@@ -270,3 +270,17 @@ checks but the full build is interrupted by local `ENOSPC`. Exact-head CI `32820
 therefore remains Review / Claimed pending independent Windows/process/unsafe/API review, with no merge or Completion Commit;
 the next action is local correction followed by fresh exact-head CI and independent Windows/process/
 unsafe/API review. I223/#378 remains pending and Issue #59 remains open.
+
+## I226 Candidate Reconciliation Checkpoint (2026-08-25)
+
+The implementation branch advanced to exact head `95740c34` after the Windows launcher candidate
+`70e8b674`. The candidate still contains only the I226 Windows Job Object implementation and its
+owner/derived synchronization; #395 is registered in the reconciliation snapshot as an unrelated
+`Intake / Unclaimed` item with no implementation authority. CI `32821573565` completed
+classification, installer fixture, Format/Check/Clippy/Test and Windows workspace successfully;
+remote issue reconciliation failed because #395 was absent from that exact head. The corrected
+local tree passes the same validator against all 52 open Issues after synchronization comment
+`5407182562`; fresh exact-head CI remains required after push. The older CI
+`32820263589` and any review bound to `70e8b674` do not transfer to this head. I226 remains
+Review / Claimed with no merge or Completion Commit; D2, I223/#378 and Issue #59 closeout remain
+ordered after this child.
