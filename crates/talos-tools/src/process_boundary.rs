@@ -353,7 +353,9 @@ impl BackgroundJobLauncher for WindowsBackgroundLauncher {
         let (tx, rx) = tokio::sync::mpsc::channel(BACKGROUND_PROCESS_EVENT_CAPACITY);
         let stdout = launched.stdout;
         let stderr = launched.stderr;
-        let process = launched.process;
+        // Raw Windows handles are pointers and are not `Send`; carry only the
+        // numeric handle value across Tokio task boundaries.
+        let process = launched.process as usize;
         tokio::spawn(async move {
             let stdout_task = tokio::spawn(pump_windows_output(
                 stdout,
@@ -366,6 +368,7 @@ impl BackgroundJobLauncher for WindowsBackgroundLauncher {
                 tx.clone(),
             ));
             let wait = tokio::task::spawn_blocking(move || unsafe {
+                let process = process as windows_sys::Win32::Foundation::HANDLE;
                 let result = windows_sys::Win32::System::Threading::WaitForSingleObject(
                     process,
                     windows_sys::Win32::System::Threading::INFINITE,
@@ -503,7 +506,7 @@ fn create_windows_job(
             return Err(last_windows_error("SetHandleInformation"));
         }
         job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
-        if job == 0 || job == INVALID_HANDLE_VALUE {
+        if job.is_null() || job == INVALID_HANDLE_VALUE {
             return Err(last_windows_error("CreateJobObjectW"));
         }
         let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
@@ -529,7 +532,7 @@ fn create_windows_job(
         if UpdateProcThreadAttribute(
             attrs,
             0,
-            PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+            PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
             handles.as_ptr() as *const _,
             size_of::<[HANDLE; 2]>(),
             std::ptr::null_mut(),

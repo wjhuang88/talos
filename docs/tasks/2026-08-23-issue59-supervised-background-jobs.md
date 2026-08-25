@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B Active / Claimed; D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B Review / Claimed; D2 and I223 remain.
 
 ## Startup Contract
 
@@ -256,3 +256,17 @@ I225 closeout PR #392 merged as `93ee3253`, making ADR-068 Accepted and D1-B Rea
 I226 is now Active / Claimed, limited to the Windows Job Object launcher, allowlisted stdio
 inheritance, fail-closed cleanup and real Windows tests. D2 and I223 remain separate and Windows
 stays fail-closed until the reviewed implementation merges.
+
+## I226 Implementation Candidate Checkpoint (2026-08-25)
+
+Implementation PR #394 is the first stable candidate, currently at exact head `fc15e4c6`. It adds
+the Windows-only Job Object launcher, allowlisted stdio inheritance, assigned-before-resume
+ownership, kill-on-close cleanup and Bash/Exec integration; Unix behavior and D2 remain outside the
+slice.
+
+Local formatting, diff and focused locked check/test pass; release preflight reaches its governance
+checks but the full build is interrupted by local `ENOSPC`. Exact-head CI run `32813314638` still
+fails Windows workspace compilation on raw HANDLE `Send` and Win32 parameter type errors. The
+candidate therefore remains Review / Claimed, with no merge or Completion Commit;
+the next action is local correction followed by fresh exact-head CI and independent Windows/process/
+unsafe/API review. I223/#378 remains pending and Issue #59 remains open.

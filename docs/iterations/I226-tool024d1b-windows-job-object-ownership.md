@@ -1,6 +1,6 @@
 # Iteration I226: Windows Job Object Process-Tree Ownership
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-25
 > Planned objective: implement ADR-068's assigned-before-exec Windows Job Object boundary for TOOL-024-D1-B.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
-| Implementation PR | Not started |
+| Implementation PR | #394 — open, current candidate `fc15e4c6` |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Claim effective on `main@d1f2a126` after PR #393 merge; implementation begins from this merge or later. |
+| Handoff / Release Condition | Candidate remains in Review until Windows exact-head CI and independent process/security/API review pass; no completion or merge authority is implied. |
 
 ## Published Baseline
 
@@ -66,10 +66,12 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-25 | Atomic claim + activation | PR #393 exact head `2905c99d`, CI `32810069430`, independent approval `5405428154`, merge-time CAS and merge `d1f2a126`; implementation starts from this merge. |
+| 2026-08-25 | Stable implementation candidate | PR #394 at `fc15e4c6` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`; exact-head CI run `32813314638` still fails Windows workspace compilation, so the candidate remains under correction. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation candidate.
+- Local candidate checks: `cargo fmt --all`, `git diff --check`, `cargo check -p talos-tools --features shell --locked`, and `cargo test -p talos-tools --features shell --locked` pass (110 unit tests plus 3 hardening integration tests). The full release preflight was interrupted by local `ENOSPC` after governance validation passed.
+- Remote exact-head CI `32813314638` is not yet green: Windows workspace reports raw `HANDLE` `Send` and Win32 parameter type errors; no merge or completion claim is made.
 
 ## Completion Evidence
 
@@ -77,7 +79,7 @@
 
 ## Variance And Residuals
 
-- D2 and I223 remain separately governed and are not activated by I226.
+- D2 and I223 remain separately governed and are not activated by I226. Windows child/grandchild, handle-isolation and cancellation evidence remain pending until a green exact-head candidate exists.
 
 ## Retrospective
 
