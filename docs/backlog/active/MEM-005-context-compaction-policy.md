@@ -156,3 +156,11 @@ scheduler should detect natural conversation boundaries first.
 - `crates/talos-agent/src/lib.rs`
 - `crates/talos-session/src/lib.rs`
 - `crates/talos-tui/src/state.rs`
+
+## Issue #390 Intake Reconciliation (2026-08-25)
+
+Issue #390 records a refinement of this owner's context-compaction policy. It proposes
+model-directed semantic checkpoints while retaining runtime-owned context bounds and the
+authoritative Session history. This intake record creates no implementation authority; any
+production work requires a separately selected iteration, Collaboration Claim, and change
+control against MEM-002, MEM-003, MEM-007, and the Session persistence boundary.

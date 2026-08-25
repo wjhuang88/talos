@@ -121,6 +121,16 @@ implementation runnable without weakening ADR-060's no-unmanaged-child invariant
 The decision must identify later D1-B and D2 documentation changes, but I225 changes no shipped
 help or behavior. Windows remains explicitly unsupported for background start until D1-B completes.
 
+## I225 Decision Execution Checkpoint (2026-08-25)
+
+Decision work started from `main@e6980722` after claim PR #388 activation and owner-first sync PR
+#389 preparation. Read-only source mapping is recorded in
+`docs/reference/I225-WINDOWS-JOB-OBJECT-CURRENT-PATH-2026-08-25.md`. Proposed ADR-068 selects an
+assigned-before-exec Job Object sequence, an allowlisted stdio handle-inheritance boundary,
+kill-on-close descendant ownership, explicit partial-failure cleanup and fail-closed migration.
+No Rust/Cargo/dependency/unsafe or Windows behavior changed. ADR-068 remains Proposed until its
+decision PR receives exact-head CI and independent Windows/process/unsafe/API review.
+
 ## Residual Destination
 
 - TOOL-024-D1-B: Accepted ADR-068 implementation and real Windows child/grandchild evidence.

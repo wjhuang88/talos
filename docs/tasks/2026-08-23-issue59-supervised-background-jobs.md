@@ -230,3 +230,13 @@ boundary.
 No Rust, Cargo, dependency, lockfile, Windows runtime, CLI/TUI, Dashboard/I213, `/auto`, release,
 publication or Desktop authority is included. D1-B implementation, D2 projection and I223/#378
 remain separately governed; Windows background start stays fail-closed.
+
+## I225 Decision Candidate Checkpoint (2026-08-25)
+
+Decision work started from `main@e6980722`. Proposed ADR-068 and
+`docs/reference/I225-WINDOWS-JOB-OBJECT-CURRENT-PATH-2026-08-25.md` reverse-map the current
+Windows fail-closed admission, Unix launcher, Agent supervisor, Process tool, Core contract and
+Runtime finalizer. The candidate chooses suspended creation, Job assignment before resume,
+allowlisted stdio handle inheritance, kill-on-close and fail-closed partial cleanup. It adds no
+Rust/Cargo/dependency/unsafe or Windows behavior. I225 remains Active/Claimed / Review-pending
+until exact-head decision CI and independent Windows/process/unsafe/API review complete.

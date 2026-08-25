@@ -101,7 +101,8 @@ authority and are not reused.
 ### Documentation To Update
 
 - TOOL-024-D1-A and I225 owners.
-- Proposed ADR-068 and a Windows Job Object current-path/migration matrix during decision execution.
+- Proposed [ADR-068](../decisions/068-windows-job-object-process-ownership.md) and the
+  [I225 current-path/migration matrix](../reference/I225-WINDOWS-JOB-OBJECT-CURRENT-PATH-2026-08-25.md).
 - TOOL-024 parent, Issue #59 long task, decision/iteration indexes and derived Board/backlog/manifest.
 
 ### Risks And Rollback
@@ -122,6 +123,7 @@ authority and are not reused.
 |---|---|---|
 | 2026-08-24 | Selection prepared | I224 closed through PR #387 merge `3cb4eff8`; fresh inventory found no D1 owner or competing proposal. |
 | 2026-08-24 | Claim activated | PR #388 exact head `e0c65c52`, CI `32729210800`, independent approval `5395556844` and merge-time CAS passed; merge `2afcdc3e` makes I225 Active/Claimed on `main`. |
+| 2026-08-25 | Decision candidate converged locally | Source mapping and proposed ADR-068 define assigned-before-exec Job Object ownership, allowlisted stdio handles, fail-closed cleanup, compatibility and D1-B matrix. No implementation or dependency change. |
 
 ## Verification Evidence
 
@@ -129,6 +131,8 @@ authority and are not reused.
   `32729210800`, independent approval `5395556844`, merge-time CAS and merge `2afcdc3e`.
 - ADR-068 and the current-path/authority decision evidence remain pending; no implementation or
   Windows background enablement is authorized by I225.
+- Decision candidate files are present locally; exact-head decision CI/review and acceptance remain
+  pending.
 
 ## Completion Evidence
 
