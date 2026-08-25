@@ -655,3 +655,85 @@ fn quote_windows_arg(value: &str) -> String {
     }
     format!("\"{}\"", value.replace('"', "\\\""))
 }
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+    use std::time::Duration;
+    use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
+
+    fn powershell(script: &str) -> WindowsBackgroundLauncher {
+        WindowsBackgroundLauncher::new(
+            "powershell.exe".to_owned(),
+            vec![
+                "-NoLogo".to_owned(),
+                "-NoProfile".to_owned(),
+                "-NonInteractive".to_owned(),
+                "-Command".to_owned(),
+                script.to_owned(),
+            ],
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            BTreeMap::new(),
+        )
+    }
+
+    #[tokio::test]
+    async fn windows_job_captures_output_and_reaps_process() {
+        let launched = Box::new(powershell(
+            "Write-Output 'stdout-ok'; [Console]::Error.WriteLine('stderr-ok')",
+        ))
+        .launch()
+        .await
+        .expect("Windows Job Object launcher succeeds");
+        let mut events = launched.events;
+        let mut output = Vec::new();
+        let exit = tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                match event {
+                    BackgroundProcessEvent::Output(chunk) => output.extend(chunk.bytes),
+                    BackgroundProcessEvent::Exited(exit) => return Some(exit),
+                    BackgroundProcessEvent::SupervisionFailed(error) => panic!("{error}"),
+                }
+            }
+            None
+        })
+        .await
+        .expect("Windows process must reach a terminal event")
+        .expect("Windows process must emit an exit event");
+
+        assert!(exit.success);
+        let output = String::from_utf8_lossy(&output);
+        assert!(output.contains("stdout-ok"));
+        assert!(output.contains("stderr-ok"));
+    }
+
+    #[tokio::test]
+    async fn windows_job_termination_reaches_terminal_event() {
+        let launched = Box::new(powershell("Start-Sleep -Seconds 30"))
+            .launch()
+            .await
+            .expect("Windows Job Object launcher succeeds");
+        let control = launched.control;
+        let mut events = launched.events;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        control
+            .terminate()
+            .await
+            .expect("Job Object termination succeeds");
+
+        let exit = tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                if let BackgroundProcessEvent::Exited(exit) = event {
+                    return Some(exit);
+                }
+            }
+            None
+        })
+        .await
+        .expect("terminated Windows process must be reaped")
+        .expect("terminated Windows process must emit an exit event");
+        assert!(!exit.success);
+    }
+}
