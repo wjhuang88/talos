@@ -137,7 +137,8 @@ fn unstarted_work_can_pause_and_recover_in_fifo_order() {
 fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
     let dir = tempfile::tempdir().expect("operation should succeed");
     let store =
-        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1")
+            .with_tombstone_limit(2);
 
     let mut oldest = submission();
     oldest.id = "oldest-batch".into();
@@ -151,7 +152,7 @@ fn pruned_terminal_payload_retains_permanent_idempotency_identity() {
         .mark_committed(&oldest.id, "turn-oldest")
         .expect("operation should succeed");
 
-    for index in 0..MAX_TOMBSTONES {
+    for index in 0..3 {
         let mut payload = submission();
         payload.id = format!("later-batch-{index}");
         payload.items[0].id = format!("later-item-{index}");

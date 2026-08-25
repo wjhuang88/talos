@@ -103,6 +103,7 @@ pub struct PendingSubmissionStore {
     session_file: Arc<PathBuf>,
     session_id: Arc<String>,
     lock: Arc<Mutex<()>>,
+    tombstone_limit: usize,
 }
 
 impl PendingSubmissionStore {
@@ -121,7 +122,15 @@ impl PendingSubmissionStore {
             session_file: Arc::new(session_file.to_path_buf()),
             session_id: Arc::new(session_id.to_owned()),
             lock: Arc::new(Mutex::new(())),
+            tombstone_limit: MAX_TOMBSTONES,
         }
+    }
+
+    #[cfg(test)]
+    fn with_tombstone_limit(mut self, tombstone_limit: usize) -> Self {
+        assert!(tombstone_limit > 0);
+        self.tombstone_limit = tombstone_limit;
+        self
     }
 
     /// Returns the sidecar path.
@@ -395,7 +404,7 @@ impl PendingSubmissionStore {
             return Ok(rejected(SubmissionRejectionReason::WrongGeneration));
         }
 
-        prune_tombstones(&transaction)?;
+        prune_tombstones(&transaction, self.tombstone_limit)?;
         if exceeds_pending_bounds(&transaction, text_bytes, image_count, image_bytes)? {
             transaction.commit()?;
             return Ok(rejected(SubmissionRejectionReason::LimitExceeded));
@@ -710,7 +719,7 @@ impl PendingSubmissionStore {
             "UPDATE pending_submissions SET state = ?2, turn_id = ?3 WHERE batch_id = ?1",
             params![submission_id, encode_state(next), turn_id],
         )?;
-        prune_tombstones(&transaction)?;
+        prune_tombstones(&transaction, self.tombstone_limit)?;
         transaction.commit()?;
         Ok(())
     }
