@@ -1,6 +1,6 @@
 # Iteration I226: Windows Job Object Process-Tree Ownership
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-25
 > Planned objective: implement ADR-068's assigned-before-exec Windows Job Object boundary for TOOL-024-D1-B.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
-| Implementation PR | #394 — open; implementation code commit `70e8b674` plus later evidence/governance synchronization |
-| Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Candidate remains in Review until Windows exact-head CI and independent process/security/API review pass; no completion or merge authority is implied. |
+| Implementation PR | #394 — merged as `d4d7cb25c9c8418345651024fa2102a83c499659`; implementation candidate `835578635daa1eebc76e79ca893296baeed6b35a` |
+| Last Updated | 2026-08-26 |
+| Handoff / Release Condition | Implementation and closeout are complete; D2/I223 remain separately governed and no release/publication authority is implied. |
 
 ## Published Baseline
 
@@ -95,12 +95,15 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `d4d7cb25c9c8418345651024fa2102a83c499659`
+- Implementation PR: #394; exact candidate head `835578635daa1eebc76e79ca893296baeed6b35a`; base `07da40fb1723838cec962dcf690d493516b2d724`.
+- Exact-head CI: `32849330531` (5/5 successful); independent Windows/process/security/API review: comment `5410840103` (APPROVE).
+- Merge-time CAS passed with stable head/base, green CI, independent review, and no overlapping implementation authority. The completion commit is the pre-existing implementation merge, not this status update.
 
 ## Variance And Residuals
 
-- D2 and I223 remain separately governed and are not activated by I226. Windows child/grandchild, handle-isolation and cancellation evidence remain pending until a green exact-head candidate exists.
+- D2 and I223 remain separately governed and are not activated by I226. Windows child/grandchild, handle-isolation and cancellation evidence were covered by the reviewed exact-head candidate.
 
 ## Retrospective
 
-- Pending implementation.
+- 2026-08-26: Closed after PR #394 merge. The previously reported `pending_submission::tests::pruned_terminal_payload_retains_permanent_idempotency_identity` 60-second observation was not reproducible on current main (single test body ~0.06s; command ~0.9s); retain future slow-test investigation as an operational follow-up if recurrence is observed.

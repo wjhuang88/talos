@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B Review / Claimed; D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; D2 and I223 remain.
 
 ## Startup Contract
 
@@ -284,3 +284,18 @@ local tree passes the same validator against all 52 open Issues after synchroniz
 `32820263589` and any review bound to `70e8b674` do not transfer to this head. I226 remains
 Review / Claimed with no merge or Completion Commit; D2, I223/#378 and Issue #59 closeout remain
 ordered after this child.
+
+## I226 Completion Checkpoint (2026-08-26)
+
+PR #394 merged into `main` as `d4d7cb25c9c8418345651024fa2102a83c499659`. The implementation
+candidate was exact head `835578635daa1eebc76e79ca893296baeed6b35a`, based on
+`07da40fb1723838cec962dcf690d493516b2d724`; exact-head CI `32849330531` passed 5/5 and the
+independent Windows/process/security/API review `5410840103` approved it. Merge-time CAS passed
+with a stable base/head, green CI, protected review and no overlapping implementation authority.
+I226 and TOOL-024-D1-B are now Complete / Closed using the pre-existing implementation merge as
+Completion Commit. D2 and I223 remain separately governed and Issue #59 stays open.
+
+The reported `pending_submission::tests::pruned_terminal_payload_retains_permanent_idempotency_identity`
+60-second run was not reproducible on current main: the test body completed in about 0.06 seconds
+and the complete command in about 0.9 seconds. A future recurrence should capture build state,
+CPU/IO pressure and the exact process tree before treating it as a product hang.
