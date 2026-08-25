@@ -259,7 +259,7 @@ stays fail-closed until the reviewed implementation merges.
 
 ## I226 Implementation Candidate Checkpoint (2026-08-25)
 
-Implementation PR #394 is the first stable candidate, currently at exact head `b6c6e387`. It adds
+Implementation PR #394 is the first stable candidate, currently at exact head `86d93740`. It adds
 the Windows-only Job Object launcher, allowlisted stdio inheritance, assigned-before-resume
 ownership, kill-on-close cleanup and Bash/Exec integration; Unix behavior and D2 remain outside the
 slice.

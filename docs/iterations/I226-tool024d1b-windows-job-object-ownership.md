@@ -19,7 +19,7 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
-| Implementation PR | #394 — open, current candidate `b6c6e387` |
+| Implementation PR | #394 — open, current candidate `86d93740` |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Candidate remains in Review until Windows exact-head CI and independent process/security/API review pass; no completion or merge authority is implied. |
 
@@ -66,7 +66,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-25 | Atomic claim + activation | PR #393 exact head `2905c99d`, CI `32810069430`, independent approval `5405428154`, merge-time CAS and merge `d1f2a126`; implementation starts from this merge. |
-| 2026-08-25 | Stable implementation candidate | PR #394 at `b6c6e387` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`; the preceding exact-head CI run `32814632407` compiled Windows successfully but failed Clippy on three mechanical warnings, now corrected in this candidate. |
+| 2026-08-25 | Stable implementation candidate | PR #394 at `86d93740` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`; the preceding exact-head CI run `32814632407` compiled Windows successfully but failed Clippy on three mechanical warnings, now corrected in this candidate. |
 
 ## Verification Evidence
 
