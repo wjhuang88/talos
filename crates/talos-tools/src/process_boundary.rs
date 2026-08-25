@@ -877,12 +877,13 @@ mod windows_tests {
 
     #[tokio::test]
     async fn windows_child_runs_only_after_job_assignment_and_resume() {
-        let marker = std::env::temp_dir().join(format!(
-            "talos-i226-assigned-marker-{}",
-            std::process::id()
-        ));
+        let marker =
+            std::env::temp_dir().join(format!("talos-i226-assigned-marker-{}", std::process::id()));
         let _ = std::fs::remove_file(&marker);
-        let script = format!("Set-Content -LiteralPath '{}' -Value assigned", marker.display());
+        let script = format!(
+            "Set-Content -LiteralPath '{}' -Value assigned",
+            marker.display()
+        );
         let launched = Box::new(powershell(&script))
             .launch()
             .await
