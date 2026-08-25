@@ -1,13 +1,13 @@
 # TOOL-024-D1-B: Windows Job Object Process-Tree Ownership
 
-> Document status: Planned / Claimed proposal
+> Document status: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D1-B |
 | Type | Product / Process-Security Implementation |
 | Priority | P1 |
-| Status | Planned / Claimed proposal |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
 | Selected Iteration | I226 Planned / Claimed proposal |
 | Depends On | TOOL-024-D1-A / I225 Complete; ADR-068 Accepted on `main@93ee3253` |
@@ -27,7 +27,7 @@
 | Authorization Evidence | I225/ADR-068 closeout merged as `93ee3253`; exact decision commit `fca45c46`, CI `32797375011`, independent security review `5404361120`, closeout review `5405268380`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Claim and Active state become effective only when this governance record merges. Implementation starts from that merge or later. |
+| Handoff / Release Condition | Claim became effective on `main@d1f2a126` after PR #393 merge. Implementation starts from that merge or later. |
 
 ## Scope
 

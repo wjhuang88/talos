@@ -1,6 +1,6 @@
 # Iteration I226: Windows Job Object Process-Tree Ownership
 
-> Document status: Planned / Claimed proposal
+> Document status: Active / Claimed
 > Published plan date: 2026-08-25
 > Planned objective: implement ADR-068's assigned-before-exec Windows Job Object boundary for TOOL-024-D1-B.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Effective only after this claim merges; implementation begins from its merge or later. |
+| Handoff / Release Condition | Claim effective on `main@d1f2a126` after PR #393 merge; implementation begins from this merge or later. |
 
 ## Published Baseline
 
@@ -65,7 +65,7 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-25 | Claim proposal | Prepared from `main@93ee3253`; both claim and Active state are ineffective until the governance PR merges. |
+| 2026-08-25 | Atomic claim + activation | PR #393 exact head `2905c99d`, CI `32810069430`, independent approval `5405428154`, merge-time CAS and merge `d1f2a126`; implementation starts from this merge. |
 
 ## Verification Evidence
 
