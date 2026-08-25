@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B and I224/C Complete; D1-A/I225 Active/Claimed after #388 merge `2afcdc3e`; D1-B/D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; D1-B/D2 and I223 remain.
 
 ## Startup Contract
 
@@ -240,3 +240,11 @@ Runtime finalizer. The candidate chooses suspended creation, Job assignment befo
 allowlisted stdio handle inheritance, kill-on-close and fail-closed partial cleanup. It adds no
 Rust/Cargo/dependency/unsafe or Windows behavior. I225 remains Active/Claimed / Review-pending
 until exact-head decision CI and independent Windows/process/unsafe/API review complete.
+
+## I225 Completion Checkpoint (2026-08-25)
+
+ADR-068 was accepted through PR #391 merge `0021690e` from exact head `fca45c46`. Exact-head CI
+`32797375011` passed, independent Windows/process/unsafe/API review `5404361120` approved the
+decision, and merge-time CAS passed. I225/D1-A is Complete/Closed with Completion Commit
+`fca45c467466cd67b52d4391e88c776abfbea198`. D1-B remains a separate Ready/Unclaimed child and
+Windows background admission remains fail-closed until its implementation is reviewed and merged.
