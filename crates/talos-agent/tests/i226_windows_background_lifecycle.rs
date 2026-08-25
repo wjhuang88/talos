@@ -11,10 +11,11 @@ use talos_agent::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
 use talos_agent::session::AppServerSession;
+use talos_core::ApprovalChoice;
 use talos_core::background_job::BackgroundJobState;
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::{ApprovalChoice, RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_permission::PermissionEngine;
 use talos_tools::BashTool;
