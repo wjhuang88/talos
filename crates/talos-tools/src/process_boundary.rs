@@ -543,7 +543,8 @@ fn create_windows_job(
         if program.contains(['\0', '"']) {
             return Err("Windows program path contains an unsupported quote or NUL".to_owned());
         }
-        let mut program_w = wide(std::ffi::OsStr::new(program));
+        let resolved_program = resolve_windows_program(program)?;
+        let mut program_w = wide(resolved_program.as_os_str());
         let mut command = quote_windows_arg(program);
         for arg in args {
             command.push(' ');
@@ -661,6 +662,33 @@ fn windows_environment(extra: &std::collections::BTreeMap<String, String>) -> Ve
 }
 
 #[cfg(windows)]
+fn resolve_windows_program(program: &str) -> Result<std::path::PathBuf, String> {
+    let candidate = std::path::PathBuf::from(program);
+    if candidate.is_absolute() || candidate.components().count() > 1 {
+        return candidate
+            .is_file()
+            .then_some(candidate)
+            .ok_or_else(|| format!("Windows executable does not exist: {program}"));
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    for directory in std::env::split_paths(&path) {
+        let direct = directory.join(program);
+        if direct.is_file() {
+            return Ok(direct);
+        }
+        if direct.extension().is_none() {
+            let exe = direct.with_extension("exe");
+            if exe.is_file() {
+                return Ok(exe);
+            }
+        }
+    }
+    Err(format!(
+        "Windows executable was not found on PATH: {program}"
+    ))
+}
+
+#[cfg(windows)]
 fn quote_windows_arg(value: &str) -> String {
     if !value.is_empty() && !value.contains([' ', '\t', '"']) {
         return value.to_owned();
@@ -698,7 +726,10 @@ mod windows_tests {
 
     fn powershell(script: &str) -> WindowsBackgroundLauncher {
         WindowsBackgroundLauncher::new(
-            "powershell.exe".to_owned(),
+            std::env::var("WINDIR").map_or_else(
+                |_| "powershell.exe".to_owned(),
+                |windir| format!(r#"{windir}\System32\WindowsPowerShell\v1.0\powershell.exe"#),
+            ),
             vec![
                 "-NoLogo".to_owned(),
                 "-NoProfile".to_owned(),
@@ -716,8 +747,11 @@ mod windows_tests {
         assert_eq!(quote_windows_arg("plain"), "plain");
         assert_eq!(quote_windows_arg(""), "\"\"");
         assert_eq!(quote_windows_arg("two words"), "\"two words\"");
-        assert!(quote_windows_arg("a\"b").contains("\\\\\\\""));
-        assert!(quote_windows_arg(r#"C:\path with space\"#).ends_with("\\\\\""));
+        let quoted = quote_windows_arg("a\"b");
+        assert!(quoted.starts_with('"') && quoted.ends_with('"'));
+        assert!(quoted.contains("\\\""));
+        let trailing = quote_windows_arg(r#"C:\path with space\"#);
+        assert!(trailing.starts_with('"') && trailing.ends_with('"'));
     }
 
     #[test]
@@ -845,7 +879,10 @@ mod windows_tests {
     #[tokio::test]
     async fn windows_job_rejects_invalid_working_directory_without_spawning() {
         let launcher = WindowsBackgroundLauncher::new(
-            "powershell.exe".to_owned(),
+            std::env::var("WINDIR").map_or_else(
+                |_| "powershell.exe".to_owned(),
+                |windir| format!(r#"{windir}\System32\WindowsPowerShell\v1.0\powershell.exe"#),
+            ),
             vec!["-NoLogo".to_owned()],
             PathBuf::from(r"C:\talos\path-that-does-not-exist"),
             BTreeMap::new(),
