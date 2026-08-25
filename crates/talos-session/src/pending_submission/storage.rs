@@ -210,7 +210,10 @@ pub(super) fn load_or_initialize_runtime_generation(
     u64::try_from(value).map_err(|_| PendingSubmissionError::UnsupportedSchema(value))
 }
 
-pub(super) fn prune_tombstones(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
+pub(super) fn prune_tombstones(
+    transaction: &Transaction<'_>,
+    tombstone_limit: usize,
+) -> Result<(), rusqlite::Error> {
     // Preserve the permanent idempotency identity and terminal summary before
     // pruning the large serialized payload. Delayed retries can therefore
     // never become a fresh Provider execution merely because payload storage
@@ -236,7 +239,7 @@ pub(super) fn prune_tombstones(transaction: &Transaction<'_>) -> Result<(), rusq
         [],
         |row| row.get(0),
     )?;
-    let remove = count.saturating_sub(to_i64(MAX_TOMBSTONES));
+    let remove = count.saturating_sub(to_i64(tombstone_limit));
     if remove > 0 {
         transaction.execute(
             "DELETE FROM pending_submissions WHERE rowid IN (
