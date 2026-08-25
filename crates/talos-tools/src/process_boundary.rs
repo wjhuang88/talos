@@ -518,11 +518,13 @@ fn create_windows_job_with_hooks(
         );
     }
     let mut already_in_job = 0;
-    if IsProcessInJob(
-        windows_sys::Win32::System::Threading::GetCurrentProcess(),
-        std::ptr::null_mut(),
-        &mut already_in_job,
-    ) == 0
+    if unsafe {
+        IsProcessInJob(
+            windows_sys::Win32::System::Threading::GetCurrentProcess(),
+            std::ptr::null_mut(),
+            &mut already_in_job,
+        )
+    } == 0
     {
         return Err(last_windows_error("IsProcessInJob"));
     }
