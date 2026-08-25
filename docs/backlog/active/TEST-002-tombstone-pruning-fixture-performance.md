@@ -1,11 +1,13 @@
 # TEST-002: Tombstone-Pruning Fixture Performance
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | TEST-002 |
 | Type | Test Infrastructure Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #396](https://github.com/wjhuang88/talos/issues/396) |
 | Selected Iteration | I227 |
 | Depends On | Existing pending-submission idempotency and tombstone-pruning contract |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline performance slice |
 | Work Slice | TEST-002 test-only pruning-threshold injection or equivalently bounded storage fixture, focused timing evidence, and owner synchronization only. |
@@ -25,7 +27,19 @@
 | Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
 | Implementation PR | #399 |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Claim became effective at PR #398 merge `c3f083ff`; implementation PR #399 remains in Review until exact-head CI and independent review pass. Remains disjoint from I226 / PR #394. |
+| Handoff / Release Condition | Closed after PR #399 merge `d02915e0`; production pending-submission authority remains unchanged. |
+
+## Completion Evidence
+
+| Field | Value |
+|---|---|
+| Completion Commit | `7b64a08b13cd75bd0ad43843707770919dc9ebec` |
+| Implementation PR | #399, merged as `d02915e0` |
+| Exact-head CI | `32839820741` on `6429febf` (5/5 success, Windows workspace included) |
+| Independent Review | Agent-role APPROVE `5409698923` on exact head |
+| Result | Focused test passed in `0.02s`; production `MAX_TOMBSTONES`, schema, transactions and behavior unchanged. |
+
+Completion Commit: `7b64a08b13cd75bd0ad43843707770919dc9ebec`
 
 ## Identity / Goal / Value
 
