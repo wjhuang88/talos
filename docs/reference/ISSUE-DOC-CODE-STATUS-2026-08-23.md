@@ -65,6 +65,7 @@ in earlier reconciliation snapshots.
 | [#378](https://github.com/wjhuang88/talos/issues/378) | Issue #59 deferred cross-platform acceptance | [I223](../iterations/I223-issue59-deferred-human-validation-cleanup.md) | Planned / Unclaimed | Evidence-only tracker; activate after exact B/C/D implementation heads exist. |
 | [#390](https://github.com/wjhuang88/talos/issues/390) | architecture(memory): evolve context compaction into model-directed checkpoints with recoverable session history | [MEM-005](../backlog/active/MEM-005-context-compaction-policy.md) | Refinement | Intake reconciliation only; reconcile MEM-002/MEM-003/MEM-007 and select a separately governed implementation slice before production changes. |
 | [#395](https://github.com/wjhuang88/talos/issues/395) | architecture(observability): establish R3 structured diagnostics, correlation, and error-fidelity contract | [OBS-002](../backlog/active/OBS-002-structured-diagnostics-contract.md) | Intake / Unclaimed | Intake owner only; architecture/characterization first. Do not activate OBS-002 or authorize implementation from the Issue alone. |
+| [#396](https://github.com/wjhuang88/talos/issues/396) | bound tombstone-pruning idempotency fixture runtime | [TEST-002](../backlog/active/TEST-002-tombstone-pruning-fixture-performance.md) | Ready / Unclaimed | Separate test-infrastructure iteration and effective claim required; preserve production limits and keep the work outside I226/PR #394. |
 
 ## Synchronization Notes
 
