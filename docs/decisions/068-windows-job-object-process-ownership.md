@@ -29,25 +29,25 @@ ordering points. A spawn-then-assign design is therefore not an acceptable migra
 
 The later D1-B launcher must perform this order for a background process:
 
-1. Validate the already-authorized command and create only the required stdout/stderr pipe
-   endpoints. No user code may run before ownership is established.
-2. Create/configure one private Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` while the
-   process is still suspended. The Job handle remains owned by the launcher/supervisor until the
-   terminal cleanup path transfers or closes it.
+1. Validate the already-authorized command and create/configure one private Job Object with
+   `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, plus only the required stdout/stderr pipe endpoints. No
+   user code may run before ownership is established. The Job handle remains owned by the
+   launcher/supervisor until the terminal cleanup path transfers or closes it.
+2. Build the `STARTUPINFOEXW` attribute list and its allowlisted child-handle list before process
+   creation. Only the required child stdout/stderr handles may be inherited. The design must
+   prevent unrelated inheritable handles from entering a concurrently created child. If the
+   binding cannot prove the allowlist, fail closed before attempting to launch.
 3. Create the Windows process with `CreateProcessW` (or a binding that proves identical semantics)
    using `CREATE_SUSPENDED` and the existing ADR-057 PowerShell command identity. Capture the process
-   and primary-thread handles; do not use shell jobs or `taskkill` as the ownership primitive.
-4. Configure an allowlisted child-handle inheritance list through `STARTUPINFOEXW` and
-   `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, or an equivalent binding with the same proof. Only the
-   required child stdout/stderr handles may be inherited. The design must prevent unrelated
-   inheritable handles from entering a concurrently created child. If the binding cannot prove the
-   allowlist, fail closed before resume.
-5. Assign the suspended process to the private Job Object. Assignment failure is terminal: terminate
+   and primary-thread handles; do not use shell jobs or `taskkill` as the ownership primitive. The
+   attribute list is supplied at this call, so no user code runs before the suspended state is
+   reached.
+4. Assign the suspended process to the private Job Object. Assignment failure is terminal: terminate
    the suspended process, close the process/thread/job/attribute-list/pipe duplicates, and return a
    typed launch failure. Never resume an unassigned process.
-6. Resume the primary thread only after steps 1-5 succeed. A resume failure is terminal and must
+5. Resume the primary thread only after steps 1-4 succeed. A resume failure is terminal and must
    invoke the same bounded cleanup path.
-7. Transfer the process/job control and pipe readers to the existing Agent/session supervisor.
+6. Transfer the process/job control and pipe readers to the existing Agent/session supervisor.
    The supervisor owns one terminal race among natural exit, deadline, cancel and shutdown. Closing
    the final Job handle after the required grace/force sequence must terminate remaining descendants
    through kill-on-close.
@@ -73,7 +73,7 @@ The later D1-B launcher must perform this order for a background process:
 
 The implementation must make these states explicit in tests and returned errors:
 
-`validated -> resources_created -> suspended_created -> job_configured -> assigned -> resumed ->
+`validated -> resources_created -> job_configured -> suspended_created -> assigned -> resumed ->
 supervised -> terminal`.
 
 For a failure in any state before `resumed`, no user code is allowed to continue and all owned
