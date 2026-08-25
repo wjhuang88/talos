@@ -1,6 +1,6 @@
 # Iteration I227: Tombstone-Pruning Fixture Performance
 
-> Document status: Active / Claimed proposal
+> Document status: Review / Claimed
 > Published plan date: 2026-08-25
 > Planned objective: preserve permanent submission idempotency coverage while removing the production-sized SQLite setup from the pruning fixture.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #398 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #399 |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
 
@@ -101,10 +101,16 @@ I226 facts. A shared derived file is not permission to overwrite the other owner
 |---|---|---|
 | 2026-08-25 | Planning | Selected TEST-002 from `main@64d5ad4c`; claim and activation remain ineffective until the finalized governance PR merges. |
 | 2026-08-25 | Atomic claim+activation proposal | PR #398 proposes one bounded TEST-002 claimant and Active state. It contains no implementation and has no effect before target-branch merge. |
+| 2026-08-25 | Activation effective | PR #398 merged as `c3f083ffc77574041cb8b0d985b2c426b672c432`; I227 claim and Active state became effective from that target-branch merge. |
+| 2026-08-25 | Implementation candidate | PR #399 proposes implementation from the claim merge; exact-head CI and independent review remain pending. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation candidate.
+- `7b64a08b`: test-only tombstone limit seam and bounded idempotency fixture.
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-session pruned_terminal_payload_retains_permanent_idempotency_identity --locked -- --nocapture`: passed in `0.02s`.
+- `cargo test -p talos-session --locked`: 176 tests passed in `0.65s`.
+- Full workspace/Windows CI: pending for PR #399.
 
 ## Completion Evidence
 

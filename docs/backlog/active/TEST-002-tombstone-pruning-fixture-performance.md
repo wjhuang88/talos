@@ -5,7 +5,7 @@
 | Story ID | TEST-002 |
 | Type | Test Infrastructure Story |
 | Priority | P1 |
-| Status | Active / Claimed proposal |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #396](https://github.com/wjhuang88/talos/issues/396) |
 | Selected Iteration | I227 |
 | Depends On | Existing pending-submission idempotency and tombstone-pruning contract |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #398 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #399 |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
+| Handoff / Release Condition | Claim became effective at PR #398 merge `c3f083ff`; implementation PR #399 remains in Review until exact-head CI and independent review pass. Remains disjoint from I226 / PR #394. |
 
 ## Identity / Goal / Value
 
