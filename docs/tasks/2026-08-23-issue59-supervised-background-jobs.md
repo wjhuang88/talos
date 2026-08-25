@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; D1-B/D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B claim proposal prepared; D2 and I223 remain.
 
 ## Startup Contract
 
@@ -248,3 +248,11 @@ ADR-068 was accepted through PR #391 merge `0021690e` from exact head `fca45c46`
 decision, and merge-time CAS passed. I225/D1-A is Complete/Closed with Completion Commit
 `fca45c467466cd67b52d4391e88c776abfbea198`. D1-B remains a separate Ready/Unclaimed child and
 Windows background admission remains fail-closed until its implementation is reviewed and merged.
+
+## I226 / TOOL-024-D1-B Claim Preparation Checkpoint (2026-08-25)
+
+I225 closeout PR #392 merged as `93ee3253`, making ADR-068 Accepted and D1-B Ready. I226 and
+TOOL-024-D1-B owner documents are prepared from this exact main. The proposal is limited to the
+Windows Job Object launcher, allowlisted stdio inheritance, fail-closed cleanup and real Windows
+tests. Claim and Active state are ineffective until the governance PR merges; D2 and I223 remain
+separate and Windows stays fail-closed.
