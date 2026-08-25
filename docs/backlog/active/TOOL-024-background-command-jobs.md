@@ -194,3 +194,10 @@ own only the prerequisite Windows Job Object security/OS-ABI decision. Claim PR 
 This decision slice changes no Rust, Cargo, dependency, `unsafe`, Windows process behavior,
 CLI/TUI, Dashboard/I213, `/auto`, release or publication surface. D1-B implementation, D2 projection
 and I223/Issue #378 remain separate and unauthorized; Windows background mode stays fail-closed.
+
+## TOOL-024-D1-A Decision Candidate Checkpoint (2026-08-25)
+
+Proposed ADR-068 and the I225 current-path/migration matrix now define the Windows ownership
+contract without enabling Windows background execution. D1-B must create/configure a Job Object and
+allowlisted stdio handle set while suspended, assign before resume, use kill-on-close, and fail
+closed with complete partial-failure cleanup. Exact decision review and acceptance remain pending.
