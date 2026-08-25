@@ -2,12 +2,13 @@
 
 ## Status
 
-Proposed for I225 / TOOL-024-D1-A (2026-08-25).
+Accepted on 2026-08-25 for I225 / TOOL-024-D1-A through decision PR #391 merge `0021690e`.
+The accepted decision content is commit `fca45c46`, with exact-head CI `32797375011` and
+independent Windows/process/unsafe/API approval `5404361120`.
 
-This ADR is a decision contract only. It does not enable Windows background execution, add a
-dependency, add `unsafe`, change a public API, or change current fail-closed behavior. Acceptance
-requires an exact-head decision review with Windows/process/unsafe/API scope. D1-B remains a
-separate implementation iteration and claim.
+This ADR is a decision contract only. Its acceptance did not enable Windows background execution,
+add a dependency, add `unsafe`, change a public API, or change fail-closed behavior. D1-B remains a
+separate implementation iteration and claim and must independently satisfy this contract.
 
 ## Context
 

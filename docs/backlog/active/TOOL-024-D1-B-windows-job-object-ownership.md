@@ -54,7 +54,8 @@
 
 ## Required Validation
 
-- Focused Windows launcher and supervisor tests.
+- Focused Windows launcher and supervisor tests, including assigned-before-resume marker evidence,
+  setup-failure cleanup injection, and parent handle-count leak checks.
 - `cargo check --workspace --locked`, `cargo clippy --workspace --locked -- -D warnings`, `cargo test --workspace --locked`.
 - `scripts/release_preflight.sh` and both governance validators.
 - Independent Windows/process/unsafe/API review against ADR-068 and ADR-007.

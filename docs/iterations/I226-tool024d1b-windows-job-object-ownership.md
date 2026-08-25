@@ -74,6 +74,10 @@
 - Local candidate checks: `cargo fmt --all`, `git diff --check`, `cargo check -p talos-tools --features shell --locked`, and `cargo test -p talos-tools --features shell --locked` pass (110 unit tests plus 3 hardening integration tests). The full release preflight was interrupted by local `ENOSPC` after governance validation passed.
 - Exact-head CI `32820263589` passes 5/5 for the candidate implementation, and the Windows workspace test log records the six I226 launcher tests passing (quoting, case-insensitive environment filtering, output/reap, invalid cwd fail-closed, Job termination and grandchild cleanup). Independent Windows/process/unsafe/API review is still required; no merge or completion claim is made.
 - Exact head `95740c34` superseded `70e8b674` for evidence and completed all Rust/Windows jobs, but its remote issue reconciliation failed because #395 was absent. The corrected local tree passes the same remote validator after OBS-002 owner creation and Issue comment `5407182562`; fresh exact-head CI and review are still required after push.
+- The next local candidate adds test-only fault injection for pipe, Job Object, attribute-list,
+  assignment and resume setup failures, handle-count leak checks, and an assigned-before-resume
+  marker fixture. These tests are evidence for the ADR-068 partial-failure and ordering matrix;
+  they do not add a production failure switch.
 
 ## Changed-File Inventory
 

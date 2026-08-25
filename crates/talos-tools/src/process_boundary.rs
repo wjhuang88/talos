@@ -438,6 +438,24 @@ struct WindowsLaunchHandles {
 }
 
 #[cfg(windows)]
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowsLaunchFault {
+    Pipe,
+    Job,
+    AttributeList,
+    Assignment,
+    Resume,
+}
+
+#[cfg(windows)]
+#[cfg(test)]
+#[derive(Default)]
+struct WindowsLaunchTestHooks {
+    fault: Option<WindowsLaunchFault>,
+}
+
+#[cfg(windows)]
 fn wide(value: &std::ffi::OsStr) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
     value.encode_wide().chain(std::iter::once(0)).collect()
@@ -454,6 +472,24 @@ fn create_windows_job(
     args: &[String],
     cwd: &std::path::Path,
     extra_env: &std::collections::BTreeMap<String, String>,
+) -> Result<WindowsLaunchHandles, String> {
+    create_windows_job_with_hooks(
+        program,
+        args,
+        cwd,
+        extra_env,
+        #[cfg(test)]
+        WindowsLaunchTestHooks::default(),
+    )
+}
+
+#[cfg(windows)]
+fn create_windows_job_with_hooks(
+    program: &str,
+    args: &[String],
+    cwd: &std::path::Path,
+    extra_env: &std::collections::BTreeMap<String, String>,
+    #[cfg(test)] hooks: WindowsLaunchTestHooks,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
     use std::os::windows::io::FromRawHandle;
@@ -493,9 +529,14 @@ fn create_windows_job(
         std::ptr::null_mut();
     let mut attr_storage = Vec::<usize>::new();
     let result = (|| unsafe {
-        if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0
-            || CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0
-        {
+        if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0 {
+            return Err(last_windows_error("CreatePipe"));
+        }
+        #[cfg(test)]
+        if hooks.fault == Some(WindowsLaunchFault::Pipe) {
+            return Err("injected pipe setup failure".to_owned());
+        }
+        if CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0 {
             return Err(last_windows_error("CreatePipe"));
         }
         if SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0) == 0
@@ -506,6 +547,10 @@ fn create_windows_job(
         job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
         if job.is_null() || job == INVALID_HANDLE_VALUE {
             return Err(last_windows_error("CreateJobObjectW"));
+        }
+        #[cfg(test)]
+        if hooks.fault == Some(WindowsLaunchFault::Job) {
+            return Err("injected Job Object setup failure".to_owned());
         }
         let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -526,6 +571,10 @@ fn create_windows_job(
             as windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST;
         if InitializeProcThreadAttributeList(attrs, 1, 0, &mut attr_size) == 0 {
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
+        }
+        #[cfg(test)]
+        if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
+            return Err("injected attribute-list setup failure".to_owned());
         }
         let handles = [out_write, err_write];
         if UpdateProcThreadAttribute(
@@ -577,10 +626,40 @@ fn create_windows_job(
         }
         process = info.hProcess;
         thread = info.hThread;
-        if AssignProcessToJobObject(job, process) == 0 {
+        if {
+            #[cfg(test)]
+            if hooks.fault == Some(WindowsLaunchFault::Assignment) {
+                true
+            } else {
+                AssignProcessToJobObject(job, process) == 0
+            }
+            #[cfg(not(test))]
+            {
+                AssignProcessToJobObject(job, process) == 0
+            }
+        } {
+            #[cfg(test)]
+            if hooks.fault == Some(WindowsLaunchFault::Assignment) {
+                return Err("injected AssignProcessToJobObject failure".to_owned());
+            }
             return Err(last_windows_error("AssignProcessToJobObject"));
         }
-        if ResumeThread(thread) == u32::MAX {
+        if {
+            #[cfg(test)]
+            if hooks.fault == Some(WindowsLaunchFault::Resume) {
+                true
+            } else {
+                ResumeThread(thread) == u32::MAX
+            }
+            #[cfg(not(test))]
+            {
+                ResumeThread(thread) == u32::MAX
+            }
+        } {
+            #[cfg(test)]
+            if hooks.fault == Some(WindowsLaunchFault::Resume) {
+                return Err("injected ResumeThread failure".to_owned());
+            }
             return Err(last_windows_error("ResumeThread"));
         }
         CloseHandle(thread);
@@ -797,6 +876,28 @@ mod windows_tests {
     }
 
     #[tokio::test]
+    async fn windows_child_runs_only_after_job_assignment_and_resume() {
+        let marker = std::env::temp_dir().join(format!(
+            "talos-i226-assigned-marker-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&marker);
+        let script = format!("Set-Content -LiteralPath '{}' -Value assigned", marker.display());
+        let launched = Box::new(powershell(&script))
+            .launch()
+            .await
+            .expect("assigned Windows Job Object launcher succeeds");
+        let mut events = launched.events;
+        while let Some(event) = events.recv().await {
+            if matches!(event, BackgroundProcessEvent::Exited(_)) {
+                break;
+            }
+        }
+        assert!(marker.exists(), "child marker must be written after resume");
+        let _ = std::fs::remove_file(marker);
+    }
+
+    #[tokio::test]
     async fn windows_job_termination_reaches_terminal_event() {
         let launched = Box::new(powershell("Start-Sleep -Seconds 30"))
             .launch()
@@ -894,6 +995,82 @@ mod windows_tests {
         assert!(error.contains("CreateProcessW"));
     }
 
+    #[tokio::test]
+    async fn windows_assignment_failure_cleans_suspended_process_without_running_marker() {
+        let marker = std::env::temp_dir().join(format!(
+            "talos-i226-assignment-marker-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&marker);
+        let script = format!(
+            "Set-Content -LiteralPath '{}' -Value marker",
+            marker.display()
+        );
+        let launcher = powershell(&script);
+        let error = match create_windows_job_with_hooks(
+            &launcher.program,
+            &launcher.args,
+            &launcher.cwd,
+            &launcher.env,
+            WindowsLaunchTestHooks {
+                fault: Some(WindowsLaunchFault::Assignment),
+            },
+        ) {
+            Ok(_) => panic!("injected assignment failure must fail closed"),
+            Err(error) => error,
+        };
+        assert!(error.contains("AssignProcessToJobObject"));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!marker.exists(), "suspended child ran before assignment");
+    }
+
+    #[tokio::test]
+    async fn windows_resume_failure_cleans_assigned_process_and_handles() {
+        let launcher = powershell("Start-Sleep -Seconds 30");
+        let error = match create_windows_job_with_hooks(
+            &launcher.program,
+            &launcher.args,
+            &launcher.cwd,
+            &launcher.env,
+            WindowsLaunchTestHooks {
+                fault: Some(WindowsLaunchFault::Resume),
+            },
+        ) {
+            Ok(_) => panic!("injected resume failure must fail closed"),
+            Err(error) => error,
+        };
+        assert!(error.contains("ResumeThread"));
+    }
+
+    #[test]
+    fn windows_partial_setup_failures_release_every_parent_handle() {
+        let launcher = powershell("Start-Sleep -Seconds 30");
+        let before = current_process_handle_count();
+        for fault in [
+            WindowsLaunchFault::Pipe,
+            WindowsLaunchFault::Job,
+            WindowsLaunchFault::AttributeList,
+            WindowsLaunchFault::Assignment,
+            WindowsLaunchFault::Resume,
+        ] {
+            for _ in 0..8 {
+                let result = create_windows_job_with_hooks(
+                    &launcher.program,
+                    &launcher.args,
+                    &launcher.cwd,
+                    &launcher.env,
+                    WindowsLaunchTestHooks { fault: Some(fault) },
+                );
+                assert!(result.is_err(), "{fault:?} must fail closed");
+            }
+        }
+        let after = current_process_handle_count();
+        assert!(
+            after <= before.saturating_add(2),
+            "partial launch failures leaked handles: before={before}, after={after}"
+        );
+    }
+
     fn windows_process_exists(pid: u32) -> bool {
         std::process::Command::new("powershell.exe")
             .args([
@@ -907,5 +1084,17 @@ mod windows_tests {
             ])
             .status()
             .is_ok_and(|status| status.success())
+    }
+
+    fn current_process_handle_count() -> u32 {
+        let mut count = 0;
+        let ok = unsafe {
+            windows_sys::Win32::System::Threading::GetProcessHandleCount(
+                windows_sys::Win32::System::Threading::GetCurrentProcess(),
+                &mut count,
+            )
+        };
+        assert_ne!(ok, 0, "GetProcessHandleCount must succeed");
+        count
     }
 }
