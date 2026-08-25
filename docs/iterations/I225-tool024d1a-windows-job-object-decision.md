@@ -1,6 +1,6 @@
 # Iteration I225: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-24
 > Planned objective: decide the assigned-before-exec Windows Job Object ownership, bounded OS-ABI,
 > compatibility, migration, rollback and validation contract required before TOOL-024-D1-B.
@@ -23,7 +23,7 @@
 | Authorization Evidence | Maintainer's persistent active goal authorizes Issue #59 delivery. I224 closed through PR #387 merge `3cb4eff8`; claim PR #388 exact head `e0c65c52`, CI `32729210800`, independent Windows/process/unsafe/API governance approval `5395556844`, merge-time CAS and merge `2afcdc3e` establish this claim on `main`. Shared-account review proves Agent-role separation only. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Decision work starts from `main@2afcdc3e` or later. D1-B implementation remains separately claimed. |
+| Handoff / Release Condition | ADR-068 is Accepted on `main@0021690e`; D1-B implementation remains separately claimable and starts from this merge or later. |
 
 ## Published Baseline
 
@@ -136,14 +136,16 @@ authority and are not reused.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
-- A claim/status commit cannot certify the decision; completion requires pre-existing reviewed
-  ADR-068 and current-path matrix commits.
+- Completion Commit: `fca45c467466cd67b52d4391e88c776abfbea198` (decision content and current-path
+  matrix; merged by PR #391 as `0021690e`).
+- Exact-head CI: `32797375011`.
+- Independent Windows/process/unsafe/API review: comment `5404361120` (APPROVE, exact-head bound).
+- Merge-time CAS passed; ADR-068 is Accepted on `main@0021690e`.
 
 ## Variance And Residuals
 
-- TOOL-024-D1-B, D2 and I223 remain separately governed and unauthorized.
+- TOOL-024-D1-B, D2 and I223 remain separately governed; Windows implementation is not included.
 
 ## Retrospective
 
-- Pending execution.
+- Decision review confirmed assigned-before-exec and handle-inheritance ordering before merge.

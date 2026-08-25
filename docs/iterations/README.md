@@ -92,7 +92,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I222 | TOOL-024-B Managed Background Execution Core | Complete / Closed | Completion Commit `8671edf45c168612bfa4a4bbb65a9847026e1b96`; PR #382 merged after exact-head CI `32690533253` and protected-scope reviews. TOOL-024-C/D and I223 remain separate. |
 | I223 | Issue #59 Deferred Human Validation Cleanup | Planned / Unclaimed | Evidence-only Issue #378 cleanup after B/C/D implementation heads exist; no behavior implementation authority. |
 | I224 | TOOL-024-C Model-Readable Process Job Control | Complete / Closed | Completion Commit `60b0367cf749397bf1167e189e820e82e32baf03`; PR #386 merged after exact-head CI `32719779528`, independent approval `5394777902` and merge-time CAS. D1/D2 and I223 remain separate. |
-| I225 | TOOL-024-D1-A Windows Job Object Decision | Active / Claimed | Decision-only prerequisite activated by claim PR #388 merge `2afcdc3e`; decision starts from that merge or later and contains no Windows implementation authority. |
+| I225 | TOOL-024-D1-A Windows Job Object Decision | Complete / Closed | ADR-068 accepted by PR #391 merge `0021690e`; Completion Commit `fca45c46`; D1-B remains separately governed. |
 
 ## Completed This Closeout
 

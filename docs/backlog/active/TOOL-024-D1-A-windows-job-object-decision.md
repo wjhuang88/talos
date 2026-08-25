@@ -1,13 +1,13 @@
 # TOOL-024-D1-A: Windows Job Object Security And OS-ABI Decision
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D1-A |
 | Type | Architecture / Process-Security Decision |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
 | Selected Iteration | I225 Active / Claimed |
 | Depends On | TOOL-024-C / I224 Complete; ADR-060 and ADR-057 Accepted |
@@ -27,7 +27,7 @@
 | Authorization Evidence | Maintainer's persistent active goal authorizes completion of Issue #59. I224 closed through reviewed PR #387 merge `3cb4eff8`; claim PR #388 exact head `e0c65c52`, CI `32729210800`, independent Windows/process/unsafe/API governance approval `5395556844`, merge-time CAS and merge `2afcdc3e` establish this claim on `main`. Shared GitHub account establishes Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-24 |
-| Handoff / Release Condition | Claim is effective on `main@2afcdc3e`; ADR-068/current-path decision evidence is pending. Later D1-B implementation needs a separate owner, iteration and effective claim. |
+| Handoff / Release Condition | ADR-068 is Accepted on `main@0021690e`; later D1-B implementation needs a separate owner, iteration and effective claim. |
 
 ## Identity / Goal / Value
 
@@ -130,6 +130,14 @@ assigned-before-exec Job Object sequence, an allowlisted stdio handle-inheritanc
 kill-on-close descendant ownership, explicit partial-failure cleanup and fail-closed migration.
 No Rust/Cargo/dependency/unsafe or Windows behavior changed. ADR-068 remains Proposed until its
 decision PR receives exact-head CI and independent Windows/process/unsafe/API review.
+
+## I225 Completion Checkpoint (2026-08-25)
+
+ADR-068 decision PR #391 merged as `0021690e` from exact head `fca45c46`. Exact-head CI
+`32797375011` was green and independent Windows/process/unsafe/API review `5404361120` approved the
+decision. The decision remains documentation-only; Windows background admission is still fail-closed.
+
+Completion Commit: `fca45c467466cd67b52d4391e88c776abfbea198`.
 
 ## Residual Destination
 
