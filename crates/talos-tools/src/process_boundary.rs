@@ -491,7 +491,7 @@ fn create_windows_job(
     let mut thread: HANDLE = std::ptr::null_mut();
     let mut attrs: windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST =
         std::ptr::null_mut();
-    let mut attr_storage = Vec::<u8>::new();
+    let mut attr_storage = Vec::<usize>::new();
     let result = (|| unsafe {
         if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0
             || CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0
@@ -520,7 +520,8 @@ fn create_windows_job(
         }
         let mut attr_size = 0usize;
         let _ = InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut attr_size);
-        attr_storage = vec![0u8; attr_size];
+        let attr_words = attr_size.div_ceil(size_of::<usize>());
+        attr_storage = vec![0usize; attr_words];
         attrs = attr_storage.as_mut_ptr()
             as windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST;
         if InitializeProcThreadAttributeList(attrs, 1, 0, &mut attr_size) == 0 {
@@ -539,7 +540,11 @@ fn create_windows_job(
         {
             return Err(last_windows_error("UpdateProcThreadAttribute"));
         }
-        let mut command = format!("\"{}\"", program);
+        if program.contains(['\0', '"']) {
+            return Err("Windows program path contains an unsupported quote or NUL".to_owned());
+        }
+        let mut program_w = wide(std::ffi::OsStr::new(program));
+        let mut command = quote_windows_arg(program);
         for arg in args {
             command.push(' ');
             command.push_str(&quote_windows_arg(arg));
@@ -555,7 +560,7 @@ fn create_windows_job(
         startup.StartupInfo.hStdError = err_write;
         let mut info: PROCESS_INFORMATION = zeroed();
         if CreateProcessW(
-            std::ptr::null(),
+            program_w.as_mut_ptr(),
             command_w.as_mut_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -627,14 +632,21 @@ fn windows_environment(extra: &std::collections::BTreeMap<String, String>) -> Ve
     let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
     let mut values = std::collections::BTreeMap::<String, String>::new();
     for (name, value) in std::env::vars() {
-        if !dangerous.iter().any(|item| item == &name) {
+        if !dangerous
+            .iter()
+            .any(|item| item.eq_ignore_ascii_case(&name))
+        {
             values.insert(name, value);
         }
     }
     values.extend(
         extra
             .iter()
-            .filter(|(name, _)| !dangerous.iter().any(|item| item == name.as_str()))
+            .filter(|(name, _)| {
+                !dangerous
+                    .iter()
+                    .any(|item| item.eq_ignore_ascii_case(name.as_str()))
+            })
             .map(|(name, value)| (name.clone(), value.clone())),
     );
     let mut block = Vec::new();
@@ -650,10 +662,30 @@ fn windows_environment(extra: &std::collections::BTreeMap<String, String>) -> Ve
 
 #[cfg(windows)]
 fn quote_windows_arg(value: &str) -> String {
-    if !value.contains([' ', '\t', '"']) {
+    if !value.is_empty() && !value.contains([' ', '\t', '"']) {
         return value.to_owned();
     }
-    format!("\"{}\"", value.replace('"', "\\\""))
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('"');
+    let mut backslashes = 0usize;
+    for character in value.chars() {
+        match character {
+            '\\' => backslashes += 1,
+            '"' => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
+                quoted.push('"');
+                backslashes = 0;
+            }
+            _ => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes));
+                quoted.push(character);
+                backslashes = 0;
+            }
+        }
+    }
+    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
+    quoted.push('"');
+    quoted
 }
 
 #[cfg(all(test, windows))]
@@ -677,6 +709,27 @@ mod windows_tests {
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             BTreeMap::new(),
         )
+    }
+
+    #[test]
+    fn windows_argument_quoting_preserves_backslashes_and_quotes() {
+        assert_eq!(quote_windows_arg("plain"), "plain");
+        assert_eq!(quote_windows_arg(""), "\"\"");
+        assert_eq!(quote_windows_arg("two words"), "\"two words\"");
+        assert!(quote_windows_arg("a\"b").contains("\\\\\\\""));
+        assert!(quote_windows_arg(r#"C:\path with space\"#).ends_with("\\\\\""));
+    }
+
+    #[test]
+    fn windows_environment_filters_dangerous_names_case_insensitively() {
+        let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
+        let Some(name) = dangerous.first() else {
+            return;
+        };
+        let mut extra = BTreeMap::new();
+        extra.insert(name.to_ascii_lowercase(), "must-not-appear".to_owned());
+        let block = String::from_utf16_lossy(&windows_environment(&extra));
+        assert!(!block.contains("must-not-appear"));
     }
 
     #[tokio::test]
@@ -735,5 +788,87 @@ mod windows_tests {
         .expect("terminated Windows process must be reaped")
         .expect("terminated Windows process must emit an exit event");
         assert!(!exit.success);
+    }
+
+    #[tokio::test]
+    async fn windows_job_termination_reaps_a_powershell_grandchild() {
+        let script = "$child = Start-Process powershell.exe -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30' -PassThru; Write-Output ('grandchild-pid=' + $child.Id); Start-Sleep -Seconds 30";
+        let launched = Box::new(powershell(script))
+            .launch()
+            .await
+            .expect("Windows Job Object launcher succeeds");
+        let control = launched.control;
+        let mut events = launched.events;
+        let mut output = Vec::new();
+        let grandchild_pid = tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                if let BackgroundProcessEvent::Output(chunk) = event {
+                    output.extend(chunk.bytes);
+                    let text = String::from_utf8_lossy(&output);
+                    if let Some(pid) = text
+                        .lines()
+                        .find_map(|line| line.strip_prefix("grandchild-pid=")?.trim().parse().ok())
+                    {
+                        return Some(pid);
+                    }
+                }
+            }
+            None
+        })
+        .await
+        .expect("grandchild marker must arrive")
+        .expect("grandchild marker must contain a PID");
+
+        control
+            .terminate()
+            .await
+            .expect("Job Object termination succeeds");
+        let _ = tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                if matches!(event, BackgroundProcessEvent::Exited(_)) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("leader must be reaped after Job termination");
+
+        for _ in 0..20 {
+            if !windows_process_exists(grandchild_pid) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("Job termination left grandchild process {grandchild_pid} alive");
+    }
+
+    #[tokio::test]
+    async fn windows_job_rejects_invalid_working_directory_without_spawning() {
+        let launcher = WindowsBackgroundLauncher::new(
+            "powershell.exe".to_owned(),
+            vec!["-NoLogo".to_owned()],
+            PathBuf::from(r"C:\talos\path-that-does-not-exist"),
+            BTreeMap::new(),
+        );
+        let error = match Box::new(launcher).launch().await {
+            Ok(_) => panic!("invalid working directory must fail closed"),
+            Err(error) => error,
+        };
+        assert!(error.contains("CreateProcessW"));
+    }
+
+    fn windows_process_exists(pid: u32) -> bool {
+        std::process::Command::new("powershell.exe")
+            .args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &format!(
+                    "if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ exit 0 }} else {{ exit 1 }}"
+                ),
+            ])
+            .status()
+            .is_ok_and(|status| status.success())
     }
 }
