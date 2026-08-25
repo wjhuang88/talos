@@ -19,7 +19,7 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
-| Implementation PR | #394 — open, current candidate `fc15e4c6` |
+| Implementation PR | #394 — open, current candidate `b6c6e387` |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Candidate remains in Review until Windows exact-head CI and independent process/security/API review pass; no completion or merge authority is implied. |
 
@@ -66,12 +66,12 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-25 | Atomic claim + activation | PR #393 exact head `2905c99d`, CI `32810069430`, independent approval `5405428154`, merge-time CAS and merge `d1f2a126`; implementation starts from this merge. |
-| 2026-08-25 | Stable implementation candidate | PR #394 at `fc15e4c6` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`; exact-head CI run `32813314638` still fails Windows workspace compilation, so the candidate remains under correction. |
+| 2026-08-25 | Stable implementation candidate | PR #394 at `b6c6e387` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`; the preceding exact-head CI run `32814632407` compiled Windows successfully but failed Clippy on three mechanical warnings, now corrected in this candidate. |
 
 ## Verification Evidence
 
 - Local candidate checks: `cargo fmt --all`, `git diff --check`, `cargo check -p talos-tools --features shell --locked`, and `cargo test -p talos-tools --features shell --locked` pass (110 unit tests plus 3 hardening integration tests). The full release preflight was interrupted by local `ENOSPC` after governance validation passed.
-- Remote exact-head CI `32813314638` is not yet green: Windows workspace reports raw `HANDLE` `Send` and Win32 parameter type errors; no merge or completion claim is made.
+- Remote exact-head CI `32814632407` is superseded: Windows workspace compilation passed, but Clippy failed on three mechanical warnings. The new candidate requires fresh exact-head CI; no merge or completion claim is made.
 
 ## Completion Evidence
 

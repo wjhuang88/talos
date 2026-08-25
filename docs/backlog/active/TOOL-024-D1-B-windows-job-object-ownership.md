@@ -25,7 +25,7 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I225/ADR-068 closeout merged as `93ee3253`; exact decision commit `fca45c46`, CI `32797375011`, independent security review `5404361120`, closeout review `5405268380`. |
-| Implementation PR | #394 — current candidate `fc15e4c6` |
+| Implementation PR | #394 — current candidate `b6c6e387` |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Claim became effective on `main@d1f2a126` after PR #393 merge. Implementation starts from that merge or later. |
 

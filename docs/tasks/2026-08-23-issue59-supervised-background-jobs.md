@@ -259,14 +259,14 @@ stays fail-closed until the reviewed implementation merges.
 
 ## I226 Implementation Candidate Checkpoint (2026-08-25)
 
-Implementation PR #394 is the first stable candidate, currently at exact head `fc15e4c6`. It adds
+Implementation PR #394 is the first stable candidate, currently at exact head `b6c6e387`. It adds
 the Windows-only Job Object launcher, allowlisted stdio inheritance, assigned-before-resume
 ownership, kill-on-close cleanup and Bash/Exec integration; Unix behavior and D2 remain outside the
 slice.
 
 Local formatting, diff and focused locked check/test pass; release preflight reaches its governance
-checks but the full build is interrupted by local `ENOSPC`. Exact-head CI run `32813314638` still
-fails Windows workspace compilation on raw HANDLE `Send` and Win32 parameter type errors. The
-candidate therefore remains Review / Claimed, with no merge or Completion Commit;
+checks but the full build is interrupted by local `ENOSPC`. The preceding exact-head CI run
+`32814632407` compiled Windows successfully but failed Clippy on three mechanical warnings, now
+corrected in `b6c6e387`. The candidate therefore remains Review / Claimed, with no merge or Completion Commit;
 the next action is local correction followed by fresh exact-head CI and independent Windows/process/
 unsafe/API review. I223/#378 remains pending and Issue #59 remains open.
