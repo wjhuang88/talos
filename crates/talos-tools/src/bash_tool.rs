@@ -307,7 +307,17 @@ impl AgentTool for BashTool {
         }
         #[cfg(windows)]
         {
-            Err("background_process_tree_unsupported".to_owned())
+            if has_detached_process_shape(&parsed.command) {
+                return Err("unsupported_background_shape: detached command".to_owned());
+            }
+            let timeout = parsed
+                .timeout_secs
+                .map(|seconds| Duration::from_secs(seconds.clamp(1, 600)))
+                .unwrap_or(self.timeout);
+            Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
+                tool_name: self.name().to_owned(),
+                timeout,
+            }))
         }
         #[cfg(unix)]
         {
@@ -333,8 +343,24 @@ impl AgentTool for BashTool {
     ) -> ToolExecutionOutput {
         #[cfg(windows)]
         {
-            let _ = (input, permit);
-            return ToolExecutionOutput::error("background_process_tree_unsupported");
+            let parsed = match parse_input(input) {
+                Ok(parsed) if parsed.background => parsed,
+                Ok(_) => return ToolExecutionOutput::error("background intent is missing"),
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
+                "powershell.exe".to_owned(),
+                vec![
+                    "-NoLogo".to_owned(),
+                    "-NoProfile".to_owned(),
+                    "-NonInteractive".to_owned(),
+                    "-Command".to_owned(),
+                    parsed.command,
+                ],
+                self.working_dir.clone(),
+                std::collections::BTreeMap::new(),
+            );
+            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
         }
         #[cfg(unix)]
         {
@@ -390,7 +416,7 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
     })
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 fn has_detached_process_shape(command: &str) -> bool {
     let normalized = command.trim();
     normalized.ends_with('&')

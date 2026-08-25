@@ -641,7 +641,26 @@ impl AgentTool for ExecTool {
         }
         #[cfg(windows)]
         {
-            Err("background_process_tree_unsupported".to_owned())
+            if !parsed.steps.is_empty()
+                || !parsed.pipes.is_empty()
+                || parsed.mode == ExecMode::Parallel
+            {
+                return Err(
+                    "unsupported_background_shape: exec requires one top-level command".to_owned(),
+                );
+            }
+            let command = parsed.command.as_deref().unwrap_or_default();
+            if has_detached_exec_shape(command, &parsed.args) {
+                return Err("unsupported_background_shape: detached command".to_owned());
+            }
+            let timeout = parsed
+                .timeout_secs
+                .map(|seconds| Duration::from_secs(seconds.clamp(1, MAX_TIMEOUT_SECS)))
+                .unwrap_or(self.timeout);
+            Ok(ToolExecutionAdmission::Background(BackgroundJobRequest {
+                tool_name: self.name().to_owned(),
+                timeout,
+            }))
         }
         #[cfg(unix)]
         {
@@ -676,8 +695,23 @@ impl AgentTool for ExecTool {
     ) -> ToolExecutionOutput {
         #[cfg(windows)]
         {
-            let _ = (input, permit);
-            return ToolExecutionOutput::error("background_process_tree_unsupported");
+            let parsed = match self.parse_input(input) {
+                Ok(parsed) if parsed.background => parsed,
+                Ok(_) => return ToolExecutionOutput::error("background intent is missing"),
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let command_name = parsed.command.as_deref().unwrap_or_default();
+            let cwd = match self.resolve_cwd(parsed.cwd.as_deref()) {
+                Ok(cwd) => cwd,
+                Err(error) => return ToolExecutionOutput::error(error.to_string()),
+            };
+            let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
+                command_name.to_owned(),
+                parsed.args,
+                cwd,
+                parsed.env,
+            );
+            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
         }
         #[cfg(unix)]
         {
@@ -709,7 +743,7 @@ impl AgentTool for ExecTool {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 fn has_detached_exec_shape(command: &str, args: &[String]) -> bool {
     let program = std::path::Path::new(command)
         .file_name()
