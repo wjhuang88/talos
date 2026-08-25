@@ -339,7 +339,7 @@ impl Drop for WindowsJobControl {
     fn drop(&mut self) {
         if !self.job.is_null() {
             unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };
-            self.job = 0;
+            self.job = std::ptr::null_mut();
         }
     }
 }
