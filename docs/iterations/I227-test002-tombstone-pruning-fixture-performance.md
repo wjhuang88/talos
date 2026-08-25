@@ -18,7 +18,7 @@
 | Source Issue | #396 |
 | Governance Claim PR | #398 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay; exact-head CI and both governance validators are required before merge. |
+| Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
@@ -44,8 +44,10 @@
 | I226 / PR #394 | Implementation in progress after effective claim | Continue independently. I226 owns Windows Job Object/process-hardening files; I227 must not modify them or TOOL-024 owners. |
 
 No other current iteration owner is Active or Review in the target-branch operating inventory.
-I227 is permitted to proceed concurrently with I226 only because its production authority and
-changed-file set are disjoint.
+I227 is permitted to proceed concurrently with I226 because its production authority is disjoint.
+`docs/BOARD.md` and `docs/iterations/README.md` are shared derived files: the later merge must
+rebase or replay its row additions with owner-first union semantics and preserve both I227 and
+I226 facts. A shared derived file is not permission to overwrite the other owner's row.
 
 ### Scope
 

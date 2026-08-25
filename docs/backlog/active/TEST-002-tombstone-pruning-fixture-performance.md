@@ -22,7 +22,7 @@
 | Source Issue | #396 |
 | Governance Claim PR | #398 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay; exact-head CI and both governance validators are required before merge. |
+| Authorization Evidence | Maintainer requested investigation and remediation of the repeated Windows 60-second delay. No separate natural-person reviewer is currently available in the shared-account operating setup; the limitation is disclosed explicitly, and Agent-role review plus exact-head CI and both governance validators are required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-25 |
 | Handoff / Release Condition | Proposed claim and activation are ineffective until PR #398 merges; implementation starts from that merge or later and remains disjoint from I226 / PR #394. |
