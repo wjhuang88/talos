@@ -1,15 +1,15 @@
 # TOOL-024-D1-B: Windows Job Object Process-Tree Ownership
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D1-B |
 | Type | Product / Process-Security Implementation |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I226 Review / Claimed |
+| Selected Iteration | I226 Complete / Closed |
 | Depends On | TOOL-024-D1-A / I225 Complete; ADR-068 Accepted on `main@93ee3253` |
 
 ## Collaboration Claim
@@ -25,9 +25,9 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I225/ADR-068 closeout merged as `93ee3253`; exact decision commit `fca45c46`, CI `32797375011`, independent security review `5404361120`, closeout review `5405268380`. |
-| Implementation PR | #394 — open; implementation code commit `70e8b674` plus later evidence/governance synchronization |
-| Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Claim became effective on `main@d1f2a126` after PR #393 merge. Implementation starts from that merge or later. |
+| Implementation PR | #394 — merged as `d4d7cb25c9c8418345651024fa2102a83c499659`; exact candidate `835578635daa1eebc76e79ca893296baeed6b35a` |
+| Last Updated | 2026-08-26 |
+| Handoff / Release Condition | Claim became effective on `main@d1f2a126`; implementation and closeout are complete. D2/I223 remain separately governed. |
 
 ## Scope
 
@@ -63,7 +63,8 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `d4d7cb25c9c8418345651024fa2102a83c499659`
+- Exact-head CI `32849330531` passed 5/5; independent Windows/process/security/API review comment `5410840103` approved exact candidate `835578635daa1eebc76e79ca893296baeed6b35a`.
 - The claim or status closeout cannot self-certify implementation completion.
 
 ## Residuals
