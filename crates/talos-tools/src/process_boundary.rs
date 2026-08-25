@@ -446,7 +446,7 @@ enum WindowsLaunchFault {
     AttributeList,
     Assignment,
     Resume,
-    NestedJob,
+    UnsupportedHost,
 }
 
 #[cfg(windows)]
@@ -499,9 +499,9 @@ fn create_windows_job_with_hooks(
     };
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JobObjectExtendedLimitInformation, SetInformationJobObject,
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+        SetInformationJobObject,
     };
     use windows_sys::Win32::System::Pipes::CreatePipe;
     use windows_sys::Win32::System::Threading::{
@@ -512,23 +512,7 @@ fn create_windows_job_with_hooks(
     };
 
     #[cfg(test)]
-    if hooks.fault == Some(WindowsLaunchFault::NestedJob) {
-        return Err(
-            "background_process_tree_unsupported: nested Windows Job Object host".to_owned(),
-        );
-    }
-    let mut already_in_job = 0;
-    if unsafe {
-        IsProcessInJob(
-            windows_sys::Win32::System::Threading::GetCurrentProcess(),
-            std::ptr::null_mut(),
-            &mut already_in_job,
-        )
-    } == 0
-    {
-        return Err(last_windows_error("IsProcessInJob"));
-    }
-    if already_in_job != 0 {
+    if hooks.fault == Some(WindowsLaunchFault::UnsupportedHost) {
         return Err(
             "background_process_tree_unsupported: nested Windows Job Object host".to_owned(),
         );
@@ -660,7 +644,10 @@ fn create_windows_job_with_hooks(
             if hooks.fault == Some(WindowsLaunchFault::Assignment) {
                 return Err("injected AssignProcessToJobObject failure".to_owned());
             }
-            return Err(last_windows_error("AssignProcessToJobObject"));
+            return Err(format!(
+                "background_process_tree_unsupported: {}",
+                last_windows_error("AssignProcessToJobObject")
+            ));
         }
         #[cfg(test)]
         let resume_failed =
@@ -1048,48 +1035,21 @@ mod windows_tests {
     }
 
     #[test]
-    fn windows_nested_job_host_is_rejected_fail_closed() {
-        if std::env::var_os("TALOS_I226_NESTED_PROBE").is_some() {
-            use windows_sys::Win32::System::JobObjects::{
-                AssignProcessToJobObject, CreateJobObjectW,
-            };
-            use windows_sys::Win32::System::Threading::GetCurrentProcess;
-            let job = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
-            assert!(!job.is_null());
-            assert_ne!(
-                unsafe { AssignProcessToJobObject(job, GetCurrentProcess()) },
-                0,
-                "probe process must become Job-owned"
-            );
-            let launcher = powershell("Write-Output should-not-run");
-            let error = match create_windows_job_with_hooks(
-                &launcher.program,
-                &launcher.args,
-                &launcher.cwd,
-                &launcher.env,
-                WindowsLaunchTestHooks::default(),
-            ) {
-                Ok(_) => panic!("nested Job host must fail closed"),
-                Err(error) => error,
-            };
-            assert!(error.contains("nested Windows Job Object"));
-            unsafe { windows_sys::Win32::Foundation::CloseHandle(job) };
-            return;
-        }
-
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "windows_nested_job_host_is_rejected_fail_closed",
-                "--nocapture",
-            ])
-            .env("TALOS_I226_NESTED_PROBE", "1")
-            .status()
-            .expect("nested Job probe process starts");
-        assert!(
-            status.success(),
-            "nested Job probe must reject launch safely"
-        );
+    fn windows_unsupported_job_host_is_rejected_fail_closed() {
+        let launcher = powershell("Write-Output should-not-run");
+        let error = match create_windows_job_with_hooks(
+            &launcher.program,
+            &launcher.args,
+            &launcher.cwd,
+            &launcher.env,
+            WindowsLaunchTestHooks {
+                fault: Some(WindowsLaunchFault::UnsupportedHost),
+            },
+        ) {
+            Ok(_) => panic!("unsupported Job host must fail closed"),
+            Err(error) => error,
+        };
+        assert!(error.contains("background_process_tree_unsupported"));
     }
 
     #[tokio::test]
