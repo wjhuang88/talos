@@ -66,7 +66,9 @@ impl LanguageModel for LifecycleModel {
                         input: serde_json::json!({
                             "command": script,
                             "background": true,
-                            "timeout_secs": if matches!(self.case, LifecycleCase::Timeout) { 1 } else { 30 },
+                            // Leave enough startup margin for a cold Windows runner while
+                            // still timing out long before the fixture's 30-second children.
+                            "timeout_secs": if matches!(self.case, LifecycleCase::Timeout) { 5 } else { 30 },
                         }),
                     },
                     provenance: Default::default(),
