@@ -626,36 +626,24 @@ fn create_windows_job_with_hooks(
         }
         process = info.hProcess;
         thread = info.hThread;
-        if {
-            #[cfg(test)]
-            if hooks.fault == Some(WindowsLaunchFault::Assignment) {
-                true
-            } else {
-                AssignProcessToJobObject(job, process) == 0
-            }
-            #[cfg(not(test))]
-            {
-                AssignProcessToJobObject(job, process) == 0
-            }
-        } {
+        #[cfg(test)]
+        let assignment_failed = hooks.fault == Some(WindowsLaunchFault::Assignment)
+            || AssignProcessToJobObject(job, process) == 0;
+        #[cfg(not(test))]
+        let assignment_failed = AssignProcessToJobObject(job, process) == 0;
+        if assignment_failed {
             #[cfg(test)]
             if hooks.fault == Some(WindowsLaunchFault::Assignment) {
                 return Err("injected AssignProcessToJobObject failure".to_owned());
             }
             return Err(last_windows_error("AssignProcessToJobObject"));
         }
-        if {
-            #[cfg(test)]
-            if hooks.fault == Some(WindowsLaunchFault::Resume) {
-                true
-            } else {
-                ResumeThread(thread) == u32::MAX
-            }
-            #[cfg(not(test))]
-            {
-                ResumeThread(thread) == u32::MAX
-            }
-        } {
+        #[cfg(test)]
+        let resume_failed =
+            hooks.fault == Some(WindowsLaunchFault::Resume) || ResumeThread(thread) == u32::MAX;
+        #[cfg(not(test))]
+        let resume_failed = ResumeThread(thread) == u32::MAX;
+        if resume_failed {
             #[cfg(test)]
             if hooks.fault == Some(WindowsLaunchFault::Resume) {
                 return Err("injected ResumeThread failure".to_owned());
