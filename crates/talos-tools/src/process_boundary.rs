@@ -446,6 +446,7 @@ enum WindowsLaunchFault {
     AttributeList,
     Assignment,
     Resume,
+    NestedJob,
 }
 
 #[cfg(windows)]
@@ -498,9 +499,9 @@ fn create_windows_job_with_hooks(
     };
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-        SetInformationJobObject,
+        AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, SetInformationJobObject,
     };
     use windows_sys::Win32::System::Pipes::CreatePipe;
     use windows_sys::Win32::System::Threading::{
@@ -509,6 +510,27 @@ fn create_windows_job_with_hooks(
         InitializeProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION,
         ResumeThread, STARTUPINFOEXW, UpdateProcThreadAttribute,
     };
+
+    #[cfg(test)]
+    if hooks.fault == Some(WindowsLaunchFault::NestedJob) {
+        return Err(
+            "background_process_tree_unsupported: nested Windows Job Object host".to_owned(),
+        );
+    }
+    let mut already_in_job = 0;
+    if IsProcessInJob(
+        windows_sys::Win32::System::Threading::GetCurrentProcess(),
+        std::ptr::null_mut(),
+        &mut already_in_job,
+    ) == 0
+    {
+        return Err(last_windows_error("IsProcessInJob"));
+    }
+    if already_in_job != 0 {
+        return Err(
+            "background_process_tree_unsupported: nested Windows Job Object host".to_owned(),
+        );
+    }
 
     if size_of::<HANDLE>() != size_of::<isize>() {
         return Err("unsupported Windows handle width".to_owned());
@@ -964,6 +986,108 @@ mod windows_tests {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         panic!("Job termination left grandchild process {grandchild_pid} alive");
+    }
+
+    async fn windows_handle_probe(launcher: WindowsBackgroundLauncher) -> bool {
+        let launched = Box::new(launcher)
+            .launch()
+            .await
+            .expect("Windows Job Object launcher succeeds");
+        let mut events = launched.events;
+        let mut output = Vec::new();
+        while let Some(event) = events.recv().await {
+            match event {
+                BackgroundProcessEvent::Output(chunk) => output.extend(chunk.bytes),
+                BackgroundProcessEvent::Exited(exit) => {
+                    assert!(exit.success, "handle probe must exit successfully");
+                    break;
+                }
+                BackgroundProcessEvent::SupervisionFailed(error) => panic!("{error}"),
+            }
+        }
+        String::from_utf8_lossy(&output)
+            .lines()
+            .any(|line| line.trim() == "1")
+    }
+
+    #[tokio::test]
+    async fn windows_concurrent_spawn_excludes_unrelated_inheritable_handle() {
+        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+        use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+        use windows_sys::Win32::System::Threading::CreateEventW;
+
+        let security = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: std::ptr::null_mut(),
+            bInheritHandle: 1,
+        };
+        let unrelated: HANDLE = unsafe { CreateEventW(&security, 0, 0, std::ptr::null()) };
+        assert!(
+            !unrelated.is_null(),
+            "unrelated inheritable handle must exist"
+        );
+
+        let script = r#"Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class TalosHandleProbe { [DllImport("kernel32.dll")] public static extern bool GetHandleInformation(IntPtr handle, out uint flags); }'; $flags = 0; if ([TalosHandleProbe]::GetHandleInformation([IntPtr]([long]$args[0]), [ref]$flags)) { '1' } else { '0' }"#;
+        let handle_arg = (unrelated as usize).to_string();
+        let mut left_launcher = powershell(script);
+        left_launcher.args.push(handle_arg.clone());
+        let mut right_launcher = powershell(script);
+        right_launcher.args.push(handle_arg);
+        let (left, right) = tokio::join!(
+            windows_handle_probe(left_launcher),
+            windows_handle_probe(right_launcher),
+        );
+        unsafe { CloseHandle(unrelated) };
+
+        assert!(
+            !left && !right,
+            "unrelated inheritable handle must not be observable in either child"
+        );
+    }
+
+    #[test]
+    fn windows_nested_job_host_is_rejected_fail_closed() {
+        if std::env::var_os("TALOS_I226_NESTED_PROBE").is_some() {
+            use windows_sys::Win32::System::JobObjects::{
+                AssignProcessToJobObject, CreateJobObjectW,
+            };
+            use windows_sys::Win32::System::Threading::GetCurrentProcess;
+            let job = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+            assert!(!job.is_null());
+            assert_ne!(
+                unsafe { AssignProcessToJobObject(job, GetCurrentProcess()) },
+                0,
+                "probe process must become Job-owned"
+            );
+            let launcher = powershell("Write-Output should-not-run");
+            let error = match create_windows_job_with_hooks(
+                &launcher.program,
+                &launcher.args,
+                &launcher.cwd,
+                &launcher.env,
+                WindowsLaunchTestHooks::default(),
+            ) {
+                Ok(_) => panic!("nested Job host must fail closed"),
+                Err(error) => error,
+            };
+            assert!(error.contains("nested Windows Job Object"));
+            unsafe { windows_sys::Win32::Foundation::CloseHandle(job) };
+            return;
+        }
+
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "windows_nested_job_host_is_rejected_fail_closed",
+                "--nocapture",
+            ])
+            .env("TALOS_I226_NESTED_PROBE", "1")
+            .status()
+            .expect("nested Job probe process starts");
+        assert!(
+            status.success(),
+            "nested Job probe must reject launch safely"
+        );
     }
 
     #[tokio::test]
