@@ -7,12 +7,16 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use talos_agent::Agent;
+use talos_agent::permission_pipeline::{
+    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+};
 use talos_agent::session::AppServerSession;
 use talos_core::background_job::BackgroundJobState;
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{ApprovalChoice, RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
+use talos_permission::PermissionEngine;
 use talos_tools::BashTool;
 use tokio::sync::mpsc;
 
@@ -27,6 +31,19 @@ struct LifecycleModel {
     case: LifecycleCase,
     marker: PathBuf,
     calls: AtomicUsize,
+}
+
+struct ApproveOnceResolver;
+
+#[async_trait]
+impl ApprovalResolver for ApproveOnceResolver {
+    async fn resolve(
+        &self,
+        _request: PermissionApprovalRequest,
+        _remaining: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        Ok(ApprovalChoice::ApproveOnce)
+    }
 }
 
 #[async_trait]
@@ -157,15 +174,20 @@ async fn run_case(case: LifecycleCase, expected: BackgroundJobState) {
     let marker = workspace.path().join("grandchild.pid");
     let mut tools = ToolRegistry::new();
     tools.register(Arc::new(BashTool::new(workspace.path().to_path_buf())));
-    #[allow(deprecated)]
-    let agent = Agent::new(
+    let agent = Agent::with_security(
         Arc::new(LifecycleModel {
             case,
             marker: marker.clone(),
             calls: AtomicUsize::new(0),
         }),
         tools,
-    );
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            workspace.path().to_path_buf(),
+        ))),
+        None,
+        workspace.path().to_path_buf(),
+    )
+    .with_approval_resolver(Arc::new(ApproveOnceResolver));
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace.path().to_path_buf(),
