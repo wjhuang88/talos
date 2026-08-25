@@ -474,12 +474,10 @@ fn create_windows_job(
         ResumeThread, STARTUPINFOEXW, UpdateProcThreadAttribute,
     };
 
-    unsafe {
-        if size_of::<HANDLE>() != size_of::<isize>() {
-            return Err("unsupported Windows handle width".to_owned());
-        }
+    if size_of::<HANDLE>() != size_of::<isize>() {
+        return Err("unsupported Windows handle width".to_owned());
     }
-    let mut security = SECURITY_ATTRIBUTES {
+    let security = SECURITY_ATTRIBUTES {
         nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
         lpSecurityDescriptor: std::ptr::null_mut(),
         bInheritHandle: 1,
@@ -495,8 +493,8 @@ fn create_windows_job(
         std::ptr::null_mut();
     let mut attr_storage = Vec::<u8>::new();
     let result = (|| unsafe {
-        if CreatePipe(&mut out_read, &mut out_write, &mut security, 0) == 0
-            || CreatePipe(&mut err_read, &mut err_write, &mut security, 0) == 0
+        if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0
+            || CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0
         {
             return Err(last_windows_error("CreatePipe"));
         }
