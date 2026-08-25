@@ -1,6 +1,6 @@
 # Iteration I226: Windows Job Object Process-Tree Ownership
 
-> Document status: Planned / Claimed proposal
+> Document status: Review / Claimed
 > Published plan date: 2026-08-25
 > Planned objective: implement ADR-068's assigned-before-exec Windows Job Object boundary for TOOL-024-D1-B.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #393 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-068 accepted on `main@93ee3253`; I225 decision evidence `fca45c46` / CI `32797375011` / review `5404361120`; closeout review `5405268380`. |
-| Implementation PR | Not started |
+| Implementation PR | #394 — open; implementation code commit `70e8b674` plus later evidence/governance synchronization |
 | Last Updated | 2026-08-25 |
-| Handoff / Release Condition | Effective only after this claim merges; implementation begins from its merge or later. |
+| Handoff / Release Condition | Candidate remains in Review until Windows exact-head CI and independent process/security/API review pass; no completion or merge authority is implied. |
 
 ## Published Baseline
 
@@ -65,11 +65,33 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-25 | Claim proposal | Prepared from `main@93ee3253`; both claim and Active state are ineffective until the governance PR merges. |
+| 2026-08-25 | Atomic claim + activation | PR #393 exact head `2905c99d`, CI `32810069430`, independent approval `5405428154`, merge-time CAS and merge `d1f2a126`; implementation starts from this merge. |
+| 2026-08-25 | Stable implementation candidate | PR #394 implementation candidate `70e8b674` contains the Windows-only Job Object launcher and Bash/Exec integration. Local fmt, diff and focused locked check/test pass; release preflight reaches its governance checks but the full build is interrupted by local `ENOSPC`. Exact-head CI `32820263589` is green, including Windows workspace compilation, Clippy and runtime tests. |
+| 2026-08-25 | Candidate reconciliation update | PR #394 moved to exact head `95740c34`. The candidate adds only the I226 implementation plus owner/derived synchronization and the open-Issue reconciliation entry for #395 (`OBS-002` Intake / Unclaimed, no implementation authority). CI `32821573565` completed the Rust, Windows workspace, installer and classification jobs successfully; remote issue reconciliation failed because #395 was not yet present in that head. The subsequent local reconciliation now passes against all 52 open Issues. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation candidate.
+- Local candidate checks: `cargo fmt --all`, `git diff --check`, `cargo check -p talos-tools --features shell --locked`, and `cargo test -p talos-tools --features shell --locked` pass (110 unit tests plus 3 hardening integration tests). The full release preflight was interrupted by local `ENOSPC` after governance validation passed.
+- Exact-head CI `32820263589` passes 5/5 for the candidate implementation, and the Windows workspace test log records the six I226 launcher tests passing (quoting, case-insensitive environment filtering, output/reap, invalid cwd fail-closed, Job termination and grandchild cleanup). Independent Windows/process/unsafe/API review is still required; no merge or completion claim is made.
+- Exact head `95740c34` superseded `70e8b674` for evidence and completed all Rust/Windows jobs, but its remote issue reconciliation failed because #395 was absent. The corrected local tree passes the same remote validator after OBS-002 owner creation and Issue comment `5407182562`; fresh exact-head CI and review are still required after push.
+- The next local candidate adds test-only fault injection for pipe, Job Object, attribute-list,
+  assignment and resume setup failures, handle-count leak checks, and an assigned-before-resume
+  marker fixture. These tests are evidence for the ADR-068 partial-failure and ordering matrix;
+  they do not add a production failure switch.
+
+## Changed-File Inventory
+
+- I226 production/dependency authority: `Cargo.lock`, `crates/talos-tools/Cargo.toml`,
+  `crates/talos-tools/src/bash_tool.rs`, `crates/talos-tools/src/exec_tool.rs`, and
+  `crates/talos-tools/src/process_boundary.rs`.
+- I226 owner/derived synchronization: `docs/BOARD.md`,
+  `docs/backlog/active/TOOL-024-D1-B-windows-job-object-ownership.md`,
+  `docs/backlog/active/TOOL-024-background-command-jobs.md`, this iteration,
+  `docs/iterations/README.md`, and the Issue #59 long-task record.
+- Unrelated remote reconciliation only: `docs/backlog/active/OBS-002-structured-diagnostics-contract.md`,
+  `docs/backlog/PRODUCT-BACKLOG.md`, and
+  `docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-23.md`. These files register #395 as
+  Intake / Unclaimed and grant no observability implementation authority.
 
 ## Completion Evidence
 
@@ -77,7 +99,7 @@
 
 ## Variance And Residuals
 
-- D2 and I223 remain separately governed and are not activated by I226.
+- D2 and I223 remain separately governed and are not activated by I226. Windows child/grandchild, handle-isolation and cancellation evidence remain pending until a green exact-head candidate exists.
 
 ## Retrospective
 

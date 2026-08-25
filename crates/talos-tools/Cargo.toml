@@ -30,6 +30,8 @@ shell = [
     "tokio/process",
     "tokio/rt",
     "tokio/time",
+    "tokio/fs",
+    "dep:windows-sys",
 ]
 git = ["dep:gix", "dep:similar", "tokio/fs", "tokio/process", "tokio/time"]
 network = [
@@ -91,6 +93,17 @@ image = { version = "0.25", default-features = false, optional = true, features 
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "1.0.0-alpha.3", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", optional = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_JobObjects",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 talos-permission = { version = "0.8.0", path = "../talos-permission" }

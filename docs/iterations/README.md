@@ -93,7 +93,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I223 | Issue #59 Deferred Human Validation Cleanup | Planned / Unclaimed | Evidence-only Issue #378 cleanup after B/C/D implementation heads exist; no behavior implementation authority. |
 | I224 | TOOL-024-C Model-Readable Process Job Control | Complete / Closed | Completion Commit `60b0367cf749397bf1167e189e820e82e32baf03`; PR #386 merged after exact-head CI `32719779528`, independent approval `5394777902` and merge-time CAS. D1/D2 and I223 remain separate. |
 | I225 | TOOL-024-D1-A Windows Job Object Decision | Complete / Closed | ADR-068 accepted by PR #391 merge `0021690e`; Completion Commit `fca45c46`; D1-B remains separately governed. |
-| I226 | TOOL-024-D1-B Windows Job Object Process-Tree Ownership | Planned / Claimed proposal | Claim proposal prepared from `main@93ee3253`; becomes effective only when its governance PR merges; no implementation authority yet. |
+| I226 | TOOL-024-D1-B Windows Job Object Process-Tree Ownership | Review / Claimed | PR #394 implementation candidate `70e8b674` passed exact-head CI `32820263589`; independent review remains before merge and scope remains limited to ADR-068. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout

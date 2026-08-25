@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B claim proposal prepared; D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C and I225/D1-A Complete; I226/D1-B Review / Claimed; D2 and I223 remain.
 
 ## Startup Contract
 
@@ -251,8 +251,36 @@ Windows background admission remains fail-closed until its implementation is rev
 
 ## I226 / TOOL-024-D1-B Claim Preparation Checkpoint (2026-08-25)
 
-I225 closeout PR #392 merged as `93ee3253`, making ADR-068 Accepted and D1-B Ready. I226 and
-TOOL-024-D1-B owner documents are prepared from this exact main. The proposal is limited to the
-Windows Job Object launcher, allowlisted stdio inheritance, fail-closed cleanup and real Windows
-tests. Claim and Active state are ineffective until the governance PR merges; D2 and I223 remain
-separate and Windows stays fail-closed.
+I225 closeout PR #392 merged as `93ee3253`, making ADR-068 Accepted and D1-B Ready. I226 claim PR
+#393 merged as `d1f2a126` after exact-head CI `32810069430` and independent approval `5405428154`.
+I226 is now Active / Claimed, limited to the Windows Job Object launcher, allowlisted stdio
+inheritance, fail-closed cleanup and real Windows tests. D2 and I223 remain separate and Windows
+stays fail-closed until the reviewed implementation merges.
+
+## I226 Implementation Candidate Checkpoint (2026-08-25)
+
+Implementation PR #394 implementation candidate is `70e8b674`. It adds
+the Windows-only Job Object launcher, allowlisted stdio inheritance, assigned-before-resume
+ownership, kill-on-close cleanup and Bash/Exec integration; Unix behavior and D2 remain outside the
+slice.
+
+Local formatting, diff and focused locked check/test pass; release preflight reaches its governance
+checks but the full build is interrupted by local `ENOSPC`. Exact-head CI `32820263589` is green
+5/5, and its Windows workspace test log records the six I226 launcher tests passing. The candidate
+therefore remains Review / Claimed pending independent Windows/process/unsafe/API review, with no merge or Completion Commit;
+the next action is local correction followed by fresh exact-head CI and independent Windows/process/
+unsafe/API review. I223/#378 remains pending and Issue #59 remains open.
+
+## I226 Candidate Reconciliation Checkpoint (2026-08-25)
+
+The implementation branch advanced to exact head `95740c34` after the Windows launcher candidate
+`70e8b674`. The candidate still contains only the I226 Windows Job Object implementation and its
+owner/derived synchronization; #395 is registered in the reconciliation snapshot as an unrelated
+`Intake / Unclaimed` item with no implementation authority. CI `32821573565` completed
+classification, installer fixture, Format/Check/Clippy/Test and Windows workspace successfully;
+remote issue reconciliation failed because #395 was absent from that exact head. The corrected
+local tree passes the same validator against all 52 open Issues after synchronization comment
+`5407182562`; fresh exact-head CI remains required after push. The older CI
+`32820263589` and any review bound to `70e8b674` do not transfer to this head. I226 remains
+Review / Claimed with no merge or Completion Commit; D2, I223/#378 and Issue #59 closeout remain
+ordered after this child.

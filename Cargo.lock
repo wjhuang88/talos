@@ -5629,6 +5629,7 @@ dependencies = [
  "talos-sandbox",
  "talos-session",
  "talos-skill",
+ "talos-tools",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -5995,6 +5996,7 @@ dependencies = [
  "toml",
  "uuid",
  "walkdir",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

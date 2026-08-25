@@ -1070,7 +1070,9 @@ fn unix_millis(time: SystemTime) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use talos_core::background_job::{BACKGROUND_PROCESS_EVENT_CAPACITY, BackgroundProcessExit};
 
     struct CountingLauncher(Arc<AtomicUsize>);
 
@@ -1082,6 +1084,74 @@ mod tests {
             self.0.fetch_add(1, Ordering::SeqCst);
             Err("launcher must not run".to_owned())
         }
+    }
+
+    struct TestControl {
+        events: StdMutex<Option<mpsc::Sender<BackgroundProcessEvent>>>,
+        terminate_count: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl BackgroundProcessControl for TestControl {
+        async fn terminate(&self) -> Result<(), String> {
+            self.terminate_count.fetch_add(1, Ordering::SeqCst);
+            if let Some(sender) = self.events.lock().unwrap().take() {
+                let _ = sender.try_send(BackgroundProcessEvent::Exited(BackgroundProcessExit {
+                    code: Some(1),
+                    success: false,
+                }));
+            }
+            Ok(())
+        }
+
+        async fn force_terminate(&self) -> Result<(), String> {
+            self.terminate().await
+        }
+    }
+
+    struct HangingLauncher;
+
+    #[async_trait]
+    impl BackgroundJobLauncher for HangingLauncher {
+        async fn launch(
+            self: Box<Self>,
+        ) -> Result<talos_core::background_job::LaunchedBackgroundJob, String> {
+            let (sender, receiver) = mpsc::channel(BACKGROUND_PROCESS_EVENT_CAPACITY);
+            let control = Arc::new(TestControl {
+                events: StdMutex::new(Some(sender)),
+                terminate_count: AtomicUsize::new(0),
+            });
+            Ok(talos_core::background_job::LaunchedBackgroundJob {
+                control,
+                events: receiver,
+            })
+        }
+    }
+
+    async fn launch_hanging(
+        supervisor: &BackgroundJobSupervisor,
+        timeout: Duration,
+    ) -> BackgroundJobId {
+        let permit = supervisor
+            .reserve(BackgroundJobRequest {
+                tool_name: "bash".to_owned(),
+                timeout,
+            })
+            .await
+            .unwrap();
+        let id = supervisor
+            .inner
+            .state
+            .lock()
+            .unwrap()
+            .jobs
+            .keys()
+            .next()
+            .unwrap()
+            .clone();
+        let result = permit.launch(Box::new(HangingLauncher)).await;
+        assert!(!result.is_error, "hanging launcher should be admitted");
+        id
     }
 
     #[test]
@@ -1327,6 +1397,41 @@ mod tests {
                 .unwrap()
                 .is_cancelled()
         );
+    }
+
+    #[tokio::test]
+    async fn supervisor_timeout_requests_tree_cleanup_and_terminalizes() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = launch_hanging(&supervisor, Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let status = supervisor.process_status(id.as_str());
+        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        assert_eq!(status["state"], "timed_out");
+        assert_eq!(status["cleanup_outcome"], "terminated");
+    }
+
+    #[tokio::test]
+    async fn supervisor_cancel_requests_tree_cleanup_and_terminalizes() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = launch_hanging(&supervisor, Duration::from_secs(5)).await;
+        let status = supervisor.process_cancel(id.as_str(), 5_000).await;
+        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        assert_eq!(status["state"], "cancelled");
+        assert_eq!(status["cleanup_outcome"], "terminated");
+    }
+
+    #[tokio::test]
+    async fn supervisor_shutdown_requests_tree_cleanup_before_finalizer_returns() {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
+        let id = launch_hanging(&supervisor, Duration::from_secs(5)).await;
+        supervisor.finalize().await.unwrap();
+        let status = supervisor.process_status(id.as_str());
+        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        assert_eq!(status["state"], "cancelled");
+        assert_eq!(status["cleanup_outcome"], "terminated");
     }
 
     #[tokio::test]
