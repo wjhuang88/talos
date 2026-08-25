@@ -337,7 +337,7 @@ impl BackgroundProcessControl for WindowsJobControl {
 #[cfg(windows)]
 impl Drop for WindowsJobControl {
     fn drop(&mut self) {
-        if self.job != 0 {
+        if !self.job.is_null() {
             unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };
             self.job = 0;
         }
@@ -380,7 +380,7 @@ impl BackgroundJobLauncher for WindowsBackgroundLauncher {
             let output = (stdout_task.await, stderr_task.await);
             let event = match (wait, output) {
                 (
-                    Ok((windows_sys::Win32::System::Threading::WAIT_OBJECT_0, code)),
+                    Ok((windows_sys::Win32::Foundation::WAIT_OBJECT_0, code)),
                     (Ok(Ok(())), Ok(Ok(()))),
                 ) => BackgroundProcessEvent::Exited(BackgroundProcessExit {
                     code: Some(code as i32),
@@ -481,14 +481,14 @@ fn create_windows_job(
         lpSecurityDescriptor: std::ptr::null_mut(),
         bInheritHandle: 1,
     };
-    let mut out_read = 0;
-    let mut out_write = 0;
-    let mut err_read = 0;
-    let mut err_write = 0;
-    let mut job: HANDLE = 0;
-    let mut process: HANDLE = 0;
-    let mut thread: HANDLE = 0;
-    let mut attrs: *mut windows_sys::Win32::System::Threading::PROC_THREAD_ATTRIBUTE_LIST =
+    let mut out_read: HANDLE = std::ptr::null_mut();
+    let mut out_write: HANDLE = std::ptr::null_mut();
+    let mut err_read: HANDLE = std::ptr::null_mut();
+    let mut err_write: HANDLE = std::ptr::null_mut();
+    let mut job: HANDLE = std::ptr::null_mut();
+    let mut process: HANDLE = std::ptr::null_mut();
+    let mut thread: HANDLE = std::ptr::null_mut();
+    let mut attrs: windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST =
         std::ptr::null_mut();
     let mut attr_storage = Vec::<u8>::new();
     let result = (|| unsafe {
@@ -521,7 +521,7 @@ fn create_windows_job(
         let _ = InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut attr_size);
         attr_storage = vec![0u8; attr_size];
         attrs = attr_storage.as_mut_ptr()
-            as *mut windows_sys::Win32::System::Threading::PROC_THREAD_ATTRIBUTE_LIST;
+            as windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST;
         if InitializeProcThreadAttributeList(attrs, 1, 0, &mut attr_size) == 0 {
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
         }
@@ -554,13 +554,13 @@ fn create_windows_job(
         startup.StartupInfo.hStdError = err_write;
         let mut info: PROCESS_INFORMATION = zeroed();
         if CreateProcessW(
-            environment.as_mut_ptr() as *mut _,
+            std::ptr::null(),
             command_w.as_mut_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             1,
             CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-            std::ptr::null(),
+            environment.as_mut_ptr() as *mut _,
             cwd_w.as_ptr(),
             &startup as *const STARTUPINFOEXW as *const _,
             &mut info,
@@ -577,17 +577,17 @@ fn create_windows_job(
             return Err(last_windows_error("ResumeThread"));
         }
         CloseHandle(thread);
-        thread = 0;
+        thread = std::ptr::null_mut();
         DeleteProcThreadAttributeList(attrs);
         attrs = std::ptr::null_mut();
         CloseHandle(out_write);
-        out_write = 0;
+        out_write = std::ptr::null_mut();
         CloseHandle(err_write);
-        err_write = 0;
+        err_write = std::ptr::null_mut();
         let stdout = tokio::fs::File::from_std(std::fs::File::from_raw_handle(out_read as _));
-        out_read = 0;
+        out_read = std::ptr::null_mut();
         let stderr = tokio::fs::File::from_std(std::fs::File::from_raw_handle(err_read as _));
-        err_read = 0;
+        err_read = std::ptr::null_mut();
         Ok(WindowsLaunchHandles {
             job,
             process,
@@ -597,21 +597,21 @@ fn create_windows_job(
     })();
     if result.is_err() {
         unsafe {
-            if thread != 0 {
+            if !thread.is_null() {
                 CloseHandle(thread);
             }
-            if process != 0 {
+            if !process.is_null() {
                 windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
                 CloseHandle(process);
             }
             if !attrs.is_null() {
                 DeleteProcThreadAttributeList(attrs);
             }
-            if job != 0 {
+            if !job.is_null() {
                 CloseHandle(job);
             }
             for handle in [out_read, out_write, err_read, err_write] {
-                if handle != 0 {
+                if !handle.is_null() {
                     CloseHandle(handle);
                 }
             }

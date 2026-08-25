@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use talos_core::background_job::BackgroundJobRequest;
 use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
