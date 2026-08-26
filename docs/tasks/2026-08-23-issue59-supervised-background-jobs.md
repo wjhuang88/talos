@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; D2 and I223 remain.
+> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is proposed Active / Claimed (ineffective until claim merge); I223 remains separate.
 
 ## Startup Contract
 
@@ -299,3 +299,13 @@ The reported `pending_submission::tests::pruned_terminal_payload_retains_permane
 60-second run was not reproducible on current main: the test body completed in about 0.06 seconds
 and the complete command in about 0.9 seconds. A future recurrence should capture build state,
 CPU/IO pressure and the exact process tree before treating it as a product hang.
+
+## I228 / TOOL-024-D2 Claim Preparation Checkpoint (2026-08-26)
+
+After I226 closeout PR #401 merged as `7dd04afd`, the D2 dependency conjunction is complete:
+TOOL-024-B/I222, TOOL-024-C/I224 and TOOL-024-D1-B/I226 all have existing implementation merge
+evidence. I228 and the TOOL-024-D2 owner are proposed Active / Claimed in a governance-only
+candidate prepared from `main@7dd04afd`; the claim and activation remain ineffective until that
+record reaches `main`. The slice is limited to CLI/TUI projection, user/model documentation and
+integrated Unix/Windows acceptance. It excludes supervisor, permission, Job Object, persistence,
+Dashboard/I213, `/auto`, release, publication, Desktop and I223 authority.

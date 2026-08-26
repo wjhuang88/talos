@@ -62,7 +62,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Complete / Closed; PR #386 merged | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | [TOOL-024-D1-A](TOOL-024-D1-A-windows-job-object-decision.md) | Windows Job Object Security And OS-ABI Decision | Architecture/Process-Security Decision | Complete / Closed | TOOL-024-C Complete; ADR-060/057 Accepted | Current-path matrix and Accepted ADR-068 define assigned-before-exec ownership, bounded OS-ABI, migration, rollback and D1-B test contract; no behavior change. |
 | [TOOL-024-D1-B](TOOL-024-D1-B-windows-job-object-ownership.md) | Windows Job Object Process-Tree Ownership | Product/Process-Security Story | Complete / Closed | TOOL-024-D1-A Complete; ADR-068 Accepted | PR #394 merged as `d4d7cb25`; exact candidate `83557863` passed CI `32849330531` and independent Windows/process/security/API review `5410840103`. |
-| TOOL-024-D2 | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Blocked / Unclaimed | TOOL-024-D1-B Complete | CLI/TUI lifecycle projection, controls, docs and integrated real Unix/Windows acceptance. |
+| [TOOL-024-D2](TOOL-024-D2-interactive-projection-and-acceptance.md) | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Active / Claimed (proposed; ineffective until claim merge) | TOOL-024-D1-B Complete | I228 owns CLI/TUI projection, user/model docs and integrated Unix/Windows acceptance; no supervisor, permission, Dashboard or `/auto` authority. |
 
 ## Major Risks
 
