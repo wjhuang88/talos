@@ -1,6 +1,6 @@
 # Iteration I223: Issue #59 Deferred Human Validation Cleanup
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-23
 > Planned objective: resolve every deferred Unix/Windows/manual acceptance row accumulated by the
 > Issue #59 TOOL-024-B/C/D chain against its exact implementation head and final integrated main.
@@ -86,8 +86,8 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
-- Evidence-only status commit cannot self-certify missing runtime acceptance.
+- Completion Commit: `a5fbc22e71afeb30ff0804ec14bf15187d0fb716` (I228/TOOL-024-D2 implementation merge; terminal I223 evidence validates the integrated behavior).
+- Evidence merge: `00bf2d5dfaa2b3726681611bbde5bd79464a1a83` (pre-existing governance evidence merge; not used as its own completion evidence).
 
 ## Variance And Residuals
 
