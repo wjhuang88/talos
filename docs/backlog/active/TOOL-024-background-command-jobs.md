@@ -218,3 +218,11 @@ protected-scope review `5421558305`. After merge-time CAS, it merged as
 `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`, which is the pre-existing Completion Commit for
 I228/TOOL-024-D2. The parent remains Partial only because I223 must execute all five Issue #378
 validation rows before TOOL-024 and Issue #59 close.
+
+## I223 Validation Claim Preparation Checkpoint (2026-08-26)
+
+I228 closeout merged as `a600bd41`, so all B/C/D implementation heads and owner closeouts are
+terminal. I223 now proposes an evidence-only Active/Claimed state for V59-B1/C1/D1/D2/FINAL. The
+claim grants no production, security-policy, release or unrelated authority and remains ineffective
+until its governance-only PR merges. Exact source heads are frozen in the I223 owner; passing rows
+still require observed command/environment/result evidence and cannot be inferred from CI or review.

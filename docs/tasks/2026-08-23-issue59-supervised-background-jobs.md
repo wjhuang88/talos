@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C, I225/D1-A, I226/D1-B and I228/D2 Complete / Closed; I223 remains Planned / Unclaimed.
+> Status: Active long task; B through D2 Complete / Closed; I223 remains Planned / Unclaimed while its evidence-only claim draft is prepared.
 
 ## Startup Contract
 
@@ -352,3 +352,11 @@ head/base, effective claim, clean mergeability and no overlapping implementation
 merged as `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`. I228 and TOOL-024-D2 are now
 Complete/Closed using that pre-existing implementation merge as Completion Commit. I223 remains
 Planned/Unclaimed and is the sole remaining Issue #59 iteration, owning V59-B1/C1/D1/D2/FINAL.
+
+## I223 Validation Claim Preparation Checkpoint (2026-08-26)
+
+I228 closeout PR #404 merged as `a600bd41`; all source implementation owners are terminal. I223
+therefore proposes Active/Claimed solely to execute and reconcile Issue #378 rows V59-B1/C1/D1/D2/
+FINAL. The source heads are B `8671edf4`, C `60b0367c`, D1 `d4d7cb25`, D2 `a5fbc22e` and final
+integrated baseline `a600bd41`. This governance-only proposal grants no Rust/Cargo or product
+authority and no row becomes Pass until exact environment, command and observed result are recorded.
