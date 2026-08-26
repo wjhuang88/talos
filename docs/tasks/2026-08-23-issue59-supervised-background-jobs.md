@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; B through D2 Complete / Closed; I223 Active / Claimed after #405 merge `ab750888`; V59-B1/C1/D1 passed, V59-D2 is Partial and V59-FINAL is Pending.
+> Status: Active long task; B through D2 Complete / Closed; I223 Review / Claimed after #405 merge `ab750888`; V59-B1/C1/D1/D2 and V59-FINAL passed, with evidence closeout pending.
 
 ## Startup Contract
 

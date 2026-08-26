@@ -98,7 +98,7 @@ Required reads:
 | I220 / PERM-006-C decision prerequisite | Complete / Closed | Completion Commits `c21bb7f3`/`820586ea`; PR #373 merged as `5d2d2dcf`, ADR-067 Accepted. I221 separately completed C implementation through commit `49d1546c` and PR #376 merge `f9e6706d`. |
 | I221 / PERM-006-C implementation | Complete / Closed | Completion Commit `49d1546c`; PR #376 merged as `f9e6706d` after exact-head CI `32640691772`, independent permission/security/API approval `5386153429` and CAS. |
 | I222 / TOOL-024-B managed background core | Complete / Closed | Completion Commit `8671edf45c168612bfa4a4bbb65a9847026e1b96`; PR #382 merged after exact-head CI `32690533253`, independent protected-scope review and final governance review. |
-| I223 / Issue #59 deferred validation cleanup | Active / Claimed | V59-B1/C1/D1 passed; Windows D2 device evidence and V59-FINAL remain pending. Evidence-only; no product behavior authority. |
+| I223 / Issue #59 deferred validation cleanup | Review / Claimed | V59-B1/C1/D1/D2 and V59-FINAL passed; evidence-only closeout pending. No product behavior authority. |
 | I225 / TOOL-024-D1-A Windows Job Object decision | Active / Claimed | Decision-only ADR-068/current-path prerequisite activated by #388 merge `2afcdc3e`; no Windows implementation authority until a later D1-B claim. |
 | ARCH-031-A / I159 | Complete / Closed | Completion Commit `d886917e` plus cfg follow-up `34c09b14`; PR #236 merged as `f79c1ead` after CI `31801484313`, approval `5293622712` and CAS. |
 | ARCH-031-B / I160 | Complete / Closed | Completion Commit `0524e82f`; PR #240 merged as `97556149`, closeout PR #241 merged as `2d48bd2c`; I161 and I162 are Complete/Closed, with I162 readiness Completion Commit `077b347d` and PR #255 merge `16564ba0`. |

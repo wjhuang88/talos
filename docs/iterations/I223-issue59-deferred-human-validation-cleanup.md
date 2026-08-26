@@ -1,6 +1,6 @@
 # Iteration I223: Issue #59 Deferred Human Validation Cleanup
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-23
 > Planned objective: resolve every deferred Unix/Windows/manual acceptance row accumulated by the
 > Issue #59 TOOL-024-B/C/D chain against its exact implementation head and final integrated main.
@@ -72,7 +72,7 @@
 | 2026-08-23 | Planned cleanup reservation | Created for Deferred Human Validation scheduling only; remains Unclaimed and inactive. |
 | 2026-08-26 | Claim preparation | All B/C/D implementation owners are Complete/Closed on `main@a600bd41`. Proposed evidence-only activation binds V59-B1 to `8671edf4`, V59-C1 to `60b0367c`, V59-D1 to `d4d7cb25`, V59-D2 to `a5fbc22e` and V59-FINAL to the post-closeout integrated baseline `a600bd41`; no pass is inferred from those merges. |
 | 2026-08-26 | Activation | Claim PR #405 merged as `ab750888`; I223 is effective and is the sole Active Issue #59 iteration. No product-code authority was added. |
-| 2026-08-26 | Partial evidence execution | V59-B1, V59-C1 and V59-D1 passed. Unix D2 passed through a rebuilt real CLI walkthrough; Windows D2 remains pending because Windows CI traverses production bridge/render code but not a real interactive device walkthrough. V59-FINAL therefore remains pending. |
+| 2026-08-26 | Evidence execution | V59-B1, V59-C1, V59-D1 and V59-D2 passed. V59-FINAL was rechecked through the terminal Windows device walkthrough below. |
 
 ## Verification Evidence
 
@@ -81,8 +81,8 @@
 | V59-B1 | Pass | macOS arm64, integrated `main@ab750888`: rebuilt `talos --no-init --repl --no-context -w /private/tmp/talos-i228-impl` started `printf 'v59-cancel-ready\\n'; sleep 300` via `bash(background=true, timeout_secs=600)`, returned job `job_408197bf-f825-4f78-a391-b5860e3454f7`, and `process(cancel)` emitted one `Cancelled` terminal with `cleanup_outcome=terminated`. Process-table check found no matching shell/sleep; foreground `printf 'v59-after-cancel-ok\\n'` exited 0. A separate 60-second run emitted `TimedOut` with terminated cleanup. |
 | V59-C1 | Pass | The same real CLI session exercised `process list`, `status`, and `read(cursor=0)` for `job_7f6a1435-1bae-4556-b750-79a4b8ca745c`; read returned `v59-ready\\n` and `next_cursor=10`. Locked focused tests on `ab750888` passed 11/11 supervisor/process cases, including cursor advancement, in-chunk resume, 32-KiB clamp/eviction and unknown-job fail-closed behavior. |
 | V59-D1 | Pass | Real Windows Server 2025 evidence at D1 candidate `835578635daa1eebc76e79ca893296baeed6b35a` (same tree as merge `d4d7cb25`), CI `32849330531`, job `97807941106`: cancel, timeout, shutdown and PowerShell grandchild-reap tests passed. Integrated `main@ab750888`, CI `32943409893`, job `98098984864`, repeated all four successfully. |
-| V59-D2 | Partial | Unix real CLI passed start/list/status/read/cancel/terminal and remained usable for a foreground command. D2 CI `32937579899` and integrated CI `32943409893` passed Windows production bridge/render projection tests, but no interactive Windows CLI/TUI device walkthrough exists. |
-| V59-FINAL | Pending | Final integrated closure waits for terminal Windows D2 device evidence. The first Unix walkthrough hit host `ENOSPC` during transcript persistence; rebuildable target cache was removed and the successful cancellation walkthrough was repeated with persistence available, so the failed attempt is retained as a variance, not a pass. |
+| V59-D2 | Pass | Unix real CLI passed start/list/status/read/cancel/terminal and remained usable for a foreground command. Windows Server 2025 hosted runner at disposable harness head `4c477a9790a7a344dfbf7305b162ab5b9426c94c`, workflow run `32958236636`, job `98144594163`, passed real interactive CLI approval flow, background start/list/status/read (19-byte `v59-windows-ready`), cancel with exactly one `Cancelled` terminal and foreground PowerShell continuation. Artifact `i223-windows-device-4c477a9790a7a344dfbf7305b162ab5b9426c94c` was uploaded. The harness branch/workflow was disposable and never merged. |
+| V59-FINAL | Pass | Final integrated main behavior was rechecked through the Windows Server 2025 device walkthrough above against source tree `main@ab750888` (product tree unchanged); B/C/D interactions, exact-one terminal projection, output delivery and post-cancel foreground usability all passed. |
 
 ## Completion Evidence
 
@@ -91,8 +91,18 @@
 
 ## Variance And Residuals
 
-- No implementation variance or product-code correction was introduced. Windows D2 interactive device evidence is the sole device residual; V59-FINAL and Issue #378/#59 closeout remain gated on it.
+- Disposable Windows runner attempts are retained as variance evidence: early failures were harness encoding, exit-marker and assertion-boundary defects; the terminal run passed all product assertions. No implementation variance or product-code correction was introduced.
+
+## 2026-08-26 Terminal Windows Evidence Checkpoint
+
+The final disposable device candidate `4c477a9790a7a344dfbf7305b162ab5b9426c94c` ran on Windows
+Server 2025 in workflow `32958236636`, job `98144594163`, with all steps successful. The uploaded
+artifact contains the CLI transcript and fixture-provider evidence. The provider independently
+recorded `read=v59-windows-ready` and `foreground=v59-windows-foreground-ok`; the CLI transcript
+contains the background receipt, list/status/read projection, exactly one `terminal: Cancelled`,
+and `process request handled`. The disposable branch `test/i223-windows-device` and its workflow
+files were used only to obtain this evidence and are not product changes.
 
 ## Retrospective
 
-- Exact runner logs prove Windows process ownership, but renderer-unit coverage is not promoted into an interactive device pass.
+- Exact runner logs prove Windows process ownership and the interactive projection against the integrated product tree.
