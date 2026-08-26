@@ -74,6 +74,20 @@ fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
         .get("state")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
+    if matches!(
+        state,
+        "completed"
+            | "exited"
+            | "failed"
+            | "cancelled"
+            | "timed_out"
+            | "spawn_failed"
+            | "supervision_failed"
+    ) {
+        return Some(format!(
+            "background {job_id}: operation completed; terminal status follows"
+        ));
+    }
     if let Some(events) = object.get("events").and_then(|v| v.as_array()) {
         let cursor = object
             .get("next_cursor")

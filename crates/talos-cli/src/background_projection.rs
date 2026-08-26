@@ -53,6 +53,20 @@ pub(crate) fn format_background_result(tool_name: &str, content: &str) -> Option
         .get("state")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
+    if matches!(
+        state,
+        "completed"
+            | "exited"
+            | "failed"
+            | "cancelled"
+            | "timed_out"
+            | "spawn_failed"
+            | "supervision_failed"
+    ) {
+        return Some(format!(
+            "[background {job_id}] operation completed; terminal status follows"
+        ));
+    }
     if let Some(events) = object.get("events").and_then(Value::as_array) {
         let next_cursor = object
             .get("next_cursor")
@@ -114,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn formats_process_read_cursor_and_eof() {
+    fn formats_terminal_process_result_as_operation_only() {
         let summary = format_background_result(
             "process",
             r#"{"job_id":"job_1","state":"exited","events":[{"stream":"stdout","text":"line one"}],"next_cursor":12,"eof":true}"#,
@@ -122,7 +136,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             summary,
-            "[background job_1] exited, 1 event(s), next cursor 12, eof"
+            "[background job_1] operation completed; terminal status follows"
         );
         assert!(!summary.contains("warning"));
         assert!(!summary.contains("secret-token"));
