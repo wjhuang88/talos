@@ -22,6 +22,9 @@ behavior until a separately selected iteration and effective Collaboration Claim
 - Identify the owner of queued work and the explicit release/cancel boundary.
 - Record compatibility, persistence, and regression-test requirements before decomposition.
 
+Remote owner reconciliation was recorded on Issue #408 on 2026-08-26; this intake remains
+unselected and unclaimed.
+
 ## Completion Evidence
 
 - Completion Commit: Pending.
