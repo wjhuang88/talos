@@ -72,10 +72,11 @@
 | 2026-08-26 | Claim preparation | Prepared from `main@7dd04afd`; I222/B, I224/C and I226/D1-B are Complete/Closed. Claim and activation remain ineffective until the governance PR merges. |
 | 2026-08-26 | Claim activation and local convergence | Claim #402 merged as `da9a79cd`; local candidate now covers CLI/TUI start/process/terminal projection, bounded display-safe summaries and SDK guidance. Foreground behavior and supervisor contracts remain unchanged. |
 | 2026-08-26 | Independent review correction | PR #403 review `5420911368` rejected exact head `f5dc3415` for duplicate terminal semantics, missing real event-chain coverage and a source-breaking `ToolResultDisplay` field. The next local candidate restores the public struct shape, makes `BackgroundJobTerminal` the only terminal display authority and adds platform-neutral production-chain tests before fresh exact-head evidence. |
+| 2026-08-26 | Local pairing correction | Independent review found interleaved tool results could be paired by recency instead of `tool_use_id`. The local candidate now maintains a private pending-call identity map and has a regression test covering background/foreground results arriving out of order. |
 
 ## Verification Evidence
 
-- Focused conversation/CLI/TUI event-chain tests pass locally; full workspace locked validation and a fresh stable PR #403 head remain pending.
+- Focused conversation/CLI/TUI event-chain tests, workspace check and clippy pass locally; fresh stable PR #403 evidence remains pending after the pairing correction.
 
 ## Completion Evidence
 

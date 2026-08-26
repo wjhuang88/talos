@@ -78,3 +78,5 @@ semantics, missing real event-chain coverage and a source-breaking public displa
 local candidate removes that field, keeps `BackgroundJobTerminal` as the single terminal display
 authority and exercises start/read/status/list/cancel plus terminal session events through the
 production projection. It remains `Review / Claimed` until fresh exact-head evidence is complete.
+The follow-up review also identified recency-based result pairing in the conversation engine; the
+candidate now pairs results by `tool_use_id` and tests interleaved background/foreground delivery.

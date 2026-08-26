@@ -328,3 +328,9 @@ local candidate restores the public struct shape, carries background intent thro
 display-name marker, gives `BackgroundJobTerminal` sole terminal-state display authority and adds
 platform-neutral production-chain coverage for start/read/status/list/cancel and terminal events.
 Old CI and review do not transfer; I228 remains Review / Claimed pending a fresh stable head.
+
+The follow-up independent review also identified a result-pairing defect: interleaved tool results
+could be attached to the most recent unresolved call rather than their provider `tool_use_id`. The
+candidate correction adds a private identity map in `ConversationEngine` and an out-of-order
+background/foreground regression test. This is part of I228's same projection boundary; it changes
+no supervisor, permission or process behavior.
