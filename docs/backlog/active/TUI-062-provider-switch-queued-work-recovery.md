@@ -25,6 +25,8 @@ behavior until a separately selected iteration and effective Collaboration Claim
 Remote status reconciliation was recorded on Issue #408 on 2026-08-26; this intake remains
 unselected and unclaimed.
 
+The intake remains intentionally outside the Issue #59 closeout and has no implementation claim.
+
 ## Completion Evidence
 
 - Completion Commit: Pending.
