@@ -100,3 +100,10 @@ head isolated cancel resources by opaque job ID and preserved `BackgroundJobRequ
 I224 is Complete / Closed. TOOL-024-D1/D2 and I223 remain separately governed, and Issue #59
 remains open until those children and deferred validation reach their own evidence-bearing terminal
 states.
+
+## I223 Deferred Validation Result (2026-08-26)
+
+V59-C1 passed on rebuilt integrated `main@ab750888`. A real CLI session exercised process
+list/status/read/cancel; read returned `v59-ready\n` once with `next_cursor=10`. Eleven locked
+supervisor/process tests also passed cursor advancement, partial-chunk resume, 32-KiB response
+clamping/eviction, cancellation, timeout, shutdown and unknown-job fail-closed behavior.

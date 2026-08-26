@@ -190,3 +190,10 @@ uncommitted core/agent protocol sketch remains paused and is not implementation 
 ## Retrospective
 
 - Pending execution.
+
+## I223 Deferred Validation Result (2026-08-26)
+
+V59-B1 passed on rebuilt integrated `main@ab750888`: real Unix background start returned a bounded
+receipt, explicit cancel emitted one `Cancelled` terminal with terminated cleanup, the process table
+contained no matching child afterward, and a foreground command remained usable. The separate
+absolute-timeout path also emitted `TimedOut` with terminated cleanup.

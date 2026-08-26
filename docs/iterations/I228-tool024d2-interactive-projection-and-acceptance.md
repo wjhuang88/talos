@@ -91,6 +91,9 @@
 ## Variance And Residuals
 
 - I223 / Issue #378 remains separately governed and is required before closing the parent Epic and Issue #59.
+- I223 Unix D2 validation passed on rebuilt `main@ab750888`; Windows production projection tests
+  passed in CI `32943409893`, but the real interactive Windows CLI/TUI device walkthrough remains
+  pending, so V59-D2 is Partial and V59-FINAL cannot yet close.
 
 ## Retrospective
 

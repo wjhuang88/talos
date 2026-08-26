@@ -226,3 +226,11 @@ terminal. I223 now proposes an evidence-only Active/Claimed state for V59-B1/C1/
 claim grants no production, security-policy, release or unrelated authority and remains ineffective
 until its governance-only PR merges. Exact source heads are frozen in the I223 owner; passing rows
 still require observed command/environment/result evidence and cannot be inferred from CI or review.
+
+## I223 Partial Validation Execution Checkpoint (2026-08-26)
+
+Claim PR #405 merged as `ab750888`, activating the evidence-only I223 owner. V59-B1 and V59-C1
+passed through rebuilt Unix CLI execution and focused locked supervisor/process tests. V59-D1
+passed on real Windows Server 2025 at source candidate `83557863` and integrated main. Unix D2
+passed through the real CLI, while Windows D2 remains Partial because its production projection
+tests are not an interactive device walkthrough. V59-FINAL and Issue #59 remain open.

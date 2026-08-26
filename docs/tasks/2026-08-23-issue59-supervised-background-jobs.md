@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; B through D2 Complete / Closed; I223 Active / Claimed in proposed governance PR #405, ineffective until merge, for evidence-only validation.
+> Status: Active long task; B through D2 Complete / Closed; I223 Review / Claimed after #405 merge `ab750888`; V59-B1/C1/D1/D2 and V59-FINAL passed, with evidence closeout pending.
 
 ## Startup Contract
 
@@ -360,3 +360,13 @@ therefore proposes Active/Claimed solely to execute and reconcile Issue #378 row
 FINAL. The source heads are B `8671edf4`, C `60b0367c`, D1 `d4d7cb25`, D2 `a5fbc22e` and final
 integrated baseline `a600bd41`. This governance-only proposal grants no Rust/Cargo or product
 authority and no row becomes Pass until exact environment, command and observed result are recorded.
+
+## I223 Partial Validation Execution Checkpoint (2026-08-26)
+
+PR #405 merged as `ab750888`, activating I223. V59-B1/C1 passed on a rebuilt macOS arm64
+interactive binary: background start returned promptly; list/status/read exposed bounded state
+and cursor 10; explicit cancel emitted one `Cancelled` terminal with terminated cleanup; no matching
+process remained; and a subsequent foreground command exited 0. V59-D1 passed on real Windows
+Server 2025 at source candidate `83557863` (CI `32849330531`, job `97807941106`) and integrated
+main (CI `32943409893`, job `98098984864`). V59-D2 is Partial because Windows projection tests
+are not an interactive CLI/TUI walkthrough. V59-FINAL and Issue #59 closeout remain pending.

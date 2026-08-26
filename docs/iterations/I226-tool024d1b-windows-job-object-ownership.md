@@ -107,3 +107,9 @@
 ## Retrospective
 
 - 2026-08-26: Closed after PR #394 merge. The previously reported `pending_submission::tests::pruned_terminal_payload_retains_permanent_idempotency_identity` 60-second observation was not reproducible on current main (single test body ~0.06s; command ~0.9s); retain future slow-test investigation as an operational follow-up if recurrence is observed.
+
+## I223 Deferred Validation Result (2026-08-26)
+
+V59-D1 passed on Windows Server 2025. Source CI `32849330531`, job `97807941106`, and integrated
+main CI `32943409893`, job `98098984864`, each passed real PowerShell child/grandchild cancellation,
+timeout and session-shutdown tests plus the Job Object grandchild-reap test.
