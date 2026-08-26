@@ -334,3 +334,10 @@ could be attached to the most recent unresolved call rather than their provider 
 candidate correction adds a private identity map in `ConversationEngine` and an out-of-order
 background/foreground regression test. This is part of I228's same projection boundary; it changes
 no supervisor, permission or process behavior.
+
+Independent review `5421297121` of exact head `4dd1dfd9` confirmed pairing correctness but found
+pending identities could survive cancelled, failed or completed turns and capture a later result
+when a provider reused the same tool ID. The next candidate clears pending identities at every
+authoritative terminal and new-turn boundary, deliberately preserves them across `ToolUse`
+continuation, and tests cancel/error/success/end-turn ID reuse. CI `32934838307` and its review do
+not transfer to the corrected head.

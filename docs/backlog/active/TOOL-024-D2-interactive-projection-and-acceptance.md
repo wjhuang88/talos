@@ -80,3 +80,6 @@ authority and exercises start/read/status/list/cancel plus terminal session even
 production projection. It remains `Review / Claimed` until fresh exact-head evidence is complete.
 The follow-up review also identified recency-based result pairing in the conversation engine; the
 candidate now pairs results by `tool_use_id` and tests interleaved background/foreground delivery.
+Review `5421297121` then found the private identity map lacked terminal cleanup; the candidate now
+clears it at authoritative turn terminals and new-turn boundaries while retaining identities across
+`ToolUse` continuation, with provider-ID reuse regression coverage.

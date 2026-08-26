@@ -212,6 +212,7 @@ impl ConversationEngine {
 
     /// Applies the authoritative session-level start of a user turn.
     pub fn handle_turn_started(&mut self) -> Vec<UiOutput> {
+        self.pending_tool_calls.clear();
         self.is_processing = true;
         self.current_phase = Some(TurnPhase::Connecting);
         vec![UiOutput::Status(self.status_snapshot())]
@@ -219,6 +220,7 @@ impl ConversationEngine {
 
     /// Applies the authoritative terminal status of the whole user turn.
     pub fn handle_turn_completed(&mut self, status: &TurnCompletionStatus) -> Vec<UiOutput> {
+        self.pending_tool_calls.clear();
         match status {
             TurnCompletionStatus::Success { .. } => {
                 let mut outputs = Vec::new();
@@ -341,6 +343,7 @@ impl ConversationEngine {
 
     pub fn cancel_turn(&mut self) -> Vec<UiOutput> {
         let mut outputs = Vec::new();
+        self.pending_tool_calls.clear();
         self.close_content(&mut outputs);
         self.is_processing = false;
         self.current_phase = Some(TurnPhase::Cancelled);
@@ -366,6 +369,7 @@ impl ConversationEngine {
 
         match event {
             AgentEvent::TurnStart => {
+                self.pending_tool_calls.clear();
                 self.is_processing = true;
                 if !matches!(self.current_phase, Some(TurnPhase::Reconnecting { .. })) {
                     self.current_phase = Some(TurnPhase::Connecting);
@@ -497,6 +501,9 @@ impl ConversationEngine {
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
+                if !matches!(stop_reason, StopReason::ToolUse) {
+                    self.pending_tool_calls.clear();
+                }
                 if matches!(stop_reason, StopReason::MaxTokens) {
                     outputs.push(UiOutput::Tip {
                         text: "Response truncated: provider reached the output token limit. Partial response preserved.".into(),
@@ -507,6 +514,7 @@ impl ConversationEngine {
             }
             AgentEvent::Error { message } => {
                 self.close_content(&mut outputs);
+                self.pending_tool_calls.clear();
                 self.is_processing = false;
                 self.current_phase = Some(if is_timeout_error(message) {
                     TurnPhase::TimedOut
