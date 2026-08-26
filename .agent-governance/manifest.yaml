@@ -65,7 +65,7 @@ migration:
   legacy_assets: []
   next_actions:
     - "Use Deferred Human Validation Mode only when the long-task startup/change record links a validation Issue and cleanup iteration; keep source owners Review, preserve exact implementation heads, never defer AGENTS.md security-review gates, and resolve every required row before long-task completion"
-    - "Keep I222/TOOL-024-B, I224/TOOL-024-C and I225/TOOL-024-D1-A Complete/Closed through implementation merges `8671edf45c168612bfa4a4bbb65a9847026e1b96`, `60b0367cf749397bf1167e189e820e82e32baf03` and decision merge `0021690e`; D1-B/D2, I223/Issue #378, PERM-006-D/E and `/auto` remain separately governed"
+    - "Keep I222/TOOL-024-B, I224/TOOL-024-C, I225/TOOL-024-D1-A, I226/D1-B, I228/D2 and I223/Issue #378 Complete/Closed through their recorded implementation/evidence merges; PERM-006-D/E and `/auto` remain separately governed"
     - "Keep GOV-008/I215 completion bound to implementation `06e61e3c`, PR #341 merge `81a603b4`, CI `32442052401`, independent Agent-role review `5365129718` and merge-time CAS; use its local-convergence/stable-stage workflow for later work"
     - "Preserve the separately authorized WEB-001-A/I195 read-only Dashboard slice. A/I189 is Complete/Closed at `6b577d6a`; B/I219 is Complete/Closed at `56436027`/`d0c96048`, and all later children remain blocked unless separately authorized. Preserve completed I196 P0 without product changes"
     - "Preserve I171/ARCH-034-D completion and the August audit/register as current architecture evidence while keeping I144 as historical evidence"
