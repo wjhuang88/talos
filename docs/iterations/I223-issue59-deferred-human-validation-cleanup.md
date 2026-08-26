@@ -1,6 +1,6 @@
 # Iteration I223: Issue #59 Deferred Human Validation Cleanup
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until claim merge)
 > Published plan date: 2026-08-23
 > Planned objective: resolve every deferred Unix/Windows/manual acceptance row accumulated by the
 > Issue #59 TOOL-024-B/C/D chain against its exact implementation head and final integrated main.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 validation session |
+| Work Slice | Evidence-only execution and reconciliation of Issue #378 rows V59-B1, V59-C1, V59-D1, V59-D2 and V59-FINAL against their existing implementation heads and final integrated main. No Rust/Cargo, product behavior, security policy, release, Dashboard, `/auto` or Desktop authority. |
+| Claimed At | 2026-08-26 |
 | Source Issue | #378 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #405 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer active goal directs Issue #59 completion. I222/B, I224/C, I226/D1-B and I228/D2 are Complete/Closed with pre-existing implementation evidence on `main@a600bd41`; this evidence-only claim requires exact-head governance CI/review/CAS before merge. |
 | Implementation PR | None |
-| Last Updated | 2026-08-23 |
-| Handoff / Release Condition | Activate only after B/C/D implementation heads and machine/security gates are terminal. |
+| Last Updated | 2026-08-26 |
+| Handoff / Release Condition | Claim/activation is ineffective until this governance-only PR merges. Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. |
 
 ## Published Baseline
 
@@ -70,6 +70,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-23 | Planned cleanup reservation | Created for Deferred Human Validation scheduling only; remains Unclaimed and inactive. |
+| 2026-08-26 | Claim preparation | All B/C/D implementation owners are Complete/Closed on `main@a600bd41`. Proposed evidence-only activation binds V59-B1 to `8671edf4`, V59-C1 to `60b0367c`, V59-D1 to `d4d7cb25`, V59-D2 to `a5fbc22e` and V59-FINAL to the post-closeout integrated baseline `a600bd41`; no pass is inferred from those merges. |
 
 ## Verification Evidence
 
