@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is proposed Active / Claimed (ineffective until claim merge); I223 remains separate.
+> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is Review / Claimed; I223 remains separate.
 
 ## Startup Contract
 
@@ -309,3 +309,35 @@ candidate prepared from `main@7dd04afd`; the claim and activation remain ineffec
 record reaches `main`. The slice is limited to CLI/TUI projection, user/model documentation and
 integrated Unix/Windows acceptance. It excludes supervisor, permission, Job Object, persistence,
 Dashboard/I213, `/auto`, release, publication, Desktop and I223 authority.
+
+## I228 Activation And Local Candidate Checkpoint (2026-08-26)
+
+Claim PR #402 merged as `da9a79cd`, so I228 is effective on `main`. The local candidate is in
+`Review / Claimed` and contains CLI/TUI projection, terminal-event delivery, bounded display-safe
+summaries and SDK guidance only. It remains subject to stable implementation PR, exact-head CI,
+independent protected-scope review and merge-time CAS. I223 still owns the five deferred Issue #378
+validation rows and remains required before closing Issue #59.
+
+## I228 Independent Review Correction Checkpoint (2026-08-26)
+
+Implementation PR #403 exact head `f5dc3415` passed CI `32929839326` 5/5, but independent review
+`5420911368` correctly rejected it: the synchronous process result still duplicated terminal
+semantics, tests did not traverse the real SessionEvent/UI chain, and a required public
+`ToolResultDisplay.is_background` field was source-breaking without migration authority. The next
+local candidate restores the public struct shape, carries background intent through an internal
+display-name marker, gives `BackgroundJobTerminal` sole terminal-state display authority and adds
+platform-neutral production-chain coverage for start/read/status/list/cancel and terminal events.
+Old CI and review do not transfer; I228 remains Review / Claimed pending a fresh stable head.
+
+The follow-up independent review also identified a result-pairing defect: interleaved tool results
+could be attached to the most recent unresolved call rather than their provider `tool_use_id`. The
+candidate correction adds a private identity map in `ConversationEngine` and an out-of-order
+background/foreground regression test. This is part of I228's same projection boundary; it changes
+no supervisor, permission or process behavior.
+
+Independent review `5421297121` of exact head `4dd1dfd9` confirmed pairing correctness but found
+pending identities could survive cancelled, failed or completed turns and capture a later result
+when a provider reused the same tool ID. The next candidate clears pending identities at every
+authoritative terminal and new-turn boundary, deliberately preserves them across `ToolUse`
+continuation, and tests cancel/error/success/end-turn ID reuse. CI `32934838307` and its review do
+not transfer to the corrected head.

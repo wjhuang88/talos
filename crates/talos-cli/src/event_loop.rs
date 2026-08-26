@@ -1,9 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use talos_core::background_job::BackgroundJobTerminalSummary;
 use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{Session, SessionManager};
 use tokio::sync::mpsc;
@@ -11,9 +12,10 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::approval::{ApprovalPrompt, TerminalApprovalRequest};
+use crate::background_projection::{format_background_result, format_background_terminal};
 use crate::event_loop::AppEvent::{
     AgentCompleted, AgentError, AgentTextDelta, AgentToolCall, AgentToolResult, ApprovalRequested,
-    UserInput, UserInterrupt,
+    BackgroundJobTerminal, UserInput, UserInterrupt,
 };
 use crate::mode_runtime::request_preview_payload;
 
@@ -24,8 +26,17 @@ pub(crate) enum AppEvent {
     UserInterrupt,
     ApprovalRequested(TerminalApprovalRequest),
     AgentTextDelta(String),
-    AgentToolCall(String),
-    AgentToolResult(bool),
+    AgentToolCall {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    AgentToolResult {
+        tool_use_id: String,
+        is_error: bool,
+        content: String,
+    },
+    BackgroundJobTerminal(BackgroundJobTerminalSummary),
     AgentCompleted,
     AgentError(String),
     /// Request to fork the current session from a specific entry.
@@ -62,6 +73,7 @@ pub(crate) struct EventLoop {
     approval_queue: VecDeque<TerminalApprovalRequest>,
     displayed_approval: Option<uuid::Uuid>,
     approval_rollover_barrier: bool,
+    background_tools: HashMap<String, String>,
 }
 
 impl EventLoop {
@@ -98,7 +110,11 @@ impl EventLoop {
                             },
                         ..
                     } => {
-                        let _ = event_tx_forward.send(AgentToolCall(call.name.clone()));
+                        let _ = event_tx_forward.send(AgentToolCall {
+                            id: call.id.clone(),
+                            name: call.name.clone(),
+                            input: call.input.clone(),
+                        });
                     }
                     SessionEvent::TurnEvent {
                         payload:
@@ -107,7 +123,11 @@ impl EventLoop {
                             },
                         ..
                     } => {
-                        let _ = event_tx_forward.send(AgentToolResult(result.is_error));
+                        let _ = event_tx_forward.send(AgentToolResult {
+                            tool_use_id: result.tool_use_id.clone(),
+                            is_error: result.is_error,
+                            content: result.content.clone(),
+                        });
                     }
                     SessionEvent::TurnEvent {
                         payload: TurnEventPayload::Completed { status },
@@ -124,6 +144,9 @@ impl EventLoop {
                             let _ = event_tx_forward.send(AgentError(message));
                         }
                     },
+                    SessionEvent::BackgroundJobTerminal { summary, .. } => {
+                        let _ = event_tx_forward.send(BackgroundJobTerminal(summary));
+                    }
                     SessionEvent::Error { message } => {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
@@ -153,6 +176,7 @@ impl EventLoop {
             approval_queue: VecDeque::new(),
             displayed_approval: None,
             approval_rollover_barrier: false,
+            background_tools: HashMap::new(),
         }
     }
 
@@ -309,6 +333,7 @@ impl EventLoop {
                 // Abort the dummy task handle (no-op, but keeps the enum contract).
                 task_handle.abort();
                 self.deny_pending_approvals();
+                self.background_tools.clear();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
                 self.first_ctrl_c_time = None;
@@ -319,19 +344,38 @@ impl EventLoop {
                 io::stdout().flush().ok();
             }
 
-            (AppState::AgentRunning { .. }, AgentToolCall(name)) => {
+            (AppState::AgentRunning { .. }, AgentToolCall { id, name, input }) => {
+                track_background_tool(&mut self.background_tools, id, &name, &input);
                 print!("\r\x1b[0K\r\n[tool: {name}]\r\n");
                 io::stdout().flush().ok();
             }
 
-            (AppState::AgentRunning { .. }, AgentToolResult(is_error)) => {
+            (
+                AppState::AgentRunning { .. },
+                AgentToolResult {
+                    tool_use_id,
+                    is_error,
+                    content,
+                },
+            ) => {
                 let status = if is_error { "error" } else { "ok" };
                 print!("[tool result: {status}]\r\n");
+                if let Some(tool_name) = self.background_tools.remove(&tool_use_id)
+                    && let Some(summary) = format_background_result(&tool_name, &content)
+                {
+                    eprintln!("{summary}");
+                }
                 io::stdout().flush().ok();
+            }
+
+            (AppState::AgentRunning { .. }, BackgroundJobTerminal(summary))
+            | (AppState::WaitingForInput, BackgroundJobTerminal(summary)) => {
+                eprintln!("{}", format_background_terminal(&summary));
             }
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
                 self.deny_pending_approvals();
+                self.background_tools.clear();
                 println!();
                 if let Err(e) = self.session_manager.update_index(&self.session) {
                     eprintln!("Warning: failed to refresh session index: {e}");
@@ -341,6 +385,7 @@ impl EventLoop {
 
             (AppState::AgentRunning { .. }, AgentError(msg)) => {
                 self.deny_pending_approvals();
+                self.background_tools.clear();
                 eprintln!("Error: {msg}");
                 self.state = AppState::WaitingForInput;
             }
@@ -421,6 +466,7 @@ impl EventLoop {
     }
 
     fn start_agent_turn(&mut self, input: String) {
+        self.background_tools.clear();
         let cancel_token = CancellationToken::new();
         // Submit through session.
         let sq_tx = self.sq_tx.clone();
@@ -566,6 +612,68 @@ impl EventLoop {
             task_handle.abort();
             let _ = task_handle.await;
         }
+    }
+}
+
+fn is_background_tool_call(name: &str, input: &serde_json::Value) -> bool {
+    name == "process"
+        || matches!(name, "bash" | "exec")
+            && input.get("background").and_then(serde_json::Value::as_bool) == Some(true)
+}
+
+fn track_background_tool(
+    tools: &mut HashMap<String, String>,
+    id: String,
+    name: &str,
+    input: &serde_json::Value,
+) {
+    if is_background_tool_call(name, input) {
+        tools.insert(id, name.to_owned());
+    }
+}
+
+#[cfg(test)]
+mod background_pairing_tests {
+    use super::*;
+
+    #[test]
+    fn interleaved_calls_remain_paired_by_tool_use_id() {
+        let mut tools = HashMap::new();
+        track_background_tool(
+            &mut tools,
+            "background-1".to_owned(),
+            "bash",
+            &serde_json::json!({"background": true}),
+        );
+        track_background_tool(
+            &mut tools,
+            "foreground-1".to_owned(),
+            "read_file",
+            &serde_json::json!({"path": "README.md"}),
+        );
+        track_background_tool(
+            &mut tools,
+            "process-1".to_owned(),
+            "process",
+            &serde_json::json!({"action": "read", "job_id": "job_1"}),
+        );
+
+        assert!(tools.remove("foreground-1").is_none());
+        assert_eq!(tools.remove("background-1").as_deref(), Some("bash"));
+        assert_eq!(tools.remove("process-1").as_deref(), Some("process"));
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn foreground_shell_calls_are_not_tracked() {
+        assert!(!is_background_tool_call(
+            "bash",
+            &serde_json::json!({"command": "printf done"}),
+        ));
+        assert!(!is_background_tool_call(
+            "exec",
+            &serde_json::json!({"argv": ["printf", "done"], "background": false}),
+        ));
     }
 }
 

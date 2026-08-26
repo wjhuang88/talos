@@ -17,10 +17,14 @@ fn new_engine() -> ConversationEngine {
 }
 
 fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {
+    make_tool_call_with_input(name, serde_json::json!({}))
+}
+
+fn make_tool_call_with_input(name: &str, input: serde_json::Value) -> ToolCall {
     ToolCall {
         id: "tc-1".to_string(),
         name: name.to_string(),
-        input: serde_json::json!({}),
+        input,
     }
 }
 
@@ -339,6 +343,242 @@ async fn tool_result_error_flag_propagates() {
     let display = find_tool_result(&outputs).expect("operation should succeed");
     assert!(display.is_error);
     assert!(display.content.contains("command not found"));
+}
+
+#[test]
+fn tool_result_marks_only_explicit_background_calls_without_changing_public_shape() {
+    let cases = [
+        (
+            "bash",
+            serde_json::json!({"command": "sleep 1", "background": true}),
+            "background:bash",
+        ),
+        (
+            "exec",
+            serde_json::json!({"command": "sleep", "args": ["1"], "background": true}),
+            "background:exec",
+        ),
+        (
+            "process",
+            serde_json::json!({"action": "status", "job_id": "job_1"}),
+            "background:process",
+        ),
+        (
+            "bash",
+            serde_json::json!({"command": "printf done"}),
+            "bash",
+        ),
+    ];
+
+    for (tool_name, input, expected_display_name) in cases {
+        let mut engine = new_engine();
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: make_tool_call_with_input(tool_name, input),
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: make_tool_result(r#"{"job_id":"job_1","state":"running"}"#, false),
+        });
+
+        let display = find_tool_result(&outputs).expect("tool result display");
+        assert_eq!(display.tool_name.as_deref(), Some(expected_display_name));
+    }
+}
+
+#[test]
+fn interleaved_tool_results_pair_by_tool_use_id() {
+    let mut engine = new_engine();
+    for (id, name, input) in [
+        (
+            "background-1",
+            "bash",
+            serde_json::json!({"command": "server", "background": true}),
+        ),
+        (
+            "foreground-1",
+            "read_file",
+            serde_json::json!({"path": "README.md"}),
+        ),
+    ] {
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: id.into(),
+                name: name.into(),
+                input,
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+    }
+
+    let background_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "background-1".into(),
+            content: r#"{"job_id":"job_1","state":"running"}"#.into(),
+            is_error: false,
+        },
+    });
+    assert_eq!(
+        find_tool_result(&background_outputs).and_then(|display| display.tool_name.as_deref()),
+        Some("background:bash")
+    );
+
+    let foreground_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "foreground-1".into(),
+            content: "file contents".into(),
+            is_error: false,
+        },
+    });
+    assert_eq!(
+        find_tool_result(&foreground_outputs).and_then(|display| display.tool_name.as_deref()),
+        Some("read_file")
+    );
+    assert!(
+        engine.messages[0]
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .is_some()
+    );
+    assert!(
+        engine.messages[1]
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .is_some()
+    );
+}
+
+fn assert_reused_tool_id_binds_only_to_new_turn(terminalize: impl FnOnce(&mut ConversationEngine)) {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: ToolCall {
+            id: "reused-id".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "old", "background": true}),
+        },
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    });
+    terminalize(&mut engine);
+
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: ToolCall {
+            id: "reused-id".into(),
+            name: "read_file".into(),
+            input: serde_json::json!({"path": "README.md"}),
+        },
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    });
+    let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "reused-id".into(),
+            content: "new result".into(),
+            is_error: false,
+        },
+    });
+
+    assert_eq!(
+        find_tool_result(&outputs).and_then(|display| display.tool_name.as_deref()),
+        Some("read_file")
+    );
+    assert!(
+        engine.messages[0]
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .is_none(),
+        "stale call must not consume the new result"
+    );
+    assert_eq!(
+        engine
+            .messages
+            .last()
+            .unwrap()
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .content,
+        "new result"
+    );
+}
+
+#[test]
+fn cancelled_turn_discards_unresolved_tool_identity_before_id_reuse() {
+    assert_reused_tool_id_binds_only_to_new_turn(|engine| {
+        engine.cancel_turn();
+    });
+}
+
+#[test]
+fn failed_turn_discards_unresolved_tool_identity_before_id_reuse() {
+    assert_reused_tool_id_binds_only_to_new_turn(|engine| {
+        engine.handle_agent_event(&AgentEvent::Error {
+            message: "provider failed".into(),
+        });
+    });
+}
+
+#[test]
+fn completed_turn_discards_unresolved_tool_identity_before_id_reuse() {
+    assert_reused_tool_id_binds_only_to_new_turn(|engine| {
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: "done".into(),
+            new_messages: vec![],
+        });
+    });
+}
+
+#[test]
+fn authoritative_new_turn_defensively_discards_unresolved_tool_identity() {
+    assert_reused_tool_id_binds_only_to_new_turn(|engine| {
+        engine.handle_agent_event(&AgentEvent::TurnStart);
+    });
+}
+
+#[test]
+fn tool_use_stop_preserves_pending_identity_but_terminal_stop_discards_it() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: ToolCall {
+            id: "call-1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "echo ok"}),
+        },
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    });
+    engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::ToolUse,
+        usage: Usage::default(),
+    });
+    let result = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "call-1".into(),
+            content: "ok".into(),
+            is_error: false,
+        },
+    });
+    assert_eq!(
+        find_tool_result(&result).and_then(|display| display.tool_name.as_deref()),
+        Some("bash")
+    );
+
+    assert_reused_tool_id_binds_only_to_new_turn(|engine| {
+        engine.handle_agent_event(&AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        });
+    });
 }
 
 // ---------------------------------------------------------------------------

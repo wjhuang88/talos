@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
 
+use crate::background_projection::format_background_terminal;
 use crate::mode_runtime::request_preview_payload;
 use crate::session_transition::authoritative_generation_for_sender;
 use crate::skill_runtime::RuntimeSkills;
@@ -538,6 +539,12 @@ async fn handle_session_event(
                 total_text_bytes,
                 disposition,
             );
+        }
+        SessionEvent::BackgroundJobTerminal { summary, .. } => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::System,
+                text: format_background_terminal(&summary),
+            }));
         }
         SessionEvent::StructuredSubmissionStarted {
             session_id,
@@ -1900,6 +1907,85 @@ pub(crate) enum SessionLifecycleRequest {
         base_url: String,
         api_key: String,
     },
+}
+
+#[cfg(test)]
+mod background_terminal_projection_tests {
+    use super::*;
+    use talos_core::background_job::{
+        BackgroundCleanupOutcome, BackgroundJobId, BackgroundJobState, BackgroundJobTerminalSummary,
+    };
+
+    fn terminal_summary(job_id: &str, state: BackgroundJobState) -> BackgroundJobTerminalSummary {
+        BackgroundJobTerminalSummary {
+            job_id: BackgroundJobId::new(job_id),
+            tool_name: "bash".to_string(),
+            state,
+            exit_code: matches!(state, BackgroundJobState::Completed).then_some(0),
+            stdout_bytes: 12,
+            stderr_bytes: 3,
+            earliest_cursor: 1,
+            next_cursor: 4,
+            truncated: false,
+            started_at_unix_ms: 1,
+            finished_at_unix_ms: 2,
+            cleanup_outcome: BackgroundCleanupOutcome::Natural,
+            cleanup_error: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn real_session_terminal_events_project_exactly_once_for_each_lifecycle_path() {
+        let cases = [
+            ("natural-exit", BackgroundJobState::Completed),
+            ("timeout", BackgroundJobState::TimedOut),
+            ("cancel", BackgroundJobState::Cancelled),
+            ("shutdown", BackgroundJobState::Cancelled),
+            ("failure", BackgroundJobState::Failed),
+        ];
+
+        for (job_id, state) in cases {
+            let mut engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+            let mut turn_state = BridgeTurnState::Idle;
+            let mut deferred_accepted = None;
+            let (session_tx, _session_rx) = tokio::sync::mpsc::channel(1);
+            let (_watch_tx, watch_rx) = tokio::sync::watch::channel(session_tx.clone());
+            let mut known_sender = session_tx;
+            let mut sender_generation = 0;
+            let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+
+            handle_session_event(
+                SessionEvent::BackgroundJobTerminal {
+                    session_id: "session-1".into(),
+                    session_generation: 1,
+                    summary: terminal_summary(job_id, state),
+                },
+                &mut engine,
+                &mut turn_state,
+                &mut deferred_accepted,
+                &watch_rx,
+                &mut known_sender,
+                &mut sender_generation,
+                &ui_tx,
+            )
+            .await;
+
+            let output = ui_rx.try_recv().expect("one terminal projection");
+            let UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::System,
+                text,
+            }) = output
+            else {
+                panic!("expected a system terminal block");
+            };
+            assert!(text.contains(&format!("[background {job_id}] terminal:")));
+            assert!(text.contains(&format!("{state:?}")));
+            assert!(
+                ui_rx.try_recv().is_err(),
+                "terminal event projected more than once"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

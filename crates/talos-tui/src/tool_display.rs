@@ -17,6 +17,97 @@ const HEAD_LINES: usize = 3;
 const TAIL_LINES: usize = 3;
 const TOOL_CALL_ARGS_BUDGET_CHARS: usize = 180;
 
+/// Converts a structured background-job result into a bounded human-facing
+/// summary while leaving the raw result available to the model/transcript.
+fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
+    let tool_name = display.tool_name.as_deref()?.strip_prefix("background:")?;
+    if !matches!(tool_name, "bash" | "exec" | "process") {
+        return None;
+    }
+    let value = serde_json::from_str::<serde_json::Value>(&display.content).ok()?;
+    let object = value.as_object()?;
+    if tool_name == "process"
+        && let Some(jobs) = object.get("jobs").and_then(|v| v.as_array())
+    {
+        let truncated = object
+            .get("truncated")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let entries = jobs
+            .iter()
+            .take(8)
+            .filter_map(|job| {
+                let id = job.get("job_id")?.as_str()?;
+                let state = job
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                Some(format!("{id}={state}"))
+            })
+            .collect::<Vec<_>>();
+        let details = if entries.is_empty() {
+            format!("{} job(s)", jobs.len())
+        } else {
+            format!(
+                "{}{}",
+                entries.join(", "),
+                if jobs.len() > entries.len() {
+                    ", …"
+                } else {
+                    ""
+                }
+            )
+        };
+        return Some(format!(
+            "background jobs: {details}{}",
+            if truncated { ", list truncated" } else { "" }
+        ));
+    }
+    let job_id = object.get("job_id")?.as_str()?;
+    if job_id.is_empty() {
+        return None;
+    }
+    let state = object
+        .get("state")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    if matches!(
+        state,
+        "completed"
+            | "exited"
+            | "failed"
+            | "cancelled"
+            | "timed_out"
+            | "spawn_failed"
+            | "supervision_failed"
+    ) {
+        return Some(format!("background {job_id}: process request handled"));
+    }
+    if let Some(events) = object.get("events").and_then(|v| v.as_array()) {
+        let cursor = object
+            .get("next_cursor")
+            .and_then(|v| v.as_u64())
+            .unwrap_or_default();
+        let eof = object.get("eof").and_then(|v| v.as_bool()).unwrap_or(false);
+        return Some(format!(
+            "background {job_id}: {state}, {} event(s), next cursor {cursor}{}",
+            events.len(),
+            if eof { ", eof" } else { "" }
+        ));
+    }
+    let exit = object
+        .get("exit_code")
+        .and_then(|v| v.as_i64())
+        .map(|code| format!(", exit code {code}"))
+        .unwrap_or_default();
+    let deadline = object
+        .get("deadline_secs")
+        .and_then(|v| v.as_u64())
+        .map(|seconds| format!(", deadline {seconds}s"))
+        .unwrap_or_default();
+    Some(format!("background {job_id}: {state}{exit}{deadline}"))
+}
+
 pub(crate) fn truncate_single_line(s: &str, max: usize) -> String {
     let single = s.replace('\n', " ");
     let chars: Vec<char> = single.chars().collect();
@@ -252,6 +343,22 @@ pub(crate) fn build_tool_result_scrollback_lines(
                     result_line_prefix(icon, true),
                     suppressed_tool_result_summary(display)
                 ),
+                line_color,
+                attrs,
+            )],
+            None,
+        )];
+    }
+
+    if let Some(summary) = background_job_projection(display) {
+        let (line_color, attrs) = if display.is_error {
+            (color, primary_result_attrs())
+        } else {
+            (secondary_result_color(), secondary_result_attrs())
+        };
+        return vec![ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("{}{}", result_line_prefix(icon, true), summary),
                 line_color,
                 attrs,
             )],
@@ -536,7 +643,8 @@ pub(crate) fn build_tool_call_scrollback_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_conversation::ToolCallDisplay;
+    use talos_conversation::{ConversationEngine, ToolCallDisplay, UiOutput};
+    use talos_core::message::{AgentEvent, MessageToolResult, ToolCall};
 
     fn make_display(provenance: ToolProvenance) -> ToolCallDisplay {
         ToolCallDisplay {
@@ -545,6 +653,40 @@ mod tests {
             provenance,
             summary_fields: vec![],
         }
+    }
+
+    fn project_real_tool_event_chain(
+        tool_name: &str,
+        input: serde_json::Value,
+        result: &str,
+    ) -> String {
+        let mut engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call-1".into(),
+                name: tool_name.into(),
+                input,
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: MessageToolResult {
+                tool_use_id: "call-1".into(),
+                content: result.into(),
+                is_error: false,
+            },
+        });
+        let display = outputs
+            .iter()
+            .find_map(|output| match output {
+                UiOutput::ToolResult(display) => Some(display),
+                _ => None,
+            })
+            .expect("real engine tool-result projection");
+        let lines = build_tool_result_scrollback_lines(display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        lines[0].text.clone()
     }
 
     #[test]
@@ -590,6 +732,111 @@ mod tests {
         assert!(!lines[0].segments[0].attrs.bold);
 
         assert_eq!(lines[0].text, "   output line");
+    }
+
+    #[test]
+    fn background_start_is_projected_without_raw_json() {
+        let display = ToolResultDisplay {
+            tool_name: Some("background:bash".to_string()),
+            content: r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, "   background job_1: running, deadline 30s");
+        assert!(!lines[0].text.contains("deadline_secs"));
+    }
+
+    #[test]
+    fn background_process_read_is_projected_with_cursor() {
+        let display = ToolResultDisplay {
+            tool_name: Some("background:process".to_string()),
+            content: r#"{"job_id":"job_1","state":"running","events":[{"stream":"stderr","text":"warning"}],"next_cursor":7,"eof":false}"#.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(
+            lines[0].text,
+            "   background job_1: running, 1 event(s), next cursor 7"
+        );
+        assert!(!lines[0].text.contains("warning"));
+    }
+
+    #[test]
+    fn terminal_process_result_is_neutral_and_omits_raw_output() {
+        let display = ToolResultDisplay {
+            tool_name: Some("background:process".to_string()),
+            content: r#"{"job_id":"job_1","state":"cancelled","events":[{"stream":"stderr","text":"secret-token"}],"next_cursor":7,"eof":true}"#.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(
+            lines[0].text,
+            "   background job_1: process request handled"
+        );
+        for hidden in [
+            "cancelled",
+            "terminal",
+            "completed",
+            "secret-token",
+            "background:",
+        ] {
+            assert!(!lines[0].text.contains(hidden));
+        }
+    }
+
+    #[test]
+    fn real_start_read_status_list_cancel_chain_uses_bounded_projection() {
+        let start = project_real_tool_event_chain(
+            "bash",
+            serde_json::json!({"command": "server", "background": true}),
+            r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#,
+        );
+        let read = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "read", "job_id": "job_1", "cursor": 0}),
+            r#"{"job_id":"job_1","state":"running","events":[{"stream":"stdout","text":"secret-output"}],"next_cursor":1,"eof":false}"#,
+        );
+        let status = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "status", "job_id": "job_1"}),
+            r#"{"job_id":"job_1","state":"running"}"#,
+        );
+        let list = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "list"}),
+            r#"{"jobs":[{"job_id":"job_1","state":"running","command":"secret-command"}],"truncated":false}"#,
+        );
+        let cancel = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "cancel", "job_id": "job_1"}),
+            r#"{"job_id":"job_1","state":"cancelled"}"#,
+        );
+
+        assert_eq!(start, "   background job_1: running, deadline 30s");
+        assert_eq!(
+            read,
+            "   background job_1: running, 1 event(s), next cursor 1"
+        );
+        assert_eq!(status, "   background job_1: running");
+        assert_eq!(list, "   background jobs: job_1=running");
+        assert_eq!(cancel, "   background job_1: process request handled");
+        let combined = [start, read, status, list, cancel].join("\n");
+        assert!(!combined.contains("secret-output"));
+        assert!(!combined.contains("secret-command"));
+        assert!(!combined.contains("background:"));
+    }
+
+    #[test]
+    fn foreground_json_shape_is_not_projected_as_background() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: r#"{"job_id":"job_1","state":"running"}"#.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert!(lines[0].text.contains("job_id"));
     }
 
     #[test]
