@@ -8,7 +8,8 @@ The terminal Windows Server 2025 device validation passed in workflow `329582366
 `98144594163`, against disposable harness head `4c477a97` with the integrated product tree based
 on `main@ab750888`. Evidence PR #406 merged as `00bf2d5d` after exact-head CI `32960406028` and
 independent Agent-role approval `5424295949`. I223 owner-first closeout now records Completion
-Commit `a5fbc22e`; Issue #378 and Issue #59 have terminal evidence and are closed. The disposable
+Commit `a5fbc22e`; Issue #378 and Issue #59 have terminal evidence and are ready for closure after
+the closeout PR merges. The disposable
 branch and workflow were never merged.
 
 ## Startup Contract
