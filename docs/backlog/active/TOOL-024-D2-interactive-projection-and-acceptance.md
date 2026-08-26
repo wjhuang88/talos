@@ -1,22 +1,22 @@
 # TOOL-024-D2: Interactive Projection And Cross-Platform Acceptance
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D2 |
 | Type | Product / CLI-TUI Integration |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I228 Review / Claimed |
+| Selected Iteration | I228 Complete / Closed |
 | Depends On | TOOL-024-B/I222 Complete; TOOL-024-C/I224 Complete; TOOL-024-D1-B/I226 Complete |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session |
 | Work Slice | CLI/TUI projection of the existing supervised background-job start and process controls, user/model documentation, and integrated Unix/Windows acceptance only. No supervisor, permission, Windows ownership, persistence, Dashboard, `/auto`, release or Desktop changes. |
@@ -27,7 +27,7 @@
 | Authorization Evidence | I222/B, I224/C and I226/D1-B are Complete/Closed on current main; exact implementation boundaries are recorded in their owners and ADR-060/ADR-068. |
 | Implementation PR | #403 |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Claim #402 is effective on `main@da9a79cd`; implementation candidate remains pending local convergence and exact-head review. D2 must not modify `crates/talos-dashboard/**` or I213 authority. |
+| Handoff / Release Condition | Closed through PR #403 merge `a5fbc22e`; I223/Issue #378 remains the separate evidence-only final gate before TOOL-024 and Issue #59 close. |
 
 ## Scope
 
@@ -60,8 +60,9 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
-- This owner must remain Review until an existing implementation merge proves the deliverable; a status-only closeout cannot self-certify.
+- Completion Commit: `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`.
+- PR #403 exact head `e65f9b490b0d375926f854076f7576131174c4b1` passed CI `32937579899` 5/5 and independent Agent-role protected-scope review `5421558305` before merge-time CAS.
+- This closeout records the pre-existing implementation merge; the status-only closeout commit does not self-certify.
 
 ## Residuals
 
@@ -83,3 +84,12 @@ candidate now pairs results by `tool_use_id` and tests interleaved background/fo
 Review `5421297121` then found the private identity map lacked terminal cleanup; the candidate now
 clears it at authoritative turn terminals and new-turn boundaries while retaining identities across
 `ToolUse` continuation, with provider-ID reuse regression coverage.
+
+## Completion Checkpoint (2026-08-26)
+
+The corrected exact head `e65f9b490b0d375926f854076f7576131174c4b1` passed CI
+`32937579899` 5/5, including the Windows workspace and rebuilt CLI smoke. Independent Agent-role
+protected-scope review `5421558305` approved the full D2 projection and lifecycle boundary.
+Merge-time CAS confirmed unchanged head/base, effective claim, clean mergeability and no competing
+implementation PR; PR #403 merged as `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`.
+I228/TOOL-024-D2 is Complete/Closed. I223 and Issue #378 remain the evidence-only final gate.

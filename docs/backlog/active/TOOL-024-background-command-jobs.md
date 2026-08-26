@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A/B/C/D1-A/D1-B Complete; D2 Review; deferred validation remains)
+**Status**: Partial (A/B/C/D1-A/D1-B/D2 Complete; deferred validation remains)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -62,7 +62,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Complete / Closed; PR #386 merged | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | [TOOL-024-D1-A](TOOL-024-D1-A-windows-job-object-decision.md) | Windows Job Object Security And OS-ABI Decision | Architecture/Process-Security Decision | Complete / Closed | TOOL-024-C Complete; ADR-060/057 Accepted | Current-path matrix and Accepted ADR-068 define assigned-before-exec ownership, bounded OS-ABI, migration, rollback and D1-B test contract; no behavior change. |
 | [TOOL-024-D1-B](TOOL-024-D1-B-windows-job-object-ownership.md) | Windows Job Object Process-Tree Ownership | Product/Process-Security Story | Complete / Closed | TOOL-024-D1-A Complete; ADR-068 Accepted | PR #394 merged as `d4d7cb25`; exact candidate `83557863` passed CI `32849330531` and independent Windows/process/security/API review `5410840103`. |
-| [TOOL-024-D2](TOOL-024-D2-interactive-projection-and-acceptance.md) | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Review / Claimed | TOOL-024-D1-B Complete | I228 owns CLI/TUI projection, user/model docs and integrated Unix/Windows acceptance; no supervisor, permission, Dashboard or `/auto` authority. |
+| [TOOL-024-D2](TOOL-024-D2-interactive-projection-and-acceptance.md) | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Complete / Closed | TOOL-024-D1-B Complete | Completion Commit `a5fbc22e`; CLI/TUI projection, user/model docs and integrated Unix/Windows machine evidence are complete. |
 
 ## Major Risks
 
@@ -209,3 +209,12 @@ candidate is in `Review / Claimed` and covers only CLI/TUI projection, terminal-
 display-safe bounded summaries and SDK guidance. The candidate preserves the foreground path and
 does not change supervisor, permission, Job Object, Dashboard, persistence, `/auto` or release
 behavior. A stable implementation PR and exact-head protected validation remain required.
+
+## TOOL-024-D2 Completion Checkpoint (2026-08-26)
+
+PR #403 exact head `e65f9b490b0d375926f854076f7576131174c4b1` passed CI
+`32937579899` 5/5, including Windows workspace validation, and independent Agent-role
+protected-scope review `5421558305`. After merge-time CAS, it merged as
+`a5fbc22e71afeb30ff0804ec14bf15187d0fb716`, which is the pre-existing Completion Commit for
+I228/TOOL-024-D2. The parent remains Partial only because I223 must execute all five Issue #378
+validation rows before TOOL-024 and Issue #59 close.
