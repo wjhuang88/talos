@@ -22,7 +22,7 @@
 | Work Slice | CLI/TUI projection of the existing supervised background-job start and process controls, user/model documentation, and integrated Unix/Windows acceptance only. No supervisor, permission, Windows ownership, persistence, Dashboard, `/auto`, release or Desktop changes. |
 | Claimed At | 2026-08-26 |
 | Source Issue | #59 |
-| Governance Claim PR | To be backfilled before merge |
+| Governance Claim PR | #402 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I222/B, I224/C and I226/D1-B are Complete/Closed on current main; exact implementation boundaries are recorded in their owners and ADR-060/ADR-068. |
 | Implementation PR | Not started |

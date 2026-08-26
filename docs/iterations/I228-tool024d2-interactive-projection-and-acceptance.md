@@ -16,7 +16,7 @@
 | Work Slice | TOOL-024-D2 projection, documentation and integrated Unix/Windows acceptance only; no supervisor or permission production changes. |
 | Claimed At | 2026-08-26 |
 | Source Issue | #59 |
-| Governance Claim PR | To be backfilled before merge |
+| Governance Claim PR | #402 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I222/B, I224/C and I226/D1-B Complete/Closed on current main; ADR-060 and ADR-068 Accepted. |
 | Implementation PR | Not started |
