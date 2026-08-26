@@ -386,6 +386,73 @@ fn tool_result_marks_only_explicit_background_calls_without_changing_public_shap
     }
 }
 
+#[test]
+fn interleaved_tool_results_pair_by_tool_use_id() {
+    let mut engine = new_engine();
+    for (id, name, input) in [
+        (
+            "background-1",
+            "bash",
+            serde_json::json!({"command": "server", "background": true}),
+        ),
+        (
+            "foreground-1",
+            "read_file",
+            serde_json::json!({"path": "README.md"}),
+        ),
+    ] {
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: id.into(),
+                name: name.into(),
+                input,
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+    }
+
+    let background_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "background-1".into(),
+            content: r#"{"job_id":"job_1","state":"running"}"#.into(),
+            is_error: false,
+        },
+    });
+    assert_eq!(
+        find_tool_result(&background_outputs).and_then(|display| display.tool_name.as_deref()),
+        Some("background:bash")
+    );
+
+    let foreground_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: MessageToolResult {
+            tool_use_id: "foreground-1".into(),
+            content: "file contents".into(),
+            is_error: false,
+        },
+    });
+    assert_eq!(
+        find_tool_result(&foreground_outputs).and_then(|display| display.tool_name.as_deref()),
+        Some("read_file")
+    );
+    assert!(
+        engine.messages[0]
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .is_some()
+    );
+    assert!(
+        engine.messages[1]
+            .tool_call
+            .as_ref()
+            .unwrap()
+            .result
+            .is_some()
+    );
+}
+
 // ---------------------------------------------------------------------------
 // handle_agent_event: TurnEnd
 // ---------------------------------------------------------------------------

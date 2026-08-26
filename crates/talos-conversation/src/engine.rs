@@ -70,6 +70,10 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
 
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
+    /// Tool calls awaiting a result, keyed by provider tool-use identity.
+    /// Keeping this side table private preserves the public transcript shape
+    /// while allowing interleaved provider results to pair deterministically.
+    pending_tool_calls: Vec<(String, usize)>,
     pub(crate) current_turn_text: String,
     pub(crate) steering_queue: Vec<SubmissionItem>,
     prepared_steering: Option<(String, Vec<String>)>,
@@ -106,6 +110,7 @@ impl ConversationEngine {
     pub fn new(model_name: String, provider_name: String) -> Self {
         Self {
             messages: Vec::new(),
+            pending_tool_calls: Vec::new(),
             current_turn_text: String::new(),
             steering_queue: Vec::new(),
             prepared_steering: None,
@@ -448,6 +453,7 @@ impl ConversationEngine {
                 });
                 self.close_content(&mut outputs);
                 self.record_provenance(provenance);
+                let message_index = self.messages.len();
                 self.messages.push(ChatMessage {
                     role: MessageRole::Assistant,
                     status: MessageStatus::Completed,
@@ -461,6 +467,8 @@ impl ConversationEngine {
                     }),
                     created_at: Instant::now(),
                 });
+                self.pending_tool_calls
+                    .push((call.id.clone(), message_index));
                 outputs.push(UiOutput::ToolCall(ToolCallDisplay {
                     tool_name: call.name.clone(),
                     arguments: call.input.clone(),
@@ -813,27 +821,30 @@ impl ConversationEngine {
     }
 
     fn set_tool_result(&mut self, result: &MessageToolResult) -> Option<String> {
-        for msg in self.messages.iter_mut().rev() {
-            if let Some(ref mut tool_call) = msg.tool_call
-                && tool_call.result.is_none()
-            {
-                let tool_name = tool_call.tool_name.clone();
-                let is_background = matches!(tool_name.as_str(), "process")
-                    || matches!(tool_name.as_str(), "bash" | "exec")
-                        && serde_json::from_str::<serde_json::Value>(&tool_call.arguments)
-                            .ok()
-                            .and_then(|input| input.get("background").cloned())
-                            .and_then(|value| value.as_bool())
-                            == Some(true);
-                tool_call.result = Some(result.clone());
-                return Some(if is_background {
-                    format!("background:{tool_name}")
-                } else {
-                    tool_name
-                });
-            }
+        let pending_index = self
+            .pending_tool_calls
+            .iter()
+            .position(|(tool_use_id, _)| tool_use_id == &result.tool_use_id)?;
+        let (_, message_index) = self.pending_tool_calls.remove(pending_index);
+        let msg = self.messages.get_mut(message_index)?;
+        let tool_call = msg.tool_call.as_mut()?;
+        if tool_call.result.is_some() {
+            return None;
         }
-        None
+        let tool_name = tool_call.tool_name.clone();
+        let is_background = matches!(tool_name.as_str(), "process")
+            || matches!(tool_name.as_str(), "bash" | "exec")
+                && serde_json::from_str::<serde_json::Value>(&tool_call.arguments)
+                    .ok()
+                    .and_then(|input| input.get("background").cloned())
+                    .and_then(|value| value.as_bool())
+                    == Some(true);
+        tool_call.result = Some(result.clone());
+        Some(if is_background {
+            format!("background:{tool_name}")
+        } else {
+            tool_name
+        })
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {
