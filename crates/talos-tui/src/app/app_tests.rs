@@ -136,7 +136,6 @@ fn tool_result_scrollback_keeps_multiple_lines() {
     let display = ToolResultDisplay {
         tool_name: Some("tree".to_string()),
         is_error: false,
-        is_background: false,
         content: "├── backend/\n├── frontend/\n└── docs/".to_string(),
     };
     let lines =
@@ -204,7 +203,6 @@ fn read_tool_result_hides_content_from_scrollback() {
     let display = ToolResultDisplay {
         tool_name: Some("read".to_string()),
         is_error: false,
-        is_background: false,
         content: "secret line\nanother line\n".to_string(),
     };
 
@@ -221,7 +219,6 @@ fn read_tool_error_result_remains_visible() {
     let display = ToolResultDisplay {
         tool_name: Some("read".to_string()),
         is_error: true,
-        is_background: false,
         content: "file not found".to_string(),
     };
 
@@ -700,7 +697,6 @@ fn read_always_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("read".to_string()),
         is_error: false,
-        is_background: false,
         content: "single line".to_string(),
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -713,7 +709,6 @@ fn read_error_not_suppressed() {
     let display = ToolResultDisplay {
         tool_name: Some("read".to_string()),
         is_error: true,
-        is_background: false,
         content: "permission denied".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -724,7 +719,6 @@ fn list_symbols_always_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("list_symbols".to_string()),
         is_error: false,
-        is_background: false,
         content: "[{\"name\": \"foo\", \"kind\": \"function\"}]\n".to_string(),
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -742,7 +736,6 @@ fn find_symbol_always_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("find_symbol".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -761,7 +754,6 @@ fn find_references_always_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("find_references".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -775,7 +767,6 @@ fn glob_under_threshold_not_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("glob".to_string()),
         is_error: false,
-        is_background: false,
         content: content.to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -790,7 +781,6 @@ fn glob_over_threshold_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("glob".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -804,7 +794,6 @@ fn ls_under_threshold_not_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("ls".to_string()),
         is_error: false,
-        is_background: false,
         content: "drwxr-xr-x  src\n-rw-r--r--  Cargo.toml\n".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -819,7 +808,6 @@ fn ls_over_threshold_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("ls".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -832,7 +820,6 @@ fn list_imports_under_threshold_not_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("list_imports".to_string()),
         is_error: false,
-        is_background: false,
         content: "[{\"module\": \"std::fs\"}]\n".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -847,7 +834,6 @@ fn list_imports_over_threshold_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("list_imports".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -860,7 +846,6 @@ fn unknown_tool_not_suppressed() {
     let display = ToolResultDisplay {
         tool_name: Some("bash".to_string()),
         is_error: false,
-        is_background: false,
         content: "output\n".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -878,7 +863,6 @@ fn suppressed_summary_fallback_for_unknown_tool() {
     let display = ToolResultDisplay {
         tool_name: Some("unknown_tool".to_string()),
         is_error: false,
-        is_background: false,
         content: "line one\nline two\n".to_string(),
     };
     let summary = tool_display::suppressed_tool_result_summary(&display);
@@ -890,7 +874,6 @@ fn grep_under_threshold_renders_inline() {
     let display = ToolResultDisplay {
         tool_name: Some("grep".to_string()),
         is_error: false,
-        is_background: false,
         content: "src/main.rs:\n  10: foo\nsrc/lib.rs:\n  5: bar\n".to_string(),
     };
     assert!(!tool_display::should_suppress_tool_result_content(&display));
@@ -915,7 +898,6 @@ fn grep_over_threshold_renders_summary() {
     let display = ToolResultDisplay {
         tool_name: Some("grep".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     assert!(tool_display::should_suppress_tool_result_content(&display));
@@ -946,7 +928,6 @@ fn bash_under_threshold_renders_full() {
     let display = ToolResultDisplay {
         tool_name: Some("bash".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     let lines =
@@ -966,7 +947,6 @@ fn bash_over_threshold_renders_head_and_tail() {
     let display = ToolResultDisplay {
         tool_name: Some("bash".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     let lines =
@@ -986,7 +966,6 @@ fn tool_result_scrollback_styles_primary_and_detail_lines() {
     let display = ToolResultDisplay {
         tool_name: Some("write".to_string()),
         is_error: false,
-        is_background: false,
         content: "wrote 11 bytes to new.txt\npreview:\nhello world".to_string(),
     };
     let lines =
@@ -1029,7 +1008,6 @@ fn tool_result_error_detail_lines_keep_error_style() {
     let display = ToolResultDisplay {
         tool_name: Some("write".to_string()),
         is_error: true,
-        is_background: false,
         content: "failed\npermission denied".to_string(),
     };
     let lines =
@@ -1052,7 +1030,6 @@ fn head_tail_omitted_count_is_correct() {
         let display = ToolResultDisplay {
             tool_name: Some("bash".to_string()),
             is_error: false,
-            is_background: false,
             content,
         };
         let lines = tool_display::build_tool_result_scrollback_lines(
@@ -1087,7 +1064,6 @@ fn head_tail_truncation_does_not_affect_export_content() {
     let display = ToolResultDisplay {
         tool_name: Some("bash".to_string()),
         is_error: false,
-        is_background: false,
         content,
     };
     let _ =

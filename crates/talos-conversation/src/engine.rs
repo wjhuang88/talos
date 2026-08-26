@@ -471,12 +471,11 @@ impl ConversationEngine {
             }
             AgentEvent::ToolResult { result } => {
                 self.close_content(&mut outputs);
-                let (tool_name, is_background) = self.set_tool_result(result);
+                let tool_name = self.set_tool_result(result);
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
                     tool_name,
                     is_error: result.is_error,
                     content: result.content.clone(),
-                    is_background,
                 }));
                 self.current_phase = Some(TurnPhase::Generating);
                 outputs.push(UiOutput::Status(self.status_snapshot()));
@@ -813,7 +812,7 @@ impl ConversationEngine {
         ])
     }
 
-    fn set_tool_result(&mut self, result: &MessageToolResult) -> (Option<String>, bool) {
+    fn set_tool_result(&mut self, result: &MessageToolResult) -> Option<String> {
         for msg in self.messages.iter_mut().rev() {
             if let Some(ref mut tool_call) = msg.tool_call
                 && tool_call.result.is_none()
@@ -827,10 +826,14 @@ impl ConversationEngine {
                             .and_then(|value| value.as_bool())
                             == Some(true);
                 tool_call.result = Some(result.clone());
-                return (Some(tool_name), is_background);
+                return Some(if is_background {
+                    format!("background:{tool_name}")
+                } else {
+                    tool_name
+                });
             }
         }
-        (None, false)
+        None
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {

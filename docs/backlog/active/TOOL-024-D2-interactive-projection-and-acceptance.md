@@ -25,7 +25,7 @@
 | Governance Claim PR | #402 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I222/B, I224/C and I226/D1-B are Complete/Closed on current main; exact implementation boundaries are recorded in their owners and ADR-060/ADR-068. |
-| Implementation PR | Not started |
+| Implementation PR | #403 |
 | Last Updated | 2026-08-26 |
 | Handoff / Release Condition | Claim #402 is effective on `main@da9a79cd`; implementation candidate remains pending local convergence and exact-head review. D2 must not modify `crates/talos-dashboard/**` or I213 authority. |
 
@@ -73,5 +73,8 @@ Claim PR #402 merged into `main` as `da9a79cd` after exact-head CI and independe
 review. I228 is therefore effective and the implementation branch starts from that merge. The
 local candidate adds only CLI/TUI projection, event-path terminal summaries and SDK guidance; it
 does not modify the supervisor, permission, Job Object, Dashboard, `/auto`, persistence or release
-surface. It remains `Review / Claimed` with `Implementation PR: Not started` until the stable
-candidate is pushed and receives fresh exact-head evidence.
+surface. PR #403 review `5420911368` rejected exact head `f5dc3415` for duplicate terminal
+semantics, missing real event-chain coverage and a source-breaking public display field. The next
+local candidate removes that field, keeps `BackgroundJobTerminal` as the single terminal display
+authority and exercises start/read/status/list/cancel plus terminal session events through the
+production projection. It remains `Review / Claimed` until fresh exact-head evidence is complete.

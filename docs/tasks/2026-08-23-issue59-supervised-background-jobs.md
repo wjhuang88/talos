@@ -317,3 +317,14 @@ Claim PR #402 merged as `da9a79cd`, so I228 is effective on `main`. The local ca
 summaries and SDK guidance only. It remains subject to stable implementation PR, exact-head CI,
 independent protected-scope review and merge-time CAS. I223 still owns the five deferred Issue #378
 validation rows and remains required before closing Issue #59.
+
+## I228 Independent Review Correction Checkpoint (2026-08-26)
+
+Implementation PR #403 exact head `f5dc3415` passed CI `32929839326` 5/5, but independent review
+`5420911368` correctly rejected it: the synchronous process result still duplicated terminal
+semantics, tests did not traverse the real SessionEvent/UI chain, and a required public
+`ToolResultDisplay.is_background` field was source-breaking without migration authority. The next
+local candidate restores the public struct shape, carries background intent through an internal
+display-name marker, gives `BackgroundJobTerminal` sole terminal-state display authority and adds
+platform-neutral production-chain coverage for start/read/status/list/cancel and terminal events.
+Old CI and review do not transfer; I228 remains Review / Claimed pending a fresh stable head.

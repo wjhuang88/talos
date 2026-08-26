@@ -20,10 +20,7 @@ const TOOL_CALL_ARGS_BUDGET_CHARS: usize = 180;
 /// Converts a structured background-job result into a bounded human-facing
 /// summary while leaving the raw result available to the model/transcript.
 fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
-    if !display.is_background {
-        return None;
-    }
-    let tool_name = display.tool_name.as_deref()?;
+    let tool_name = display.tool_name.as_deref()?.strip_prefix("background:")?;
     if !matches!(tool_name, "bash" | "exec" | "process") {
         return None;
     }
@@ -84,9 +81,7 @@ fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
             | "spawn_failed"
             | "supervision_failed"
     ) {
-        return Some(format!(
-            "background {job_id}: operation completed; terminal status follows"
-        ));
+        return Some(format!("background {job_id}: process request handled"));
     }
     if let Some(events) = object.get("events").and_then(|v| v.as_array()) {
         let cursor = object
@@ -648,7 +643,8 @@ pub(crate) fn build_tool_call_scrollback_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_conversation::ToolCallDisplay;
+    use talos_conversation::{ConversationEngine, ToolCallDisplay, UiOutput};
+    use talos_core::message::{AgentEvent, MessageToolResult, ToolCall};
 
     fn make_display(provenance: ToolProvenance) -> ToolCallDisplay {
         ToolCallDisplay {
@@ -657,6 +653,40 @@ mod tests {
             provenance,
             summary_fields: vec![],
         }
+    }
+
+    fn project_real_tool_event_chain(
+        tool_name: &str,
+        input: serde_json::Value,
+        result: &str,
+    ) -> String {
+        let mut engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call-1".into(),
+                name: tool_name.into(),
+                input,
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: MessageToolResult {
+                tool_use_id: "call-1".into(),
+                content: result.into(),
+                is_error: false,
+            },
+        });
+        let display = outputs
+            .iter()
+            .find_map(|output| match output {
+                UiOutput::ToolResult(display) => Some(display),
+                _ => None,
+            })
+            .expect("real engine tool-result projection");
+        let lines = build_tool_result_scrollback_lines(display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        lines[0].text.clone()
     }
 
     #[test]
@@ -693,7 +723,6 @@ mod tests {
             tool_name: Some("test_tool".to_string()),
             content: "output line".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
         assert_eq!(lines.len(), 1);
@@ -708,10 +737,9 @@ mod tests {
     #[test]
     fn background_start_is_projected_without_raw_json() {
         let display = ToolResultDisplay {
-            tool_name: Some("bash".to_string()),
+            tool_name: Some("background:bash".to_string()),
             content: r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#.to_string(),
             is_error: false,
-            is_background: true,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 1);
@@ -722,10 +750,9 @@ mod tests {
     #[test]
     fn background_process_read_is_projected_with_cursor() {
         let display = ToolResultDisplay {
-            tool_name: Some("process".to_string()),
+            tool_name: Some("background:process".to_string()),
             content: r#"{"job_id":"job_1","state":"running","events":[{"stream":"stderr","text":"warning"}],"next_cursor":7,"eof":false}"#.to_string(),
             is_error: false,
-            is_background: true,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(
@@ -736,12 +763,77 @@ mod tests {
     }
 
     #[test]
+    fn terminal_process_result_is_neutral_and_omits_raw_output() {
+        let display = ToolResultDisplay {
+            tool_name: Some("background:process".to_string()),
+            content: r#"{"job_id":"job_1","state":"cancelled","events":[{"stream":"stderr","text":"secret-token"}],"next_cursor":7,"eof":true}"#.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(
+            lines[0].text,
+            "   background job_1: process request handled"
+        );
+        for hidden in [
+            "cancelled",
+            "terminal",
+            "completed",
+            "secret-token",
+            "background:",
+        ] {
+            assert!(!lines[0].text.contains(hidden));
+        }
+    }
+
+    #[test]
+    fn real_start_read_status_list_cancel_chain_uses_bounded_projection() {
+        let start = project_real_tool_event_chain(
+            "bash",
+            serde_json::json!({"command": "server", "background": true}),
+            r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#,
+        );
+        let read = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "read", "job_id": "job_1", "cursor": 0}),
+            r#"{"job_id":"job_1","state":"running","events":[{"stream":"stdout","text":"secret-output"}],"next_cursor":1,"eof":false}"#,
+        );
+        let status = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "status", "job_id": "job_1"}),
+            r#"{"job_id":"job_1","state":"running"}"#,
+        );
+        let list = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "list"}),
+            r#"{"jobs":[{"job_id":"job_1","state":"running","command":"secret-command"}],"truncated":false}"#,
+        );
+        let cancel = project_real_tool_event_chain(
+            "process",
+            serde_json::json!({"action": "cancel", "job_id": "job_1"}),
+            r#"{"job_id":"job_1","state":"cancelled"}"#,
+        );
+
+        assert_eq!(start, "   background job_1: running, deadline 30s");
+        assert_eq!(
+            read,
+            "   background job_1: running, 1 event(s), next cursor 1"
+        );
+        assert_eq!(status, "   background job_1: running");
+        assert_eq!(list, "   background jobs: job_1=running");
+        assert_eq!(cancel, "   background job_1: process request handled");
+        let combined = [start, read, status, list, cancel].join("\n");
+        assert!(!combined.contains("secret-output"));
+        assert!(!combined.contains("secret-command"));
+        assert!(!combined.contains("background:"));
+    }
+
+    #[test]
     fn foreground_json_shape_is_not_projected_as_background() {
         let display = ToolResultDisplay {
             tool_name: Some("bash".to_string()),
             content: r#"{"job_id":"job_1","state":"running"}"#.to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert!(lines[0].text.contains("job_id"));
@@ -753,7 +845,6 @@ mod tests {
             tool_name: Some("test_tool".to_string()),
             content: "error line".to_string(),
             is_error: true,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red), 120);
         assert_eq!(lines.len(), 1);
@@ -770,7 +861,6 @@ mod tests {
             tool_name: Some("test_tool".to_string()),
             content: "".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines_empty =
             build_tool_result_scrollback_lines(&display_empty, "", Some(CColor::Green), 120);
@@ -784,7 +874,6 @@ mod tests {
             tool_name: Some("read".to_string()),
             content: "line 1\nline 2".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines_suppressed =
             build_tool_result_scrollback_lines(&display_suppressed, "", Some(CColor::Green), 120);
@@ -801,7 +890,6 @@ mod tests {
             tool_name: Some("edit".to_string()),
             content: "edited src/main.rs\ndiff:\n- old line\n+ new line".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 4);
@@ -831,7 +919,6 @@ mod tests {
             tool_name: Some("git_diff".to_string()),
             content: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n context line".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 7);
@@ -856,7 +943,6 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: "- this is a bullet\n+ another bullet\nnormal text".to_string(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 3);
@@ -908,7 +994,6 @@ mod tests {
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s".to_string(),
             is_error: false,
-            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -934,7 +1019,6 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_1 cancelled. No further fires will occur.".to_string(),
             is_error: false,
-            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -956,7 +1040,6 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_99 not found or already completed.".to_string(),
             is_error: false,
-            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -978,7 +1061,6 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "scheduler is not available".to_string(),
             is_error: true,
-            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -1000,7 +1082,6 @@ mod tests {
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "No active scheduled tasks.".to_string(),
             is_error: false,
-            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -1021,7 +1102,6 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: long.clone(),
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 160);
         assert_eq!(lines.len(), 1);
@@ -1039,7 +1119,6 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: long,
             is_error: false,
-            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 40);
         assert!(
@@ -1060,7 +1139,6 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: "你好".repeat(50),
             is_error: false,
-            is_background: false,
         };
         let lines_narrow = build_tool_result_scrollback_lines(&display, "", None, 40);
         let lines_wide = build_tool_result_scrollback_lines(&display, "", None, 160);
@@ -1084,7 +1162,6 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content,
             is_error: false,
-            is_background: false,
         };
         for width in [40u16, 80, 120, 160] {
             let lines = build_tool_result_scrollback_lines(&display, "", None, width);

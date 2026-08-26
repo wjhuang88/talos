@@ -1684,7 +1684,6 @@ pub(crate) fn render_history_messages(
                     tool_name: Some(tool_name),
                     is_error: result.is_error,
                     content,
-                    is_background: false,
                 };
                 lines.extend(crate::tool_display::build_tool_result_scrollback_lines(
                     &display,

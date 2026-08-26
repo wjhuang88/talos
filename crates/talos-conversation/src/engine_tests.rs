@@ -17,10 +17,14 @@ fn new_engine() -> ConversationEngine {
 }
 
 fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {
+    make_tool_call_with_input(name, serde_json::json!({}))
+}
+
+fn make_tool_call_with_input(name: &str, input: serde_json::Value) -> ToolCall {
     ToolCall {
         id: "tc-1".to_string(),
         name: name.to_string(),
-        input: serde_json::json!({}),
+        input,
     }
 }
 
@@ -339,6 +343,47 @@ async fn tool_result_error_flag_propagates() {
     let display = find_tool_result(&outputs).expect("operation should succeed");
     assert!(display.is_error);
     assert!(display.content.contains("command not found"));
+}
+
+#[test]
+fn tool_result_marks_only_explicit_background_calls_without_changing_public_shape() {
+    let cases = [
+        (
+            "bash",
+            serde_json::json!({"command": "sleep 1", "background": true}),
+            "background:bash",
+        ),
+        (
+            "exec",
+            serde_json::json!({"command": "sleep", "args": ["1"], "background": true}),
+            "background:exec",
+        ),
+        (
+            "process",
+            serde_json::json!({"action": "status", "job_id": "job_1"}),
+            "background:process",
+        ),
+        (
+            "bash",
+            serde_json::json!({"command": "printf done"}),
+            "bash",
+        ),
+    ];
+
+    for (tool_name, input, expected_display_name) in cases {
+        let mut engine = new_engine();
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: make_tool_call_with_input(tool_name, input),
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: make_tool_result(r#"{"job_id":"job_1","state":"running"}"#, false),
+        });
+
+        let display = find_tool_result(&outputs).expect("tool result display");
+        assert_eq!(display.tool_name.as_deref(), Some(expected_display_name));
+    }
 }
 
 // ---------------------------------------------------------------------------

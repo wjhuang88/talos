@@ -63,9 +63,7 @@ pub(crate) fn format_background_result(tool_name: &str, content: &str) -> Option
             | "spawn_failed"
             | "supervision_failed"
     ) {
-        return Some(format!(
-            "[background {job_id}] operation completed; terminal status follows"
-        ));
+        return Some(format!("[background {job_id}] process request handled"));
     }
     if let Some(events) = object.get("events").and_then(Value::as_array) {
         let next_cursor = object
@@ -128,16 +126,16 @@ mod tests {
     }
 
     #[test]
-    fn formats_terminal_process_result_as_operation_only() {
+    fn formats_terminal_process_result_without_terminal_semantics() {
         let summary = format_background_result(
             "process",
             r#"{"job_id":"job_1","state":"exited","events":[{"stream":"stdout","text":"line one"}],"next_cursor":12,"eof":true}"#,
         )
         .unwrap();
-        assert_eq!(
-            summary,
-            "[background job_1] operation completed; terminal status follows"
-        );
+        assert_eq!(summary, "[background job_1] process request handled");
+        for terminal_word in ["completed", "terminal", "exited", "cancelled", "follows"] {
+            assert!(!summary.contains(terminal_word));
+        }
         assert!(!summary.contains("warning"));
         assert!(!summary.contains("secret-token"));
     }
