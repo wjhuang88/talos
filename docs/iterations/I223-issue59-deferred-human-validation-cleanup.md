@@ -23,7 +23,7 @@
 | Authorization Evidence | Maintainer active goal directs Issue #59 completion. Claim PR #405 exact head `77090baea4b729defa9ecea718ad8699fd1b6eb6` passed CI `32942271783`, independent Agent-role approval `5422073546` and merge-time CAS, then merged as `ab7508883100f17260eb8b0a54002c07373395bd`. |
 | Implementation PR | None |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. Windows D2 device evidence and V59-FINAL remain pending. |
+| Handoff / Release Condition | Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. All rows now have terminal evidence; evidence merge and owner-first closeout remain pending. |
 
 ## Published Baseline
 
