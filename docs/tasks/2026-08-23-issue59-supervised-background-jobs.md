@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; B through D2 Complete / Closed; I223 remains Planned / Unclaimed while its evidence-only claim draft is prepared.
+> Status: Active long task; B through D2 Complete / Closed; I223 Active / Claimed in proposed governance PR #405, ineffective until merge, for evidence-only validation.
 
 ## Startup Contract
 
