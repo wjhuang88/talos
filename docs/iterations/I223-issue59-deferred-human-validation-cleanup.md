@@ -1,6 +1,6 @@
 # Iteration I223: Issue #59 Deferred Human Validation Cleanup
 
-> Document status: Active / Claimed (proposed; ineffective until claim merge)
+> Document status: Active / Claimed
 > Published plan date: 2026-08-23
 > Planned objective: resolve every deferred Unix/Windows/manual acceptance row accumulated by the
 > Issue #59 TOOL-024-B/C/D chain against its exact implementation head and final integrated main.
@@ -20,10 +20,10 @@
 | Source Issue | #378 |
 | Governance Claim PR | #405 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer active goal directs Issue #59 completion. I222/B, I224/C, I226/D1-B and I228/D2 are Complete/Closed with pre-existing implementation evidence on `main@a600bd41`; this evidence-only claim requires exact-head governance CI/review/CAS before merge. |
+| Authorization Evidence | Maintainer active goal directs Issue #59 completion. Claim PR #405 exact head `77090baea4b729defa9ecea718ad8699fd1b6eb6` passed CI `32942271783`, independent Agent-role approval `5422073546` and merge-time CAS, then merged as `ab7508883100f17260eb8b0a54002c07373395bd`. |
 | Implementation PR | None |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Claim/activation is ineffective until this governance-only PR merges. Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. |
+| Handoff / Release Condition | Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. Windows D2 device evidence and V59-FINAL remain pending. |
 
 ## Published Baseline
 
@@ -71,10 +71,18 @@
 |---|---|---|
 | 2026-08-23 | Planned cleanup reservation | Created for Deferred Human Validation scheduling only; remains Unclaimed and inactive. |
 | 2026-08-26 | Claim preparation | All B/C/D implementation owners are Complete/Closed on `main@a600bd41`. Proposed evidence-only activation binds V59-B1 to `8671edf4`, V59-C1 to `60b0367c`, V59-D1 to `d4d7cb25`, V59-D2 to `a5fbc22e` and V59-FINAL to the post-closeout integrated baseline `a600bd41`; no pass is inferred from those merges. |
+| 2026-08-26 | Activation | Claim PR #405 merged as `ab750888`; I223 is effective and is the sole Active Issue #59 iteration. No product-code authority was added. |
+| 2026-08-26 | Partial evidence execution | V59-B1, V59-C1 and V59-D1 passed. Unix D2 passed through a rebuilt real CLI walkthrough; Windows D2 remains pending because Windows CI traverses production bridge/render code but not a real interactive device walkthrough. V59-FINAL therefore remains pending. |
 
 ## Verification Evidence
 
-- Pending source implementation heads.
+| Row | State | Exact evidence |
+|---|---|---|
+| V59-B1 | Pass | macOS arm64, integrated `main@ab750888`: rebuilt `talos --no-init --repl --no-context -w /private/tmp/talos-i228-impl` started `printf 'v59-cancel-ready\\n'; sleep 300` via `bash(background=true, timeout_secs=600)`, returned job `job_408197bf-f825-4f78-a391-b5860e3454f7`, and `process(cancel)` emitted one `Cancelled` terminal with `cleanup_outcome=terminated`. Process-table check found no matching shell/sleep; foreground `printf 'v59-after-cancel-ok\\n'` exited 0. A separate 60-second run emitted `TimedOut` with terminated cleanup. |
+| V59-C1 | Pass | The same real CLI session exercised `process list`, `status`, and `read(cursor=0)` for `job_7f6a1435-1bae-4556-b750-79a4b8ca745c`; read returned `v59-ready\\n` and `next_cursor=10`. Locked focused tests on `ab750888` passed 11/11 supervisor/process cases, including cursor advancement, in-chunk resume, 32-KiB clamp/eviction and unknown-job fail-closed behavior. |
+| V59-D1 | Pass | Real Windows Server 2025 evidence at D1 candidate `835578635daa1eebc76e79ca893296baeed6b35a` (same tree as merge `d4d7cb25`), CI `32849330531`, job `97807941106`: cancel, timeout, shutdown and PowerShell grandchild-reap tests passed. Integrated `main@ab750888`, CI `32943409893`, job `98098984864`, repeated all four successfully. |
+| V59-D2 | Partial | Unix real CLI passed start/list/status/read/cancel/terminal and remained usable for a foreground command. D2 CI `32937579899` and integrated CI `32943409893` passed Windows production bridge/render projection tests, but no interactive Windows CLI/TUI device walkthrough exists. |
+| V59-FINAL | Pending | Final integrated closure waits for terminal Windows D2 device evidence. The first Unix walkthrough hit host `ENOSPC` during transcript persistence; rebuildable target cache was removed and the successful cancellation walkthrough was repeated with persistence available, so the failed attempt is retained as a variance, not a pass. |
 
 ## Completion Evidence
 
@@ -83,8 +91,8 @@
 
 ## Variance And Residuals
 
-- Pending implementation rows.
+- No implementation variance or product-code correction was introduced. Windows D2 interactive device evidence is the sole device residual; V59-FINAL and Issue #378/#59 closeout remain gated on it.
 
 ## Retrospective
 
-- Pending execution.
+- Exact runner logs prove Windows process ownership, but renderer-unit coverage is not promoted into an interactive device pass.
