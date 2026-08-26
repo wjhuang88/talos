@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is Review / Claimed; I223 remains separate.
+> Status: Active long task; I222/B, I224/C, I225/D1-A, I226/D1-B and I228/D2 Complete / Closed; I223 remains Planned / Unclaimed.
 
 ## Startup Contract
 
@@ -341,3 +341,14 @@ when a provider reused the same tool ID. The next candidate clears pending ident
 authoritative terminal and new-turn boundary, deliberately preserves them across `ToolUse`
 continuation, and tests cancel/error/success/end-turn ID reuse. CI `32934838307` and its review do
 not transfer to the corrected head.
+
+## I228 / TOOL-024-D2 Completion Checkpoint (2026-08-26)
+
+The final PR #403 head `e65f9b490b0d375926f854076f7576131174c4b1` passed exact-head CI
+`32937579899` 5/5, including Windows workspace tests and rebuilt CLI smoke. Independent Agent-role
+protected-scope review `5421558305` approved the full CLI/TUI projection, terminal exactly-once,
+foreground compatibility, public API and platform coverage. Merge-time CAS confirmed stable
+head/base, effective claim, clean mergeability and no overlapping implementation PR before #403
+merged as `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`. I228 and TOOL-024-D2 are now
+Complete/Closed using that pre-existing implementation merge as Completion Commit. I223 remains
+Planned/Unclaimed and is the sole remaining Issue #59 iteration, owning V59-B1/C1/D1/D2/FINAL.

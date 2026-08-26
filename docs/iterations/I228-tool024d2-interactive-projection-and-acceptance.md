@@ -1,6 +1,6 @@
 # Iteration I228: TOOL-024-D2 Interactive Projection And Cross-Platform Acceptance
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-26
 > Planned objective: complete the real CLI/TUI projection and integrated cross-platform acceptance for the already-supervised background command contract.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 session |
 | Work Slice | TOOL-024-D2 projection, documentation and integrated Unix/Windows acceptance only; no supervisor or permission production changes. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | I222/B, I224/C and I226/D1-B Complete/Closed on current main; ADR-060 and ADR-068 Accepted. |
 | Implementation PR | #403 |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Claim #402 is effective on `main@da9a79cd`; implementation candidate requires fresh exact-head CI/review/CAS before merge. |
+| Handoff / Release Condition | Closed after PR #403 exact-head CI, independent protected-scope review, merge-time CAS and implementation merge `a5fbc22e`. I223 remains separately governed. |
 
 ## Published Baseline
 
@@ -74,14 +74,19 @@
 | 2026-08-26 | Independent review correction | PR #403 review `5420911368` rejected exact head `f5dc3415` for duplicate terminal semantics, missing real event-chain coverage and a source-breaking `ToolResultDisplay` field. The next local candidate restores the public struct shape, makes `BackgroundJobTerminal` the only terminal display authority and adds platform-neutral production-chain tests before fresh exact-head evidence. |
 | 2026-08-26 | Local pairing correction | Independent review found interleaved tool results could be paired by recency instead of `tool_use_id`. The local candidate now maintains a private pending-call identity map and has a regression test covering background/foreground results arriving out of order. |
 | 2026-08-26 | Pending-identity lifecycle correction | Review `5421297121` found unresolved identities could survive a cancelled, failed or completed turn and capture a later result after provider ID reuse. The candidate now clears pending identities at authoritative terminal/new-turn boundaries while preserving `ToolUse` continuation, with reuse regressions for cancel/error/success/end-turn. |
+| 2026-08-26 | Implementation completion | PR #403 exact head `e65f9b490b0d375926f854076f7576131174c4b1` passed CI `32937579899` 5/5, including Windows workspace, and independent Agent-role protected-scope review `5421558305` approved it. Merge-time CAS confirmed stable head/base, effective claim, clean merge state and no overlapping implementation PR; PR #403 merged as `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`. |
 
 ## Verification Evidence
 
-- Focused conversation/CLI/TUI event-chain tests, workspace check and clippy pass locally; fresh stable PR #403 evidence remains pending after the pairing correction.
+- Local focused conversation/CLI/TUI tests and `./scripts/release_preflight.sh` passed on the final candidate.
+- Exact-head CI `32937579899` passed 5/5 on `e65f9b490b0d375926f854076f7576131174c4b1`, including the Windows workspace test and rebuilt CLI smoke.
+- Independent Agent-role protected-scope review `5421558305` approved the same head; shared GitHub identity proves role separation only, not natural-person identity separation.
+- Merge-time CAS passed before PR #403 merged as `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `a5fbc22e71afeb30ff0804ec14bf15187d0fb716`.
+- This closeout records the pre-existing implementation merge; the status-only closeout commit does not self-certify completion.
 
 ## Variance And Residuals
 
@@ -89,4 +94,5 @@
 
 ## Retrospective
 
-- Pending implementation.
+- Keeping terminal lifecycle projection under one authoritative event and testing real event chains prevented formatter-only tests from hiding ordering defects.
+- Private correlation state needs explicit lifecycle cleanup whenever provider identifiers may be reused across turns.
