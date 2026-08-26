@@ -33,7 +33,11 @@ pub(crate) fn format_background_result(tool_name: &str, content: &str) -> Option
             format!(
                 "{}{}",
                 entries.join(", "),
-                if jobs.len() > entries.len() { ", …" } else { "" }
+                if jobs.len() > entries.len() {
+                    ", …"
+                } else {
+                    ""
+                }
             )
         };
         return Some(format!(

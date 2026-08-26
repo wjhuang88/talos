@@ -41,7 +41,10 @@ fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
             .take(8)
             .filter_map(|job| {
                 let id = job.get("job_id")?.as_str()?;
-                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let state = job
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
                 Some(format!("{id}={state}"))
             })
             .collect::<Vec<_>>();
@@ -51,7 +54,11 @@ fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
             format!(
                 "{}{}",
                 entries.join(", "),
-                if jobs.len() > entries.len() { ", …" } else { "" }
+                if jobs.len() > entries.len() {
+                    ", …"
+                } else {
+                    ""
+                }
             )
         };
         return Some(format!(
