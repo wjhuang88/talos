@@ -1026,6 +1026,7 @@ mod tests {
             talos_conversation::ToolResultDisplay {
                 tool_name: Some("bash".into()),
                 is_error: false,
+                is_background: false,
                 content: "first\nsecond line with 你好 and long content\n\nfourth\nfifth".into(),
             },
         ));

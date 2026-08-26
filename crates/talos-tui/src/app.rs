@@ -348,6 +348,7 @@ impl Tui {
                             tool_name: Some(tool_name),
                             is_error: result.is_error,
                             content,
+                            is_background: false,
                         },
                     ));
                 }

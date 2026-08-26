@@ -17,6 +17,81 @@ const HEAD_LINES: usize = 3;
 const TAIL_LINES: usize = 3;
 const TOOL_CALL_ARGS_BUDGET_CHARS: usize = 180;
 
+/// Converts a structured background-job result into a bounded human-facing
+/// summary while leaving the raw result available to the model/transcript.
+fn background_job_projection(display: &ToolResultDisplay) -> Option<String> {
+    if !display.is_background {
+        return None;
+    }
+    let tool_name = display.tool_name.as_deref()?;
+    if !matches!(tool_name, "bash" | "exec" | "process") {
+        return None;
+    }
+    let value = serde_json::from_str::<serde_json::Value>(&display.content).ok()?;
+    let object = value.as_object()?;
+    if tool_name == "process"
+        && let Some(jobs) = object.get("jobs").and_then(|v| v.as_array())
+    {
+        let truncated = object
+            .get("truncated")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let entries = jobs
+            .iter()
+            .take(8)
+            .filter_map(|job| {
+                let id = job.get("job_id")?.as_str()?;
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("unknown");
+                Some(format!("{id}={state}"))
+            })
+            .collect::<Vec<_>>();
+        let details = if entries.is_empty() {
+            format!("{} job(s)", jobs.len())
+        } else {
+            format!(
+                "{}{}",
+                entries.join(", "),
+                if jobs.len() > entries.len() { ", …" } else { "" }
+            )
+        };
+        return Some(format!(
+            "background jobs: {details}{}",
+            if truncated { ", list truncated" } else { "" }
+        ));
+    }
+    let job_id = object.get("job_id")?.as_str()?;
+    if job_id.is_empty() {
+        return None;
+    }
+    let state = object
+        .get("state")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    if let Some(events) = object.get("events").and_then(|v| v.as_array()) {
+        let cursor = object
+            .get("next_cursor")
+            .and_then(|v| v.as_u64())
+            .unwrap_or_default();
+        let eof = object.get("eof").and_then(|v| v.as_bool()).unwrap_or(false);
+        return Some(format!(
+            "background {job_id}: {state}, {} event(s), next cursor {cursor}{}",
+            events.len(),
+            if eof { ", eof" } else { "" }
+        ));
+    }
+    let exit = object
+        .get("exit_code")
+        .and_then(|v| v.as_i64())
+        .map(|code| format!(", exit code {code}"))
+        .unwrap_or_default();
+    let deadline = object
+        .get("deadline_secs")
+        .and_then(|v| v.as_u64())
+        .map(|seconds| format!(", deadline {seconds}s"))
+        .unwrap_or_default();
+    Some(format!("background {job_id}: {state}{exit}{deadline}"))
+}
+
 pub(crate) fn truncate_single_line(s: &str, max: usize) -> String {
     let single = s.replace('\n', " ");
     let chars: Vec<char> = single.chars().collect();
@@ -252,6 +327,22 @@ pub(crate) fn build_tool_result_scrollback_lines(
                     result_line_prefix(icon, true),
                     suppressed_tool_result_summary(display)
                 ),
+                line_color,
+                attrs,
+            )],
+            None,
+        )];
+    }
+
+    if let Some(summary) = background_job_projection(display) {
+        let (line_color, attrs) = if display.is_error {
+            (color, primary_result_attrs())
+        } else {
+            (secondary_result_color(), secondary_result_attrs())
+        };
+        return vec![ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("{}{}", result_line_prefix(icon, true), summary),
                 line_color,
                 attrs,
             )],
@@ -581,6 +672,7 @@ mod tests {
             tool_name: Some("test_tool".to_string()),
             content: "output line".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", Some(CColor::Green), 120);
         assert_eq!(lines.len(), 1);
@@ -593,11 +685,54 @@ mod tests {
     }
 
     #[test]
+    fn background_start_is_projected_without_raw_json() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#.to_string(),
+            is_error: false,
+            is_background: true,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, "   background job_1: running, deadline 30s");
+        assert!(!lines[0].text.contains("deadline_secs"));
+    }
+
+    #[test]
+    fn background_process_read_is_projected_with_cursor() {
+        let display = ToolResultDisplay {
+            tool_name: Some("process".to_string()),
+            content: r#"{"job_id":"job_1","state":"running","events":[{"stream":"stderr","text":"warning"}],"next_cursor":7,"eof":false}"#.to_string(),
+            is_error: false,
+            is_background: true,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert_eq!(
+            lines[0].text,
+            "   background job_1: running, 1 event(s), next cursor 7"
+        );
+        assert!(!lines[0].text.contains("warning"));
+    }
+
+    #[test]
+    fn foreground_json_shape_is_not_projected_as_background() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: r#"{"job_id":"job_1","state":"running"}"#.to_string(),
+            is_error: false,
+            is_background: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+        assert!(lines[0].text.contains("job_id"));
+    }
+
+    #[test]
     fn tool_result_error_rendering_unchanged() {
         let display = ToolResultDisplay {
             tool_name: Some("test_tool".to_string()),
             content: "error line".to_string(),
             is_error: true,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red), 120);
         assert_eq!(lines.len(), 1);
@@ -614,6 +749,7 @@ mod tests {
             tool_name: Some("test_tool".to_string()),
             content: "".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines_empty =
             build_tool_result_scrollback_lines(&display_empty, "", Some(CColor::Green), 120);
@@ -627,6 +763,7 @@ mod tests {
             tool_name: Some("read".to_string()),
             content: "line 1\nline 2".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines_suppressed =
             build_tool_result_scrollback_lines(&display_suppressed, "", Some(CColor::Green), 120);
@@ -643,6 +780,7 @@ mod tests {
             tool_name: Some("edit".to_string()),
             content: "edited src/main.rs\ndiff:\n- old line\n+ new line".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 4);
@@ -672,6 +810,7 @@ mod tests {
             tool_name: Some("git_diff".to_string()),
             content: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n context line".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 7);
@@ -696,6 +835,7 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: "- this is a bullet\n+ another bullet\nnormal text".to_string(),
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
         assert_eq!(lines.len(), 3);
@@ -747,6 +887,7 @@ mod tests {
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s".to_string(),
             is_error: false,
+            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -772,6 +913,7 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_1 cancelled. No further fires will occur.".to_string(),
             is_error: false,
+            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -793,6 +935,7 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_99 not found or already completed.".to_string(),
             is_error: false,
+            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -814,6 +957,7 @@ mod tests {
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "scheduler is not available".to_string(),
             is_error: true,
+            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -835,6 +979,7 @@ mod tests {
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "No active scheduled tasks.".to_string(),
             is_error: false,
+            is_background: false,
         };
         for width in [40u16, 60, 80, 120] {
             let (buf, h) = render_tool_result_to_buffer(&display, width);
@@ -855,6 +1000,7 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: long.clone(),
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 160);
         assert_eq!(lines.len(), 1);
@@ -872,6 +1018,7 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: long,
             is_error: false,
+            is_background: false,
         };
         let lines = build_tool_result_scrollback_lines(&display, "", None, 40);
         assert!(
@@ -892,6 +1039,7 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content: "你好".repeat(50),
             is_error: false,
+            is_background: false,
         };
         let lines_narrow = build_tool_result_scrollback_lines(&display, "", None, 40);
         let lines_wide = build_tool_result_scrollback_lines(&display, "", None, 160);
@@ -915,6 +1063,7 @@ mod tests {
             tool_name: Some("bash".to_string()),
             content,
             is_error: false,
+            is_background: false,
         };
         for width in [40u16, 80, 120, 160] {
             let lines = build_tool_result_scrollback_lines(&display, "", None, width);

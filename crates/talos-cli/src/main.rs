@@ -13,6 +13,7 @@
 //! - `--session <id>`: Resume a specific session by UUID
 
 mod approval;
+mod background_projection;
 mod colors;
 mod dashboard_helpers;
 mod diagnostics;

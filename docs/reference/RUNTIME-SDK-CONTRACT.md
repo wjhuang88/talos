@@ -151,6 +151,14 @@ and reap path. Unknown or foreign job identifiers fail closed without metadata d
 This control surface does not attach to arbitrary PIDs, persist across restarts, provide stdin/PTY
 control, add scheduling or autonomous follow-up turns, or change Windows background support.
 
+For an intentionally long-running `bash` or one-command `exec` invocation, set the explicit
+`background: true` input. The start result contains an opaque `job_id`; use the `process` tool
+with `status`, `read` (passing each returned `next_cursor`), `list`, or `cancel`. Use foreground
+execution for finite commands whose output is needed immediately. Do not infer background intent
+from shell syntax such as `&`, `nohup`, `Start-Job`, or `-d`, and do not busy-poll `read`.
+The CLI and TUI render a bounded job summary while retaining the structured result for the model;
+foreground tool output keeps its existing projection.
+
 ### Pattern 1a: Bounded Shared Shutdown
 
 ```rust,ignore

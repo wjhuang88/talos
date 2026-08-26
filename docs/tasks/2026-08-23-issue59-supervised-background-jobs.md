@@ -1,6 +1,6 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is proposed Active / Claimed (ineffective until claim merge); I223 remains separate.
+> Status: Active long task; I222/B, I224/C, I225/D1-A and I226/D1-B Complete / Closed; I228/D2 is Review / Claimed; I223 remains separate.
 
 ## Startup Contract
 
@@ -309,3 +309,11 @@ candidate prepared from `main@7dd04afd`; the claim and activation remain ineffec
 record reaches `main`. The slice is limited to CLI/TUI projection, user/model documentation and
 integrated Unix/Windows acceptance. It excludes supervisor, permission, Job Object, persistence,
 Dashboard/I213, `/auto`, release, publication, Desktop and I223 authority.
+
+## I228 Activation And Local Candidate Checkpoint (2026-08-26)
+
+Claim PR #402 merged as `da9a79cd`, so I228 is effective on `main`. The local candidate is in
+`Review / Claimed` and contains CLI/TUI projection, terminal-event delivery, bounded display-safe
+summaries and SDK guidance only. It remains subject to stable implementation PR, exact-head CI,
+independent protected-scope review and merge-time CAS. I223 still owns the five deferred Issue #378
+validation rows and remains required before closing Issue #59.

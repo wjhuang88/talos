@@ -471,11 +471,12 @@ impl ConversationEngine {
             }
             AgentEvent::ToolResult { result } => {
                 self.close_content(&mut outputs);
-                let tool_name = self.set_tool_result(result);
+                let (tool_name, is_background) = self.set_tool_result(result);
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
                     tool_name,
                     is_error: result.is_error,
                     content: result.content.clone(),
+                    is_background,
                 }));
                 self.current_phase = Some(TurnPhase::Generating);
                 outputs.push(UiOutput::Status(self.status_snapshot()));
@@ -812,17 +813,24 @@ impl ConversationEngine {
         ])
     }
 
-    fn set_tool_result(&mut self, result: &MessageToolResult) -> Option<String> {
+    fn set_tool_result(&mut self, result: &MessageToolResult) -> (Option<String>, bool) {
         for msg in self.messages.iter_mut().rev() {
             if let Some(ref mut tool_call) = msg.tool_call
                 && tool_call.result.is_none()
             {
                 let tool_name = tool_call.tool_name.clone();
+                let is_background = matches!(tool_name.as_str(), "process")
+                    || matches!(tool_name.as_str(), "bash" | "exec")
+                        && serde_json::from_str::<serde_json::Value>(&tool_call.arguments)
+                            .ok()
+                            .and_then(|input| input.get("background").cloned())
+                            .and_then(|value| value.as_bool())
+                            == Some(true);
                 tool_call.result = Some(result.clone());
-                return Some(tool_name);
+                return (Some(tool_name), is_background);
             }
         }
-        None
+        (None, false)
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {

@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A/B/C and D1-A Complete; D1-B/D2 and deferred validation remain)
+**Status**: Partial (A/B/C/D1-A/D1-B Complete; D2 Review; deferred validation remains)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -62,7 +62,7 @@ This Epic is deliberately narrower than a durable autonomous task runtime:
 | [TOOL-024-C](TOOL-024-C-model-readable-process-job-control.md) | Model-Readable Process Job Control | Product/Tool Story | Complete / Closed; PR #386 merged | TOOL-024-B Complete | Bounded `process` read/status/list/cancel operations with stable identity and ordered cursors. |
 | [TOOL-024-D1-A](TOOL-024-D1-A-windows-job-object-decision.md) | Windows Job Object Security And OS-ABI Decision | Architecture/Process-Security Decision | Complete / Closed | TOOL-024-C Complete; ADR-060/057 Accepted | Current-path matrix and Accepted ADR-068 define assigned-before-exec ownership, bounded OS-ABI, migration, rollback and D1-B test contract; no behavior change. |
 | [TOOL-024-D1-B](TOOL-024-D1-B-windows-job-object-ownership.md) | Windows Job Object Process-Tree Ownership | Product/Process-Security Story | Complete / Closed | TOOL-024-D1-A Complete; ADR-068 Accepted | PR #394 merged as `d4d7cb25`; exact candidate `83557863` passed CI `32849330531` and independent Windows/process/security/API review `5410840103`. |
-| [TOOL-024-D2](TOOL-024-D2-interactive-projection-and-acceptance.md) | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Active / Claimed (proposed; ineffective until claim merge) | TOOL-024-D1-B Complete | I228 owns CLI/TUI projection, user/model docs and integrated Unix/Windows acceptance; no supervisor, permission, Dashboard or `/auto` authority. |
+| [TOOL-024-D2](TOOL-024-D2-interactive-projection-and-acceptance.md) | Interactive Projection And Cross-Platform Acceptance | Product/TUI Story | Review / Claimed | TOOL-024-D1-B Complete | I228 owns CLI/TUI projection, user/model docs and integrated Unix/Windows acceptance; no supervisor, permission, Dashboard or `/auto` authority. |
 
 ## Major Risks
 
@@ -201,3 +201,11 @@ Proposed ADR-068 and the I225 current-path/migration matrix now define the Windo
 contract without enabling Windows background execution. D1-B must create/configure a Job Object and
 allowlisted stdio handle set while suspended, assign before resume, use kill-on-close, and fail
 closed with complete partial-failure cleanup. Exact decision review and acceptance remain pending.
+
+## I228 Activation And Local Candidate Checkpoint (2026-08-26)
+
+Claim PR #402 merged as `da9a79cd`, making I228 effective on the current `main`. The local D2
+candidate is in `Review / Claimed` and covers only CLI/TUI projection, terminal-event delivery,
+display-safe bounded summaries and SDK guidance. The candidate preserves the foreground path and
+does not change supervisor, permission, Job Object, Dashboard, persistence, `/auto` or release
+behavior. A stable implementation PR and exact-head protected validation remain required.

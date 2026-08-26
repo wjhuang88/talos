@@ -318,6 +318,7 @@ mod tests {
         tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
             tool_name: Some("read_file".into()),
             is_error: false,
+            is_background: false,
             content: "done".into(),
         }));
 

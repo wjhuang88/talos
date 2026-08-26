@@ -420,6 +420,8 @@ pub struct ToolResultDisplay {
     pub tool_name: Option<String>,
     pub is_error: bool,
     pub content: String,
+    /// Whether the originating call explicitly requested supervised background execution.
+    pub is_background: bool,
 }
 
 /// Scope for the `/copy` slash command.

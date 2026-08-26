@@ -539,6 +539,26 @@ async fn handle_session_event(
                 disposition,
             );
         }
+        SessionEvent::BackgroundJobTerminal { summary, .. } => {
+            let cleanup = summary
+                .cleanup_error
+                .as_deref()
+                .map(|error| format!(", cleanup: {}", error.chars().take(120).collect::<String>()))
+                .unwrap_or_default();
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::System,
+                text: format!(
+                    "[background {}] terminal: {:?}, stdout {} bytes, stderr {} bytes, cursor {}..{}{}",
+                    summary.job_id,
+                    summary.state,
+                    summary.stdout_bytes,
+                    summary.stderr_bytes,
+                    summary.earliest_cursor,
+                    summary.next_cursor,
+                    cleanup,
+                ),
+            }));
+        }
         SessionEvent::StructuredSubmissionStarted {
             session_id,
             session_generation,

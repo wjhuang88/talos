@@ -17,6 +17,7 @@ use talos_core::tool::ToolPresentationPolicy;
 use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
+use crate::background_projection::format_background_terminal;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
@@ -231,6 +232,9 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
+                SessionEvent::BackgroundJobTerminal { summary, .. } => {
+                    eprintln!("{}", format_background_terminal(&summary));
+                }
                 SessionEvent::TurnEvent {
                     payload:
                         TurnEventPayload::Progress {

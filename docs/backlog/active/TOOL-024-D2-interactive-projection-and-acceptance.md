@@ -1,15 +1,15 @@
 # TOOL-024-D2: Interactive Projection And Cross-Platform Acceptance
 
-> Document status: Active / Claimed (proposed; ineffective until the claim PR merges)
+> Document status: Review / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | TOOL-024-D2 |
 | Type | Product / CLI-TUI Integration |
 | Priority | P1 |
-| Status | Active / Claimed (proposed) |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) |
-| Selected Iteration | I228 Active / Claimed (proposed) |
+| Selected Iteration | I228 Review / Claimed |
 | Depends On | TOOL-024-B/I222 Complete; TOOL-024-C/I224 Complete; TOOL-024-D1-B/I226 Complete |
 
 ## Collaboration Claim
@@ -27,7 +27,7 @@
 | Authorization Evidence | I222/B, I224/C and I226/D1-B are Complete/Closed on current main; exact implementation boundaries are recorded in their owners and ADR-060/ADR-068. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Claim and activation become effective only on target-branch merge. Implementation starts from that merge or later main; D2 must not modify `crates/talos-dashboard/**` or I213 authority. |
+| Handoff / Release Condition | Claim #402 is effective on `main@da9a79cd`; implementation candidate remains pending local convergence and exact-head review. D2 must not modify `crates/talos-dashboard/**` or I213 authority. |
 
 ## Scope
 
@@ -66,3 +66,12 @@
 ## Residuals
 
 - I223 / Issue #378 deferred human-validation cleanup remains separate and must be completed before closing TOOL-024 or Issue #59.
+
+## Activation And Implementation Checkpoint (2026-08-26)
+
+Claim PR #402 merged into `main` as `da9a79cd` after exact-head CI and independent governance
+review. I228 is therefore effective and the implementation branch starts from that merge. The
+local candidate adds only CLI/TUI projection, event-path terminal summaries and SDK guidance; it
+does not modify the supervisor, permission, Job Object, Dashboard, `/auto`, persistence or release
+surface. It remains `Review / Claimed` with `Implementation PR: Not started` until the stable
+candidate is pushed and receives fresh exact-head evidence.

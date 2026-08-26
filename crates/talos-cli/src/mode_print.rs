@@ -13,6 +13,7 @@ use talos_core::session::{
 use talos_core::tool::ToolPresentationPolicy;
 
 use crate::approval::ApprovalPrompt;
+use crate::background_projection::format_background_terminal;
 use crate::image_validation::{ImageValidationError, create_image_content_part, max_image_count};
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
@@ -183,6 +184,9 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut stdout_line_open = false;
     while let Some(event) = handle.eq_rx.recv().await {
         match event {
+            SessionEvent::BackgroundJobTerminal { summary, .. } => {
+                eprintln!("{}", format_background_terminal(&summary));
+            }
             SessionEvent::TurnEvent {
                 payload:
                     TurnEventPayload::Progress {

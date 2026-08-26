@@ -130,6 +130,7 @@ mod tests {
         let display = ToolResultDisplay {
             tool_name: Some("bash".to_string()),
             is_error: false,
+            is_background: false,
             content: "你好\nlong result line".to_string(),
         };
         let mut store = TranscriptStore::default();
