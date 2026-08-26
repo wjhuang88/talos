@@ -65,6 +65,7 @@ in earlier reconciliation snapshots.
 | [#378](https://github.com/wjhuang88/talos/issues/378) | Issue #59 deferred cross-platform acceptance | [I223](../iterations/I223-issue59-deferred-human-validation-cleanup.md) | Planned / Unclaimed | Evidence-only tracker; activate after exact B/C/D implementation heads exist. |
 | [#390](https://github.com/wjhuang88/talos/issues/390) | architecture(memory): evolve context compaction into model-directed checkpoints with recoverable session history | [MEM-005](../backlog/active/MEM-005-context-compaction-policy.md) | Refinement | Intake reconciliation only; reconcile MEM-002/MEM-003/MEM-007 and select a separately governed implementation slice before production changes. |
 | [#395](https://github.com/wjhuang88/talos/issues/395) | architecture(observability): establish R3 structured diagnostics, correlation, and error-fidelity contract | [OBS-002](../backlog/active/OBS-002-structured-diagnostics-contract.md) | Intake / Unclaimed | Intake owner only; architecture/characterization first. Do not activate OBS-002 or authorize implementation from the Issue alone. |
+| [#408](https://github.com/wjhuang88/talos/issues/408) | allow provider switch after Esc cancels queued work | [TUI-062](../backlog/active/TUI-062-provider-switch-queued-work-recovery.md) | Intake / Unclaimed | Characterization and recovery-boundary intake only; no implementation authority. |
 
 ## Synchronization Notes
 

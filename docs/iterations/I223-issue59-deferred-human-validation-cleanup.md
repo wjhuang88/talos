@@ -1,6 +1,6 @@
 # Iteration I223: Issue #59 Deferred Human Validation Cleanup
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-23
 > Planned objective: resolve every deferred Unix/Windows/manual acceptance row accumulated by the
 > Issue #59 TOOL-024-B/C/D chain against its exact implementation head and final integrated main.
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5.6 Sol mainline Issue #59 validation session |
 | Work Slice | Evidence-only execution and reconciliation of Issue #378 rows V59-B1, V59-C1, V59-D1, V59-D2 and V59-FINAL against their existing implementation heads and final integrated main. No Rust/Cargo, product behavior, security policy, release, Dashboard, `/auto` or Desktop authority. |
@@ -23,7 +23,7 @@
 | Authorization Evidence | Maintainer active goal directs Issue #59 completion. Claim PR #405 exact head `77090baea4b729defa9ecea718ad8699fd1b6eb6` passed CI `32942271783`, independent Agent-role approval `5422073546` and merge-time CAS, then merged as `ab7508883100f17260eb8b0a54002c07373395bd`. |
 | Implementation PR | None |
 | Last Updated | 2026-08-26 |
-| Handoff / Release Condition | Close only after every Issue #378 row has exact environment/command/result evidence or a separately governed corrective owner. All rows now have terminal evidence; evidence merge and owner-first closeout remain pending. |
+| Handoff / Release Condition | Closed after all Issue #378 rows received terminal evidence and owner-first closeout merged. Evidence merge `00bf2d5d`; closeout merge recorded in the final owner checkpoint. |
 
 ## Published Baseline
 
@@ -86,8 +86,8 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
-- Evidence-only status commit cannot self-certify missing runtime acceptance.
+- Completion Commit: `a5fbc22e71afeb30ff0804ec14bf15187d0fb716` (I228/TOOL-024-D2 implementation merge; terminal I223 evidence validates the integrated behavior).
+- Evidence merge: `00bf2d5dfaa2b3726681611bbde5bd79464a1a83` (pre-existing governance evidence merge; not used as its own completion evidence).
 
 ## Variance And Residuals
 

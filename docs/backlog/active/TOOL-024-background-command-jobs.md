@@ -1,6 +1,6 @@
 # TOOL-024: Background Command Jobs And Session Result Delivery
 
-**Status**: Partial (A/B/C/D1-A/D1-B/D2 Complete; deferred validation remains)
+**Status**: Complete / Closed (A/B/C/D1-A/D1-B/D2 and I223 validation complete)
 **Priority**: P1
 **Type**: Epic
 **Source**: [GitHub Issue #59](https://github.com/wjhuang88/talos/issues/59) and maintainer request —
@@ -234,3 +234,11 @@ passed through rebuilt Unix CLI execution and focused locked supervisor/process 
 passed on real Windows Server 2025 at source candidate `83557863` and integrated main. Unix D2
 passed through the real CLI, while Windows D2 remains Partial because its production projection
 tests are not an interactive device walkthrough. V59-FINAL and Issue #59 remain open.
+
+## I223 Validation Closeout Checkpoint (2026-08-26)
+
+I223 evidence merge `00bf2d5dfaa2b3726681611bbde5bd79464a1a83` recorded terminal passes for all five
+Issue #378 rows. The Windows Server 2025 device run `32958236636` / job `98144594163` passed the
+interactive approval, background output, process control, cancellation, cleanup and foreground
+continuation checks. I223 records pre-existing implementation commit `a5fbc22e` as Completion
+Commit; TOOL-024 and Issue #59 are now Complete / Closed after owner-first closeout.

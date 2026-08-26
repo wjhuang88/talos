@@ -1,6 +1,16 @@
 # Issue #59 Supervised Background Command Jobs Long Task
 
-> Status: Active long task; B through D2 Complete / Closed; I223 Review / Claimed after #405 merge `ab750888`; V59-B1/C1/D1/D2 and V59-FINAL passed, with evidence closeout pending.
+> Status: Complete / Closed long task; B through D2 and I223 Complete / Closed; V59-B1/C1/D1/D2/FINAL passed, evidence merge `00bf2d5d` and I223 Completion Commit `a5fbc22e` recorded.
+
+## Final Closeout Checkpoint (2026-08-26)
+
+The terminal Windows Server 2025 device validation passed in workflow `32958236636`, job
+`98144594163`, against disposable harness head `4c477a97` with the integrated product tree based
+on `main@ab750888`. Evidence PR #406 merged as `00bf2d5d` after exact-head CI `32960406028` and
+independent Agent-role approval `5424295949`. I223 owner-first closeout now records Completion
+Commit `a5fbc22e`; Issue #378 and Issue #59 have terminal evidence and are ready for closure after
+the closeout PR merges. The disposable
+branch and workflow were never merged.
 
 ## Startup Contract
 
