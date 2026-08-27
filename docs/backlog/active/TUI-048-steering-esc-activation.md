@@ -5,7 +5,8 @@
 | Story ID | TUI-048 |
 | Type | TUI / Runtime State Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
+| Completion Commit | `9d7c87cb` (PR #411 implementation merge) |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267); [Issue #408](https://github.com/wjhuang88/talos/issues/408) |
 | Selected Iteration | I206 |
 | Depends On | TUI-044 / I169 accepted steering custody; current Esc cancellation behavior |
@@ -25,7 +26,7 @@
 | Authorization Evidence | Maintainer directed implementation of Issue #408. Claim PR #410 exact head `11861083` passed CI `33036746350`, independent Agent-role approval `5434254388` and merge-time CAS, then merged as `c3a121f0`. |
 | Implementation PR | #411 |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim PR #410 merged as `c3a121f0`. Completion requires implementation merge plus focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |
+| Handoff / Release Condition | Claim PR #410 merged as `c3a121f0`; implementation PR #411 merged as `9d7c87cb` after focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |
 
 ## Identity / Goal / Value
 
@@ -81,3 +82,12 @@ the queued input and pauses instead of crossing Session generations.
 The rebuilt TUI PTY trace recorded one cancelled turn followed automatically by one successful
 `queued continuation` turn in the same session. Provider-switch fence/release ordering is covered
 by the real bridge protocol fixture because the PTY remained inside the picker after opening it.
+
+## I206 Completion Checkpoint (2026-08-27)
+
+I206 is Complete / Closed. PR #411 exact head `c742eea5` merged to `main` as `9d7c87cb` after
+exact-head CI `33063880465` attempt 2 (5/5 success), independent Agent-role approval comment
+`5438243363`, and merge-time CAS. Completion evidence is the existing implementation merge, not
+this status update. Issue #267 is closed; Issue #408 remains mapped to the superseded TUI-062
+tombstone with I206 providing the delivered correction.
+- Completion Commit: `9d7c87cb` (PR #411 implementation merge).
