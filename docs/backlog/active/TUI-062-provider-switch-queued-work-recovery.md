@@ -1,8 +1,8 @@
 # TUI-062: Provider Switch Recovery After Cancelled Queued Work
 
 **Issue**: [#408](https://github.com/wjhuang88/talos/issues/408)
-**Status**: Intake / Unclaimed
-**Selected Iteration**: None
+**Status**: Superseded before implementation by TUI-048 / I206
+**Selected Iteration**: I206 through TUI-048
 
 ## Problem
 
@@ -27,6 +27,14 @@ unselected and unclaimed.
 
 The intake remains intentionally outside the Issue #59 closeout and has no implementation claim.
 
+## Disposition (2026-08-27)
+
+Read-only source tracing established that provider switching is blocked because Engine-owned
+steering remains authoritative after Esc cancellation. ADR-049 forbids a TUI-local clear or guard
+bypass, while TUI-048/I206 already requires that accepted steering become exactly one runnable
+same-Session turn after Esc. TUI-062 is therefore superseded before implementation and Issue #408
+is added to TUI-048/I206 acceptance. No separate TUI-062 branch, claim or code change is allowed.
+
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: Not applicable; superseded before implementation.
