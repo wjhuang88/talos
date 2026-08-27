@@ -77,7 +77,7 @@ not activated; no other Active iteration or overlapping open implementation PR e
 - `esc_cancel_activates_queued_turn_before_provider_switch_is_allowed` drives the bridge protocol:
   provider switch rejected before drain, generation-bound Esc interrupt, exactly one queued
   continuation submission, terminal success, then provider switch accepted.
-- `cargo test --locked -p talos-cli`: 355 unit tests plus all integration suites passed, 0 failures.
+- `cargo test --locked -p talos-cli`: 356 unit tests plus all integration suites passed, 0 failures.
 - `cargo clippy --locked -p talos-cli --all-targets -- -D warnings`: passed.
 - `generation_change_after_esc_retains_queue_without_cross_generation_submit`: passed; a G7
   cancellation cannot submit its queued input through a G8 route.
