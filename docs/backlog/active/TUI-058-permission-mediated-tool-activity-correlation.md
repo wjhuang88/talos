@@ -5,27 +5,27 @@
 | Story ID | TUI-058 |
 | Type | Bug / TUI / Permission Presentation Story |
 | Priority | P0 corrective residual from I211 |
-| Status | Ready / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #329](https://github.com/wjhuang88/talos/issues/329) |
-| Selected Iteration | None |
+| Selected Iteration | I229 (claim PR #413; activation ineffective until merge) |
 | Depends On | TUI-043/I201 merged behavior; permission approval event ordering; ADR-054 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-058 session |
+| Work Slice | Implement only TUI-058 permission-mediated tool activity correlation: preserve pending compatibility marker until correlated real ToolCall, suppress it only when known, and render each approval/result outcome with one named request identity. Add approve/deny/cancel/failure/retry/timeout and direct-event negative coverage. Exclude permission policy, provider, persistence schema, renderer rewrite, release, publication, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-27 |
 | Source Issue | #329 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #413 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Select a runnable corrective iteration and establish an effective claim before implementation. Permission-policy or protected-crate changes require independent security review. |
+| Last Updated | 2026-08-27 |
+| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #413 merges to `main`; protected permission-surface changes require independent security review. |
 
 ## Identity / Goal / Value
 
