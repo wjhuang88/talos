@@ -2,8 +2,8 @@
 
 Source intake: [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267).
 
-This sequence records three steering behaviors. I206/TUI-048 now proposes the first atomic
-claim/activation and absorbs Issue #408's provider-switch symptom; I207/I208 remain independently
+This sequence records three steering behaviors. I206/TUI-048 is in Review after claim #410 merged
+as `c3a121f0` and absorbs Issue #408's provider-switch symptom; I207/I208 remain independently
 claimable and no later-story implementation authorization is implied.
 
 ## Ordered Stories
@@ -20,8 +20,7 @@ claimable and no later-story implementation authorization is implied.
   validation and independent review before activation or completion.
 - No story may change durable steering custody, Session identity, permission policy or execution
   authority without explicit change control.
-- Current state: I206/TUI-048 is proposed `Active / Claimed` and ineffective until its governance
-  PR merges; I207/I208 remain `Planned / Unclaimed`. No implementation branch exists.
+- Current state: I206/TUI-048 is `Review / Claimed`; I207/I208 remain `Planned / Unclaimed`.
 
 ## Resume
 

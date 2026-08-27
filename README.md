@@ -517,7 +517,9 @@ killed and the shell remains in a raw or mouse-reporting state, run `reset` or o
 If you type a message while the model is still processing, it queues automatically and is sent
 FIFO after the current turn completes. The TUI shows a compact preview of queued messages
 above the composer (up to 6 lines; longer queues show a `+N more` summary). The preview clears
-when the queue empties.
+when the queue empties. If `Esc` cancels the active turn, already-accepted queued input becomes the
+next turn in the same session automatically. Model/provider switching remains blocked until that
+queued input is accepted by the session and the queue is drained.
 
 Use `/model` to switch among models whose providers are already configured. The picker
 uses **three-level navigation**: Level 1 lists recent models (when available, persisted

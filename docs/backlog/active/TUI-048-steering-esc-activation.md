@@ -5,7 +5,7 @@
 | Story ID | TUI-048 |
 | Type | TUI / Runtime State Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until claim merge) |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267); [Issue #408](https://github.com/wjhuang88/talos/issues/408) |
 | Selected Iteration | I206 |
 | Depends On | TUI-044 / I169 accepted steering custody; current Esc cancellation behavior |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer directed implementation of Issue #408. Repository analysis maps the symptom to the existing TUI-048/I206 objective and ADR-049/ADR-056 custody contract; claim PR #410 remains ineffective until exact-head CI, independent Agent-role review and merge-time CAS pass and it merges to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Merge this atomic claim/activation, then start implementation from that merge or later main. Completion requires focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |
+| Handoff / Release Condition | Claim PR #410 merged as `c3a121f0`. Completion requires implementation merge plus focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |
 
 ## Identity / Goal / Value
 
@@ -67,3 +67,15 @@ dropping the queue would violate ADR-049 and the published I206 objective. I206 
 correction: terminal cancellation must trigger transactional dispatch of the accepted steering,
 and provider switching becomes legal only after actor acceptance drains the authoritative queue.
 TUI-062 is absorbed as a duplicate symptom owner and grants no separate implementation authority.
+
+## I206 Local Stable Candidate Checkpoint (2026-08-27)
+
+Implementation starts from claim merge `c3a121f0`. Structured and legacy bridge completion now
+allow queued continuation only after Success or an explicitly requested cancellation; unrelated
+Cancelled and Error outcomes remain paused. The integration fixture proves provider mutation stays
+fenced before queue drain, Esc emits a generation-bound interrupt, accepted steering becomes one
+same-generation submission, and provider switching succeeds only after the continuation completes.
+No queue deletion, provider guard bypass, public API, permission or persistence change was made.
+The rebuilt TUI PTY trace recorded one cancelled turn followed automatically by one successful
+`queued continuation` turn in the same session. Provider-switch fence/release ordering is covered
+by the real bridge protocol fixture because the PTY remained inside the picker after opening it.
