@@ -389,6 +389,26 @@ mod tests {
             Some(TranscriptBlock::ToolResult(_))
         ));
     }
+
+    #[test]
+    fn approval_outcome_keeps_the_correlated_tool_name() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let (response, _receiver) = tokio::sync::oneshot::channel();
+        tui.handle_ui_output(UiOutput::ToolApprovalRequest {
+            tool_name: "write_file".into(),
+            arguments: serde_json::json!({"path": "README.md"}),
+            summary_fields: vec!["path".into()],
+            preview: None,
+            response,
+        });
+
+        tui.resolve_approval(talos_core::ApprovalChoice::ApproveOnce);
+
+        assert!(matches!(
+            tui.transcript.entries().last().map(|entry| &entry.block),
+            Some(TranscriptBlock::StyledLine(line)) if line.text.contains("approved: write_file")
+        ));
+    }
 }
 
 impl Tui {
