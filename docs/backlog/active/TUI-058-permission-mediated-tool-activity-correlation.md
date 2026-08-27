@@ -7,7 +7,7 @@
 | Priority | P0 corrective residual from I211 |
 | Status | Ready / Unclaimed |
 | Source | [GitHub Issue #329](https://github.com/wjhuang88/talos/issues/329) |
-| Selected Iteration | None |
+| Selected Iteration | I229 (claim pending; activation ineffective until merge) |
 | Depends On | TUI-043/I201 merged behavior; permission approval event ordering; ADR-054 |
 
 ## Collaboration Claim
