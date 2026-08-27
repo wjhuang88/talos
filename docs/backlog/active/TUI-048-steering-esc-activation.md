@@ -20,9 +20,9 @@
 | Work Slice | Implement only TUI-048/I206: after active-turn Esc cancellation reaches a terminal state, transactionally submit already-accepted Engine-owned steering to the same Session/generation as exactly one next runnable turn; preserve FIFO, durable submission identity, at-most-one active turn, retry/rollback semantics and existing queue projection. Prove provider switching remains blocked while queued work is authoritative and succeeds after the steering batch is actor-accepted and the queue is drained. No queue deletion/editing, provider-switch guard bypass, TUI-049/TUI-050, permission, persistence schema, provider lifecycle, release, Dashboard or Desktop changes. |
 | Claimed At | 2026-08-27 |
 | Source Issue | #267, #408 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #410 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer directed implementation of Issue #408. Repository analysis maps the symptom to the existing TUI-048/I206 objective and ADR-049/ADR-056 custody contract; the proposed claim and activation remain ineffective until this governance-only PR passes exact-head CI, independent Agent-role review and merge-time CAS. |
+| Authorization Evidence | Maintainer directed implementation of Issue #408. Repository analysis maps the symptom to the existing TUI-048/I206 objective and ADR-049/ADR-056 custody contract; claim PR #410 remains ineffective until exact-head CI, independent Agent-role review and merge-time CAS pass and it merges to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
 | Handoff / Release Condition | Merge this atomic claim/activation, then start implementation from that merge or later main. Completion requires focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |

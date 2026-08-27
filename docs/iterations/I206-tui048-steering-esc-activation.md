@@ -15,9 +15,9 @@
 | Work Slice | Implement only TUI-048/I206: transactionally activate already-accepted steering as exactly one same-Session next turn after active-turn Esc cancellation; prove queue custody/drain and provider-switch recovery without bypassing session mutation guards. Preserve I169, ADR-049 and ADR-056 identity/FIFO/rollback semantics. Exclude queue deletion/editing, TUI-049/TUI-050, provider lifecycle redesign, permission, persistence schema, release, Dashboard and Desktop work. |
 | Claimed At | 2026-08-27 |
 | Source Issue | #267, #408 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #410 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer directed Issue #408 implementation; exact claim/activation becomes effective only after governance PR CI, independent Agent-role review and merge-time CAS. |
+| Authorization Evidence | Maintainer directed Issue #408 implementation; claim PR #410 becomes effective only after exact-head CI, independent Agent-role review, merge-time CAS and merge to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
 | Handoff / Release Condition | Implementation begins from the claim merge or later main and must locally converge before one stable candidate push. |
