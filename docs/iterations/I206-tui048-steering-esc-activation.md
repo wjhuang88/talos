@@ -1,6 +1,6 @@
 # Iteration I206: Esc-Cancelled Steering Activation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned date: 2026-08-17
 > Objective: implement TUI-048 so accepted steering becomes a runnable Session turn when `Esc`
 > cancels the active turn, without changing the accepted I169 custody contract.
@@ -45,13 +45,24 @@ No TUI-049/TUI-050 implementation, queue redesign, permission policy change or r
 
 - [x] Esc cancellation admits accepted steering into the same Session.
 - [x] Exactly one continuation turn becomes runnable; empty and repeated-cancel cases are covered.
-- [ ] Focused, locked workspace validation and real-terminal evidence pass at exact head.
+- [x] Focused, locked workspace validation and real-terminal evidence pass at exact head.
 - [x] User-facing steering/cancellation documentation is updated.
 
 ## Status
 
-Review / Claimed. Implementation locally converged from claim merge `c3a121f0`; remote candidate
-and exact-head evidence remain pending.
+Complete / Closed. Implementation merged through PR #411 as `9d7c87cb` after exact-head CI,
+independent review and merge-time CAS.
+
+## 2026-08-27 Closeout Checkpoint
+
+- Implementation PR #411 exact head `c742eea5` merged to `main` as `9d7c87cb`.
+- Exact-head CI run `33063880465` attempt 2 passed all five jobs, including Windows workspace.
+- Independent Agent-role review approved exact head in comment `5438243363`; shared GitHub identity
+  is disclosed and no natural-person identity separation is claimed.
+- Local focused tests, clippy, release preflight, governance validators, YAML parsing and real PTY
+  evidence passed as recorded above.
+- Existing I226/#59 Windows marker-timeout flake was reproduced on the first CI attempt and passed
+  on retry; it remains outside I206 scope.
 
 ## 2026-08-27 Requirement Reconciliation
 
@@ -92,5 +103,6 @@ not activated; no other Active iteration or overlapping open implementation PR e
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `9d7c87cb` (implementation merge commit for PR #411; source implementation
+  commits `31862962`, `7a04584d`, and `c742eea5` are also present in its history).
 - A status-only documentation commit cannot self-certify completion.
