@@ -2,8 +2,9 @@
 
 Source intake: [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267).
 
-This sequence records three newly reported steering behaviors. It is a planning container only;
-the three stories remain independently claimable and no implementation authorization is implied.
+This sequence records three steering behaviors. I206/TUI-048 now proposes the first atomic
+claim/activation and absorbs Issue #408's provider-switch symptom; I207/I208 remain independently
+claimable and no later-story implementation authorization is implied.
 
 ## Ordered Stories
 
@@ -19,10 +20,11 @@ the three stories remain independently claimable and no implementation authoriza
   validation and independent review before activation or completion.
 - No story may change durable steering custody, Session identity, permission policy or execution
   authority without explicit change control.
-- The current state of all three stories is `Planned / Unclaimed`; no implementation branch exists.
+- Current state: I206/TUI-048 is proposed `Active / Claimed` and ineffective until its governance
+  PR merges; I207/I208 remain `Planned / Unclaimed`. No implementation branch exists.
 
 ## Resume
 
-Before selecting I206, refresh the exact-main inventory and create the pending intake Issue. Select
-I207 only after the shared padding contract is identified. Select I208 after the first two contracts
-are accepted or their interaction is explicitly resolved.
+I206 implementation starts only from its claim merge or later main. Select I207 only after the
+shared padding contract is identified. Select I208 after the first two contracts are accepted or
+their interaction is explicitly resolved.
