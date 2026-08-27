@@ -5,9 +5,9 @@
 | Story ID | TUI-058 |
 | Type | Bug / TUI / Permission Presentation Story |
 | Priority | P0 corrective residual from I211 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #329](https://github.com/wjhuang88/talos/issues/329) |
-| Selected Iteration | I229 (claim PR #413; activation ineffective until merge) |
+| Selected Iteration | I229 (claim PR #413 merged as `0e0c79ba`) |
 | Depends On | TUI-043/I201 merged behavior; permission approval event ordering; ADR-054 |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #413 merges to `main`; protected permission-surface changes require independent security review. |
+| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation is limited to this Work Slice and requires exact-head CI/review. Protected permission-surface changes require independent security review. |
 
 ## Identity / Goal / Value
 

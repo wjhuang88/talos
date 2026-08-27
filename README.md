@@ -588,6 +588,11 @@ Session only; it is not written into permission policy or session history, does 
 new/resume/fork/runtime replacement, and never overrides a configured deny. A different path, tool
 provenance, provider identity, or uncovered permission facet still requires approval.
 
+Approval outcomes in the TUI retain the associated tool name, and the temporary `Calling tools...`
+compatibility marker is held until a real structured tool call is confirmed. Direct result or
+approval events without a matching call keep the marker visible rather than creating a false
+correlation.
+
 Load a confined local read-only plugin package explicitly:
 
 ```bash

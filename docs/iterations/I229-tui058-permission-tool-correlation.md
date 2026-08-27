@@ -1,6 +1,6 @@
 # Iteration I229: Permission-Mediated Tool Activity Correlation
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-058/#329 by correlating permission-mediated tool activity without leaking compatibility markers or rendering unnamed approval outcomes.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized governance claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim and Active state become effective only after PR #413 merges to `main`; implementation starts from that merge or later. Protected permission-surface changes require independent security review. |
+| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation starts from that merge or later. Protected permission-surface changes require independent security review and exact-head review before merge. |
 
 ## Published Baseline
 
@@ -72,11 +72,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-27 | Atomic claim+activation proposal | Prepared from `main@d440a562`; I197/I201 remain Review under this corrective owner chain, I206 is Complete, and no overlapping implementation PR exists. PR #413 proposes the single bounded claim and Active state; both remain ineffective until merge. |
+| 2026-08-27 | Atomic claim+activation | PR #413 exact head `2bfb6b2b` passed CI `33072214429` attempt 2 and independent review `5439294515`, then merged as `0e0c79ba`. I229/TUI-058 claim and Active state are effective; implementation starts from this merge or later. |
 
 ## Verification Evidence
 
-- Pending implementation and exact-head evidence.
+- Local implementation candidate commits `0459e268` and `2c390c6d` add approval-wait marker custody, named approval outcomes and focused regression coverage. Exact-head implementation CI/review remain pending.
 
 ## Completion Evidence
 
