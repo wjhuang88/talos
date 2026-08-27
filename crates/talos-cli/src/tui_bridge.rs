@@ -108,11 +108,13 @@ pub(super) enum BridgeTurnState {
         session_id: String,
         turn_id: String,
         next_sequence: u64,
+        sender_generation: u64,
     },
     LegacyCancelling {
         session_id: String,
         turn_id: String,
         next_sequence: u64,
+        sender_generation: u64,
     },
     /// Exact durable submission that failed before Provider start. New user
     /// input remains Engine-owned until this identity is explicitly resolved.
@@ -145,6 +147,21 @@ fn session_mutation_blocked(state: &BridgeTurnState, engine: &ConversationEngine
     state.blocks_session_mutation()
         || engine.has_steering()
         || !engine.pending_image_attachments.is_empty()
+}
+
+fn completion_allows_queued_continuation(
+    status: &TurnCompletionStatus,
+    cancellation_requested: bool,
+) -> bool {
+    matches!(status, TurnCompletionStatus::Success { .. })
+        || cancellation_requested && matches!(status, TurnCompletionStatus::Cancelled)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum QueuedDispatch {
+    None,
+    CurrentRoute,
+    Generation(u64),
 }
 
 pub(crate) struct ConversationLoopIo {
@@ -432,7 +449,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     &mut known_sender,
                                     &mut sender_generation,
                                     &ui_tx,
-                                ).await;
+                                    QueuedDispatch::CurrentRoute,
+                                )
+                                .await;
                             }
                         }
                     }
@@ -574,6 +593,7 @@ async fn handle_session_event(
             sequence,
             payload,
         } => {
+            let mut dispatch = QueuedDispatch::None;
             handle_structured_turn_event(
                 engine,
                 turn_state,
@@ -588,8 +608,11 @@ async fn handle_session_event(
                 turn_id,
                 sequence,
                 payload,
+                &mut dispatch,
             );
-            if matches!(turn_state, BridgeTurnState::Idle) {
+            if !matches!(dispatch, QueuedDispatch::None)
+                && matches!(turn_state, BridgeTurnState::Idle)
+            {
                 dispatch_prepared_submission(
                     engine,
                     turn_state,
@@ -597,6 +620,7 @@ async fn handle_session_event(
                     known_sender,
                     sender_generation,
                     ui_tx,
+                    dispatch,
                 )
                 .await;
             }
@@ -607,10 +631,17 @@ async fn handle_session_event(
             sequence,
             payload,
         } => {
-            let completed_success = legacy_projection::handle_legacy_turn_event(
-                engine, turn_state, ui_tx, session_id, turn_id, sequence, payload,
+            let dispatch = legacy_projection::handle_legacy_turn_event(
+                engine,
+                turn_state,
+                ui_tx,
+                session_id,
+                turn_id,
+                sequence,
+                payload,
+                *sender_generation,
             );
-            if completed_success {
+            if !matches!(dispatch, QueuedDispatch::None) {
                 dispatch_prepared_submission(
                     engine,
                     turn_state,
@@ -618,6 +649,7 @@ async fn handle_session_event(
                     known_sender,
                     sender_generation,
                     ui_tx,
+                    dispatch,
                 )
                 .await;
             }
@@ -779,6 +811,7 @@ async fn handle_session_event(
                     known_sender,
                     sender_generation,
                     ui_tx,
+                    QueuedDispatch::CurrentRoute,
                 )
                 .await;
             }
@@ -1048,6 +1081,7 @@ fn handle_structured_turn_event(
     turn_id: String,
     sequence: u64,
     payload: TurnEventPayload,
+    queued_dispatch: &mut QueuedDispatch,
 ) {
     let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
     match payload {
@@ -1280,6 +1314,8 @@ fn handle_structured_turn_event(
             }
         }
         TurnEventPayload::Completed { status } => {
+            let cancellation_requested =
+                matches!(&state, BridgeTurnState::StructuredCancelling { .. });
             let matching = match &state {
                 BridgeTurnState::StructuredRunning {
                     session_id: expected_session,
@@ -1316,8 +1352,9 @@ fn handle_structured_turn_event(
             for output in engine.handle_turn_completed(&status) {
                 let _ = ui_tx.send(output);
             }
-            let success = matches!(status, TurnCompletionStatus::Success { .. });
-            *turn_state = if success {
+            let continuation_allowed =
+                completion_allows_queued_continuation(&status, cancellation_requested);
+            *turn_state = if continuation_allowed {
                 deferred_accepted.take().map_or(
                     BridgeTurnState::Idle,
                     DeferredAcceptedSubmission::into_turn_state,
@@ -1329,10 +1366,80 @@ fn handle_structured_turn_event(
             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                 engine.steering_queue_snapshot(),
             ));
+            if continuation_allowed {
+                *queued_dispatch = if cancellation_requested {
+                    QueuedDispatch::Generation(session_generation)
+                } else {
+                    QueuedDispatch::CurrentRoute
+                };
+            }
         }
         _ => {
             *turn_state = state;
         }
+    }
+}
+
+#[cfg(test)]
+mod completion_continuation_tests {
+    use super::*;
+
+    #[test]
+    fn only_success_or_requested_cancellation_allows_queued_continuation() {
+        let success = TurnCompletionStatus::Success {
+            final_text: String::new(),
+            new_messages: Vec::new(),
+        };
+        assert!(completion_allows_queued_continuation(&success, false));
+        assert!(completion_allows_queued_continuation(
+            &TurnCompletionStatus::Cancelled,
+            true
+        ));
+        assert!(!completion_allows_queued_continuation(
+            &TurnCompletionStatus::Cancelled,
+            false
+        ));
+        assert!(!completion_allows_queued_continuation(
+            &TurnCompletionStatus::Error {
+                message: "provider failed".into(),
+            },
+            true
+        ));
+    }
+
+    #[tokio::test]
+    async fn generation_change_after_esc_retains_queue_without_cross_generation_submit() {
+        let (generation_eight, mut generation_eight_rx) = tokio::sync::mpsc::channel(4);
+        crate::session_transition::register_generation_bound_sender(&generation_eight, 8);
+        let (_watch_tx, watch_rx) = tokio::sync::watch::channel(generation_eight.clone());
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut engine = ConversationEngine::new("model".into(), "provider".into());
+        engine.enqueue_steering("generation-seven-queued".into());
+        let mut turn_state = BridgeTurnState::Idle;
+        let mut known_sender = generation_eight;
+        let mut sender_generation = 8;
+
+        dispatch_prepared_submission(
+            &mut engine,
+            &mut turn_state,
+            &watch_rx,
+            &mut known_sender,
+            &mut sender_generation,
+            &ui_tx,
+            QueuedDispatch::Generation(7),
+        )
+        .await;
+
+        assert!(matches!(turn_state, BridgeTurnState::PausedAfterFailure));
+        assert_eq!(engine.steering_queue_snapshot().total_count, 1);
+        assert!(generation_eight_rx.try_recv().is_err());
+        assert!(matches!(
+            ui_rx.try_recv(),
+            Ok(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text,
+            })) if text.contains("session generation changed after cancellation")
+        ));
     }
 }
 
@@ -1443,6 +1550,7 @@ fn request_cancel(
             session_id,
             turn_id,
             next_sequence,
+            sender_generation,
         } => {
             if !send_legacy_interrupt(sq_tx_watch, ui_tx) {
                 return;
@@ -1451,6 +1559,7 @@ fn request_cancel(
                 session_id: session_id.clone(),
                 turn_id: turn_id.clone(),
                 next_sequence: *next_sequence,
+                sender_generation: *sender_generation,
             };
         }
         _ => {}
@@ -1528,6 +1637,7 @@ async fn dispatch_prepared_submission(
     known_sender: &mut tokio::sync::mpsc::Sender<SessionOp>,
     sender_generation: &mut u64,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    dispatch: QueuedDispatch,
 ) {
     let current_sender = sq_tx_watch.borrow().clone();
     if !known_sender.same_channel(&current_sender) {
@@ -1540,6 +1650,16 @@ async fn dispatch_prepared_submission(
         };
         *sender_generation = current_generation;
         *known_sender = current_sender.clone();
+    }
+    if let QueuedDispatch::Generation(expected_generation) = dispatch
+        && *sender_generation != expected_generation
+    {
+        *turn_state = BridgeTurnState::PausedAfterFailure;
+        emit_bridge_error(
+            ui_tx,
+            "session generation changed after cancellation; queued input was retained",
+        );
+        return;
     }
     let Some(mut submission) = engine.prepare_steering_submission() else {
         return;

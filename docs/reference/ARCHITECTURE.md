@@ -413,7 +413,7 @@ Always occupies exactly 1 row in the viewport. Shows `streaming_preview` content
 When a user submits normal text while a turn is already processing, the
 conversation engine stores it in the steering queue and emits a queue status
 update. The queued text is not rendered as a user message yet. After the active
-turn ends, the bridge drains one queued message, calls `start_user_message` for
+turn ends successfully or is cancelled, the bridge drains one queued message, calls `start_user_message` for
 that drained text, emits the resulting user stream/status to the TUI, and only
 then submits it to the session actor. This keeps scrollback, transcript state,
 queue counters, and the actual session submission in the same order.
