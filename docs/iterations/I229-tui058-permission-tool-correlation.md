@@ -1,6 +1,6 @@
 # Iteration I229: Permission-Mediated Tool Activity Correlation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-058/#329 by correlating permission-mediated tool activity without leaking compatibility markers or rendering unnamed approval outcomes.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #413 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized governance claim requires exact-head CI, governance validators and independent review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #414 |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation starts from that merge or later. Protected permission-surface changes require independent security review and exact-head review before merge. |
+| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation PR #414 merged as `5a9b6589` after exact-head CI and independent review. |
 
 ## Published Baseline
 
@@ -72,20 +72,21 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-27 | Atomic claim+activation | PR #413 exact head `2bfb6b2b` passed CI `33072214429` attempt 2 and independent review `5439294515`, then merged as `0e0c79ba`. I229/TUI-058 claim and Active state are effective; implementation starts from this merge or later. |
+| 2026-08-27 | Atomic claim+activation | PR #413 exact head `2bfb6b2b` passed CI `33072214429` attempt 2 and independent review `5439294515`, then merged as `0e0c79ba`. I229/TUI-058 claim and Active state became effective. |
 
 ## Verification Evidence
 
-- Local implementation candidate commits `0459e268` and `2c390c6d` add approval-wait marker custody, named approval outcomes and focused regression coverage. Exact-head implementation CI/review remain pending.
+- Local implementation candidate commits `0459e268` and `2c390c6d` add approval-wait marker custody, named approval outcomes and focused regression coverage. PR #414 exact head `b2179d33` merged as `5a9b6589` after CI `33074348512` attempt 2 and independent Agent-role approval `5439760729`.
+- `cargo test --locked -p talos-tui` passed 560 tests; strict Clippy, format, diff check and release preflight passed locally. User-facing README documentation was updated.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `5a9b6589` (PR #414 implementation merge).
 - Status-only governance commits cannot self-certify implementation completion.
 
 ## Variance And Residuals
 
-- I201 remains Review until this corrective story closes the permission-mediated failure; unrelated TUI-059, TUI-060, SKILL-005 and TUI-061 owners remain separate.
+- I201/TUI-043 remains Review because its separately deferred natural-person validation row is still open; I229/TUI-058 closes the permission-mediated implementation defect. TUI-059, TUI-060, SKILL-005 and TUI-061 remain separate.
 
 ## Retrospective
 
