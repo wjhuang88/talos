@@ -5,27 +5,27 @@
 | Story ID | TUI-059 |
 | Type | Bug / TUI / Permission Layout Story |
 | Priority | P0 corrective residual from I211 |
-| Status | Ready / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #330](https://github.com/wjhuang88/talos/issues/330) |
-| Selected Iteration | None |
+| Selected Iteration | I230 (claim PR #416; activation ineffective until merge) |
 | Depends On | TUI-045/I197 merged anchor state; inline composer ownership; ADR-054 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-059 session |
+| Work Slice | Implement only TUI-059 composer-relative permission prompt docking and deterministic layout restoration. Exclude permission semantics, request identity, persistence, provider, release, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-28 |
 | Source Issue | #330 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #416 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Select a runnable corrective iteration and establish an effective claim before implementation. Any permission semantic or protected-crate change stops for independent security review. |
+| Last Updated | 2026-08-28 |
+| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #416 merges to `main`; protected permission-surface changes require independent security review. |
 
 ## Identity / Goal / Value
 
