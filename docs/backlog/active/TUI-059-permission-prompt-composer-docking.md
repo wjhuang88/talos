@@ -7,7 +7,7 @@
 | Priority | P0 corrective residual from I211 |
 | Status | In Progress / Claimed |
 | Source | [GitHub Issue #330](https://github.com/wjhuang88/talos/issues/330) |
-| Selected Iteration | I230 (claim PR #416; activation ineffective until merge) |
+| Selected Iteration | I230 (claim PR #416; activation effective after merge) |
 | Depends On | TUI-045/I197 merged anchor state; inline composer ownership; ADR-054 |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #416 merges to `main`; protected permission-surface changes require independent security review. |
+| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation starts from that merge or later. Protected permission-surface changes require independent security review. |
 
 ## Identity / Goal / Value
 
