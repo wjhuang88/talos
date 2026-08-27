@@ -17,8 +17,8 @@
 | Source Issue | #267, #408 |
 | Governance Claim PR | #410 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer directed Issue #408 implementation; claim PR #410 becomes effective only after exact-head CI, independent Agent-role review, merge-time CAS and merge to main. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer directed Issue #408 implementation; claim PR #410 exact head `11861083` passed CI `33036746350`, independent Agent-role approval `5434254388` and merge-time CAS, then merged as `c3a121f0`. |
+| Implementation PR | #411 |
 | Last Updated | 2026-08-27 |
 | Handoff / Release Condition | Claim PR #410 merged as `c3a121f0`; implementation must pass exact-head CI, independent review, real-terminal acceptance and merge-time CAS. |
 

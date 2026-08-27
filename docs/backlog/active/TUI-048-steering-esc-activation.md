@@ -22,8 +22,8 @@
 | Source Issue | #267, #408 |
 | Governance Claim PR | #410 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer directed implementation of Issue #408. Repository analysis maps the symptom to the existing TUI-048/I206 objective and ADR-049/ADR-056 custody contract; claim PR #410 remains ineffective until exact-head CI, independent Agent-role review and merge-time CAS pass and it merges to main. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer directed implementation of Issue #408. Claim PR #410 exact head `11861083` passed CI `33036746350`, independent Agent-role approval `5434254388` and merge-time CAS, then merged as `c3a121f0`. |
+| Implementation PR | #411 |
 | Last Updated | 2026-08-27 |
 | Handoff / Release Condition | Claim PR #410 merged as `c3a121f0`. Completion requires implementation merge plus focused bridge/engine/TUI tests and a real-terminal Esc -> queued turn -> provider switch trace. |
 
