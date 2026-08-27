@@ -5,7 +5,7 @@
 | Story ID | TUI-058 |
 | Type | Bug / TUI / Permission Presentation Story |
 | Priority | P0 corrective residual from I211 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #329](https://github.com/wjhuang88/talos/issues/329) |
 | Selected Iteration | I229 (claim PR #413 merged as `0e0c79ba`) |
 | Depends On | TUI-043/I201 merged behavior; permission approval event ordering; ADR-054 |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #413 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #414 |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation is limited to this Work Slice and requires exact-head CI/review. Protected permission-surface changes require independent security review. |
+| Handoff / Release Condition | Claim PR #413 merged as `0e0c79ba`; implementation PR #414 merged as `5a9b6589` after exact-head CI `33074348512` attempt 2 and independent Agent-role review `5439760729`. |
 
 ## Identity / Goal / Value
 
@@ -93,3 +93,13 @@ runtime behavior.
 
 Permission policy, grant semantics or security decisions remain in PERM owners; general live
 activity headers remain in TUI-057.
+
+## Completion Checkpoint (2026-08-27)
+
+TUI-058 / I229 is Complete / Closed. The existing implementation merge `5a9b6589` is the
+Completion Commit. It fixes approval-wait marker custody and names approval outcomes without
+changing permission policy, execution semantics, persistence, Markdown rendering, provider
+behavior, release, Dashboard, Desktop or `/auto` behavior. I201/#111 remains Review only for its
+separately deferred natural-person acceptance row.
+
+Completion Commit: `5a9b6589`.
