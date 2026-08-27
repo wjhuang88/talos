@@ -71,10 +71,6 @@ in earlier reconciliation snapshots.
   `0953f3b1`; they are removed from this open-Issue matrix while historical owner evidence remains.
 - Issue #55 closed after I221/PERM-006-C implementation and owner-first closeout reached
   `main@e1c375e6`; its historical evidence remains in the 2026-08-22 snapshot and owner documents.
-- Issue #59 is Partial: A and technical prerequisites are complete, and B/I222 is Active/Claimed
-  through PR #379 merge `48e8ae9b`; C/D remain separately governed.
-- Issue #378 is mapped to planned evidence-only I223 and cannot substitute for mandatory process,
-  permission, unsafe or API security review.
 - Issue #395 is recorded under the unclaimed OBS-002 intake owner only; it has no iteration, claim,
   or implementation authority. Its registration is unrelated to I226 and does not activate
   observability work.
