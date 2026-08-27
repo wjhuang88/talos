@@ -1,6 +1,6 @@
 # Iteration I229: Permission-Mediated Tool Activity Correlation
 
-> Document status: Planned
+> Document status: Active / Claimed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-058/#329 by correlating permission-mediated tool activity without leaking compatibility markers or rendering unnamed approval outcomes.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-058 session |
+| Work Slice | Implement only TUI-058: correlate permission-mediated marker, approval outcome and named tool result by request identity, preserving permission semantics, ordering, execution count, persistence and legitimate marker-containing text; add positive and direct-event negative coverage. Exclude permission policy, provider, persistence schema, renderer rewrite, release, publication, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-27 |
 | Source Issue | #329 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #413 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized governance claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Establish an effective claim before implementation; protected permission-surface changes require independent security review. |
+| Handoff / Release Condition | Claim and Active state become effective only after PR #413 merges to `main`; implementation starts from that merge or later. Protected permission-surface changes require independent security review. |
 
 ## Published Baseline
 
@@ -72,7 +72,7 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-27 | Claim preparation | Prepared from `main@d440a562`; I197/I201 remain Review under this corrective owner chain, I206 is Complete, and no overlapping implementation PR exists. Claim and activation remain ineffective until the finalized governance PR merges. |
+| 2026-08-27 | Atomic claim+activation proposal | Prepared from `main@d440a562`; I197/I201 remain Review under this corrective owner chain, I206 is Complete, and no overlapping implementation PR exists. PR #413 proposes the single bounded claim and Active state; both remain ineffective until merge. |
 
 ## Verification Evidence
 

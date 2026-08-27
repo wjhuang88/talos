@@ -95,7 +95,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I225 | TOOL-024-D1-A Windows Job Object Decision | Complete / Closed | ADR-068 accepted by PR #391 merge `0021690e`; Completion Commit `fca45c46`; D1-B remains separately governed. |
 | I226 | TOOL-024-D1-B Windows Job Object Process-Tree Ownership | Complete / Closed | Completion Commit `d4d7cb25`; PR #394 merged from exact candidate `83557863`, CI `32849330531`, independent review `5410840103`. |
 | I228 | TOOL-024-D2 Interactive Projection And Cross-Platform Acceptance | Complete / Closed | Completion Commit `a5fbc22e`; PR #403 exact head `e65f9b49` passed CI `32937579899`, independent review `5421558305` and merge-time CAS. I223 remains separate. |
-| I229 | Permission-Mediated Tool Activity Correlation | Planned / Unclaimed | TUI-058/#329 corrective iteration; claim preparation from `main@d440a562`; no implementation authorization until claim merge. |
+| I229 | Permission-Mediated Tool Activity Correlation | Active / Claimed | TUI-058/#329 corrective iteration; governance claim PR #413 proposes activation from `main@d440a562`; implementation authorization remains ineffective until merge. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout
