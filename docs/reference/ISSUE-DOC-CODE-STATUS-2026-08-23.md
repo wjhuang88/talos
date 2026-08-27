@@ -25,7 +25,6 @@ in earlier reconciliation snapshots.
 | [#52](https://github.com/wjhuang88/talos/issues/52) | permission pipeline convergence | [PERM-006](../backlog/active/PERM-006-permission-pipeline-convergence.md) | In Progress | A-C are Complete/Closed; D is Ready/Unclaimed and E is Blocked on D. |
 | [#56](https://github.com/wjhuang88/talos/issues/56) | typed effects/resources | [PERM-006-D](../backlog/active/PERM-006-D-typed-effects-and-resources.md) | Ready | C is Complete; D still requires its own iteration and effective claim. |
 | [#57](https://github.com/wjhuang88/talos/issues/57) | cross-surface permission conformance | [PERM-006-E](../backlog/active/PERM-006-E-cross-surface-conformance.md) | Blocked | Completion blocked by D. |
-| [#59](https://github.com/wjhuang88/talos/issues/59) | supervised background command jobs | [TOOL-024](../backlog/active/TOOL-024-background-command-jobs.md) | Partial; B/I222 Active / Claimed | PR #379 merged as `48e8ae9b` after exact-head CI, independent Agent-role claim review and CAS; C/D and Issue #378/I223 remain ordered. |
 | [#111](https://github.com/wjhuang88/talos/issues/111) | hide Calling tools placeholder | [TUI-043](../backlog/active/TUI-043-tool-placeholder-suppression.md) | Review / Claimed | I201 implementation merged as `7f5a6df2`; permission-mediated suppression failed terminal validation and is now owned by Ready/Unclaimed TUI-058/#329. |
 | [#114](https://github.com/wjhuang88/talos/issues/114) | user-only global-memory admission | [MEM-010](../backlog/active/MEM-010-user-origin-memory-admission.md) | Ready P0 | Narrow safety correction; iteration/claim required. |
 | [#116](https://github.com/wjhuang88/talos/issues/116) | extensible memory scopes/migration | [MEM-011](../backlog/active/MEM-011-extensible-memory-scopes.md) | Refinement | ADR and migration fixtures required. |
@@ -62,13 +61,14 @@ in earlier reconciliation snapshots.
 | [#360](https://github.com/wjhuang88/talos/issues/360) | server remote relational persistence profile | [SERVER-002](../backlog/active/SERVER-002-remote-relational-persistence-profile.md) | Intake / Unclaimed | Separate refinement/ADR/iteration/claim required. |
 | [#361](https://github.com/wjhuang88/talos/issues/361) | standalone `talos-server` host composition | [SERVER-001-C](../backlog/active/SERVER-001-C-standalone-server-host-composition.md) | Intake / Unclaimed | Reuse existing runtime authorities; no implementation before separate governance. |
 | [#362](https://github.com/wjhuang88/talos/issues/362) | optional S3-compatible object-storage workspace | [TOOL-027](../backlog/active/TOOL-027-s3-object-workspace-backend.md) | Intake / Unclaimed | Optional object-workspace tools only; no implementation claim. |
-| [#378](https://github.com/wjhuang88/talos/issues/378) | Issue #59 deferred cross-platform acceptance | [I223](../iterations/I223-issue59-deferred-human-validation-cleanup.md) | Planned / Unclaimed | Evidence-only tracker; activate after exact B/C/D implementation heads exist. |
 | [#390](https://github.com/wjhuang88/talos/issues/390) | architecture(memory): evolve context compaction into model-directed checkpoints with recoverable session history | [MEM-005](../backlog/active/MEM-005-context-compaction-policy.md) | Refinement | Intake reconciliation only; reconcile MEM-002/MEM-003/MEM-007 and select a separately governed implementation slice before production changes. |
 | [#395](https://github.com/wjhuang88/talos/issues/395) | architecture(observability): establish R3 structured diagnostics, correlation, and error-fidelity contract | [OBS-002](../backlog/active/OBS-002-structured-diagnostics-contract.md) | Intake / Unclaimed | Intake owner only; architecture/characterization first. Do not activate OBS-002 or authorize implementation from the Issue alone. |
 | [#408](https://github.com/wjhuang88/talos/issues/408) | allow provider switch after Esc cancels queued work | [TUI-062](../backlog/active/TUI-062-provider-switch-queued-work-recovery.md) | Superseded before implementation | Duplicate symptom owner retained for unique Issue mapping; TUI-048/I206 owns Esc activation and provider-switch recovery after authoritative queue drain. Claim ineffective until merge. |
 
 ## Synchronization Notes
 
+- Issues #59 and #378 closed after I223/TOOL-024 evidence and owner-first closeout merged as
+  `0953f3b1`; they are removed from this open-Issue matrix while historical owner evidence remains.
 - Issue #55 closed after I221/PERM-006-C implementation and owner-first closeout reached
   `main@e1c375e6`; its historical evidence remains in the 2026-08-22 snapshot and owner documents.
 - Issue #59 is Partial: A and technical prerequisites are complete, and B/I222 is Active/Claimed
