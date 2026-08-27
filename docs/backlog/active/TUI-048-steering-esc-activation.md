@@ -76,6 +76,8 @@ Cancelled and Error outcomes remain paused. The integration fixture proves provi
 fenced before queue drain, Esc emits a generation-bound interrupt, accepted steering becomes one
 same-generation submission, and provider switching succeeds only after the continuation completes.
 No queue deletion, provider guard bypass, public API, permission or persistence change was made.
+Cancellation continuation now carries an explicit generation fence; a route replacement retains
+the queued input and pauses instead of crossing Session generations.
 The rebuilt TUI PTY trace recorded one cancelled turn followed automatically by one successful
 `queued continuation` turn in the same session. Provider-switch fence/release ordering is covered
 by the real bridge protocol fixture because the PTY remained inside the picker after opening it.

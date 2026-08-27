@@ -3,9 +3,11 @@ use talos_core::message::AgentEvent;
 use talos_core::session::TurnEventPayload;
 
 use super::{
-    BridgeTurnState, ProgressMode, completion_allows_queued_continuation, emit_bridge_error,
+    BridgeTurnState, ProgressMode, QueuedDispatch, completion_allows_queued_continuation,
+    emit_bridge_error,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_legacy_turn_event(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
@@ -14,14 +16,16 @@ pub(super) fn handle_legacy_turn_event(
     turn_id: String,
     sequence: u64,
     payload: TurnEventPayload,
-) -> bool {
+    current_sender_generation: u64,
+) -> QueuedDispatch {
     if matches!(
         turn_state,
         BridgeTurnState::StructuredRunning { .. } | BridgeTurnState::StructuredCancelling { .. }
     ) {
-        return handle_structured_legacy_projection(
+        handle_structured_legacy_projection(
             engine, turn_state, ui_tx, session_id, turn_id, sequence, payload,
         );
+        return QueuedDispatch::None;
     }
 
     let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
@@ -35,18 +39,21 @@ pub(super) fn handle_legacy_turn_event(
                 session_id,
                 turn_id,
                 next_sequence: 1,
+                sender_generation: current_sender_generation,
             };
-            false
+            QueuedDispatch::None
         }
         BridgeTurnState::LegacyRunning {
             session_id: expected_session,
             turn_id: expected_turn,
             mut next_sequence,
+            sender_generation,
         }
         | BridgeTurnState::LegacyCancelling {
             session_id: expected_session,
             turn_id: expected_turn,
             mut next_sequence,
+            sender_generation,
         } => {
             let cancelling = state_was_legacy_cancelling;
             if expected_session != session_id
@@ -58,16 +65,18 @@ pub(super) fn handle_legacy_turn_event(
                         session_id: expected_session,
                         turn_id: expected_turn,
                         next_sequence,
+                        sender_generation,
                     }
                 } else {
                     BridgeTurnState::LegacyRunning {
                         session_id: expected_session,
                         turn_id: expected_turn,
                         next_sequence,
+                        sender_generation,
                     }
                 };
                 emit_bridge_error(ui_tx, "ignored stale or out-of-order legacy session event");
-                return false;
+                return QueuedDispatch::None;
             }
             next_sequence = next_sequence.saturating_add(1);
             match payload {
@@ -80,15 +89,17 @@ pub(super) fn handle_legacy_turn_event(
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     } else {
                         BridgeTurnState::LegacyRunning {
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     };
-                    false
+                    QueuedDispatch::None
                 }
                 TurnEventPayload::Progress {
                     event: AgentEvent::Error { .. },
@@ -98,15 +109,17 @@ pub(super) fn handle_legacy_turn_event(
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     } else {
                         BridgeTurnState::LegacyRunning {
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     };
-                    false
+                    QueuedDispatch::None
                 }
                 TurnEventPayload::Progress { event } => {
                     for output in engine.handle_agent_event(&event) {
@@ -117,15 +130,17 @@ pub(super) fn handle_legacy_turn_event(
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     } else {
                         BridgeTurnState::LegacyRunning {
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     };
-                    false
+                    QueuedDispatch::None
                 }
                 TurnEventPayload::Completed { status } => {
                     for output in engine.handle_turn_completed(&status) {
@@ -141,7 +156,11 @@ pub(super) fn handle_legacy_turn_event(
                     let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                         engine.steering_queue_snapshot(),
                     ));
-                    continuation_allowed
+                    if continuation_allowed {
+                        QueuedDispatch::Generation(sender_generation)
+                    } else {
+                        QueuedDispatch::None
+                    }
                 }
                 _ => {
                     *turn_state = if cancelling {
@@ -149,21 +168,23 @@ pub(super) fn handle_legacy_turn_event(
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     } else {
                         BridgeTurnState::LegacyRunning {
                             session_id,
                             turn_id,
                             next_sequence,
+                            sender_generation,
                         }
                     };
-                    false
+                    QueuedDispatch::None
                 }
             }
         }
         other => {
             *turn_state = other;
-            false
+            QueuedDispatch::None
         }
     }
 }

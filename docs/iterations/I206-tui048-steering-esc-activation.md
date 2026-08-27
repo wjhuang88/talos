@@ -71,11 +71,16 @@ not activated; no other Active iteration or overlapping open implementation PR e
   cancellation; unrequested cancellation and Error remain paused.
 - Legacy compatibility dispatches after `LegacyCancelling + Cancelled`, without making arbitrary
   legacy Cancelled events runnable.
+- Cancellation continuation is fenced to the original Session generation. If the command route
+  advances before the terminal cancellation event arrives, queued input remains Engine-owned in
+  `PausedAfterFailure` and is never submitted to the replacement generation.
 - `esc_cancel_activates_queued_turn_before_provider_switch_is_allowed` drives the bridge protocol:
   provider switch rejected before drain, generation-bound Esc interrupt, exactly one queued
   continuation submission, terminal success, then provider switch accepted.
 - `cargo test --locked -p talos-cli`: 355 unit tests plus all integration suites passed, 0 failures.
 - `cargo clippy --locked -p talos-cli --all-targets -- -D warnings`: passed.
+- `generation_change_after_esc_retains_queue_without_cross_generation_submit`: passed; a G7
+  cancellation cannot submit its queued input through a G8 route.
 - User documentation updated in `README.md`, `README.zh-CN.md` and architecture reference.
 - Real-terminal evidence: rebuilt `target/debug/talos --no-init --tui --no-context` was driven in a
   120x40 PTY against a temporary loopback provider. Session
