@@ -329,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn approval_without_confirmed_call_flushes_marker() {
+    fn approval_wait_keeps_marker_pending_until_call_is_confirmed() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
             source: MessageSource::Assistant,
@@ -347,8 +347,67 @@ mod tests {
             response,
         });
 
-        assert!(pending_text(&tui).contains("Calling tools..."));
+        assert!(!pending_text(&tui).contains("Calling tools..."));
+        assert!(tui.tool_placeholder_gate.is_pending());
         assert!(tui.state.pending_approval_response.is_some());
+
+        tui.handle_ui_output(UiOutput::ToolCall(tool_call_named("write_file")));
+        assert!(!pending_text(&tui).contains("Calling tools..."));
+        assert!(matches!(
+            tui.pending_transcript.last(),
+            Some(TranscriptBlock::ToolCall(_))
+        ));
+    }
+
+    #[test]
+    fn approval_without_confirmed_call_flushes_marker_on_direct_result() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+            text: "Calling tools...".into(),
+        }));
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
+        let (response, _receiver) = tokio::sync::oneshot::channel();
+        tui.handle_ui_output(UiOutput::ToolApprovalRequest {
+            tool_name: "write_file".into(),
+            arguments: serde_json::json!({"path": "README.md"}),
+            summary_fields: vec!["path".into()],
+            preview: None,
+            response,
+        });
+        tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            tool_name: None,
+            is_error: true,
+            content: "permission denied".into(),
+        }));
+
+        assert!(pending_text(&tui).contains("Calling tools..."));
+        assert!(matches!(
+            tui.pending_transcript.last(),
+            Some(TranscriptBlock::ToolResult(_))
+        ));
+    }
+
+    #[test]
+    fn approval_outcome_keeps_the_correlated_tool_name() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let (response, _receiver) = tokio::sync::oneshot::channel();
+        tui.handle_ui_output(UiOutput::ToolApprovalRequest {
+            tool_name: "write_file".into(),
+            arguments: serde_json::json!({"path": "README.md"}),
+            summary_fields: vec!["path".into()],
+            preview: None,
+            response,
+        });
+
+        tui.resolve_approval(talos_core::ApprovalChoice::ApproveOnce);
+
+        assert!(matches!(
+            tui.transcript.entries().last().map(|entry| &entry.block),
+            Some(TranscriptBlock::StyledLine(line)) if line.text.contains("approved: write_file")
+        ));
     }
 }
 
@@ -519,7 +578,6 @@ impl Tui {
                 preview,
                 response,
             } => {
-                self.finalize_ordered_content();
                 self.state.pending_approval_response = Some(response);
                 let args_str = serde_json::to_string_pretty(&arguments)
                     .unwrap_or_else(|_| arguments.to_string());

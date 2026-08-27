@@ -133,10 +133,14 @@ impl Tui {
                 "denied",
             ),
         };
+        let tool_name = match &self.state.approval_state {
+            ApprovalState::Visible { tool_name, .. } => tool_name.as_str(),
+            ApprovalState::Hidden => "unknown tool",
+        };
         self.pending_transcript
             .push(TranscriptBlock::StyledLine(ScrollbackLine::styled(
                 vec![HistorySegment::styled(
-                    format!("   {icon} {msg}"),
+                    format!("   {icon} {msg}: {tool_name}"),
                     color,
                     HistoryAttrs::default(),
                 )],
