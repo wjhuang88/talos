@@ -7,7 +7,7 @@
 | Priority | P0 corrective residual from I211 |
 | Status | Ready / Unclaimed |
 | Source | [GitHub Issue #330](https://github.com/wjhuang88/talos/issues/330) |
-| Selected Iteration | None |
+| Selected Iteration | I230 (claim pending; activation ineffective until merge) |
 | Depends On | TUI-045/I197 merged anchor state; inline composer ownership; ADR-054 |
 
 ## Collaboration Claim
