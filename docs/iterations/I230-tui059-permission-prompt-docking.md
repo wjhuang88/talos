@@ -1,6 +1,6 @@
 # Iteration I230: Permission Prompt Composer-Relative Docking
 
-> Document status: Planned
+> Document status: Active / Claimed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-059/#330 by keeping permission prompts adjacent to the logical composer across non-bottom, narrow and resized layouts.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-059 session |
+| Work Slice | Implement only TUI-059 composer-relative permission prompt docking: derive placement from the logical composer/layout plan, apply minimum deterministic reflow, restore prior scroll state after resolution, and cover non-bottom, narrow/short, wrapped, repeated and resize paths. Exclude permission semantics, request identity, persistence, provider, release, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-28 |
 | Source Issue | #330 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #416 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Establish an effective claim before implementation; permission semantic or protected-crate changes require independent security review. |
+| Handoff / Release Condition | Claim and Active state become effective only after PR #416 merges to `main`; implementation starts from that merge or later. Permission semantic or protected-crate changes require independent security review. |
 
 ## Published Baseline
 
@@ -70,7 +70,7 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-27 | Claim preparation | Prepared from `main@fd84c92e`; I229/TUI-058 is Complete, I197 remains Review, and no overlapping implementation PR exists. Claim and activation remain ineffective until finalized governance PR merges. |
+| 2026-08-28 | Atomic claim+activation proposal | Prepared from `main@fd84c92e`; I229/TUI-058 is Complete, I197 remains Review, and no overlapping implementation PR exists. PR #416 proposes the single bounded claim and Active state; both remain ineffective until merge. |
 
 ## Verification Evidence
 
