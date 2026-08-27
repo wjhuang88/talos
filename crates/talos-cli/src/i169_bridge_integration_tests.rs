@@ -588,6 +588,204 @@ async fn coalesced_sender_replacements_submit_and_ack_exact_generation_two() {
 }
 
 #[tokio::test]
+async fn esc_cancel_activates_queued_turn_before_provider_switch_is_allowed() {
+    let (command_tx, mut command_rx) = mpsc::channel(8);
+    register_generation_bound_sender(&command_tx, 7);
+    let (agent_tx, agent_rx) = mpsc::unbounded_channel();
+    let (user_tx, user_rx) = mpsc::unbounded_channel();
+    let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+    let (_watch_tx, watch_rx) = tokio::sync::watch::channel(command_tx);
+    let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(128_000));
+    let (session_tx, mut session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let bridge_task = tokio::spawn(run_conversation_loop(
+        ConversationEngine::new("i206-model".into(), "test-provider".into()),
+        ConversationLoopIo {
+            agent_rx,
+            user_rx,
+            ui_tx,
+            sq_tx_watch: watch_rx,
+            model_info_watch: model_rx,
+            session_tx,
+            runtime_skills: runtime_skills(),
+            permission_engine: None,
+        },
+    ));
+
+    user_tx
+        .send(UserInput::Message("active turn".into()))
+        .expect("submit active turn");
+    let first = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+        .await
+        .expect("first submission timeout")
+        .expect("command channel open");
+    let SessionOp::SubmitStructured { submission: first } = first else {
+        panic!("expected first structured submission");
+    };
+    let first_receipt = "receipt-i206-first".to_string();
+    let first_turn = "turn-i206-first".to_string();
+    agent_tx
+        .send(SessionEvent::SubmissionReceipt {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: first.id.clone(),
+            reservation_id: format!("reservation:{}", first.id),
+            receipt_id: first_receipt.clone(),
+            item_count: first.items.len(),
+            total_text_bytes: first.total_text_bytes(),
+            disposition: SubmissionReceiptDisposition::AcceptedPending,
+        })
+        .expect("first receipt");
+    agent_tx
+        .send(SessionEvent::StructuredTurnEvent {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: first.id.clone(),
+            receipt_id: first_receipt.clone(),
+            turn_id: first_turn.clone(),
+            sequence: 0,
+            payload: TurnEventPayload::Started,
+        })
+        .expect("first turn start");
+
+    user_tx
+        .send(UserInput::Message("queued continuation".into()))
+        .expect("queue continuation");
+    user_tx
+        .send(UserInput::ConnectSelect {
+            provider: "other-provider".into(),
+        })
+        .expect("try provider switch while queued");
+    assert!(
+        session_rx.try_recv().is_err(),
+        "provider switch must remain fenced"
+    );
+
+    user_tx.send(UserInput::Cancel).expect("Esc cancellation");
+    let interrupt = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+        .await
+        .expect("interrupt timeout")
+        .expect("command channel open");
+    assert!(matches!(
+        interrupt,
+        SessionOp::InterruptTurn {
+            session_generation: 7,
+            ref turn_id,
+        } if turn_id == &first_turn
+    ));
+    agent_tx
+        .send(SessionEvent::StructuredTurnEvent {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: first.id,
+            receipt_id: first_receipt,
+            turn_id: first_turn,
+            sequence: 1,
+            payload: TurnEventPayload::Completed {
+                status: TurnCompletionStatus::Cancelled,
+            },
+        })
+        .expect("cancelled completion");
+
+    let second = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+        .await
+        .expect("queued continuation dispatch timeout")
+        .expect("command channel open");
+    let SessionOp::SubmitStructured { submission: second } = second else {
+        panic!("expected queued structured submission");
+    };
+    assert_eq!(second.sender_generation, 7);
+    assert_eq!(second.items.len(), 1);
+    assert_eq!(second.items[0].text, "queued continuation");
+
+    let second_receipt = "receipt-i206-second".to_string();
+    agent_tx
+        .send(SessionEvent::SubmissionReceipt {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: second.id.clone(),
+            reservation_id: format!("reservation:{}", second.id),
+            receipt_id: second_receipt.clone(),
+            item_count: second.items.len(),
+            total_text_bytes: second.total_text_bytes(),
+            disposition: SubmissionReceiptDisposition::AcceptedPending,
+        })
+        .expect("second receipt");
+    agent_tx
+        .send(SessionEvent::StructuredTurnEvent {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: second.id.clone(),
+            receipt_id: second_receipt.clone(),
+            turn_id: "turn-i206-second".into(),
+            sequence: 0,
+            payload: TurnEventPayload::Started,
+        })
+        .expect("second turn start");
+    agent_tx
+        .send(SessionEvent::StructuredTurnEvent {
+            session_id: "session-i206".into(),
+            session_generation: 7,
+            source: SubmissionSource::User,
+            submission_id: second.id,
+            receipt_id: second_receipt,
+            turn_id: "turn-i206-second".into(),
+            sequence: 1,
+            payload: TurnEventPayload::Completed {
+                status: TurnCompletionStatus::Success {
+                    final_text: String::new(),
+                    new_messages: Vec::new(),
+                },
+            },
+        })
+        .expect("second turn completion");
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut saw_second_turn_running = false;
+        loop {
+            match ui_rx.recv().await {
+                Some(UiOutput::Status(status)) if status.is_processing => {
+                    saw_second_turn_running = true;
+                }
+                Some(UiOutput::Status(status))
+                    if saw_second_turn_running
+                        && !status.is_processing
+                        && status.phase.is_none()
+                        && status.steering_count == 0 =>
+                {
+                    break;
+                }
+                Some(_) => {}
+                None => panic!("bridge closed before queue drained"),
+            }
+        }
+    })
+    .await
+    .expect("queue drain projection timeout");
+    user_tx
+        .send(UserInput::ConnectSelect {
+            provider: "other-provider".into(),
+        })
+        .expect("provider switch after queue drain");
+    let request = tokio::time::timeout(Duration::from_secs(2), session_rx.recv())
+        .await
+        .expect("provider switch request timeout")
+        .expect("session lifecycle channel open");
+    assert!(matches!(
+        request,
+        SessionLifecycleRequest::ConnectRequest { provider }
+            if provider == "other-provider"
+    ));
+
+    user_tx.send(UserInput::Exit).expect("exit bridge");
+    bridge_task.await.expect("bridge task");
+}
+
+#[tokio::test]
 async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
     let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));

@@ -147,6 +147,14 @@ fn session_mutation_blocked(state: &BridgeTurnState, engine: &ConversationEngine
         || !engine.pending_image_attachments.is_empty()
 }
 
+fn completion_allows_queued_continuation(
+    status: &TurnCompletionStatus,
+    cancellation_requested: bool,
+) -> bool {
+    matches!(status, TurnCompletionStatus::Success { .. })
+        || cancellation_requested && matches!(status, TurnCompletionStatus::Cancelled)
+}
+
 pub(crate) struct ConversationLoopIo {
     pub agent_rx: tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     pub user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
@@ -1280,6 +1288,8 @@ fn handle_structured_turn_event(
             }
         }
         TurnEventPayload::Completed { status } => {
+            let cancellation_requested =
+                matches!(&state, BridgeTurnState::StructuredCancelling { .. });
             let matching = match &state {
                 BridgeTurnState::StructuredRunning {
                     session_id: expected_session,
@@ -1316,8 +1326,9 @@ fn handle_structured_turn_event(
             for output in engine.handle_turn_completed(&status) {
                 let _ = ui_tx.send(output);
             }
-            let success = matches!(status, TurnCompletionStatus::Success { .. });
-            *turn_state = if success {
+            let continuation_allowed =
+                completion_allows_queued_continuation(&status, cancellation_requested);
+            *turn_state = if continuation_allowed {
                 deferred_accepted.take().map_or(
                     BridgeTurnState::Idle,
                     DeferredAcceptedSubmission::into_turn_state,
@@ -1333,6 +1344,34 @@ fn handle_structured_turn_event(
         _ => {
             *turn_state = state;
         }
+    }
+}
+
+#[cfg(test)]
+mod completion_continuation_tests {
+    use super::*;
+
+    #[test]
+    fn only_success_or_requested_cancellation_allows_queued_continuation() {
+        let success = TurnCompletionStatus::Success {
+            final_text: String::new(),
+            new_messages: Vec::new(),
+        };
+        assert!(completion_allows_queued_continuation(&success, false));
+        assert!(completion_allows_queued_continuation(
+            &TurnCompletionStatus::Cancelled,
+            true
+        ));
+        assert!(!completion_allows_queued_continuation(
+            &TurnCompletionStatus::Cancelled,
+            false
+        ));
+        assert!(!completion_allows_queued_continuation(
+            &TurnCompletionStatus::Error {
+                message: "provider failed".into(),
+            },
+            true
+        ));
     }
 }
 

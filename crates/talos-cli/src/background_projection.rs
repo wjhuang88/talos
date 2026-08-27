@@ -120,7 +120,7 @@ mod tests {
             "bash",
             r#"{"job_id":"job_1","state":"running","tool":"bash","deadline_secs":30}"#,
         )
-        .unwrap();
+        .expect("valid background start receipt fixture");
         assert_eq!(summary, "[background job_1] running, deadline 30s");
         assert!(!summary.contains("deadline_secs"));
     }
@@ -131,7 +131,7 @@ mod tests {
             "process",
             r#"{"job_id":"job_1","state":"exited","events":[{"stream":"stdout","text":"line one"}],"next_cursor":12,"eof":true}"#,
         )
-        .unwrap();
+        .expect("valid background terminal fixture");
         assert_eq!(summary, "[background job_1] process request handled");
         for terminal_word in ["completed", "terminal", "exited", "cancelled", "follows"] {
             assert!(!summary.contains(terminal_word));
@@ -146,7 +146,7 @@ mod tests {
             "process",
             r#"{"jobs":[{"job_id":"job_1","state":"running"}],"truncated":false}"#,
         )
-        .unwrap();
+        .expect("valid background list fixture");
         assert_eq!(summary, "[background jobs] job_1=running");
     }
 

@@ -1,8 +1,10 @@
 use talos_conversation::{ConversationEngine, UiOutput};
 use talos_core::message::AgentEvent;
-use talos_core::session::{TurnCompletionStatus, TurnEventPayload};
+use talos_core::session::TurnEventPayload;
 
-use super::{BridgeTurnState, ProgressMode, emit_bridge_error};
+use super::{
+    BridgeTurnState, ProgressMode, completion_allows_queued_continuation, emit_bridge_error,
+};
 
 pub(super) fn handle_legacy_turn_event(
     engine: &mut ConversationEngine,
@@ -129,8 +131,9 @@ pub(super) fn handle_legacy_turn_event(
                     for output in engine.handle_turn_completed(&status) {
                         let _ = ui_tx.send(output);
                     }
-                    let success = matches!(status, TurnCompletionStatus::Success { .. });
-                    *turn_state = if success {
+                    let continuation_allowed =
+                        completion_allows_queued_continuation(&status, cancelling);
+                    *turn_state = if continuation_allowed {
                         BridgeTurnState::Idle
                     } else {
                         BridgeTurnState::PausedAfterFailure
@@ -138,7 +141,7 @@ pub(super) fn handle_legacy_turn_event(
                     let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                         engine.steering_queue_snapshot(),
                     ));
-                    success
+                    continuation_allowed
                 }
                 _ => {
                     *turn_state = if cancelling {
