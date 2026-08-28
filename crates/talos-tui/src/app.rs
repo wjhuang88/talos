@@ -11,7 +11,8 @@ use ratatui::{
     widgets::Paragraph,
 };
 use talos_conversation::{
-    ContentOutput, CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput, UserInput,
+    ContentOutput, CopyScope, StatusSnapshot, TipKind, TodoPanelData, TurnPhase, UiOutput,
+    UserInput,
 };
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
@@ -161,6 +162,7 @@ pub struct Tui {
     dashboard_availability: Option<crate::splash::DashboardAvailability>,
     approval_viewport_snapshot: Option<ApprovalViewportSnapshot>,
     approval_preview_fully_visible: bool,
+    deferred_reconnecting_status: Option<(StatusSnapshot, Instant)>,
 }
 
 #[derive(Clone, Debug)]
@@ -243,6 +245,7 @@ impl Tui {
             dashboard_availability: None,
             approval_viewport_snapshot: None,
             approval_preview_fully_visible: true,
+            deferred_reconnecting_status: None,
         })
     }
 
@@ -287,6 +290,7 @@ impl Tui {
             dashboard_availability: None,
             approval_viewport_snapshot: None,
             approval_preview_fully_visible: true,
+            deferred_reconnecting_status: None,
         }
     }
 
