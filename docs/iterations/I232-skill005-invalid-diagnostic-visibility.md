@@ -1,6 +1,6 @@
 # Iteration I232: Invalid Skill Diagnostic Visibility
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-28
 > Planned objective: close SKILL-005/#333 by surfacing bounded field diagnostics for explicitly activated invalid local Skill documents.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim and Active state become effective only after PR #423 merges to `main`; implementation starts from that merge or later. |
+| Handoff / Release Condition | Claim PR #423 merged as `f2c98ff1`; implementation candidate requires exact-head CI, independent review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -67,11 +67,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-28 | Claim preparation | Prepared from `main@88261365`; I231 is Complete/Closed, I198 remains Review and no overlapping implementation PR exists. Claim and activation remain ineffective until governance merge. |
+| 2026-08-28 | Atomic claim+activation | PR #423 exact head `c93705ce` passed CI and governance gates, then merged as `f2c98ff1`; I232/SKILL-005 claim and Active state became effective. |
 
 ## Verification Evidence
 
-- Pending.
+- Local candidate preserves fail-closed discovery while surfacing bounded `triggers` diagnostics for explicit invalid scalar/mapping activation. Unit, real-binary, full CLI/Skill tests and strict Clippy pass locally; exact-head gates pending.
 
 ## Completion Evidence
 

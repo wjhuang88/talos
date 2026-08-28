@@ -1,14 +1,16 @@
 //! Runtime skill discovery and session prompt wiring.
 
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Result, anyhow, bail};
 use talos_agent::Agent;
 use talos_conversation::SkillDiagnostic;
-use talos_skill::{SkillIndex, SkillLoader, SkillManager};
+use talos_skill::{SkillDiscoveryWarningKind, SkillIndex, SkillLoader, SkillManager};
 
 const MAX_SKILL_BODY_BYTES: usize = 24 * 1024;
 const MAX_SKILL_REFERENCE_BYTES: usize = 16 * 1024;
+const MAX_INVALID_SKILL_DIAGNOSTIC_BYTES: usize = 512;
 
 /// Skill metadata discovered for a runtime session.
 pub(crate) struct RuntimeSkills {
@@ -19,6 +21,7 @@ pub(crate) struct RuntimeSkills {
     active_name: Option<String>,
     activated_content: Option<String>,
     loaded_references: Vec<String>,
+    invalid_activation_diagnostics: HashMap<String, String>,
 }
 
 impl RuntimeSkills {
@@ -53,10 +56,12 @@ impl RuntimeSkills {
 
     /// Activates a Skill body and returns bounded model-visible content.
     pub(crate) fn activate(&mut self, name: &str) -> Result<String> {
-        let skill = self
-            .manager
-            .load_skill(name)
-            .map_err(|_| anyhow!("skill '{name}' was not found"))?;
+        let skill = self.manager.load_skill(name).map_err(|_| {
+            self.invalid_activation_diagnostics.get(name).map_or_else(
+                || anyhow!("skill '{name}' was not found"),
+                |diagnostic| anyhow!("skill '{name}' is invalid: {diagnostic}"),
+            )
+        })?;
         let body = bounded_text(&skill.body, MAX_SKILL_BODY_BYTES);
         let content = format!("## Skill Body\n{body}\n");
         self.active_name = Some(skill.name.clone());
@@ -116,6 +121,7 @@ pub(crate) fn discover_runtime_skills_with_home(
     );
     let search_paths = loader.search_paths.clone();
     loader.discover()?;
+    let invalid_activation_diagnostics = collect_invalid_activation_diagnostics(&loader);
 
     let mut manager = SkillManager::new(loader);
     let index = manager.get_index().to_vec();
@@ -129,7 +135,37 @@ pub(crate) fn discover_runtime_skills_with_home(
         active_name: None,
         activated_content: None,
         loaded_references: Vec::new(),
+        invalid_activation_diagnostics,
     })
+}
+
+fn collect_invalid_activation_diagnostics(loader: &SkillLoader) -> HashMap<String, String> {
+    let mut diagnostics = HashMap::new();
+    for warning in &loader.discovery_warnings {
+        if warning.kind != SkillDiscoveryWarningKind::InvalidSkill
+            || !warning.message.contains("triggers")
+        {
+            continue;
+        }
+        let Some(name) = warning
+            .path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty() && name.len() <= 128)
+        else {
+            continue;
+        };
+        let single_line = warning
+            .message
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        diagnostics
+            .entry(name.to_string())
+            .or_insert_with(|| bounded_text(&single_line, MAX_INVALID_SKILL_DIAGNOSTIC_BYTES));
+    }
+    diagnostics
 }
 
 /// Injects runtime-discovered Level 0 skills into the agent prompt.
@@ -348,6 +384,30 @@ mod tests {
 
         assert!(error.contains("skill 'missing' was not found"));
         assert!(runtime.active_name().is_none());
+    }
+
+    #[test]
+    fn invalid_skill_activation_surfaces_bounded_triggers_diagnostic() {
+        let dir = tempfile::tempdir().expect("operation should succeed");
+        let invalid = dir.path().join(".talos/skills/bad-scalar");
+        fs::create_dir_all(&invalid).expect("operation should succeed");
+        fs::write(
+            invalid.join("SKILL.md"),
+            "---\nname: bad-scalar\ndescription: invalid\ntriggers: build\n---\nBody\n",
+        )
+        .expect("operation should succeed");
+
+        let mut runtime =
+            discover_runtime_skills(dir.path(), false).expect("operation should succeed");
+        assert!(!runtime.index.iter().any(|skill| skill.name == "bad-scalar"));
+        let error = runtime
+            .activate("bad-scalar")
+            .expect_err("operation should fail")
+            .to_string();
+
+        assert!(error.contains("skill 'bad-scalar' is invalid"));
+        assert!(error.contains("triggers"));
+        assert!(!error.contains(dir.path().to_string_lossy().as_ref()));
     }
 
     #[test]

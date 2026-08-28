@@ -98,7 +98,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I229 | Permission-Mediated Tool Activity Correlation | Complete / Closed | Completion Commit `5a9b6589`; PR #414 merged from exact head `b2179d33` after CI `33074348512` attempt 2 and independent approval `5439760729`. |
 | I230 | Permission Prompt Composer-Relative Docking | Complete / Closed | Completion Commit `b29a3d92`; PR #418 merged from exact head `1cb595ce` after CI `33130918248` attempt 2 and bounded single-maintainer CAS record `5447132762`. |
 | I231 | Initial Connection And Queue Status Sequencing | Complete / Closed | Completion Commit `e4cbb714`; PR #421 exact head `38c4f030` passed CI `33136176771` and bounded single-maintainer CAS `5447796064`. |
-| I232 | Invalid Skill Diagnostic Visibility | Active / Claimed | SKILL-005/#333 corrective iteration; governance claim PR #423 proposes activation from `main@88261365`; implementation authorization remains ineffective until merge. |
+| I232 | Invalid Skill Diagnostic Visibility | Review / Claimed | SKILL-005/#333 candidate preserves fail-closed invalid-Skill discovery and surfaces explicit activation diagnostics; claim #423 merged as `f2c98ff1`, exact implementation gates pending. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout

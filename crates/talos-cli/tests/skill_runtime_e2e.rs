@@ -109,3 +109,54 @@ I058_BINARY_SKILL_BODY_REACHED_PROVIDER_CONTEXT
         "stdout: {stdout}"
     );
 }
+
+#[test]
+fn inline_binary_distinguishes_invalid_triggers_from_absent_skill() {
+    let workspace = tempfile::tempdir().expect("create temporary workspace");
+    for (name, triggers) in [
+        ("bad-scalar", "triggers: build"),
+        ("bad-map", "triggers:\n  build: true"),
+    ] {
+        let skill_dir = workspace.path().join(".talos/skills").join(name);
+        fs::create_dir_all(&skill_dir).expect("create skill directory");
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            format!(
+                "---\nname: {name}\ndescription: invalid trigger fixture\n{triggers}\n---\nBody\n"
+            ),
+        )
+        .expect("write invalid skill fixture");
+    }
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_talos"))
+        .args([
+            "--mock",
+            "--inline",
+            "--workspace",
+            workspace.path().to_str().expect("UTF-8 workspace path"),
+            "--no-init",
+        ])
+        .env("HOME", workspace.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn talos binary");
+    child
+        .stdin
+        .as_mut()
+        .expect("child stdin")
+        .write_all(
+            b"/skills activate bad-scalar\n/skills activate bad-map\n/skills activate absent\n/quit\n",
+        )
+        .expect("write scripted input");
+
+    let output = child.wait_with_output().expect("run talos binary");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("skill 'bad-scalar' is invalid"), "{stdout}");
+    assert!(stdout.contains("skill 'bad-map' is invalid"), "{stdout}");
+    assert!(stdout.matches("triggers").count() >= 2, "{stdout}");
+    assert!(stdout.contains("skill 'absent' was not found"), "{stdout}");
+    assert!(!stdout.contains(workspace.path().to_string_lossy().as_ref()));
+}
