@@ -1,6 +1,6 @@
 # Iteration I231: Initial Connection And Queue Status Sequencing
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: close TUI-060/#332 by making initial connection and first-submission queue status truthful and observable.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #420 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #421 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation candidate starts from that merge and requires exact-head CI/review/CAS. |
+| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation PR #421 merged as `e4cbb714` after exact-head CI and CAS. |
 
 ## Published Baseline
 
@@ -72,8 +72,9 @@
 
 ## Verification Evidence
 
-- Local candidate `6f79f559` suppresses only idle-first-submit queue hints at the bridge and defers a fast Reconnecting status for one 150ms activity interval without delaying cancellation or terminal state. TUI 563 and CLI 357 core tests plus strict Clippy pass locally; exact-head gates pending.
+- Candidate `6f79f559` suppresses only idle-first-submit queue hints at the bridge and defers a fast Reconnecting status for one 150ms activity interval without delaying cancellation or terminal state. PR #421 exact head `38c4f030` merged as `e4cbb714` after CI `33136176771`; independent reviewer was unavailable and bounded single-maintainer CAS is recorded in `5447796064`.
+- Full standard preflight passed outside nested sandbox; TUI 563 and CLI 357 core tests plus strict Clippy passed.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `e4cbb714` (PR #421 implementation merge).

@@ -5,7 +5,7 @@
 | Story ID | TUI-060 |
 | Type | Bug / Conversation Status / TUI |
 | Priority | P0 corrective residual from I211 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #332](https://github.com/wjhuang88/talos/issues/332) |
 | Selected Iteration | I231 (claim PR #420 merged as `27f64b70`) |
 | Depends On | PROVIDER-006/I210 merged progress contract; steering submission boundary |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #420 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #421 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation candidate requires exact-head CI/review/CAS. |
+| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation PR #421 merged as `e4cbb714` after CI `33136176771` and bounded single-maintainer CAS `5447796064`. |
 
 ## Identity / Goal / Value
 
@@ -64,3 +64,14 @@ Make connection and submission status truthful and understandable during fast pr
 
 This intake changes no runtime behavior. Select a separate iteration and effective claim before
 implementation; I211 remains evidence-only.
+
+## Completion Checkpoint (2026-08-28)
+
+TUI-060 / I231 is Complete / Closed. The existing implementation merge `e4cbb714` is the
+Completion Commit. Idle first submissions no longer show a false queue hint; active-turn steering
+retains its hint and FIFO custody. Fast retries keep Connecting visible for one activity interval,
+while cancellation and terminal states preempt deferred reconnect immediately. Provider retry
+policy, protocol, submission identity and persistence are unchanged. I210/#278 retains its
+separate deferred natural-person acceptance.
+
+Completion Commit: `e4cbb714`.
