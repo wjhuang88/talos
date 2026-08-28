@@ -1,6 +1,6 @@
 # Iteration I231: Initial Connection And Queue Status Sequencing
 
-> Document status: Planned
+> Document status: Active / Claimed
 > Published plan date: 2026-08-28
 > Planned objective: close TUI-060/#332 by making initial connection and first-submission queue status truthful and observable.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-060 session |
+| Work Slice | Implement only TUI-060: truthful queue hint semantics for idle versus active-turn input, and observable initial Connecting before real retry facts, preserving retry policy, submission identity, steering FIFO, cancellation and persistence. Exclude provider policy/protocol, permission, persistence schema, release, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-28 |
 | Source Issue | #332 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #420 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Establish an effective claim before implementation. |
+| Handoff / Release Condition | Claim and Active state become effective only after PR #420 merges to `main`; implementation starts from that merge or later. |
 
 ## Published Baseline
 
