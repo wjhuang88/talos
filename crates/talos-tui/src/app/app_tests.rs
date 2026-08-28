@@ -2706,6 +2706,59 @@ fn startup_tui_at(width: u16, height: u16) -> crate::app::Tui {
     tui
 }
 
+fn rendered_row_containing(rendered: &str, needle: &str) -> usize {
+    rendered
+        .lines()
+        .position(|line| line.contains(needle))
+        .unwrap_or_else(|| panic!("expected rendered row containing {needle:?}: {rendered:?}"))
+}
+
+#[test]
+fn approval_prompt_stays_adjacent_to_non_bottom_startup_composer() {
+    let mut tui = startup_tui_at(80, 24);
+    tui.state.input_append_str("draft-anchor");
+    tui.draw_frame().expect("startup frame");
+    let original_composer_row =
+        rendered_row_containing(&tui.terminal.test_rendered_text(), "draft-anchor");
+    assert!(
+        original_composer_row < 18,
+        "startup composer must be non-bottom"
+    );
+
+    tui.show_approval("write_file", "path: README.md");
+    tui.draw_frame().expect("approval frame");
+    let rendered = tui.terminal.test_rendered_text();
+    let composer_row = rendered_row_containing(&rendered, "draft-anchor");
+    let approval_row = rendered_row_containing(&rendered, "write_file");
+    assert!(
+        approval_row.abs_diff(composer_row) <= 4,
+        "approval must remain adjacent to composer: composer={composer_row}, approval={approval_row}, rendered={rendered:?}"
+    );
+    assert!(
+        approval_row < 20,
+        "approval must not jump to physical bottom"
+    );
+
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(50, 18));
+    tui.draw_frame().expect("resized approval frame");
+    let resized = tui.terminal.test_rendered_text();
+    let resized_composer = rendered_row_containing(&resized, "draft-anchor");
+    let resized_approval = rendered_row_containing(&resized, "write_file");
+    assert!(
+        resized_approval.abs_diff(resized_composer) <= 4,
+        "resized approval must remain adjacent to composer"
+    );
+
+    tui.hide_approval();
+    tui.state.slash_menu.close();
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("restored startup frame");
+    let restored = rendered_row_containing(&tui.terminal.test_rendered_text(), "draft-anchor");
+    assert_eq!(restored, original_composer_row);
+}
+
 #[test]
 fn startup_layout_places_composer_one_row_below_logo() {
     let mut tui = startup_tui_at(80, 24);
