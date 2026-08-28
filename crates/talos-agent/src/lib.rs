@@ -50,6 +50,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub mod auto_resolver;
 pub mod caching;
 mod configuration;
 pub mod context;
