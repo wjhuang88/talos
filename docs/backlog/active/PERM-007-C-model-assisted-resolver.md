@@ -20,7 +20,7 @@
 | Work Slice | Deterministic ADR-064 create-only eligibility, isolated redacted evaluator, closed output validation, one-shot admission binding, audit and circuit breaker. |
 | Claimed At | 2026-08-28 |
 | Source Issue | #188 |
-| Governance Claim PR | #431 (draft; claim ineffective until merge) |
+| Governance Claim PR | #431 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-064 `c129d4a5`; protected permission/security scope requires exact-head independent review. |
 | Implementation PR | Not started |
