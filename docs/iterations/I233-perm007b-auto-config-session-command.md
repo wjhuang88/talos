@@ -19,9 +19,9 @@
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim/activation must reach `main` before implementation; ADR-064 remains normative and no model/permission-result authority is transferred. |
+| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and merge-time CAS. |
 
 ## Published Baseline
 

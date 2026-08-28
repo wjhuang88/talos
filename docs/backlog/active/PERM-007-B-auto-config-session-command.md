@@ -28,9 +28,9 @@ cross-surface `auto` mode without making any model request or changing permissio
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR requires exact-head CI, independent permission/API review and CAS. |
+| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and CAS. |
 
 ## Published Baseline
 
