@@ -5,7 +5,7 @@
 | Story ID | PERM-007-B |
 | Type | Permission / Configuration / CLI-TUI Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; effective only after PR #426 merges) |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
 | Selected Iteration | I233 |
 | Depends On | PERM-007-A/I218 and ADR-064 Accepted; PERM-006-A/B/C complete |
@@ -28,9 +28,10 @@ cross-surface `auto` mode without making any model request or changing permissio
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 (merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`) |
+| Completion Commit | `c536e190e63ec7a3aed3c54c726ca6d82d054d75` |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Establish and merge a separate claim before implementation; preserve ADR-064 precedence and fail-closed boundaries. |
+| Handoff / Release Condition | Complete; preserve ADR-064 precedence and fail-closed boundaries. PERM-007-C remains separately gated. |
 
 ## Published Baseline
 
@@ -84,3 +85,5 @@ cross-surface `auto` mode without making any model request or changing permissio
 
 Model-assisted eligibility, resolver, audit and circuit behavior belong to PERM-007-C; cross-surface
 conformance belongs to PERM-007-D. Neither is authorized by this owner.
+
+Completion Commit: `c536e190e63ec7a3aed3c54c726ca6d82d054d75` (implementation merge for PR #428).

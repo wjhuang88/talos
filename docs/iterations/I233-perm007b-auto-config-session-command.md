@@ -1,6 +1,6 @@
 # Iteration I233: Auto Configuration And Session Command
 
-> Document status: Active / Claimed (proposed; effective only after PR #426 merges)
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: implement the ADR-064 configuration and active-session `/auto` control surface without changing permission decisions.
 > Baseline rule: once committed, preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 (merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`) |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim/activation must reach `main` before implementation; ADR-064 remains normative and no model/permission-result authority is transferred. |
+| Handoff / Release Condition | Complete; PERM-007-C remains separately gated and no model/permission-result authority was transferred. |
 
 ## Published Baseline
 
@@ -85,14 +85,16 @@ historical Published Baselines.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-28 | Selection | PERM-006-A/B/C are complete and ADR-064 is Accepted; I233 is selected as the sole PERM-007-B governance/implementation child. |
+| 2026-08-28 | Activation | Claim #426 merged at `7f47f9c3072a344c13eeb861c10b1a700b7a3531`; implementation started from that merge point. |
+| 2026-08-28 | Implementation | PR #428 exact head `47afcee32a3764ac90da4ef91e78cf1db7dd7b21`, base `7f47f9c3072a344c13eeb861c10b1a700b7a3531`, CI `33159475333` 5/5 SUCCESS, independent review comment `5451227280` APPROVE; merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation candidate.
+- Exact-head CI `33159475333` passed all five jobs; independent implementation review `5451227280` approved the exact head; governance validators and focused locked tests passed.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `c536e190e63ec7a3aed3c54c726ca6d82d054d75` (implementation merge for PR #428).
 
 ## Variance And Residuals
 
