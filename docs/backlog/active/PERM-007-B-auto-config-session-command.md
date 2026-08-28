@@ -5,7 +5,7 @@
 | Story ID | PERM-007-B |
 | Type | Permission / Configuration / CLI-TUI Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
 | Selected Iteration | I233 |
 | Depends On | PERM-007-A/I218 and ADR-064 Accepted; PERM-006-A/B/C complete |
@@ -30,7 +30,7 @@ cross-surface `auto` mode without making any model request or changing permissio
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
 | Implementation PR | #428 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and CAS. |
+| Handoff / Release Condition | Complete; preserve ADR-064 precedence and fail-closed boundaries. PERM-007-C remains separately gated. |
 
 ## Published Baseline
 
@@ -98,3 +98,5 @@ governed; I233 changes no version, tag or publication state.
 Session override lifecycle is reset only after a successful runtime replacement publishes an
 authoritative command sender; failed or rolled-back transitions do not mutate the active session's
 override.
+
+Completion Commit: `c536e190e63ec7a3aed3c54c726ca6d82d054d75` (implementation merge for PR #428).

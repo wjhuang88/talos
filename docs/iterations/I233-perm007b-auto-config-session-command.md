@@ -1,6 +1,6 @@
 # Iteration I233: Auto Configuration And Session Command
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: implement the ADR-064 configuration and active-session `/auto` control surface without changing permission decisions.
 > Baseline rule: once committed, preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | #428 |
+| Implementation PR | #428 (merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`) |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and merge-time CAS. |
+| Handoff / Release Condition | Complete; PERM-007-C remains separately gated and no model/permission-result authority was transferred. |
 
 ## Published Baseline
 
@@ -40,7 +40,7 @@
 | I198 | Terminal / Complete | Preserve the completed Skill compatibility owner and its original/corrective evidence; no authority transfer. |
 | I207, I208 | Planned / Unclaimed | Preserve the ordered steering sequence; do not activate. |
 | I213 | Terminal / independent | Dashboard lane remains independent; no overlap. |
-| I233 | Review / Claimed | Claim #426 merged as `7f47f9c3`; implementation is under exact-head validation and review. |
+| I233 | Complete / Closed | Claim #426 merged as `7f47f9c3`; implementation PR #428 merged as `c536e190`. |
 
 PRs #120/#121 remain archival Drafts and are not to be resumed. No other open PR owns PERM-007-B;
 PERM-007-C/D remain Blocked / Unclaimed. This inventory is a current checkpoint, not a rewrite of
@@ -108,7 +108,7 @@ cannot authorize itself, create grants or replace the authoritative permission p
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `c536e190e63ec7a3aed3c54c726ca6d82d054d75` (implementation merge for PR #428).
 
 ## Variance And Residuals
 
