@@ -5,27 +5,27 @@
 | Story ID | SKILL-005 |
 | Type | Bug / Skill CLI Compatibility Story |
 | Priority | P1 corrective residual from I211 |
-| Status | Ready / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #333](https://github.com/wjhuang88/talos/issues/333) |
-| Selected Iteration | None |
+| Selected Iteration | I232 (claim PR #423; activation ineffective until merge) |
 | Depends On | SKILL-004/I198 optional-trigger compatibility; existing parser diagnostics |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline SKILL-005 session |
+| Work Slice | Implement only SKILL-005 invalid local Skill diagnostic visibility during explicit activation; preserve fail-closed exclusion and absent behavior. Exclude parser policy, routing, permission, persistence, release and `/auto`. |
+| Claimed At | 2026-08-28 |
 | Source Issue | #333 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #423 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Select a runnable corrective iteration and establish an effective claim before implementation. |
+| Last Updated | 2026-08-28 |
+| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #423 merges to `main`. |
 
 ## Identity / Goal / Value
 
