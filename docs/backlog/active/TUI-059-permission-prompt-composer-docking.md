@@ -5,7 +5,7 @@
 | Story ID | TUI-059 |
 | Type | Bug / TUI / Permission Layout Story |
 | Priority | P0 corrective residual from I211 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #330](https://github.com/wjhuang88/talos/issues/330) |
 | Selected Iteration | I230 (claim PR #416 merged as `0f17e79d`) |
 | Depends On | TUI-045/I197 merged anchor state; inline composer ownership; ADR-054 |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #416 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #418 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation candidate requires exact-head CI/review and preserves permission semantics. |
+| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation PR #418 merged as `b29a3d92` after exact-head CI `33130918248` attempt 2 and bounded single-maintainer CAS. |
 
 ## Identity / Goal / Value
 
@@ -92,3 +92,13 @@ runtime behavior.
 
 General panel docking or permission-policy changes require separate owners; TUI-058 owns only
 tool-activity correlation and unnamed outcome rows.
+
+## Completion Checkpoint (2026-08-28)
+
+TUI-059 / I230 is Complete / Closed. The existing implementation merge `b29a3d92` is the
+Completion Commit. It preserves the pre-approval startup/natural FollowTail layout while the
+permission prompt is visible, keeps prompt and composer adjacent through resize, and restores the
+prior viewport when the prompt closes. Permission semantics, request identity and persistence are
+unchanged. I197/#125 remains Review only for its separately deferred natural-person acceptance.
+
+Completion Commit: `b29a3d92`.

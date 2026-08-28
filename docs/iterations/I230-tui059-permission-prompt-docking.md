@@ -1,6 +1,6 @@
 # Iteration I230: Permission Prompt Composer-Relative Docking
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-059/#330 by keeping permission prompts adjacent to the logical composer across non-bottom, narrow and resized layouts.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #416 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #418 |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation candidate starts from that merge and requires exact-head CI, independent review and merge-time CAS. |
+| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation PR #418 merged as `b29a3d92` after exact-head CI and merge-time CAS. |
 
 ## Published Baseline
 
@@ -74,11 +74,12 @@
 
 ## Verification Evidence
 
-- Local candidate commit `097353b7` derives prompt placement from the pre-approval natural-flow state, preserving composer-relative docking through startup/non-bottom layouts and resize. Focused and full TUI tests pass locally; exact-head implementation CI/review remain pending.
+- Candidate commit `097353b7` derives prompt placement from the pre-approval natural-flow state, preserving composer-relative docking through startup/non-bottom layouts and resize. PR #418 exact head `1cb595ce` merged as `b29a3d92` after CI `33130918248` attempt 2; independent reviewer was unavailable and the bounded TUI-only single-maintainer merge record is `5447132762`.
+- Full `talos-tui` suite passed 561 tests; strict Clippy, formatting, release preflight and governance validators passed.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `b29a3d92` (PR #418 implementation merge).
 
 ## Variance And Residuals
 
