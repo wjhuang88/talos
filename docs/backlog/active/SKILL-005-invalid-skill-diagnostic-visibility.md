@@ -7,7 +7,7 @@
 | Priority | P1 corrective residual from I211 |
 | Status | Ready / Unclaimed |
 | Source | [GitHub Issue #333](https://github.com/wjhuang88/talos/issues/333) |
-| Selected Iteration | None |
+| Selected Iteration | I232 (claim pending; activation ineffective until merge) |
 | Depends On | SKILL-004/I198 optional-trigger compatibility; existing parser diagnostics |
 
 ## Collaboration Claim
