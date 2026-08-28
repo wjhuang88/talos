@@ -22,6 +22,21 @@
 | Last Updated | 2026-08-28 |
 | Handoff / Release Condition | Require independent permission/security review, exact-head CI and merge-time CAS. PERM-007-D remains separately blocked. |
 
+## Current Nonterminal Inventory And Disposition
+
+This selection was checked against the current `main@c352435e` before claim preparation:
+
+| State | Iterations | Disposition |
+|---|---|---|
+| Active | None | I234 is only proposed on this branch; it is ineffective until claim merge. |
+| Review | None | No unresolved review iteration blocks this selection. |
+| Planned | I207, I208 | Preserve as unclaimed steering children; do not activate or overlap. |
+| Blocked | None with a current iteration document status | PERM-007-D and other backlog blockers retain their own owners; no authority transfers here. |
+| Paused | I164 | Superseded startup target; do not restore. |
+
+Historical terminal iterations and archival Draft PRs #120/#121 were inspected and do not own this
+scope. Existing worktrees outside this branch are preserved and untouched.
+
 ## Published Baseline
 
 ### Selected Story
