@@ -20,10 +20,13 @@
 | Source Issue | #188 |
 | Governance Claim PR | #432 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent permission/security/API review |
+| Authorization Evidence | Pending exact-head independent permission/security/API review; claim is ineffective until PR #432 merges to `main` |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-29 |
 | Handoff / Release Condition | Requires independent permission/security/API review; only an accepted decision may authorize a later implementation slice. |
+
+The proposed claim, activation and Active status in this PR have no ownership or implementation
+effect until this exact record reaches `main` through merge-time CAS.
 
 ## Nonterminal Inventory And Disposition
 

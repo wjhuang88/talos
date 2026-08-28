@@ -22,10 +22,12 @@
 | Source Issue | #188 |
 | Governance Claim PR | #432 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent permission/security/API review |
+| Authorization Evidence | Pending exact-head independent permission/security/API review; claim is ineffective until PR #432 merges to `main` |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-29 |
 | Handoff / Release Condition | Accepted decision and independent review required before I234 dependency implementation. |
+
+The proposed claim has no ownership or implementation effect until PR #432 merges to `main`.
 
 ## Purpose
 
