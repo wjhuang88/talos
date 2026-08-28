@@ -5,9 +5,9 @@
 | Story ID | SKILL-005 |
 | Type | Bug / Skill CLI Compatibility Story |
 | Priority | P1 corrective residual from I211 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #333](https://github.com/wjhuang88/talos/issues/333) |
-| Selected Iteration | I232 (claim PR #423; activation ineffective until merge) |
+| Selected Iteration | I232 (claim PR #423 merged as `f2c98ff1`) |
 | Depends On | SKILL-004/I198 optional-trigger compatibility; existing parser diagnostics |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #423 merges to `main`. |
+| Handoff / Release Condition | Claim PR #423 merged as `f2c98ff1`; implementation candidate requires exact-head CI/review. |
 
 ## Identity / Goal / Value
 
