@@ -94,3 +94,7 @@ conformance belongs to PERM-007-D. Neither is authorized by this owner.
 Public Rust users that construct `Config` exhaustively must add `auto: AutoConfig::default()` or
 use `..Config::default()`. The corresponding compatible workspace version/release is separately
 governed; I233 changes no version, tag or publication state.
+
+Session override lifecycle is reset only after a successful runtime replacement publishes an
+authoritative command sender; failed or rolled-back transitions do not mutate the active session's
+override.

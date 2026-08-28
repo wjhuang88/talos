@@ -94,6 +94,7 @@ cannot authorize itself, create grants or replace the authoritative permission p
 | 2026-08-28 | Selection | PERM-006-A/B/C are complete and ADR-064 is Accepted; I233 is selected as the sole PERM-007-B governance/implementation child. |
 | 2026-08-28 | Claim effective | PR #426 exact head `996a63f8` passed CI `33153127031`, independent Agent-role review and CAS, then merged as `7f47f9c3`; implementation starts from that merge. |
 | 2026-08-28 | Local implementation | Added default-on `auto.enabled`, CLI config get/set, session-only `/auto` status/on/off, TUI registry wiring and lifecycle-by-rebuild reset. No model request, resolver, permission decision or execution path changed. |
+| 2026-08-28 | Lifecycle correction | Independent review found the long-lived conversation engine did not clear session override after runtime replacement. The implementation now clears it only after an authoritative new command sender/generation is published, with a regression test; failed transitions retain the prior session state. |
 
 ## Verification Evidence
 
