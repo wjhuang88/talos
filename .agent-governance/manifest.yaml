@@ -5,7 +5,7 @@ status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-08-27"
 status_note: "High-risk/release-managed profile confirmed. I203/REL-003 and the v0.8.0 GitHub-first publication task are Complete/Closed through implementation commits `b0354ae6`/`d8e1aa26`/`d5de4a65`, PR #264 merge `f425e7bc`, immutable tag `v0.8.0`, and successful Release workflow `31953951828`. All 20 authorized crates are visible at 0.8.0; only `talos-models` remains quarantined. REL-002 and RUNTIME-006 remain separate residual owners."
-current_execution_note: "I229/TUI-058, I230/TUI-059 and I231/TUI-060 are Complete/Closed through implementation merges `5a9b6589`, `b29a3d92` and `e4cbb714`. I232/SKILL-005 claim PR #423 merged as `f2c98ff1`; local candidate preserves fail-closed Skill discovery and surfaces bounded diagnostics for explicit invalid activation, with exact implementation CI/review pending. I197/I198/I201/I210 remain Review under corrective owners. Release, `/auto`, Dashboard and Desktop remain separate."
+current_execution_note: "I229/TUI-058, I230/TUI-059, I231/TUI-060 and I232/SKILL-005 are Complete/Closed through implementation merges `5a9b6589`, `b29a3d92`, `e4cbb714` and `fedd6fac`. I232 source `fb47b0c2` passed exact-head CI `33141878176` and independent review `5448628671`, preserving fail-closed Skill discovery while surfacing bounded diagnostics for explicit invalid activation. I197/I198/I201/I210 remain Review under corrective owners. Release, `/auto`, Dashboard and Desktop remain separate."
 
 governance:
   skill_name: "agent-project-governance"

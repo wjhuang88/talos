@@ -1,6 +1,6 @@
 # Iteration I232: Invalid Skill Diagnostic Visibility
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: close SKILL-005/#333 by surfacing bounded field diagnostics for explicitly activated invalid local Skill documents.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #423 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #424 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim PR #423 merged as `f2c98ff1`; implementation candidate requires exact-head CI, independent review and merge-time CAS. |
+| Handoff / Release Condition | Implementation PR #424 merged as `fedd6fac`; exact-head CI/review and merge-time CAS are recorded below. |
 
 ## Published Baseline
 
@@ -68,11 +68,12 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-28 | Atomic claim+activation | PR #423 exact head `c93705ce` passed CI and governance gates, then merged as `f2c98ff1`; I232/SKILL-005 claim and Active state became effective. |
+| 2026-08-28 | Implementation and closeout | PR #424 exact implementation head `fb47b0c2` passed exact-head CI `33141878176` (5/5, including Windows workspace) and independent Skill/CLI review `5448628671`; merged to `main` as `fedd6fac`. |
 
 ## Verification Evidence
 
-- Local candidate preserves fail-closed discovery while surfacing bounded `triggers` diagnostics for explicit invalid scalar/mapping activation. Unit, real-binary, full CLI/Skill tests and strict Clippy pass locally; exact-head gates pending.
+- Exact implementation head `fb47b0c2` preserves fail-closed discovery while surfacing bounded `triggers` diagnostics for explicit invalid scalar/mapping activation. `talos-skill` (81), `talos-cli` (358), real-binary (3), format, Clippy and locked preflight passed; CI `33141878176` and independent review `5448628671` are bound to that head.
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `fedd6fac94708628478836b94b6fd01954de53e0` (PR #424 merge; implementation source `fb47b0c2`).
