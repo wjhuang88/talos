@@ -1,6 +1,6 @@
 # Iteration I233: Auto Configuration And Session Command
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: implement the ADR-064 configuration and active-session `/auto` control surface without changing permission decisions.
 > Baseline rule: once committed, preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | #428 |
+| Implementation PR | #428 (merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`) |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and merge-time CAS. |
+| Handoff / Release Condition | Complete; PERM-007-C remains separately gated and no model/permission-result authority was transferred. |
 
 ## Published Baseline
 
@@ -95,6 +95,7 @@ cannot authorize itself, create grants or replace the authoritative permission p
 | 2026-08-28 | Claim effective | PR #426 exact head `996a63f8` passed CI `33153127031`, independent Agent-role review and CAS, then merged as `7f47f9c3`; implementation starts from that merge. |
 | 2026-08-28 | Local implementation | Added default-on `auto.enabled`, CLI config get/set, session-only `/auto` status/on/off, TUI registry wiring and lifecycle-by-rebuild reset. No model request, resolver, permission decision or execution path changed. |
 | 2026-08-28 | Lifecycle correction | Independent review found the long-lived conversation engine did not clear session override after runtime replacement. The implementation now clears it only after an authoritative new command sender/generation is published, with a regression test; failed transitions retain the prior session state. |
+| 2026-08-28 | Completion | PR #428 exact head `47afcee32a3764ac90da4ef91e78cf1db7dd7b21` passed CI `33159475333` and independent review `5451227280`, then merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`; I233 is Complete / Closed. |
 
 ## Verification Evidence
 
@@ -108,7 +109,7 @@ cannot authorize itself, create grants or replace the authoritative permission p
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `c536e190e63ec7a3aed3c54c726ca6d82d054d75` (implementation merge for PR #428).
 
 ## Variance And Residuals
 
