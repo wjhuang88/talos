@@ -5,7 +5,7 @@
 | Story ID | SKILL-005 |
 | Type | Bug / Skill CLI Compatibility Story |
 | Priority | P1 corrective residual from I211 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #333](https://github.com/wjhuang88/talos/issues/333) |
 | Selected Iteration | I232 (claim PR #423 merged as `f2c98ff1`) |
 | Depends On | SKILL-004/I198 optional-trigger compatibility; existing parser diagnostics |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #423 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #424 (merged as `fedd6fac`) |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim PR #423 merged as `f2c98ff1`; implementation candidate requires exact-head CI/review. |
+| Handoff / Release Condition | Completed through implementation head `fb47b0c2`, exact-head CI `33141878176`, independent review `5448628671`, and merge `fedd6fac`. |
 
 ## Identity / Goal / Value
 
@@ -61,5 +61,11 @@ actual activation path.
 
 ## Residual Destination
 
-This intake changes no runtime behavior. Select a separate iteration and effective claim before
-implementation; I198 remains Review and I211 remains evidence-only.
+Implementation is complete in I232. I198 remains Review for its separate historical completion
+evidence; I211 remains evidence-only.
+
+## Completion Evidence
+
+- Completion Commit: `fedd6fac94708628478836b94b6fd01954de53e0` (PR #424 merge; implementation source `fb47b0c2`).
+- Exact-head CI: `33141878176` (5/5 success, including Windows workspace).
+- Independent Skill/CLI review: `5448628671` (APPROVE, exact head `fb47b0c2`).
