@@ -216,6 +216,10 @@ impl PermissionPipeline {
         } = authorization;
         let deadline_at = Instant::now() + deadline;
         ensure_before(deadline_at)?;
+        let binding_snapshot = self
+            .state
+            .state_snapshot()
+            .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let request = PermissionRequest::new(tool_name, provenance, profile, input);
         let invocation = self
             .state
@@ -238,17 +242,11 @@ impl PermissionPipeline {
                     arguments: presentation_input,
                     summary_fields,
                     preview: session.preview().clone(),
-                    binding: {
-                        let snapshot = self
-                            .state
-                            .state_snapshot()
-                            .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
-                        PermissionBinding {
-                            session_id: snapshot.session_id.stable_id(),
-                            revisions: snapshot.revisions.as_array(),
-                            mode: self.context.mode(),
-                            interaction: self.context.interaction(),
-                        }
+                    binding: PermissionBinding {
+                        session_id: binding_snapshot.session_id.stable_id(),
+                        revisions: binding_snapshot.revisions.as_array(),
+                        mode: self.context.mode(),
+                        interaction: self.context.interaction(),
                     },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
