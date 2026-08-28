@@ -587,6 +587,7 @@ pub(crate) async fn run_tui_mode(
         })
         .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
+        .with_auto_enabled(config.auto.enabled)
         .with_skills(skill_diagnostics)
         .with_mcp_servers(mcp_diagnostics.clone())
         .with_hook_declarations(hook_decls.clone())

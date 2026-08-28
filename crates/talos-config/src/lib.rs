@@ -31,10 +31,10 @@ pub use endpoint::{
 pub use error::ConfigError;
 pub use store::ConfigStore;
 pub use types::{
-    Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration, LogConfig,
-    LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig, MemoryPromptConfig,
-    ModelConfig, ProviderConfig, ProviderProtocol, ProviderTimeoutConfig, ReasoningEffort,
-    ReasoningOptions, RpcConfig, SkillConfig,
+    AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration,
+    LogConfig, LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig,
+    MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol, ProviderTimeoutConfig,
+    ReasoningEffort, ReasoningOptions, RpcConfig, SkillConfig,
 };
 
 pub use builtin::builtin_provider_config;

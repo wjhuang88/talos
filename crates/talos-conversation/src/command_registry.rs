@@ -161,6 +161,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             available: always_available,
         },
         CommandDefinition {
+            name: "/auto",
+            aliases: &[],
+            usage: "/auto [on | off]",
+            description: "Show or set bounded auto-assistance mode for this session",
+            arg_hint: Some("[on | off]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
             name: "/plugins",
             aliases: &[],
             usage: "/plugins",

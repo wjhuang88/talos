@@ -93,6 +93,8 @@ pub struct ConversationEngine {
     pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
     pub(crate) is_processing: bool,
+    auto_config_enabled: bool,
+    auto_override: Option<bool>,
     pub(crate) current_phase: Option<TurnPhase>,
     pub(crate) context_limit: Option<u32>,
     pub(crate) input_price_per_million: Option<f64>,
@@ -130,6 +132,8 @@ impl ConversationEngine {
             skills: Vec::new(),
             scrollback: ScrollbackState::default(),
             is_processing: false,
+            auto_config_enabled: true,
+            auto_override: None,
             current_phase: None,
             context_limit: None,
             input_price_per_million: None,
@@ -145,6 +149,17 @@ impl ConversationEngine {
     pub fn with_workspace_root(mut self, workspace_root: PathBuf) -> Self {
         self.workspace_root = Some(workspace_root);
         self
+    }
+
+    /// Sets the persisted configuration default for bounded auto assistance.
+    #[must_use]
+    pub fn with_auto_enabled(mut self, enabled: bool) -> Self {
+        self.auto_config_enabled = enabled;
+        self
+    }
+
+    fn auto_enabled(&self) -> bool {
+        self.auto_override.unwrap_or(self.auto_config_enabled)
     }
 
     /// Supplies the typed set of explicitly loaded plugin packages.

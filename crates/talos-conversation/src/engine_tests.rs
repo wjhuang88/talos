@@ -868,6 +868,35 @@ async fn slash_status_shows_model_and_tokens() {
     assert!(text.contains("17"));
 }
 
+#[tokio::test]
+async fn slash_auto_is_session_only_and_rejects_invalid_arguments() {
+    let mut engine = new_engine().with_auto_enabled(false);
+
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("disabled"));
+
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto on"))
+        .await
+        .expect("toggle should render");
+    assert!(text.contains("session only"));
+
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("enabled"));
+
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto maybe"))
+        .await
+        .expect("invalid command should render");
+    assert!(text.contains("Usage: /auto"));
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("enabled"));
+}
+
 // ---------------------------------------------------------------------------
 // handle_slash_command: /plugins (transition notice) and /mcp
 // ---------------------------------------------------------------------------

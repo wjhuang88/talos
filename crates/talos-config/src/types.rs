@@ -248,6 +248,24 @@ impl Default for DashboardConfig {
     }
 }
 
+/// Configuration for bounded model-assisted `auto` mode.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct AutoConfig {
+    /// Whether bounded assistance is attempted when a later resolver is available.
+    #[serde(default = "default_auto_enabled")]
+    pub enabled: bool,
+}
+
+fn default_auto_enabled() -> bool {
+    true
+}
+
+impl Default for AutoConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 /// Talos configuration.
 ///
 /// Contains the model provider, model name, and optional API key.
@@ -297,6 +315,10 @@ pub struct Config {
     /// Loopback dashboard configuration (ADR-031).
     #[serde(default)]
     pub dashboard: DashboardConfig,
+
+    /// Bounded model-assisted permission mode configuration (ADR-064).
+    #[serde(default)]
+    pub auto: AutoConfig,
 }
 
 fn default_provider_name() -> String {
@@ -317,6 +339,7 @@ impl Default for Config {
             memory_prompt: MemoryPromptConfig::default(),
             skills: SkillConfig::default(),
             dashboard: DashboardConfig::default(),
+            auto: AutoConfig::default(),
         }
     }
 }
