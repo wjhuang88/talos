@@ -8,9 +8,9 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | In Progress — PERM-007-A / I218 Complete; PERM-007-B/C/D Blocked |
+| Status | In Progress — PERM-007-A / I218 Complete; PERM-007-B Ready / Unclaimed; C/D Blocked |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 Complete / Closed for PERM-007-A; implementation none |
+| Selected Iteration | I218 Complete / Closed for A; I233 selected for B; C/D unselected |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; Accepted ADR-064; existing Deny precedence |
 
 ## Collaboration Claim
@@ -28,7 +28,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-22 |
-| Handoff / Release Condition | ADR-064 is Accepted through I218. Finish PERM-006-A/B/C, then prepare one bounded PERM-007 child with its own protected-scope claim before implementation. |
+| Handoff / Release Condition | ADR-064 is Accepted and PERM-006-A/B/C are Complete. I233/PERM-007-B requires its own effective claim before implementation; C/D remain blocked on B/C respectively. |
 
 ## Identity / Goal / Value
 
@@ -70,7 +70,7 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 | Child | Deliverable | Current State | Gate |
 |---|---|---|---|
 | PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Complete / Closed at Completion Commit `a289a07f`; ADR-064 Accepted | No behavior change; evidence retained |
-| PERM-007-B | Canonical config plus `/auto` session command | Blocked / Unclaimed | Accepted A and all PERM-006 A-C gates closed |
+| PERM-007-B / I233 | Canonical config plus `/auto` session command | Ready / Unclaimed | Accepted A and all PERM-006 A-C gates closed; separate claim required |
 | PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Blocked / Unclaimed | B closed and separate protected-scope claim |
 | PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
 
