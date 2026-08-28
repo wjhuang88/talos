@@ -8,9 +8,9 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | In Progress — PERM-007-A / I218 and PERM-007-B / I233 Complete; C/D Blocked |
+| Status | In Progress — PERM-007-A / I218 and PERM-007-B / I233 Complete; C Active / Claimed; D Blocked |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; C/D unselected |
+| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; I234 Active / Claimed for C; D unselected |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; Accepted ADR-064; existing Deny precedence |
 
 ## Collaboration Claim
@@ -71,11 +71,11 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 |---|---|---|---|
 | PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Complete / Closed at Completion Commit `a289a07f`; ADR-064 Accepted | No behavior change; evidence retained |
 | PERM-007-B / I233 | Canonical config plus `/auto` session command | Complete / Closed; implementation merge `c536e190` | Accepted A and all PERM-006 A-C gates closed; model resolver remains separate |
-| PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Blocked / Unclaimed | B closed and separate protected-scope claim |
+| PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Active / Claimed (proposed; ineffective until claim merge) | B closed; I234 protected-scope claim |
 | PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
 
 The maintainer requested A early for unattended continuity. Decision work may run alongside I189
-because it changes no behavior; B-D cannot bypass the ordered PERM-006 implementation chain.
+because it changes no behavior; C-D cannot bypass the ordered PERM-006 implementation chain.
 
 PERM-007-A child Completion Commit: `a289a07ff97746d877f3a422d15f8044bbf50ab6`.
 The parent Epic remains In Progress and does not claim completion from this child evidence.

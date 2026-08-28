@@ -100,6 +100,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I231 | Initial Connection And Queue Status Sequencing | Complete / Closed | Completion Commit `e4cbb714`; PR #421 exact head `38c4f030` passed CI `33136176771` and bounded single-maintainer CAS `5447796064`. |
 | I232 | Invalid Skill Diagnostic Visibility | Complete / Closed | Completion Commit `fedd6fac`; implementation source `fb47b0c2`, exact-head CI `33141878176`, independent Skill/CLI review `5448628671`. Fail-closed invalid-Skill discovery and bounded explicit activation diagnostics are complete. |
 | I233 | Auto Configuration And Session Command | Complete / Closed | PERM-007-B / Issue #188; implementation merged as `c536e190`. Config/session `/auto` only; no model or permission-result authority. |
+| I234 | Bounded Model-Assisted Permission Resolver | Active / Claimed (proposed) | PERM-007-C / Issue #188; protected create-only resolver, redacted schemas, atomic no-clobber and fail-closed circuit; claim ineffective until governance merge. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout
