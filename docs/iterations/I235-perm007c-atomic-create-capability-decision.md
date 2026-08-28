@@ -73,6 +73,20 @@
 4. Which adversarial fixtures prove target collision, parent replacement, symlink/reparse rejection,
    traversal rejection and no write outside the held capability?
 
+## Candidate Assessment
+
+The current preferred candidate is `cap-std` 4.0.3, subject to independent review and a formal
+decision record. Its `cap_std::fs::Dir` API opens files relative to an already-held directory
+capability and maps `create_new` to platform no-clobber primitives. Its Unix and Windows backends
+hold directory identity through the operation. The later implementation must wrap this API so
+absolute paths, parent components and symlink/reparse traversal are rejected, and must verify the
+exact supported-platform behavior in CI. `cap-std`'s internal platform `unsafe` remains an
+external-dependency security surface and must be recorded and reviewed before adoption. WASI is
+unsupported and remains fail-closed.
+
+No dependency is added by this decision-only iteration. Until the candidate is accepted, I234's
+production positive path remains unavailable.
+
 ## Completion Evidence
 
 Completion Commit: Pending. A decision/status commit cannot self-certify acceptance.
