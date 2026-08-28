@@ -18,6 +18,7 @@ use talos_core::tool::{ToolNature, ToolResourceKind};
 use crate::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
+use talos_permission::PermissionMode;
 
 /// Version of the closed evaluator wire format.
 pub const AUTO_EVALUATOR_SCHEMA_VERSION: u8 = 1;
@@ -96,6 +97,12 @@ pub struct AutoPermissionRequest {
     pub target_label: String,
     /// Operation subtype.
     pub operation: AutoOperation,
+    /// Permission Session identity bound to this assessment.
+    pub session_id: String,
+    /// Monotonic policy/mode/workspace generations bound to this assessment.
+    pub revisions: [u64; 6],
+    /// Permission mode at assessment time.
+    pub mode: PermissionMode,
     /// Digest binding the response to this exact request.
     pub request_digest: String,
 }
@@ -269,7 +276,11 @@ impl AutoPermissionResolver {
 }
 
 fn digest(request: &AutoPermissionRequest) -> String {
-    let encoded = serde_json::to_vec(request).unwrap_or_default();
+    let mut value = serde_json::to_value(request).unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(object) = value.as_object_mut() {
+        object.remove("request_digest");
+    }
+    let encoded = serde_json::to_vec(&value).unwrap_or_default();
     let digest = Sha256::digest(encoded);
     let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
     format!("sha256:{hex}")
@@ -299,6 +310,9 @@ fn eligible(
         risk_class: AutoRiskClass::BoundedWorkspaceTextCreate,
         target_label,
         operation: AutoOperation::CreateTextFile,
+        session_id: request.binding.session_id.clone(),
+        revisions: request.binding.revisions,
+        mode: request.binding.mode,
         request_digest: String::new(),
     };
     result.request_digest = digest(&result);
@@ -393,6 +407,9 @@ mod tests {
             risk_class: AutoRiskClass::BoundedWorkspaceTextCreate,
             target_label: "new.txt".into(),
             operation: AutoOperation::CreateTextFile,
+            session_id: "session".into(),
+            revisions: [0; 6],
+            mode: talos_permission::PermissionMode::Interactive,
             request_digest: String::new(),
         };
         let first = digest(&request);

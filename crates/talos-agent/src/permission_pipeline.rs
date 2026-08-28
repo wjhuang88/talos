@@ -58,6 +58,21 @@ pub struct PermissionApprovalRequest {
     pub summary_fields: Vec<String>,
     /// Exact capability-relative Session preview.
     pub preview: GrantPreview,
+    /// Redaction-safe state binding captured at evaluation time.
+    pub binding: PermissionBinding,
+}
+
+/// Opaque permission state identity supplied to bounded approval adapters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionBinding {
+    /// In-memory Session identity.
+    pub session_id: String,
+    /// Monotonic state generations in policy/mode/workspace order.
+    pub revisions: [u64; 6],
+    /// Evaluation mode.
+    pub mode: PermissionMode,
+    /// Whether a human approval surface is available.
+    pub interaction: InteractionCapability,
 }
 
 /// Exact authorization inputs owned by the Agent permission pipeline.
@@ -223,6 +238,18 @@ impl PermissionPipeline {
                     arguments: presentation_input,
                     summary_fields,
                     preview: session.preview().clone(),
+                    binding: {
+                        let snapshot = self
+                            .state
+                            .state_snapshot()
+                            .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
+                        PermissionBinding {
+                            session_id: snapshot.session_id.stable_id(),
+                            revisions: snapshot.revisions.as_array(),
+                            mode: self.context.mode(),
+                            interaction: self.context.interaction(),
+                        }
+                    },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
                 let resolver_future =
