@@ -1,6 +1,6 @@
 # Iteration I233: Auto Configuration And Session Command
 
-> Document status: Active / Claimed (proposed; effective only after PR #426 merges)
+> Document status: Review / Claimed
 > Published plan date: 2026-08-28
 > Planned objective: implement the ADR-064 configuration and active-session `/auto` control surface without changing permission decisions.
 > Baseline rule: once committed, preserve this target; changed objectives require a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim/activation must reach `main` before implementation; ADR-064 remains normative and no model/permission-result authority is transferred. |
+| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -40,7 +40,7 @@
 | I198 | Terminal / Complete | Preserve the completed Skill compatibility owner and its original/corrective evidence; no authority transfer. |
 | I207, I208 | Planned / Unclaimed | Preserve the ordered steering sequence; do not activate. |
 | I213 | Terminal / independent | Dashboard lane remains independent; no overlap. |
-| I233 | Active / Claimed proposed by #426 | Claim/activation is ineffective until PR #426 merges; implementation starts only from merge or later. |
+| I233 | Review / Claimed | Claim #426 merged as `7f47f9c3`; implementation is under exact-head validation and review. |
 
 PRs #120/#121 remain archival Drafts and are not to be resumed. No other open PR owns PERM-007-B;
 PERM-007-C/D remain Blocked / Unclaimed. This inventory is a current checkpoint, not a rewrite of
@@ -56,6 +56,13 @@ historical Published Baselines.
 
 - No evaluator/model call, eligibility, grant, permission policy/result, execution, resolver or audit behavior.
 - No PERM-007-C/D, PERM-006-D/E, sandbox, Dashboard, Desktop, release, version/tag/publication or dependency work.
+
+PERM-007-C must separately define and review the model-assessment seam before any permission
+request can trigger model judgment: the temporary context must be minimal, redacted and bound to
+the exact normalized request, policy/mode generation and session; conversation, credentials,
+untrusted raw tool input and provider reasoning are excluded. A model result is only a bounded
+one-shot suggestion after deterministic eligibility and independent schema/digest validation; it
+cannot authorize itself, create grants or replace the authoritative permission pipeline.
 
 ### Acceptance
 
@@ -85,10 +92,19 @@ historical Published Baselines.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-28 | Selection | PERM-006-A/B/C are complete and ADR-064 is Accepted; I233 is selected as the sole PERM-007-B governance/implementation child. |
+| 2026-08-28 | Claim effective | PR #426 exact head `996a63f8` passed CI `33153127031`, independent Agent-role review and CAS, then merged as `7f47f9c3`; implementation starts from that merge. |
+| 2026-08-28 | Local implementation | Added default-on `auto.enabled`, CLI config get/set, session-only `/auto` status/on/off, TUI registry wiring and lifecycle-by-rebuild reset. No model request, resolver, permission decision or execution path changed. |
+| 2026-08-28 | Lifecycle correction | Independent review found the long-lived conversation engine did not clear session override after runtime replacement. The implementation now clears it only after an authoritative new command sender/generation is published, with a regression test; failed transitions retain the prior session state. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation candidate.
+- `cargo test -p talos-config -p talos-conversation --locked`: 225 + 171 tests passed.
+- `cargo test -p talos-cli --locked`: 358 unit tests and all CLI integration tests passed.
+- Session state is owned only by each `ConversationEngine`; new/resume/fork runtime rebuilds create a
+  fresh engine from current config, so no override is serialized or inherited.
+- Public `Config` exhaustive literals must add `auto: AutoConfig::default()` or use
+  `..Config::default()`. This source migration is recorded for the next compatible workspace
+  version; release/version/tag/publication remain outside I233.
 
 ## Completion Evidence
 

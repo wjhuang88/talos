@@ -61,6 +61,18 @@ fn test_default_config() {
 }
 
 #[test]
+fn auto_config_defaults_enabled_and_parses_explicit_values() {
+    let missing: Config = toml::from_str("provider = \"anthropic\"\nmodel = \"test\"\n")
+        .expect("operation should succeed");
+    assert!(missing.auto.enabled);
+
+    let disabled: Config =
+        toml::from_str("provider = \"anthropic\"\nmodel = \"test\"\n[auto]\nenabled = false\n")
+            .expect("operation should succeed");
+    assert!(!disabled.auto.enabled);
+}
+
+#[test]
 fn test_api_key_from_env_anthropic() {
     let _lock = ENV_MUTEX.lock().expect("operation should succeed");
     unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key-anthropic") };
@@ -76,6 +88,7 @@ fn test_api_key_from_env_anthropic() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(
         config.api_key().expect("operation should succeed"),
@@ -143,6 +156,7 @@ fn test_api_key_from_env_openai() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(
         config.api_key().expect("operation should succeed"),
@@ -168,6 +182,7 @@ fn test_api_key_from_env_openai_compat() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(
         config.api_key().expect("operation should succeed"),
@@ -193,6 +208,7 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(
         config.api_key().expect("operation should succeed"),
@@ -219,6 +235,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     let err = config.api_key().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -244,6 +261,7 @@ fn test_api_key_missing_error() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     let err = config.api_key().expect_err("operation should fail");
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -274,6 +292,7 @@ fn test_base_url_getter() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(config.base_url().as_deref(), Some("https://example.com/v1"));
 }
@@ -381,6 +400,7 @@ fn test_custom_provider_api_key_env() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
 
     assert_eq!(
@@ -406,6 +426,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     let (builtin_ctx, builtin_out) = builtin.resolve_model_limits();
     assert_eq!(builtin_ctx, 1_047_576);
@@ -442,6 +463,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     assert_eq!(custom.context_limit(), Some(202_752));
     assert_eq!(custom.output_limit(), Some(4096));
@@ -580,6 +602,7 @@ fn test_provider_serialization() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
     let config_openai = Config {
         variant: None,
@@ -593,6 +616,7 @@ fn test_provider_serialization() {
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
         dashboard: DashboardConfig::default(),
+        auto: AutoConfig::default(),
     };
 
     let a_str = toml::to_string(&config_anthropic).expect("operation should succeed");

@@ -140,6 +140,34 @@ impl ConversationEngine {
                 );
                 outputs.push(content_block(MessageSource::System, text));
             }
+            "/auto" => {
+                let argument = arg.trim().to_ascii_lowercase();
+                match argument.as_str() {
+                    "" => {
+                        let source = if self.auto_override.is_some() {
+                            "session override"
+                        } else {
+                            "config/default"
+                        };
+                        let state = if self.auto_enabled() {
+                            "enabled"
+                        } else {
+                            "disabled"
+                        };
+                        outputs.push(content_block(MessageSource::System, format!("[System] Auto mode: {state} (source: {source}; evaluator: unavailable in this slice; deadline: 8s; circuit: closed).\n")));
+                    }
+                    "on" | "off" => {
+                        let enabled = argument == "on";
+                        self.auto_override = Some(enabled);
+                        let state = if enabled { "enabled" } else { "disabled" };
+                        outputs.push(content_block(MessageSource::System, format!("[System] Auto mode {state} for this session only; configuration and transcript were not changed.\n")));
+                    }
+                    _ => outputs.push(content_block(
+                        MessageSource::Error,
+                        "[Error] Usage: /auto [on | off]. State unchanged.\n".to_string(),
+                    )),
+                }
+            }
             "/plugins" => {
                 outputs.extend(self.handle_plugins_command());
             }

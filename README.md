@@ -186,6 +186,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 talos config list                                # print all settings (secrets masked)
 talos config get model                           # get a single value
 talos config set model claude-sonnet-4-20250514  # set and persist
+talos config set auto.enabled false               # disable bounded auto-assistance attempts
 
 # Remove a provider entry or clear a credential (--confirm required):
 talos config unset providers.my-gateway --confirm             # remove entire custom provider
@@ -200,6 +201,10 @@ builtin-backed provider (e.g. `anthropic`) clears the user-saved credential and
 overrides but the provider remains available via the builtin catalog. Removing
 the active provider does not crash — the next session start or `/model` re-opens
 the model picker. Environment variables you set yourself are never touched.
+
+The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistance mode, never an
+unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
+session without writing configuration or transcript state.
 
 ## Development
 
@@ -627,6 +632,7 @@ mode.
 | `/help` | Show available commands |
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
+| `/auto`, `/auto on`, `/auto off` | Show or change bounded auto-assistance for this session only |
 | `/plugins` | Show explicitly loaded local plugin packages and registered capabilities |
 | `/mcp` | Show MCP server status and observed tool provenance |
 | `/skills` | List available runtime skills and active state |

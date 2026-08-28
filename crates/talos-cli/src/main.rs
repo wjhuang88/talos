@@ -826,6 +826,7 @@ pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
             .ok_or_else(|| anyhow::anyhow!("not found")),
         ["dashboard", "enabled"] => Ok(config.dashboard.enabled.to_string()),
         ["dashboard", "loopback_only"] => Ok(config.dashboard.loopback_only.to_string()),
+        ["auto", "enabled"] => Ok(config.auto.enabled.to_string()),
         _ => anyhow::bail!("unsupported config key: '{key}'"),
     }
 }
@@ -839,6 +840,12 @@ pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> 
         }
         ["provider"] => {
             config.provider = value.to_string();
+            Ok(())
+        }
+        ["auto", "enabled"] => {
+            config.auto.enabled = value.parse().map_err(|_| {
+                anyhow::anyhow!("invalid auto.enabled '{value}': must be true or false")
+            })?;
             Ok(())
         }
         ["providers", name, "protocol"] => {

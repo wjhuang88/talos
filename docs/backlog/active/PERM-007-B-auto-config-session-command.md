@@ -5,7 +5,7 @@
 | Story ID | PERM-007-B |
 | Type | Permission / Configuration / CLI-TUI Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; effective only after PR #426 merges) |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
 | Selected Iteration | I233 |
 | Depends On | PERM-007-A/I218 and ADR-064 Accepted; PERM-006-A/B/C complete |
@@ -28,9 +28,9 @@ cross-surface `auto` mode without making any model request or changing permissio
 | Governance Claim PR | #426 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer-directed long-task objective; exact-base validators, CI and independent review required before implementation. |
-| Implementation PR | Not started |
+| Implementation PR | #428 |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Establish and merge a separate claim before implementation; preserve ADR-064 precedence and fail-closed boundaries. |
+| Handoff / Release Condition | Claim #426 merged as `7f47f9c3`; implementation PR #428 requires exact-head CI, independent permission/API review and CAS. |
 
 ## Published Baseline
 
@@ -48,6 +48,12 @@ cross-surface `auto` mode without making any model request or changing permissio
 - No model request, resolver, eligibility predicate, grant, permission result or execution change.
 - No PERM-007-C evaluator/circuit implementation, PERM-006-D/E, sandbox/fallback, `/goal` behavior,
   Dashboard, Desktop, release, version, tag, publication or dependency change.
+
+The later PERM-007-C child must establish a separate, independently reviewed model-assessment
+contract. Its temporary context is minimal/redacted and digest-bound to the exact permission
+request; full conversation, credentials, raw untrusted tool input and provider reasoning are never
+forwarded. Model output remains a bounded suggestion subject to deterministic eligibility and
+independent validation, never a replacement permission authority.
 
 ### Acceptance
 
@@ -84,3 +90,11 @@ cross-surface `auto` mode without making any model request or changing permissio
 
 Model-assisted eligibility, resolver, audit and circuit behavior belong to PERM-007-C; cross-surface
 conformance belongs to PERM-007-D. Neither is authorized by this owner.
+
+Public Rust users that construct `Config` exhaustively must add `auto: AutoConfig::default()` or
+use `..Config::default()`. The corresponding compatible workspace version/release is separately
+governed; I233 changes no version, tag or publication state.
+
+Session override lifecycle is reset only after a successful runtime replacement publishes an
+authoritative command sender; failed or rolled-back transitions do not mutate the active session's
+override.
