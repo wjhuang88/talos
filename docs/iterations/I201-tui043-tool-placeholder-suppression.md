@@ -1,6 +1,6 @@
 # Iteration I201: Tool-Call Placeholder Suppression
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-14
 > Planned objective: prevent an exact standalone `Calling tools…` compatibility marker from
 > becoming visible history only when the same assistant response proceeds to structured tool calls.
@@ -89,7 +89,7 @@ Issue #302 / I211.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `7f5a6df2` (implementation merge for PR #309).
 
 ## Variance And Residuals
 
@@ -144,6 +144,14 @@ deny, failure, cancel and resume observations, but failed the permission-mediate
 write/read sequences retained `Calling tools…`, then displayed an unnamed approved row, then the
 named structured tool row.
 
-I201 and TUI-043 remain Review with `Completion Commit: Pending`. Corrective Story TUI-058 / Issue
-#329 separately owns approval-boundary marker correlation and named outcome rows. It is
-Ready/Unclaimed and authorizes no product or permission-policy implementation.
+At this historical checkpoint I201 and TUI-043 remained Review with `Completion Commit: Pending`;
+Corrective Story TUI-058 / Issue #329 separately owned approval-boundary marker correlation and
+named outcome rows. That corrective story is now complete.
+
+## 2026-08-28 Natural-Person Validation Closure
+
+The maintainer completed the executable Issue #111 walkthrough on the integrated implementation:
+approved tool activity showed one named approval and one named tool/result sequence without an
+unnamed approval row; deny showed one named denial with no tool execution; and Esc from an open
+selector showed `Cancelled by user.` with no tool execution. The historical permission-mediated
+failure checkpoint is retained. I201 is now Complete / Closed.

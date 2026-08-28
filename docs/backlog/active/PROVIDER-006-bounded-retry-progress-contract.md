@@ -5,9 +5,9 @@
 | Story ID | PROVIDER-006 |
 | Type | Provider / Runtime Observability Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #278](https://github.com/wjhuang88/talos/issues/278) |
-| Selected Iteration | I210 - Review / Claimed |
+| Selected Iteration | I210 - Complete / Closed |
 | Depends On | I209 disposition; ADR for a semver-compatible provider progress contract |
 
 ## Collaboration Claim
@@ -142,3 +142,5 @@ The maintainer confirmed the live TUI request sequence: initial `Connecting...`,
 provider-reported `Reconnecting... (attempt n/m)` during a real retry, followed by cleanup of the
 transient activity state at the terminal outcome. This records the deferred observation while
 preserving the historical partial-failure record and retry-policy boundaries.
+
+Completion Commit: `9d5c8a71`.

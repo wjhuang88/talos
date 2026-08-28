@@ -5,9 +5,9 @@
 | Story ID | TUI-045 |
 | Type | Bug / TUI / Permission UX Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #125](https://github.com/wjhuang88/talos/issues/125) |
-| Selected Iteration | I197 — Review / Claimed |
+| Selected Iteration | I197 — Complete / Closed |
 | Depends On | Inline TUI scrollback/composer ownership; permission panel state; ADR-054 renderer |
 
 ## Collaboration Claim
@@ -113,3 +113,11 @@ Issue #302 checkpoint `5341637918` did not accept the presentation hierarchy and
 the required terminal matrix. A new-session, non-bottom composer also exposed physical-bottom
 permission-panel placement. This Story remains Review; TUI-059 / Issue #330 is the separate
 Ready/Unclaimed corrective owner. No permission semantic or implementation authority transfers.
+## Natural-Person Validation Closure (2026-08-28)
+
+The maintainer confirmed the executable layout paths: the prompt stayed adjacent to a non-bottom
+composer, narrow/short layouts kept all choices visible, and denial restored usable composer and
+history state. Editing a draft while the selector owns keyboard focus is explicitly not an
+executable acceptance path; only pre-existing state preservation is required.
+
+Completion Commit: `d98f37e7`.

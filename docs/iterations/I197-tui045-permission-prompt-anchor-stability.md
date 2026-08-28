@@ -1,6 +1,6 @@
 # Iteration I197: Permission Prompt Layout Anchor Stability
 
-> Document status: Review
+> Document status: Complete / Closed
 > Published plan date: 2026-08-14
 > Planned objective: keep the inline permission prompt adjacent to the current interaction while
 > preserving the logical viewport/composer anchor and prior tail-follow state across prompt open,
@@ -94,7 +94,7 @@ rows remain deferred to Issue #302 / I211.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commit: `d98f37e7` (implementation merge for PR #305).
 
 ## Variance And Residuals
 
@@ -146,6 +146,16 @@ below the composer while running tool activity remained above it, and the requir
 small-terminal and queued-prompt matrix was not completed. A separate new-session observation found
 a non-bottom composer while the permission request rendered at the physical terminal bottom.
 
-I197 and TUI-045 remain Review with `Completion Commit: Pending`. Corrective Story TUI-059 / Issue
-#330 now owns composer-relative docking and the complete terminal matrix. It is Ready/Unclaimed and
-does not authorize implementation or permission-policy changes.
+At this historical checkpoint I197 and TUI-045 remained Review with `Completion Commit: Pending`;
+Corrective Story TUI-059 / Issue #330 subsequently owned composer-relative docking and the complete
+terminal matrix. That corrective story is now complete.
+
+## 2026-08-28 Natural-Person Validation Closure
+
+The maintainer completed the executable Issue #125 walkthrough: in a new session with the composer
+above the physical terminal bottom, the permission panel remained adjacent to the logical composer;
+the narrow/short layout kept all choices visible; and after denial the panel closed while the
+composer and history remained usable. The selector owns keyboard focus while open, so editing a
+multiline draft inside it is not an executable acceptance path; that criterion is limited to
+preservation of pre-existing composer/history state across open and close. I197 is now Complete /
+Closed.

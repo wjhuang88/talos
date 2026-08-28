@@ -5,9 +5,9 @@
 | Story ID | TUI-043 |
 | Type | TUI / Bug Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #111](https://github.com/wjhuang88/talos/issues/111) |
-| Selected Iteration | I201 — Review / Claimed |
+| Selected Iteration | I201 — Complete / Closed |
 | Depends On | Existing OpenAI request placeholder; canonical TUI ordered-content lifecycle |
 
 ## Collaboration Claim
@@ -135,3 +135,10 @@ Issue #302 checkpoint `5341637918` passed the negative legitimate-text and ordin
 observations but failed permission-mediated suppression: the marker and an unnamed approved line
 remained before the named tool row. This Story remains Review. TUI-058 / Issue #329 is the separate
 Ready/Unclaimed corrective owner; no implementation or permission-policy authority transfers.
+## Natural-Person Validation Closure (2026-08-28)
+
+The maintainer confirmed approval, denial and selector-cancel paths on the integrated implementation:
+each outcome had one named row, no unnamed approval/denial row appeared, and no unintended tool
+execution or file write occurred. Historical failure evidence remains preserved.
+
+Completion Commit: `7f5a6df2`.

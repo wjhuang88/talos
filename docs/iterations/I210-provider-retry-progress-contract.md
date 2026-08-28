@@ -1,6 +1,6 @@
 # Iteration I210: Provider Retry Progress Contract
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned date: 2026-08-17
 > Objective: deliver PROVIDER-006 through a truthful semver-compatible progress contract for
 > provider dispatch, retry backoff and first-packet wait.
@@ -161,8 +161,8 @@ walkthrough found that an idle first submission emitted `Message queued and will
 turn.` even though no earlier turn existed.
 
 TUI-060 / Issue #332 separately owns observable initial connection status and first-turn queue-hint
-semantics. I210 remains Review with `Completion Commit: Pending`; I211 grants no corrective
-implementation authority.
+semantics. At this historical checkpoint I210 remained Review with `Completion Commit: Pending`;
+I211 granted no corrective implementation authority.
 
 ## 2026-08-28 Natural-Person Validation Closure
 
@@ -170,3 +170,5 @@ The maintainer confirmed the live request path displayed the expected initial `C
 state followed by provider-reported `Reconnecting... (attempt n/m)` during a real retry, with
 transient activity clearing after the terminal outcome. Historical partial-failure checkpoints
 remain unchanged.
+
+I210 is now Complete / Closed. Completion Commit: `9d5c8a71` (implementation merge for PR #323).
