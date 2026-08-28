@@ -13,7 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use talos_core::ApprovalChoice;
-use talos_core::tool::{ToolNature, ToolResourceKind};
+use talos_core::tool::{SharedAtomicCreateCapability, ToolNature, ToolResourceKind};
 
 use crate::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
@@ -24,10 +24,11 @@ use talos_permission::PermissionMode;
 pub const AUTO_EVALUATOR_SCHEMA_VERSION: u8 = 1;
 
 /// A typed lease proving that automatic creation is confined to one managed workspace.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ManagedWorkspaceLease {
     root: PathBuf,
     session_id: String,
+    atomic_create: Option<SharedAtomicCreateCapability>,
 }
 
 impl ManagedWorkspaceLease {
@@ -42,7 +43,18 @@ impl ManagedWorkspaceLease {
         Ok(Self {
             root,
             session_id: session_id.into(),
+            atomic_create: None,
         })
+    }
+
+    /// Attaches the same host capability used by the authorized write tool.
+    #[must_use]
+    pub fn with_atomic_create_capability(
+        mut self,
+        capability: SharedAtomicCreateCapability,
+    ) -> Self {
+        self.atomic_create = Some(capability);
+        self
     }
 
     /// Returns the opaque session identity (never sent to the evaluator).
@@ -52,6 +64,9 @@ impl ManagedWorkspaceLease {
     }
 
     fn allows(&self, path: &Path) -> bool {
+        if self.atomic_create.is_none() {
+            return false;
+        }
         let path = if path.is_absolute() {
             path.to_path_buf()
         } else {
@@ -379,6 +394,14 @@ impl ApprovalResolver for AutoPermissionResolver {
 mod tests {
     use super::*;
 
+    struct TestCapability;
+
+    impl talos_core::tool::AtomicCreateCapability for TestCapability {
+        fn create_new(&self, _relative_path: &Path, _contents: &[u8]) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn response_schema_rejects_unknown_fields() {
         let result = serde_json::from_str::<AutoPermissionResponse>(
@@ -390,7 +413,9 @@ mod tests {
     #[test]
     fn lease_only_accepts_absent_descendants_and_redacts_absolute_paths() {
         let root = tempfile::tempdir().expect("root");
-        let lease = ManagedWorkspaceLease::new(root.path(), "session").expect("lease");
+        let lease = ManagedWorkspaceLease::new(root.path(), "session")
+            .expect("lease")
+            .with_atomic_create_capability(Arc::new(TestCapability));
         let absolute = root.path().join("new.txt");
         assert!(lease.allows(&absolute));
         assert_eq!(lease.relative_label(&absolute).as_deref(), Some("new.txt"));

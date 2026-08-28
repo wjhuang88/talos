@@ -1,12 +1,12 @@
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use talos_core::tool::{
-    AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolPermissionFacet,
-    ToolResourceKind, ToolResult,
+    AgentTool, SharedAtomicCreateCapability, ToolExecutionAuthorization, ToolFamily, ToolNature,
+    ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
 
@@ -28,6 +28,7 @@ pub struct WriteInput {
 pub struct WriteTool {
     workspace_root: PathBuf,
     snapshots: Option<FileSnapshotRegistry>,
+    atomic_create: Option<SharedAtomicCreateCapability>,
 }
 
 impl WriteTool {
@@ -35,6 +36,7 @@ impl WriteTool {
         Self {
             workspace_root,
             snapshots: None,
+            atomic_create: None,
         }
     }
 
@@ -47,7 +49,18 @@ impl WriteTool {
         Self {
             workspace_root,
             snapshots: Some(snapshots),
+            atomic_create: None,
         }
+    }
+
+    /// Attaches a host-provided capability-bound atomic create primitive.
+    #[must_use]
+    pub fn with_atomic_create_capability(
+        mut self,
+        capability: SharedAtomicCreateCapability,
+    ) -> Self {
+        self.atomic_create = Some(capability);
+        self
     }
 
     async fn execute_inner(
@@ -68,6 +81,29 @@ impl WriteTool {
 
         if path.exists() {
             return Err(FileToolError::FileExists(write_input.path));
+        }
+
+        if let Some(capability) = &self.atomic_create {
+            let requested = Path::new(&write_input.path);
+            if requested.is_absolute()
+                || requested
+                    .components()
+                    .any(|component| matches!(component, Component::ParentDir))
+            {
+                return Err(FileToolError::PathEscape(write_input.path));
+            }
+            capability
+                .create_new(requested, write_input.content.as_bytes())
+                .map_err(FileToolError::Io)?;
+            if let Some(registry) = &self.snapshots {
+                registry.invalidate_path(&path)?;
+            }
+            return Ok(format!(
+                "wrote {} bytes to {}\npreview:\n{}",
+                write_input.content.len(),
+                write_input.path,
+                bounded_preview(&write_input.content)
+            ));
         }
 
         if let Some(parent) = path.parent() {
