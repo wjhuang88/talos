@@ -84,3 +84,9 @@
 ## Variance And Residuals
 
 - I197/#125 remains Review until this corrective story closes its layout/docking failure. TUI-060, SKILL-005 and TUI-061 remain separate.
+
+### Acceptance Clarification (2026-08-28)
+
+The permission selector owns keyboard focus while open; typing a multiline draft at that point is
+not an executable user path. Human validation should instead verify that pre-existing composer and
+history state remains intact across prompt open/close. The historical Published Baseline is retained.

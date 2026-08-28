@@ -102,3 +102,11 @@ prior viewport when the prompt closes. Permission semantics, request identity an
 unchanged. I197/#125 remains Review only for its separately deferred natural-person acceptance.
 
 Completion Commit: `b29a3d92`.
+
+## Acceptance Clarification (2026-08-28)
+
+The interactive permission selector owns keyboard focus while it is open, so editing a draft from
+inside the selector is not an executable acceptance path. The multiline-draft criterion is therefore
+limited to preserving any pre-existing composer/history state across prompt open and close; it does
+not require input editing while the selector is active. This clarification preserves the Published
+Baseline and records the executable human-validation boundary.
