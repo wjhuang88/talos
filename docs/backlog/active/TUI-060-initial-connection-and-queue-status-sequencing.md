@@ -7,7 +7,7 @@
 | Priority | P0 corrective residual from I211 |
 | Status | Ready / Unclaimed |
 | Source | [GitHub Issue #332](https://github.com/wjhuang88/talos/issues/332) |
-| Selected Iteration | None |
+| Selected Iteration | I231 (claim pending; activation ineffective until merge) |
 | Depends On | PROVIDER-006/I210 merged progress contract; steering submission boundary |
 
 ## Collaboration Claim
