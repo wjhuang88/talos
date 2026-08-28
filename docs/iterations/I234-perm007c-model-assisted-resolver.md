@@ -78,6 +78,7 @@
 |---|---|---|
 | 2026-08-28 | Governance preparation | Claim and Active state are proposed in this governance branch and have no effect until the finalized claim merges to `main`. Implementation must start from that merge or later. |
 | 2026-08-28 | Remote reconciliation | Issue #188 owner/status reconciliation comment `5453556697` records PERM-007-C/I234 as proposed Active/Claimed and ineffective until claim merge. |
+| 2026-08-28 | Remote reconciliation correction | Comment `5453584031` records the matrix status `In Progress` and exact relative owner path required by the reconciliation validator. |
 
 ## Verification Evidence
 
