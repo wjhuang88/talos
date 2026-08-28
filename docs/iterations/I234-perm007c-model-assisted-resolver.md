@@ -15,7 +15,7 @@
 | Work Slice | PERM-007-C/I234 only: deterministic create-only eligibility, redacted evaluator request/output schemas, isolated single-call resolver, digest/revision/mode/session binding, audit report and circuit breaker at the PERM-006-C seam. No cross-surface D, existing-file modification, grants, sandbox fallback, Execute/Network, Dashboard, Desktop, release or publication. |
 | Claimed At | 2026-08-28 |
 | Source Issue | #188 |
-| Governance Claim PR | #TBD (draft to be opened from this branch) |
+| Governance Claim PR | #431 (draft; claim ineffective until merge) |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-064 Accepted at `c129d4a5`; PERM-006-A/B/C and PERM-007-B are complete. Protected permission/security scope requires exact-head independent review before implementation merge. |
 | Implementation PR | Not started |
