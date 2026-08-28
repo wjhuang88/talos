@@ -1,6 +1,6 @@
 # Iteration I235: PERM-007-C Atomic Create Capability Decision
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: decide and independently validate the platform capability needed by I234 to
 > perform ADR-064 directory-relative atomic no-clobber creation.
@@ -20,13 +20,14 @@
 | Source Issue | #188 |
 | Governance Claim PR | #432 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent permission/security/API review; claim is ineffective until PR #432 merges to `main` |
-| Implementation PR | Not started |
+| Authorization Evidence | Exact head `f47ed04670f37f626a2eb24ccffd67a6b576b576` passed CI `33189300888` and independent permission/security/API review `5455600711`; PR #432 merged to `main` as `71acbe0cb60fa204f359d33301b1e2af70125750` |
+| Implementation PR | Not applicable; decision-only iteration |
 | Last Updated | 2026-08-29 |
 | Handoff / Release Condition | Requires independent permission/security/API review; only an accepted decision may authorize a later implementation slice. |
 
-The proposed claim, activation and Active status in this PR have no ownership or implementation
-effect until this exact record reaches `main` through merge-time CAS.
+The proposed claim and Active status were ineffective until PR #432 reached `main` through
+merge-time CAS. That merge occurred as `71acbe0cb60fa204f359d33301b1e2af70125750`; the decision
+is now accepted, while I234 remains separately responsible for implementation.
 
 ## Nonterminal Inventory And Disposition
 
@@ -92,9 +93,18 @@ production positive path remains unavailable.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A decision/status commit cannot self-certify acceptance.
+Completion Commit: `71acbe0cb60fa204f359d33301b1e2af70125750` (PR #432 merge; decision-only
+implementation evidence). Exact-head CI `33189300888` and independent review `5455600711` are
+bound to the pre-merge decision head `f47ed046`.
 
 ## Residuals
 
 I234 remains incomplete until the accepted decision's implementation contract is realized and
 verified. PERM-007-D remains blocked and separately governed.
+
+## Closeout Checkpoint
+
+On 2026-08-29, PR #432 was merged after merge-time CAS. The accepted decision authorizes a later
+I234 implementation slice to evaluate `cap-std` 4.0.3 as the preferred directory-capability
+primitive, subject to its own dependency/security review and exact implementation evidence. This
+closeout changes no executable behavior.

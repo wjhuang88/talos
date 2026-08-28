@@ -8,9 +8,9 @@
 | Story ID | PERM-007 |
 | Type | Permission / Security Epic |
 | Priority | P1 |
-| Status | In Progress — PERM-007-A / I218 and PERM-007-B / I233 Complete; C Active / Claimed; D Blocked |
+| Status | In Progress — PERM-007-A / I218, B / I233 and C0 / I235 Complete; C / I234 Active / Claimed; D Blocked |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; I234 Active / Claimed for C; D unselected |
+| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; I235 Complete / Closed for C0; I234 Active / Claimed for C; D unselected |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; Accepted ADR-064; existing Deny precedence |
 
 ## Collaboration Claim
@@ -71,7 +71,8 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 |---|---|---|---|
 | PERM-007-A / I218 | Threat model and ADR-011 revision/supersession | Complete / Closed at Completion Commit `a289a07f`; ADR-064 Accepted | No behavior change; evidence retained |
 | PERM-007-B / I233 | Canonical config plus `/auto` session command | Complete / Closed; implementation merge `c536e190` | Accepted A and all PERM-006 A-C gates closed; model resolver remains separate |
-| PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Active / Claimed (proposed; ineffective until claim merge) | B closed; I234 protected-scope claim |
+| PERM-007-C0 / I235 | Atomic create capability decision | Complete / Closed; completion commit `71acbe0c` | Decision-only prerequisite accepted through PR #432; no implementation authority |
+| PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Active / Claimed | B and C0 closed; I234 protected-scope implementation claim |
 | PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Blocked / Unclaimed | C closed and human validation where required |
 
 The maintainer requested A early for unattended continuity. Decision work may run alongside I189
