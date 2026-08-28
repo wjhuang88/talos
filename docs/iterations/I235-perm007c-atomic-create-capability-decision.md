@@ -1,6 +1,6 @@
 # Iteration I235: PERM-007-C Atomic Create Capability Decision
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 > Published plan date: 2026-08-28
 > Planned objective: decide and independently validate the platform capability needed by I234 to
 > perform ADR-064 directory-relative atomic no-clobber creation.
@@ -12,17 +12,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline permission session |
 | Work Slice | Decision-only PERM-007-C prerequisite: evaluate safe directory-capability implementations, platform support, dependency and unsafe implications, API boundary, migration, adversarial evidence and rollback. No Rust/Cargo/dependency implementation, permission behavior, model resolver wiring, Dashboard, Desktop, release or publication change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-29 |
 | Source Issue | #188 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #432 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending exact-head independent permission/security/API review |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-28 |
+| Last Updated | 2026-08-29 |
 | Handoff / Release Condition | Requires independent permission/security/API review; only an accepted decision may authorize a later implementation slice. |
 
 ## Nonterminal Inventory And Disposition
