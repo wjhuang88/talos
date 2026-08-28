@@ -1,6 +1,6 @@
 # Iteration I230: Permission Prompt Composer-Relative Docking
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-27
 > Planned objective: close TUI-059/#330 by keeping permission prompts adjacent to the logical composer across non-bottom, narrow and resized layouts.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, governance validators and independent review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-27 |
-| Handoff / Release Condition | Claim and Active state become effective only after PR #416 merges to `main`; implementation starts from that merge or later. Permission semantic or protected-crate changes require independent security review. |
+| Handoff / Release Condition | Claim PR #416 merged as `0f17e79d`; implementation candidate starts from that merge and requires exact-head CI, independent review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -70,11 +70,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-28 | Atomic claim+activation proposal | Prepared from `main@fd84c92e`; I229/TUI-058 is Complete, I197 remains Review, and no overlapping implementation PR exists. PR #416 proposes the single bounded claim and Active state; both remain ineffective until merge. |
+| 2026-08-28 | Atomic claim+activation | PR #416 exact head `8362fc39` passed CI `33091698474` and independent review `5446933935`, then merged as `0f17e79d`. I230/TUI-059 claim and Active state became effective; implementation starts from this merge. |
 
 ## Verification Evidence
 
-- Pending implementation and exact-head evidence.
+- Local candidate commit `097353b7` derives prompt placement from the pre-approval natural-flow state, preserving composer-relative docking through startup/non-bottom layouts and resize. Focused and full TUI tests pass locally; exact-head implementation CI/review remain pending.
 
 ## Completion Evidence
 

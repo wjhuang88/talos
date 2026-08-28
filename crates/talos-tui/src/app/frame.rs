@@ -95,12 +95,26 @@ impl Tui {
         let screen_size = self.terminal.size()?;
         let width = screen_size.width;
         let is_startup = self.is_startup_mode();
+        let approval_startup = self
+            .approval_viewport_snapshot
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.startup_mode);
+        let approval_preserves_follow_tail =
+            self.approval_viewport_snapshot
+                .as_ref()
+                .is_some_and(|snapshot| {
+                    matches!(
+                        snapshot.history_scroll.mode,
+                        crate::history_projection::HistoryScrollMode::FollowTail
+                    )
+                });
+        let natural_startup_flow = is_startup || approval_startup;
         let splash = crate::splash::viewport_splash_lines_with_dashboard(
             width,
             self.dashboard_availability.as_ref(),
         );
         let splash_rows = splash.len();
-        let startup_spacer_rows: usize = if is_startup { 1 } else { 0 };
+        let startup_spacer_rows: usize = if natural_startup_flow { 1 } else { 0 };
         let follows_tail = matches!(
             self.history_scroll.mode,
             crate::history_projection::HistoryScrollMode::FollowTail
@@ -111,11 +125,11 @@ impl Tui {
         // normal allocation clamps it to the remaining frame and the composer
         // naturally becomes bottom-fixed.  Anchored history deliberately uses
         // the regular viewport so scrolling never moves the input frame.
-        let history_cap = if is_startup {
+        let history_cap = if natural_startup_flow {
             Some((splash_rows + startup_spacer_rows) as u16)
-        } else if follows_tail
-            && !self.state.slash_menu.is_open
-            && matches!(self.state.approval_state, ApprovalState::Hidden)
+        } else if (follows_tail || approval_preserves_follow_tail)
+            && (!self.state.slash_menu.is_open
+                || !matches!(self.state.approval_state, ApprovalState::Hidden))
         {
             let natural_rows = self
                 .history_projection_cache

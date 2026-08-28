@@ -167,6 +167,7 @@ pub struct Tui {
 struct ApprovalViewportSnapshot {
     history_scroll: HistoryScrollState,
     history_prefix_start: Option<usize>,
+    startup_mode: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -497,9 +498,11 @@ impl Tui {
             .as_deref()
             .is_none_or(|value| value.trim().is_empty());
         if self.approval_viewport_snapshot.is_none() {
+            let startup_mode = self.is_startup_mode();
             self.approval_viewport_snapshot = Some(ApprovalViewportSnapshot {
                 history_scroll: self.history_scroll.clone(),
                 history_prefix_start: self.history_prefix_start,
+                startup_mode,
             });
 
             // A FollowTail projection is sized for the pre-prompt natural flow. Once the
