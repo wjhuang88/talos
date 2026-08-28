@@ -99,6 +99,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I230 | Permission Prompt Composer-Relative Docking | Complete / Closed | Completion Commit `b29a3d92`; PR #418 merged from exact head `1cb595ce` after CI `33130918248` attempt 2 and bounded single-maintainer CAS record `5447132762`. |
 | I231 | Initial Connection And Queue Status Sequencing | Complete / Closed | Completion Commit `e4cbb714`; PR #421 exact head `38c4f030` passed CI `33136176771` and bounded single-maintainer CAS `5447796064`. |
 | I232 | Invalid Skill Diagnostic Visibility | Complete / Closed | Completion Commit `fedd6fac`; implementation source `fb47b0c2`, exact-head CI `33141878176`, independent Skill/CLI review `5448628671`. Fail-closed invalid-Skill discovery and bounded explicit activation diagnostics are complete. |
+| I233 | Auto Configuration And Session Command | Active / Claimed (proposed by #426; ineffective until merge) | PERM-007-B / Issue #188; ADR-064 and PERM-006-A/B/C are complete. Config/session `/auto` only; no model or permission-result authority. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout
