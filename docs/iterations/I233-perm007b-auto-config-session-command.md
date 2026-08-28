@@ -40,7 +40,7 @@
 | I198 | Terminal / Complete | Preserve the completed Skill compatibility owner and its original/corrective evidence; no authority transfer. |
 | I207, I208 | Planned / Unclaimed | Preserve the ordered steering sequence; do not activate. |
 | I213 | Terminal / independent | Dashboard lane remains independent; no overlap. |
-| I233 | Complete / Closed | Claim #426 merged as `7f47f9c3`; implementation PR #428 merged as `c536e190`. |
+| I233 | Review / Claimed | Claim #426 merged as `7f47f9c3`; implementation is under exact-head validation and review. |
 
 PRs #120/#121 remain archival Drafts and are not to be resumed. No other open PR owns PERM-007-B;
 PERM-007-C/D remain Blocked / Unclaimed. This inventory is a current checkpoint, not a rewrite of
@@ -95,6 +95,7 @@ cannot authorize itself, create grants or replace the authoritative permission p
 | 2026-08-28 | Claim effective | PR #426 exact head `996a63f8` passed CI `33153127031`, independent Agent-role review and CAS, then merged as `7f47f9c3`; implementation starts from that merge. |
 | 2026-08-28 | Local implementation | Added default-on `auto.enabled`, CLI config get/set, session-only `/auto` status/on/off, TUI registry wiring and lifecycle-by-rebuild reset. No model request, resolver, permission decision or execution path changed. |
 | 2026-08-28 | Lifecycle correction | Independent review found the long-lived conversation engine did not clear session override after runtime replacement. The implementation now clears it only after an authoritative new command sender/generation is published, with a regression test; failed transitions retain the prior session state. |
+| 2026-08-28 | Completion | PR #428 exact head `47afcee32a3764ac90da4ef91e78cf1db7dd7b21` passed CI `33159475333` and independent review `5451227280`, then merged as `c536e190e63ec7a3aed3c54c726ca6d82d054d75`; I233 is Complete / Closed. |
 
 ## Verification Evidence
 
