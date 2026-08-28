@@ -135,3 +135,10 @@ the initial `Connecting...` state too brief to observe and an idle first submiss
 labeled as queued. TUI-060 / Issue #332 owns that corrective presentation/sequencing work.
 PROVIDER-006 remains Review; no retry-policy change or implementation authority transfers through
 this note.
+
+## Natural-Person Validation Closure (2026-08-28)
+
+The maintainer confirmed the live TUI request sequence: initial `Connecting...`, then
+provider-reported `Reconnecting... (attempt n/m)` during a real retry, followed by cleanup of the
+transient activity state at the terminal outcome. This records the deferred observation while
+preserving the historical partial-failure record and retry-policy boundaries.

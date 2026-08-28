@@ -78,3 +78,10 @@
 ## Completion Evidence
 
 - Completion Commit: `e4cbb714` (PR #421 implementation merge).
+
+## Natural-Person Validation Note (2026-08-28)
+
+The maintainer confirmed the live connection presentation after the corrective implementation:
+`Connecting...` is observable before a real retry, `Reconnecting... (attempt n/m)` is shown during
+retry, and the transient status clears at the terminal outcome. This complements deterministic
+tests without changing retry policy.

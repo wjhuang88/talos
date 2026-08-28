@@ -163,3 +163,10 @@ turn.` even though no earlier turn existed.
 TUI-060 / Issue #332 separately owns observable initial connection status and first-turn queue-hint
 semantics. I210 remains Review with `Completion Commit: Pending`; I211 grants no corrective
 implementation authority.
+
+## 2026-08-28 Natural-Person Validation Closure
+
+The maintainer confirmed the live request path displayed the expected initial `Connecting...`
+state followed by provider-reported `Reconnecting... (attempt n/m)` during a real retry, with
+transient activity clearing after the terminal outcome. Historical partial-failure checkpoints
+remain unchanged.
