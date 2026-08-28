@@ -1,6 +1,6 @@
 # Iteration I231: Initial Connection And Queue Status Sequencing
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-28
 > Planned objective: close TUI-060/#332 by making initial connection and first-submission queue status truthful and observable.
 > Baseline rule: preserve this target; changed objectives require a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim and Active state become effective only after PR #420 merges to `main`; implementation starts from that merge or later. |
+| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation candidate starts from that merge and requires exact-head CI/review/CAS. |
 
 ## Published Baseline
 
@@ -68,11 +68,11 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-28 | Claim preparation | Prepared from `main@34fcfeab`; I230 is Complete/Closed, I210 remains Review and no overlapping implementation PR exists. Claim and activation remain ineffective until governance PR merge. |
+| 2026-08-28 | Atomic claim+activation | PR #420 exact head `381fac7c` passed exact-head CI and single-maintainer claim CAS `5447355718`, then merged as `27f64b70`. I231/TUI-060 claim and Active state became effective. |
 
 ## Verification Evidence
 
-- Pending.
+- Local candidate `6f79f559` suppresses only idle-first-submit queue hints at the bridge and defers a fast Reconnecting status for one 150ms activity interval without delaying cancellation or terminal state. TUI 563 and CLI 357 core tests plus strict Clippy pass locally; exact-head gates pending.
 
 ## Completion Evidence
 

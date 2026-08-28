@@ -5,9 +5,9 @@
 | Story ID | TUI-060 |
 | Type | Bug / Conversation Status / TUI |
 | Priority | P0 corrective residual from I211 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #332](https://github.com/wjhuang88/talos/issues/332) |
-| Selected Iteration | I231 (claim PR #420; activation ineffective until merge) |
+| Selected Iteration | I231 (claim PR #420 merged as `27f64b70`) |
 | Depends On | PROVIDER-006/I210 merged progress contract; steering submission boundary |
 
 ## Collaboration Claim
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #420 merges to `main`. |
+| Handoff / Release Condition | Claim PR #420 merged as `27f64b70`; implementation candidate requires exact-head CI/review/CAS. |
 
 ## Identity / Goal / Value
 
