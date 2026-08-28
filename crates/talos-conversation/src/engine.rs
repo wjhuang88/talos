@@ -162,6 +162,11 @@ impl ConversationEngine {
         self.auto_override.unwrap_or(self.auto_config_enabled)
     }
 
+    /// Clears the non-persistent override when a session runtime is replaced.
+    pub fn reset_auto_override(&mut self) {
+        self.auto_override = None;
+    }
+
     /// Supplies the typed set of explicitly loaded plugin packages.
     #[must_use]
     pub fn with_loaded_plugins(mut self, plugins: Vec<LoadedPluginDiagnostic>) -> Self {

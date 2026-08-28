@@ -897,6 +897,21 @@ async fn slash_auto_is_session_only_and_rejects_invalid_arguments() {
     assert!(text.contains("enabled"));
 }
 
+#[tokio::test]
+async fn auto_override_resets_when_session_runtime_is_replaced() {
+    let mut engine = new_engine().with_auto_enabled(false);
+    let _ = engine.handle_slash_command("/auto on");
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("enabled"));
+    engine.reset_auto_override();
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("disabled"));
+}
+
 // ---------------------------------------------------------------------------
 // handle_slash_command: /plugins (transition notice) and /mcp
 // ---------------------------------------------------------------------------

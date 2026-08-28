@@ -215,6 +215,10 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         {
                             sender_generation = current_generation;
                             known_sender = current_sender;
+                            // A new/resumed/forked session publishes a fresh command sender.
+                            // Clear the prior session's non-persistent auto override only after
+                            // the replacement runtime is authoritative.
+                            engine.reset_auto_override();
                             if !engine.pending_image_attachments.is_empty() {
                                 pending_attachment_generation = Some(sender_generation);
                                 send_bridge_stream(
