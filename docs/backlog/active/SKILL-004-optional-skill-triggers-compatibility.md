@@ -1,20 +1,22 @@
 # SKILL-004: Optional Skill Triggers Compatibility
 
+> Document status: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | SKILL-004 |
 | Source Issue | #155 |
-| Status | Review / Claimed - compatibility delivered; diagnostic visibility failed and transferred to SKILL-005/#333 |
+| Status | Complete / Closed |
 | Priority | P1 |
 | Type | Skill Format / Compatibility |
-| Selected Iteration | I198 — Review / Claimed |
+| Selected Iteration | I198 — Complete / Closed |
 | Depends On | Current `talos-skill` parser and SKILL-001 through SKILL-003 compatibility contracts |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I198/SKILL-004 only: confirm the additive omitted-`triggers` contract; default an omitted field to an empty list; preserve explicit empty/non-empty lists and malformed-value rejection; add focused parser/runtime fixtures; update English and Chinese skill-author documentation. Excludes discovery, linked-skill policy, trigger routing, permissions, registry/ClawHub clients, dependencies, persistence, release/publication and unrelated I211 work. |
@@ -24,8 +26,8 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | #325 |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #325 passed exact-head CI/review/CAS and merged as `15a3d424`. I211 terminal validation passed omitted/empty/list behavior but exposed a hidden malformed-input diagnostic; SKILL-005/#333 is the separate Ready/Unclaimed corrective owner. Keep SKILL-004 Review with no transferred implementation authority. |
+| Last Updated | 2026-08-28 |
+| Handoff / Release Condition | Closed after PR #325 delivered compatibility and I232/SKILL-005 corrected explicit malformed-input diagnostics through PR #424 merge `fedd6fac`. |
 
 ## Goal And Compatibility Contract
 
@@ -148,3 +150,13 @@ required field-specific diagnostic.
 SKILL-005 / Issue #333 is the separate Ready/Unclaimed corrective owner for diagnostic visibility.
 SKILL-004 remains Review with Completion Commit Pending; I211 records evidence only and grants no
 implementation authority.
+
+The preceding paragraph is a dated pre-correction checkpoint. It is superseded by the 2026-08-28
+completion record below and is retained only for historical accuracy.
+
+## 2026-08-28 Corrective Completion
+
+I232/SKILL-005 completed the failed malformed-input activation row through implementation source
+`fb47b0c2`, exact-head CI `33141878176`, independent review `5448628671` and merge `fedd6fac`.
+Completion Commits: `f719ed913d36ad7ad00f5a99d3d990b414dbbd5d` and
+`fedd6fac94708628478836b94b6fd01954de53e0`. This status-only closeout does not self-certify completion.

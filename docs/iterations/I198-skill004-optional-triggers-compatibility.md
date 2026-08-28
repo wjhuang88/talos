@@ -1,6 +1,6 @@
 # Iteration I198: Optional Skill Triggers Compatibility
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-14
 > Planned objective: decide and implement the smallest compatible omitted-`triggers` contract for
 > otherwise-valid `SKILL.md` files without weakening malformed-value validation or changing skill
@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I198/SKILL-004 only: confirm the additive omitted-`triggers` contract; default an omitted field to an empty list; preserve explicit empty/non-empty lists and malformed-value rejection; add focused parser/runtime fixtures; update English and Chinese skill-author documentation. Excludes discovery, linked-skill policy, trigger routing, permissions, registry/ClawHub clients, dependencies, persistence, release/publication and unrelated I211 work. |
@@ -24,8 +24,8 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #324 exact head `a06e34a51dabd33a3204d2e96e749f2342545438` passed CI `32337065552`, independent Agent claim review `5351981686`, both governance validators and merge-time CAS, then merged to `main` as `ea6686855de971df42de0311333617090c30de47`. |
 | Implementation PR | #325 |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | PR #325 passed exact-head CI/review/CAS and merged as `15a3d424`. I211 terminal validation passed compatibility behavior but exposed the hidden malformed-input diagnostic; SKILL-005/#333 is the separate Ready/Unclaimed corrective owner. Keep I198 Review with no implementation authority transfer. |
+| Last Updated | 2026-08-28 |
+| Handoff / Release Condition | Closed after PR #325 delivered omitted/empty/list compatibility and I232/SKILL-005 corrected explicit malformed-input diagnostics through PR #424 merge `fedd6fac`. |
 
 ## Published Baseline
 
@@ -83,16 +83,24 @@ create the required ADR/migration owner; do not silently choose a different cont
 
 ## Actual Activation And Execution
 
-No activation has occurred. This planned iteration remains Unclaimed and follows I197 in the
-mainline priority long task; that order is coordination, not implementation authority.
+### Historical checkpoint — 2026-08-20 pre-activation
+
+The original planning checkpoint recorded no activation and an Unclaimed state. It is historical
+only; subsequent claim and implementation records below supersede its current-state wording.
 
 ## Verification Evidence
 
-Pending implementation after an effective claim reaches `main`.
+### Current verification checkpoint — 2026-08-28
+
+Claim PR #324 merged as `ea668685`; implementation PR #325 merged as `15a3d424` from evidence
+commit `f719ed91`. The deferred malformed-input row was corrected by I232/SKILL-005 implementation
+source `fb47b0c2`, exact-head CI `33141878176`, independent review `5448628671`, and merge
+`fedd6fac`. Omitted/empty/list compatibility, fail-closed invalid discovery and bounded explicit
+activation diagnostics are verified; no broader Skill-format compatibility is claimed.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as its own evidence.
+Completion Commits: `f719ed913d36ad7ad00f5a99d3d990b414dbbd5d` and `fedd6fac94708628478836b94b6fd01954de53e0`. The first is the I198 implementation; the second is the existing I232 corrective implementation merge. A status-only commit cannot serve as its own evidence.
 
 ## Variance And Residuals
 
@@ -117,7 +125,7 @@ for a separate ADR/migration owner.
 
 ## Retrospective
 
-Pending execution.
+Outcome: met. I198 delivered omitted/empty/list compatibility; I232/SKILL-005 closed the malformed-input activation diagnostic while preserving fail-closed discovery.
 
 ## Exact-Main Claim Inventory - 2026-08-20
 
