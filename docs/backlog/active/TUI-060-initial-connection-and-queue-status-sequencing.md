@@ -5,27 +5,27 @@
 | Story ID | TUI-060 |
 | Type | Bug / Conversation Status / TUI |
 | Priority | P0 corrective residual from I211 |
-| Status | Ready / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #332](https://github.com/wjhuang88/talos/issues/332) |
-| Selected Iteration | None |
+| Selected Iteration | I231 (claim PR #420; activation ineffective until merge) |
 | Depends On | PROVIDER-006/I210 merged progress contract; steering submission boundary |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline TUI-060 session |
+| Work Slice | Implement only TUI-060 initial connection and queue status sequencing; preserve provider retry policy, submission identity, steering FIFO, cancellation and persistence. Exclude permission, release, Dashboard, Desktop and `/auto`. |
+| Claimed At | 2026-08-28 |
 | Source Issue | #332 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #420 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer-directed long-task objective; finalized claim requires exact-head CI, validators and review before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-20 |
-| Handoff / Release Condition | Select a runnable corrective iteration and establish an effective claim before implementation. |
+| Last Updated | 2026-08-28 |
+| Handoff / Release Condition | Claim and implementation authorization become effective only after PR #420 merges to `main`. |
 
 ## Identity / Goal / Value
 
