@@ -409,6 +409,66 @@ mod tests {
             Some(TranscriptBlock::StyledLine(line)) if line.text.contains("approved: write_file")
         ));
     }
+
+    #[test]
+    fn fast_reconnect_waits_for_one_observable_connecting_interval() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let mut connecting = StatusSnapshot {
+            is_processing: true,
+            phase: Some(TurnPhase::Connecting),
+            ..Default::default()
+        };
+        connecting.workspace_path = "workspace".into();
+        tui.handle_ui_output(UiOutput::Status(connecting));
+
+        let reconnecting = StatusSnapshot {
+            is_processing: true,
+            phase: Some(TurnPhase::Reconnecting {
+                attempt: 1,
+                max_attempts: 2,
+            }),
+            ..Default::default()
+        };
+        tui.handle_ui_output(UiOutput::Status(reconnecting));
+
+        assert_eq!(tui.state.status.phase, Some(TurnPhase::Connecting));
+        assert!(tui.deferred_reconnecting_status.is_some());
+        tui.release_deferred_reconnecting_status(Instant::now() + PROCESSING_FRAME_INTERVAL);
+        assert_eq!(
+            tui.state.status.phase,
+            Some(TurnPhase::Reconnecting {
+                attempt: 1,
+                max_attempts: 2,
+            })
+        );
+        assert_eq!(tui.state.status.workspace_path, "workspace");
+    }
+
+    #[test]
+    fn terminal_status_preempts_deferred_reconnect() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Status(StatusSnapshot {
+            is_processing: true,
+            phase: Some(TurnPhase::Connecting),
+            ..Default::default()
+        }));
+        tui.handle_ui_output(UiOutput::Status(StatusSnapshot {
+            is_processing: true,
+            phase: Some(TurnPhase::Reconnecting {
+                attempt: 1,
+                max_attempts: 2,
+            }),
+            ..Default::default()
+        }));
+        tui.handle_ui_output(UiOutput::Status(StatusSnapshot {
+            is_processing: false,
+            phase: Some(TurnPhase::Cancelled),
+            ..Default::default()
+        }));
+
+        assert_eq!(tui.state.status.phase, Some(TurnPhase::Cancelled));
+        assert!(tui.deferred_reconnecting_status.is_none());
+    }
 }
 
 impl Tui {
@@ -596,11 +656,7 @@ impl Tui {
                 if !snapshot.is_processing {
                     self.finalize_ordered_content();
                 }
-                let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
-                self.state.status = snapshot;
-                if self.state.status.workspace_path.is_empty() {
-                    self.state.status.workspace_path = workspace_path;
-                }
+                self.handle_status_snapshot(snapshot, Instant::now());
             }
             UiOutput::SessionIdentity { id } => {
                 self.session_id = Some(id);
@@ -730,6 +786,7 @@ impl Tui {
     }
 
     pub(super) fn advance_processing_frame(&mut self) {
+        self.release_deferred_reconnecting_status(Instant::now());
         self.processing_frame =
             next_processing_frame(self.state.status.is_processing, self.processing_frame);
         let Some(selection) = self.selection else {
@@ -746,6 +803,46 @@ impl Tui {
             self.scroll_frame_history_up(1);
         } else {
             self.scroll_frame_history_down(1, self.last_history_viewport_height);
+        }
+    }
+
+    fn handle_status_snapshot(&mut self, snapshot: StatusSnapshot, now: Instant) {
+        let defer_reconnecting = self.state.status.is_processing
+            && matches!(self.state.status.phase, Some(TurnPhase::Connecting))
+            && snapshot.is_processing
+            && matches!(snapshot.phase, Some(TurnPhase::Reconnecting { .. }));
+        if defer_reconnecting {
+            if let Some((pending, _)) = self.deferred_reconnecting_status.as_mut() {
+                *pending = snapshot;
+            } else {
+                self.deferred_reconnecting_status =
+                    Some((snapshot, now + PROCESSING_FRAME_INTERVAL));
+            }
+            return;
+        }
+        self.deferred_reconnecting_status = None;
+        self.apply_status_snapshot(snapshot);
+    }
+
+    fn release_deferred_reconnecting_status(&mut self, now: Instant) {
+        let Some((_, deadline)) = self.deferred_reconnecting_status.as_ref() else {
+            return;
+        };
+        if now < *deadline {
+            return;
+        }
+        let (snapshot, _) = self
+            .deferred_reconnecting_status
+            .take()
+            .expect("deferred reconnect status exists");
+        self.apply_status_snapshot(snapshot);
+    }
+
+    fn apply_status_snapshot(&mut self, snapshot: StatusSnapshot) {
+        let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
+        self.state.status = snapshot;
+        if self.state.status.workspace_path.is_empty() {
+            self.state.status.workspace_path = workspace_path;
         }
     }
 }

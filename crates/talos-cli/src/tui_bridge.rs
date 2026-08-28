@@ -19,7 +19,7 @@ use talos_conversation::MessageSource;
 use talos_conversation::{
     ContentOutput, ConversationEngine, CredentialResponseData, ModelInfo, ModelSwitchRequest,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
-    SkillCommandRequest, TodoCommandRequest, UiOutput, UserInput,
+    SkillCommandRequest, TipKind, TodoCommandRequest, UiOutput, UserInput,
 };
 use talos_core::message::AgentEvent;
 use talos_core::session::{
@@ -429,6 +429,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             }
                             let attachments = std::mem::take(&mut engine.pending_image_attachments);
                             let attachment_generation = pending_attachment_generation.take();
+                            let queued_behind_active_turn = turn_state.accepts_queued_input();
                             let (accepted, outputs) = engine.enqueue_structured_steering(
                                 text,
                                 kind,
@@ -439,9 +440,14 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 pending_attachment_generation = attachment_generation;
                             }
                             for output in outputs {
-                                let _ = ui_tx.send(output);
+                                if should_forward_enqueue_output(
+                                    &output,
+                                    queued_behind_active_turn,
+                                ) {
+                                    let _ = ui_tx.send(output);
+                                }
                             }
-                            if !turn_state.accepts_queued_input() {
+                            if !queued_behind_active_turn {
                                 dispatch_prepared_submission(
                                     &mut engine,
                                     &mut turn_state,
@@ -517,6 +523,35 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 }
             }
         }
+    }
+}
+
+fn should_forward_enqueue_output(output: &UiOutput, queued_behind_active_turn: bool) -> bool {
+    queued_behind_active_turn
+        || !matches!(
+            output,
+            UiOutput::Tip {
+                kind: TipKind::QueueHint,
+                ..
+            }
+        )
+}
+
+#[cfg(test)]
+mod enqueue_output_tests {
+    use super::*;
+
+    #[test]
+    fn idle_first_submit_suppresses_only_the_queue_hint() {
+        let hint = UiOutput::Tip {
+            text: "Message queued and will send after current turn.".into(),
+            kind: TipKind::QueueHint,
+        };
+        let status = UiOutput::Status(Default::default());
+
+        assert!(!should_forward_enqueue_output(&hint, false));
+        assert!(should_forward_enqueue_output(&status, false));
+        assert!(should_forward_enqueue_output(&hint, true));
     }
 }
 

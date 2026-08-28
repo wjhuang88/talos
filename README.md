@@ -320,7 +320,8 @@ In the interactive TUI, a model request starts with `Connecting...`. Built-in Op
 and Anthropic providers replace it with `Reconnecting... (attempt n/m)` during an actual bounded
 retry, using the provider's configured retry ordinal and ceiling. The activity is transient and
 clears on content, failure, cancellation, or completion; providers that do not implement typed
-progress retain the compatible static `Connecting...` display.
+progress retain the compatible static `Connecting...` display. A fast retry still leaves the
+initial `Connecting...` phase visible for one activity frame before the truthful reconnect state.
 
 Attach one or more local images to a print-mode prompt (requires a vision-capable model):
 
@@ -520,6 +521,7 @@ above the composer (up to 6 lines; longer queues show a `+N more` summary). The 
 when the queue empties. If `Esc` cancels the active turn, already-accepted queued input becomes the
 next turn in the same session automatically. Model/provider switching remains blocked until that
 queued input is accepted by the session and the queue is drained.
+An idle first submission dispatches directly and does not show the queued-message hint.
 
 Use `/model` to switch among models whose providers are already configured. The picker
 uses **three-level navigation**: Level 1 lists recent models (when available, persisted

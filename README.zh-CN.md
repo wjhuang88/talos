@@ -268,7 +268,8 @@ talos -p "summarize this repository"
 在交互式 TUI 中，模型请求开始时显示 `Connecting...`。内置 OpenAI 兼容与 Anthropic
 provider 发生真实的有界重试时，会按 provider 配置的重试序号和上限显示
 `Reconnecting... (attempt n/m)`。该活动状态是瞬态的，在收到内容、失败、取消或完成时清除；
-未实现类型化进度的 provider 继续保持兼容的静态 `Connecting...` 显示。
+未实现类型化进度的 provider 继续保持兼容的静态 `Connecting...` 显示。即使重试很快，初始
+`Connecting...` 也会至少显示一个活动帧，再切换到真实的 reconnect 状态。
 
 显式指定工作区：
 
@@ -409,6 +410,7 @@ inline 模式中使用。
 shell 仍处于 raw 或鼠标上报状态，请运行 `reset` 或打开新终端。
 
 如果你在模型仍在处理时输入消息，会自动排队并在当前 turn 完成后按 FIFO 顺序发送。TUI 在输入区上方显示排队消息的紧凑预览（最多 6 行；较长队列显示 `+N more` 摘要）。队列清空后预览自动消失。如果按 `Esc` 取消活动 turn，已经接受的排队输入会自动成为同一会话的下一个 turn。模型或提供商切换会继续阻塞，直到该输入被会话接受且队列耗尽。
+空闲会话的第一条消息会直接提交，不显示“已排队”的提示。
 
 TUI 中可用的斜杠命令：
 
