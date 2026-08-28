@@ -96,7 +96,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I226 | TOOL-024-D1-B Windows Job Object Process-Tree Ownership | Complete / Closed | Completion Commit `d4d7cb25`; PR #394 merged from exact candidate `83557863`, CI `32849330531`, independent review `5410840103`. |
 | I228 | TOOL-024-D2 Interactive Projection And Cross-Platform Acceptance | Complete / Closed | Completion Commit `a5fbc22e`; PR #403 exact head `e65f9b49` passed CI `32937579899`, independent review `5421558305` and merge-time CAS. I223 remains separate. |
 | I229 | Permission-Mediated Tool Activity Correlation | Complete / Closed | Completion Commit `5a9b6589`; PR #414 merged from exact head `b2179d33` after CI `33074348512` attempt 2 and independent approval `5439760729`. |
-| I230 | Permission Prompt Composer-Relative Docking | Active / Claimed | TUI-059/#330 corrective iteration; governance claim PR #416 proposes activation from `main@fd84c92e`; implementation authorization remains ineffective until merge. |
+| I230 | Permission Prompt Composer-Relative Docking | Review / Claimed | TUI-059/#330 candidate commit `097353b7` keeps approval prompts beside the logical composer in startup/non-bottom layouts and resize; claim #416 merged as `0f17e79d`, exact implementation gates pending. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
 ## Completed This Closeout
