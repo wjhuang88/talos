@@ -28,7 +28,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-30 |
-| Handoff / Release Condition | ADR-064 and PERM-006-A/B/C are Complete. I234/PERM-007-C is Complete / Closed with implementation merge `c5be0109b3da4f81e221fa37f734af2431e35255`; PERM-007-D is Ready / Unclaimed and requires its own claim. |
+| Handoff / Release Condition | ADR-064 and PERM-006-A/B/C are Complete. I234/PERM-007-C is Complete / Closed with implementation merge `c5be0109b3da4f81e221fa37f734af2431e35255`; I236/PERM-007-D claim is proposed and ineffective until merge. |
 
 ## Identity / Goal / Value
 
@@ -73,7 +73,7 @@ boundaries. Goal mode is one consumer of this shared capability, not its securit
 | PERM-007-B / I233 | Canonical config plus `/auto` session command | Complete / Closed; implementation merge `c536e190` | Accepted A and all PERM-006 A-C gates closed; model resolver remains separate |
 | PERM-007-C0 / I235 | Atomic create capability decision | Complete / Closed; completion commit `71acbe0c` | Decision-only prerequisite accepted through PR #432; no implementation authority |
 | PERM-007-C | Bounded model-assisted resolver inside the authoritative Ask path | Complete / Closed | Completion Commit `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1`; PR #434 merged as `c5be0109b3da4f81e221fa37f734af2431e35255` |
-| PERM-007-D | Cross-surface conformance, rollout and rollback evidence | Ready / Unclaimed | C closed and human validation where required |
+| PERM-007-D / I236 | Cross-surface conformance, rollout and rollback evidence | Active / Claimed (proposed; ineffective until claim merge) | C closed and human validation where required |
 
 The maintainer requested A early for unattended continuity. Decision work may run alongside I189
 because it changes no behavior; C-D cannot bypass the ordered PERM-006 implementation chain.
