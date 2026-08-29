@@ -579,6 +579,7 @@ impl ApprovalResolver for AutoPermissionResolver {
         };
         let budget = remaining.min(self.deadline);
         let started = Instant::now();
+        let assessment_epoch = self.control.reset_epoch();
         let raw = match tokio::time::timeout(
             budget,
             self.assessor.assess(evaluator_request.clone(), budget),
@@ -600,6 +601,20 @@ impl ApprovalResolver for AutoPermissionResolver {
                     .await;
             }
         };
+        // A mode change while the model was running invalidates its result. In
+        // particular, `/auto off` must not allow an in-flight assessor to grant.
+        if !self.control.is_enabled() || self.control.reset_epoch() != assessment_epoch {
+            self.report(AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "session_mode_changed".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: evaluator_request.request_digest.clone(),
+            });
+            return self
+                .fallback
+                .resolve(request, remaining.saturating_sub(started.elapsed()))
+                .await;
+        }
         let response: AutoPermissionResponse = match serde_json::from_str(&raw) {
             Ok(value) => value,
             Err(_) => {
