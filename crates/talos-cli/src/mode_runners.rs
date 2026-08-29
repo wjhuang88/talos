@@ -28,7 +28,7 @@ use talos_core::tool::{ToolPresentationPolicy, ToolRegistry};
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_tools::{
     bash_tool_contribution, git_mutation_tool_contributions, git_read_tool_contributions,
-    snapshot_aware_file_tool_contributions, workspace_non_document_tool_contributions,
+    workspace_non_document_tool_contributions,
 };
 use talos_tui::Tui;
 use tokio::sync::{mpsc, watch};

@@ -128,7 +128,8 @@ pub use file_tools::FileSnapshotRegistry;
 pub use file_tools::snapshot_aware_file_tools;
 #[cfg(feature = "file-write")]
 pub use file_tools::{
-    DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, WriteInput, WriteTool,
+    CapStdAtomicCreateCapability, DeleteError, DeleteInput, DeleteTool, EditInput, EditTool,
+    WriteInput, WriteTool,
 };
 #[cfg(any(
     feature = "file-read",
