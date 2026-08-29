@@ -95,6 +95,7 @@ pub struct ConversationEngine {
     pub(crate) is_processing: bool,
     auto_config_enabled: bool,
     auto_override: Option<bool>,
+    auto_mode_callback: Option<std::sync::Arc<dyn Fn(bool) + Send + Sync>>,
     pub(crate) current_phase: Option<TurnPhase>,
     pub(crate) context_limit: Option<u32>,
     pub(crate) input_price_per_million: Option<f64>,
@@ -134,6 +135,7 @@ impl ConversationEngine {
             is_processing: false,
             auto_config_enabled: true,
             auto_override: None,
+            auto_mode_callback: None,
             current_phase: None,
             context_limit: None,
             input_price_per_million: None,
@@ -158,6 +160,16 @@ impl ConversationEngine {
         self
     }
 
+    /// Connects session `/auto` changes to the active permission resolver.
+    #[must_use]
+    pub fn with_auto_mode_callback(
+        mut self,
+        callback: std::sync::Arc<dyn Fn(bool) + Send + Sync>,
+    ) -> Self {
+        self.auto_mode_callback = Some(callback);
+        self
+    }
+
     fn auto_enabled(&self) -> bool {
         self.auto_override.unwrap_or(self.auto_config_enabled)
     }
@@ -165,6 +177,9 @@ impl ConversationEngine {
     /// Clears the non-persistent override when a session runtime is replaced.
     pub fn reset_auto_override(&mut self) {
         self.auto_override = None;
+        if let Some(callback) = &self.auto_mode_callback {
+            callback(self.auto_config_enabled);
+        }
     }
 
     /// Supplies the typed set of explicitly loaded plugin packages.

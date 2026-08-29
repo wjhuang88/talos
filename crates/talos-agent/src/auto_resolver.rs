@@ -5,6 +5,7 @@
 //! remain owned by [`crate::permission_pipeline::PermissionPipeline`].
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -309,6 +310,45 @@ pub struct AutoDecisionReport {
     pub request_digest: String,
 }
 
+/// Session-scoped control shared by the conversation UI and its permission resolver.
+///
+/// The control carries a reset epoch so enabling auto assistance also clears any
+/// circuit state accumulated before it was disabled.
+#[derive(Clone)]
+pub struct AutoPermissionControl {
+    enabled: Arc<AtomicBool>,
+    reset_epoch: Arc<AtomicU64>,
+}
+
+impl AutoPermissionControl {
+    /// Creates a control with the supplied configuration default.
+    #[must_use]
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            enabled: Arc::new(AtomicBool::new(enabled)),
+            reset_epoch: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// Returns whether model assistance is enabled for this session.
+    #[must_use]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Acquire)
+    }
+
+    /// Changes the session mode. Enabling starts a fresh circuit epoch.
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.store(enabled, Ordering::Release);
+        if enabled {
+            self.reset_epoch.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+
+    fn reset_epoch(&self) -> u64 {
+        self.reset_epoch.load(Ordering::Acquire)
+    }
+}
+
 /// Redacted circuit snapshot suitable for status/audit surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AutoCircuitStatus {
@@ -327,6 +367,8 @@ pub struct AutoPermissionResolver {
     lease: ManagedWorkspaceLease,
     state: Mutex<CircuitState>,
     last_report: Mutex<Option<AutoDecisionReport>>,
+    control: AutoPermissionControl,
+    observed_reset_epoch: AtomicU64,
     deadline: Duration,
 }
 
@@ -338,6 +380,7 @@ impl AutoPermissionResolver {
         fallback: Arc<dyn ApprovalResolver>,
         lease: ManagedWorkspaceLease,
         deadline: Duration,
+        control: AutoPermissionControl,
     ) -> Self {
         Self {
             assessor,
@@ -345,6 +388,8 @@ impl AutoPermissionResolver {
             lease,
             state: Mutex::new(CircuitState::default()),
             last_report: Mutex::new(None),
+            observed_reset_epoch: AtomicU64::new(control.reset_epoch()),
+            control,
             deadline: deadline.clamp(Duration::from_millis(1), Duration::from_secs(30)),
         }
     }
@@ -354,6 +399,8 @@ impl AutoPermissionResolver {
         if let Ok(mut state) = self.state.lock() {
             *state = CircuitState::default();
         }
+        self.observed_reset_epoch
+            .store(self.control.reset_epoch(), Ordering::Release);
     }
 
     /// Returns a redacted snapshot of circuit state.
@@ -415,6 +462,22 @@ impl AutoPermissionResolver {
             .lock()
             .ok()
             .and_then(|report| report.clone())
+    }
+
+    /// Enables or disables model assistance for the current session.
+    pub fn set_enabled(&self, enabled: bool) {
+        self.control.set_enabled(enabled);
+    }
+
+    fn sync_reset(&self) {
+        let epoch = self.control.reset_epoch();
+        if self.observed_reset_epoch.load(Ordering::Acquire) == epoch {
+            return;
+        }
+        if let Ok(mut state) = self.state.lock() {
+            *state = CircuitState::default();
+        }
+        self.observed_reset_epoch.store(epoch, Ordering::Release);
     }
 }
 
@@ -507,7 +570,8 @@ impl ApprovalResolver for AutoPermissionResolver {
         request: PermissionApprovalRequest,
         remaining: Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        if self.circuit_open() {
+        self.sync_reset();
+        if !self.control.is_enabled() || self.circuit_open() {
             return self.fallback.resolve(request, remaining).await;
         }
         let Some(evaluator_request) = eligible(&request, &self.lease) else {
@@ -584,12 +648,97 @@ impl ApprovalResolver for AutoPermissionResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    use crate::permission_pipeline::PermissionBinding;
+    use async_trait::async_trait;
+    use talos_core::tool::ToolPermissionFacet;
+    use talos_permission::{
+        PermissionContext, PermissionEngine, PermissionInvocation, PermissionRequest,
+        PermissionSessionState,
+    };
 
     struct TestCapability;
 
     impl talos_core::tool::AtomicCreateCapability for TestCapability {
         fn create_new(&self, _relative_path: &Path, _contents: &[u8]) -> std::io::Result<()> {
             Ok(())
+        }
+    }
+
+    struct CountingAssessor {
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl AutoPermissionAssessor for CountingAssessor {
+        async fn assess(
+            &self,
+            request: AutoPermissionRequest,
+            _remaining: Duration,
+        ) -> Result<String, String> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Ok(format!(
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                request.request_digest
+            ))
+        }
+    }
+
+    struct DenyFallback;
+
+    #[async_trait]
+    impl ApprovalResolver for DenyFallback {
+        async fn resolve(
+            &self,
+            _request: PermissionApprovalRequest,
+            _remaining: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            Ok(ApprovalChoice::Deny)
+        }
+    }
+
+    fn approval_request(
+        root: &std::path::Path,
+        state: &PermissionSessionState,
+        path: &str,
+    ) -> PermissionApprovalRequest {
+        let input = serde_json::json!({"path": path, "content": "hello"});
+        let target_text = root.join(path).display().to_string();
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            target_text,
+            ToolResourceKind::Path,
+        )];
+        let request = PermissionRequest::new("write", ToolProvenance::Native, &profile, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let PermissionInvocation::Ask {
+            session: proposal, ..
+        } = state
+            .begin_invocation(&request, &context)
+            .expect("approval proposal")
+        else {
+            panic!("write should require approval")
+        };
+        PermissionApprovalRequest {
+            tool_name: "write".to_owned(),
+            provenance: ToolProvenance::Native,
+            arguments: input,
+            summary_fields: vec!["path".to_owned()],
+            preview: proposal.preview().clone(),
+            binding: PermissionBinding {
+                session_id: state.session_id().expect("session id").stable_id(),
+                revisions: state
+                    .state_snapshot()
+                    .expect("snapshot")
+                    .revisions
+                    .as_array(),
+                mode: context.mode(),
+                interaction: context.interaction(),
+            },
         }
     }
 
@@ -636,5 +785,62 @@ mod tests {
         let first = digest(&request);
         request.target_label = "other.txt".into();
         assert_ne!(first, digest(&request));
+    }
+
+    #[test]
+    fn enabling_control_advances_reset_epoch() {
+        let control = AutoPermissionControl::new(false);
+        assert!(!control.is_enabled());
+        let first = control.reset_epoch();
+        control.set_enabled(true);
+        assert!(control.is_enabled());
+        assert!(control.reset_epoch() > first);
+        control.set_enabled(false);
+        assert!(!control.is_enabled());
+    }
+
+    #[tokio::test]
+    async fn disabled_control_bypasses_assessor_and_enabling_resets_circuit() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let control = AutoPermissionControl::new(false);
+        let lease =
+            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
+                .expect("lease")
+                .with_atomic_create_capability(Arc::new(TestCapability));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(CountingAssessor {
+                calls: calls.clone(),
+            }),
+            Arc::new(DenyFallback),
+            lease,
+            Duration::from_secs(8),
+            control.clone(),
+        );
+
+        let request = approval_request(root.path(), &state, "new.txt");
+        assert_eq!(
+            resolver
+                .resolve(request, Duration::from_secs(1))
+                .await
+                .unwrap(),
+            ApprovalChoice::Deny
+        );
+        assert_eq!(calls.load(Ordering::Acquire), 0);
+
+        control.set_enabled(true);
+        let request = approval_request(root.path(), &state, "other.txt");
+        assert_eq!(
+            resolver
+                .resolve(request, Duration::from_secs(1))
+                .await
+                .unwrap(),
+            ApprovalChoice::ApproveOnce
+        );
+        assert_eq!(calls.load(Ordering::Acquire), 1);
+        assert_eq!(resolver.circuit_status().technical_failures, 0);
     }
 }

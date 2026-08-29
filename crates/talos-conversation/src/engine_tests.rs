@@ -912,6 +912,29 @@ async fn auto_override_resets_when_session_runtime_is_replaced() {
     assert!(text.contains("disabled"));
 }
 
+#[tokio::test]
+async fn auto_override_notifies_permission_runtime_control() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicI8, Ordering},
+    };
+
+    let observed = Arc::new(AtomicI8::new(-1));
+    let callback_observed = observed.clone();
+    let mut engine = new_engine()
+        .with_auto_enabled(true)
+        .with_auto_mode_callback(Arc::new(move |enabled| {
+            callback_observed.store(enabled as i8, Ordering::Release);
+        }));
+
+    let _ = engine.handle_slash_command("/auto off");
+    assert_eq!(observed.load(Ordering::Acquire), 0);
+    let _ = engine.handle_slash_command("/auto on");
+    assert_eq!(observed.load(Ordering::Acquire), 1);
+    engine.reset_auto_override();
+    assert_eq!(observed.load(Ordering::Acquire), 1);
+}
+
 // ---------------------------------------------------------------------------
 // handle_slash_command: /plugins (transition notice) and /mcp
 // ---------------------------------------------------------------------------

@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
 use rmcp::ServiceExt;
-use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
+use talos_agent::{Agent, auto_resolver::AutoPermissionControl};
 use talos_config::Config;
 use talos_conversation::{
     ContentOutput, ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, TipKind,
@@ -285,6 +285,7 @@ pub(crate) async fn run_tui_mode(
         workspace_root.to_path_buf(),
         &talos_root,
     ));
+    let auto_control = AutoPermissionControl::new(config.auto.enabled);
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
@@ -296,7 +297,8 @@ pub(crate) async fn run_tui_mode(
         cli.plugin_packages.clone(),
         !cli.no_context,
         cli.mock,
-    );
+    )
+    .with_auto_control(auto_control.clone());
     let initial_runtime_builder = TuiRuntimeBuilder::new(
         hooks.clone(),
         workspace_root.to_path_buf(),
@@ -305,7 +307,8 @@ pub(crate) async fn run_tui_mode(
         cli.plugin_packages.clone(),
         !cli.no_context,
         mock_for_startup,
-    );
+    )
+    .with_auto_control(auto_control.clone());
 
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();
@@ -588,6 +591,10 @@ pub(crate) async fn run_tui_mode(
         .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_auto_enabled(config.auto.enabled)
+        .with_auto_mode_callback(Arc::new({
+            let auto_control = auto_control.clone();
+            move |enabled| auto_control.set_enabled(enabled)
+        }))
         .with_skills(skill_diagnostics)
         .with_mcp_servers(mcp_diagnostics.clone())
         .with_hook_declarations(hook_decls.clone())
