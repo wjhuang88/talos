@@ -12,7 +12,7 @@ fn register_interactive_builtin_contributions(
     registry: &mut ToolRegistry,
     _approval: Arc<std::sync::Mutex<ApprovalPrompt>>,
     workspace_root: &Path,
-) -> Result<()> {
+) -> Result<Option<SharedAtomicCreateCapability>> {
     let bash = bash_tool_contribution(workspace_root.to_path_buf());
     registry.register_contribution(bash)?;
 
@@ -21,7 +21,7 @@ fn register_interactive_builtin_contributions(
         .map(|value| Arc::new(value) as SharedAtomicCreateCapability);
     for contribution in talos_tools::snapshot_aware_file_tool_contributions_with_capability(
         workspace_root.to_path_buf(),
-        capability,
+        capability.clone(),
     ) {
         registry.register_contribution(contribution)?;
     }
@@ -37,7 +37,7 @@ fn register_interactive_builtin_contributions(
         registry.register_contribution(contribution)?;
     }
 
-    Ok(())
+    Ok(capability)
 }
 
 pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
@@ -86,7 +86,11 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     for tool in sched_tools {
         registry.register(tool);
     }
-    register_interactive_builtin_contributions(&mut registry, approval.clone(), &workspace_root)?;
+    let atomic_create_capability = register_interactive_builtin_contributions(
+        &mut registry,
+        approval.clone(),
+        &workspace_root,
+    )?;
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
@@ -110,10 +114,9 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let fallback = terminal_approval.clone();
     let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
         if config.auto.enabled {
-            CapStdAtomicCreateCapability::open(&workspace_root)
-                .ok()
+            atomic_create_capability
+                .clone()
                 .and_then(|capability| {
-                    let capability: SharedAtomicCreateCapability = Arc::new(capability);
                     ManagedWorkspaceLease::new(&workspace_root, session.id.to_string())
                         .ok()
                         .map(|lease| {
