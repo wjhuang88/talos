@@ -15,7 +15,7 @@
 | Work Slice | PERM-007-D/I236 only: cross-surface wiring and conformance evidence for the existing I234 resolver contract, bounded rollout/rollback and user/API documentation. No new authority class, sandbox fallback, Dashboard/Desktop, release or publication work. |
 | Claimed At | 2026-08-30 |
 | Source Issue | #188 |
-| Governance Claim PR | #436 |
+| Governance Claim PR | #437 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-064 Accepted; PERM-006-A/B/C, PERM-007-B and PERM-007-C/I234 are Complete/Closed. I234 implementation PR #434 merged as `c5be0109b3da4f81e221fa37f734af2431e35255`; closeout PR #435 merged as `469f50d1959e57551b1c58537d17f15f32dd303c`. |
 | Implementation PR | Not started |
