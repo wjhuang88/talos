@@ -96,6 +96,7 @@ scope. Existing worktrees outside this branch are preserved and untouched.
 | 2026-08-28 | Remote reconciliation correction | Comment `5453584031` records the matrix status `In Progress` and exact relative owner path required by the reconciliation validator. |
 | 2026-08-29 | I235 handoff accepted | I235/PERM-007-C0 decision closeout merged as `55acce9b` with Completion Commit `71acbe0c`; ADR-064 now permits a separately reviewed `cap-std` implementation. |
 | 2026-08-29 | Local implementation checkpoint | Local commits add the `cap-std` 4.0.3 directory-capability creator, atomic no-clobber tests, shared `WriteTool` capability injection, and optional Runtime shared-composition injection. Candidate remains local; no implementation PR or production model assessor wiring has been submitted. |
+| 2026-08-29 | Local TUI composition checkpoint | Local commits `d5bb9d7c` and `b3500cd4` wire the provider-backed resolver and the same optional atomic-create capability into TUI product composition when `auto.enabled` is true. Runtime SDK, MCP, print/headless defaults, Dashboard and Desktop remain unchanged. These commits are local evidence only; exact-head CI, independent security review and merge remain pending. |
 
 ## Verification Evidence
 

@@ -29,7 +29,9 @@ use talos_permission::{
 };
 use talos_permission::{PermissionEngine, PermissionSessionState};
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
-use talos_runtime::composition::{SharedToolProfile, contribution_groups};
+use talos_runtime::composition::{
+    SharedToolProfile, contribution_groups, contribution_groups_with_capability,
+};
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -717,17 +719,36 @@ fn build_print_tool_registry_with_todo_contributions(
     registry
 }
 
+/// Compatibility constructor for callers that do not provide an atomic-create capability.
+#[allow(dead_code)]
 pub(crate) fn build_tui_tool_registry(
     approval_handler: Arc<TuiApprovalHandler>,
     workspace_root: PathBuf,
     session_id: Uuid,
     delay_tool: Vec<Arc<dyn AgentTool>>,
 ) -> ToolRegistry {
+    build_tui_tool_registry_with_capability(
+        approval_handler,
+        workspace_root,
+        session_id,
+        delay_tool,
+        None,
+    )
+}
+
+pub(crate) fn build_tui_tool_registry_with_capability(
+    approval_handler: Arc<TuiApprovalHandler>,
+    workspace_root: PathBuf,
+    session_id: Uuid,
+    delay_tool: Vec<Arc<dyn AgentTool>>,
+    atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
+) -> ToolRegistry {
     build_tui_tool_registry_with_todo_contributions(
         approval_handler,
         workspace_root,
         delay_tool,
         default_todo_tool_contributions(session_id),
+        atomic_create,
     )
 }
 
@@ -736,9 +757,14 @@ fn build_tui_tool_registry_with_todo_contributions(
     workspace_root: PathBuf,
     delay_tool: Vec<Arc<dyn AgentTool>>,
     todo_contributions: Vec<ToolContribution>,
+    atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    let shared = contribution_groups(SharedToolProfile::Product, workspace_root);
+    let shared = contribution_groups_with_capability(
+        SharedToolProfile::Product,
+        workspace_root,
+        atomic_create,
+    );
     let mut contributions = shared.shell;
     contributions.extend(shared.files);
     contributions.push(
@@ -1116,6 +1142,7 @@ mod tests {
             PathBuf::from("."),
             Vec::new(),
             todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+            None,
         );
         let mcp_registry = build_mcp_tool_registry();
 
