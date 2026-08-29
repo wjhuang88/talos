@@ -13,6 +13,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use talos_core::ApprovalChoice;
+use talos_core::message::{AgentEvent, Message};
+use talos_core::provider::LanguageModel;
 use talos_core::tool::{SharedAtomicCreateCapability, ToolNature, ToolResourceKind};
 
 use crate::permission_pipeline::{
@@ -197,6 +199,78 @@ pub trait AutoPermissionAssessor: Send + Sync {
     /// Stable evaluator identity for audit/status surfaces.
     fn identity(&self) -> &str {
         "configured-model"
+    }
+}
+
+/// Provider-backed assessor that performs one tool-free model request.
+pub struct ProviderAutoPermissionAssessor {
+    provider: Arc<dyn LanguageModel>,
+    identity: String,
+}
+
+impl ProviderAutoPermissionAssessor {
+    /// Creates an assessor using the supplied configured model.
+    #[must_use]
+    pub fn new(provider: Arc<dyn LanguageModel>) -> Self {
+        Self {
+            provider,
+            identity: "configured-model".to_owned(),
+        }
+    }
+
+    /// Overrides the redacted identity reported in audit/status surfaces.
+    #[must_use]
+    pub fn with_identity(mut self, identity: impl Into<String>) -> Self {
+        self.identity = identity.into();
+        self
+    }
+}
+
+#[async_trait]
+impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess(
+        &self,
+        request: AutoPermissionRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        let payload = serde_json::to_string(&request).map_err(|error| error.to_string())?;
+        let messages = vec![
+            Message::System {
+                content: "You are a permission risk assessor. Return only the closed JSON response schema; never request tools, infer missing authority, or include explanation.".to_owned(),
+                cache_markers: Vec::new(),
+            },
+            Message::User {
+                content: format!("Assess this redacted request and return JSON only:\n{payload}"),
+            },
+        ];
+        let mut events = self
+            .provider
+            .stream(&messages)
+            .await
+            .map_err(|error| error.to_string())?;
+        let deadline = tokio::time::sleep(remaining);
+        tokio::pin!(deadline);
+        let mut output = String::new();
+        loop {
+            tokio::select! {
+                _ = &mut deadline => return Err("model assessment deadline exceeded".to_owned()),
+                event = events.recv() => match event {
+                    Some(AgentEvent::TextDelta { delta }) => output.push_str(&delta),
+                    Some(AgentEvent::ToolCall { .. }) => return Err("tool use is forbidden in auto assessment".to_owned()),
+                    Some(AgentEvent::Error { message }) => return Err(message),
+                    Some(AgentEvent::TurnEnd { .. }) | None => break,
+                    Some(_) => {}
+                }
+            }
+        }
+        if output.trim().is_empty() {
+            return Err("model assessment returned no JSON".to_owned());
+        }
+        Ok(output)
+    }
+
+    fn identity(&self) -> &str {
+        &self.identity
     }
 }
 
