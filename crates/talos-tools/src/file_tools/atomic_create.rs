@@ -62,11 +62,11 @@ mod tests {
             std::fs::read(dir.path().join("new.txt")).expect("read"),
             b"first"
         );
-        assert!(capability
-            .create_new(Path::new("new.txt"), b"second")
-            .is_err());
-        assert!(capability
-            .create_new(Path::new("../escape"), b"x")
-            .is_err());
+        assert!(
+            capability
+                .create_new(Path::new("new.txt"), b"second")
+                .is_err()
+        );
+        assert!(capability.create_new(Path::new("../escape"), b"x").is_err());
     }
 }

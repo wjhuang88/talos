@@ -19,9 +19,7 @@ use crate::SaveUrlTool;
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::TreeTool;
 #[cfg(all(feature = "file-read", feature = "file-write"))]
-use crate::file_tools::{
-    DeleteTool, EditTool, LsTool, ReadTool, WriteTool, snapshot_aware_file_tools,
-};
+use crate::file_tools::{DeleteTool, EditTool, LsTool, ReadTool, WriteTool};
 #[cfg(feature = "git")]
 use crate::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
@@ -35,7 +33,7 @@ use crate::{BashTool, ExecTool};
 use crate::{DiffTool, StatTool};
 #[cfg(feature = "network")]
 use crate::{FetchUrlTool, HttpRequestTool, WebSearchTool};
-#[cfg(feature = "search")]
+#[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{GlobTool, GrepTool};
 
 #[cfg(all(feature = "file-read", feature = "file-write"))]
@@ -202,7 +200,20 @@ pub fn network_tool_contributions() -> Vec<ToolContribution> {
 #[must_use]
 #[cfg(all(feature = "file-read", feature = "file-write"))]
 pub fn snapshot_aware_file_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
-    let (read, write, edit, delete) = snapshot_aware_file_tools(workspace_root.clone());
+    snapshot_aware_file_tool_contributions_with_capability(workspace_root, None)
+}
+
+/// Builds snapshot-aware file tools with an optional shared atomic-create capability.
+#[must_use]
+#[cfg(all(feature = "file-read", feature = "file-write"))]
+pub fn snapshot_aware_file_tool_contributions_with_capability(
+    workspace_root: PathBuf,
+    atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
+) -> Vec<ToolContribution> {
+    let (read, write, edit, delete) = crate::file_tools::snapshot_aware_file_tools_with_capability(
+        workspace_root.clone(),
+        atomic_create,
+    );
     vec![
         file_contribution(Arc::new(read)),
         file_contribution(Arc::new(write)),
