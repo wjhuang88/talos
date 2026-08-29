@@ -672,6 +672,7 @@ mod tests {
         PermissionContext, PermissionEngine, PermissionInvocation, PermissionRequest,
         PermissionSessionState,
     };
+    use tokio::sync::Notify;
 
     struct TestCapability;
 
@@ -710,6 +711,27 @@ mod tests {
             _remaining: Duration,
         ) -> Result<ApprovalChoice, ApprovalResolverError> {
             Ok(ApprovalChoice::Deny)
+        }
+    }
+
+    struct BlockingAssessor {
+        started: Arc<Notify>,
+        release: Arc<Notify>,
+    }
+
+    #[async_trait]
+    impl AutoPermissionAssessor for BlockingAssessor {
+        async fn assess(
+            &self,
+            request: AutoPermissionRequest,
+            _remaining: Duration,
+        ) -> Result<String, String> {
+            self.started.notify_one();
+            self.release.notified().await;
+            Ok(format!(
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                request.request_digest
+            ))
         }
     }
 
@@ -857,5 +879,44 @@ mod tests {
         );
         assert_eq!(calls.load(Ordering::Acquire), 1);
         assert_eq!(resolver.circuit_status().technical_failures, 0);
+    }
+
+    #[tokio::test]
+    async fn disabling_during_assessment_invalidates_result() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let control = AutoPermissionControl::new(true);
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let lease =
+            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
+                .expect("lease")
+                .with_atomic_create_capability(Arc::new(TestCapability));
+        let resolver = Arc::new(AutoPermissionResolver::new(
+            Arc::new(BlockingAssessor {
+                started: started.clone(),
+                release: release.clone(),
+            }),
+            Arc::new(DenyFallback),
+            lease,
+            Duration::from_secs(8),
+            control.clone(),
+        ));
+        let request = approval_request(root.path(), &state, "in-flight.txt");
+        let task = tokio::spawn({
+            let resolver = resolver.clone();
+            async move {
+                resolver
+                    .resolve(request, Duration::from_secs(2))
+                    .await
+                    .expect("fallback result")
+            }
+        });
+        started.notified().await;
+        control.set_enabled(false);
+        release.notify_one();
+        assert_eq!(task.await.expect("resolver task"), ApprovalChoice::Deny);
     }
 }
