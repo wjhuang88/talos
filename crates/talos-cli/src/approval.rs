@@ -16,6 +16,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+#[cfg(test)]
+use talos_agent::permission_pipeline::PermissionBinding;
 use talos_agent::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
@@ -262,9 +264,20 @@ mod tests {
         };
         PermissionApprovalRequest {
             tool_name: "write".to_owned(),
+            provenance: ToolProvenance::Native,
             arguments: input,
             summary_fields: vec!["path".to_owned()],
             preview: session.preview().clone(),
+            binding: PermissionBinding {
+                session_id: state.session_id().expect("session id").stable_id(),
+                revisions: state
+                    .state_snapshot()
+                    .expect("snapshot")
+                    .revisions
+                    .as_array(),
+                mode: context.mode(),
+                interaction: context.interaction(),
+            },
         }
     }
 

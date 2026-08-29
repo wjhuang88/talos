@@ -25,6 +25,12 @@ impl PermissionSessionId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
+
+    /// Returns a stable opaque identifier suitable for an in-memory binding.
+    #[must_use]
+    pub fn stable_id(self) -> String {
+        self.0.to_string()
+    }
 }
 
 impl Default for PermissionSessionId {
@@ -44,17 +50,20 @@ pub struct PermissionStateRevisions {
     store: u64,
 }
 
-impl PermissionStateRevisions {
-    const ZERO: Self = Self {
-        policy: 0,
-        mode: 0,
-        workspace: 0,
-        registration: 0,
-        restriction: 0,
-        store: 0,
-    };
+/// Redaction-safe snapshot used to bind an approval assessment to one
+/// permission Session state. The values carry no policy or resource data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PermissionStateSnapshot {
+    /// Opaque in-memory Session identity.
+    pub session_id: PermissionSessionId,
+    /// Monotonic generations for policy, mode and related state.
+    pub revisions: PermissionStateRevisions,
+}
 
-    const fn as_array(self) -> [u64; 6] {
+impl PermissionStateRevisions {
+    /// Returns the six monotonic generations in stable order.
+    #[must_use]
+    pub const fn as_array(self) -> [u64; 6] {
         [
             self.policy,
             self.mode,
@@ -64,6 +73,17 @@ impl PermissionStateRevisions {
             self.store,
         ]
     }
+}
+
+impl PermissionStateRevisions {
+    const ZERO: Self = Self {
+        policy: 0,
+        mode: 0,
+        workspace: 0,
+        registration: 0,
+        restriction: 0,
+        store: 0,
+    };
 }
 
 /// Structured evaluation plus any matching Session grant.
@@ -399,6 +419,19 @@ impl PermissionSessionState {
             .lock()
             .map_err(|_| GrantError::StateUnavailable)?;
         Ok(state.session_id)
+    }
+
+    /// Returns the current redaction-safe Session identity and revision
+    /// generations for binding an external assessment.
+    pub fn state_snapshot(&self) -> Result<PermissionStateSnapshot, GrantError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| GrantError::StateUnavailable)?;
+        Ok(PermissionStateSnapshot {
+            session_id: state.session_id,
+            revisions: state.revisions,
+        })
     }
 
     /// Starts a new unrelated permission Session at a successful runtime

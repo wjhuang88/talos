@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+#[cfg(test)]
+use talos_agent::permission_pipeline::PermissionBinding;
 use talos_core::background_job::BackgroundJobTerminalSummary;
 use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{Session, SessionManager};
@@ -783,9 +785,20 @@ mod approval_queue_tests {
                 id: uuid::Uuid::new_v4(),
                 request: PermissionApprovalRequest {
                     tool_name: "write".to_owned(),
+                    provenance: ToolProvenance::Native,
                     arguments: input,
                     summary_fields: vec!["path".to_owned()],
                     preview: session.preview().clone(),
+                    binding: PermissionBinding {
+                        session_id: state.session_id().expect("session id").stable_id(),
+                        revisions: state
+                            .state_snapshot()
+                            .expect("snapshot")
+                            .revisions
+                            .as_array(),
+                        mode: context.mode(),
+                        interaction: context.interaction(),
+                    },
                 },
                 response,
             },

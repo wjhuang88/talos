@@ -7,6 +7,33 @@ mod file_tool_tests {
     use super::*;
     use serde_json::json;
     use std::fs;
+    use std::path::Path;
+    use std::sync::Arc;
+
+    struct RecordingCreateCapability {
+        root: std::path::PathBuf,
+    }
+
+    impl talos_core::tool::AtomicCreateCapability for RecordingCreateCapability {
+        fn create_new(&self, relative_path: &Path, contents: &[u8]) -> std::io::Result<()> {
+            if relative_path.is_absolute()
+                || relative_path
+                    .components()
+                    .any(|component| matches!(component, std::path::Component::ParentDir))
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "path must be relative",
+                ));
+            }
+            let path = self.root.join(relative_path);
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .and_then(|mut file| std::io::Write::write_all(&mut file, contents))
+        }
+    }
 
     #[tokio::test]
     async fn test_read_tool_read_file() {
@@ -399,6 +426,34 @@ mod file_tool_tests {
         let content =
             fs::read_to_string(temp_dir.path().join("new.txt")).expect("operation should succeed");
         assert_eq!(content, "hello world");
+    }
+
+    #[tokio::test]
+    async fn capability_create_uses_relative_no_clobber_primitive() {
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        let capability = Arc::new(RecordingCreateCapability {
+            root: temp_dir.path().to_path_buf(),
+        });
+        let tool =
+            WriteTool::new(temp_dir.path().to_path_buf()).with_atomic_create_capability(capability);
+
+        let result = tool
+            .execute(json!({ "path": "capability.txt", "content": "first" }))
+            .await;
+        assert!(!result.is_error);
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("capability.txt")).unwrap(),
+            "first"
+        );
+
+        let result = tool
+            .execute(json!({ "path": "capability.txt", "content": "second" }))
+            .await;
+        assert!(result.is_error);
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("capability.txt")).unwrap(),
+            "first"
+        );
     }
 
     #[test]

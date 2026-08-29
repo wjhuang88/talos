@@ -9,7 +9,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
-use talos_agent::{Agent, PendingSchedulerActor, session::AppServerSession};
+use talos_agent::{
+    Agent, PendingSchedulerActor,
+    auto_resolver::{
+        AutoPermissionControl, AutoPermissionResolver, ManagedWorkspaceLease,
+        ProviderAutoPermissionAssessor,
+    },
+    session::AppServerSession,
+};
 use talos_config::Config;
 use talos_core::message::Message;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionHandle};
@@ -26,10 +33,11 @@ use crate::mode_runtime::{
 use crate::model_lifecycle::materialize_runtime_model_config;
 use crate::provider_setup::build_provider;
 use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry, register_explicit_tui_plugins,
+    TuiApprovalHandler, build_tui_tool_registry_with_capability, register_explicit_tui_plugins,
     register_tui_permission_aware_tools,
 };
 use crate::skill_runtime::{RuntimeSkills, apply_runtime_skills, discover_runtime_skills};
+use talos_tools::CapStdAtomicCreateCapability;
 
 /// Inputs that are stable across all runtime reconstructions in one TUI process.
 #[derive(Clone)]
@@ -41,6 +49,7 @@ pub(crate) struct TuiRuntimeBuilder {
     plugin_packages: Arc<Vec<PathBuf>>,
     include_workspace_context: bool,
     mock: bool,
+    auto_control: Option<AutoPermissionControl>,
 }
 
 pub(crate) struct PreparedTuiRuntime {
@@ -107,7 +116,13 @@ impl TuiRuntimeBuilder {
             plugin_packages: Arc::new(plugin_packages),
             include_workspace_context,
             mock,
+            auto_control: None,
         }
+    }
+
+    pub(crate) fn with_auto_control(mut self, control: AutoPermissionControl) -> Self {
+        self.auto_control = Some(control);
+        self
     }
 
     #[must_use]
@@ -148,11 +163,15 @@ impl TuiRuntimeBuilder {
         mcp_runtime.report_startup_failures();
 
         let (scheduler_tools, pending_scheduler) = talos_agent::create_scheduler_tools();
-        let mut registry = build_tui_tool_registry(
+        let atomic_create_capability = CapStdAtomicCreateCapability::open(&self.workspace_root)
+            .ok()
+            .map(|value| Arc::new(value) as talos_core::tool::SharedAtomicCreateCapability);
+        let mut registry = build_tui_tool_registry_with_capability(
             self.approval_handler.clone(),
             self.workspace_root.clone(),
             session.id,
             scheduler_tools,
+            atomic_create_capability.clone(),
         );
         register_tui_permission_aware_tools(
             &mut registry,
@@ -166,6 +185,30 @@ impl TuiRuntimeBuilder {
         )
         .map_err(anyhow::Error::msg)?;
 
+        let fallback = self.approval_handler.clone();
+        let auto_control = self
+            .auto_control
+            .clone()
+            .unwrap_or_else(|| AutoPermissionControl::new(runtime_config.auto.enabled));
+        let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
+            atomic_create_capability
+                .clone()
+                .and_then(|capability| {
+                    ManagedWorkspaceLease::new(&self.workspace_root, session.id.to_string())
+                        .ok()
+                        .map(|lease| {
+                            let lease = lease.with_atomic_create_capability(capability);
+                            Arc::new(AutoPermissionResolver::new(
+                                Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
+                                fallback.clone(),
+                                lease,
+                                std::time::Duration::from_secs(8),
+                                auto_control,
+                            ))
+                                as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
+                        })
+                })
+                .unwrap_or(fallback);
         let mut agent = Agent::with_security_and_hooks(
             provider,
             registry,
@@ -180,7 +223,7 @@ impl TuiRuntimeBuilder {
                 talos_permission::PermissionMode::Interactive,
                 talos_permission::InteractionCapability::Available,
             ),
-            Some(self.approval_handler.clone()),
+            Some(resolver),
         );
         agent.set_tool_protocol(runtime_config.tool_protocol());
         set_image_input_capability(&mut agent, &runtime_config);

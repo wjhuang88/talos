@@ -94,11 +94,15 @@ scope. Existing worktrees outside this branch are preserved and untouched.
 | 2026-08-28 | Governance preparation | Claim and Active state are proposed in this governance branch and have no effect until the finalized claim merges to `main`. Implementation must start from that merge or later. |
 | 2026-08-28 | Remote reconciliation | Issue #188 owner/status reconciliation comment `5453556697` records PERM-007-C/I234 as proposed Active/Claimed and ineffective until claim merge. |
 | 2026-08-28 | Remote reconciliation correction | Comment `5453584031` records the matrix status `In Progress` and exact relative owner path required by the reconciliation validator. |
+| 2026-08-29 | I235 handoff accepted | I235/PERM-007-C0 decision closeout merged as `55acce9b` with Completion Commit `71acbe0c`; ADR-064 now permits a separately reviewed `cap-std` implementation. |
+| 2026-08-29 | Local implementation checkpoint | Local commits add the `cap-std` 4.0.3 directory-capability creator, atomic no-clobber tests, shared `WriteTool` capability injection, and optional Runtime shared-composition injection. Candidate remains local; no implementation PR or production model assessor wiring has been submitted. |
+| 2026-08-29 | Local TUI composition checkpoint | Local commits `d5bb9d7c` and `b3500cd4` wire the provider-backed resolver and the same optional atomic-create capability into TUI product composition when `auto.enabled` is true. Runtime SDK, MCP, print/headless defaults, Dashboard and Desktop remain unchanged. These commits are local evidence only; exact-head CI, independent security review and merge remain pending. |
 
 ## Verification Evidence
 
 - Preflight source audit: current `ApprovalResolver` returns legacy `ApprovalChoice`; `WriteTool` uses check-then-write and therefore requires capability-bound atomic creation before entering the allowlist.
-- No implementation or dependency changes are present in this governance slice.
+- Local candidate validation: `cargo test -p talos-agent --lib --locked` (298 passed), `cargo test -p talos-tools --features file-write --lib --locked` (107 passed), `cargo check -p talos-tools --features file-write --locked`, and `cargo check -p talos-runtime --features shared-composition --locked` passed. A concurrent full workspace run was interrupted by `ENOSPC`; it must be rerun after the candidate is complete.
+- Stable-candidate validation: workspace `cargo check --workspace --locked -j2`, workspace Clippy with `-D warnings`, `./scripts/release_preflight.sh`, both governance validators and `git diff --check` passed. `cargo test --workspace --locked -j2` completed all runnable suites; only the two macOS Seatbelt tests failed because this restricted execution environment denies `sandbox-exec` (`Operation not permitted`). A low-debug, single-job `cargo test -p talos-cli --locked -j1` completed 358 unit tests and all CLI integration suites successfully.
 
 ## Completion Evidence
 

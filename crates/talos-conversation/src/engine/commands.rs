@@ -159,6 +159,9 @@ impl ConversationEngine {
                     "on" | "off" => {
                         let enabled = argument == "on";
                         self.auto_override = Some(enabled);
+                        if let Some(callback) = &self.auto_mode_callback {
+                            callback(enabled);
+                        }
                         let state = if enabled { "enabled" } else { "disabled" };
                         outputs.push(content_block(MessageSource::System, format!("[System] Auto mode {state} for this session only; configuration and transcript were not changed.\n")));
                     }

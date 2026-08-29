@@ -8,6 +8,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[cfg(feature = "shared-composition")]
+use crate::composition::SharedToolProfile;
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_agent::permission_pipeline::{
@@ -267,6 +269,8 @@ pub struct RuntimeBuilder {
     skill_index: Vec<SkillIndex>,
     durable_session: Option<(DurableSession, PersistencePolicy)>,
     shutdown_finalizers: Vec<Arc<dyn RuntimeFinalizer>>,
+    #[cfg(feature = "shared-composition")]
+    atomic_create_capability: Option<talos_core::tool::SharedAtomicCreateCapability>,
 }
 
 impl RuntimeBuilder {
@@ -291,6 +295,8 @@ impl RuntimeBuilder {
             skill_index: Vec::new(),
             durable_session: None,
             shutdown_finalizers: Vec::new(),
+            #[cfg(feature = "shared-composition")]
+            atomic_create_capability: None,
         }
     }
 
@@ -324,10 +330,25 @@ impl RuntimeBuilder {
     #[must_use]
     pub fn shared_tools(mut self) -> Self {
         self.tools.extend(
-            composition::runtime_tool_contributions(self.workspace_root.clone())
-                .into_iter()
-                .map(|contribution| contribution.tool().clone()),
+            composition::tool_contributions_with_capability(
+                SharedToolProfile::Runtime,
+                self.workspace_root.clone(),
+                self.atomic_create_capability.clone(),
+            )
+            .into_iter()
+            .map(|contribution| contribution.tool().clone()),
         );
+        self
+    }
+
+    /// Supplies a held directory capability for atomic new-file creation in shared tools.
+    #[cfg(feature = "shared-composition")]
+    #[must_use]
+    pub fn atomic_create_capability(
+        mut self,
+        capability: talos_core::tool::SharedAtomicCreateCapability,
+    ) -> Self {
+        self.atomic_create_capability = Some(capability);
         self
     }
 

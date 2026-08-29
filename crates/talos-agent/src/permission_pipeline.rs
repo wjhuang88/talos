@@ -52,12 +52,29 @@ pub fn project_permission_input(input: &serde_json::Value) -> serde_json::Value 
 pub struct PermissionApprovalRequest {
     /// Tool name being approved.
     pub tool_name: String,
+    /// Trusted tool provenance captured by the authoritative pipeline.
+    pub provenance: ToolProvenance,
     /// Safe presentation projection; not used for authorization identity.
     pub arguments: serde_json::Value,
     /// Bounded summary fields for a local approval surface.
     pub summary_fields: Vec<String>,
     /// Exact capability-relative Session preview.
     pub preview: GrantPreview,
+    /// Redaction-safe state binding captured at evaluation time.
+    pub binding: PermissionBinding,
+}
+
+/// Opaque permission state identity supplied to bounded approval adapters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionBinding {
+    /// In-memory Session identity.
+    pub session_id: String,
+    /// Monotonic state generations in policy/mode/workspace order.
+    pub revisions: [u64; 6],
+    /// Evaluation mode.
+    pub mode: PermissionMode,
+    /// Whether a human approval surface is available.
+    pub interaction: InteractionCapability,
 }
 
 /// Exact authorization inputs owned by the Agent permission pipeline.
@@ -201,7 +218,11 @@ impl PermissionPipeline {
         } = authorization;
         let deadline_at = Instant::now() + deadline;
         ensure_before(deadline_at)?;
-        let request = PermissionRequest::new(tool_name, provenance, profile, input);
+        let binding_snapshot = self
+            .state
+            .state_snapshot()
+            .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
+        let request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
         let invocation = self
             .state
             .try_begin_invocation(&request, &self.context)
@@ -220,9 +241,16 @@ impl PermissionPipeline {
                     .ok_or(PermissionPipelineError::ResolverUnavailable)?;
                 let approval = PermissionApprovalRequest {
                     tool_name: tool_name.to_owned(),
+                    provenance,
                     arguments: presentation_input,
                     summary_fields,
                     preview: session.preview().clone(),
+                    binding: PermissionBinding {
+                        session_id: binding_snapshot.session_id.stable_id(),
+                        revisions: binding_snapshot.revisions.as_array(),
+                        mode: self.context.mode(),
+                        interaction: self.context.interaction(),
+                    },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
                 let resolver_future =

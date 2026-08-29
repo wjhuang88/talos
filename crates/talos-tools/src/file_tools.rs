@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[cfg(feature = "file-write")]
+mod atomic_create;
+#[cfg(feature = "file-write")]
 mod delete_tool;
 #[cfg(feature = "file-read")]
 mod ls_tool;
@@ -15,6 +17,8 @@ mod snapshot;
 #[cfg(feature = "file-write")]
 mod write_edit_tools;
 
+#[cfg(feature = "file-write")]
+pub use atomic_create::CapStdAtomicCreateCapability;
 #[cfg(feature = "file-write")]
 pub use delete_tool::{DeleteInput, DeleteTool};
 #[cfg(feature = "file-read")]
@@ -32,10 +36,25 @@ pub use write_edit_tools::{EditInput, EditTool, WriteInput, WriteTool};
 pub fn snapshot_aware_file_tools(
     workspace_root: PathBuf,
 ) -> (ReadTool, WriteTool, EditTool, DeleteTool) {
+    snapshot_aware_file_tools_with_capability(workspace_root, None)
+}
+
+/// Creates the core file tools and optionally binds atomic creation to a
+/// held directory capability.
+#[must_use]
+#[cfg(all(feature = "file-read", feature = "file-write"))]
+pub fn snapshot_aware_file_tools_with_capability(
+    workspace_root: PathBuf,
+    atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
+) -> (ReadTool, WriteTool, EditTool, DeleteTool) {
     let snapshots = FileSnapshotRegistry::new();
+    let mut write = WriteTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone());
+    if let Some(capability) = atomic_create {
+        write = write.with_atomic_create_capability(capability);
+    }
     (
         ReadTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
-        WriteTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
+        write,
         EditTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
         DeleteTool::with_snapshot_registry(workspace_root, snapshots),
     )

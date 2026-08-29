@@ -110,7 +110,10 @@ pub use contributions::{bash_tool_contribution, shell_tool_contributions};
 #[cfg(feature = "git")]
 pub use contributions::{git_mutation_tool_contributions, git_read_tool_contributions};
 #[cfg(all(feature = "file-read", feature = "file-write"))]
-pub use contributions::{ordinary_file_tool_contributions, snapshot_aware_file_tool_contributions};
+pub use contributions::{
+    ordinary_file_tool_contributions, snapshot_aware_file_tool_contributions,
+    snapshot_aware_file_tool_contributions_with_capability,
+};
 #[cfg(feature = "git")]
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 #[cfg(feature = "document")]
@@ -125,7 +128,8 @@ pub use file_tools::FileSnapshotRegistry;
 pub use file_tools::snapshot_aware_file_tools;
 #[cfg(feature = "file-write")]
 pub use file_tools::{
-    DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, WriteInput, WriteTool,
+    CapStdAtomicCreateCapability, DeleteError, DeleteInput, DeleteTool, EditInput, EditTool,
+    WriteInput, WriteTool,
 };
 #[cfg(any(
     feature = "file-read",

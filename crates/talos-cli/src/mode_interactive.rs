@@ -2,16 +2,28 @@
 
 use super::*;
 use crate::approval::terminal_approval_channel;
+use talos_agent::auto_resolver::{
+    AutoPermissionControl, AutoPermissionResolver, ManagedWorkspaceLease,
+    ProviderAutoPermissionAssessor,
+};
+use talos_core::tool::SharedAtomicCreateCapability;
+use talos_tools::CapStdAtomicCreateCapability;
 
 fn register_interactive_builtin_contributions(
     registry: &mut ToolRegistry,
     _approval: Arc<std::sync::Mutex<ApprovalPrompt>>,
     workspace_root: &Path,
-) -> Result<()> {
+) -> Result<Option<SharedAtomicCreateCapability>> {
     let bash = bash_tool_contribution(workspace_root.to_path_buf());
     registry.register_contribution(bash)?;
 
-    for contribution in snapshot_aware_file_tool_contributions(workspace_root.to_path_buf()) {
+    let capability = CapStdAtomicCreateCapability::open(workspace_root)
+        .ok()
+        .map(|value| Arc::new(value) as SharedAtomicCreateCapability);
+    for contribution in talos_tools::snapshot_aware_file_tool_contributions_with_capability(
+        workspace_root.to_path_buf(),
+        capability.clone(),
+    ) {
         registry.register_contribution(contribution)?;
     }
 
@@ -26,7 +38,7 @@ fn register_interactive_builtin_contributions(
         registry.register_contribution(contribution)?;
     }
 
-    Ok(())
+    Ok(capability)
 }
 
 pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
@@ -75,7 +87,11 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     for tool in sched_tools {
         registry.register(tool);
     }
-    register_interactive_builtin_contributions(&mut registry, approval.clone(), &workspace_root)?;
+    let atomic_create_capability = register_interactive_builtin_contributions(
+        &mut registry,
+        approval.clone(),
+        &workspace_root,
+    )?;
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
@@ -95,8 +111,30 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .map_err(|_| anyhow!("approval lock poisoned"))?
         .session_state();
     let (terminal_approval, terminal_approval_rx) = terminal_approval_channel();
+    let provider = build_provider(&config, &api_key, cli.mock);
+    let fallback = terminal_approval.clone();
+    let auto_control = AutoPermissionControl::new(config.auto.enabled);
+    let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
+        atomic_create_capability
+            .clone()
+            .and_then(|capability| {
+                ManagedWorkspaceLease::new(&workspace_root, session.id.to_string())
+                    .ok()
+                    .map(|lease| {
+                        let lease = lease.with_atomic_create_capability(capability);
+                        Arc::new(AutoPermissionResolver::new(
+                            Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
+                            fallback.clone(),
+                            lease,
+                            std::time::Duration::from_secs(8),
+                            auto_control,
+                        ))
+                            as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
+                    })
+            })
+            .unwrap_or(fallback);
     let mut agent = Agent::with_security_and_hooks(
-        build_provider(&config, &api_key, cli.mock),
+        provider,
         registry,
         None,
         None,
@@ -109,7 +147,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
             talos_permission::PermissionMode::Interactive,
             talos_permission::InteractionCapability::Available,
         ),
-        Some(terminal_approval),
+        Some(resolver),
     );
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);

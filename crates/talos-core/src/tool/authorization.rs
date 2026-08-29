@@ -1,10 +1,25 @@
 use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::ToolNature;
+
+/// Host-provided capability for atomic, no-clobber creation relative to an
+/// already-held parent directory identity.
+///
+/// Implementations must perform the creation relative to the held capability,
+/// never by reopening a path from the workspace root. Unsupported hosts should
+/// decline to provide this capability so callers fail closed.
+pub trait AtomicCreateCapability: Send + Sync {
+    /// Creates one new file relative to the held parent capability.
+    fn create_new(&self, relative_path: &Path, contents: &[u8]) -> io::Result<()>;
+}
+
+/// Shared handle to a host-provided atomic creation capability.
+pub type SharedAtomicCreateCapability = Arc<dyn AtomicCreateCapability>;
 
 /// Identifies how a permission resource string should be interpreted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

@@ -6,12 +6,12 @@
 
 use std::path::PathBuf;
 
+use talos_core::tool::SharedAtomicCreateCapability;
 use talos_core::tool::ToolContribution;
 use talos_tools::{
     git_mutation_tool_contributions, git_read_tool_contributions, network_tool_contributions,
     ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
-    snapshot_aware_file_tool_contributions, symbol_tool_contributions,
-    workspace_tool_contributions,
+    symbol_tool_contributions, workspace_tool_contributions,
 };
 
 /// Explicit consumer profile for the shared built-in contribution inventory.
@@ -54,6 +54,16 @@ pub fn contribution_groups(
     profile: SharedToolProfile,
     workspace_root: PathBuf,
 ) -> SharedToolContributions {
+    contribution_groups_with_capability(profile, workspace_root, None)
+}
+
+/// Selects shared contributions with an optional directory capability for new-file creation.
+#[cfg(feature = "shared-composition")]
+pub fn contribution_groups_with_capability(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    atomic_create: Option<SharedAtomicCreateCapability>,
+) -> SharedToolContributions {
     let image = (profile != SharedToolProfile::Mcp)
         .then(|| read_image_tool_contribution(workspace_root.clone()));
     SharedToolContributions {
@@ -61,7 +71,10 @@ pub fn contribution_groups(
         files: if profile == SharedToolProfile::Mcp {
             ordinary_file_tool_contributions(workspace_root.clone())
         } else {
-            snapshot_aware_file_tool_contributions(workspace_root.clone())
+            talos_tools::snapshot_aware_file_tool_contributions_with_capability(
+                workspace_root.clone(),
+                atomic_create,
+            )
         },
         workspace: workspace_tool_contributions(workspace_root.clone()),
         network: network_tool_contributions(),
@@ -83,6 +96,28 @@ pub fn tool_contributions(
     workspace_root: PathBuf,
 ) -> Vec<ToolContribution> {
     let groups = contribution_groups(profile, workspace_root);
+    let mut contributions = groups.shell;
+    contributions.extend(groups.files);
+    contributions.extend(groups.workspace);
+    contributions.extend(groups.network);
+    if let Some(image) = groups.image {
+        contributions.push(image);
+    }
+    contributions.extend(groups.symbols);
+    contributions.extend(groups.git_read);
+    contributions.extend(groups.git_mutation);
+    contributions
+}
+
+/// Builds shared contributions with an optional atomic-create capability.
+#[cfg(feature = "shared-composition")]
+#[must_use]
+pub fn tool_contributions_with_capability(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    atomic_create: Option<SharedAtomicCreateCapability>,
+) -> Vec<ToolContribution> {
+    let groups = contribution_groups_with_capability(profile, workspace_root, atomic_create);
     let mut contributions = groups.shell;
     contributions.extend(groups.files);
     contributions.extend(groups.workspace);
