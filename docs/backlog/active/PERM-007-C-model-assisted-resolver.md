@@ -5,7 +5,7 @@
 | Story ID | PERM-007-C |
 | Type | Permission / Security / Runtime Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until claim merge) |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
 | Selected Iteration | I234 |
 | Depends On | ADR-064 Accepted; PERM-006-A/B/C and PERM-007-B complete |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #431 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-064 `c129d4a5`; protected permission/security scope requires exact-head independent review. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-28 |
-| Handoff / Release Condition | No implementation merge without exact-head permission/security review, CI and CAS. |
+| Implementation PR | #434, merged as `c5be0109b3da4f81e221fa37f734af2431e35255` |
+| Last Updated | 2026-08-30 |
+| Handoff / Release Condition | Complete; PERM-007-D remains separately governed. |
 
 ## Contract
 
@@ -50,4 +50,4 @@ release/publication outside this story.
 
 ## Completion Evidence
 
-Completion Commit: Pending. A status-only commit cannot serve as implementation evidence.
+Completion Commit: `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1` (merged as `c5be0109b3da4f81e221fa37f734af2431e35255`; status-only closeout cannot serve as evidence).
