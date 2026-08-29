@@ -264,6 +264,7 @@ mod tests {
         };
         PermissionApprovalRequest {
             tool_name: "write".to_owned(),
+            provenance: ToolProvenance::Native,
             arguments: input,
             summary_fields: vec!["path".to_owned()],
             preview: session.preview().clone(),

@@ -92,18 +92,25 @@ impl WriteTool {
             {
                 return Err(FileToolError::PathEscape(write_input.path));
             }
-            capability
-                .create_new(requested, write_input.content.as_bytes())
-                .map_err(FileToolError::Io)?;
-            if let Some(registry) = &self.snapshots {
-                registry.invalidate_path(&path)?;
+            // The capability is deliberately limited to direct children. Nested
+            // human-approved writes retain the legacy create_dir_all path until
+            // a nested-parent capability contract is separately reviewed.
+            if requested.components().count() != 1 {
+                // Fall through to the compatibility path below.
+            } else {
+                capability
+                    .create_new(requested, write_input.content.as_bytes())
+                    .map_err(FileToolError::Io)?;
+                if let Some(registry) = &self.snapshots {
+                    registry.invalidate_path(&path)?;
+                }
+                return Ok(format!(
+                    "wrote {} bytes to {}\npreview:\n{}",
+                    write_input.content.len(),
+                    write_input.path,
+                    bounded_preview(&write_input.content)
+                ));
             }
-            return Ok(format!(
-                "wrote {} bytes to {}\npreview:\n{}",
-                write_input.content.len(),
-                write_input.path,
-                bounded_preview(&write_input.content)
-            ));
         }
 
         if let Some(parent) = path.parent() {

@@ -52,6 +52,8 @@ pub fn project_permission_input(input: &serde_json::Value) -> serde_json::Value 
 pub struct PermissionApprovalRequest {
     /// Tool name being approved.
     pub tool_name: String,
+    /// Trusted tool provenance captured by the authoritative pipeline.
+    pub provenance: ToolProvenance,
     /// Safe presentation projection; not used for authorization identity.
     pub arguments: serde_json::Value,
     /// Bounded summary fields for a local approval surface.
@@ -220,7 +222,7 @@ impl PermissionPipeline {
             .state
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
-        let request = PermissionRequest::new(tool_name, provenance, profile, input);
+        let request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
         let invocation = self
             .state
             .try_begin_invocation(&request, &self.context)
@@ -239,6 +241,7 @@ impl PermissionPipeline {
                     .ok_or(PermissionPipelineError::ResolverUnavailable)?;
                 let approval = PermissionApprovalRequest {
                     tool_name: tool_name.to_owned(),
+                    provenance,
                     arguments: presentation_input,
                     summary_fields,
                     preview: session.preview().clone(),

@@ -785,6 +785,7 @@ mod approval_queue_tests {
                 id: uuid::Uuid::new_v4(),
                 request: PermissionApprovalRequest {
                     tool_name: "write".to_owned(),
+                    provenance: ToolProvenance::Native,
                     arguments: input,
                     summary_fields: vec!["path".to_owned()],
                     preview: session.preview().clone(),

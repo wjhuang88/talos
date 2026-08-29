@@ -15,12 +15,14 @@ use sha2::{Digest, Sha256};
 use talos_core::ApprovalChoice;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::LanguageModel;
-use talos_core::tool::{SharedAtomicCreateCapability, ToolNature, ToolResourceKind};
+use talos_core::tool::{
+    SharedAtomicCreateCapability, ToolNature, ToolProvenance, ToolResourceKind,
+};
 
 use crate::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
-use talos_permission::PermissionMode;
+use talos_permission::{InteractionCapability, PermissionMode};
 
 /// Version of the closed evaluator wire format.
 pub const AUTO_EVALUATOR_SCHEMA_VERSION: u8 = 1;
@@ -114,14 +116,27 @@ pub struct AutoPermissionRequest {
     pub target_label: String,
     /// Operation subtype.
     pub operation: AutoOperation,
-    /// Permission Session identity bound to this assessment.
-    pub session_id: String,
+    /// Bounded, non-secret content shape used for risk assessment.
+    pub content_shape: AutoContentShape,
+    /// Opaque digest binding this assessment to one Permission Session.
+    pub session_binding: String,
     /// Monotonic policy/mode/workspace generations bound to this assessment.
     pub revisions: [u64; 6],
     /// Permission mode at assessment time.
     pub mode: PermissionMode,
     /// Digest binding the response to this exact request.
     pub request_digest: String,
+}
+
+/// Redacted shape of the proposed new text content.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct AutoContentShape {
+    /// Lowercase allowlisted file extension.
+    pub extension: String,
+    /// UTF-8 byte length of the proposed content.
+    pub bytes: usize,
+    /// Number of newline-delimited lines.
+    pub lines: usize,
 }
 
 /// Closed provenance projection.
@@ -281,6 +296,19 @@ struct CircuitState {
     open: bool,
 }
 
+/// Redacted outcome record retained for status and host-owned audit sinks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoDecisionReport {
+    /// Final bounded outcome.
+    pub outcome: String,
+    /// Stable reason classification.
+    pub reason: String,
+    /// Evaluator identity.
+    pub evaluator: String,
+    /// Request digest, never raw arguments.
+    pub request_digest: String,
+}
+
 /// Redacted circuit snapshot suitable for status/audit surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AutoCircuitStatus {
@@ -298,6 +326,7 @@ pub struct AutoPermissionResolver {
     fallback: Arc<dyn ApprovalResolver>,
     lease: ManagedWorkspaceLease,
     state: Mutex<CircuitState>,
+    last_report: Mutex<Option<AutoDecisionReport>>,
     deadline: Duration,
 }
 
@@ -315,6 +344,7 @@ impl AutoPermissionResolver {
             fallback,
             lease,
             state: Mutex::new(CircuitState::default()),
+            last_report: Mutex::new(None),
             deadline: deadline.clamp(Duration::from_millis(1), Duration::from_secs(30)),
         }
     }
@@ -349,6 +379,7 @@ impl AutoPermissionResolver {
     fn record_failure(&self) {
         if let Ok(mut s) = self.state.lock() {
             s.technical_failures = s.technical_failures.saturating_add(1);
+            s.human_required = 0;
             if s.technical_failures >= 2 {
                 s.open = true;
             }
@@ -357,10 +388,33 @@ impl AutoPermissionResolver {
     fn record_human(&self) {
         if let Ok(mut s) = self.state.lock() {
             s.human_required = s.human_required.saturating_add(1);
+            s.technical_failures = 0;
             if s.human_required >= 3 {
                 s.open = true;
             }
         }
+    }
+
+    fn record_success(&self) {
+        if let Ok(mut s) = self.state.lock() {
+            s.technical_failures = 0;
+            s.human_required = 0;
+        }
+    }
+
+    fn report(&self, report: AutoDecisionReport) {
+        if let Ok(mut slot) = self.last_report.lock() {
+            *slot = Some(report);
+        }
+    }
+
+    /// Returns the latest redacted decision report, if one was produced.
+    #[must_use]
+    pub fn last_report(&self) -> Option<AutoDecisionReport> {
+        self.last_report
+            .lock()
+            .ok()
+            .and_then(|report| report.clone())
     }
 }
 
@@ -375,11 +429,22 @@ fn digest(request: &AutoPermissionRequest) -> String {
     format!("sha256:{hex}")
 }
 
+fn session_binding(session_id: &str) -> String {
+    let digest = Sha256::digest(session_id.as_bytes());
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("sha256:{hex}")
+}
+
 fn eligible(
     request: &PermissionApprovalRequest,
     lease: &ManagedWorkspaceLease,
 ) -> Option<AutoPermissionRequest> {
-    if request.tool_name != "write" || request.preview.facets().len() != 1 {
+    if request.tool_name != "write"
+        || request.provenance != ToolProvenance::Native
+        || request.binding.mode != PermissionMode::Interactive
+        || request.binding.interaction != InteractionCapability::Available
+        || request.preview.facets().len() != 1
+    {
         return None;
     }
     let facet = &request.preview.facets()[0];
@@ -388,6 +453,28 @@ fn eligible(
     }
     let path = request.arguments.get("path")?.as_str()?;
     let path = Path::new(path);
+    if path.is_absolute()
+        || path.components().count() != 1
+        || !path
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+    {
+        return None;
+    }
+    if lease.session_id() != request.binding.session_id {
+        return None;
+    }
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    if !matches!(
+        extension.as_str(),
+        "txt" | "md" | "markdown" | "json" | "toml" | "yaml" | "yml"
+    ) {
+        return None;
+    }
+    let content = request.arguments.get("content")?.as_str()?;
+    if content.len() > 64 * 1024 || content.as_bytes().contains(&0) {
+        return None;
+    }
     if !lease.allows(path) {
         return None;
     }
@@ -399,7 +486,12 @@ fn eligible(
         risk_class: AutoRiskClass::BoundedWorkspaceTextCreate,
         target_label,
         operation: AutoOperation::CreateTextFile,
-        session_id: request.binding.session_id.clone(),
+        content_shape: AutoContentShape {
+            extension,
+            bytes: content.len(),
+            lines: content.lines().count().max(1),
+        },
+        session_binding: session_binding(&request.binding.session_id),
         revisions: request.binding.revisions,
         mode: request.binding.mode,
         request_digest: String::new(),
@@ -432,6 +524,12 @@ impl ApprovalResolver for AutoPermissionResolver {
             Ok(Ok(raw)) => raw,
             _ => {
                 self.record_failure();
+                self.report(AutoDecisionReport {
+                    outcome: "human_required".into(),
+                    reason: "technical_failure".into(),
+                    evaluator: self.assessor.identity().into(),
+                    request_digest: evaluator_request.request_digest.clone(),
+                });
                 return self
                     .fallback
                     .resolve(request, remaining.saturating_sub(started.elapsed()))
@@ -442,6 +540,12 @@ impl ApprovalResolver for AutoPermissionResolver {
             Ok(value) => value,
             Err(_) => {
                 self.record_failure();
+                self.report(AutoDecisionReport {
+                    outcome: "human_required".into(),
+                    reason: "malformed_output".into(),
+                    evaluator: self.assessor.identity().into(),
+                    request_digest: evaluator_request.request_digest.clone(),
+                });
                 return self
                     .fallback
                     .resolve(request, remaining.saturating_sub(started.elapsed()))
@@ -454,9 +558,22 @@ impl ApprovalResolver for AutoPermissionResolver {
             && response.reason_code == AutoReasonCode::BoundedWorkspaceTextCreate
             && response.confidence == AutoConfidence::High;
         if valid {
+            self.record_success();
+            self.report(AutoDecisionReport {
+                outcome: "allow_once".into(),
+                reason: "bounded_workspace_text_create".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: evaluator_request.request_digest.clone(),
+            });
             Ok(ApprovalChoice::ApproveOnce)
         } else {
             self.record_human();
+            self.report(AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "validation_failed".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: evaluator_request.request_digest.clone(),
+            });
             self.fallback
                 .resolve(request, remaining.saturating_sub(started.elapsed()))
                 .await
@@ -506,7 +623,12 @@ mod tests {
             risk_class: AutoRiskClass::BoundedWorkspaceTextCreate,
             target_label: "new.txt".into(),
             operation: AutoOperation::CreateTextFile,
-            session_id: "session".into(),
+            content_shape: AutoContentShape {
+                extension: "txt".into(),
+                bytes: 0,
+                lines: 1,
+            },
+            session_binding: session_binding("session"),
             revisions: [0; 6],
             mode: talos_permission::PermissionMode::Interactive,
             request_digest: String::new(),
