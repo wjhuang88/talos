@@ -117,7 +117,7 @@ pub fn tool_contributions_with_capability(
     workspace_root: PathBuf,
     atomic_create: Option<SharedAtomicCreateCapability>,
 ) -> Vec<ToolContribution> {
-    let groups = contribution_groups_with_capability(profile, workspace_root, None);
+    let groups = contribution_groups_with_capability(profile, workspace_root, atomic_create);
     let mut contributions = groups.shell;
     contributions.extend(groups.files);
     contributions.extend(groups.workspace);
