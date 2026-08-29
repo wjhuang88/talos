@@ -1,6 +1,6 @@
 # Iteration I234: Bounded Model-Assisted Permission Resolver
 
-> Document status: Active / Claimed (proposed; ineffective until this governance record merges)
+> Document status: Complete / Closed
 > Published plan date: 2026-08-28
 > Planned objective: deliver PERM-007-C under Accepted ADR-064 without allowing model output to bypass the authoritative permission pipeline.
 > MVP deliverable: a runnable, fail-closed resolver path that evaluates only the ADR-064 create-only allowlist and returns a one-shot authorization or human fallback.
@@ -18,9 +18,9 @@
 | Governance Claim PR | #431 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-064 Accepted at `c129d4a5`; PERM-006-A/B/C and PERM-007-B are complete. Protected permission/security scope requires exact-head independent review before implementation merge. |
-| Implementation PR | Not started |
-| Last Updated | 2026-08-28 |
-| Handoff / Release Condition | Require independent permission/security review, exact-head CI and merge-time CAS. PERM-007-D remains separately blocked. |
+| Implementation PR | #434 (merged as `c5be0109b3da4f81e221fa37f734af2431e35255`) |
+| Last Updated | 2026-08-30 |
+| Handoff / Release Condition | Complete; PERM-007-D remains separately governed and requires its own claim. |
 
 ## Current Nonterminal Inventory And Disposition
 
@@ -97,6 +97,7 @@ scope. Existing worktrees outside this branch are preserved and untouched.
 | 2026-08-29 | I235 handoff accepted | I235/PERM-007-C0 decision closeout merged as `55acce9b` with Completion Commit `71acbe0c`; ADR-064 now permits a separately reviewed `cap-std` implementation. |
 | 2026-08-29 | Local implementation checkpoint | Local commits add the `cap-std` 4.0.3 directory-capability creator, atomic no-clobber tests, shared `WriteTool` capability injection, and optional Runtime shared-composition injection. Candidate remains local; no implementation PR or production model assessor wiring has been submitted. |
 | 2026-08-29 | Local TUI composition checkpoint | Local commits `d5bb9d7c` and `b3500cd4` wire the provider-backed resolver and the same optional atomic-create capability into TUI product composition when `auto.enabled` is true. Runtime SDK, MCP, print/headless defaults, Dashboard and Desktop remain unchanged. These commits are local evidence only; exact-head CI, independent security review and merge remain pending. |
+| 2026-08-30 | Implementation merged | PR #434 exact head `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1` merged to `main` as `c5be0109b3da4f81e221fa37f734af2431e35255` after CI `33263845955` (5/5 SUCCESS), independent permission/security/API approval `5463712782`, and merge-time CAS. |
 
 ## Verification Evidence
 
@@ -106,8 +107,13 @@ scope. Existing worktrees outside this branch are preserved and untouched.
 
 ## Completion Evidence
 
-- Completion Commit: Pending. A status-only governance commit cannot self-certify implementation.
+- Completion Commit: `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1` (implementation head merged by `c5be0109b3da4f81e221fa37f734af2431e35255`; this closeout status commit is not the evidence).
+
+Closeout verification: exact-head CI `33263845955` completed 5/5 SUCCESS for implementation head
+`7ddba098b5929e593fff94b9d3f5fd10f2fb35c1`; independent permission/security/API review
+`5463712782` is APPROVE and bound to the same head/base. Merge-time CAS confirmed unchanged head
+and base, clean mergeability, and no blocking feedback before PR #434 merged.
 
 ## Variance And Residuals
 
-- PERM-007-D remains separately blocked until C is complete and requires its own claim and cross-surface evidence.
+- PERM-007-D is now unblocked by C completion but remains unclaimed and requires its own cross-surface claim, implementation and review.
