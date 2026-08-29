@@ -102,6 +102,7 @@ scope. Existing worktrees outside this branch are preserved and untouched.
 
 - Preflight source audit: current `ApprovalResolver` returns legacy `ApprovalChoice`; `WriteTool` uses check-then-write and therefore requires capability-bound atomic creation before entering the allowlist.
 - Local candidate validation: `cargo test -p talos-agent --lib --locked` (298 passed), `cargo test -p talos-tools --features file-write --lib --locked` (107 passed), `cargo check -p talos-tools --features file-write --locked`, and `cargo check -p talos-runtime --features shared-composition --locked` passed. A concurrent full workspace run was interrupted by `ENOSPC`; it must be rerun after the candidate is complete.
+- Stable-candidate validation: workspace `cargo check --workspace --locked -j2`, workspace Clippy with `-D warnings`, `./scripts/release_preflight.sh`, both governance validators and `git diff --check` passed. `cargo test --workspace --locked -j2` completed all runnable suites; only the two macOS Seatbelt tests failed because this restricted execution environment denies `sandbox-exec` (`Operation not permitted`). A low-debug, single-job `cargo test -p talos-cli --locked -j1` completed 358 unit tests and all CLI integration suites successfully.
 
 ## Completion Evidence
 
