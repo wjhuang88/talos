@@ -5,9 +5,9 @@
 | Story ID | PERM-007-C0 |
 | Type | Permission / Security / Architecture Decision |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I235 Active / Claimed |
+| Selected Iteration | I235 Complete / Closed |
 | Depends On | ADR-064; I234 discovery that std cannot provide directory-handle-relative creation |
 
 ## Collaboration Claim
@@ -22,12 +22,13 @@
 | Source Issue | #188 |
 | Governance Claim PR | #432 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head independent permission/security/API review; claim is ineffective until PR #432 merges to `main` |
-| Implementation PR | Not started |
+| Authorization Evidence | PR #432 exact head `f47ed04670f37f626a2eb24ccffd67a6b576b576`; CI `33189300888`; independent review `5455600711`; merged to `main` as `71acbe0cb60fa204f359d33301b1e2af70125750` |
+| Implementation PR | Not applicable; decision-only story |
 | Last Updated | 2026-08-29 |
 | Handoff / Release Condition | Accepted decision and independent review required before I234 dependency implementation. |
 
-The proposed claim has no ownership or implementation effect until PR #432 merges to `main`.
+The proposed claim had no ownership or implementation effect until PR #432 merged to `main`.
+It is now effective as a completed decision record; no I234 implementation authority is implied.
 
 ## Purpose
 
@@ -49,4 +50,5 @@ then I234 must keep automatic positive authorization unavailable.
 
 ## Completion Evidence
 
-Completion Commit: Pending.
+Completion Commit: `71acbe0cb60fa204f359d33301b1e2af70125750` (PR #432 merge; decision-only
+closeout evidence).
