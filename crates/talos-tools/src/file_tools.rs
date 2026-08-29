@@ -14,6 +14,8 @@ mod read_tool;
 mod snapshot;
 #[cfg(feature = "file-write")]
 mod write_edit_tools;
+#[cfg(feature = "file-write")]
+mod atomic_create;
 
 #[cfg(feature = "file-write")]
 pub use delete_tool::{DeleteInput, DeleteTool};
@@ -25,6 +27,8 @@ pub use read_tool::{ReadInput, ReadTool};
 pub use snapshot::FileSnapshotRegistry;
 #[cfg(feature = "file-write")]
 pub use write_edit_tools::{EditInput, EditTool, WriteInput, WriteTool};
+#[cfg(feature = "file-write")]
+pub use atomic_create::CapStdAtomicCreateCapability;
 
 /// Creates the four core file tools with one shared model-private snapshot registry.
 #[must_use]

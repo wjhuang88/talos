@@ -11,7 +11,7 @@ rust-version.workspace = true
 [features]
 default = ["file-read", "search"]
 file-read = ["dep:sha2", "dep:uuid", "dep:walkdir", "tokio/fs"]
-file-write = ["file-read", "tokio/fs"]
+file-write = ["file-read", "dep:cap-std", "tokio/fs"]
 search = [
     "dep:glob",
     "dep:grep-matcher",
@@ -90,6 +90,7 @@ scraper = { version = "0.27", optional = true }
 uuid = { version = "1", optional = true, features = ["v4"] }
 sha2 = { version = "0.11", optional = true }
 image = { version = "0.25", default-features = false, optional = true, features = ["png", "jpeg", "gif", "webp"] }
+cap-std = { version = "4.0.3", default-features = false, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "1.0.0-alpha.3", optional = true }
