@@ -1,6 +1,6 @@
 # Iteration I237: Canonical Work Domain And Todo Compatibility
 
-> Document status: Planned / Unclaimed — claim proposed; ineffective until merge
+> Document status: Active / Claimed — implementation not started
 > Published plan date: 2026-08-30
 > Planned objective: implement WORK-001-B/P1 as one canonical Work Domain with a tested Todo
 > compatibility surface, preserving current persistence and permission behavior.
@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session |
 | Work Slice | WORK-001-B / I237 P1 only; canonical Work Domain plus Todo compatibility and migration evidence. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-30 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Proposed basis: WORK-001-A/I196 Completion Commit `779a4c71`; ADR-061 boundary; exact-base governance checks and independent review required |
+| Governance Claim PR | #440 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; I196 Completion Commit `779a4c71` and ADR-061 remain the boundary basis. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-30 |
 | Handoff / Release Condition | Implementation starts only from claim merge or later current `main`; completion requires implementation evidence, exact-head validation, independent review and owner-first closeout. |
