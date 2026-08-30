@@ -6,7 +6,7 @@
 | Type | Architecture / Domain Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Ready / Unclaimed — claim proposed; ineffective until merge |
+| Status | Active / Claimed — implementation not started |
 | Source | GitHub Issue #29; WORK-001 P1; Desktop prerequisite chain §20.2 |
 | Selected Iteration | I237 |
 | Depends On | WORK-001-A / I196 Complete; ADR-061 Proposed boundary; RUNTIME-001; TODO-001; TODO-002; VALIDATION-001 |
@@ -15,15 +15,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session |
 | Work Slice | WORK-001-B / I237 P1 only: implement one canonical Work Domain and adapt the existing session Todo surface to it, including identity, revision, status/priority/tags, dependency and cycle rules, idempotent and batch mutation, permission-gated writes, query/filter and short-ID projection. Preserve existing Todo data and behavior through a compatibility path; no Completion Claim/Evaluation, evaluator runtime, Mission gate, Desktop, Dashboard, `/auto`, release or publication work. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-30 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Proposed basis: P0/WORK-001-A completion `779a4c71` and ADR-061; exact-base governance validation and independent review required before merge |
+| Governance Claim PR | #440 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; P0 completion `779a4c71` and ADR-061 remain the boundary basis. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-30 |
 | Handoff / Release Condition | Start implementation only from the claim merge or later current `main`; keep P2-P4 blocked until this Story has implementation evidence and closeout. |
