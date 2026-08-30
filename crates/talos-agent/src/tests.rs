@@ -140,6 +140,7 @@ struct TimedMockTool {
 
 struct AutoWriteMockTool {
     execution_log: Arc<Mutex<Vec<String>>>,
+    order_log: Arc<Mutex<Vec<String>>>,
 }
 
 #[async_trait]
@@ -181,7 +182,28 @@ impl AgentTool for AutoWriteMockTool {
 
     async fn execute(&self, input: Value) -> ToolExecutionResult {
         self.execution_log.lock().await.push(input.to_string());
+        self.order_log.lock().await.push("execute".into());
         ToolExecutionResult::success("written")
+    }
+}
+
+struct OrderingPermissionHook {
+    order_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl HookHandler for OrderingPermissionHook {
+    fn name(&self) -> &str {
+        "i236-ordering-capture"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
+        self.order_log.lock().await.push("after_permission".into());
+        HookResult::Continue
     }
 }
 
@@ -2950,9 +2972,11 @@ async fn i236_agent_path_dispatches_final_permission_hook_before_execution() {
     let root = tempfile::tempdir().expect("tempdir");
     let target = root.path().join("new.txt");
     let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let order_log = Arc::new(Mutex::new(Vec::new()));
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(AutoWriteMockTool {
         execution_log: execution_log.clone(),
+        order_log: order_log.clone(),
     }));
 
     let responses = vec![
@@ -2991,6 +3015,9 @@ async fn i236_agent_path_dispatches_final_permission_hook_before_execution() {
     hooks.register(Arc::new(PermissionDecisionCaptureHook {
         decisions: decisions.clone(),
     }));
+    hooks.register(Arc::new(OrderingPermissionHook {
+        order_log: order_log.clone(),
+    }));
     let state = Arc::new(talos_permission::PermissionSessionState::new(
         PermissionEngine::with_workspace_root(root.path().to_path_buf()),
     ));
@@ -3026,6 +3053,10 @@ async fn i236_agent_path_dispatches_final_permission_hook_before_execution() {
 
     assert_eq!(agent.run("write it".into()).await.expect("run"), "Done");
     assert_eq!(execution_log.lock().await.len(), 1);
+    assert_eq!(
+        *order_log.lock().await,
+        vec!["after_permission".to_owned(), "execute".to_owned()]
+    );
     let decisions = decisions.lock().await;
     assert_eq!(decisions.len(), 1);
     assert!(matches!(decisions[0], PermissionDecision::Allow));
