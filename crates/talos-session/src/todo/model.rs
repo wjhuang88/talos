@@ -34,6 +34,18 @@ pub enum TodoError {
     /// A todo cannot depend on itself.
     #[error("todo item cannot depend on itself: {0}")]
     SelfDependency(Uuid),
+
+    /// The persisted revision cannot advance further.
+    #[error("todo revision exhausted for item: {0}")]
+    RevisionExhausted(Uuid),
+
+    /// A concurrent writer advanced the canonical revision.
+    #[error("todo revision changed concurrently for item: {0}")]
+    RevisionConflict(Uuid),
+
+    /// The Todo database schema or stored value cannot be migrated losslessly.
+    #[error("unsupported or lossy todo schema: {0}")]
+    Migration(String),
 }
 
 impl From<rusqlite::Error> for TodoError {
@@ -74,12 +86,13 @@ impl TodoStatus {
         }
     }
 
-    pub(super) fn from_str(value: &str) -> Self {
+    pub(super) fn from_str(value: &str) -> Option<Self> {
         match value {
-            "in_progress" => TodoStatus::InProgress,
-            "completed" => TodoStatus::Completed,
-            "blocked" => TodoStatus::Blocked,
-            _ => TodoStatus::Todo,
+            "todo" => Some(TodoStatus::Todo),
+            "in_progress" => Some(TodoStatus::InProgress),
+            "completed" => Some(TodoStatus::Completed),
+            "blocked" => Some(TodoStatus::Blocked),
+            _ => None,
         }
     }
 }
@@ -110,12 +123,13 @@ impl TodoPriority {
         }
     }
 
-    pub(super) fn from_str(value: &str) -> Self {
+    pub(super) fn from_str(value: &str) -> Option<Self> {
         match value {
-            "low" => TodoPriority::Low,
-            "high" => TodoPriority::High,
-            "critical" => TodoPriority::Critical,
-            _ => TodoPriority::Medium,
+            "low" => Some(TodoPriority::Low),
+            "medium" => Some(TodoPriority::Medium),
+            "high" => Some(TodoPriority::High),
+            "critical" => Some(TodoPriority::Critical),
+            _ => None,
         }
     }
 }
@@ -143,6 +157,40 @@ pub struct TodoItem {
     pub assigned_to_turn: Option<String>,
     /// User/model tags for filtering.
     pub tags: Vec<String>,
+}
+
+impl TodoItem {
+    /// Project this legacy Todo record into the canonical storage-neutral WorkUnit domain value.
+    ///
+    /// The projection is lossless for the fields currently owned by Todo. Persistence remains
+    /// owned by `TodoRepository`; this method does not create a second repository or mutate data.
+    #[must_use]
+    pub fn as_work_unit(&self, revision: u64) -> talos_core::work::WorkNode {
+        use talos_core::work::{WorkPriority, WorkStatus};
+        talos_core::work::WorkNode {
+            identity: talos_core::work::WorkIdentity {
+                id: self.id,
+                kind: talos_core::work::WorkKind::WorkUnit,
+                revision,
+            },
+            parent_id: None,
+            title: self.title.clone(),
+            description: self.description.clone(),
+            status: match self.status {
+                TodoStatus::Todo => WorkStatus::Todo,
+                TodoStatus::InProgress => WorkStatus::InProgress,
+                TodoStatus::Completed => WorkStatus::Completed,
+                TodoStatus::Blocked => WorkStatus::Blocked,
+            },
+            priority: match self.priority {
+                TodoPriority::Low => WorkPriority::Low,
+                TodoPriority::Medium => WorkPriority::Medium,
+                TodoPriority::High => WorkPriority::High,
+                TodoPriority::Critical => WorkPriority::Critical,
+            },
+            tags: self.tags.clone(),
+        }
+    }
 }
 
 /// A dependency edge between two todo items in one session.

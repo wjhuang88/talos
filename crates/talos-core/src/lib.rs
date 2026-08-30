@@ -9,5 +9,6 @@ pub mod session;
 pub mod submission;
 pub mod tool;
 pub mod tool_filter;
+pub mod work;
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};

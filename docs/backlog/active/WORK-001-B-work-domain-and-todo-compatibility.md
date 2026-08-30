@@ -6,7 +6,7 @@
 | Type | Architecture / Domain Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Active / Claimed — implementation not started |
+| Status | Review / Claimed — implementation PR #442 under review |
 | Source | GitHub Issue #29; WORK-001 P1; Desktop prerequisite chain §20.2 |
 | Selected Iteration | I237 |
 | Depends On | WORK-001-A / I196 Complete; ADR-061 Proposed boundary; RUNTIME-001; TODO-001; TODO-002; VALIDATION-001 |
@@ -24,7 +24,7 @@
 | Governance Claim PR | #440 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; P0 completion `779a4c71` and ADR-061 remain the boundary basis. |
-| Implementation PR | Not started |
+| Implementation PR | #442 (head `73763497`) |
 | Last Updated | 2026-08-30 |
 | Handoff / Release Condition | Start implementation only from the claim merge or later current `main`; keep P2-P4 blocked until this Story has implementation evidence and closeout. |
 
@@ -75,6 +75,7 @@ need for a second independently mutable Todo repository before later evaluation 
 - `docs/backlog/active/TODO-001-session-todo-list.md`
 - `docs/backlog/active/TODO-002-todo-mutation-reliability.md`
 - `docs/backlog/active/VALIDATION-001-internal-validation-service.md`
+- `docs/reference/WORK-DOMAIN-TODO-COMPATIBILITY.md`
 
 ## Acceptance For Behavior
 
@@ -111,3 +112,14 @@ need for a second independently mutable Todo repository before later evaluation 
 
 Any unresolved migration, public API or compatibility issue remains here or receives a separately
 governed child; do not move P2/P3/P4 into this Story.
+
+## Local Convergence Checkpoint (2026-08-30)
+
+The implementation candidate currently adds a storage-neutral `talos_core::work` domain with typed
+Mission/Goal/WorkUnit roles, UUID identities, validated DAG snapshots and stable edge identities.
+The existing Todo SQLite authority remains the only durable writer; its compatibility adapter adds
+an additive, version-checked revision/edge migration, deterministic read projections, checked
+revision updates, atomic batch mutation, and fail-closed validation for unknown values, orphan
+edges and duplicate identities. Focused core/session tests pass locally. Full workspace validation,
+user/API documentation, exact-head CI and independent implementation review remain pending; this
+checkpoint is not completion evidence and does not modify the Published Baseline.
