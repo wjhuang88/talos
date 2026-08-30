@@ -10,7 +10,7 @@
 | Priority | P1 |
 | Status | Complete / Closed — PERM-007-A / I218, B / I233, C0 / I235, C / I234 and D / I236 complete |
 | Source | [GitHub Issue #188](https://github.com/wjhuang88/talos/issues/188) |
-| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; I235 Complete / Closed for C0; I234 Complete / Closed for C; D unselected |
+| Selected Iteration | I218 Complete / Closed for A; I233 Complete / Closed for B; I235 Complete / Closed for C0; I234 Complete / Closed for C; I236 Complete / Closed for D |
 | Depends On | PERM-006-A/B/C structured decision and authoritative execution pipeline; Accepted ADR-064; existing Deny precedence |
 
 ## Collaboration Claim
