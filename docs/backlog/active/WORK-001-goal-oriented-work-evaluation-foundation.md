@@ -42,7 +42,7 @@ mainline work. It does not authorize any child merely because the overall direct
 |---|---|---|---|---|
 | WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Complete / Closed | Current repository and dependency inventory | I196 Complete / Closed |
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
-| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Blocked pending owner, iteration and effective claim after P1 closeout reaches `main` | WORK-001-B Complete | None |
+| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Ready / Unclaimed; proposed I238 claim is ineffective until merge | WORK-001-B Complete | I238 Planned / Unclaimed |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Blocked; owner to be formed after P2 | WORK-001-C Complete | None |
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
 
@@ -72,6 +72,14 @@ head/base, and merge-time CAS completed before PR #442 merged. P2 is now the nex
 candidate, but remains unactivated until this closeout reaches `main` and a separate requirement
 owner, runnable iteration and effective Collaboration Claim are established. P3 and P4 remain
 blocked on their direct predecessors.
+
+## 2026-08-31 P2 Requirement Intake Checkpoint
+
+The I237 closeout merged to `main` as `6ed8a24f1e6b92f8e6e62b58841e27736557065f`, so
+WORK-001-C/P2 now has its own API/State Story owner and runnable I238 iteration proposal. P2 is
+limited to storage-neutral Completion Claim, Acceptance Criterion and exact-revision Evaluation
+state semantics. This proposal does not activate P2 until its finalized atomic claim record merges;
+P3/P4 remain blocked and no implementation authority transfers from I237.
 
 ## Scope
 
