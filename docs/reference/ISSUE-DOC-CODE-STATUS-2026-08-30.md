@@ -1,7 +1,7 @@
-# GitHub Issue / Owner Document Status Reconciliation — 2026-08-28
+# GitHub Issue / Owner Document Status Reconciliation — 2026-08-30
 
-**Repository baseline**: `main@c352435ed28f69244e39f5280c6cfc21b25b4ad2`
-**Purpose**: refresh the open-Issue owner snapshot after closing #111, #125 and #278 and preparing PERM-007-C/I234.
+**Repository baseline**: `main@d5ede746851a220aecb58b52f53192c0263dc615`
+**Purpose**: current open-Issue owner reconciliation after PERM-007-D/I236 closed Issue #188.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Open Issue Matrix
@@ -29,7 +29,6 @@
 | [#142](https://github.com/wjhuang88/talos/issues/142) | serve/connect protocol adapter architecture | [SERVER-001](../backlog/active/SERVER-001-serve-connect-protocol-adapters.md) | Intake | P1 architecture intake; dependency and single-runtime boundary refinement required. |
 | [#143](https://github.com/wjhuang88/talos/issues/143) | RTK-derived semantic shell output filters | [TOOL-025](../backlog/active/TOOL-025-rtk-derived-semantic-output-filters.md) | Intake | P1 source/provenance and behavior-boundary refinement required before extraction. |
 | [#146](https://github.com/wjhuang88/talos/issues/146) | optional utility model role and bounded routing | [MODEL-012](../backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md) | Intake | P2 model-role, routing, TUI, compatibility, and evaluation refinement required before implementation. |
-| [#188](https://github.com/wjhuang88/talos/issues/188) | model-assisted cross-surface `auto` permission decisions | [PERM-007](../backlog/active/PERM-007-model-assisted-goal-permission-decisions.md) | In Progress; A/B Complete, C Active / Claimed (proposed), D Blocked | ADR-064 and PERM-006-A/B/C are complete; I234/#431 proposes the protected C claim and remains ineffective until merge. |
 | [#199](https://github.com/wjhuang88/talos/issues/199) | shared retry and circuit-breaker policy | [NET-001](../backlog/active/NET-001-network-resilience-policy.md) | Intake | Inventory and ADR-backed decomposition required; no implementation or replay authority. |
 | [#234](https://github.com/wjhuang88/talos/issues/234) | single-direct-dependency runtime SDK facade | [RUNTIME-006](../backlog/active/RUNTIME-006-single-dependency-sdk-facade.md) | Refinement | Provider strategy, compatibility treatment, external fixture, iteration and claim required before API implementation. |
 | [#245](https://github.com/wjhuang88/talos/issues/245) | I161 independent security review: sandbox fallback and coding preset | [I161](../iterations/I161-sandbox-fallback-and-coding-preset.md) | Blocked | Historical reviewer-assignment record; remote Issue remains open. |
@@ -52,10 +51,9 @@
 
 ## Synchronization Notes
 
-
-This snapshot supersedes the 2026-08-23 open-Issue matrix for current reconciliation only. Historical
-snapshots remain unchanged. Closed Issues #111, #125 and #278 are intentionally absent; their owner
-and completion evidence remain in the iteration and backlog records.
+This current matrix supersedes the 2026-08-28 open-Issue matrix for reconciliation only; that
+dated snapshot remains historical evidence and is not modified. Closed Issue #188 remains recorded
+in PERM-007 and I236 owner documents with completion evidence from I236.
 
 This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
-mechanism. Open claim PR #431 remains ineffective until its finalized claim reaches `main`.
+mechanism. Open claim PR #440 remains ineffective until its finalized claim reaches `main`.
