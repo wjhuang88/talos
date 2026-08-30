@@ -1,6 +1,6 @@
 # Iteration I237: Canonical Work Domain And Todo Compatibility
 
-> Document status: Review / Claimed — stable local candidate; implementation PR not started
+> Document status: Review / Claimed — implementation PR #442 under review
 > Published plan date: 2026-08-30
 > Planned objective: implement WORK-001-B/P1 as one canonical Work Domain with a tested Todo
 > compatibility surface, preserving current persistence and permission behavior.
@@ -20,7 +20,7 @@
 | Governance Claim PR | #440 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; I196 Completion Commit `779a4c71` and ADR-061 remain the boundary basis. |
-| Implementation PR | Not started |
+| Implementation PR | #442 (head `73763497`) |
 | Last Updated | 2026-08-30 |
 | Handoff / Release Condition | Implementation starts only from claim merge or later current `main`; completion requires implementation evidence, exact-head validation, independent review and owner-first closeout. |
 
@@ -74,6 +74,13 @@ complete P1 design/code/tests/docs locally before pushing one stable candidate.
 
 Initial domain, compatibility migration, deterministic graph projection and transactional Todo
 mutation work is present locally on `feat-i237-work-domain-todo`. Focused locked-offline tests for
-`talos-core` and `talos-session` pass (66 and 183 tests respectively). The candidate is not yet a
+`talos-core` and `talos-session` pass (66 and 186 tests respectively). The candidate is not yet a
 stable PR: full workspace validation, documentation closure, staged-diff audit, exact-head CI and
 independent review are still required. The Published Baseline remains unchanged.
+
+## Implementation Candidate Checkpoint (2026-08-31)
+
+Implementation PR #442 was opened from `main@c1d0a126` with candidate commit
+`7376349700f8c37a398f22a6be3e8ba42275ad9b`. Local release preflight, focused tests, clippy and
+governance validators passed before push. Exact-head CI and independent implementation review are
+pending; this checkpoint does not claim completion.

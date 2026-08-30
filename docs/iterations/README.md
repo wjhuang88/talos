@@ -102,7 +102,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I233 | Auto Configuration And Session Command | Complete / Closed | PERM-007-B / Issue #188; implementation merged as `c536e190`. Config/session `/auto` only; no model or permission-result authority. |
 | I234 | Bounded Model-Assisted Permission Resolver | Complete / Closed | PERM-007-C / Issue #188; Completion Commit `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1`, PR #434 merged as `c5be0109b3da4f81e221fa37f734af2431e35255`. |
 | I236 | PERM-007-D Cross-Surface Conformance | Complete / Closed | Completion Commit `5cb6ddc5b6e025ca9f116401f85aeb9a90cc8bba`; PR #438 merged after exact-head CI `33291156177` and independent approval `5466806184`. |
-| I237 | Canonical Work Domain And Todo Compatibility | Review / Claimed | Claim PR #440 merged as `3f6f036d`; stable local implementation candidate is ready for one implementation PR and independent review. P2-P4 remain blocked. |
+| I237 | Canonical Work Domain And Todo Compatibility | Review / Claimed | Claim PR #440 merged as `3f6f036d`; implementation PR #442 is under exact-head CI and independent review. P2-P4 remain blocked. |
 | I235 | PERM-007-C Atomic Create Capability Decision | Complete / Closed | Completion Commit `71acbe0c`; PR #432 accepted the decision-only directory-capability contract. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
