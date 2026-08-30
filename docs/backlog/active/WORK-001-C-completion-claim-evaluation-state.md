@@ -6,7 +6,7 @@
 | Type | API / State Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Ready / Unclaimed — proposed I238 claim is ineffective until target-branch merge |
+| Status | Active / Claimed — proposed claim and activation are ineffective until PR #444 merges |
 | Source | GitHub Issue #29; WORK-001 P2; Desktop prerequisite chain section 20.2 |
 | Selected Iteration | I238 (Planned / Unclaimed) |
 | Depends On | WORK-001-B / I237 Complete; ADR-061 boundary; canonical `talos_core::work` domain |
@@ -15,18 +15,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline WORK-001 session |
 | Work Slice | WORK-001-C / I238 P2 only: storage-neutral Completion Claim, typed Acceptance Criterion, exact-revision Evaluation subject/report/finding/verdict and deterministic staleness/transition rules in the shared Work Domain. No evaluator runtime, provider call, Validation execution, persistence, Mission final gate, UI, Desktop, Dashboard, permission, `/auto`, release or publication work. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #444 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance CI and independent architecture/API review. |
+| Authorization Evidence | Pending exact-head governance CI and independent architecture/API review for PR #444. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim and activation are ineffective until this finalized record reaches `main`; implementation must start from that merge or later current `main`. |
+| Handoff / Release Condition | Proposed Active/Claimed state, claim and activation are ineffective until finalized PR #444 reaches `main`; implementation must start from that merge or later current `main`. |
 
 ## Identity / Goal / Value
 

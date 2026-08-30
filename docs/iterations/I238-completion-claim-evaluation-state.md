@@ -1,6 +1,6 @@
 # Iteration I238: Completion Claim And Evaluation State Model
 
-> Document status: Planned / Unclaimed — proposed atomic claim and activation are ineffective until target-branch merge
+> Document status: Active / Claimed — proposed claim and activation are ineffective until PR #444 merges
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-C/P2 as a shared, exact-revision Completion Claim and
 > Evaluation state contract without starting the evaluator runtime or Mission delivery gate.
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline WORK-001 session |
 | Work Slice | WORK-001-C / I238 P2 only: storage-neutral Completion Claim, Acceptance Criterion, Evaluation subject/report/finding/verdict and deterministic revision-bound transition/staleness rules in the shared Work Domain. No evaluator runtime, persistence, Mission final gate, UI, Desktop, Dashboard, permission, `/auto`, release or publication. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #444 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance CI and independent architecture/API review. |
+| Authorization Evidence | Pending exact-head governance CI and independent architecture/API review for PR #444. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim and activation are ineffective until this finalized record reaches `main`; implementation starts from that merge or later current `main`. |
+| Handoff / Release Condition | Proposed Active/Claimed state, claim and activation are ineffective until finalized PR #444 reaches `main`; implementation starts from that merge or later current `main`. |
 
 ## Published Baseline
 
@@ -31,7 +31,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| WORK-001-C | WORK-001 | Ready / Unclaimed | WORK-001-B/I237 Complete; ADR-061; canonical `talos_core::work` domain | One storage-neutral, executable Completion Claim/Evaluation state contract with exact-revision staleness and no evaluator runtime. |
+| WORK-001-C | WORK-001 | Active / Claimed (proposed; ineffective until PR #444 merges) | WORK-001-B/I237 Complete; ADR-061; canonical `talos_core::work` domain | One storage-neutral, executable Completion Claim/Evaluation state contract with exact-revision staleness and no evaluator runtime. |
 
 ### Non-Terminal Inventory And Disposition
 
@@ -103,8 +103,8 @@ after I237; no in-flight proposal reserves it.
 
 ## Activation Rule
 
-This governance-only branch may propose Claimed/Active atomically after its actual PR number is
-backfilled. Both states remain ineffective until the finalized exact head merges to `main`. No
+This governance-only branch proposes Claimed/Active atomically in PR #444. Both states remain
+ineffective until the finalized exact head merges to `main`. No
 implementation branch, Rust/Cargo edit, dependency change or experiment represented as progress is
 authorized before that merge.
 
