@@ -239,6 +239,35 @@ fn deleting_parent_advances_surviving_child_revision() {
 }
 
 #[test]
+fn deleting_child_does_not_advance_surviving_parent_revision() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let parent = create(&repo, session_id, "parent");
+    let child = create(&repo, session_id, "child");
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("dependency");
+    let before = repo
+        .list_work_units(session_id)
+        .expect("work units")
+        .into_iter()
+        .find(|node| node.identity.id == parent.id)
+        .expect("parent work unit")
+        .identity
+        .revision;
+    let mut repo = repo;
+    assert!(repo.delete(session_id, child.id).expect("delete"));
+    let after = repo
+        .list_work_units(session_id)
+        .expect("work units")
+        .into_iter()
+        .find(|node| node.identity.id == parent.id)
+        .expect("parent work unit")
+        .identity
+        .revision;
+    assert_eq!(after, before);
+}
+
+#[test]
 fn legacy_schema_migrates_losslessly_and_keeps_backup() {
     let dir = tempdir().expect("temp dir");
     let path = dir.path().join("todos.sqlite");

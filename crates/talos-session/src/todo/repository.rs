@@ -341,8 +341,8 @@ impl TodoRepository {
         let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
         let affected_children = {
             let mut stmt = tx.prepare(
-                "SELECT DISTINCT CASE WHEN parent_id = ?2 THEN child_id ELSE parent_id END \
-                 FROM todo_dependencies WHERE session_id = ?1 AND (parent_id = ?2 OR child_id = ?2)",
+                "SELECT DISTINCT child_id FROM todo_dependencies \
+                 WHERE session_id = ?1 AND parent_id = ?2",
             )?;
             stmt.query_map(params![session_id.to_string(), id.to_string()], |row| {
                 parse_uuid_column(row.get::<_, String>(0)?, 0)
