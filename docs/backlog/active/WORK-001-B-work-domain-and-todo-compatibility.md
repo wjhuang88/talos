@@ -6,7 +6,7 @@
 | Type | Architecture / Domain Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Active / Claimed — implementation not started |
+| Status | Review / Claimed — stable local candidate; implementation PR not started |
 | Source | GitHub Issue #29; WORK-001 P1; Desktop prerequisite chain §20.2 |
 | Selected Iteration | I237 |
 | Depends On | WORK-001-A / I196 Complete; ADR-061 Proposed boundary; RUNTIME-001; TODO-001; TODO-002; VALIDATION-001 |
@@ -75,6 +75,7 @@ need for a second independently mutable Todo repository before later evaluation 
 - `docs/backlog/active/TODO-001-session-todo-list.md`
 - `docs/backlog/active/TODO-002-todo-mutation-reliability.md`
 - `docs/backlog/active/VALIDATION-001-internal-validation-service.md`
+- `docs/reference/WORK-DOMAIN-TODO-COMPATIBILITY.md`
 
 ## Acceptance For Behavior
 
@@ -111,3 +112,14 @@ need for a second independently mutable Todo repository before later evaluation 
 
 Any unresolved migration, public API or compatibility issue remains here or receives a separately
 governed child; do not move P2/P3/P4 into this Story.
+
+## Local Convergence Checkpoint (2026-08-30)
+
+The implementation candidate currently adds a storage-neutral `talos_core::work` domain with typed
+Mission/Goal/WorkUnit roles, UUID identities, validated DAG snapshots and stable edge identities.
+The existing Todo SQLite authority remains the only durable writer; its compatibility adapter adds
+an additive, version-checked revision/edge migration, deterministic read projections, checked
+revision updates, atomic batch mutation, and fail-closed validation for unknown values, orphan
+edges and duplicate identities. Focused core/session tests pass locally. Full workspace validation,
+user/API documentation, exact-head CI and independent implementation review remain pending; this
+checkpoint is not completion evidence and does not modify the Published Baseline.

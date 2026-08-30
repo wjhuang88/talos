@@ -1,4 +1,5 @@
 use super::*;
+use rusqlite::OptionalExtension;
 use talos_core::tool::{AgentTool, ToolNature};
 use tempfile::tempdir;
 use uuid::Uuid;
@@ -68,6 +69,369 @@ fn create_and_get_round_trips_item() {
     assert_eq!(loaded.priority, TodoPriority::High);
     assert_eq!(loaded.assigned_to_turn.as_deref(), Some("turn-1"));
     assert_eq!(loaded.tags, vec!["session"]);
+    assert_eq!(
+        repo.list_work_units(session_id).expect("projection")[0]
+            .identity
+            .revision,
+        1
+    );
+}
+
+#[test]
+fn updates_advance_canonical_revision_and_project_work_unit() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let item = create(&repo, session_id, "canonical");
+    repo.update(
+        session_id,
+        item.id,
+        TodoUpdate {
+            title: Some("canonical v2".into()),
+            ..TodoUpdate::default()
+        },
+    )
+    .expect("update");
+    let work = repo.list_work_units(session_id).expect("projection")[0].clone();
+    assert_eq!(work.identity.id, item.id);
+    assert_eq!(work.identity.revision, 2);
+    assert_eq!(work.identity.kind, talos_core::work::WorkKind::WorkUnit);
+}
+
+#[test]
+fn canonical_graph_snapshot_is_validated_and_consistent() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let first = create(&repo, session_id, "first");
+    let second = create(&repo, session_id, "second");
+    repo.add_dependency(session_id, first.id, second.id)
+        .expect("dependency");
+    let graph = repo.load_work_graph(session_id).expect("graph");
+    assert_eq!(graph.nodes.len(), 2);
+    assert_eq!(graph.edges.len(), 1);
+}
+
+#[test]
+fn update_batch_rolls_back_every_item_when_a_later_item_is_missing() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let first = create(&repo, session_id, "first");
+    let before = repo.load_work_graph(session_id).expect("before");
+    let error = repo
+        .update_batch(
+            session_id,
+            vec![
+                (
+                    first.id,
+                    TodoUpdate {
+                        title: Some("changed".into()),
+                        ..TodoUpdate::default()
+                    },
+                ),
+                (Uuid::new_v4(), TodoUpdate::default()),
+            ],
+        )
+        .expect_err("batch must fail");
+    assert!(matches!(error, TodoError::NotFound(_)));
+    assert_eq!(
+        repo.get(session_id, first.id)
+            .expect("get")
+            .expect("item")
+            .title,
+        "first"
+    );
+    assert_eq!(repo.load_work_graph(session_id).expect("after"), before);
+}
+
+#[test]
+fn dependency_mutation_advances_dependent_revision_only_on_real_change() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let parent = create(&repo, session_id, "parent");
+    let child = create(&repo, session_id, "child");
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("add");
+    let after_add = repo.load_work_graph(session_id).expect("after add");
+    let child_after_add = after_add
+        .nodes
+        .iter()
+        .find(|node| node.identity.id == child.id)
+        .expect("child");
+    assert_eq!(child_after_add.identity.revision, 2);
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("idempotent add");
+    assert_eq!(
+        repo.load_work_graph(session_id).expect("duplicate"),
+        after_add
+    );
+    assert!(
+        repo.remove_dependency(session_id, parent.id, child.id)
+            .expect("remove")
+    );
+    let after_remove = repo.load_work_graph(session_id).expect("after remove");
+    assert_eq!(
+        after_remove
+            .nodes
+            .iter()
+            .find(|node| node.identity.id == child.id)
+            .expect("child")
+            .identity
+            .revision,
+        3
+    );
+    assert!(
+        !repo
+            .remove_dependency(session_id, parent.id, child.id)
+            .expect("absent")
+    );
+    assert_eq!(
+        repo.load_work_graph(session_id).expect("absent graph"),
+        after_remove
+    );
+}
+
+#[test]
+fn readding_dependency_preserves_stable_identity_and_advances_edge_revision() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let parent = create(&repo, session_id, "parent");
+    let child = create(&repo, session_id, "child");
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("add");
+    let first = repo.load_work_graph(session_id).expect("graph").edges[0];
+    assert!(
+        repo.remove_dependency(session_id, parent.id, child.id)
+            .expect("remove")
+    );
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("re-add");
+    let second = repo.load_work_graph(session_id).expect("graph").edges[0];
+    assert_eq!(second.identity.id, first.identity.id);
+    assert_eq!(second.identity.revision, first.identity.revision + 1);
+}
+
+#[test]
+fn deleting_parent_advances_surviving_child_revision() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let parent = create(&repo, session_id, "parent");
+    let child = create(&repo, session_id, "child");
+    repo.add_dependency(session_id, parent.id, child.id)
+        .expect("dependency");
+    let before = repo
+        .list_work_units(session_id)
+        .expect("work units")
+        .into_iter()
+        .find(|node| node.identity.id == child.id)
+        .expect("child work unit")
+        .identity
+        .revision;
+    let mut repo = repo;
+    assert!(repo.delete(session_id, parent.id).expect("delete"));
+    let after = repo
+        .list_work_units(session_id)
+        .expect("work units")
+        .into_iter()
+        .find(|node| node.identity.id == child.id)
+        .expect("child work unit")
+        .identity
+        .revision;
+    assert_eq!(after, before + 1);
+}
+
+#[test]
+fn legacy_schema_migrates_losslessly_and_keeps_backup() {
+    let dir = tempdir().expect("temp dir");
+    let path = dir.path().join("todos.sqlite");
+    let session_id = Uuid::new_v4();
+    let parent_id = Uuid::new_v4();
+    let child_id = Uuid::new_v4();
+    let connection = rusqlite::Connection::open(&path).expect("legacy database");
+    connection
+        .execute_batch(
+            "CREATE TABLE todo_items (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, \
+             title TEXT NOT NULL, description TEXT, status TEXT NOT NULL, priority TEXT NOT NULL, \
+             created_at TEXT NOT NULL, completed_at TEXT, assigned_to_turn TEXT, \
+             tags_json TEXT NOT NULL DEFAULT '[]'); \
+             CREATE TABLE todo_dependencies (session_id TEXT NOT NULL, parent_id TEXT NOT NULL, \
+             child_id TEXT NOT NULL, PRIMARY KEY(session_id,parent_id,child_id));",
+        )
+        .expect("legacy schema");
+    for (id, title) in [(parent_id, "parent"), (child_id, "child")] {
+        connection
+            .execute(
+                "INSERT INTO todo_items VALUES (?1, ?2, ?3, NULL, 'todo', 'medium', \
+             '2026-08-30T00:00:00Z', NULL, NULL, '[]')",
+                rusqlite::params![id.to_string(), session_id.to_string(), title],
+            )
+            .expect("legacy item");
+    }
+    connection
+        .execute(
+            "INSERT INTO todo_dependencies VALUES (?1, ?2, ?3)",
+            rusqlite::params![
+                session_id.to_string(),
+                parent_id.to_string(),
+                child_id.to_string()
+            ],
+        )
+        .expect("legacy edge");
+    drop(connection);
+
+    let repo = TodoRepository::new(&path).expect("repo");
+    repo.init_schema().expect("migrate");
+    let graph = repo.load_work_graph(session_id).expect("graph");
+    assert_eq!(graph.nodes.len(), 2);
+    assert!(graph.nodes.iter().all(|node| node.identity.revision == 1));
+    assert_eq!(graph.edges.len(), 1);
+    assert_eq!(graph.edges[0].identity.revision, 1);
+    assert!(dir.path().join("todos.sqlite.pre-work-v1.bak").exists());
+}
+
+#[test]
+fn lossy_legacy_value_fails_before_migration_or_backup() {
+    let dir = tempdir().expect("temp dir");
+    let path = dir.path().join("todos.sqlite");
+    let connection = rusqlite::Connection::open(&path).expect("legacy database");
+    connection.execute_batch(
+        "CREATE TABLE todo_items (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, title TEXT NOT NULL, \
+         description TEXT, status TEXT NOT NULL, priority TEXT NOT NULL, created_at TEXT NOT NULL, \
+         completed_at TEXT, assigned_to_turn TEXT, tags_json TEXT NOT NULL DEFAULT '[]'); \
+         CREATE TABLE todo_dependencies (session_id TEXT NOT NULL, parent_id TEXT NOT NULL, \
+         child_id TEXT NOT NULL, PRIMARY KEY(session_id,parent_id,child_id));",
+    ).expect("legacy schema");
+    connection
+        .execute(
+            "INSERT INTO todo_items VALUES (?1, ?2, 'bad', NULL, 'unknown', 'medium', \
+         '2026-08-30T00:00:00Z', NULL, NULL, '[]')",
+            rusqlite::params![Uuid::new_v4().to_string(), Uuid::new_v4().to_string()],
+        )
+        .expect("bad row");
+    drop(connection);
+    let repo = TodoRepository::new(&path).expect("repo");
+    assert!(matches!(repo.init_schema(), Err(TodoError::Migration(_))));
+    assert!(!dir.path().join("todos.sqlite.pre-work-v1.bak").exists());
+}
+
+#[test]
+fn partial_schema_is_rejected_without_creating_the_missing_table() {
+    let dir = tempdir().expect("temp dir");
+    let path = dir.path().join("todos.sqlite");
+    let connection = rusqlite::Connection::open(&path).expect("database");
+    connection
+        .execute_batch(
+            "CREATE TABLE todo_items (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, \
+             title TEXT NOT NULL, description TEXT, status TEXT NOT NULL, priority TEXT NOT NULL, \
+             created_at TEXT NOT NULL, completed_at TEXT, assigned_to_turn TEXT, \
+             tags_json TEXT NOT NULL DEFAULT '[]');",
+        )
+        .expect("partial schema");
+    drop(connection);
+    let repo = TodoRepository::new(&path).expect("repo");
+    assert!(matches!(repo.init_schema(), Err(TodoError::Migration(_))));
+    let connection = rusqlite::Connection::open(&path).expect("database");
+    let edge_table: Option<String> = connection
+        .query_row(
+            "SELECT type FROM sqlite_master WHERE name='todo_dependencies'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("metadata");
+    assert!(
+        edge_table.is_none(),
+        "migration must not create missing table"
+    );
+}
+
+#[test]
+fn duplicate_current_edge_identity_is_rejected() {
+    let dir = tempdir().expect("temp dir");
+    let path = dir.path().join("todos.sqlite");
+    let connection = rusqlite::Connection::open(&path).expect("database");
+    connection
+        .execute_batch(
+            "CREATE TABLE todo_items (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, \
+             title TEXT NOT NULL, description TEXT, status TEXT NOT NULL, priority TEXT NOT NULL, \
+             created_at TEXT NOT NULL, completed_at TEXT, assigned_to_turn TEXT, \
+             tags_json TEXT NOT NULL DEFAULT '[]', revision INTEGER NOT NULL DEFAULT 1); \
+             CREATE TABLE todo_dependencies (session_id TEXT NOT NULL, parent_id TEXT NOT NULL, \
+             child_id TEXT NOT NULL, edge_id TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, \
+             PRIMARY KEY(session_id,parent_id,child_id));",
+        )
+        .expect("current schema");
+    let session_id = Uuid::new_v4();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    let third = Uuid::new_v4();
+    for (id, title) in [(first, "first"), (second, "second"), (third, "third")] {
+        connection
+            .execute(
+                "INSERT INTO todo_items (id,session_id,title,status,priority,created_at,tags_json) \
+                 VALUES (?1,?2,?3,'todo','medium','2026-08-30T00:00:00Z','[]')",
+                rusqlite::params![id.to_string(), session_id.to_string(), title],
+            )
+            .expect("item");
+    }
+    let shared_edge_id = Uuid::new_v4().to_string();
+    connection
+        .execute(
+            "INSERT INTO todo_dependencies VALUES (?1,?2,?3,?4,1)",
+            rusqlite::params![
+                session_id.to_string(),
+                first.to_string(),
+                second.to_string(),
+                shared_edge_id
+            ],
+        )
+        .expect("edge");
+    connection
+        .execute(
+            "INSERT INTO todo_dependencies VALUES (?1,?2,?3,?4,1)",
+            rusqlite::params![
+                session_id.to_string(),
+                second.to_string(),
+                third.to_string(),
+                shared_edge_id
+            ],
+        )
+        .expect("edge");
+    drop(connection);
+    let repo = TodoRepository::new(&path).expect("repo");
+    assert!(matches!(repo.init_schema(), Err(TodoError::Migration(_))));
+}
+
+#[test]
+fn repository_projects_todos_and_edges_without_second_store() {
+    let repo = repo();
+    let session_id = Uuid::new_v4();
+    let first = create(&repo, session_id, "first");
+    let second = create(&repo, session_id, "second");
+    repo.add_dependency(session_id, first.id, second.id)
+        .expect("dependency");
+    let units = repo.list_work_units(session_id).expect("units");
+    let edges = repo.list_work_edges(session_id).expect("edges");
+    assert_eq!(units.len(), 2);
+    assert_eq!(
+        edges,
+        vec![talos_core::work::WorkEdge {
+            identity: talos_core::work::WorkEdgeIdentity {
+                id: {
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(session_id.as_bytes());
+                    hasher.update(first.id.as_bytes());
+                    hasher.update(second.id.as_bytes());
+                    let digest = hasher.finalize();
+                    let mut bytes = [0_u8; 16];
+                    bytes.copy_from_slice(&digest[..16]);
+                    Uuid::from_bytes(bytes)
+                },
+                revision: 1,
+            },
+            parent_id: first.id,
+            child_id: second.id
+        }]
+    );
 }
 
 #[test]

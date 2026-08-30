@@ -255,7 +255,7 @@ impl AgentTool for TodoUpdateBatchTool {
             Ok(repo) => repo,
             Err(err) => return ToolResult::error(err.to_string()),
         };
-        let mut updated_count = 0usize;
+        let mut updates = Vec::with_capacity(input.items.len());
         for item in input.items {
             let id = match parse_tool_uuid("id", &item.id) {
                 Ok(id) => id,
@@ -276,11 +276,12 @@ impl AgentTool for TodoUpdateBatchTool {
                 },
                 tags: item.tags,
             };
-            match repo.update(self.session_id, id, update) {
-                Ok(_) => updated_count += 1,
-                Err(err) => return ToolResult::error(err.to_string()),
-            }
+            updates.push((id, update));
         }
+        let updated_count = match repo.update_batch(self.session_id, updates) {
+            Ok(items) => items.len(),
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
         let action = format!("Updated {updated_count} todo(s)");
         let all = repo.list_all(self.session_id).unwrap_or_default();
         ToolResult::success(format_mutation_result(&action, &all))

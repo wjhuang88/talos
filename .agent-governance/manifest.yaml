@@ -64,7 +64,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "WORK-001-B/P1 I237 claim PR #440 merged as `3f6f036d`; owner and iteration are now Active/Claimed and implementation may start from current main. Keep P2-P4 blocked."
+    - "WORK-001-B/P1 I237 claim PR #440 merged as `3f6f036d`; owner and iteration are now Review/Claimed with a stable local implementation candidate ready for one PR and independent review. Keep P2-P4 blocked."
     - "Use Deferred Human Validation Mode only when the long-task startup/change record links a validation Issue and cleanup iteration; keep source owners Review, preserve exact implementation heads, never defer AGENTS.md security-review gates, and resolve every required row before long-task completion"
     - "Keep I222/TOOL-024-B, I224/TOOL-024-C, I225/TOOL-024-D1-A, I226/D1-B, I228/D2 and I223/Issue #378 Complete/Closed through their recorded implementation/evidence merges; PERM-006-D/E and `/auto` remain separately governed"
     - "Keep GOV-008/I215 completion bound to implementation `06e61e3c`, PR #341 merge `81a603b4`, CI `32442052401`, independent Agent-role review `5365129718` and merge-time CAS; use its local-convergence/stable-stage workflow for later work"

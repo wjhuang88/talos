@@ -1,6 +1,6 @@
 # Iteration I237: Canonical Work Domain And Todo Compatibility
 
-> Document status: Active / Claimed — implementation not started
+> Document status: Review / Claimed — stable local candidate; implementation PR not started
 > Published plan date: 2026-08-30
 > Planned objective: implement WORK-001-B/P1 as one canonical Work Domain with a tested Todo
 > compatibility surface, preserving current persistence and permission behavior.
@@ -69,3 +69,11 @@ implement Completion Claim/Evaluation, evaluator runtime, Mission Delivery, Desk
 After this claim merges, refresh `main`, repeat the non-terminal and overlap inventory, create the
 implementation branch from the effective claim merge (or later current `main`), and converge the
 complete P1 design/code/tests/docs locally before pushing one stable candidate.
+
+## Local Convergence Checkpoint (2026-08-30)
+
+Initial domain, compatibility migration, deterministic graph projection and transactional Todo
+mutation work is present locally on `feat-i237-work-domain-todo`. Focused locked-offline tests for
+`talos-core` and `talos-session` pass (66 and 183 tests respectively). The candidate is not yet a
+stable PR: full workspace validation, documentation closure, staged-diff audit, exact-head CI and
+independent review are still required. The Published Baseline remains unchanged.
