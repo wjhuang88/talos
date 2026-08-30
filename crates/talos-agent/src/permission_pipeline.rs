@@ -320,7 +320,7 @@ mod tests {
     use super::*;
     use std::path::Path;
     use talos_core::tool::{ToolNature, ToolResourceKind};
-    use talos_permission::PermissionEngine;
+    use talos_permission::{PermissionEngine, PermissionRule, ResourceKind};
 
     struct StaticResolver(ApprovalChoice);
 
@@ -585,5 +585,125 @@ mod tests {
             error.final_decision(),
             PermissionDecision::Deny(_)
         ));
+    }
+
+    #[derive(Clone, Copy)]
+    enum SurfaceProfile {
+        Goal,
+        InteractiveCli,
+        InteractiveTui,
+        Runtime,
+        Mcp,
+    }
+
+    impl SurfaceProfile {
+        fn context(self) -> PermissionContext {
+            match self {
+                Self::Goal | Self::InteractiveCli | Self::InteractiveTui => PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                ),
+                Self::Runtime | Self::Mcp => PermissionContext::new(
+                    PermissionMode::Headless,
+                    InteractionCapability::Unavailable,
+                ),
+            }
+        }
+
+        fn has_interaction(self) -> bool {
+            matches!(
+                self,
+                Self::Goal | Self::InteractiveCli | Self::InteractiveTui
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn i236_surface_matrix_preserves_approval_and_headless_fallback() {
+        let profiles = [
+            SurfaceProfile::Goal,
+            SurfaceProfile::InteractiveCli,
+            SurfaceProfile::InteractiveTui,
+            SurfaceProfile::Runtime,
+            SurfaceProfile::Mcp,
+        ];
+
+        for surface in profiles {
+            let root = tempfile::tempdir().expect("tempdir");
+            let target = root.path().join("new.txt");
+            let state = Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+            ));
+            let resolver = surface.has_interaction().then(|| {
+                Arc::new(StaticResolver(ApprovalChoice::ApproveOnce)) as Arc<dyn ApprovalResolver>
+            });
+            let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
+            let profile = write_profile(&target);
+            let result = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: "write",
+                    provenance: ToolProvenance::Native,
+                    profile: &profile,
+                    input: &serde_json::json!({"path": target}),
+                    presentation_input: serde_json::json!({"path": "new.txt"}),
+                    summary_fields: vec!["path".to_owned()],
+                    deadline: Duration::from_secs(1),
+                })
+                .await;
+
+            if surface.has_interaction() {
+                assert!(result.is_ok(), "interactive surface must resolve Ask");
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(PermissionPipelineError::ResolverUnavailable)
+                ));
+                assert_eq!(state.grant_count().expect("grant count"), 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn i236_hard_deny_wins_over_every_surface_resolver() {
+        let profiles = [
+            SurfaceProfile::Goal,
+            SurfaceProfile::InteractiveCli,
+            SurfaceProfile::InteractiveTui,
+            SurfaceProfile::Runtime,
+            SurfaceProfile::Mcp,
+        ];
+
+        for surface in profiles {
+            let root = tempfile::tempdir().expect("tempdir");
+            let target = root.path().join("blocked.txt");
+            let engine = PermissionEngine::from_rules(vec![PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("**/blocked.txt".to_owned()),
+                Some(ResourceKind::Path),
+                PermissionDecision::Deny("policy deny".to_owned()),
+            )]);
+            let state = Arc::new(PermissionSessionState::new(engine));
+            let resolver = surface.has_interaction().then(|| {
+                Arc::new(StaticResolver(ApprovalChoice::ApproveOnce)) as Arc<dyn ApprovalResolver>
+            });
+            let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
+            let profile = write_profile(&target);
+            let result = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: "write",
+                    provenance: ToolProvenance::Native,
+                    profile: &profile,
+                    input: &serde_json::json!({"path": target}),
+                    presentation_input: serde_json::json!({"path": "blocked.txt"}),
+                    summary_fields: Vec::new(),
+                    deadline: Duration::from_secs(1),
+                })
+                .await;
+            assert!(matches!(
+                result,
+                Err(PermissionPipelineError::Denied(PermissionDecision::Deny(_)))
+            ));
+            assert_eq!(state.grant_count().expect("grant count"), 0);
+        }
     }
 }

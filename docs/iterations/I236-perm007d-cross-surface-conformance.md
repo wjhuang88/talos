@@ -1,6 +1,6 @@
 # Iteration I236: PERM-007-D Cross-Surface Conformance
 
-> Document status: Active / Claimed (proposed; ineffective until this governance record merges)
+> Document status: Active / Claimed
 > Published plan date: 2026-08-30
 > Planned objective: complete the remaining PERM-007-D cross-surface conformance, rollout and rollback evidence for Issue #188 without widening the accepted ADR-064 authority.
 > MVP deliverable: runnable conformance fixtures proving equivalent `Ask` requests have equivalent auto/fallback semantics across Goal, interactive CLI/TUI, headless, Runtime and MCP entrypoints.
@@ -26,7 +26,7 @@
 
 | State | Iterations | Disposition |
 |---|---|---|
-| Active | I236 (proposed) | This claim is ineffective until its governance PR reaches `main`; no implementation branch before then. |
+| Active | I236 | Claim PR #437 is merged; implementation is authorized from `main@1ea3d99d`. |
 | Review | None | No review iteration blocks the claim. |
 | Planned | I207, I208 | Preserve as unclaimed steering children; no overlap. |
 | Blocked | None with a current iteration document status | PERM-007-D was unblocked by I234 completion; no other authority is transferred. |
@@ -58,6 +58,15 @@
 - Hard Deny and unsupported contexts remain Deny on every surface; auto-off and assessor failure never produce automatic authorization.
 - Rollout can be disabled through configuration/session control and resumes the pre-I234 human/headless behavior without migration or grant residue.
 - Exact-head focused tests, locked workspace validation, governance validators, diff check, independent review and merge-time CAS all pass.
+
+## Activation Checkpoint — 2026-08-30
+
+I236 claim PR #437 is effective on the target branch. The claim head was
+`6a1368dc22cbc1211893d2077cf923febb796423`, based on `7c7ed6243a5ec9371ee7de356709c9fb0cb947c4`;
+exact-head CI `33265886227` passed the routed governance jobs and independent review comment
+`5463899122` approved the claim. Merge-time CAS completed at merge commit
+`1ea3d99d61985bed65c6df9e534f03a71e7d1cf5`. Implementation starts from that merge point and
+remains limited to the published scope above.
 
 ## Completion Evidence
 

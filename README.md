@@ -206,6 +206,12 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
+Auto assistance is available only when the active surface supplies an interactive approval
+resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
+their existing fail-closed behavior for unresolved `Ask` decisions; enabling `auto` in config does
+not silently grant those surfaces model authority. Disabling auto always returns an interactive
+surface to human approval and a headless surface to denial.
+
 ## Development
 
 ### Build From Source
