@@ -318,11 +318,86 @@ pub fn headless_pipeline(engine: talos_permission::PermissionEngine) -> Permissi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auto_resolver::{
+        AutoPermissionAssessor, AutoPermissionControl, AutoPermissionRequest,
+        AutoPermissionResolver, ManagedWorkspaceLease,
+    };
     use std::path::Path;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use talos_core::tool::{ToolNature, ToolResourceKind};
-    use talos_permission::PermissionEngine;
+    use talos_permission::{PermissionEngine, PermissionRule, ResourceKind};
 
     struct StaticResolver(ApprovalChoice);
+
+    struct MatrixCapability;
+
+    impl talos_core::tool::AtomicCreateCapability for MatrixCapability {
+        fn create_new(&self, _relative_path: &Path, _contents: &[u8]) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct MatrixAssessor {
+        calls: Arc<AtomicUsize>,
+    }
+
+    fn matrix_approval_request(
+        root: &Path,
+        state: &PermissionSessionState,
+        path: &str,
+    ) -> PermissionApprovalRequest {
+        let input = serde_json::json!({"path": path, "content": "hello"});
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            root.join(path).display().to_string(),
+            ToolResourceKind::Path,
+        )];
+        let request = PermissionRequest::new("write", ToolProvenance::Native, &profile, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let PermissionInvocation::Ask {
+            session: proposal, ..
+        } = state
+            .begin_invocation(&request, &context)
+            .expect("approval proposal")
+        else {
+            panic!("write should require approval");
+        };
+        PermissionApprovalRequest {
+            tool_name: "write".to_owned(),
+            provenance: ToolProvenance::Native,
+            arguments: input,
+            summary_fields: vec!["path".to_owned()],
+            preview: proposal.preview().clone(),
+            binding: PermissionBinding {
+                session_id: state.session_id().expect("session id").stable_id(),
+                revisions: state
+                    .state_snapshot()
+                    .expect("snapshot")
+                    .revisions
+                    .as_array(),
+                mode: context.mode(),
+                interaction: context.interaction(),
+            },
+        }
+    }
+
+    #[async_trait]
+    impl AutoPermissionAssessor for MatrixAssessor {
+        async fn assess(
+            &self,
+            request: AutoPermissionRequest,
+            _remaining: Duration,
+        ) -> Result<String, String> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Ok(format!(
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                request.request_digest
+            ))
+        }
+    }
 
     #[async_trait]
     impl ApprovalResolver for StaticResolver {
@@ -585,5 +660,205 @@ mod tests {
             error.final_decision(),
             PermissionDecision::Deny(_)
         ));
+    }
+
+    #[derive(Clone, Copy)]
+    enum SurfaceProfile {
+        Goal,
+        InteractiveCli,
+        InteractiveTui,
+        Runtime,
+        Mcp,
+    }
+
+    impl SurfaceProfile {
+        fn context(self) -> PermissionContext {
+            match self {
+                Self::Goal | Self::InteractiveCli | Self::InteractiveTui => PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                ),
+                Self::Runtime | Self::Mcp => PermissionContext::new(
+                    PermissionMode::Headless,
+                    InteractionCapability::Unavailable,
+                ),
+            }
+        }
+
+        fn has_interaction(self) -> bool {
+            matches!(
+                self,
+                Self::Goal | Self::InteractiveCli | Self::InteractiveTui
+            )
+        }
+
+        fn provenance(self) -> ToolProvenance {
+            match self {
+                Self::Mcp => ToolProvenance::McpRemote {
+                    server: "standalone-mcp".to_owned(),
+                },
+                _ => ToolProvenance::Native,
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn i236_surface_matrix_preserves_approval_and_headless_fallback() {
+        let profiles = [
+            SurfaceProfile::Goal,
+            SurfaceProfile::InteractiveCli,
+            SurfaceProfile::InteractiveTui,
+            SurfaceProfile::Runtime,
+            SurfaceProfile::Mcp,
+        ];
+
+        for surface in profiles {
+            let root = tempfile::tempdir().expect("tempdir");
+            let target = root.path().join("new.txt");
+            let state = Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+            ));
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let resolver = if surface.has_interaction() {
+                let lease = ManagedWorkspaceLease::new(
+                    root.path(),
+                    state.session_id().expect("session id").stable_id(),
+                )
+                .expect("lease")
+                .with_atomic_create_capability(Arc::new(MatrixCapability));
+                Some(Arc::new(AutoPermissionResolver::new(
+                    Arc::new(MatrixAssessor {
+                        calls: calls.clone(),
+                    }),
+                    Arc::new(StaticResolver(ApprovalChoice::Deny)),
+                    lease,
+                    Duration::from_secs(8),
+                    AutoPermissionControl::new(true),
+                )) as Arc<dyn ApprovalResolver>)
+            } else {
+                None
+            };
+            let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
+            let profile = write_profile(&target);
+            let result = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: "write",
+                    provenance: surface.provenance(),
+                    profile: &profile,
+                    input: &serde_json::json!({
+                        "path": target.display().to_string(),
+                        "content": "hello"
+                    }),
+                    presentation_input: serde_json::json!({
+                        "path": "new.txt",
+                        "content": "hello"
+                    }),
+                    summary_fields: vec!["path".to_owned()],
+                    deadline: Duration::from_secs(1),
+                })
+                .await;
+
+            if surface.has_interaction() {
+                assert!(result.is_ok(), "interactive surface must resolve Ask");
+                assert_eq!(calls.load(std::sync::atomic::Ordering::Acquire), 1);
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(PermissionPipelineError::ResolverUnavailable)
+                ));
+                assert_eq!(state.grant_count().expect("grant count"), 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn i236_hard_deny_wins_over_every_surface_resolver() {
+        let profiles = [
+            SurfaceProfile::Goal,
+            SurfaceProfile::InteractiveCli,
+            SurfaceProfile::InteractiveTui,
+            SurfaceProfile::Runtime,
+            SurfaceProfile::Mcp,
+        ];
+
+        for surface in profiles {
+            let root = tempfile::tempdir().expect("tempdir");
+            let target = root.path().join("blocked.txt");
+            let engine = PermissionEngine::from_rules(vec![PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("**/blocked.txt".to_owned()),
+                Some(ResourceKind::Path),
+                PermissionDecision::Deny("policy deny".to_owned()),
+            )]);
+            let state = Arc::new(PermissionSessionState::new(engine));
+            let resolver = surface.has_interaction().then(|| {
+                Arc::new(StaticResolver(ApprovalChoice::ApproveOnce)) as Arc<dyn ApprovalResolver>
+            });
+            let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
+            let profile = write_profile(&target);
+            let result = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: "write",
+                    provenance: surface.provenance(),
+                    profile: &profile,
+                    input: &serde_json::json!({"path": "blocked.txt", "content": "hello"}),
+                    presentation_input: serde_json::json!({"path": "blocked.txt"}),
+                    summary_fields: Vec::new(),
+                    deadline: Duration::from_secs(1),
+                })
+                .await;
+            assert!(matches!(
+                result,
+                Err(PermissionPipelineError::Denied(PermissionDecision::Deny(_)))
+            ));
+            assert_eq!(state.grant_count().expect("grant count"), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn i236_auto_off_rolls_back_to_human_fallback_without_assessor_call() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let control = AutoPermissionControl::new(false);
+        let lease = ManagedWorkspaceLease::new(
+            root.path(),
+            state.session_id().expect("session id").stable_id(),
+        )
+        .expect("lease")
+        .with_atomic_create_capability(Arc::new(MatrixCapability));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(MatrixAssessor {
+                calls: calls.clone(),
+            }),
+            Arc::new(StaticResolver(ApprovalChoice::Deny)),
+            lease,
+            Duration::from_secs(8),
+            control.clone(),
+        );
+        let request = matrix_approval_request(root.path(), &state, "rollback.txt");
+        assert_eq!(
+            resolver
+                .resolve(request, Duration::from_secs(1))
+                .await
+                .expect("fallback"),
+            ApprovalChoice::Deny
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Acquire), 0);
+        assert!(resolver.last_report().is_none());
+        control.set_enabled(true);
+        let request = matrix_approval_request(root.path(), &state, "enabled.txt");
+        assert_eq!(
+            resolver
+                .resolve(request, Duration::from_secs(1))
+                .await
+                .expect("assessor"),
+            ApprovalChoice::ApproveOnce
+        );
+        let report = resolver.last_report().expect("redacted report");
+        assert_eq!(report.outcome, "allow_once");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Acquire), 1);
     }
 }

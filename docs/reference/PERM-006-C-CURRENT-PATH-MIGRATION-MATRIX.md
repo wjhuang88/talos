@@ -76,3 +76,18 @@ persistent permission data is rewritten and no approval is widened by rollback.
   fallback and TUI `/attach` boundaries are unchanged.
 - Third-party tools with secret-bearing arguments must override the default
   `AgentTool::project_input()`; PERM-006-E owns the later documentation/conformance gate.
+
+## 2026-08-30 I236 Cross-Surface Conformance Facts
+
+- Goal and interactive CLI/TUI compose the existing bounded auto resolver only when an interactive
+  `ApprovalResolver` is available. The resolver can return only an invocation-local `ApproveOnce`;
+  policy evaluation and final admission remain Agent-owned.
+- Print/inline headless CLI, embedded Runtime and standalone MCP intentionally do not infer model
+  authority from the shared `auto.enabled` setting. An unresolved `Ask` remains a deterministic
+  Deny on those surfaces, preserving pre-I234 behavior and avoiding an implicit SDK/MCP policy
+  change.
+- The I236 matrix tests exercise one normalized request across all five surface profiles. They
+  verify that interactive profiles resolve an eligible `Ask`, headless profiles fail closed with
+  no grant residue, and an explicit policy `Deny` dominates every resolver profile.
+- Rollback is composition-only: `/auto off` or an unavailable assessor leaves no persistent grant
+  and returns the surface to its existing human-approval or headless-Deny path.

@@ -25,6 +25,13 @@ use talos_skill::SkillIndex;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
+use crate::auto_resolver::{
+    AutoPermissionAssessor, AutoPermissionControl, AutoPermissionRequest, AutoPermissionResolver,
+    ManagedWorkspaceLease,
+};
+use crate::permission_pipeline::{
+    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+};
 use crate::{
     Agent, AgentError, AgentResult, PendingToolCall, SandboxFallbackContext,
     SandboxFallbackDecision, SandboxFallbackHandler, SandboxFallbackPolicy, ToolDescription,
@@ -129,6 +136,116 @@ struct TimedMockTool {
     delay_ms: u64,
     result: ToolExecutionResult,
     execution_log: Arc<Mutex<Vec<String>>>,
+}
+
+struct AutoWriteMockTool {
+    execution_log: Arc<Mutex<Vec<String>>>,
+    order_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl AgentTool for AutoWriteMockTool {
+    fn name(&self) -> &str {
+        "write"
+    }
+
+    fn description(&self) -> &str {
+        "Bounded write fixture"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+
+    fn is_read_only(&self) -> bool {
+        false
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            input
+                .get("path")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+            ToolResourceKind::Path,
+        )]
+    }
+
+    fn project_input(&self, input: &Value) -> Value {
+        let mut projected = input.clone();
+        if let Some(object) = projected.as_object_mut() {
+            object.insert("path".into(), Value::String("new.txt".into()));
+        }
+        projected
+    }
+
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.execution_log.lock().await.push(input.to_string());
+        self.order_log.lock().await.push("execute".into());
+        ToolExecutionResult::success("written")
+    }
+}
+
+struct OrderingPermissionHook {
+    order_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl HookHandler for OrderingPermissionHook {
+    fn name(&self) -> &str {
+        "i236-ordering-capture"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
+        self.order_log.lock().await.push("after_permission".into());
+        HookResult::Continue
+    }
+}
+
+struct AutoTestAssessor;
+
+struct AutoWriteCapability;
+
+impl talos_core::tool::AtomicCreateCapability for AutoWriteCapability {
+    fn create_new(
+        &self,
+        _relative_path: &std::path::Path,
+        _contents: &[u8],
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AutoPermissionAssessor for AutoTestAssessor {
+    async fn assess(
+        &self,
+        request: AutoPermissionRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<String, String> {
+        Ok(format!(
+            "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+            request.request_digest
+        ))
+    }
+}
+
+struct AutoDenyFallback;
+
+#[async_trait]
+impl ApprovalResolver for AutoDenyFallback {
+    async fn resolve(
+        &self,
+        _request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<talos_core::ApprovalChoice, ApprovalResolverError> {
+        Ok(talos_core::ApprovalChoice::Deny)
+    }
 }
 
 struct ProjectedMockTool;
@@ -2848,6 +2965,101 @@ async fn agent_pipeline_no_resolver_emits_one_final_deny_and_executes_nothing() 
     let decisions = decisions.lock().await;
     assert_eq!(decisions.len(), 1);
     assert!(matches!(decisions[0], PermissionDecision::Deny(_)));
+}
+
+#[tokio::test]
+async fn i236_agent_path_dispatches_final_permission_hook_before_execution() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let target = root.path().join("new.txt");
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let order_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(AutoWriteMockTool {
+        execution_log: execution_log.clone(),
+        order_log: order_log.clone(),
+    }));
+
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call_auto_write".into(),
+                    name: "write".into(),
+                    input: serde_json::json!({
+                        "path": target.display().to_string(),
+                        "content": "hello"
+                    }),
+                },
+                provenance: Default::default(),
+                summary_fields: vec!["path".into()],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "Done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+    let decisions = Arc::new(Mutex::new(Vec::new()));
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(PermissionDecisionCaptureHook {
+        decisions: decisions.clone(),
+    }));
+    hooks.register(Arc::new(OrderingPermissionHook {
+        order_log: order_log.clone(),
+    }));
+    let state = Arc::new(talos_permission::PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+    ));
+    let lease = ManagedWorkspaceLease::new(
+        root.path(),
+        state.session_id().expect("session id").stable_id(),
+    )
+    .expect("lease")
+    .with_atomic_create_capability(Arc::new(AutoWriteCapability));
+    let resolver = AutoPermissionResolver::new(
+        Arc::new(AutoTestAssessor),
+        Arc::new(AutoDenyFallback),
+        lease,
+        std::time::Duration::from_secs(8),
+        AutoPermissionControl::new(true),
+    );
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        None,
+        None,
+        root.path().to_path_buf(),
+        Arc::new(hooks),
+    )
+    .with_permission_pipeline(
+        state,
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Interactive,
+            talos_permission::InteractionCapability::Available,
+        ),
+        Some(Arc::new(resolver)),
+    );
+
+    assert_eq!(agent.run("write it".into()).await.expect("run"), "Done");
+    assert_eq!(execution_log.lock().await.len(), 1);
+    assert_eq!(
+        *order_log.lock().await,
+        vec!["after_permission".to_owned(), "execute".to_owned()]
+    );
+    let decisions = decisions.lock().await;
+    assert_eq!(decisions.len(), 1);
+    assert!(matches!(decisions[0], PermissionDecision::Allow));
 }
 
 #[tokio::test]
