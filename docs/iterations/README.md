@@ -101,7 +101,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I232 | Invalid Skill Diagnostic Visibility | Complete / Closed | Completion Commit `fedd6fac`; implementation source `fb47b0c2`, exact-head CI `33141878176`, independent Skill/CLI review `5448628671`. Fail-closed invalid-Skill discovery and bounded explicit activation diagnostics are complete. |
 | I233 | Auto Configuration And Session Command | Complete / Closed | PERM-007-B / Issue #188; implementation merged as `c536e190`. Config/session `/auto` only; no model or permission-result authority. |
 | I234 | Bounded Model-Assisted Permission Resolver | Complete / Closed | PERM-007-C / Issue #188; Completion Commit `7ddba098b5929e593fff94b9d3f5fd10f2fb35c1`, PR #434 merged as `c5be0109b3da4f81e221fa37f734af2431e35255`. |
-| I236 | PERM-007-D Cross-Surface Conformance | Active / Claimed | PERM-007-D / Issue #188; conformance, rollout and rollback evidence only. |
+| I236 | PERM-007-D Cross-Surface Conformance | Complete / Closed | Completion Commit `5cb6ddc5b6e025ca9f116401f85aeb9a90cc8bba`; PR #438 merged after exact-head CI `33291156177` and independent approval `5466806184`. |
 | I235 | PERM-007-C Atomic Create Capability Decision | Complete / Closed | Completion Commit `71acbe0c`; PR #432 accepted the decision-only directory-capability contract. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
