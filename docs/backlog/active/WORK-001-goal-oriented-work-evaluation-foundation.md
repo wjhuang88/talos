@@ -41,7 +41,7 @@ mainline work. It does not authorize any child merely because the overall direct
 | Child | Outcome | Status | Depends On | Iteration |
 |---|---|---|---|---|
 | WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Complete / Closed | Current repository and dependency inventory | I196 Complete / Closed |
-| WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Blocked; owner to be formed after P0 | WORK-001-A Accepted and Complete | None |
+| WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Ready / Unclaimed — I237 claim proposed; ineffective until merge | WORK-001-A Accepted and Complete | I237 |
 | WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Blocked; owner to be formed after P1 | WORK-001-B Complete | None |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Blocked; owner to be formed after P2 | WORK-001-C Complete | None |
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
@@ -52,6 +52,15 @@ Epic remains open while P1-P4 are separately governed).
 P1-P4 identifiers reserve dependency boundaries only. Their executable owner documents, iteration
 plans and claims must be created separately after the preceding child is accepted; this P0 claim
 must not pre-authorize or implement them.
+
+## 2026-08-30 P1 Claim Preparation Checkpoint
+
+WORK-001-A/I196 is Complete / Closed and its completion evidence is present on `main`. The first
+eligible child, WORK-001-B/P1, now has an independent requirement owner and I237 iteration with a
+bounded Collaboration Claim proposal. The proposed claim is ineffective until its governance PR
+merges to `main`; no implementation branch, Rust/Cargo change, persistence change or P2-P4
+activation is authorized before that merge. P2, P3 and P4 remain Blocked on their direct child
+prerequisites.
 
 ## Scope
 
