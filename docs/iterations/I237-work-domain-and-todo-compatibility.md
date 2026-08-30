@@ -1,6 +1,6 @@
 # Iteration I237: Canonical Work Domain And Todo Compatibility
 
-> Document status: Review / Claimed — implementation PR #442 under review
+> Document status: Complete / Closed
 > Published plan date: 2026-08-30
 > Planned objective: implement WORK-001-B/P1 as one canonical Work Domain with a tested Todo
 > compatibility surface, preserving current persistence and permission behavior.
@@ -20,9 +20,9 @@
 | Governance Claim PR | #440 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; I196 Completion Commit `779a4c71` and ADR-061 remain the boundary basis. |
-| Implementation PR | #442 (head `73763497`) |
-| Last Updated | 2026-08-30 |
-| Handoff / Release Condition | Implementation starts only from claim merge or later current `main`; completion requires implementation evidence, exact-head validation, independent review and owner-first closeout. |
+| Implementation PR | #442 (final head `319a1f1576a2a47a49c987491c2c017376510bf6`; merged as `f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`) |
+| Last Updated | 2026-08-31 |
+| Handoff / Release Condition | Complete after exact-head CI, independent implementation review and merge-time CAS. P2 remains separately governed and unactivated. |
 
 ## Published Baseline
 
@@ -84,3 +84,25 @@ Implementation PR #442 was opened from `main@c1d0a126` with candidate commit
 `7376349700f8c37a398f22a6be3e8ba42275ad9b`. Local release preflight, focused tests, clippy and
 governance validators passed before push. Exact-head CI and independent implementation review are
 pending; this checkpoint does not claim completion.
+
+## Completion Evidence
+
+Completion Commit: `f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91` (PR #442 implementation
+merge, containing final implementation head `319a1f1576a2a47a49c987491c2c017376510bf6`).
+
+## Completion Checkpoint (2026-08-31)
+
+PR #442 final implementation head `319a1f1576a2a47a49c987491c2c017376510bf6`, based on
+`c1d0a1262fa4fbab3c922cdeef14882a9f29add9`, passed exact-head CI run `33323509558`
+attempt 2 with all five jobs successful. Independent Agent-role implementation review comment
+`5470154364` approved the same head/base after checking WorkGraph invariants, Todo compatibility,
+SQLite migration and fail-closed schema handling, CAS/revision semantics, stable edge identity,
+permission routing and scope boundaries. Merge-time CAS found the PR MERGEABLE/CLEAN, no
+overlapping non-archival main PR, unchanged head/base and a clean worktree; PR #442 then merged as
+`f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`.
+
+The canonical Work Domain and Todo compatibility path are now complete. P2-P4 were not activated
+or implemented by I237. A Todo-specific denial-to-unchanged-SQLite fixture remains an optional
+test-strengthening follow-up; the accepted evidence combines Todo permission-facet tests with the
+authoritative Agent pipeline's deny-before-execution tests, and the independent review found no
+alternate model-facing writer.

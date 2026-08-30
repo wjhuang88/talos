@@ -6,7 +6,7 @@
 | Type | Architecture / Domain Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Review / Claimed — implementation PR #442 under review |
+| Status | Complete / Closed |
 | Source | GitHub Issue #29; WORK-001 P1; Desktop prerequisite chain §20.2 |
 | Selected Iteration | I237 |
 | Depends On | WORK-001-A / I196 Complete; ADR-061 Proposed boundary; RUNTIME-001; TODO-001; TODO-002; VALIDATION-001 |
@@ -24,9 +24,9 @@
 | Governance Claim PR | #440 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #440 exact head `4e2bd58dc5d54cea2846a2756b56b46438debbc9` passed CI `33312960052` and independent governance approval, then merged to `main` as `3f6f036dfcce612ca88dc57e654b23aedf761678`; P0 completion `779a4c71` and ADR-061 remain the boundary basis. |
-| Implementation PR | #442 (head `73763497`) |
-| Last Updated | 2026-08-30 |
-| Handoff / Release Condition | Start implementation only from the claim merge or later current `main`; keep P2-P4 blocked until this Story has implementation evidence and closeout. |
+| Implementation PR | #442 (final head `319a1f1576a2a47a49c987491c2c017376510bf6`; merged as `f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`) |
+| Last Updated | 2026-08-31 |
+| Handoff / Release Condition | Complete after exact-head CI, independent implementation review and merge-time CAS. P2-P4 retain separate owner, iteration and claim requirements. |
 
 ## Identity / Goal / Value
 
@@ -92,14 +92,14 @@ need for a second independently mutable Todo repository before later evaluation 
 
 ## Acceptance For Technical Work
 
-- [ ] Canonical domain and Todo adapter have focused unit/integration tests for identity, revision,
+- [x] Canonical domain and Todo adapter have focused unit/integration tests for identity, revision,
       dependency/cycle, idempotency, batch mutation, permission denial and compatibility fixtures.
-- [ ] Existing Todo tests remain green and no second independently mutable Todo repository exists.
-- [ ] Migration/rollback and public API compatibility evidence is documented.
-- [ ] User/API documentation explains the preserved Todo surface and canonical Work Domain boundary.
-- [ ] Locked focused/full validation, governance validators and `git diff --check` pass at the
+- [x] Existing Todo tests remain green and no second independently mutable Todo repository exists.
+- [x] Migration/rollback and public API compatibility evidence is documented.
+- [x] User/API documentation explains the preserved Todo surface and canonical Work Domain boundary.
+- [x] Locked focused/full validation, governance validators and `git diff --check` pass at the
       implementation candidate exact head.
-- [ ] Independent exact-head review and merge-time CAS are recorded before completion.
+- [x] Independent exact-head review and merge-time CAS are recorded before completion.
 
 ## State / Status Owners
 
@@ -123,3 +123,21 @@ revision updates, atomic batch mutation, and fail-closed validation for unknown 
 edges and duplicate identities. Focused core/session tests pass locally. Full workspace validation,
 user/API documentation, exact-head CI and independent implementation review remain pending; this
 checkpoint is not completion evidence and does not modify the Published Baseline.
+
+## Completion Evidence
+
+Completion Commit: `f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91` (PR #442 implementation
+merge, containing final implementation head `319a1f1576a2a47a49c987491c2c017376510bf6`).
+
+## Completion Checkpoint (2026-08-31)
+
+The final candidate passed local release preflight, focused `talos-core`/`talos-session` tests,
+locked Clippy, formatting, both governance validators and diff checks. CI run `33323509558`
+attempt 2 passed all five jobs on exact head `319a1f1576a2a47a49c987491c2c017376510bf6`;
+independent Agent-role review comment `5470154364` approved that exact head/base. Merge-time CAS
+confirmed MERGEABLE/CLEAN state, unchanged head/base and no overlapping non-archival main PR before
+PR #442 merged as `f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`.
+
+Todo remains the sole mutable SQLite authority and projects canonical WorkUnits/edges through the
+documented compatibility surface. P2 Completion Claim/Evaluation semantics, P3 evaluator runtime
+and P4 Mission delivery remain excluded and require fresh owners, iterations and claims.

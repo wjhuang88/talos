@@ -5,7 +5,7 @@
 | Story ID | WORK-001 |
 | Type | Architecture / Domain Epic |
 | Priority | P0 |
-| Status | Refinement — P0 child Ready; P1-P4 remain ordered future slices |
+| Status | In Progress — P0/P1 Complete; P2 is the next separately governed slice |
 | Source | DESKTOP-001 refined direction; GitHub Issue #29; three-track development baseline |
 | Selected Iteration | None — Epic parents are not selected directly |
 | Depends On | RUNTIME-001; TODO-001; TODO-002; VALIDATION-001; ADR-008; ADR-024; ADR-042; ADR-052 |
@@ -41,8 +41,8 @@ mainline work. It does not authorize any child merely because the overall direct
 | Child | Outcome | Status | Depends On | Iteration |
 |---|---|---|---|---|
 | WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Complete / Closed | Current repository and dependency inventory | I196 Complete / Closed |
-| WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Active / Claimed — implementation not started | WORK-001-A Accepted and Complete | I237 |
-| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Blocked; owner to be formed after P1 | WORK-001-B Complete | None |
+| WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
+| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Blocked pending owner, iteration and effective claim after P1 closeout reaches `main` | WORK-001-B Complete | None |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Blocked; owner to be formed after P2 | WORK-001-C Complete | None |
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
 
@@ -61,6 +61,17 @@ bounded Collaboration Claim proposal. The proposed claim is ineffective until it
 merges to `main`; no implementation branch, Rust/Cargo change, persistence change or P2-P4
 activation is authorized before that merge. P2, P3 and P4 remain Blocked on their direct child
 prerequisites.
+
+## 2026-08-31 P1 Completion Checkpoint
+
+WORK-001-B/I237 is Complete / Closed through Completion Commit
+`f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`, containing final implementation head
+`319a1f1576a2a47a49c987491c2c017376510bf6`. Exact-head CI run `33323509558` attempt 2
+passed all five jobs, independent Agent-role review comment `5470154364` approved the same
+head/base, and merge-time CAS completed before PR #442 merged. P2 is now the next dependency-order
+candidate, but remains unactivated until this closeout reaches `main` and a separate requirement
+owner, runnable iteration and effective Collaboration Claim are established. P3 and P4 remain
+blocked on their direct predecessors.
 
 ## Scope
 
