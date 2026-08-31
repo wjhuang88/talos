@@ -253,6 +253,14 @@ impl ConversationEngine {
         vec![UiOutput::Status(self.status_snapshot())]
     }
 
+    /// Forward a storage-neutral Mission gate result to presentation clients.
+    ///
+    /// The conversation layer does not interpret or mutate work state. Keeping this as one
+    /// ordered output lets the existing TUI bridge and later clients consume the same projection.
+    pub fn project_mission_gate(&self, result: talos_core::work::MissionGateResult) -> UiOutput {
+        UiOutput::WorkProjection(result)
+    }
+
     /// Applies the authoritative terminal status of the whole user turn.
     pub fn handle_turn_completed(&mut self, status: &TurnCompletionStatus) -> Vec<UiOutput> {
         self.pending_tool_calls.clear();

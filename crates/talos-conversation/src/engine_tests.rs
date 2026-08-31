@@ -16,6 +16,27 @@ fn new_engine() -> ConversationEngine {
     ConversationEngine::new("claude-sonnet-4".to_string(), "anthropic".to_string())
 }
 
+#[test]
+fn mission_gate_projection_uses_the_canonical_ui_output_path() {
+    let mission = talos_core::work::WorkIdentity {
+        id: uuid::Uuid::new_v4(),
+        kind: talos_core::work::WorkKind::Mission,
+        revision: 1,
+    };
+    let result = talos_core::work::MissionGateResult {
+        mission,
+        delivery: talos_core::work::DeliveryEligibility::Eligible,
+        events: vec![
+            talos_core::work::WorkProjectionEvent::DeliveryEligibilityChanged { eligible: true },
+        ],
+    };
+    let output = new_engine().project_mission_gate(result.clone());
+    assert!(matches!(
+        output,
+        UiOutput::WorkProjection(projected) if projected == result
+    ));
+}
+
 fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {
     make_tool_call_with_input(name, serde_json::json!({}))
 }

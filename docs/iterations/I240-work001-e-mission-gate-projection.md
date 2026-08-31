@@ -1,6 +1,6 @@
 # Iteration I240: Mission Final Gate And UI-Neutral Projection
 
-> Document status: Active / Claimed (proposed; ineffective until PR #450 merges)
+> Document status: Review / Claimed
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-E/P4 as a shared Mission gate and UI-neutral projection
 > without introducing Desktop/UI authority.
@@ -21,7 +21,7 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable candidate push |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim+activation must merge before implementation; owner-first closeout after implementation evidence |
 
@@ -34,7 +34,7 @@ ineffective until the finalized governance record reaches `main`.
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| WORK-001-E | WORK-001 | Active / Claimed (proposed; ineffective until PR #450 merges) | WORK-001-D/I239 Complete; P1/P2 contracts; DESKTOP-001 section 20.5 | Mission gate, UI-neutral projection and non-GPUI end-to-end evidence |
+| WORK-001-E | WORK-001 | Review / Claimed | WORK-001-D/I239 Complete; P1/P2 contracts; DESKTOP-001 section 20.5 | Mission gate, UI-neutral projection and non-GPUI end-to-end evidence |
 
 ### Non-Terminal Inventory And Disposition
 
@@ -90,11 +90,14 @@ ineffective until the finalized governance record reaches `main`.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-31 | Atomic claim+activation proposal | PR #450 proposes I240 Active/Claimed for the bounded P4 scope; both remain ineffective until merge, and no implementation authority exists before then. |
+| 2026-08-31 | Atomic claim+activation | PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; I240 is effective and implementation started from that merge. |
+| 2026-08-31 | Local end-to-end convergence | Added a storage-neutral fixture covering Completion Claim/report, revision staleness, rework, Mission gate denial, refreshed Goal/Mission PASS and serializable UI-neutral Delivery projection. Focused and full locked validation pass; stable implementation PR remains pending. |
 
 ## Verification Evidence
 
-- Pending activation and implementation.
+- Local candidate: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
+  `p4_non_persistent_fixture_covers_claim_staleness_gate_and_delivery_projection` test covers the
+  complete P4 sequence; stable implementation PR remains pending.
 
 ## Completion Evidence
 

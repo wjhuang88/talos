@@ -6,9 +6,9 @@
 | Type | Runtime / State / Projection Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Active / Claimed (proposed; ineffective until PR #450 merges) |
+| Status | Review / Claimed |
 | Source | GitHub Issue #29; DESKTOP-001 prerequisite chain section 20.5 |
-| Selected Iteration | I240 Active / Claimed (proposed; ineffective until PR #450 merges) |
+| Selected Iteration | I240 Review / Claimed |
 | Depends On | WORK-001-D / I239 Complete; WORK-001-C / I238; DESKTOP-001 direction; ADR-061 |
 
 ## Collaboration Claim
@@ -24,9 +24,9 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required; claim and activation are ineffective until merge |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable candidate push |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Establish effective claim and I240 activation before implementation; complete only with end-to-end evidence and independent review |
+| Handoff / Release Condition | Implementation candidate locally converged; push one stable PR, obtain exact-head CI and independent review before closeout |
 
 ## Identity / Goal / Value
 
@@ -87,11 +87,11 @@ this projection rather than inventing a second Mission or evaluation authority.
 
 ## Acceptance For Technical Work
 
-- [ ] Mission gate and Delivery eligibility are implemented against existing P1-P3 contracts.
-- [ ] Criterion/revision/staleness and fail-closed cases have focused tests.
-- [ ] Projection state/events have serialization and ordering tests and one documented adapter path.
-- [ ] A runnable non-GPUI end-to-end test or transcript covers the full P4 sequence.
-- [ ] Public/API documentation names the projection, compatibility and migration boundary.
+- [x] Mission gate and Delivery eligibility are implemented against existing P1-P3 contracts.
+- [x] Criterion/revision/staleness and fail-closed cases have focused tests.
+- [x] Projection state/events have serialization and ordering tests and one documented adapter path.
+- [x] A runnable non-GPUI end-to-end test or transcript covers the full P4 sequence.
+- [x] Public/API documentation names the projection, compatibility and migration boundary.
 - [ ] Locked focused/workspace validation, governance validators, `git diff --check`, exact-head CI
       and independent runtime/security review pass before Complete.
 
@@ -119,6 +119,16 @@ do not describe Desktop behavior as shipped.
 - `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`
 - `docs/backlog/active/VALIDATION-001-internal-validation-service.md`
 - `docs/decisions/061-canonical-work-domain-and-todo-migration.md`
+
+## Local Convergence Checkpoint (2026-08-31)
+
+The implementation candidate is locally converged. The changed-file inventory is limited to the
+canonical `talos-core` Mission gate and projection types/tests, the `talos-conversation` forwarding
+path/test, the existing `talos-tui` compatibility arm/test, and the shared evaluation API
+documentation. No persistence, Desktop, Dashboard, permission, release or dependency files were
+changed. Focused core/conversation/TUI tests, clippy and the locked workspace test suite passed.
+The stable candidate still requires one implementation PR, exact-head CI and independent
+runtime/security/API review.
 
 ## Residual Destination
 
