@@ -619,7 +619,22 @@ mod tests {
             revision: 1,
         };
 
-        // CompletionClaim::new plus an accepted report models WorkUnit completion and
+        let work_unit = WorkNode {
+            identity: WorkIdentity {
+                id: Uuid::new_v4(),
+                kind: WorkKind::WorkUnit,
+                revision: 1,
+            },
+            parent_id: Some(goal.id),
+            title: "fixture work unit".into(),
+            description: None,
+            status: WorkStatus::Completed,
+            priority: WorkPriority::Medium,
+            tags: vec![],
+        };
+        assert_eq!(work_unit.status, WorkStatus::Completed);
+
+        // CompletionClaim::new plus an accepted report models the completed WorkUnit's
         // independent evaluation without introducing a persistence dependency in P4.
         let mut goal_evaluation = passing_evaluation(mission, goal);
         let mut changed_subject = goal_evaluation.claim.subject;
