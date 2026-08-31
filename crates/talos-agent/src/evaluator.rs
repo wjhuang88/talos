@@ -345,15 +345,15 @@ fn validate_report_evidence(
         else {
             return Err("evaluator report references an unknown criterion".to_owned());
         };
-        if criterion.required && result.verdict == talos_core::evaluation::CriterionVerdict::Pass {
-            if result.evidence.is_empty()
+        if criterion.required
+            && result.verdict == talos_core::evaluation::CriterionVerdict::Pass
+            && (result.evidence.is_empty()
                 || result
                     .evidence
                     .iter()
-                    .any(|evidence| !valid_evidence.contains(&evidence.id))
-            {
-                return Err("required PASS criterion lacks valid supplied evidence".to_owned());
-            }
+                    .any(|evidence| !valid_evidence.contains(&evidence.id)))
+        {
+            return Err("required PASS criterion lacks valid supplied evidence".to_owned());
         }
     }
     Ok(())
