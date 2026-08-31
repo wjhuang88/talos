@@ -276,8 +276,7 @@ impl IndependentEvaluator {
                     && !evidence.evidence.kind.trim().is_empty()
                     && evidence.status != ValidationEvidenceStatus::Unavailable
             })
-            .map(|evidence| evidence.evidence.id)
-            .chain(claim.claimed_evidence.iter().map(|evidence| evidence.id))
+            .map(|evidence| evidence.evidence.clone())
             .collect();
         let assessment = self.assessor.assess(request, self.deadline);
         tokio::pin!(assessment);
@@ -335,7 +334,7 @@ impl IndependentEvaluator {
 fn validate_report_evidence(
     claim: &CompletionClaim,
     report: &EvaluationReport,
-    valid_evidence: &HashSet<uuid::Uuid>,
+    valid_evidence: &HashSet<EvidenceRef>,
 ) -> Result<(), String> {
     for result in &report.results {
         let Some(criterion) = claim
@@ -351,7 +350,7 @@ fn validate_report_evidence(
                 || result
                     .evidence
                     .iter()
-                    .any(|evidence| !valid_evidence.contains(&evidence.id)))
+                    .any(|evidence| !valid_evidence.contains(evidence)))
         {
             return Err("required PASS criterion lacks valid supplied evidence".to_owned());
         }
@@ -515,6 +514,66 @@ mod tests {
         assert!(
             matches!(evaluator.evaluate(&claim, Vec::new()).await, EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. }) if reason.contains("supplied evidence"))
         );
+    }
+
+    #[tokio::test]
+    async fn claimed_evidence_hint_cannot_authorize_required_pass() {
+        let mut claim = claim();
+        let evidence = EvidenceRef {
+            id: Uuid::new_v4(),
+            kind: "validation".into(),
+        };
+        claim.claimed_evidence.push(evidence.clone());
+        let result = CriterionEvaluation {
+            criterion_id: claim.criteria[0].id,
+            verdict: CriterionVerdict::Pass,
+            evidence: vec![evidence],
+            finding_ids: Vec::new(),
+        };
+        let report =
+            EvaluationReport::new(&claim, claim.subject, vec![result], Vec::new()).expect("report");
+        let evaluator = IndependentEvaluator::new(
+            Arc::new(Assessor(serde_json::to_string(&report).expect("json"))),
+            Duration::from_secs(1),
+        );
+        assert!(matches!(
+            evaluator.evaluate(&claim, Vec::new()).await,
+            EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
+                if reason.contains("supplied evidence")
+        ));
+    }
+
+    #[tokio::test]
+    async fn evidence_kind_mismatch_cannot_authorize_required_pass() {
+        let claim = claim();
+        let supplied = EvidenceRef {
+            id: Uuid::new_v4(),
+            kind: "validation".into(),
+        };
+        let reported = EvidenceRef {
+            id: supplied.id,
+            kind: "executor-claim".into(),
+        };
+        let result = CriterionEvaluation {
+            criterion_id: claim.criteria[0].id,
+            verdict: CriterionVerdict::Pass,
+            evidence: vec![reported],
+            finding_ids: Vec::new(),
+        };
+        let report =
+            EvaluationReport::new(&claim, claim.subject, vec![result], Vec::new()).expect("report");
+        let evaluator = IndependentEvaluator::new(
+            Arc::new(Assessor(serde_json::to_string(&report).expect("json"))),
+            Duration::from_secs(1),
+        );
+        let supplied =
+            ValidationEvidence::new(supplied, ValidationEvidenceStatus::Passed, "digest")
+                .expect("evidence");
+        assert!(matches!(
+            evaluator.evaluate(&claim, vec![supplied]).await,
+            EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
+                if reason.contains("supplied evidence")
+        ));
     }
 
     #[test]
