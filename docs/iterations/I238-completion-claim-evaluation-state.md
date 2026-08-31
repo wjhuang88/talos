@@ -1,6 +1,6 @@
 # Iteration I238: Completion Claim And Evaluation State Model
 
-> Document status: Review / Claimed — implementation candidate `f813dc9a` is locally converged; implementation PR #445 is under review
+> Document status: Complete / Closed — implementation PR #445 merged as `209931e5`
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-C/P2 as a shared, exact-revision Completion Claim and
 > Evaluation state contract without starting the evaluator runtime or Mission delivery gate.
@@ -21,7 +21,8 @@
 | Governance Claim PR | #444 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #444 exact head `821d8583ae27b55a5c45da55ecc9d0c5fa8cb110` passed CI `33341379928`, independent review comment `5472316362`, and merged to `main` as `7a6b5ed46170c744254b4283240ac263b57f87a9`. |
-| Implementation PR | #445 — stable candidate `f813dc9a` on `feat/work001-c-completion-evaluation` |
+| Implementation PR | #445 — final candidate `cc2fa218` merged as `209931e5` |
+| Completion Commit | `209931e5bf56589e3ebee178c70e89a40e0c4db1` |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim and activation are effective after PR #444 merge; implementation must remain within the recorded P2 slice and start from `main@7a6b5ed4` or later. |
 
@@ -58,13 +59,24 @@ unchanged; this checkpoint records only the activation fact.
 
 ## 2026-08-31 Local Convergence Checkpoint
 
-The bounded P2 implementation is locally converged at candidate commit `f813dc9a` (building on
-`b08358e6`).
+The bounded P2 implementation was locally converged at candidate commit `f813dc9a` (building on
+`b08358e6`) and finalized at `cc2fa218`.
 It adds only storage-neutral `talos_core::evaluation` contracts, canonical `talos_core::work`
 re-exports, and the shared API reference. Focused `talos-core` tests (70 passed), locked Clippy
 (`-D warnings`) and format checks pass. No evaluator runtime, persistence, Runtime/Session wiring,
 Mission gate, UI, permission or publication behavior was added. The owner is now `Review / Claimed`
-for stable-candidate review; PR #445 and its exact-head CI/review are in progress.
+for stable-candidate review; PR #445 completed the exact-head CI/review gate.
+
+## 2026-08-31 Implementation Closeout
+
+Implementation PR #445 exact head `cc2fa218def0c6f204573b448a5c1c3c231a97ae` passed exact-head
+CI `33346629666` (5/5) and independent architecture/API approval `5472633260`, then merged to
+`main` as `209931e5bf56589e3ebee178c70e89a40e0c4db1`. The implementation adds the storage-neutral
+Completion Claim/Evaluation contract, forged-report rejection at the acceptance boundary, tests,
+and the public API reference. No excluded runtime, persistence, UI, permission or publication
+behavior was added. This existing implementation merge is the Completion Commit for I238; the
+closeout status change is not used as its own evidence. P3/P4 remain blocked pending separately
+governed work.
 
 ### Scope
 
