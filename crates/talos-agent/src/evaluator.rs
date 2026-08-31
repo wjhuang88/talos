@@ -4,6 +4,7 @@
 //! conversation.  Its output is revalidated by the P2 state machine before it can become a
 //! verdict; provider failures and malformed output never become PASS.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -259,6 +260,25 @@ impl IndependentEvaluator {
     ) -> EvaluatorOutcome {
         let request = EvaluatorRequest::for_claim(claim, validation_evidence);
         let evaluator = self.assessor.identity().to_owned();
+        if request.validation_evidence.iter().any(|evidence| {
+            evidence.record_digest.trim().is_empty() || evidence.evidence.kind.trim().is_empty()
+        }) {
+            return EvaluatorOutcome::Failure(EvaluatorFailure {
+                evaluator,
+                reason: "validation evidence lacks provenance or integrity binding".to_owned(),
+            });
+        }
+        let valid_evidence: HashSet<_> = request
+            .validation_evidence
+            .iter()
+            .filter(|evidence| {
+                !evidence.record_digest.trim().is_empty()
+                    && !evidence.evidence.kind.trim().is_empty()
+                    && evidence.status != ValidationEvidenceStatus::Unavailable
+            })
+            .map(|evidence| evidence.evidence.id)
+            .chain(claim.claimed_evidence.iter().map(|evidence| evidence.id))
+            .collect();
         let assessment = self.assessor.assess(request, self.deadline);
         tokio::pin!(assessment);
         let raw = tokio::select! {
@@ -290,6 +310,9 @@ impl IndependentEvaluator {
                 });
             }
         };
+        if let Err(reason) = validate_report_evidence(claim, &report, &valid_evidence) {
+            return EvaluatorOutcome::Failure(EvaluatorFailure { evaluator, reason });
+        }
         let mut evaluation = claim.evaluation();
         if let Err(error) = evaluation.begin() {
             return EvaluatorOutcome::Failure(EvaluatorFailure {
@@ -307,6 +330,33 @@ impl IndependentEvaluator {
             evaluation: Box::new(evaluation),
         }
     }
+}
+
+fn validate_report_evidence(
+    claim: &CompletionClaim,
+    report: &EvaluationReport,
+    valid_evidence: &HashSet<uuid::Uuid>,
+) -> Result<(), String> {
+    for result in &report.results {
+        let Some(criterion) = claim
+            .criteria
+            .iter()
+            .find(|criterion| criterion.id == result.criterion_id)
+        else {
+            return Err("evaluator report references an unknown criterion".to_owned());
+        };
+        if criterion.required && result.verdict == talos_core::evaluation::CriterionVerdict::Pass {
+            if result.evidence.is_empty()
+                || result
+                    .evidence
+                    .iter()
+                    .any(|evidence| !valid_evidence.contains(&evidence.id))
+            {
+                return Err("required PASS criterion lacks valid supplied evidence".to_owned());
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -417,17 +467,24 @@ mod tests {
     #[tokio::test]
     async fn valid_report_is_revalidated_and_accepted() {
         let claim = claim();
+        let evidence = EvidenceRef {
+            id: Uuid::new_v4(),
+            kind: "validation".into(),
+        };
         let result = CriterionEvaluation {
             criterion_id: claim.criteria[0].id,
             verdict: CriterionVerdict::Pass,
-            evidence: Vec::new(),
+            evidence: vec![evidence.clone()],
             finding_ids: Vec::new(),
         };
         let report =
             EvaluationReport::new(&claim, claim.subject, vec![result], Vec::new()).expect("report");
         let raw = serde_json::to_string(&report).expect("json");
         let evaluator = IndependentEvaluator::new(Arc::new(Assessor(raw)), Duration::from_secs(1));
-        let outcome = evaluator.evaluate(&claim, Vec::new()).await;
+        let supplied =
+            ValidationEvidence::new(evidence, ValidationEvidenceStatus::Passed, "digest")
+                .expect("evidence");
+        let outcome = evaluator.evaluate(&claim, vec![supplied]).await;
         match outcome {
             EvaluatorOutcome::Report { evaluation } => assert_eq!(
                 evaluation.state,
@@ -435,6 +492,29 @@ mod tests {
             ),
             EvaluatorOutcome::Failure(error) => panic!("unexpected failure: {}", error.reason),
         }
+    }
+
+    #[tokio::test]
+    async fn pass_without_supplied_evidence_is_rejected() {
+        let claim = claim();
+        let result = CriterionEvaluation {
+            criterion_id: claim.criteria[0].id,
+            verdict: CriterionVerdict::Pass,
+            evidence: vec![EvidenceRef {
+                id: Uuid::new_v4(),
+                kind: "validation".into(),
+            }],
+            finding_ids: Vec::new(),
+        };
+        let report =
+            EvaluationReport::new(&claim, claim.subject, vec![result], Vec::new()).expect("report");
+        let evaluator = IndependentEvaluator::new(
+            Arc::new(Assessor(serde_json::to_string(&report).expect("json"))),
+            Duration::from_secs(1),
+        );
+        assert!(
+            matches!(evaluator.evaluate(&claim, Vec::new()).await, EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. }) if reason.contains("supplied evidence"))
+        );
     }
 
     #[test]
