@@ -21,7 +21,7 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required |
-| Implementation PR | #451 (`faac28b7`) |
+| Implementation PR | #451 (`b6e8c607`) |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim+activation must merge before implementation; owner-first closeout after implementation evidence |
 
@@ -91,11 +91,11 @@ ineffective until the finalized governance record reaches `main`.
 | Date | Type | Record |
 |---|---|---|
 | 2026-08-31 | Atomic claim+activation | PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; I240 is effective and implementation started from that merge. |
-| 2026-08-31 | Local end-to-end convergence | Added a storage-neutral fixture covering Completion Claim/report, revision staleness, rework, Mission gate denial, refreshed Goal/Mission PASS and serializable UI-neutral Delivery projection. Focused and full locked validation pass; stable implementation PR remains pending. |
+| 2026-08-31 | Local end-to-end convergence | Added a storage-neutral fixture covering Completion Claim/report, revision staleness, rework, Mission gate denial, refreshed Goal/Mission PASS and serializable UI-neutral Delivery projection. Focused and full locked validation pass; PR #451 remains under exact-head CI and independent review. |
 
 ## Verification Evidence
 
-- PR #451 candidate `faac28b7`: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
+- PR #451 candidate `b6e8c607`: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
   `p4_non_persistent_fixture_covers_claim_staleness_gate_and_delivery_projection` test covers the
   complete P4 sequence; exact-head CI and independent review remain pending.
 
