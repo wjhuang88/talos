@@ -1,6 +1,6 @@
 # Iteration I239: Independent Evaluator Runtime And Evidence Boundary
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-D/P3 as a separately enforced evaluator boundary that
 > consumes Validation evidence without granting evaluator, validator or executor self-certification.
@@ -20,7 +20,7 @@
 | Governance Claim PR | #447 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | WORK-001-C/I238 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447 |
-| Implementation PR | Not started |
+| Implementation PR | #448 (latest candidate includes evidence-boundary fix) |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim/activation is proposed by PR #447 and becomes effective only after merge; P4 remains separately governed. |
 
@@ -65,6 +65,20 @@ governance claim; implementation starts from the claim merge or a later `main` h
 - Focused evaluator, evidence and permission-boundary tests plus existing Work/Evaluation tests.
 - Locked workspace check, Clippy, tests, format, both governance validators and `git diff --check`.
 - Exact-head CI, independent runtime/security review and merge-time CAS after stable local convergence.
+
+## Local Convergence Checkpoint (2026-08-31)
+
+The P3 candidate adds `talos_agent::evaluator::IndependentEvaluator`, a tool-free provider assessor,
+read-only evaluator admission, provenance-bound Validation evidence snapshots, outer deadline and
+cancellation enforcement and P2 report revalidation. Focused evaluator tests cover malformed
+output, assessor deadline/cancellation, valid report acceptance, side-effecting tool rejection and missing evidence
+integrity. No persistence, Mission gate, UI, Desktop, Dashboard, permission expansion, release or
+publication behavior is included.
+
+The stable candidate changed-file inventory is six implementation/documentation files:
+`crates/talos-agent/src/evaluator.rs`, `crates/talos-agent/src/lib.rs`,
+`crates/talos-runtime/src/lib.rs`, `docs/reference/WORK-EVALUATION-API.md`, this iteration and its
+WORK-001-D owner. No Dashboard, Desktop or unrelated governance authority is included.
 
 ## Activation Rule
 

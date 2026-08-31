@@ -41,3 +41,23 @@ Only the evaluator-facing `accept_report` operation can create a verdict, and it
 after `begin`. Reports for another claim or revision, duplicate criteria/findings, unknown IDs, and
 malformed criteria are rejected. This is a state contract only; evaluator runtime, Mission final
 gate, Delivery, persistence, SDK wiring and Desktop/Dashboard UI belong to later WORK-001 slices.
+
+## Independent evaluator runtime (P3)
+
+`talos_agent::evaluator::IndependentEvaluator` is the P3 runtime boundary around the core state
+machine. It builds a fresh, bounded `EvaluatorRequest` from the immutable claim snapshot and
+provenance-preserving Validation evidence references. Executor conversation/reasoning is not
+authoritative input, and evaluator tools are admitted as `Read` or `Internal` only by default;
+write, execute and network natures are rejected.
+
+An `EvaluatorAssessor` returns one JSON `EvaluationReport`. The report is parsed and revalidated by
+`EvaluationReport::new` and `Evaluation::accept_report`, including exact claim subject, criterion
+coverage and derived aggregate verdict. Provider/tool use, malformed output, stale subjects,
+unavailable evidence, cancellation and deadline expiry produce an explicit non-PASS failure and
+never complete a Goal. `evaluate_with_cancellation` accepts a caller-owned cancellation token; the
+outer runtime deadline also bounds assessors that ignore their supplied deadline.
+
+Validation records remain evidence producers. They must carry a stable producer identity and an
+integrity digest before entering the evaluator request; their status cannot directly issue a Goal
+verdict. Mission final evaluation, Delivery gating and UI-neutral projection remain the separately
+governed WORK-001-E/P4 boundary.
