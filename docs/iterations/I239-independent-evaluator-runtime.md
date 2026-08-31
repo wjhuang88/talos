@@ -1,6 +1,6 @@
 # Iteration I239: Independent Evaluator Runtime And Evidence Boundary
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-D/P3 as a separately enforced evaluator boundary that
 > consumes Validation evidence without granting evaluator, validator or executor self-certification.
@@ -20,9 +20,9 @@
 | Governance Claim PR | #447 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | WORK-001-C/I238 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447 |
-| Implementation PR | #448 (latest candidate includes evidence-boundary fix) |
+| Implementation PR | #448, merged as `ac4ce436aca8681dbc2ea4e75560e2be999af242` |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim/activation is proposed by PR #447 and becomes effective only after merge; P4 remains separately governed. |
+| Handoff / Release Condition | Complete; P4 remains separately governed and requires its own owner, iteration and claim. |
 
 ## Published Baseline
 
@@ -91,3 +91,20 @@ claim merge or a later `main` head.
 Implementation must merge before owner-first closeout. The closeout must cite an already-existing
 implementation merge SHA as `Completion Commit`; a status-only commit cannot self-certify completion.
 P4 remains blocked until this closeout reaches `main`.
+
+## 2026-08-31 Completion Checkpoint
+
+I239 / WORK-001-D is Complete / Closed after implementation PR #448 merged to `main` as
+`ac4ce436aca8681dbc2ea4e75560e2be999af242`. The implementation source head
+`2ff8b9f4507537b41c912661745708e942d19d62` is an existing ancestor of that merge and is the
+Completion Commit evidence; this status closeout is not used as its own evidence. Exact-head CI
+`33359367715` passed all five jobs on the implementation head, and the independent Agent-role
+runtime/security review recommendation was recorded at review `5063376615` (shared GitHub account
+cannot represent natural-person identity separation). The final six-file inventory remained within
+I239: evaluator runtime/API implementation and its owner/reference documentation only; no
+Dashboard, Desktop, persistence, permission-policy, release or publication changes were included.
+
+Completion Commit: `2ff8b9f4507537b41c912661745708e942d19d62`
+
+P4 / WORK-001-E remains separately blocked until its own requirement intake, owner, runnable
+iteration and effective claim are established.
