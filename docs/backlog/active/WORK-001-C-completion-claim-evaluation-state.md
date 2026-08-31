@@ -8,7 +8,7 @@
 | Priority | P0 |
 | Status | Complete / Closed — Completion Commit `209931e5`; implementation PR #445 merged |
 | Source | GitHub Issue #29; WORK-001 P2; Desktop prerequisite chain section 20.2 |
-| Selected Iteration | I238 Active / Claimed |
+| Selected Iteration | I238 Complete / Closed |
 | Depends On | WORK-001-B / I237 Complete; ADR-061 boundary; canonical `talos_core::work` domain |
 
 ## Collaboration Claim
@@ -27,7 +27,7 @@
 | Implementation PR | #445 — final head `cc2fa218`, merged as `209931e5` |
 | Completion Commit | `209931e5bf56589e3ebee178c70e89a40e0c4db1` |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim is effective after PR #444 merge; implementation must start from `main@7a6b5ed4` or later and remain within this P2 scope. |
+| Handoff / Release Condition | I238 is Complete / Closed after implementation PR #445 merged as `209931e5`; P3 remains separately governed and blocked until its own claim and implementation evidence. |
 
 ## Identity / Goal / Value
 
