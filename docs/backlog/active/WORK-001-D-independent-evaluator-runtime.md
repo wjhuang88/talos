@@ -24,7 +24,7 @@
 | Governance Claim PR | #447 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | I238/P2 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447. |
-| Implementation PR | #448 (head `3bb9c9e0`) |
+| Implementation PR | #448 (latest candidate head `efe6870f`) |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim PR #447 must merge before implementation. Completion requires exact-head CI, independent runtime/security review, acceptance evidence and owner-first closeout. |
 
