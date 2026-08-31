@@ -69,9 +69,9 @@ governance claim; implementation starts from the claim merge or a later `main` h
 ## Local Convergence Checkpoint (2026-08-31)
 
 The P3 candidate adds `talos_agent::evaluator::IndependentEvaluator`, a tool-free provider assessor,
-read-only evaluator admission, provenance-bound Validation evidence snapshots, outer deadline
-enforcement and P2 report revalidation. Focused evaluator tests cover malformed output, assessor
-deadline violations, valid report acceptance, side-effecting tool rejection and missing evidence
+read-only evaluator admission, provenance-bound Validation evidence snapshots, outer deadline and
+cancellation enforcement and P2 report revalidation. Focused evaluator tests cover malformed
+output, assessor deadline/cancellation, valid report acceptance, side-effecting tool rejection and missing evidence
 integrity. No persistence, Mission gate, UI, Desktop, Dashboard, permission expansion, release or
 publication behavior is included.
 

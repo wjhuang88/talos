@@ -17,6 +17,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::LanguageModel;
 use talos_core::tool::ToolNature;
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 
 /// Validation status recorded in a bounded evidence snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -245,12 +246,29 @@ impl IndependentEvaluator {
         claim: &CompletionClaim,
         validation_evidence: Vec<ValidationEvidence>,
     ) -> EvaluatorOutcome {
+        self.evaluate_with_cancellation(claim, validation_evidence, CancellationToken::new())
+            .await
+    }
+
+    /// Evaluate with caller-owned cancellation. Cancellation is always an explicit non-PASS.
+    pub async fn evaluate_with_cancellation(
+        &self,
+        claim: &CompletionClaim,
+        validation_evidence: Vec<ValidationEvidence>,
+        cancellation: CancellationToken,
+    ) -> EvaluatorOutcome {
         let request = EvaluatorRequest::for_claim(claim, validation_evidence);
         let evaluator = self.assessor.identity().to_owned();
-        let raw =
-            match tokio::time::timeout(self.deadline, self.assessor.assess(request, self.deadline))
-                .await
-            {
+        let assessment = self.assessor.assess(request, self.deadline);
+        tokio::pin!(assessment);
+        let raw = tokio::select! {
+            _ = cancellation.cancelled() => {
+                return EvaluatorOutcome::Failure(EvaluatorFailure {
+                    evaluator,
+                    reason: "evaluator cancelled".to_owned(),
+                });
+            }
+            result = tokio::time::timeout(self.deadline, &mut assessment) => match result {
                 Ok(Ok(raw)) => raw,
                 Ok(Err(reason)) => {
                     return EvaluatorOutcome::Failure(EvaluatorFailure { evaluator, reason });
@@ -261,7 +279,8 @@ impl IndependentEvaluator {
                         reason: "evaluator deadline exceeded".to_owned(),
                     });
                 }
-            };
+            }
+        };
         let report: EvaluationReport = match serde_json::from_str(&raw) {
             Ok(report) => report,
             Err(error) => {
@@ -378,6 +397,20 @@ mod tests {
         let outcome = evaluator.evaluate(&claim(), Vec::new()).await;
         assert!(
             matches!(outcome, EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. }) if reason.contains("deadline"))
+        );
+    }
+
+    #[tokio::test]
+    async fn cancellation_is_explicit_failure() {
+        let evaluator =
+            IndependentEvaluator::new(Arc::new(HangingAssessor), Duration::from_secs(1));
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let outcome = evaluator
+            .evaluate_with_cancellation(&claim(), Vec::new(), cancellation)
+            .await;
+        assert!(
+            matches!(outcome, EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. }) if reason.contains("cancelled"))
         );
     }
 

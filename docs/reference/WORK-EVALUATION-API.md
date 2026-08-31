@@ -54,8 +54,8 @@ An `EvaluatorAssessor` returns one JSON `EvaluationReport`. The report is parsed
 `EvaluationReport::new` and `Evaluation::accept_report`, including exact claim subject, criterion
 coverage and derived aggregate verdict. Provider/tool use, malformed output, stale subjects,
 unavailable evidence, cancellation and deadline expiry produce an explicit non-PASS failure and
-never complete a Goal. The outer runtime deadline also bounds assessors that ignore their supplied
-deadline.
+never complete a Goal. `evaluate_with_cancellation` accepts a caller-owned cancellation token; the
+outer runtime deadline also bounds assessors that ignore their supplied deadline.
 
 Validation records remain evidence producers. They must carry a stable producer identity and an
 integrity digest before entering the evaluator request; their status cannot directly issue a Goal
