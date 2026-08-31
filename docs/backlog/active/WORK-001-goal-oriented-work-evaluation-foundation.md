@@ -43,7 +43,7 @@ mainline work. It does not authorize any child merely because the overall direct
 | WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Complete / Closed | Current repository and dependency inventory | I196 Complete / Closed |
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
 | WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Complete / Closed; Completion Commit `209931e5`, PR #445 merged | WORK-001-B Complete | I238 Complete / Closed |
-| WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Ready / Unclaimed; I239 planned | WORK-001-C Complete | I239 Planned / Unclaimed |
+| WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Active / Claimed; I239 proposed by #447, ineffective until merge | WORK-001-C Complete | I239 Active / Claimed (proposed) |
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
 
 Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (WORK-001-A P0 decision packet; the
@@ -56,8 +56,8 @@ must not pre-authorize or implement them.
 ## 2026-08-31 P3 Requirement Intake Checkpoint
 
 WORK-001-C/I238 is Complete / Closed on `main` at Completion Commit `209931e5`. WORK-001-D/P3 now
-has its own bounded owner and runnable I239 plan. I239 is Planned / Unclaimed and has no
-implementation authority until a separate Collaboration Claim becomes effective on `main`.
+has its own bounded owner and runnable I239 plan. I239's Active / Claimed state is proposed by
+governance PR #447 and has no implementation authority until that claim becomes effective on `main`.
 Its scope is limited to fresh evaluator context, read-only admission, Validation-001 evidence
 consumption and explicit fail-closed outcomes. Mission final gating, UI-neutral projection and
 end-to-end Delivery remain WORK-001-E/P4 and blocked.

@@ -1,6 +1,6 @@
 # Iteration I239: Independent Evaluator Runtime And Evidence Boundary
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-D/P3 as a separately enforced evaluator boundary that
 > consumes Validation evidence without granting evaluator, validator or executor self-certification.
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | WORK-001-D / I239 P3 only; implementation is unauthorized until a finalized claim merges |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline WORK-001 session |
+| Work Slice | WORK-001-D / I239 P3 only: fresh evaluator context, read-only admission, Validation-001 evidence consumption, exact-revision binding and explicit fail-closed outcomes. |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | WORK-001-C/I238 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract |
+| Governance Claim PR | #447 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | WORK-001-C/I238 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447 |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim/activation must merge before implementation; P4 remains separately governed. |
+| Handoff / Release Condition | Claim/activation is proposed by PR #447 and becomes effective only after merge; P4 remains separately governed. |
 
 ## Published Baseline
 
@@ -30,20 +30,20 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| WORK-001-D | WORK-001 | Ready / Unclaimed | WORK-001-C/I238 Complete; ADR-061; VALIDATION-001 | Independent evaluator runtime boundary with safe evidence consumption and no self-certification. |
+| WORK-001-D | WORK-001 | Active / Claimed (proposed; ineffective until PR #447 merges) | WORK-001-C/I238 Complete; ADR-061; VALIDATION-001 | Independent evaluator runtime boundary with safe evidence consumption and no self-certification. |
 
 ### Non-Terminal Inventory And Disposition
 
 | State | Iterations / owners | Disposition |
 |---|---|---|
-| Active | I225 / TOOL-024-D1-A remains separately governed | Preserve its decision-only scope; no overlap with WORK-001-D. |
+| Active | None on current `main@76c9b7fd` | I239 activation is proposed only by this claim; no existing active implementation is displaced. |
 | Review | None on current main | No review work is bypassed. |
-| Planned | I207, I208 and other unclaimed steering children | Preserve; do not activate or transfer their scope. |
-| Blocked | WORK-001-E/P4; unrelated blocked owners | Keep blocked pending I239 completion and its own claim. |
+| Planned / Unclaimed | I207, I208 | Preserve unclaimed steering children; do not activate or transfer their scope. |
+| Blocked | WORK-001-E/P4 and unrelated blocked owners | Keep blocked pending I239 completion and its own claim. |
 | Paused | I164 | Superseded startup target; do not restore. |
 
-Open archival Draft recovery PRs #120/#121 remain excluded. No implementation branch or claim is
-created by this planned iteration.
+Open archival Draft recovery PRs #120/#121 remain excluded. This branch contains only the proposed
+governance claim; implementation starts from the claim merge or a later `main` head.
 
 ## Scope
 
@@ -68,9 +68,9 @@ created by this planned iteration.
 
 ## Activation Rule
 
-This proposal is Planned/Unclaimed. It grants no implementation authority. A governance claim must
-first establish the responsible actor, exact Work Slice, authorization evidence and activation on
-the target branch. Implementation starts from that claim merge or a later `main` head.
+This claim proposes Active/Claimed atomically in PR #447. Both remain ineffective until that record
+reaches `main`; no implementation authority exists before the merge. Implementation starts from the
+claim merge or a later `main` head.
 
 ## Completion Rule
 

@@ -6,27 +6,27 @@
 | Type | Runtime / Evaluation Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Ready / Unclaimed |
+| Status | Active / Claimed |
 | Source | GitHub Issue #29; WORK-001 P3; Desktop prerequisite chain section 20.4 |
-| Selected Iteration | I239 (Planned / Unclaimed) |
+| Selected Iteration | I239 Active / Claimed |
 | Depends On | WORK-001-C / I238 Complete; ADR-061; VALIDATION-001 evidence contract |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned until a separate I239 claim becomes effective |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline WORK-001 session |
+| Work Slice | WORK-001-D / I239 P3 only: fresh evaluator context, read-only admission, Validation-001 evidence consumption, exact-revision binding and explicit fail-closed outcomes. No Mission gate, UI, Desktop, Dashboard, permission expansion, release or publication. |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #447 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | I238/P2 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447. |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | A separate I239 claim must merge before implementation. Completion requires exact-head CI, independent runtime/security review, acceptance evidence and owner-first closeout. |
+| Handoff / Release Condition | Claim PR #447 must merge before implementation. Completion requires exact-head CI, independent runtime/security review, acceptance evidence and owner-first closeout. |
 
 ## Identity / Goal / Value
 
