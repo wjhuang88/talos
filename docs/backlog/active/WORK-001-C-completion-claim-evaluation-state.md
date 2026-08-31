@@ -25,6 +25,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #444 exact head `821d8583ae27b55a5c45da55ecc9d0c5fa8cb110` passed CI `33341379928`, independent review `5472316362`, and merged to `main` as `7a6b5ed46170c744254b4283240ac263b57f87a9`. |
 | Implementation PR | #445 — final head `cc2fa218`, merged as `209931e5` |
+| Completion Commit | `209931e5bf56589e3ebee178c70e89a40e0c4db1` |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim is effective after PR #444 merge; implementation must start from `main@7a6b5ed4` or later and remain within this P2 scope. |
 
