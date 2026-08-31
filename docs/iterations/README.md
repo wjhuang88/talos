@@ -104,6 +104,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I236 | PERM-007-D Cross-Surface Conformance | Complete / Closed | Completion Commit `5cb6ddc5b6e025ca9f116401f85aeb9a90cc8bba`; PR #438 merged after exact-head CI `33291156177` and independent approval `5466806184`. |
 | I237 | Canonical Work Domain And Todo Compatibility | Complete / Closed | Completion Commit `f2b0b5c7`; final head `319a1f15`, CI `33323509558` attempt 2 and independent review `5470154364`. P2 remains separately governed. |
 | I238 | Completion Claim And Evaluation State Model | Complete / Closed | Completion Commit `209931e5`; PR #445 final head `cc2fa218`, CI `33346629666`, independent approval `5472633260`; P3-P4 remain blocked. |
+| I239 | Independent Evaluator Runtime And Evidence Boundary | Planned / Unclaimed | WORK-001-D / Issue #29; no implementation authority until a separate claim merges; P4 remains blocked. |
 | I235 | PERM-007-C Atomic Create Capability Decision | Complete / Closed | Completion Commit `71acbe0c`; PR #432 accepted the decision-only directory-capability contract. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 
