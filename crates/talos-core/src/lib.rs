@@ -13,3 +13,9 @@ pub mod tool_filter;
 pub mod work;
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};
+pub use evaluation::{
+    AcceptanceCriterion, ArtifactRef, CompletionClaim, CriterionEvaluation, CriterionKind,
+    CriterionVerdict, Evaluation, EvaluationError, EvaluationFinding, EvaluationReport,
+    EvaluationState, EvaluationSubject, EvaluationVerdict, EvidenceRef, FindingSeverity,
+    WorkspaceRevision,
+};
