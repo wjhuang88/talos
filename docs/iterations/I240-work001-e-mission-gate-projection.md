@@ -21,7 +21,7 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; exact-head implementation CI and independent review required |
-| Implementation PR | #451 (`bebe3a4cbc7946efe33dc1caacbdb2a93d3b235a`); CI `33368584442` passed |
+| Implementation PR | #451 (`cf5ad36b324708b1124fed7d21af94d081e9c982`); CI `33370748281` passed |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim+activation must merge before implementation; owner-first closeout after implementation evidence |
 
@@ -95,7 +95,7 @@ ineffective until the finalized governance record reaches `main`.
 
 ## Verification Evidence
 
-- PR #451 exact head `bebe3a4cbc7946efe33dc1caacbdb2a93d3b235a`: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
+- PR #451 exact head `cf5ad36b324708b1124fed7d21af94d081e9c982`: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
   `p4_non_persistent_fixture_covers_claim_staleness_gate_and_delivery_projection` test covers the
   complete P4 sequence; exact-head CI and independent review remain pending.
 
