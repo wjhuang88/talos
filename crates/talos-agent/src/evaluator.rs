@@ -4,7 +4,7 @@
 //! conversation.  Its output is revalidated by the P2 state machine before it can become a
 //! verdict; provider failures and malformed output never become PASS.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -260,13 +260,24 @@ impl IndependentEvaluator {
     ) -> EvaluatorOutcome {
         let request = EvaluatorRequest::for_claim(claim, validation_evidence);
         let evaluator = self.assessor.identity().to_owned();
-        if request.validation_evidence.iter().any(|evidence| {
-            evidence.record_digest.trim().is_empty() || evidence.evidence.kind.trim().is_empty()
-        }) {
-            return EvaluatorOutcome::Failure(EvaluatorFailure {
-                evaluator,
-                reason: "validation evidence lacks provenance or integrity binding".to_owned(),
-            });
+        let mut supplied_records = HashMap::new();
+        for evidence in &request.validation_evidence {
+            if evidence.record_digest.trim().is_empty() || evidence.evidence.kind.trim().is_empty()
+            {
+                return EvaluatorOutcome::Failure(EvaluatorFailure {
+                    evaluator,
+                    reason: "validation evidence lacks provenance or integrity binding".to_owned(),
+                });
+            }
+            let record = (evidence.status, evidence.record_digest.as_str());
+            if let Some(previous) = supplied_records.insert(evidence.evidence.clone(), record)
+                && previous != record
+            {
+                return EvaluatorOutcome::Failure(EvaluatorFailure {
+                    evaluator,
+                    reason: "validation evidence has conflicting records".to_owned(),
+                });
+            }
         }
         let valid_evidence: HashSet<_> = request
             .validation_evidence
@@ -274,7 +285,7 @@ impl IndependentEvaluator {
             .filter(|evidence| {
                 !evidence.record_digest.trim().is_empty()
                     && !evidence.evidence.kind.trim().is_empty()
-                    && evidence.status != ValidationEvidenceStatus::Unavailable
+                    && evidence.status == ValidationEvidenceStatus::Passed
             })
             .map(|evidence| evidence.evidence.clone())
             .collect();
@@ -568,6 +579,35 @@ mod tests {
         );
         let supplied =
             ValidationEvidence::new(supplied, ValidationEvidenceStatus::Passed, "digest")
+                .expect("evidence");
+        assert!(matches!(
+            evaluator.evaluate(&claim, vec![supplied]).await,
+            EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
+                if reason.contains("supplied evidence")
+        ));
+    }
+
+    #[tokio::test]
+    async fn failed_evidence_cannot_authorize_required_pass() {
+        let claim = claim();
+        let evidence = EvidenceRef {
+            id: Uuid::new_v4(),
+            kind: "validation".into(),
+        };
+        let result = CriterionEvaluation {
+            criterion_id: claim.criteria[0].id,
+            verdict: CriterionVerdict::Pass,
+            evidence: vec![evidence.clone()],
+            finding_ids: Vec::new(),
+        };
+        let report =
+            EvaluationReport::new(&claim, claim.subject, vec![result], Vec::new()).expect("report");
+        let evaluator = IndependentEvaluator::new(
+            Arc::new(Assessor(serde_json::to_string(&report).expect("json"))),
+            Duration::from_secs(1),
+        );
+        let supplied =
+            ValidationEvidence::new(evidence, ValidationEvidenceStatus::Failed, "digest")
                 .expect("evidence");
         assert!(matches!(
             evaluator.evaluate(&claim, vec![supplied]).await,
