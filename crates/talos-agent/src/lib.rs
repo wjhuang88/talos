@@ -54,6 +54,7 @@ pub mod auto_resolver;
 pub mod caching;
 mod configuration;
 pub mod context;
+pub mod evaluator;
 mod helpers;
 pub mod permission_pipeline;
 pub mod prompt;

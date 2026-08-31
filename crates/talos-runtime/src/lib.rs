@@ -83,6 +83,11 @@ impl RuntimeFinalizer for BackgroundJobsRuntimeFinalizer {
 #[doc(hidden)]
 pub mod composition;
 
+pub use talos_agent::evaluator::{
+    EvaluatorAdmission, EvaluatorAssessor, EvaluatorError, EvaluatorFailure, EvaluatorOutcome,
+    EvaluatorRequest, IndependentEvaluator, ProviderEvaluatorAssessor, ValidationEvidence,
+    ValidationEvidenceStatus,
+};
 pub use talos_agent::{SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy};
 pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 pub use talos_core::provider::{ProviderError, ToolDefinition};
