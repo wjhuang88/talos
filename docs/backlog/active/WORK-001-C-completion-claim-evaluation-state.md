@@ -6,7 +6,7 @@
 | Type | API / State Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Review / Claimed — stable implementation candidate `b08358e6`; implementation PR not yet opened |
+| Status | Review / Claimed — stable implementation candidate `f813dc9a`; implementation PR #445 under review |
 | Source | GitHub Issue #29; WORK-001 P2; Desktop prerequisite chain section 20.2 |
 | Selected Iteration | I238 Active / Claimed |
 | Depends On | WORK-001-B / I237 Complete; ADR-061 boundary; canonical `talos_core::work` domain |
@@ -24,7 +24,7 @@
 | Governance Claim PR | #444 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #444 exact head `821d8583ae27b55a5c45da55ecc9d0c5fa8cb110` passed CI `33341379928`, independent review `5472316362`, and merged to `main` as `7a6b5ed46170c744254b4283240ac263b57f87a9`. |
-| Implementation PR | Not started — stable local candidate `b08358e6` on `feat/work001-c-completion-evaluation` |
+| Implementation PR | #445 — stable candidate `f813dc9a` on `feat/work001-c-completion-evaluation` |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim is effective after PR #444 merge; implementation must start from `main@7a6b5ed4` or later and remain within this P2 scope. |
 
