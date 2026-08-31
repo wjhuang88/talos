@@ -1,6 +1,6 @@
 # Iteration I238: Completion Claim And Evaluation State Model
 
-> Document status: Active / Claimed — proposed claim and activation are ineffective until PR #444 merges
+> Document status: Review / Claimed — implementation candidate `b08358e6` is locally converged; implementation PR not yet opened
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-C/P2 as a shared, exact-revision Completion Claim and
 > Evaluation state contract without starting the evaluator runtime or Mission delivery gate.
@@ -20,10 +20,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #444 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance CI and independent architecture/API review for PR #444. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #444 exact head `821d8583ae27b55a5c45da55ecc9d0c5fa8cb110` passed CI `33341379928`, independent review comment `5472316362`, and merged to `main` as `7a6b5ed46170c744254b4283240ac263b57f87a9`. |
+| Implementation PR | Not started — stable local candidate `b08358e6` on `feat/work001-c-completion-evaluation` |
 | Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Proposed Active/Claimed state, claim and activation are ineffective until finalized PR #444 reaches `main`; implementation starts from that merge or later current `main`. |
+| Handoff / Release Condition | Claim and activation are effective after PR #444 merge; implementation must remain within the recorded P2 slice and start from `main@7a6b5ed4` or later. |
 
 ## Published Baseline
 
@@ -46,6 +46,24 @@
 Open PRs #120/#121 remain archival Draft recovery snapshots and are excluded from current work.
 There is no other open main-base claim or implementation PR. I238 is the next unused iteration ID
 after I237; no in-flight proposal reserves it.
+
+## 2026-08-31 Activation Checkpoint
+
+PR #444 merged to `main` as `7a6b5ed46170c744254b4283240ac263b57f87a9` after exact-head CI
+`33341379928` and independent Agent-role architecture/API review `5472316362`. The claim is
+effective and implementation may start from this merge or a later `main` head. The reviewer
+disclosed the shared GitHub account limitation: Agent-role separation is recorded, but no
+distinct natural-person identity separation is claimed. The prior Published Baseline remains
+unchanged; this checkpoint records only the activation fact.
+
+## 2026-08-31 Local Convergence Checkpoint
+
+The bounded P2 implementation is locally converged at pre-existing commit `b08358e6`.
+It adds only storage-neutral `talos_core::evaluation` contracts, canonical `talos_core::work`
+re-exports, and the shared API reference. Focused `talos-core` tests (70 passed), locked Clippy
+(`-D warnings`) and format checks pass. No evaluator runtime, persistence, Runtime/Session wiring,
+Mission gate, UI, permission or publication behavior was added. The owner is now `Review / Claimed`
+for stable-candidate review; an implementation PR and exact-head CI are still pending.
 
 ### Scope
 
@@ -97,7 +115,8 @@ after I237; no in-flight proposal reserves it.
 
 ### Documentation Targets
 
-- Add or update one shared Work/Evaluation API reference.
+- Add or update the shared Work/Evaluation API reference at
+  `docs/reference/WORK-EVALUATION-API.md`.
 - Keep P1 Todo compatibility documentation accurate.
 - Do not describe evaluator runtime, Mission Delivery or Desktop binding as shipped.
 
