@@ -39,6 +39,8 @@ pub enum DeliveryBlockReason {
     StaleGoalEvaluation,
     /// A required Goal evaluation is not a passing verdict.
     GoalNotPassed,
+    /// More than one result was supplied for the same required Goal.
+    ConflictingGoalEvaluations,
     /// The independent Mission evaluation is absent.
     MissingMissionEvaluation,
     /// The Mission evaluation targets another identity or revision.
@@ -100,15 +102,19 @@ impl MissionGate<'_> {
         let mut events = Vec::with_capacity(self.required_goals.len() + 2);
         let mut blocked = None;
         for goal in self.required_goals {
-            let evaluation = self.goal_evaluations.iter().find(|evaluation| {
-                evaluation.claim.subject.goal.id == goal.id
-                    && evaluation.claim.subject.goal.kind == goal.kind
-            });
-            match evaluation {
-                None => {
+            let evaluations: Vec<&Evaluation> = self
+                .goal_evaluations
+                .iter()
+                .filter(|evaluation| {
+                    evaluation.claim.subject.goal.id == goal.id
+                        && evaluation.claim.subject.goal.kind == goal.kind
+                })
+                .collect();
+            match evaluations.as_slice() {
+                [] => {
                     blocked.get_or_insert(DeliveryBlockReason::MissingGoalEvaluation);
                 }
-                Some(evaluation) => {
+                [evaluation] => {
                     events.push(WorkProjectionEvent::GoalObserved {
                         goal_id: goal.id,
                         revision: goal.revision,
@@ -121,6 +127,9 @@ impl MissionGate<'_> {
                     {
                         blocked.get_or_insert(DeliveryBlockReason::GoalNotPassed);
                     }
+                }
+                _ => {
+                    blocked.get_or_insert(DeliveryBlockReason::ConflictingGoalEvaluations);
                 }
             };
         }
@@ -654,5 +663,37 @@ mod tests {
         assert_eq!(eligible.delivery, DeliveryEligibility::Eligible);
         assert_eq!(eligible.events.len(), 3);
         assert!(serde_json::to_value(&eligible).is_ok());
+    }
+
+    #[test]
+    fn mission_gate_rejects_duplicate_goal_evaluations() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let first = passing_evaluation(mission, goal);
+        let second = passing_evaluation(mission, goal);
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[first, second],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::ConflictingGoalEvaluations
+            }
+        );
     }
 }
