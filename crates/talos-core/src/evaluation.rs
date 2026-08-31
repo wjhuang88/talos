@@ -326,6 +326,20 @@ impl Evaluation {
         if self.state != EvaluationState::Evaluating || report.claim_id != self.claim.id {
             return Err(EvaluationError::IllegalTransition);
         }
+        // Reports are public and deserializable, so revalidate the complete payload at the
+        // authority boundary instead of trusting a caller-provided aggregate verdict.
+        if !self.claim.subject.matches(&report.subject) {
+            return Err(EvaluationError::SubjectMismatch);
+        }
+        let validated = EvaluationReport::new(
+            &self.claim,
+            report.subject,
+            report.results.clone(),
+            report.findings.clone(),
+        )?;
+        if validated.verdict != report.verdict {
+            return Err(EvaluationError::VerdictMismatch);
+        }
         self.state = EvaluationState::Verdict(report.verdict);
         self.report = Some(report);
         Ok(())
@@ -382,6 +396,9 @@ pub enum EvaluationError {
     /// An operation is not legal from the current lifecycle state.
     #[error("illegal evaluation state transition")]
     IllegalTransition,
+    /// A report's caller-provided aggregate verdict disagrees with its criterion results.
+    #[error("evaluation verdict contradicts criterion results")]
+    VerdictMismatch,
 }
 
 fn validate_criteria(criteria: &[AcceptanceCriterion]) -> Result<(), EvaluationError> {
@@ -556,5 +573,54 @@ mod tests {
             ),
             Err(EvaluationError::CriterionMismatch)
         );
+    }
+
+    #[test]
+    fn accepting_a_forged_report_revalidates_subject_and_verdict() {
+        let c = criterion(true);
+        let claim = CompletionClaim::new(subject(), vec![c.clone()], vec![], vec![], "done")
+            .expect("valid test claim");
+        let mut evaluation = claim.evaluation();
+        evaluation
+            .begin()
+            .expect("pending claim can begin evaluation");
+        let valid = EvaluationReport::new(
+            &claim,
+            claim.subject,
+            vec![result(c.id, CriterionVerdict::Pass)],
+            vec![],
+        )
+        .expect("valid test report");
+        let forged = EvaluationReport {
+            subject: {
+                let mut subject = claim.subject;
+                subject.goal.revision += 1;
+                subject
+            },
+            verdict: EvaluationVerdict::Fail,
+            ..valid
+        };
+        assert_eq!(
+            evaluation.accept_report(forged),
+            Err(EvaluationError::SubjectMismatch)
+        );
+        assert_eq!(evaluation.state, EvaluationState::Evaluating);
+
+        let valid = EvaluationReport::new(
+            &claim,
+            claim.subject,
+            vec![result(c.id, CriterionVerdict::Pass)],
+            vec![],
+        )
+        .expect("valid test report");
+        let forged = EvaluationReport {
+            verdict: EvaluationVerdict::Fail,
+            ..valid
+        };
+        assert_eq!(
+            evaluation.accept_report(forged),
+            Err(EvaluationError::VerdictMismatch)
+        );
+        assert_eq!(evaluation.state, EvaluationState::Evaluating);
     }
 }
