@@ -24,7 +24,7 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required; claim and activation are ineffective until merge |
-| Implementation PR | #451 (latest candidate `bf19b1cc`) |
+| Implementation PR | #451 (latest candidate `faac28b7`) |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Implementation candidate locally converged; push one stable PR, obtain exact-head CI and independent review before closeout |
 
@@ -122,7 +122,7 @@ do not describe Desktop behavior as shipped.
 
 ## Local Convergence Checkpoint (2026-08-31)
 
-The implementation candidate is locally converged and submitted as PR #451 at `bf19b1cc`. The changed-file inventory is limited to the
+The implementation candidate is locally converged and submitted as PR #451 at `faac28b7`. The changed-file inventory is limited to the
 canonical `talos-core` Mission gate and projection types/tests, the `talos-conversation` forwarding
 path/test, the existing `talos-tui` compatibility arm/test, and the shared evaluation API
 documentation. No persistence, Desktop, Dashboard, permission, release or dependency files were
