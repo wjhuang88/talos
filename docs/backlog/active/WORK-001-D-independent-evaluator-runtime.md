@@ -8,7 +8,7 @@
 | Priority | P0 |
 | Status | Complete / Closed |
 | Source | GitHub Issue #29; WORK-001 P3; Desktop prerequisite chain section 20.4 |
-| Selected Iteration | I239 Active / Claimed |
+| Selected Iteration | I239 Complete / Closed |
 | Depends On | WORK-001-C / I238 Complete; ADR-061; VALIDATION-001 evidence contract |
 
 ## Collaboration Claim
