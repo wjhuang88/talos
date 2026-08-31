@@ -742,4 +742,50 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn mission_gate_rejects_passing_state_with_valid_fail_report() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let mut forged = passing_evaluation(mission, goal);
+        let claim = forged.claim.clone();
+        forged.report = Some(
+            EvaluationReport::new(
+                &claim,
+                claim.subject,
+                vec![CriterionEvaluation {
+                    criterion_id: claim.criteria[0].id,
+                    verdict: CriterionVerdict::Fail,
+                    evidence: vec![],
+                    finding_ids: vec![],
+                }],
+                vec![],
+            )
+            .expect("valid fail report"),
+        );
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[forged],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::GoalNotPassed
+            }
+        );
+    }
 }

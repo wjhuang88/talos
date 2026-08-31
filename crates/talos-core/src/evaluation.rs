@@ -324,6 +324,9 @@ impl Evaluation {
         if report.claim_id != self.claim.id || !self.claim.subject.matches(&report.subject) {
             return false;
         }
+        if report.verdict != EvaluationVerdict::Pass {
+            return false;
+        }
         EvaluationReport::new(
             &self.claim,
             report.subject,
