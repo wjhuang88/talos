@@ -6,24 +6,24 @@
 | Type | Runtime / State / Projection Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Ready |
+| Status | Active / Claimed (proposed; ineffective until PR #450 merges) |
 | Source | GitHub Issue #29; DESKTOP-001 prerequisite chain section 20.5 |
-| Selected Iteration | I240 Planned |
+| Selected Iteration | I240 Active / Claimed (proposed; ineffective until PR #450 merges) |
 | Depends On | WORK-001-D / I239 Complete; WORK-001-C / I238; DESKTOP-001 direction; ADR-061 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned — proposed P4 boundary only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline WORK-001 session |
+| Work Slice | WORK-001-E/I240 P4 only: Mission final-evaluation gate, UI-neutral state/event projection, TUI-compatible adapter and non-GPUI end-to-end evidence. Excludes Desktop, Dashboard, SESSION-009, `/auto`, permission/sandbox, persistence migration, release and publication. |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | To be recorded on the atomic claim PR; claim and activation are ineffective until merge |
+| Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required; claim and activation are ineffective until merge |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Establish effective claim and I240 activation before implementation; complete only with end-to-end evidence and independent review |

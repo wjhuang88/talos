@@ -44,7 +44,7 @@ mainline work. It does not authorize any child merely because the overall direct
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
 | WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Complete / Closed; Completion Commit `209931e5`, PR #445 merged | WORK-001-B Complete | I238 Complete / Closed |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Complete / Closed | WORK-001-C Complete | I239 Complete / Closed |
-| WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Ready; I240 claim/activation pending | WORK-001-D Complete | I240 Planned |
+| WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Active / Claimed (proposed; ineffective until PR #450 merges) | WORK-001-D Complete | I240 Active / Claimed (proposed) |
 
 Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (WORK-001-A P0 decision packet; the
 Epic remains open while P1-P4 are separately governed).
@@ -169,4 +169,4 @@ requirement owner `WORK-001-E` and runnable iteration `I240` are now prepared fo
 in DESKTOP-001 section 20.5: Mission final evaluation gating, UI-neutral projection and a non-GPUI
 end-to-end walkthrough. The claim is still pending and ineffective; no implementation branch,
 Rust/Cargo change, persistence change or Desktop/Dashboard authority is authorized until the
-atomic claim+activation record reaches `main`.
+atomic claim+activation record reaches `main`. PR #450 carries the proposed atomic record.

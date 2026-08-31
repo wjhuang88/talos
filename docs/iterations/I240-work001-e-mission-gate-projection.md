@@ -1,6 +1,6 @@
 # Iteration I240: Mission Final Gate And UI-Neutral Projection
 
-> Document status: Planned
+> Document status: Active / Claimed (proposed; ineffective until PR #450 merges)
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-E/P4 as a shared Mission gate and UI-neutral projection
 > without introducing Desktop/UI authority.
@@ -12,15 +12,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned — proposed WORK-001-E/P4 only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5.6 Sol mainline WORK-001 session |
+| Work Slice | WORK-001-E/I240 P4 only: Mission final-evaluation gate, UI-neutral state/event projection, TUI-compatible adapter and non-GPUI end-to-end evidence. |
+| Claimed At | 2026-08-31 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | To be recorded on the atomic claim PR |
+| Authorization Evidence | Draft claim PR #450; exact-head governance CI, independent review and merge-time CAS required |
 | Implementation PR | Not started |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim+activation must merge before implementation; owner-first closeout after implementation evidence |
@@ -34,7 +34,7 @@ ineffective until the finalized governance record reaches `main`.
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| WORK-001-E | WORK-001 | Ready | WORK-001-D/I239 Complete; P1/P2 contracts; DESKTOP-001 section 20.5 | Mission gate, UI-neutral projection and non-GPUI end-to-end evidence |
+| WORK-001-E | WORK-001 | Active / Claimed (proposed; ineffective until PR #450 merges) | WORK-001-D/I239 Complete; P1/P2 contracts; DESKTOP-001 section 20.5 | Mission gate, UI-neutral projection and non-GPUI end-to-end evidence |
 
 ### Non-Terminal Inventory And Disposition
 
@@ -90,7 +90,7 @@ ineffective until the finalized governance record reaches `main`.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-08-31 | Requirement intake | P4 owner and runnable iteration prepared after I239/P3 completion; claim remains pending and no implementation authority exists. |
+| 2026-08-31 | Atomic claim+activation proposal | PR #450 proposes I240 Active/Claimed for the bounded P4 scope; both remain ineffective until merge, and no implementation authority exists before then. |
 
 ## Verification Evidence
 
