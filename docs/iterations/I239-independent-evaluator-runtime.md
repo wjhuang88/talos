@@ -20,7 +20,7 @@
 | Governance Claim PR | #447 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | WORK-001-C/I238 Complete on `main@76c9b7fd`; ADR-061; VALIDATION-001 evidence contract; exact-head governance CI and independent review for PR #447 |
-| Implementation PR | Stable candidate pending push |
+| Implementation PR | #448 (head `3bb9c9e0`) |
 | Last Updated | 2026-08-31 |
 | Handoff / Release Condition | Claim/activation is proposed by PR #447 and becomes effective only after merge; P4 remains separately governed. |
 
