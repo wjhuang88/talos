@@ -2,6 +2,7 @@
 
 pub mod approval;
 pub mod background_job;
+pub mod evaluation;
 pub mod message;
 pub mod model;
 pub mod provider;

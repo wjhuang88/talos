@@ -10,6 +10,16 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
 
+// Re-export completion/evaluation contracts from the canonical work-domain path.  The
+// implementation lives in its own module to keep the graph model readable while allowing
+// consumers to import all work-domain values from `talos_core::work`.
+pub use crate::evaluation::{
+    AcceptanceCriterion, ArtifactRef, CompletionClaim, CriterionEvaluation, CriterionKind,
+    CriterionVerdict, Evaluation, EvaluationError, EvaluationFinding, EvaluationReport,
+    EvaluationState, EvaluationSubject, EvaluationVerdict, EvidenceRef, FindingSeverity,
+    WorkspaceRevision,
+};
+
 /// A durable node role in the canonical work graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
