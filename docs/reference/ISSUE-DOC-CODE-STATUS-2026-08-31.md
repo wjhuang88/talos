@@ -49,6 +49,7 @@
 | [#390](https://github.com/wjhuang88/talos/issues/390) | architecture(memory): evolve context compaction into model-directed checkpoints with recoverable session history | [MEM-005](../backlog/active/MEM-005-context-compaction-policy.md) | Refinement | Intake reconciliation only; select a separately governed implementation slice before production changes. |
 | [#395](https://github.com/wjhuang88/talos/issues/395) | architecture(observability): establish R3 structured diagnostics, correlation, and error-fidelity contract | [OBS-002](../backlog/active/OBS-002-structured-diagnostics-contract.md) | Intake / Unclaimed | Intake owner only; architecture/characterization first. |
 | [#452](https://github.com/wjhuang88/talos/issues/452) | Optional host-executed managed-browser tool core | [WEB-007](../backlog/active/WEB-007-optional-managed-browser-tool-core.md) | Intake / Unclaimed | Intake only; resolve WEB-005 relationship, API/schema and security boundary before selecting an implementation iteration. |
+| [#453](https://github.com/wjhuang88/talos/issues/453) | Unified `talos upgrade` coordinator | [REL-004](../backlog/active/REL-004-unified-upgrade-coordinator.md) | Intake / Unclaimed | Intake only; preserve REL-003 publication boundary and define planner/helper ownership before implementation. |
 
 ## Synchronization Notes
 
