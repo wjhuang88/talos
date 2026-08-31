@@ -123,8 +123,7 @@ impl MissionGate<'_> {
                         || evaluation.claim.subject.mission != self.mission
                     {
                         blocked.get_or_insert(DeliveryBlockReason::StaleGoalEvaluation);
-                    } else if evaluation.state != EvaluationState::Verdict(EvaluationVerdict::Pass)
-                    {
+                    } else if !evaluation.has_valid_pass() {
                         blocked.get_or_insert(DeliveryBlockReason::GoalNotPassed);
                     }
                 }
@@ -708,6 +707,38 @@ mod tests {
             result.delivery,
             DeliveryEligibility::Blocked {
                 reason: DeliveryBlockReason::ConflictingGoalEvaluations
+            }
+        );
+    }
+
+    #[test]
+    fn mission_gate_rejects_forged_passing_evaluation_without_report() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let mut forged = passing_evaluation(mission, goal);
+        forged.report = None;
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[forged],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::GoalNotPassed
             }
         );
     }

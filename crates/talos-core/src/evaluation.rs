@@ -312,6 +312,27 @@ pub struct Evaluation {
 }
 
 impl Evaluation {
+    /// Return whether this evaluation contains a validated passing report for its claim.
+    #[must_use]
+    pub fn has_valid_pass(&self) -> bool {
+        if self.state != EvaluationState::Verdict(EvaluationVerdict::Pass) {
+            return false;
+        }
+        let Some(report) = &self.report else {
+            return false;
+        };
+        if report.claim_id != self.claim.id || !self.claim.subject.matches(&report.subject) {
+            return false;
+        }
+        EvaluationReport::new(
+            &self.claim,
+            report.subject,
+            report.results.clone(),
+            report.findings.clone(),
+        )
+        .is_ok_and(|validated| validated.verdict == report.verdict)
+    }
+
     /// Transition `Pending` to `Evaluating`.
     pub fn begin(&mut self) -> Result<(), EvaluationError> {
         if self.state != EvaluationState::Pending {
