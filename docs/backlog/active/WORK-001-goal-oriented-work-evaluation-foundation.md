@@ -42,7 +42,7 @@ mainline work. It does not authorize any child merely because the overall direct
 |---|---|---|---|---|
 | WORK-001-A / P0 | Decide the canonical work-state boundary and publish the Todo migration, compatibility and rollback contract. | Complete / Closed | Current repository and dependency inventory | I196 Complete / Closed |
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
-| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Active / Claimed proposal in PR #444; ineffective until merge | WORK-001-B Complete | I238 Active / Claimed proposal |
+| WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Review / Claimed; stable candidate `f813dc9a` under implementation PR #445 review | WORK-001-B Complete | I238 Review / Claimed |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Blocked; owner to be formed after P2 | WORK-001-C Complete | None |
 | WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Blocked; owner to be formed after P3 | WORK-001-D Complete | None |
 

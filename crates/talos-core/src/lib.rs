@@ -2,6 +2,7 @@
 
 pub mod approval;
 pub mod background_job;
+pub mod evaluation;
 pub mod message;
 pub mod model;
 pub mod provider;
@@ -12,3 +13,9 @@ pub mod tool_filter;
 pub mod work;
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};
+pub use evaluation::{
+    AcceptanceCriterion, ArtifactRef, CompletionClaim, CriterionEvaluation, CriterionKind,
+    CriterionVerdict, Evaluation, EvaluationError, EvaluationFinding, EvaluationReport,
+    EvaluationState, EvaluationSubject, EvaluationVerdict, EvidenceRef, FindingSeverity,
+    WorkspaceRevision,
+};
