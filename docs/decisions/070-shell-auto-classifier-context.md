@@ -121,7 +121,8 @@ CLI/TUI/Runtime/MCP equivalence.
 This ADR is Accepted through I243 decision review. It changes no production behavior and authorizes
 no Rust, Cargo, schema, release, or publication work by itself. I244 has a separate effective
 implementation claim and is the only owner for the bounded implementation described in its owner
-document.
+document. Its locally converged candidate is in Review and still requires exact-head CI,
+independent permission/security/API review and merge-time CAS.
 
 Acceptance evidence: decision content was present in the pre-existing governance merge
 `cc4f22e5`; exact-head CI `33495286016` and independent permission/security/API approval

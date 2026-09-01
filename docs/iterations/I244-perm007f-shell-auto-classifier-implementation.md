@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Active / Claimed (claim PR #465 merged; effective on main)
+> Document status: Review / Claimed (local stable candidate converged; remote evidence pending)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -26,8 +26,8 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | None |
-| Last Updated | 2026-09-01 |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-02 |
 | Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
 
 The Active/Claimed state became effective when claim PR #465 merged to `main` at merge commit
@@ -47,8 +47,8 @@ target-branch commit.
 
 | State | Iterations | Disposition |
 |---|---|---|
-| Active | I244 (this slice, claim #465 effective) | Owns only generic shell classifier implementation after ADR-070; implementation starts from #465 merge or later. |
-| Review | None | No review work is displaced. |
+| Active | None | No additional implementation slice is activated by this candidate. |
+| Review | I244 (this slice, claim #465 effective) | Local stable candidate owns only generic shell classifier implementation after ADR-070; exact-head CI and independent permission/security/API review remain pending. |
 | Planned | I207, I208 | Preserve steering follow-ups as separate unclaimed work; no permission or shell overlap. |
 | Blocked | None with an iteration-owner status | Adjacent PERM-006-D/E authority and other blocked backlog items remain separately owned. |
 | Paused | I164 | Superseded; do not restore or absorb its scope. |
@@ -100,6 +100,33 @@ release, or publication.
 
 ## Execution Status
 
-The atomic I244 claim is effective on `main`. This owner now records implementation execution facts
-and remains `Active / Claimed` until a separately reviewed implementation and owner-first closeout
-land on `main`.
+The atomic I244 claim is effective on `main`. Local implementation has converged and this owner is
+now `Review / Claimed`; it cannot become Complete until the implementation merge and a later
+owner-first closeout cite pre-existing implementation evidence.
+
+## 2026-09-02 Local Convergence And Issue Synchronization Checkpoint
+
+- Exact implementation base remains `main@94ba2dc5`; the feature branch is locally ahead and no
+  implementation PR exists yet.
+- New open Issues #466 and #467 were reconciled as requirement-intake-only architecture work with no
+  repository owner, iteration, claim, or implementation authority. They do not overlap I244's
+  permission authority. Any later root Cargo or Runtime overlap requires fresh coordination.
+- The implementation carries the exact shell command as untrusted data, bounded current user
+  intent, shell structure, canonical cwd/workspace bindings, environment names and an opaque full
+  environment binding, permission revisions, fixed classifier policy, and honest unavailable/empty
+  configured-remote context. Network effects remain ineligible for automatic approval.
+- Published 0.8.0 request/response/enum shapes remain source-compatible. Generic shell context uses
+  an additive assessor entrypoint with a fail-closed default, and the legacy permission request
+  struct literals are covered by a dedicated compile regression.
+- The single authoritative permission evaluation now distinguishes default Ask from configured or
+  explicit Ask without re-evaluating policy. Explicit Ask bypasses the assessor; one model
+  `AllowOnce` still crosses the existing proposal/revision/admission fence before execution.
+- Deterministically known write/mutation and package/network shell classes, secret-like input,
+  background requests, composed shell syntax, non-read-only effects, model tool calls, timeout,
+  malformed output, context drift and `/auto off` all return to the existing human-required or deny
+  path.
+- Focused local evidence passes: 22 auto-resolver tests, 12 permission-pipeline tests and the Agent
+  final permission-hook regression. Locked workspace check, Clippy with warnings denied, full
+  workspace tests, release preflight, both governance validators and `git diff --check` also pass.
+  Real TUI acceptance, exact-head CI and independent permission/security/API review remain pending
+  before closeout.

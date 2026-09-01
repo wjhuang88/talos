@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Active / Claimed (claim PR #465 merged; effective on main) |
+| Status | Review / Claimed (local stable candidate converged; remote evidence pending) |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -24,8 +24,8 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; claim PR #465 merged at `94ba2dc5`, with exact-head CI `33513662235`, independent review approval and merge-time CAS. Maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI and governance validators remain mandatory. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | None |
-| Last Updated | 2026-09-01 |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-02 |
 | Handoff / Release Condition | Claim PR #465 is effective on main; implementation starts from `94ba2dc5` or later and closeout requires exact-head implementation CI and independent permission/security/API review. |
 
 ## Goal And Value
@@ -90,3 +90,20 @@ network access, permanent grants, implicit shell semantics, Desktop, release or 
 
 Unknown semantics remain human-required and are tracked as follow-up stories; the classifier must
 not silently widen permissions.
+
+## 2026-09-02 Implementation Checkpoint
+
+The local stable candidate now distinguishes explicit/configured Ask from default Ask using the
+same authoritative evaluation report, sends a bounded tool-free classifier request for eligible
+foreground shell actions, and rechecks exact context plus the existing revision/admission fence
+before execution. Known write/mutation and package/network classes, secrets, composition, non-read
+effects, timeout, malformed output and stale context remain human-required or denied. Configured
+remote trust is deliberately reported unavailable/empty in this fixed conservative policy version;
+network effects cannot be auto-approved.
+
+Open architecture Issues #466/#467 have no effective owner/iteration/claim and are not imported into
+this Story. Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full workspace
+tests, release preflight and both governance validators pass locally. Real TUI acceptance,
+exact-head CI and independent permission/security/API review remain required. Status stays
+Review/Claimed and `Implementation PR` remains Not started until the complete local candidate is
+pushed once.
