@@ -1,6 +1,6 @@
 # Iteration I243: Shell Auto Classifier Decision
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Planned objective: decide the classifier context, precedence, trust configuration, exact-request
 > binding, rollback, and migration contract needed for Claude-like shell auto mode.
 > MVP deliverable: an accepted ADR-070 and security matrix that can authorize a separate runnable
@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-09-01 |
 | Work Slice | Decision-only ADR-070 classifier context, precedence, exact-request binding, migration/rollback contract, Issue #56/#57 authority reconciliation, and threat matrix. No Rust, Cargo, config schema, runtime behavior, UI, release, or publication authority. |
@@ -24,10 +24,17 @@
 | Source Issue | #462 |
 | Governance Claim PR | #463 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. ADR-070 acceptance review is recorded on PR #463 in comment `5492369576`. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | Independent permission/security/API review must accept ADR-070 before I244 claim preparation. |
+
+## Completion Evidence
+
+Completion Commit: `cc4f22e5`
+
+The cited pre-existing governance merge contains ADR-070 and the I243 decision/threat-matrix
+deliverable. The closeout status change is not its own completion evidence.
 
 ## Current Nonterminal Inventory And Disposition
 
@@ -82,7 +89,7 @@ ADR-070 is accepted.
 
 ## Documentation Targets
 
-- ADR-070 and `docs/reference/I243-SHELL-AUTO-CLASSIFIER-THREAT-MATRIX.md` are the decision output.
+- ADR-070 and `docs/reference/I243-SHELL-AUTO-CLASSIFIER-THREAT-MATRIX.md` are the accepted decision output.
 - README and user-facing `/auto` documentation remain unchanged until I244 implements observable
   behavior.
 
@@ -100,5 +107,5 @@ ADR-070 is accepted.
 
 ## Next Step
 
-Prepare ADR-070 and the security matrix, then establish an effective decision-only claim. I244 owns
-implementation and requires its own effective claim after ADR acceptance.
+I243 is complete after ADR-070 acceptance. I244 owns implementation and requires its own effective
+claim after ADR acceptance.
