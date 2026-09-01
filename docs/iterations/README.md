@@ -142,7 +142,8 @@ I170's accepted residuals remain explicit:
 
 | ID | State | Notes |
 |---|---|---|
-| I242 | Complete / Closed | PERM-007-E security decision; ADR-069 accepted. Completion Commit `8c570f84`; PR #457 merged as `3e423259`. I241 remains separately unclaimed for implementation. |
+| I242 | Complete / Closed | PERM-007-E security decision; ADR-069 accepted. Completion Commit `8c570f84`; PR #457 merged as `3e423259`. |
+| I241 | Active / Claimed | PERM-007-E implementation claim pending merge; bounded model-first triage only, no blanket shell approval. |
 | I168 | Complete (2026-07-30) | Provider terminal outcome integrity; completion commit `86262d02`. |
 | I167 | Complete (2026-07-29) | Approval option contrast; implementation `3356aac`. |
 | I166 | Complete (2026-07-28) | Interrupt shortcut reliability; automated and maintainer Alacritty acceptance passed. |
