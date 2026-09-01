@@ -607,6 +607,7 @@ fn eligible_exec(
     if input.get("background").and_then(serde_json::Value::as_bool) == Some(true)
         || input.get("steps").is_some()
         || input.get("pipes").is_some()
+        || !exec_environment_is_empty(input)
     {
         return None;
     }
@@ -705,6 +706,17 @@ fn eligible_exec(
     };
     result.request_digest = digest(&result);
     Some(result)
+}
+
+/// Auto-approved commands must inherit the process environment unchanged. Caller-provided
+/// variables (especially `PATH` and toolchain overrides) can change which executable runs or
+/// alter its behavior, so they are outside the bounded model-assessed effect set.
+fn exec_environment_is_empty(input: &serde_json::Value) -> bool {
+    match input.get("env") {
+        None | Some(serde_json::Value::Null) => true,
+        Some(serde_json::Value::Object(values)) => values.is_empty(),
+        Some(_) => false,
+    }
 }
 
 #[async_trait]
@@ -852,6 +864,29 @@ mod tests {
         let third = argument_digest("git", &["status"], "subdir");
         assert_ne!(first, second);
         assert_ne!(first, third);
+    }
+
+    #[test]
+    fn auto_exec_rejects_caller_environment_overrides() {
+        assert!(exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"]
+        })));
+        assert!(exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"],
+            "env": {}
+        })));
+        assert!(!exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"],
+            "env": {"PATH": "/tmp/bin"}
+        })));
+        assert!(!exec_environment_is_empty(&serde_json::json!({
+            "command": "cargo",
+            "args": ["check", "--offline"],
+            "env": "PATH=/tmp/bin"
+        })));
     }
 
     struct TestCapability;

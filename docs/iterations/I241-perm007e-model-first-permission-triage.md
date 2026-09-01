@@ -79,9 +79,13 @@ status`, and exact local validation forms (`cargo fmt --check`, `cargo check`, `
 `cargo clippy`). Shell syntax, pipelines, redirects, command substitution, background mode,
 absolute/parent paths, unsupported arguments and symlink escapes remain ineligible and fall back to
 the existing human-required path. Model input contains only closed risk/operation classes and a
-one-way argument digest; raw arguments, paths and environment contents are not sent.
+one-way argument digest; raw arguments, paths and environment contents are not sent. Auto-approved
+exec requests must not provide caller environment overrides (including `PATH`, toolchain, or
+wrapper variables); any non-empty or malformed `env` field falls back to the existing human-required
+path so the assessed command inherits the process environment unchanged.
 
 Local validation: `cargo fmt --all -- --check`; `cargo check --workspace --locked`; `cargo test
 -p talos-agent --locked` (all tests passed); focused auto-resolver tests include exact argument
-binding and shell/path escape rejection. Stable candidate PR and independent permission/security
-review remain pending.
+binding, shell/path escape rejection, and caller-environment rejection. The initial independent
+security review found environment overrides could bypass the bounded-effects claim; this candidate
+records the local fix before fresh exact-head CI and review.
