@@ -71,7 +71,8 @@ release, or publication.
 - Update `/auto` help and permission UI copy so automatic allow, human-required and hard block are
   distinguishable without exposing model reasoning or secrets.
 
-## Next Step
+## Claim Preparation
 
-Wait for I243 / ADR-070 acceptance, then establish a separate effective implementation claim from
-the current target branch.
+This governance branch prepares an atomic I244 claim after ADR-070 acceptance. The claim remains
+pending until the Draft PR receives its number and the finalized exact-head record is reviewed and
+merged; no implementation authority exists on this branch.
