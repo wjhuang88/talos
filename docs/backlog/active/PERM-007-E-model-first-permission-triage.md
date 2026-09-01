@@ -5,7 +5,7 @@
 | Story ID | PERM-007-E |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #456 |
 | Selected Iteration | I241 |
@@ -24,7 +24,7 @@
 | Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim ineffective until finalized governance record reaches `main`. |
-| Implementation PR | Not started |
+| Implementation PR | #460 (merged as `b7735ef8`) |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | After claim merge, local convergence precedes one stable implementation candidate; exact-head independent permission/security/API review required before merge. |
 
@@ -83,5 +83,8 @@ and are recorded as follow-up children rather than widened implicitly.
 
 ## Execution Update
 
-I241 implementation is locally converged on `feat/i241-model-first-permission-triage`; stable
-candidate publication, exact-head CI and independent permission/security/API review remain pending.
+I241 implementation merged through PR #460 as `b7735ef8`. Exact head `96d655d6` passed CI
+`33475638936` (five jobs) and independent permission/security/API review `5489739524`; auto
+approved exec rejects all caller-provided environment overrides.
+
+Completion Commit: `b7735ef8` (implementation source `96d655d6`).

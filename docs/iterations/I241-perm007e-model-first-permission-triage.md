@@ -1,6 +1,6 @@
 # Iteration I241: Model-First Permission Triage
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Planned objective: establish and implement a new, independently reviewed model-first permission
 > triage contract that reduces routine approval prompts without blanket shell auto-approval.
 > MVP deliverable: a runnable normalized-request matrix proves bounded low-risk shell/read/validation
@@ -34,7 +34,7 @@
 
 | Iteration | Current state | I241 disposition |
 |---|---|---|
-| I241 | Active / Claimed | This implementation slice; claim and activation are pending target-branch merge. |
+| I241 | Complete / Closed | Implemented and merged as PR #460; closeout records exact-head evidence below. |
 | I242 | Closed | ADR-069 accepted; use as normative decision contract. |
 | I207, I208 | Planned / Unclaimed | Preserve steering order; no overlap. |
 | I164 | Paused / superseded | Do not restore. |
@@ -68,8 +68,8 @@ sandbox expansion, Desktop, release and publication.
 
 ## Next Step
 
-ADR-069 is accepted. Do not modify production permission code until this I241 claim is effective on
-`main`; implementation must start from the claim merge or a later target commit.
+ADR-069 was accepted before implementation. Implementation started from the claim merge and is now
+complete.
 
 ## Execution Evidence
 
@@ -88,4 +88,13 @@ Local validation: `cargo fmt --all -- --check`; `cargo check --workspace --locke
 -p talos-agent --locked` (all tests passed); focused auto-resolver tests include exact argument
 binding, shell/path escape rejection, and caller-environment rejection. The initial independent
 security review found environment overrides could bypass the bounded-effects claim; this candidate
-records the local fix before fresh exact-head CI and review.
+records the local fix before fresh exact-head CI and review; both CI and follow-up review passed.
+
+## Completion Evidence
+
+- Completion Commit: `b7735ef8` (merge of implementation PR #460; source implementation commit `96d655d6`)
+- Exact implementation head: `96d655d628bb3d463d6fa263270693da9bb14ccb`
+- Base: `81ad333cbfdc2f4f1f6219e9a65e522c9adbadb0`
+- Exact-head CI: `33475638936`, all five jobs successful
+- Independent permission/security/API review: APPROVE, comment `5489739524`, bound to exact head; shared-account Agent-role limitation disclosed
+- Merge-time CAS: head, base, CI, review and clean merge state verified before merge
