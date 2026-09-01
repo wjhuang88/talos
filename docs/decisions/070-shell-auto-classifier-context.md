@@ -1,6 +1,6 @@
 # ADR-070: Shell Auto Classifier Context And Precedence
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-09-01
 **Owners:** PERM-007-F0 / I243; implementation PERM-007-F / I244
 **Depends on:** ADR-012, ADR-040, ADR-064, ADR-067, ADR-069
@@ -118,6 +118,10 @@ CLI/TUI/Runtime/MCP equivalence.
 
 ## Status And Authorization
 
-This ADR is Proposed. It changes no production behavior and authorizes no Rust, Cargo, schema,
-release, or publication work. Acceptance requires an effective I243 decision claim and independent
-permission/security/API review. I244 requires a separate implementation claim after acceptance.
+This ADR is Accepted through I243 decision review. It changes no production behavior and authorizes
+no Rust, Cargo, schema, release, or publication work. I244 requires a separate implementation
+claim after acceptance.
+
+Acceptance evidence: decision content was present in the pre-existing governance merge
+`cc4f22e5`; exact-head CI `33495286016` and independent permission/security/API approval
+`5492369576` were bound to the I243 claim candidate. I244 remains separately gated and unclaimed.

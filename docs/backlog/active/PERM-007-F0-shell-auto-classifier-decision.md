@@ -1,11 +1,13 @@
 # PERM-007-F0: Shell Auto Classifier Decision
 
+**Status**: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-F0 |
 | Type | Permission / Security Decision Story |
 | Priority | P0 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | PERM-007-F / Issue #462 |
 | Selected Iteration | I243 |
 | Depends On | I241, ADR-012, ADR-040, ADR-069 |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session 2026-09-01 |
 | Work Slice | Decision-only ADR-070 classifier context, precedence, exact-request binding, migration/rollback contract, Issue #56/#57 authority reconciliation, and threat matrix. No Rust, Cargo, config schema, runtime behavior, UI, release, or publication authority. |
@@ -22,13 +24,19 @@
 | Source Issue | #462 |
 | Governance Claim PR | #463 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. ADR-070 acceptance review is recorded on PR #463 in comment `5492369576`. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | Accept ADR-070 after independent permission/security/API review; I244 remains separately gated. |
 
-The claim and Active state above became effective when governance PR #463 merged to `main` as
-`cc4f22e5`.
+The claim became effective when governance PR #463 merged to `main` as `cc4f22e5`.
+
+## Completion Evidence
+
+Completion Commit: `cc4f22e5`
+
+The cited commit contains ADR-070 and the decision/threat-matrix content. The current status
+record is a later governance closeout and does not self-certify completion.
 
 ## Goal
 
