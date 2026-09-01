@@ -70,3 +70,18 @@ sandbox expansion, Desktop, release and publication.
 
 ADR-069 is accepted. Do not modify production permission code until this I241 claim is effective on
 `main`; implementation must start from the claim merge or a later target commit.
+
+## Execution Evidence
+
+Implementation is locally converged on branch `feat/i241-model-first-permission-triage`.
+The first candidate adds bounded native `exec` triage for `pwd`, constrained `ls`/`rg`, `git
+status`, and exact local validation forms (`cargo fmt --check`, `cargo check`, `cargo test`,
+`cargo clippy`). Shell syntax, pipelines, redirects, command substitution, background mode,
+absolute/parent paths, unsupported arguments and symlink escapes remain ineligible and fall back to
+the existing human-required path. Model input contains only closed risk/operation classes and a
+one-way argument digest; raw arguments, paths and environment contents are not sent.
+
+Local validation: `cargo fmt --all -- --check`; `cargo check --workspace --locked`; `cargo test
+-p talos-agent --locked` (all tests passed); focused auto-resolver tests include exact argument
+binding and shell/path escape rejection. Stable candidate PR and independent permission/security
+review remain pending.
