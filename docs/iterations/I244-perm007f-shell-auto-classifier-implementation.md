@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Active / Claimed (proposed; ineffective until claim PR #465 merges)
+> Document status: Active / Claimed (claim PR #465 merged; effective on main)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -28,10 +28,20 @@
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | ADR-070 accepted and a separate implementation claim effective on main. |
+| Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
 
-The proposed Active/Claimed state becomes effective only when finalized claim PR #465 merges to
-`main`; implementation must start from that merge or a later target-branch commit.
+The Active/Claimed state became effective when claim PR #465 merged to `main` at merge commit
+`94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`. Implementation must start from that merge or a later
+target-branch commit.
+
+## Activation Checkpoint (2026-09-01)
+
+- Claim PR: #465, exact reviewed head `f7b56662d0c672d5b3d62d463cec394bb29491a4`
+- Claim base: `be4fbcfc0c72a6460d009eb4a1b69cd3eade1f8a`
+- Exact-head CI: `33513662235` (all required jobs successful)
+- Independent review: approved at exact head; issue reconciliation passed
+- Merge-time CAS: passed; claim merge commit `94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`
+- Implementation authority: active for the bounded I244 work slice; no implementation PR exists yet.
 
 ## Current Nonterminal Inventory And Disposition
 
@@ -90,6 +100,6 @@ release, or publication.
 
 ## Claim Preparation
 
-This governance branch prepares an atomic I244 claim after ADR-070 acceptance. The claim remains
-pending until the Draft PR receives its number and the finalized exact-head record is reviewed and
-merged; no implementation authority exists on this branch.
+The atomic I244 claim is effective on `main`. This owner now records implementation execution facts
+and remains `Active / Claimed` until a separately reviewed implementation and owner-first closeout
+land on `main`.

@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Active / Claimed (proposed; ineffective until claim PR #465 merges) |
+| Status | Active / Claimed (claim PR #465 merged; effective on main) |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -23,10 +23,10 @@
 | Source Issue | #462 |
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; claim PR #465 merged at `94ba2dc5`, with exact-head CI `33513662235`, independent review approval and merge-time CAS. Maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI and governance validators remain mandatory. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | Claim PR #465 must merge before implementation; closeout requires exact-head implementation CI and independent permission/security/API review. |
+| Handoff / Release Condition | Claim PR #465 is effective on main; implementation starts from `94ba2dc5` or later and closeout requires exact-head implementation CI and independent permission/security/API review. |
 
 ## Goal And Value
 
