@@ -1,6 +1,6 @@
 # Iteration I241: Model-First Permission Triage
 
-> Document status: Refinement / Unclaimed
+> Document status: Active / Claimed
 > Planned objective: establish and implement a new, independently reviewed model-first permission
 > triage contract that reduces routine approval prompts without blanket shell auto-approval.
 > MVP deliverable: a runnable normalized-request matrix proves bounded low-risk shell/read/validation
@@ -13,11 +13,40 @@
 |---|---|---|---|---|
 | PERM-007-E | PERM-007 | Refinement / Unclaimed | PERM-006-C; PERM-007-D; ADR-064 | Model-first triage with constrained shell/exec coverage and fail-closed evidence |
 
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
+| Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only and local-validation shell/tool requests; deterministic classification first, model `AllowOnce`/`HumanRequired` only, exact binding, fail-closed timeout/error/cancellation, audit redaction, and supported-surface conformance. No blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release or publication. |
+| Claimed At | 2026-09-01 |
+| Source Issue | #456 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; implementation claim is ineffective until this finalized record reaches `main`. |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-01 |
+| Handoff / Release Condition | After claim merge, converge locally and submit one stable implementation candidate for independent permission/security/API review. |
+
+## Current Nonterminal Inventory And Disposition
+
+| Iteration | Current state | I241 disposition |
+|---|---|---|
+| I241 | Active / Claimed | This implementation slice; claim and activation are pending target-branch merge. |
+| I242 | Closed | ADR-069 accepted; use as normative decision contract. |
+| I207, I208 | Planned / Unclaimed | Preserve steering order; no overlap. |
+| I164 | Paused / superseded | Do not restore. |
+
+Other Active, Review, Planned and Blocked iterations remain under their existing owners; this claim
+does not modify Dashboard, Desktop, TOOL-024 or unrelated permission authorities.
+
 ## Governance Gate
 
-This iteration is not active and grants no implementation authority. Before activation, complete
-requirement intake, accept ADR-069 (a superseding follow-up boundary), define the normalized shell
-schema and threat matrix, then establish an effective Collaboration Claim.
+Before activation, confirm accepted ADR-069, define the normalized shell schema and threat matrix,
+then establish an effective Collaboration Claim. The proposed claim is ineffective until merged to
+`main`.
 
 Required decision read: `docs/decisions/069-model-first-permission-triage.md`.
 
@@ -39,5 +68,5 @@ sandbox expansion, Desktop, release and publication.
 
 ## Next Step
 
-Resolve ADR-069 and its security contract first. Do not create an implementation branch or modify production
-permission code until the claim is effective on `main`.
+ADR-069 is accepted. Do not modify production permission code until this I241 claim is effective on
+`main`; implementation must start from the claim merge or a later target commit.

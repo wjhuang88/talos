@@ -5,28 +5,28 @@
 | Story ID | PERM-007-E |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Refinement / Unclaimed |
+| Status | Active / Claimed |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #456 |
-| Selected Iteration | None |
+| Selected Iteration | I241 |
 | Depends On | PERM-006-C, PERM-007-D, ADR-064, ADR-069 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
+| Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only/local-validation requests with deterministic policy first, one-time model decisions, exact binding and fail-closed behavior. Exclude blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release and publication. |
+| Claimed At | 2026-09-01 |
 | Source Issue | #456 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim ineffective until finalized governance record reaches `main`. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | Accept the security contract and establish an effective claim before implementation. |
+| Handoff / Release Condition | After claim merge, local convergence precedes one stable implementation candidate; exact-head independent permission/security/API review required before merge. |
 
 ## Goal And Value
 
@@ -61,8 +61,8 @@ release or publication work.
 
 ## Required Governance
 
-Accept ADR-069, its threat model, normalized shell schema and rollback
-plan before implementation. Required review is independent permission/security/API review.
+ADR-069 is accepted. Define the normalized shell schema and rollback tests during implementation;
+exact-head independent permission/security/API review is required before merge.
 
 ## Required Reads
 
