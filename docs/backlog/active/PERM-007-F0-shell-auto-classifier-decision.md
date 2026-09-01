@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F0 |
 | Type | Permission / Security Decision Story |
 | Priority | P0 |
-| Status | Active / Claimed (proposed; ineffective until claim PR #463 merges) |
+| Status | Active / Claimed |
 | Parent Epic | PERM-007-F / Issue #462 |
 | Selected Iteration | I243 |
 | Depends On | I241, ADR-012, ADR-040, ADR-069 |
@@ -22,12 +22,13 @@
 | Source Issue | #462 |
 | Governance Claim PR | #463 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session authorizes a generic model-classifier decision instead of per-command exceptions. Independent exact-head permission/security/API review, CI, validators and merge-time CAS remain mandatory; the proposed claim is ineffective until #463 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | Accept ADR-070 after independent permission/security/API review; I244 remains separately gated. |
 
-The claim and Active state above are proposals only until governance PR #463 merges to `main`.
+The claim and Active state above became effective when governance PR #463 merged to `main` as
+`cc4f22e5`.
 
 ## Goal
 

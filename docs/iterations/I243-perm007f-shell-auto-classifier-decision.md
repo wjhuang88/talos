@@ -1,6 +1,6 @@
 # Iteration I243: Shell Auto Classifier Decision
 
-> Document status: Active / Claimed (proposed; ineffective until claim PR #463 merges)
+> Document status: Active / Claimed
 > Planned objective: decide the classifier context, precedence, trust configuration, exact-request
 > binding, rollback, and migration contract needed for Claude-like shell auto mode.
 > MVP deliverable: an accepted ADR-070 and security matrix that can authorize a separate runnable
@@ -24,7 +24,7 @@
 | Source Issue | #462 |
 | Governance Claim PR | #463 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session authorizes a generic model-classifier decision instead of per-command exceptions. Independent exact-head permission/security/API review, CI, validators and merge-time CAS remain mandatory; the proposed claim is ineffective until #463 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session; claim PR #463 merged as `cc4f22e5` after exact-head CI `33495286016`, independent permission/security/API approval `5492369576`, validators and merge-time CAS. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | Independent permission/security/API review must accept ADR-070 before I244 claim preparation. |
@@ -50,11 +50,11 @@ shell behavior explicitly left to Issue #462. At this checkpoint there is no Act
 iteration; I207 and I208 remain Planned/Unclaimed, I164 remains Paused/superseded, and I244 remains
 Blocked/Unclaimed. I243 may become Active only through its own atomic decision claim merge.
 
-### Proposed Atomic Activation Through PR #463
+### Activation Through PR #463
 
-PR #463 proposes I243 as the sole Active iteration and claims only the decision surface stated
-above. The proposal has no target-branch effect before merge. I244 and PERM-007-F remain
-Blocked/Unclaimed, and ADR-069 remains the executable authority while ADR-070 is Proposed.
+PR #463 established I243 as the sole Active iteration and claims only the decision surface stated
+above. I244 and PERM-007-F remain Blocked/Unclaimed, and ADR-069 remains the executable authority
+while ADR-070 is Proposed.
 
 ## Decision Questions
 
