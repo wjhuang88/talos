@@ -57,6 +57,7 @@ in earlier reconciliation snapshots.
 | [#362](https://github.com/wjhuang88/talos/issues/362) | optional S3-compatible object-storage workspace | [TOOL-027](../backlog/active/TOOL-027-s3-object-workspace-backend.md) | Intake / Unclaimed | Optional object-workspace tools only; no implementation claim. |
 | [#390](https://github.com/wjhuang88/talos/issues/390) | architecture(memory): evolve context compaction into model-directed checkpoints with recoverable session history | [MEM-005](../backlog/active/MEM-005-context-compaction-policy.md) | Refinement | Intake reconciliation only; reconcile MEM-002/MEM-003/MEM-007 and select a separately governed implementation slice before production changes. |
 | [#395](https://github.com/wjhuang88/talos/issues/395) | architecture(observability): establish R3 structured diagnostics, correlation, and error-fidelity contract | [OBS-002](../backlog/active/OBS-002-structured-diagnostics-contract.md) | Intake / Unclaimed | Intake owner only; architecture/characterization first. Do not activate OBS-002 or authorize implementation from the Issue alone. |
+| [#456](https://github.com/wjhuang88/talos/issues/456) | feat(permission): model-first auto triage for low-risk shell and tool requests | [I242](../iterations/I242-perm007e-security-decision.md) | Active / Claimed | Decision-only ADR-069 review; no implementation or permission-behavior authority. Claim PR #457 is pending merge. |
 
 ## Synchronization Notes
 
@@ -67,5 +68,7 @@ in earlier reconciliation snapshots.
 - Issue #395 is recorded under the unclaimed OBS-002 intake owner only; it has no iteration, claim,
   or implementation authority. Its registration is unrelated to I226 and does not activate
   observability work.
+- Issue #456 is recorded under the claimed I242 decision-only owner; ADR-069 acceptance remains
+  subject to exact-head independent permission/security review and merge-time CAS.
 - This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
   mechanism.
