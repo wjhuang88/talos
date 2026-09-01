@@ -29,6 +29,18 @@ Review ADR-069, its threat model and migration/rollback contract. This iteration
 no Rust/Cargo/config/dependency/schema changes, no permission behavior, no `/auto` changes, no
 Desktop/Dashboard work, and no release or publication.
 
+## Current Nonterminal Inventory And Disposition
+
+| Iteration | Current state | I242 disposition |
+|---|---|---|
+| I242 | Active / Claimed | This decision-only slice; continue to exact-head review and CAS. |
+| I241 | Refinement / Unclaimed | Preserve as the separately gated implementation follow-up; do not activate before ADR-069 acceptance. |
+| I207, I208 | Planned / Unclaimed | Preserve the ordered steering follow-ups; do not activate from I242. |
+| I164 | Paused / superseded | Do not restore; its target was replaced by later continuity work. |
+
+All other Active, Review, Planned and Blocked owners remain governed by the current iteration and
+backlog indexes; I242 claims no authority over them.
+
 ## Acceptance And Validation
 
 - Every request class has an explicit maximum authority and fail-closed path.
