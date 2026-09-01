@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Blocked / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until claim PR #465 merges)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -17,18 +17,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned; blocked pending ADR-070 |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
+| Work Slice | Generic model-first shell effect classification after deterministic deny/ask, isolated tool-free context, exact action/cwd/environment/revision binding, fail-closed fallback, and CLI/TUI/Runtime/MCP equivalence. No per-command exception table; no PERM-006-D/E authority, Dashboard, Desktop, release, or publication. |
+| Claimed At | 2026-09-01 |
 | Source Issue | #462 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #465 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | ADR-070 accepted and a separate implementation claim effective on main. |
+
+The proposed Active/Claimed state becomes effective only when finalized claim PR #465 merges to
+`main`; implementation must start from that merge or a later target-branch commit.
 
 ## Planned Scope
 
