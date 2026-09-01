@@ -537,21 +537,23 @@ impl Agent {
             }
 
             let authorization = pipeline
-                .authorize(PermissionAuthorizationRequest {
-                    tool_name: &call.name,
-                    provenance: tool.provenance(),
-                    profile: &permission_profile,
-                    input: &call.input,
-                    presentation_input: tool.project_input(&call.input),
-                    summary_fields: tool
-                        .summary_fields()
-                        .iter()
-                        .map(|field| (*field).to_string())
-                        .collect(),
+                .authorize_with_user_intent(
+                    PermissionAuthorizationRequest {
+                        tool_name: &call.name,
+                        provenance: tool.provenance(),
+                        profile: &permission_profile,
+                        input: &call.input,
+                        presentation_input: tool.project_input(&call.input),
+                        summary_fields: tool
+                            .summary_fields()
+                            .iter()
+                            .map(|field| (*field).to_string())
+                            .collect(),
+                        deadline: permission_deadline_at
+                            .saturating_duration_since(tokio::time::Instant::now()),
+                    },
                     user_intent,
-                    deadline: permission_deadline_at
-                        .saturating_duration_since(tokio::time::Instant::now()),
-                })
+                )
                 .await;
             let decision = authorization
                 .as_ref()

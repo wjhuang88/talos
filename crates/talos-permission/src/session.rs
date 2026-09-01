@@ -196,6 +196,22 @@ impl PermissionSessionState {
         begin_invocation_locked(&state, request, context)
     }
 
+    /// Begins one invocation and returns the structured report produced by the same evaluation.
+    ///
+    /// Resolver orchestration uses this variant when it must distinguish a configured human
+    /// checkpoint from the default consequential-operation prompt without evaluating policy twice.
+    pub fn try_begin_invocation_with_report(
+        &self,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<(PermissionInvocation, PermissionDecisionReport), GrantError> {
+        let state = self.try_lock_state()?;
+        let evaluation = evaluate_locked(&state, request, context)?;
+        let report = evaluation.report.clone();
+        let invocation = begin_invocation_from_evaluation(&state, request, context, evaluation)?;
+        Ok((invocation, report))
+    }
+
     fn lock_state(&self) -> Result<MutexGuard<'_, State>, GrantError> {
         self.state.lock().map_err(|_| GrantError::StateUnavailable)
     }
@@ -259,6 +275,15 @@ fn begin_invocation_locked(
     context: &PermissionContext,
 ) -> Result<PermissionInvocation, GrantError> {
     let evaluation = evaluate_locked(state, request, context)?;
+    begin_invocation_from_evaluation(state, request, context, evaluation)
+}
+
+fn begin_invocation_from_evaluation(
+    state: &State,
+    request: &PermissionRequest<'_>,
+    context: &PermissionContext,
+    evaluation: PermissionEvaluation,
+) -> Result<PermissionInvocation, GrantError> {
     match evaluation.decision() {
         PermissionDecision::Allow => {
             let (facets, fingerprint) = compiled_identity(request, state.engine.workspace_root())?;

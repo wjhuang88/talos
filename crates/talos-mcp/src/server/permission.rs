@@ -102,7 +102,6 @@ impl McpPermissionGate {
                 input: &input,
                 presentation_input: tool_call.input.clone(),
                 summary_fields: Vec::new(),
-                user_intent: None,
                 deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
             })
             .await;
