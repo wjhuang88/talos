@@ -24,7 +24,7 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; claim PR #465 merged at `94ba2dc5`, with exact-head CI `33513662235`, independent review approval and merge-time CAS. Maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI and governance validators remain mandatory. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | Not started |
+| Implementation PR | #468 |
 | Last Updated | 2026-09-02 |
 | Handoff / Release Condition | Claim PR #465 is effective on main; implementation starts from `94ba2dc5` or later and closeout requires exact-head implementation CI and independent permission/security/API review. |
 
@@ -105,5 +105,4 @@ Open architecture Issues #466/#467 have no effective owner/iteration/claim and a
 this Story. Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full workspace
 tests, release preflight and both governance validators pass locally. Real TUI acceptance,
 exact-head CI and independent permission/security/API review remain required. Status stays
-Review/Claimed and `Implementation PR` remains Not started until the complete local candidate is
-pushed once.
+Review/Claimed while implementation PR #468 carries the stable candidate.

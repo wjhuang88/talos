@@ -26,7 +26,7 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | Not started |
+| Implementation PR | #468 |
 | Last Updated | 2026-09-02 |
 | Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
 
@@ -106,8 +106,8 @@ owner-first closeout cite pre-existing implementation evidence.
 
 ## 2026-09-02 Local Convergence And Issue Synchronization Checkpoint
 
-- Exact implementation base remains `main@94ba2dc5`; the feature branch is locally ahead and no
-  implementation PR exists yet.
+- Exact implementation base remains `main@94ba2dc5`; stable implementation PR #468 now carries the
+  locally converged candidate.
 - New open Issues #466 and #467 were reconciled as requirement-intake-only architecture work with no
   repository owner, iteration, claim, or implementation authority. They do not overlap I244's
   permission authority. Any later root Cargo or Runtime overlap requires fresh coordination.
