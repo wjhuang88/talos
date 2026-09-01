@@ -33,6 +33,20 @@
 The proposed Active/Claimed state becomes effective only when finalized claim PR #465 merges to
 `main`; implementation must start from that merge or a later target-branch commit.
 
+## Current Nonterminal Inventory And Disposition
+
+| State | Iterations | Disposition |
+|---|---|---|
+| Active | I244 (this slice, proposed until claim merge) | Owns only generic shell classifier implementation after ADR-070; no implementation starts before #465 merges. |
+| Review | None | No review work is displaced. |
+| Planned | I207, I208 | Preserve steering follow-ups as separate unclaimed work; no permission or shell overlap. |
+| Blocked | None with an iteration-owner status | Adjacent PERM-006-D/E authority and other blocked backlog items remain separately owned. |
+| Paused | I164 | Superseded; do not restore or absorb its scope. |
+
+I243 is Complete/Closed with ADR-070 Accepted. I241, I242 and the earlier PERM-007 slices are
+Complete/Closed; this inventory does not reactivate them or claim authority over Dashboard,
+Desktop, release, publication, or PERM-006-D/E work.
+
 ## Planned Scope
 
 - Route shell permission requests through the classifier after deterministic deny/explicit-ask
