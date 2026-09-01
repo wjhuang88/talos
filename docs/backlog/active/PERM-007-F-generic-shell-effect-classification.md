@@ -107,3 +107,15 @@ Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full w
 tests, release preflight and both governance validators pass locally. Real TUI acceptance,
 exact-head CI and independent permission/security/API review remain required. Status stays
 Review/Claimed while implementation PR #468 carries the stable candidate.
+
+## 2026-09-02 Adversarial Re-Convergence Checkpoint
+
+Implementer-side threat-matrix replay found that the prior PR head could send known external or
+sensitive read targets, incomplete current intent, or secret-bearing intent to the model. The
+corrected local tree now rejects those shapes before assessment, including command-independent
+Unix, Windows, UNC, parent-traversal and symlink escape targets, without replacing semantic model
+classification with a command allowlist. Twenty-four resolver tests, 12 permission-pipeline tests,
+the public 0.8.0 API compatibility test, and the full locked release preflight pass. Prior head
+`a71b4052`, CI `33540527533`, and review request `5498309737` are stale for this substantive change.
+The Story remains Review / Claimed pending one corrected PR #468 head, fresh exact-head CI,
+independent permission/security/API approval, real TUI acceptance and merge-time CAS.

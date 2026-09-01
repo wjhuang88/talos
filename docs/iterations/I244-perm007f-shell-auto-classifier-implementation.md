@@ -131,3 +131,24 @@ owner-first closeout cite pre-existing implementation evidence.
   workspace tests, release preflight, both governance validators and `git diff --check` also pass.
   Real TUI acceptance, exact-head CI and independent permission/security/API review remain pending
   before closeout.
+
+## 2026-09-02 Adversarial Re-Convergence Checkpoint
+
+- Implementer-side adversarial review invalidated the prior `a71b4052` stable-candidate evidence:
+  known external or sensitive reads, missing or truncated current intent, and secret-bearing intent
+  could reach the classifier. CI run `33540527533` and review request comment `5498309737` therefore
+  do not authorize merge of the corrected candidate.
+- The corrected local tree fails closed before the model for missing, empty, oversized, or
+  secret-bearing current intent; known secret/protected targets; URLs; home expansion; Unix
+  absolute paths; Windows drive and UNC paths; lexical parent traversal; and canonical symlink
+  escape. These checks are command-name independent, while an unfamiliar command with no external
+  target such as `python --version` remains model-assessable.
+- Focused evidence now passes: 24 `auto_resolver` tests, 12 `permission_pipeline` tests, and the
+  dedicated `i244_public_api_compat` test. `./scripts/release_preflight.sh` also passed with the
+  repository-pinned toolchain, locked dependency graph, full workspace check/Clippy/tests, both
+  governance validators, public-site/installer validation, and CI-classifier tests. Local Cargo
+  incremental compilation and debug symbols were disabled only to control disk usage; source,
+  features, lockfile, test selection, and release behavior were unchanged.
+- Status remains Review / Claimed. A single corrected stable candidate must be committed and pushed
+  to PR #468, then receive fresh exact-head CI and independent permission/security/API review.
+  Real TUI acceptance and merge-time CAS remain pending; no completion evidence is claimed.
