@@ -132,12 +132,14 @@ pub struct AutoPermissionRequest {
 /// Redacted shape of the proposed new text content.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct AutoContentShape {
-    /// Lowercase allowlisted file extension.
+    /// Lowercase allowlisted extension or command name.
     pub extension: String,
     /// UTF-8 byte length of the proposed content.
     pub bytes: usize,
     /// Number of newline-delimited lines.
     pub lines: usize,
+    /// Digest of the normalized command arguments; raw arguments are never sent.
+    pub argument_digest: String,
 }
 
 /// Closed provenance projection.
@@ -152,6 +154,8 @@ pub enum AutoProvenance {
 #[serde(rename_all = "snake_case")]
 pub enum AutoRiskClass {
     BoundedWorkspaceTextCreate,
+    BoundedReadOnlyCommand,
+    BoundedLocalValidation,
 }
 
 /// Closed operation subtype.
@@ -159,6 +163,8 @@ pub enum AutoRiskClass {
 #[serde(rename_all = "snake_case")]
 pub enum AutoOperation {
     CreateTextFile,
+    ExecuteReadOnlyCommand,
+    ExecuteLocalValidation,
 }
 
 /// Closed model output. Unknown JSON fields are rejected during deserialization.
@@ -190,6 +196,8 @@ pub enum AutoDecision {
 #[serde(rename_all = "snake_case")]
 pub enum AutoReasonCode {
     BoundedWorkspaceTextCreate,
+    BoundedReadOnlyCommand,
+    BoundedLocalValidation,
     Uncertain,
     Malformed,
     InjectionDetected,
@@ -498,6 +506,20 @@ fn session_binding(session_id: &str) -> String {
     format!("sha256:{hex}")
 }
 
+fn argument_digest(command: &str, args: &[&str], cwd: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(command.as_bytes());
+    hasher.update([0]);
+    hasher.update(cwd.as_bytes());
+    for arg in args {
+        hasher.update([0]);
+        hasher.update(arg.as_bytes());
+    }
+    let digest = hasher.finalize();
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("sha256:{hex}")
+}
+
 fn eligible(
     request: &PermissionApprovalRequest,
     lease: &ManagedWorkspaceLease,
@@ -553,6 +575,7 @@ fn eligible(
             extension,
             bytes: content.len(),
             lines: content.lines().count().max(1),
+            argument_digest: argument_digest("write", &[path.to_string_lossy().as_ref()], "."),
         },
         session_binding: session_binding(&request.binding.session_id),
         revisions: request.binding.revisions,
@@ -561,6 +584,139 @@ fn eligible(
     };
     result.request_digest = digest(&result);
     Some(result)
+}
+
+fn eligible_exec(
+    request: &PermissionApprovalRequest,
+    lease: &ManagedWorkspaceLease,
+) -> Option<AutoPermissionRequest> {
+    if request.tool_name != "exec"
+        || request.provenance != ToolProvenance::Native
+        || request.binding.mode != PermissionMode::Interactive
+        || request.binding.interaction != InteractionCapability::Available
+        || request.preview.facets().len() != 1
+        || lease.session_id() != request.binding.session_id
+    {
+        return None;
+    }
+    let facet = &request.preview.facets()[0];
+    if facet.nature != ToolNature::Execute || facet.resource_kind != ToolResourceKind::Command {
+        return None;
+    }
+    let input = &request.arguments;
+    if input.get("background").and_then(serde_json::Value::as_bool) == Some(true)
+        || input.get("steps").is_some()
+        || input.get("pipes").is_some()
+        || !exec_environment_is_empty(input)
+    {
+        return None;
+    }
+    let command = input.get("command")?.as_str()?.trim();
+    let args = input
+        .get("args")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|values| {
+            values
+                .iter()
+                .map(serde_json::Value::as_str)
+                .collect::<Option<Vec<_>>>()
+        })
+        .unwrap_or_default();
+    if command.is_empty()
+        || command.contains(['/', '\\', ';', '|', '&', '$', '`', '>', '<'])
+        || args.iter().any(|arg| {
+            arg.is_empty()
+                || arg.starts_with(['/', '\\'])
+                || arg.split('/').any(|part| part == "..")
+                || arg.split('\\').any(|part| part == "..")
+                || arg.contains([';', '|', '&', '$', '`', '>', '<'])
+        })
+    {
+        return None;
+    }
+    let program = Path::new(command)
+        .file_name()?
+        .to_str()?
+        .to_ascii_lowercase();
+    let (risk_class, operation) = match program.as_str() {
+        "pwd" if args.is_empty() => (
+            AutoRiskClass::BoundedReadOnlyCommand,
+            AutoOperation::ExecuteReadOnlyCommand,
+        ),
+        "ls" if args.len() <= 1 && args.iter().all(|arg| !arg.starts_with('-')) => (
+            AutoRiskClass::BoundedReadOnlyCommand,
+            AutoOperation::ExecuteReadOnlyCommand,
+        ),
+        "rg" if args.len() <= 1 && args.iter().all(|arg| !arg.starts_with('-')) => (
+            AutoRiskClass::BoundedReadOnlyCommand,
+            AutoOperation::ExecuteReadOnlyCommand,
+        ),
+        "git" if args == ["status"] => (
+            AutoRiskClass::BoundedReadOnlyCommand,
+            AutoOperation::ExecuteReadOnlyCommand,
+        ),
+        "cargo"
+            if args == ["fmt", "--check"]
+                || args == ["check", "--offline"]
+                || args == ["test", "--offline"]
+                || args == ["clippy", "--offline"] =>
+        {
+            (
+                AutoRiskClass::BoundedLocalValidation,
+                AutoOperation::ExecuteLocalValidation,
+            )
+        }
+        _ => return None,
+    };
+    let cwd = input
+        .get("cwd")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(".");
+    let cwd_path = Path::new(cwd);
+    if cwd_path.is_absolute()
+        || cwd_path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return None;
+    }
+    let Ok(cwd_absolute) = lease.root.join(cwd_path).canonicalize() else {
+        return None;
+    };
+    if !cwd_absolute.is_dir() || !cwd_absolute.starts_with(&lease.root) {
+        return None;
+    }
+    let mut result = AutoPermissionRequest {
+        schema_version: AUTO_EVALUATOR_SCHEMA_VERSION,
+        tool: "exec".into(),
+        provenance: AutoProvenance::Native,
+        risk_class,
+        target_label: "managed_workspace".to_owned(),
+        operation,
+        content_shape: AutoContentShape {
+            extension: program,
+            bytes: args.iter().map(|arg| arg.len()).sum(),
+            lines: args.len().max(1),
+            argument_digest: argument_digest(command, &args, cwd),
+        },
+        session_binding: session_binding(&request.binding.session_id),
+        revisions: request.binding.revisions,
+        mode: request.binding.mode,
+        request_digest: String::new(),
+    };
+    result.request_digest = digest(&result);
+    Some(result)
+}
+
+/// Auto-approved commands must inherit the process environment unchanged. Caller-provided
+/// variables (especially `PATH` and toolchain overrides) can change which executable runs or
+/// alter its behavior, so they are outside the bounded model-assessed effect set.
+fn exec_environment_is_empty(input: &serde_json::Value) -> bool {
+    match input.get("env") {
+        None | Some(serde_json::Value::Null) => true,
+        Some(serde_json::Value::Object(values)) => values.is_empty(),
+        Some(_) => false,
+    }
 }
 
 #[async_trait]
@@ -574,7 +730,9 @@ impl ApprovalResolver for AutoPermissionResolver {
         if !self.control.is_enabled() || self.circuit_open() {
             return self.fallback.resolve(request, remaining).await;
         }
-        let Some(evaluator_request) = eligible(&request, &self.lease) else {
+        let Some(evaluator_request) =
+            eligible(&request, &self.lease).or_else(|| eligible_exec(&request, &self.lease))
+        else {
             return self.fallback.resolve(request, remaining).await;
         };
         let budget = remaining.min(self.deadline);
@@ -634,7 +792,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         let valid = response.schema_version == AUTO_EVALUATOR_SCHEMA_VERSION
             && response.request_digest == evaluator_request.request_digest
             && response.decision == AutoDecision::AllowOnce
-            && response.reason_code == AutoReasonCode::BoundedWorkspaceTextCreate
+            && matches!(
+                (evaluator_request.risk_class, response.reason_code),
+                (
+                    AutoRiskClass::BoundedWorkspaceTextCreate,
+                    AutoReasonCode::BoundedWorkspaceTextCreate
+                ) | (
+                    AutoRiskClass::BoundedReadOnlyCommand,
+                    AutoReasonCode::BoundedReadOnlyCommand
+                ) | (
+                    AutoRiskClass::BoundedLocalValidation,
+                    AutoReasonCode::BoundedLocalValidation
+                )
+            )
             && response.confidence == AutoConfidence::High;
         if valid {
             self.record_success();
@@ -673,6 +843,51 @@ mod tests {
         PermissionSessionState,
     };
     use tokio::sync::Notify;
+
+    #[test]
+    fn bounded_exec_shape_rejects_escape_and_shell_syntax() {
+        let safe = ["status"];
+        assert_eq!(safe.first().copied(), Some("status"));
+        for argument in ["/etc/passwd", "../secret", "foo;rm", "$(id)", "foo|bar"] {
+            assert!(
+                argument.starts_with(['/', '\\'])
+                    || argument.split('/').any(|part| part == "..")
+                    || argument.contains([';', '|', '&', '$', '`', '>', '<'])
+            );
+        }
+    }
+
+    #[test]
+    fn normalized_exec_argument_digest_distinguishes_requests() {
+        let first = argument_digest("git", &["status"], ".");
+        let second = argument_digest("git", &["diff"], ".");
+        let third = argument_digest("git", &["status"], "subdir");
+        assert_ne!(first, second);
+        assert_ne!(first, third);
+    }
+
+    #[test]
+    fn auto_exec_rejects_caller_environment_overrides() {
+        assert!(exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"]
+        })));
+        assert!(exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"],
+            "env": {}
+        })));
+        assert!(!exec_environment_is_empty(&serde_json::json!({
+            "command": "git",
+            "args": ["status"],
+            "env": {"PATH": "/tmp/bin"}
+        })));
+        assert!(!exec_environment_is_empty(&serde_json::json!({
+            "command": "cargo",
+            "args": ["check", "--offline"],
+            "env": "PATH=/tmp/bin"
+        })));
+    }
 
     struct TestCapability;
 
@@ -813,6 +1028,7 @@ mod tests {
                 extension: "txt".into(),
                 bytes: 0,
                 lines: 1,
+                argument_digest: "sha256:test".into(),
             },
             session_binding: session_binding("session"),
             revisions: [0; 6],

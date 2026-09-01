@@ -80,3 +80,8 @@ exact-head independent permission/security/API review is required before merge.
 
 Unclassified shell structures and any request class not admitted by the new ADR remain human-required
 and are recorded as follow-up children rather than widened implicitly.
+
+## Execution Update
+
+I241 implementation is locally converged on `feat/i241-model-first-permission-triage`; stable
+candidate publication, exact-head CI and independent permission/security/API review remain pending.
