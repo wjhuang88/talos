@@ -101,8 +101,9 @@ effects, timeout, malformed output and stale context remain human-required or de
 remote trust is deliberately reported unavailable/empty in this fixed conservative policy version;
 network effects cannot be auto-approved.
 
-Open architecture Issues #466/#467 have no effective owner/iteration/claim and are not imported into
-this Story. Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full workspace
+Open architecture Issues #466/#467 now have Refinement/Unclaimed intake owners but no selected
+iteration, effective claim or implementation authority and are not imported into this Story.
+Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full workspace
 tests, release preflight and both governance validators pass locally. Real TUI acceptance,
 exact-head CI and independent permission/security/API review remain required. Status stays
 Review/Claimed while implementation PR #468 carries the stable candidate.

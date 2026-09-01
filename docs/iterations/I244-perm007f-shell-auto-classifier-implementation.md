@@ -108,9 +108,10 @@ owner-first closeout cite pre-existing implementation evidence.
 
 - Exact implementation base remains `main@94ba2dc5`; stable implementation PR #468 now carries the
   locally converged candidate.
-- New open Issues #466 and #467 were reconciled as requirement-intake-only architecture work with no
-  repository owner, iteration, claim, or implementation authority. They do not overlap I244's
-  permission authority. Any later root Cargo or Runtime overlap requires fresh coordination.
+- New open Issues #466 and #467 are reconciled through Refinement/Unclaimed intake owners CAP-001
+  and CAP-001-P0, with no selected iteration, effective claim or implementation authority. They do
+  not overlap I244's permission authority. Any later root Cargo or Runtime overlap requires fresh
+  coordination.
 - The implementation carries the exact shell command as untrusted data, bounded current user
   intent, shell structure, canonical cwd/workspace bindings, environment names and an opaque full
   environment binding, permission revisions, fixed classifier policy, and honest unavailable/empty
