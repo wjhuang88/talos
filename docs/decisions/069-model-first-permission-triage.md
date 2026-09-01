@@ -1,6 +1,6 @@
 # ADR-069: Model-First Permission Triage For Bounded Requests
 
-**Status:** Proposed
+**Status:** Accepted / I242 Complete
 **Date:** 2026-09-01
 **Owners:** PERM-007-E / I241
 **Depends on:** ADR-064, ADR-065, ADR-066, ADR-067
@@ -74,3 +74,13 @@ Claim and a fresh independent permission/security/API review.
 Supersede or withdraw this ADR if exact request binding cannot be maintained, if a model result can
 cross a policy/admission boundary, if secrets reach the assessor or audit log, or if the bounded
 allowlist cannot be proven stable and fail-closed across supported surfaces.
+
+## Acceptance Evidence
+
+Decision content was introduced by commit `8c570f84`. I242 claim and decision review merged through
+PR #457 as `3e42325916e0299864c109704fe782ca96b04d3d`, with exact-head CI `33464911927` and
+independent permission/governance review comment `5488294817` approving exact head
+`1d08c760416cd983ab2c00c56d039938a5424dbe` against base `6501167a5f050920089f3345e29e1e7ed1021b7a`.
+The review verified the threat model, normalized contract, fail-closed boundaries, exclusions and
+rollback triggers. This acceptance authorizes no implementation; I241 requires its own effective
+implementation claim and independent security review.
