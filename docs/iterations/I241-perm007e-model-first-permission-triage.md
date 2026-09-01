@@ -1,6 +1,6 @@
 # Iteration I241: Model-First Permission Triage
 
-> Document status: Complete / Closed
+> Document status: Complete
 > Planned objective: establish and implement a new, independently reviewed model-first permission
 > triage contract that reduces routine approval prompts without blanket shell auto-approval.
 > MVP deliverable: a runnable normalized-request matrix proves bounded low-risk shell/read/validation
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
 | Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only and local-validation shell/tool requests; deterministic classification first, model `AllowOnce`/`HumanRequired` only, exact binding, fail-closed timeout/error/cancellation, audit redaction, and supported-surface conformance. No blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release or publication. |
@@ -25,10 +25,10 @@
 | Source Issue | #456 |
 | Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; implementation claim is ineffective until this finalized record reaches `main`. |
-| Implementation PR | Not started |
+| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim PR #459 merged as `81ad333c`; implementation exact head `96d655d6` passed CI `33475638936`, independent approval `5489739524`, and merge-time CAS. |
+| Implementation PR | #460 (merged as `b7735ef8`) |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | After claim merge, converge locally and submit one stable implementation candidate for independent permission/security/API review. |
+| Handoff / Release Condition | Closed after PR #460 merge `b7735ef8`; broader shell classification remains separately governed. |
 
 ## Current Nonterminal Inventory And Disposition
 

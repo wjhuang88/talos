@@ -1,11 +1,13 @@
 # PERM-007-E: Model-First Permission Triage
 
+**Status**: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-E |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Complete / Closed |
+| Status | Complete |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #456 |
 | Selected Iteration | I241 |
@@ -15,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
 | Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only/local-validation requests with deterministic policy first, one-time model decisions, exact binding and fail-closed behavior. Exclude blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release and publication. |
@@ -23,10 +25,10 @@
 | Source Issue | #456 |
 | Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim ineffective until finalized governance record reaches `main`. |
+| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim PR #459 merged as `81ad333c`; implementation exact head `96d655d6` passed CI `33475638936`, independent approval `5489739524`, and merge-time CAS. |
 | Implementation PR | #460 (merged as `b7735ef8`) |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | After claim merge, local convergence precedes one stable implementation candidate; exact-head independent permission/security/API review required before merge. |
+| Handoff / Release Condition | Closed after PR #460 merge `b7735ef8`; broader shell classification remains separately governed. |
 
 ## Goal And Value
 
