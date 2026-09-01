@@ -46,8 +46,8 @@ backlog indexes; I242 claims no authority over them.
 Completion Commit: `8c570f84`
 
 The cited commit contains the ADR-069 decision content. The later governance merge `3e423259` and
-exact-head review/CI provide acceptance and claim evidence; this status record is not its own
-completion evidence.
+exact-head review comments `5488254817` and `5488336387`, plus CI `33464911927`, provide acceptance
+and claim evidence; this status record is not its own completion evidence.
 
 ## Acceptance And Validation
 

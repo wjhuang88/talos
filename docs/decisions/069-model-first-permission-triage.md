@@ -79,8 +79,9 @@ allowlist cannot be proven stable and fail-closed across supported surfaces.
 
 Decision content was introduced by commit `8c570f84`. I242 claim and decision review merged through
 PR #457 as `3e42325916e0299864c109704fe782ca96b04d3d`, with exact-head CI `33464911927` and
-independent permission/governance review comment `5488294817` approving exact head
+independent permission/governance review comments `5488254817` (initial decision review) and
+`5488336387` (incremental approval) approving exact head
 `1d08c760416cd983ab2c00c56d039938a5424dbe` against base `6501167a5f050920089f3345e29e1e7ed1021b7a`.
-The review verified the threat model, normalized contract, fail-closed boundaries, exclusions and
-rollback triggers. This acceptance authorizes no implementation; I241 requires its own effective
+Together these reviews verified the threat model, normalized contract, fail-closed boundaries,
+exclusions and rollback triggers. This acceptance authorizes no implementation; I241 requires its own effective
 implementation claim and independent security review.
