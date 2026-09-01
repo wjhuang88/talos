@@ -61,3 +61,21 @@ Validation records remain evidence producers. They must carry a stable producer 
 integrity digest before entering the evaluator request; their status cannot directly issue a Goal
 verdict. Mission final evaluation, Delivery gating and UI-neutral projection remain the separately
 governed WORK-001-E/P4 boundary.
+
+## Mission gate and UI-neutral projection (P4)
+
+`talos_core::work::MissionGate` is a storage-neutral final gate. It reads the required Goal
+identities, their existing revision-bound `Evaluation` values, and an independent
+`MissionEvaluation`; it never mutates those inputs or creates a second work repository.
+
+`MissionGate::evaluate` returns `MissionGateResult` with `DeliveryEligibility` and ordered
+`WorkProjectionEvent` values. Delivery is eligible only when every required Goal has a current
+`Verdict(Pass)` and the independent Mission evaluation also targets the exact Mission identity and
+revision with `Pass`. Missing, stale, failed or inconclusive results produce an explicit
+`DeliveryBlockReason` and `eligible: false`. The event list is presentation-neutral and can be
+adapted by the existing CLI/TUI bridge; it contains no GPUI, locale, cursor or layout state.
+
+The core regression fixture `work::tests::mission_gate_emits_deterministic_eligible_projection`
+walks the non-GPUI happy path, while companion missing-Mission and stale-Goal tests prove that Goal
+PASS alone and an old Goal revision cannot unlock Delivery. Desktop binding, persistence and
+multi-client session behavior remain separate downstream work.

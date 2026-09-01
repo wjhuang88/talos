@@ -19,3 +19,7 @@ pub use evaluation::{
     EvaluationState, EvaluationSubject, EvaluationVerdict, EvidenceRef, FindingSeverity,
     WorkspaceRevision,
 };
+pub use work::{
+    DeliveryBlockReason, DeliveryEligibility, MissionEvaluation, MissionGate, MissionGateResult,
+    WorkProjectionEvent,
+};

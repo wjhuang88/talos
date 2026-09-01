@@ -20,6 +20,150 @@ pub use crate::evaluation::{
     WorkspaceRevision,
 };
 
+/// A Mission-level evaluation result used by the final Delivery gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct MissionEvaluation {
+    /// Exact Mission identity and revision that was evaluated.
+    pub mission: WorkIdentity,
+    /// Independent evaluator verdict for the integrated Mission outcome.
+    pub verdict: EvaluationVerdict,
+}
+
+/// Why a Mission is not eligible for Delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryBlockReason {
+    /// A required Goal has no evaluation result.
+    MissingGoalEvaluation,
+    /// A Goal evaluation does not match the required Mission revision.
+    StaleGoalEvaluation,
+    /// A required Goal evaluation is not a passing verdict.
+    GoalNotPassed,
+    /// More than one result was supplied for the same required Goal.
+    ConflictingGoalEvaluations,
+    /// The independent Mission evaluation is absent.
+    MissingMissionEvaluation,
+    /// The Mission evaluation targets another identity or revision.
+    StaleMissionEvaluation,
+    /// The independent Mission evaluation did not pass.
+    MissionNotPassed,
+}
+
+/// Delivery eligibility produced by the Mission final gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", tag = "state")]
+pub enum DeliveryEligibility {
+    /// All required Goal and Mission evaluations passed at the current revisions.
+    Eligible,
+    /// Delivery is denied until the reported blocker is resolved.
+    Blocked { reason: DeliveryBlockReason },
+}
+
+/// Presentation-neutral event emitted by a Mission gate evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum WorkProjectionEvent {
+    /// A required Goal was inspected by the gate.
+    GoalObserved { goal_id: Uuid, revision: u64 },
+    /// The Mission-level evaluator was inspected by the gate.
+    MissionObserved { mission_id: Uuid, revision: u64 },
+    /// The final Delivery eligibility was determined.
+    DeliveryEligibilityChanged { eligible: bool },
+}
+
+/// Result of evaluating one Mission against its required Goal evaluations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct MissionGateResult {
+    /// Mission identity evaluated by the gate.
+    pub mission: WorkIdentity,
+    /// Delivery eligibility; blocked results never mutate work state.
+    pub delivery: DeliveryEligibility,
+    /// Deterministically ordered events for UI-neutral consumers.
+    pub events: Vec<WorkProjectionEvent>,
+}
+
+/// Storage-neutral final gate for Mission Delivery.
+#[derive(Debug, Clone, Copy)]
+pub struct MissionGate<'a> {
+    /// Mission identity and revision to evaluate.
+    pub mission: WorkIdentity,
+    /// Required Goal identities in deterministic order.
+    pub required_goals: &'a [WorkIdentity],
+    /// Existing revision-bound Goal evaluations.
+    pub goal_evaluations: &'a [Evaluation],
+    /// Independent Mission-level evaluation, if available.
+    pub mission_evaluation: Option<MissionEvaluation>,
+}
+
+impl MissionGate<'_> {
+    /// Evaluate required Goal and Mission results without mutating any input state.
+    #[must_use]
+    pub fn evaluate(&self) -> MissionGateResult {
+        let mut events = Vec::with_capacity(self.required_goals.len() + 2);
+        let mut blocked = None;
+        for goal in self.required_goals {
+            let evaluations: Vec<&Evaluation> = self
+                .goal_evaluations
+                .iter()
+                .filter(|evaluation| {
+                    evaluation.claim.subject.goal.id == goal.id
+                        && evaluation.claim.subject.goal.kind == goal.kind
+                })
+                .collect();
+            match evaluations.as_slice() {
+                [] => {
+                    blocked.get_or_insert(DeliveryBlockReason::MissingGoalEvaluation);
+                }
+                [evaluation] => {
+                    events.push(WorkProjectionEvent::GoalObserved {
+                        goal_id: goal.id,
+                        revision: goal.revision,
+                    });
+                    if evaluation.claim.subject.goal != *goal
+                        || evaluation.claim.subject.mission != self.mission
+                    {
+                        blocked.get_or_insert(DeliveryBlockReason::StaleGoalEvaluation);
+                    } else if !evaluation.has_valid_pass() {
+                        blocked.get_or_insert(DeliveryBlockReason::GoalNotPassed);
+                    }
+                }
+                _ => {
+                    blocked.get_or_insert(DeliveryBlockReason::ConflictingGoalEvaluations);
+                }
+            };
+        }
+
+        match self.mission_evaluation {
+            None => {
+                blocked.get_or_insert(DeliveryBlockReason::MissingMissionEvaluation);
+            }
+            Some(evaluation) => {
+                events.push(WorkProjectionEvent::MissionObserved {
+                    mission_id: evaluation.mission.id,
+                    revision: evaluation.mission.revision,
+                });
+                if evaluation.mission != self.mission {
+                    blocked.get_or_insert(DeliveryBlockReason::StaleMissionEvaluation);
+                } else if evaluation.verdict != EvaluationVerdict::Pass {
+                    blocked.get_or_insert(DeliveryBlockReason::MissionNotPassed);
+                }
+            }
+        }
+
+        let delivery = blocked.map_or(DeliveryEligibility::Eligible, |reason| {
+            DeliveryEligibility::Blocked { reason }
+        });
+        events.push(WorkProjectionEvent::DeliveryEligibilityChanged {
+            eligible: matches!(delivery, DeliveryEligibility::Eligible),
+        });
+        MissionGateResult {
+            mission: self.mission,
+            delivery,
+            events,
+        }
+    }
+}
+
 /// A durable node role in the canonical work graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -267,6 +411,41 @@ pub fn validate_edge(
 mod tests {
     use super::*;
 
+    fn passing_evaluation(mission: WorkIdentity, goal: WorkIdentity) -> Evaluation {
+        let subject = EvaluationSubject {
+            mission,
+            goal,
+            workspace: WorkspaceRevision {
+                id: Uuid::new_v4(),
+                revision: 1,
+            },
+        };
+        let criterion = AcceptanceCriterion {
+            id: Uuid::new_v4(),
+            kind: CriterionKind::Technical,
+            statement: "works".into(),
+            required: true,
+        };
+        let claim = CompletionClaim::new(subject, vec![criterion.clone()], vec![], vec![], "done")
+            .expect("claim");
+        let mut evaluation = claim.evaluation();
+        evaluation.begin().expect("begin");
+        let report = EvaluationReport::new(
+            &claim,
+            subject,
+            vec![CriterionEvaluation {
+                criterion_id: criterion.id,
+                verdict: CriterionVerdict::Pass,
+                evidence: vec![],
+                finding_ids: vec![],
+            }],
+            vec![],
+        )
+        .expect("report");
+        evaluation.accept_report(report).expect("accept");
+        evaluation
+    }
+
     #[test]
     fn rejects_self_dependency_and_cycles() {
         let a = Uuid::new_v4();
@@ -328,6 +507,285 @@ mod tests {
                 }
             )
             .is_ok()
+        );
+    }
+
+    #[test]
+    fn mission_gate_requires_independent_mission_pass() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 4,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 2,
+        };
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[passing_evaluation(mission, goal)],
+            mission_evaluation: None,
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::MissingMissionEvaluation
+            }
+        );
+        assert!(matches!(
+            result.events.last(),
+            Some(WorkProjectionEvent::DeliveryEligibilityChanged { eligible: false })
+        ));
+    }
+
+    #[test]
+    fn mission_gate_emits_deterministic_eligible_projection() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[passing_evaluation(mission, goal)],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(result.delivery, DeliveryEligibility::Eligible);
+        assert_eq!(result.events.len(), 3);
+        assert!(matches!(
+            result.events.last(),
+            Some(WorkProjectionEvent::DeliveryEligibilityChanged { eligible: true })
+        ));
+    }
+
+    #[test]
+    fn mission_gate_rejects_stale_goal_revision() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let required_goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 2,
+        };
+        let old_goal = WorkIdentity {
+            revision: 1,
+            ..required_goal
+        };
+        let result = MissionGate {
+            mission,
+            required_goals: &[required_goal],
+            goal_evaluations: &[passing_evaluation(mission, old_goal)],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::StaleGoalEvaluation
+            }
+        );
+    }
+
+    #[test]
+    fn p4_non_persistent_fixture_covers_claim_staleness_gate_and_delivery_projection() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+
+        let work_unit = WorkNode {
+            identity: WorkIdentity {
+                id: Uuid::new_v4(),
+                kind: WorkKind::WorkUnit,
+                revision: 1,
+            },
+            parent_id: Some(goal.id),
+            title: "fixture work unit".into(),
+            description: None,
+            status: WorkStatus::Completed,
+            priority: WorkPriority::Medium,
+            tags: vec![],
+        };
+        assert_eq!(work_unit.status, WorkStatus::Completed);
+
+        // CompletionClaim::new plus an accepted report models the completed WorkUnit's
+        // independent evaluation without introducing a persistence dependency in P4.
+        let mut goal_evaluation = passing_evaluation(mission, goal);
+        let mut changed_subject = goal_evaluation.claim.subject;
+        changed_subject.goal.revision = 2;
+        goal_evaluation
+            .observe_subject(changed_subject)
+            .expect("revision change marks the prior evaluation stale");
+        goal_evaluation
+            .request_rework()
+            .expect("stale evaluation requires rework");
+        assert_eq!(goal_evaluation.state, EvaluationState::Rework);
+
+        let stale = MissionGate {
+            mission,
+            required_goals: &[changed_subject.goal],
+            goal_evaluations: &[goal_evaluation.clone()],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            stale.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::StaleGoalEvaluation
+            }
+        );
+
+        let refreshed = passing_evaluation(mission, changed_subject.goal);
+        let eligible = MissionGate {
+            mission,
+            required_goals: &[changed_subject.goal],
+            goal_evaluations: &[refreshed],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(eligible.delivery, DeliveryEligibility::Eligible);
+        assert_eq!(eligible.events.len(), 3);
+        assert!(serde_json::to_value(&eligible).is_ok());
+    }
+
+    #[test]
+    fn mission_gate_rejects_duplicate_goal_evaluations() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let first = passing_evaluation(mission, goal);
+        let second = passing_evaluation(mission, goal);
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[first, second],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::ConflictingGoalEvaluations
+            }
+        );
+    }
+
+    #[test]
+    fn mission_gate_rejects_forged_passing_evaluation_without_report() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let mut forged = passing_evaluation(mission, goal);
+        forged.report = None;
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[forged],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::GoalNotPassed
+            }
+        );
+    }
+
+    #[test]
+    fn mission_gate_rejects_passing_state_with_valid_fail_report() {
+        let mission = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 1,
+        };
+        let goal = WorkIdentity {
+            id: Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 1,
+        };
+        let mut forged = passing_evaluation(mission, goal);
+        let claim = forged.claim.clone();
+        forged.report = Some(
+            EvaluationReport::new(
+                &claim,
+                claim.subject,
+                vec![CriterionEvaluation {
+                    criterion_id: claim.criteria[0].id,
+                    verdict: CriterionVerdict::Fail,
+                    evidence: vec![],
+                    finding_ids: vec![],
+                }],
+                vec![],
+            )
+            .expect("valid fail report"),
+        );
+        let result = MissionGate {
+            mission,
+            required_goals: &[goal],
+            goal_evaluations: &[forged],
+            mission_evaluation: Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        }
+        .evaluate();
+        assert_eq!(
+            result.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::GoalNotPassed
+            }
         );
     }
 }

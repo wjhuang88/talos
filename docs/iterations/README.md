@@ -105,7 +105,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 | I237 | Canonical Work Domain And Todo Compatibility | Complete / Closed | Completion Commit `f2b0b5c7`; final head `319a1f15`, CI `33323509558` attempt 2 and independent review `5470154364`. P2 remains separately governed. |
 | I238 | Completion Claim And Evaluation State Model | Complete / Closed | Completion Commit `209931e5`; PR #445 final head `cc2fa218`, CI `33346629666`, independent approval `5472633260`; P3-P4 remain blocked. |
 | I239 | Independent Evaluator Runtime And Evidence Boundary | Complete / Closed | WORK-001-D / Issue #29; Completion Commit `2ff8b9f4`, PR #448 merged as `ac4ce436`, exact-head CI `33359367715`, independent Agent-role review `5063376615`; P4 remains blocked and separately governed. |
-| I240 | Mission Final Gate And UI-Neutral Projection | Active / Claimed (proposed; ineffective until PR #450 merges) | WORK-001-E / Issue #29; bounded P4 claim in PR #450, no implementation authority before merge. |
+| I240 | Mission Final Gate And UI-Neutral Projection | Review / Claimed | WORK-001-E / Issue #29; PR #451 code head `29fb900e`, CI `33386852833` passed; independent review pending. |
 | I235 | PERM-007-C Atomic Create Capability Decision | Complete / Closed | Completion Commit `71acbe0c`; PR #432 accepted the decision-only directory-capability contract. |
 | I227 | Tombstone-Pruning Fixture Performance | Complete / Closed | Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` (5/5) and independent Agent-role approval `5409698923`. |
 

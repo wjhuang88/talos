@@ -317,6 +317,8 @@ pub enum UiOutput {
     TodoCommand(TodoCommandRequest),
     /// Read-only todo panel data rendered by TUI/bridges.
     TodoPanel(TodoPanelData),
+    /// Presentation-neutral Mission/Delivery projection for downstream clients.
+    WorkProjection(talos_core::work::MissionGateResult),
     /// Ask the TUI to collect an API key for the named provider.
     CredentialRequest(CredentialRequestData),
     /// TUI returns a collected API key to the lifecycle handler.

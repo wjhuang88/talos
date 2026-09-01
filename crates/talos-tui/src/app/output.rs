@@ -206,6 +206,28 @@ mod tests {
     }
 
     #[test]
+    fn work_projection_preserves_existing_tui_transcript() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        let result = talos_core::work::MissionGateResult {
+            mission: talos_core::work::WorkIdentity {
+                id: Default::default(),
+                kind: talos_core::work::WorkKind::Mission,
+                revision: 1,
+            },
+            delivery: talos_core::work::DeliveryEligibility::Eligible,
+            events: vec![
+                talos_core::work::WorkProjectionEvent::DeliveryEligibilityChanged {
+                    eligible: true,
+                },
+            ],
+        };
+
+        assert!(!tui.handle_ui_output(UiOutput::WorkProjection(result)));
+        assert!(tui.pending_transcript.is_empty());
+        assert!(!tui.state.should_exit);
+    }
+
+    #[test]
     fn structured_tool_call_suppresses_split_marker_without_blank_row() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
@@ -627,6 +649,10 @@ impl Tui {
             }
             UiOutput::TodoPanel(data) => {
                 self.append_styled_lines(build_todo_panel_lines(&data));
+            }
+            UiOutput::WorkProjection(_) => {
+                // Mission/Delivery state is consumed by presentation-neutral clients. The TUI
+                // keeps its existing transcript and status rendering unchanged.
             }
             UiOutput::ThinkingPreview { text } => {
                 self.state.thinking_preview = text;
