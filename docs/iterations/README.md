@@ -142,6 +142,7 @@ I170's accepted residuals remain explicit:
 
 | ID | State | Notes |
 |---|---|---|
+| I242 | Active / Claimed | PERM-007-E security decision; decision-only ADR-069 review, no implementation authority; claim PR #457 pending merge. |
 | I168 | Complete (2026-07-30) | Provider terminal outcome integrity; completion commit `86262d02`. |
 | I167 | Complete (2026-07-29) | Approval option contrast; implementation `3356aac`. |
 | I166 | Complete (2026-07-28) | Interrupt shortcut reliability; automated and maintainer Alacritty acceptance passed. |
