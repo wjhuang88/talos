@@ -1,6 +1,6 @@
 # Iteration I243: Shell Auto Classifier Decision
 
-> Document status: Refinement / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until claim PR #463 merges)
 > Planned objective: decide the classifier context, precedence, trust configuration, exact-request
 > binding, rollback, and migration contract needed for Claude-like shell auto mode.
 > MVP deliverable: an accepted ADR-070 and security matrix that can authorize a separate runnable
@@ -16,15 +16,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned; decision-only, no production authority |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session 2026-09-01 |
+| Work Slice | Decision-only ADR-070 classifier context, precedence, exact-request binding, migration/rollback contract, Issue #56/#57 authority reconciliation, and threat matrix. No Rust, Cargo, config schema, runtime behavior, UI, release, or publication authority. |
+| Claimed At | 2026-09-01 |
 | Source Issue | #462 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #463 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer direction in the 2026-09-01 mainline session authorizes a generic model-classifier decision instead of per-command exceptions. Independent exact-head permission/security/API review, CI, validators and merge-time CAS remain mandatory; the proposed claim is ineffective until #463 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
 | Implementation PR | None |
 | Last Updated | 2026-09-01 |
 | Handoff / Release Condition | Independent permission/security/API review must accept ADR-070 before I244 claim preparation. |
@@ -49,6 +49,12 @@ merged as `93c4377e`, so `main@93c4377e` records I241 and PERM-007-E Complete/Cl
 shell behavior explicitly left to Issue #462. At this checkpoint there is no Active or Review
 iteration; I207 and I208 remain Planned/Unclaimed, I164 remains Paused/superseded, and I244 remains
 Blocked/Unclaimed. I243 may become Active only through its own atomic decision claim merge.
+
+### Proposed Atomic Activation Through PR #463
+
+PR #463 proposes I243 as the sole Active iteration and claims only the decision surface stated
+above. The proposal has no target-branch effect before merge. I244 and PERM-007-F remain
+Blocked/Unclaimed, and ADR-069 remains the executable authority while ADR-070 is Proposed.
 
 ## Decision Questions
 
