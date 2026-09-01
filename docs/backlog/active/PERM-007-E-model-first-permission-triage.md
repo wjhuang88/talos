@@ -21,7 +21,7 @@
 | Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only/local-validation requests with deterministic policy first, one-time model decisions, exact binding and fail-closed behavior. Exclude blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release and publication. |
 | Claimed At | 2026-09-01 |
 | Source Issue | #456 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim ineffective until finalized governance record reaches `main`. |
 | Implementation PR | Not started |

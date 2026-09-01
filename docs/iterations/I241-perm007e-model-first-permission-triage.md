@@ -23,7 +23,7 @@
 | Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only and local-validation shell/tool requests; deterministic classification first, model `AllowOnce`/`HumanRequired` only, exact binding, fail-closed timeout/error/cancellation, audit redaction, and supported-surface conformance. No blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release or publication. |
 | Claimed At | 2026-09-01 |
 | Source Issue | #456 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; implementation claim is ineffective until this finalized record reaches `main`. |
 | Implementation PR | Not started |
