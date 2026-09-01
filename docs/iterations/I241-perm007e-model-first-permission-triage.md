@@ -1,6 +1,6 @@
 # Iteration I241: Model-First Permission Triage
 
-> Document status: Active / Claimed
+> Document status: Complete
 > Planned objective: establish and implement a new, independently reviewed model-first permission
 > triage contract that reduces routine approval prompts without blanket shell auto-approval.
 > MVP deliverable: a runnable normalized-request matrix proves bounded low-risk shell/read/validation
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
 | Work Slice | Implement bounded model-first triage for normalized, redacted low-risk read-only and local-validation shell/tool requests; deterministic classification first, model `AllowOnce`/`HumanRequired` only, exact binding, fail-closed timeout/error/cancellation, audit redaction, and supported-surface conformance. No blanket shell approval, destructive/network/write expansion, sandbox fallback, permanent grants, Desktop, release or publication. |
@@ -25,16 +25,16 @@
 | Source Issue | #456 |
 | Governance Claim PR | #459 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; implementation claim is ineffective until this finalized record reaches `main`. |
-| Implementation PR | Not started |
+| Authorization Evidence | ADR-069 accepted through I242 closeout merge `017886886f808dc359f6cb0b77e9bef53b822e6f`; claim PR #459 merged as `81ad333c`; implementation exact head `96d655d6` passed CI `33475638936`, independent approval `5489739524`, and merge-time CAS. |
+| Implementation PR | #460 (merged as `b7735ef8`) |
 | Last Updated | 2026-09-01 |
-| Handoff / Release Condition | After claim merge, converge locally and submit one stable implementation candidate for independent permission/security/API review. |
+| Handoff / Release Condition | Closed after PR #460 merge `b7735ef8`; broader shell classification remains separately governed. |
 
 ## Current Nonterminal Inventory And Disposition
 
 | Iteration | Current state | I241 disposition |
 |---|---|---|
-| I241 | Active / Claimed | This implementation slice; claim and activation are pending target-branch merge. |
+| I241 | Complete / Closed | Implemented and merged as PR #460; closeout records exact-head evidence below. |
 | I242 | Closed | ADR-069 accepted; use as normative decision contract. |
 | I207, I208 | Planned / Unclaimed | Preserve steering order; no overlap. |
 | I164 | Paused / superseded | Do not restore. |
@@ -68,8 +68,8 @@ sandbox expansion, Desktop, release and publication.
 
 ## Next Step
 
-ADR-069 is accepted. Do not modify production permission code until this I241 claim is effective on
-`main`; implementation must start from the claim merge or a later target commit.
+ADR-069 was accepted before implementation. Implementation started from the claim merge and is now
+complete.
 
 ## Execution Evidence
 
@@ -88,4 +88,13 @@ Local validation: `cargo fmt --all -- --check`; `cargo check --workspace --locke
 -p talos-agent --locked` (all tests passed); focused auto-resolver tests include exact argument
 binding, shell/path escape rejection, and caller-environment rejection. The initial independent
 security review found environment overrides could bypass the bounded-effects claim; this candidate
-records the local fix before fresh exact-head CI and review.
+records the local fix before fresh exact-head CI and review; both CI and follow-up review passed.
+
+## Completion Evidence
+
+- Completion Commit: `b7735ef8` (merge of implementation PR #460; source implementation commit `96d655d6`)
+- Exact implementation head: `96d655d628bb3d463d6fa263270693da9bb14ccb`
+- Base: `81ad333cbfdc2f4f1f6219e9a65e522c9adbadb0`
+- Exact-head CI: `33475638936`, all five jobs successful
+- Independent permission/security/API review: APPROVE, comment `5489739524`, bound to exact head; shared-account Agent-role limitation disclosed
+- Merge-time CAS: head, base, CI, review and clean merge state verified before merge
