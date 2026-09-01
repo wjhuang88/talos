@@ -11,7 +11,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| PERM-007-F | PERM-007 / Issue #462 | Refinement / Unclaimed | I243 / ADR-070 | Claude-like shell classifier experience with exact binding and fail-closed evidence |
+| PERM-007-F | PERM-007 / Issue #462 | Active / Claimed | I243 / ADR-070 | Claude-like shell classifier experience with exact binding and fail-closed evidence |
 
 ## Collaboration Claim
 
@@ -47,7 +47,7 @@ target-branch commit.
 
 | State | Iterations | Disposition |
 |---|---|---|
-| Active | I244 (this slice, proposed until claim merge) | Owns only generic shell classifier implementation after ADR-070; no implementation starts before #465 merges. |
+| Active | I244 (this slice, claim #465 effective) | Owns only generic shell classifier implementation after ADR-070; implementation starts from #465 merge or later. |
 | Review | None | No review work is displaced. |
 | Planned | I207, I208 | Preserve steering follow-ups as separate unclaimed work; no permission or shell overlap. |
 | Blocked | None with an iteration-owner status | Adjacent PERM-006-D/E authority and other blocked backlog items remain separately owned. |
@@ -98,7 +98,7 @@ release, or publication.
 - Update `/auto` help and permission UI copy so automatic allow, human-required and hard block are
   distinguishable without exposing model reasoning or secrets.
 
-## Claim Preparation
+## Execution Status
 
 The atomic I244 claim is effective on `main`. This owner now records implementation execution facts
 and remains `Active / Claimed` until a separately reviewed implementation and owner-first closeout
