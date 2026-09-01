@@ -1,6 +1,6 @@
 # Iteration I240: Mission Final Gate And UI-Neutral Projection
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-08-31
 > Planned objective: implement WORK-001-E/P4 as a shared Mission gate and UI-neutral projection
 > without introducing Desktop/UI authority.
@@ -21,12 +21,12 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; exact-head implementation CI and independent review required |
-| Implementation PR | #451 (code head `29fb900e7f62afa37a83159b0d137efcc42b1d47`); CI `33386852833` passed |
-| Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Claim+activation must merge before implementation; owner-first closeout after implementation evidence |
+| Implementation PR | #451, merged as `2d667085ae040c5262110232d7ee7f25bc8da037` |
+| Last Updated | 2026-09-01 |
+| Handoff / Release Condition | Complete; downstream Desktop, persistence and multi-client binding remain separately governed. |
 
-Before implementation, follow `docs/sop/AGENT-COLLABORATION.md`. Claim and Active state are
-ineffective until the finalized governance record reaches `main`.
+Implementation began only after the finalized claim and Active record reached `main`, as recorded
+in the dated activation checkpoint below.
 
 ## Published Baseline
 
@@ -92,17 +92,20 @@ ineffective until the finalized governance record reaches `main`.
 |---|---|---|
 | 2026-08-31 | Atomic claim+activation | PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; I240 is effective and implementation started from that merge. |
 | 2026-08-31 | Local end-to-end convergence | Added a storage-neutral fixture covering Completion Claim/report, revision staleness, rework, Mission gate denial, refreshed Goal/Mission PASS and serializable UI-neutral Delivery projection. Focused and full locked validation pass; PR #451 remains under exact-head CI and independent review. |
+| 2026-09-01 | Implementation merged | PR #451 final integration head `ec136f80c563df15316b265d18bd11a625c0ced0` passed exact-head CI `33412796197` (5/5), received independent Agent-role runtime/security/API approval `5481320406`, passed merge-time CAS and merged as `2d667085ae040c5262110232d7ee7f25bc8da037`. |
 
 ## Verification Evidence
 
 - PR #451 code head `29fb900e7f62afa37a83159b0d137efcc42b1d47`: Mission gate/projection and TUI forwarding tests pass. The storage-neutral
   `p4_non_persistent_fixture_covers_claim_staleness_gate_and_delivery_projection` test covers the
-  complete P4 sequence; exact-head CI and independent review remain pending.
+  complete P4 sequence. Final integration head `ec136f80c563df15316b265d18bd11a625c0ced0`
+  passed exact-head CI `33412796197` (5/5) and independent Agent-role review `5481320406`.
 
 ## Completion Evidence
 
-- Completion Commit: Pending
-- A status-only documentation commit cannot certify implementation completion.
+- Completion Commit: `29fb900e7f62afa37a83159b0d137efcc42b1d47` (implementation code head,
+  merged by PR #451 as `2d667085ae040c5262110232d7ee7f25bc8da037`; this status-only closeout
+  commit is not completion evidence).
 
 ## Variance And Residuals
 
@@ -110,6 +113,8 @@ ineffective until the finalized governance record reaches `main`.
 
 ## Retrospective
 
-- Outcome: Pending.
-- Documentation: owner and derived views will be synchronized owner-first after claim/implementation.
-- Lessons: preserve local convergence and stable-stage validation from GOV-008.
+- Outcome: Mission final gating, Delivery eligibility, UI-neutral projection, TUI compatibility and
+  the non-GPUI end-to-end fixture are complete.
+- Documentation: `WORK-EVALUATION-API.md`, owner and derived views are synchronized owner-first.
+- Lessons: keep implementation code identity separate from metadata tails, and move unrelated
+  live-Issue reconciliation into its own governance PR before final review.
