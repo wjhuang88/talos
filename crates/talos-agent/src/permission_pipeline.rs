@@ -58,6 +58,8 @@ pub struct PermissionApprovalRequest {
     pub arguments: serde_json::Value,
     /// Bounded summary fields for a local approval surface.
     pub summary_fields: Vec<String>,
+    /// Bounded current-turn user intent, never prior history or tool output.
+    pub user_intent: String,
     /// Exact capability-relative Session preview.
     pub preview: GrantPreview,
     /// Redaction-safe state binding captured at evaluation time.
@@ -91,6 +93,8 @@ pub struct PermissionAuthorizationRequest<'a> {
     pub presentation_input: serde_json::Value,
     /// Bounded fields highlighted by an approval surface.
     pub summary_fields: Vec<String>,
+    /// Current-turn user instruction used only as bounded classifier context.
+    pub user_intent: Option<&'a str>,
     /// Total remaining permission-pipeline budget.
     pub deadline: Duration,
 }
@@ -214,6 +218,7 @@ impl PermissionPipeline {
             input,
             presentation_input,
             summary_fields,
+            user_intent,
             deadline,
         } = authorization;
         let deadline_at = Instant::now() + deadline;
@@ -244,6 +249,9 @@ impl PermissionPipeline {
                     provenance,
                     arguments: presentation_input,
                     summary_fields,
+                    user_intent: user_intent
+                        .map(|intent| intent.chars().take(4096).collect())
+                        .unwrap_or_default(),
                     preview: session.preview().clone(),
                     binding: PermissionBinding {
                         session_id: binding_snapshot.session_id.stable_id(),
@@ -370,6 +378,7 @@ mod tests {
             provenance: ToolProvenance::Native,
             arguments: input,
             summary_fields: vec!["path".to_owned()],
+            user_intent: String::new(),
             preview: proposal.preview().clone(),
             binding: PermissionBinding {
                 session_id: state.session_id().expect("session id").stable_id(),
@@ -393,7 +402,7 @@ mod tests {
         ) -> Result<String, String> {
             self.calls.fetch_add(1, Ordering::AcqRel);
             Ok(format!(
-                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
                 request.request_digest
             ))
         }
@@ -498,6 +507,7 @@ mod tests {
                 input: &serde_json::json!({"path": target}),
                 presentation_input: serde_json::json!({"path": root.path()}),
                 summary_fields: Vec::new(),
+                user_intent: None,
                 deadline: Duration::from_secs(1),
             })
             .await
@@ -536,6 +546,7 @@ mod tests {
                     input: &input,
                     presentation_input: serde_json::json!({"path": "target.txt"}),
                     summary_fields: vec!["path".to_owned()],
+                    user_intent: None,
                     deadline: Duration::from_secs(1),
                 })
                 .await
@@ -571,6 +582,7 @@ mod tests {
                 input: &input,
                 presentation_input: input.clone(),
                 summary_fields: Vec::new(),
+                user_intent: None,
                 deadline: Duration::from_secs(1),
             })
             .await
@@ -584,6 +596,7 @@ mod tests {
                 input: &input,
                 presentation_input: input.clone(),
                 summary_fields: Vec::new(),
+                user_intent: None,
                 deadline: Duration::from_secs(1),
             })
             .await
@@ -615,6 +628,7 @@ mod tests {
                 input: &serde_json::json!({"path": target}),
                 presentation_input: serde_json::json!({"path": "target.txt"}),
                 summary_fields: Vec::new(),
+                user_intent: None,
                 deadline: Duration::from_millis(10),
             })
             .await
@@ -651,6 +665,7 @@ mod tests {
                 input: &serde_json::json!({"path": target}),
                 presentation_input: serde_json::json!({"path": "target.txt"}),
                 summary_fields: Vec::new(),
+                user_intent: None,
                 deadline: Duration::from_secs(1),
             })
             .await
@@ -754,6 +769,7 @@ mod tests {
                         "content": "hello"
                     }),
                     summary_fields: vec!["path".to_owned()],
+                    user_intent: None,
                     deadline: Duration::from_secs(1),
                 })
                 .await;
@@ -804,6 +820,7 @@ mod tests {
                     input: &serde_json::json!({"path": "blocked.txt", "content": "hello"}),
                     presentation_input: serde_json::json!({"path": "blocked.txt"}),
                     summary_fields: Vec::new(),
+                    user_intent: None,
                     deadline: Duration::from_secs(1),
                 })
                 .await;

@@ -1049,12 +1049,21 @@ impl Agent {
             let tool_results = if let Some(ref tx) = event_tx {
                 let effective_pending =
                     self.pending_calls_with_provenance(&effective_tool_calls, &turn_tool_calls);
+                let user_intent = messages
+                    .iter()
+                    .rev()
+                    .find_map(|message| match message {
+                        Message::User { content } => Some(content.as_str()),
+                        _ => None,
+                    })
+                    .map(str::to_owned);
                 match self
                     .execute_tools_for_ui_with_presentation(
                         &hook_ctx,
                         &effective_pending,
                         tx,
                         &mut messages,
+                        user_intent.as_deref(),
                         &active_tool_presentation_policy,
                         &active_presented_tool_names,
                     )
@@ -1069,10 +1078,15 @@ impl Agent {
                     }
                 }
             } else {
+                let user_intent = messages.iter().rev().find_map(|message| match message {
+                    Message::User { content } => Some(content.as_str()),
+                    _ => None,
+                });
                 let (tool_results, parts) = match self
                     .execute_tools_with_presentation(
                         &hook_ctx,
                         &effective_tool_calls,
+                        user_intent,
                         &active_tool_presentation_policy,
                         &active_presented_tool_names,
                     )

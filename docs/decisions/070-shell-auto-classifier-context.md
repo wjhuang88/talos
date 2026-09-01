@@ -119,9 +119,11 @@ CLI/TUI/Runtime/MCP equivalence.
 ## Status And Authorization
 
 This ADR is Accepted through I243 decision review. It changes no production behavior and authorizes
-no Rust, Cargo, schema, release, or publication work. I244 requires a separate implementation
-claim after acceptance.
+no Rust, Cargo, schema, release, or publication work by itself. I244 has a separate effective
+implementation claim and is the only owner for the bounded implementation described in its owner
+document.
 
 Acceptance evidence: decision content was present in the pre-existing governance merge
 `cc4f22e5`; exact-head CI `33495286016` and independent permission/security/API approval
-`5492369576` were bound to the I243 claim candidate. I244 remains separately gated and unclaimed.
+`5492369576` were bound to the I243 claim candidate. I244 claim PR #465 was subsequently merged at
+`94ba2dc5`; implementation remains subject to its exact-head review and closeout gates.

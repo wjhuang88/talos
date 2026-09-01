@@ -267,6 +267,7 @@ mod tests {
             provenance: ToolProvenance::Native,
             arguments: input,
             summary_fields: vec!["path".to_owned()],
+            user_intent: String::new(),
             preview: session.preview().clone(),
             binding: PermissionBinding {
                 session_id: state.session_id().expect("session id").stable_id(),
