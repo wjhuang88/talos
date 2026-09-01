@@ -6,9 +6,9 @@
 | Type | Runtime / State / Projection Story |
 | Parent Epic | WORK-001 |
 | Priority | P0 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | GitHub Issue #29; DESKTOP-001 prerequisite chain section 20.5 |
-| Selected Iteration | I240 Review / Claimed |
+| Selected Iteration | I240 Complete / Closed |
 | Depends On | WORK-001-D / I239 Complete; WORK-001-C / I238; DESKTOP-001 direction; ADR-061 |
 
 ## Collaboration Claim
@@ -24,9 +24,9 @@
 | Governance Claim PR | #450 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #450 merged as `c6ebc1a41d3824cea77a3a3f15862e95bbe27432`; exact-head implementation CI and independent review required |
-| Implementation PR | #451 (code head `29fb900e7f62afa37a83159b0d137efcc42b1d47`; CI `33386852833`) |
-| Last Updated | 2026-08-31 |
-| Handoff / Release Condition | Implementation candidate locally converged; push one stable PR, obtain exact-head CI and independent review before closeout |
+| Implementation PR | #451, merged as `2d667085ae040c5262110232d7ee7f25bc8da037` |
+| Last Updated | 2026-09-01 |
+| Handoff / Release Condition | Complete; downstream Desktop, durable Mission/session storage and multi-client integration remain separately governed. |
 
 ## Identity / Goal / Value
 
@@ -92,7 +92,7 @@ this projection rather than inventing a second Mission or evaluation authority.
 - [x] Projection state/events have serialization and ordering tests and one documented adapter path.
 - [x] A runnable non-GPUI end-to-end test or transcript covers the full P4 sequence.
 - [x] Public/API documentation names the projection, compatibility and migration boundary.
-- [ ] Locked focused/workspace validation, governance validators, `git diff --check`, exact-head CI
+- [x] Locked focused/workspace validation, governance validators, `git diff --check`, exact-head CI
       and independent runtime/security review pass before Complete.
 
 ## State / Status Owners
@@ -122,13 +122,21 @@ do not describe Desktop behavior as shipped.
 
 ## Local Convergence Checkpoint (2026-08-31)
 
-The implementation candidate is locally converged and submitted as PR #451 at code head `29fb900e7f62afa37a83159b0d137efcc42b1d47`; exact-head CI `33386852833` passed. The changed-file inventory is limited to the
+The implementation candidate converged at code head `29fb900e7f62afa37a83159b0d137efcc42b1d47`. The changed-file inventory is limited to the
 canonical `talos-core` Mission gate and projection types/tests, the `talos-conversation` forwarding
 path/test, the existing `talos-tui` compatibility arm/test, and the shared evaluation API
 documentation. No persistence, Desktop, Dashboard, permission, release or dependency files were
 changed. Focused core/conversation/TUI tests, clippy and the locked workspace test suite passed.
-The submitted candidate still requires exact-head CI and independent
-runtime/security/API review.
+PR #451 final integration head `ec136f80c563df15316b265d18bd11a625c0ced0` passed exact-head CI
+`33412796197` (5/5), independent Agent-role runtime/security/API review `5481320406` and merge-time
+CAS, then merged as `2d667085ae040c5262110232d7ee7f25bc8da037`.
+
+## Completion Evidence
+
+Completion Commit: `29fb900e7f62afa37a83159b0d137efcc42b1d47` (implementation code head,
+merged by PR #451 as `2d667085ae040c5262110232d7ee7f25bc8da037`; this owner closeout cannot
+self-certify completion). The review was performed as an independent Agent role under a shared
+GitHub account and does not claim natural-person identity separation.
 
 ## Residual Destination
 

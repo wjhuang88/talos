@@ -5,7 +5,7 @@
 | Story ID | WORK-001 |
 | Type | Architecture / Domain Epic |
 | Priority | P0 |
-| Status | In Progress — P0/P1/P2/P3 Complete; P4 is the next separately governed slice |
+| Status | Complete / Closed — P0-P4 complete |
 | Source | DESKTOP-001 refined direction; GitHub Issue #29; three-track development baseline |
 | Selected Iteration | None — Epic parents are not selected directly |
 | Depends On | RUNTIME-001; TODO-001; TODO-002; VALIDATION-001; ADR-008; ADR-024; ADR-042; ADR-052 |
@@ -24,8 +24,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Close every required child through its own owner, iteration, claim, implementation PR, acceptance evidence and independent exact-head review. |
+| Last Updated | 2026-09-01 |
+| Handoff / Release Condition | Complete; every P0-P4 child closed through its own owner, iteration, claim, implementation evidence and independent exact-head review. |
 
 ## Identity / Goal / Value
 
@@ -44,14 +44,30 @@ mainline work. It does not authorize any child merely because the overall direct
 | WORK-001-B / P1 | Implement the canonical Work Domain and mechanically prove Todo compatibility. | Complete / Closed | WORK-001-A Accepted and Complete | I237 Complete / Closed |
 | WORK-001-C / P2 | Implement Completion Claim and revision-bound Evaluation state semantics. | Complete / Closed; Completion Commit `209931e5`, PR #445 merged | WORK-001-B Complete | I238 Complete / Closed |
 | WORK-001-D / P3 | Implement an independent evaluator runtime boundary and consume Validation evidence safely. | Complete / Closed | WORK-001-C Complete | I239 Complete / Closed |
-| WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Review / Claimed | WORK-001-D Complete | I240 Review / Claimed |
+| WORK-001-E / P4 | Implement Mission final gating, UI-neutral projection and non-GPUI end-to-end closure. | Complete / Closed | WORK-001-D Complete | I240 Complete / Closed |
 
-Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (WORK-001-A P0 decision packet; the
-Epic remains open while P1-P4 are separately governed).
+P0 Completion Commit: `779a4c7116610f07258013e866f74b2a180c5453` (WORK-001-A decision packet).
 
-P1-P4 identifiers reserve dependency boundaries only. Their executable owner documents, iteration
-plans and claims must be created separately after the preceding child is accepted; this P0 claim
-must not pre-authorize or implement them.
+## 2026-09-01 P4 And Epic Completion Checkpoint
+
+WORK-001-E/I240 is Complete / Closed at Completion Commit
+`29fb900e7f62afa37a83159b0d137efcc42b1d47`, merged by PR #451 as
+`2d667085ae040c5262110232d7ee7f25bc8da037`. Final integration head `ec136f80` passed exact-head
+CI `33412796197` (5/5), independent Agent-role runtime/security/API review `5481320406` and
+merge-time CAS. The shipped shared foundation now includes the canonical Work Domain and Todo
+compatibility, revision-bound Completion Claim/Evaluation state, independent evaluator runtime,
+Mission Delivery gate, UI-neutral projection, TUI compatibility adapter and a non-GPUI end-to-end
+fixture. P0-P4 are therefore all Complete / Closed. Desktop, Dashboard, durable Mission/session
+storage and multi-client attachment remain outside WORK-001 and retain their own owners.
+
+Epic Completion Commits: P0 `779a4c7116610f07258013e866f74b2a180c5453`; P1
+`f2b0b5c7e5f5080c9c36f7b7a1993af4246f6f91`; P2 `209931e5`; P3
+`2ff8b9f4507537b41c912661745708e942d19d62`; P4
+`29fb900e7f62afa37a83159b0d137efcc42b1d47`.
+
+At P0 publication, P1-P4 identifiers reserved dependency boundaries only and the P0 claim did not
+pre-authorize them. Each later child was subsequently created and completed through its own owner,
+iteration and claim.
 
 ## 2026-08-31 P3 Completion Checkpoint
 
@@ -159,8 +175,8 @@ update its own user-facing documentation.
 
 ## Residual Destination
 
-Create WORK-001-B through WORK-001-E owner documents only when their direct prerequisite is
-accepted and their own requirement intake can define a bounded, testable result.
+Desktop binding, durable Mission/session persistence, multi-client attachment and product-specific
+presentation remain in their existing downstream owners; they are not residual WORK-001 work.
 
 ## 2026-08-31 P4 Requirement Intake Checkpoint
 
