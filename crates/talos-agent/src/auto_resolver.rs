@@ -1408,7 +1408,7 @@ impl ApprovalResolver for AutoPermissionResolver {
                 .resolve(request, remaining.saturating_sub(started.elapsed()))
                 .await;
         }
-        let response: AutoPermissionWireResponse = match serde_json::from_str(&raw) {
+        let response: AutoPermissionWireResponse = match parse_auto_response(&raw) {
             Ok(value) => value,
             Err(_) => {
                 self.record_failure();
@@ -1478,6 +1478,25 @@ impl ApprovalResolver for AutoPermissionResolver {
                 .await
         }
     }
+}
+
+/// Parses the closed assessor response while tolerating provider wrappers such as a Markdown
+/// code fence or a short preamble. The extracted value is still deserialized with
+/// `deny_unknown_fields`, so this does not broaden the wire contract or decision authority.
+fn parse_auto_response(raw: &str) -> Result<AutoPermissionWireResponse, serde_json::Error> {
+    let trimmed = raw.trim();
+    if let Ok(response) = serde_json::from_str(trimmed) {
+        return Ok(response);
+    }
+    let start = trimmed.find('{').ok_or_else(|| {
+        serde_json::from_str::<AutoPermissionWireResponse>("not-json")
+            .expect_err("sentinel must fail")
+    })?;
+    let end = trimmed.rfind('}').ok_or_else(|| {
+        serde_json::from_str::<AutoPermissionWireResponse>("not-json")
+            .expect_err("sentinel must fail")
+    })?;
+    serde_json::from_str(&trimmed[start..=end])
 }
 
 #[cfg(test)]
@@ -2403,6 +2422,14 @@ mod tests {
                 expected_reason
             );
         }
+    }
+
+    #[test]
+    fn assessor_response_accepts_provider_wrapped_json_only() {
+        let raw = "Here is the decision:\n```json\n{\"schema_version\":1,\"request_digest\":\"sha256:x\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_read_only_command\",\"confidence\":\"high\"}\n```";
+        let response = parse_auto_response(raw).expect("wrapped JSON");
+        assert_eq!(response.decision, AutoDecision::AllowOnce);
+        assert_eq!(response.effect, AutoEffect::ReadOnly);
     }
 
     #[tokio::test]
