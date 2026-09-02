@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Review / Claimed (local stable candidate converged; remote evidence pending) |
+| Status | Review / Claimed (implementation merged; deferred real-TUI acceptance pending) |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -117,5 +117,16 @@ Unix, Windows, UNC, parent-traversal and symlink escape targets, without replaci
 classification with a command allowlist. Twenty-four resolver tests, 12 permission-pipeline tests,
 the public 0.8.0 API compatibility test, and the full locked release preflight pass. Prior head
 `a71b4052`, CI `33540527533`, and review request `5498309737` are stale for this substantive change.
-The Story remains Review / Claimed pending one corrected PR #468 head, fresh exact-head CI,
-independent permission/security/API approval, real TUI acceptance and merge-time CAS.
+The Story remains Review / Claimed after PR #468 merged. Real TUI acceptance is deferred under the
+validation tracker; `Completion Commit` remains unset until that evidence is recorded.
+
+## 2026-09-02 Post-Merge Closeout Checkpoint
+
+- Implementation PR #468 merged at `4ba1b79f`; implementation evidence commit is
+  `4342caa625faac3cea1ef3ff8838a203773c6a9f`.
+- Exact-head CI `33571272200` passed 5/5. Independent permission/security/API review APPROVE is
+  comment `5502603758`, bound to the exact implementation head and base.
+- Merge-time CAS passed. Local locked tests, release preflight, governance validators and public
+  API compatibility checks passed before merge.
+- Real TUI acceptance remains deferred under Issue #302's validation process; no completion claim
+  is made until routine auto-allow, fallback prompt and `/auto off` behavior are observed.

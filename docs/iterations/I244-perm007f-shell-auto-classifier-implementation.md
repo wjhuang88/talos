@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Review / Claimed (local stable candidate converged; remote evidence pending)
+> Document status: Review / Claimed (implementation merged; deferred real-TUI acceptance pending)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -31,7 +31,7 @@
 | Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
 
 The Active/Claimed state became effective when claim PR #465 merged to `main` at merge commit
-`94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`. Implementation must start from that merge or a later
+`94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`. Implementation started from that merge or a later
 target-branch commit.
 
 ## Activation Checkpoint (2026-09-01)
@@ -100,9 +100,9 @@ release, or publication.
 
 ## Execution Status
 
-The atomic I244 claim is effective on `main`. Local implementation has converged and this owner is
-now `Review / Claimed`; it cannot become Complete until the implementation merge and a later
-owner-first closeout cite pre-existing implementation evidence.
+The atomic I244 claim is effective on `main`. The implementation is merged, but this owner remains
+`Review / Claimed` until deferred real-TUI acceptance is recorded. `Completion Commit` remains unset;
+a later owner-first closeout must cite pre-existing implementation evidence.
 
 ## 2026-09-02 Local Convergence And Issue Synchronization Checkpoint
 
@@ -149,6 +149,20 @@ owner-first closeout cite pre-existing implementation evidence.
   governance validators, public-site/installer validation, and CI-classifier tests. Local Cargo
   incremental compilation and debug symbols were disabled only to control disk usage; source,
   features, lockfile, test selection, and release behavior were unchanged.
-- Status remains Review / Claimed. A single corrected stable candidate must be committed and pushed
-  to PR #468, then receive fresh exact-head CI and independent permission/security/API review.
-  Real TUI acceptance and merge-time CAS remain pending; no completion evidence is claimed.
+- Status remains Review / Claimed. The corrected stable candidate was merged through PR #468.
+  Real TUI acceptance is deferred to the validation tracker below; no completion evidence is claimed
+  until that evidence is recorded.
+
+## 2026-09-02 Post-Merge Closeout Checkpoint
+
+- Implementation PR #468 merged at `4ba1b79f`; implementation evidence commit is
+  `4342caa625faac3cea1ef3ff8838a203773c6a9f`.
+- Exact-head CI `33571272200` passed 5/5. Independent permission/security/API review APPROVE is
+  comment `5502603758`, bound to the exact implementation head and base.
+- Merge-time CAS passed before merge. No Dashboard, Desktop, release, publication, Cargo
+  manifest, lockfile, or PERM-006-D/E authority was included.
+- Local locked tests, public API compatibility, full workspace validation, release preflight,
+  both governance validators, and `git diff --check` passed.
+- Real TUI acceptance of routine auto-allow, human-required fallback, and `/auto off` remains
+  deferred under Issue #302's validation process. I244 therefore remains Review / Claimed and
+  `Completion Commit` is intentionally unset.
