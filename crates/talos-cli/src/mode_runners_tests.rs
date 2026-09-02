@@ -7,6 +7,31 @@ use talos_config::ProviderConfig;
 use talos_plugin::HookRegistry;
 use tracing_subscriber::fmt::MakeWriter;
 
+#[test]
+fn auto_review_report_distinguishes_model_decision_from_classifier_bypass() {
+    let allowed = talos_agent::auto_resolver::AutoDecisionReport {
+        outcome: "allow_once".into(),
+        reason: "shell_command".into(),
+        evaluator: "test".into(),
+        request_digest: "sha256:test".into(),
+    };
+    assert_eq!(
+        super::format_auto_review_report(&allowed),
+        "Auto review: model allowed once — bounded read-only shell command\n"
+    );
+
+    let bypassed = talos_agent::auto_resolver::AutoDecisionReport {
+        outcome: "human_required".into(),
+        reason: "classifier_not_eligible".into(),
+        evaluator: "test".into(),
+        request_digest: "unavailable".into(),
+    };
+    assert_eq!(
+        super::format_auto_review_report(&bypassed),
+        "Auto review: model not consulted — request outside automatic review scope\n"
+    );
+}
+
 #[derive(Clone, Default)]
 struct DashboardLogBuffer(Arc<StdMutex<Vec<u8>>>);
 

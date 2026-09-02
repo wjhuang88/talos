@@ -60,6 +60,31 @@ use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::todo_view;
 use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
 use crate::tui_runtime_builder::TuiRuntimeBuilder;
+
+fn format_auto_review_report(report: &talos_agent::auto_resolver::AutoDecisionReport) -> String {
+    let text = match (report.outcome.as_str(), report.reason.as_str()) {
+        ("allow_once", "shell_command") => "model allowed once — bounded read-only shell command",
+        ("allow_once", "bounded_create") => "model allowed once — bounded workspace file creation",
+        ("human_required", "classifier_not_eligible") => {
+            "model not consulted — request outside automatic review scope"
+        }
+        ("human_required", "explicit_human_checkpoint") => {
+            "human approval required — explicit permission rule"
+        }
+        ("human_required", "auto_disabled") => "model not consulted — auto mode is disabled",
+        ("human_required", "circuit_open") => {
+            "model not consulted — automatic review temporarily unavailable"
+        }
+        ("human_required", "technical_failure") => "model review failed — human approval required",
+        ("human_required", "malformed_output") => {
+            "model returned an invalid review — human approval required"
+        }
+        ("human_required", "human_required") => "model requested human approval",
+        ("human_required", _) => "model could not allow — human approval required",
+        _ => "automatic review completed",
+    };
+    format!("Auto review: {text}\n")
+}
 use crate::{Cli, build_hook_registry, event_loop};
 use tokio::sync::Mutex;
 
@@ -286,6 +311,19 @@ pub(crate) async fn run_tui_mode(
         &talos_root,
     ));
     let auto_control = AutoPermissionControl::new(config.auto.enabled);
+    let auto_report_sink: Arc<
+        dyn Fn(talos_agent::auto_resolver::AutoDecisionReport) + Send + Sync,
+    > = Arc::new({
+        let ui_tx = ui_output_tx.clone();
+        move |report| {
+            let _ = ui_tx.send(UiOutput::Content(
+                talos_conversation::ContentOutput::Block {
+                    source: talos_conversation::MessageSource::System,
+                    text: format_auto_review_report(&report),
+                },
+            ));
+        }
+    });
 
     let hooks = build_hook_registry(true);
     apply_mcp_fixture_config(&mut config, &cli);
@@ -298,7 +336,8 @@ pub(crate) async fn run_tui_mode(
         !cli.no_context,
         cli.mock,
     )
-    .with_auto_control(auto_control.clone());
+    .with_auto_control(auto_control.clone())
+    .with_auto_report_sink(auto_report_sink.clone());
     let initial_runtime_builder = TuiRuntimeBuilder::new(
         hooks.clone(),
         workspace_root.to_path_buf(),
@@ -308,7 +347,8 @@ pub(crate) async fn run_tui_mode(
         !cli.no_context,
         mock_for_startup,
     )
-    .with_auto_control(auto_control.clone());
+    .with_auto_control(auto_control.clone())
+    .with_auto_report_sink(auto_report_sink);
 
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();

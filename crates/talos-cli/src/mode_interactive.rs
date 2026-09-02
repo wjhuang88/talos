@@ -115,7 +115,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let fallback = terminal_approval.clone();
     let auto_control = AutoPermissionControl::new(config.auto.enabled);
     let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
-        ManagedWorkspaceLease::new(&workspace_root, session.id.to_string())
+        ManagedWorkspaceLease::for_permission_session(&workspace_root, permission_state.clone())
             .ok()
             .map(|lease| {
                 let lease = atomic_create_capability

@@ -1140,7 +1140,7 @@ fn preview_text_uses_phase_priority_states() {
             "",
             0,
         ),
-        "running tool: bash..."
+        "processing tool request: bash..."
     );
 }
 
