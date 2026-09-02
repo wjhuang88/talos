@@ -9,7 +9,8 @@ use talos_core::ApprovalChoice;
 use talos_core::tool::{ToolExecutionAuthorization, ToolPermissionFacet, ToolProvenance};
 use talos_permission::{
     GrantPreview, GrantSource, InteractionCapability, PermissionContext, PermissionDecision,
-    PermissionInvocation, PermissionMode, PermissionRequest, PermissionSessionState,
+    PermissionDecisionSource, PermissionInvocation, PermissionMode, PermissionOutcome,
+    PermissionRequest, PermissionRuleSource, PermissionSessionState,
 };
 use thiserror::Error;
 use tokio::time::{Instant, timeout_at};
@@ -104,6 +105,22 @@ pub trait ApprovalResolver: Send + Sync {
         request: PermissionApprovalRequest,
         remaining: Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError>;
+
+    /// Resolves an approval with the authoritative pipeline's automatic-assessment eligibility.
+    ///
+    /// Existing human-only resolvers can rely on this default. Automatic resolvers override it so
+    /// a configured or explicit `Ask` remains a human checkpoint without extending the public
+    /// [`PermissionApprovalRequest`] data contract.
+    async fn resolve_with_auto_assessment(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        let _ = (auto_assessment_allowed, user_intent);
+        self.resolve(request, remaining).await
+    }
 
     /// Identifies the bounded source recorded for a Session grant.
     fn grant_source(&self) -> GrantSource {
@@ -207,6 +224,24 @@ impl PermissionPipeline {
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        self.authorize_inner(authorization, None).await
+    }
+
+    /// Evaluates, resolves and admits one request with bounded current-turn intent available to
+    /// contextual automatic assessors. The intent is never added to the approval request API.
+    pub async fn authorize_with_user_intent(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        self.authorize_inner(authorization, user_intent).await
+    }
+
+    async fn authorize_inner(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
         let PermissionAuthorizationRequest {
             tool_name,
             provenance,
@@ -223,9 +258,9 @@ impl PermissionPipeline {
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
-        let invocation = self
+        let (invocation, evaluation_report) = self
             .state
-            .try_begin_invocation(&request, &self.context)
+            .try_begin_invocation_with_report(&request, &self.context)
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         ensure_before(deadline_at)?;
 
@@ -239,6 +274,17 @@ impl PermissionPipeline {
                     .resolver
                     .as_ref()
                     .ok_or(PermissionPipelineError::ResolverUnavailable)?;
+                let auto_assessment_allowed = !evaluation_report.facets().iter().any(|facet| {
+                    facet.outcome() == PermissionOutcome::Ask
+                        && matches!(
+                            facet.source(),
+                            PermissionDecisionSource::Rule {
+                                rule_source: PermissionRuleSource::Configured
+                                    | PermissionRuleSource::Explicit,
+                                ..
+                            }
+                        )
+                });
                 let approval = PermissionApprovalRequest {
                     tool_name: tool_name.to_owned(),
                     provenance,
@@ -254,8 +300,13 @@ impl PermissionPipeline {
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
                 let resolver_future =
-                    std::panic::AssertUnwindSafe(resolver.resolve(approval, remaining))
-                        .catch_unwind();
+                    std::panic::AssertUnwindSafe(resolver.resolve_with_auto_assessment(
+                        approval,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind();
                 let choice = timeout_at(deadline_at, resolver_future)
                     .await
                     .map_err(|_| PermissionPipelineError::DeadlineExceeded)?
@@ -341,6 +392,11 @@ mod tests {
         calls: Arc<AtomicUsize>,
     }
 
+    struct ShellMatrixAssessor {
+        calls: Arc<AtomicUsize>,
+        invalidate: Option<Arc<PermissionSessionState>>,
+    }
+
     fn matrix_approval_request(
         root: &Path,
         state: &PermissionSessionState,
@@ -393,7 +449,34 @@ mod tests {
         ) -> Result<String, String> {
             self.calls.fetch_add(1, Ordering::AcqRel);
             Ok(format!(
-                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+                request.request_digest
+            ))
+        }
+    }
+
+    #[async_trait]
+    impl AutoPermissionAssessor for ShellMatrixAssessor {
+        async fn assess(
+            &self,
+            _request: AutoPermissionRequest,
+            _remaining: Duration,
+        ) -> Result<String, String> {
+            Err("shell matrix requires contextual entrypoint".to_owned())
+        }
+
+        async fn assess_with_context(
+            &self,
+            request: AutoPermissionRequest,
+            _context: crate::auto_resolver::AutoPermissionAssessmentContext,
+            _remaining: Duration,
+        ) -> Result<String, String> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            if let Some(state) = &self.invalidate {
+                state.clear().map_err(|error| error.to_string())?;
+            }
+            Ok(format!(
+                "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_read_only_command\",\"confidence\":\"high\"}}",
                 request.request_digest
             ))
         }
@@ -475,6 +558,18 @@ mod tests {
             path.display().to_string(),
             ToolResourceKind::Path,
         )]
+    }
+
+    fn shell_profile(command: &str) -> Vec<ToolPermissionFacet> {
+        vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            format!("bash:read_only_inspection:exact:{command}"),
+            ToolResourceKind::Command,
+        )]
+    }
+
+    fn shell_input(command: &str) -> serde_json::Value {
+        serde_json::json!({"command": command, "background": false})
     }
 
     #[tokio::test]
@@ -772,6 +867,72 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn i244_shell_classifier_preserves_interactive_and_headless_surface_contracts() {
+        let profiles = [
+            SurfaceProfile::Goal,
+            SurfaceProfile::InteractiveCli,
+            SurfaceProfile::InteractiveTui,
+            SurfaceProfile::Runtime,
+            SurfaceProfile::Mcp,
+        ];
+
+        for surface in profiles {
+            let root = tempfile::tempdir().expect("tempdir");
+            let command = "ls -la";
+            let state = Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+            ));
+            let calls = Arc::new(AtomicUsize::new(0));
+            let resolver = surface.has_interaction().then(|| {
+                Arc::new(AutoPermissionResolver::new(
+                    Arc::new(ShellMatrixAssessor {
+                        calls: calls.clone(),
+                        invalidate: None,
+                    }),
+                    Arc::new(StaticResolver(ApprovalChoice::Deny)),
+                    ManagedWorkspaceLease::new(
+                        root.path(),
+                        state.session_id().expect("session id").stable_id(),
+                    )
+                    .expect("lease"),
+                    Duration::from_secs(8),
+                    AutoPermissionControl::new(true),
+                )) as Arc<dyn ApprovalResolver>
+            });
+            let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
+            let input = shell_input(command);
+            let result = pipeline
+                .authorize_with_user_intent(
+                    PermissionAuthorizationRequest {
+                        tool_name: "bash",
+                        provenance: surface.provenance(),
+                        profile: &shell_profile(command),
+                        input: &input,
+                        presentation_input: input.clone(),
+                        summary_fields: vec!["command".to_owned()],
+                        deadline: Duration::from_secs(1),
+                    },
+                    surface
+                        .has_interaction()
+                        .then_some("inspect this workspace"),
+                )
+                .await;
+
+            if surface.has_interaction() {
+                assert!(result.is_ok(), "interactive shell request should resolve");
+                assert_eq!(calls.load(Ordering::Acquire), 1);
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(PermissionPipelineError::ResolverUnavailable)
+                ));
+                assert_eq!(calls.load(Ordering::Acquire), 0);
+            }
+            assert_eq!(state.grant_count().expect("grant count"), 0);
+        }
+    }
+
+    #[tokio::test]
     async fn i236_hard_deny_wins_over_every_surface_resolver() {
         let profiles = [
             SurfaceProfile::Goal,
@@ -813,6 +974,164 @@ mod tests {
             ));
             assert_eq!(state.grant_count().expect("grant count"), 0);
         }
+    }
+
+    #[tokio::test]
+    async fn i244_explicit_ask_bypasses_model_assessment() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let command = "ls -la";
+        let engine = PermissionEngine::from_rules(vec![PermissionRule::new_nature(
+            ToolNature::Execute,
+            None,
+            None,
+            PermissionDecision::Ask,
+        )]);
+        let state = Arc::new(PermissionSessionState::new(engine));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellMatrixAssessor {
+                calls: calls.clone(),
+                invalidate: None,
+            }),
+            Arc::new(StaticResolver(ApprovalChoice::Deny)),
+            ManagedWorkspaceLease::new(
+                root.path(),
+                state.session_id().expect("session id").stable_id(),
+            )
+            .expect("lease"),
+            Duration::from_secs(8),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state,
+            PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let input = shell_input(command);
+        let result = pipeline
+            .authorize_with_user_intent(
+                PermissionAuthorizationRequest {
+                    tool_name: "bash",
+                    provenance: ToolProvenance::Native,
+                    profile: &shell_profile(command),
+                    input: &input,
+                    presentation_input: input.clone(),
+                    summary_fields: vec!["command".to_owned()],
+                    deadline: Duration::from_secs(1),
+                },
+                Some("inspect this workspace"),
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(PermissionPipelineError::Denied(PermissionDecision::Deny(_)))
+        ));
+        assert_eq!(calls.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test]
+    async fn i244_default_shell_ask_is_assessed_then_admitted_once() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let command = "ls -la";
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellMatrixAssessor {
+                calls: calls.clone(),
+                invalidate: None,
+            }),
+            Arc::new(StaticResolver(ApprovalChoice::Deny)),
+            ManagedWorkspaceLease::new(
+                root.path(),
+                state.session_id().expect("session id").stable_id(),
+            )
+            .expect("lease"),
+            Duration::from_secs(8),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state.clone(),
+            PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let input = shell_input(command);
+        pipeline
+            .authorize_with_user_intent(
+                PermissionAuthorizationRequest {
+                    tool_name: "bash",
+                    provenance: ToolProvenance::Native,
+                    profile: &shell_profile(command),
+                    input: &input,
+                    presentation_input: input.clone(),
+                    summary_fields: vec!["command".to_owned()],
+                    deadline: Duration::from_secs(1),
+                },
+                Some("inspect this workspace"),
+            )
+            .await
+            .expect("one exact shell invocation is admitted");
+
+        assert_eq!(calls.load(Ordering::Acquire), 1);
+        assert_eq!(state.grant_count().expect("grant count"), 0);
+    }
+
+    #[tokio::test]
+    async fn i244_model_allow_cannot_cross_a_stale_admission_fence() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let command = "ls -la";
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellMatrixAssessor {
+                calls: calls.clone(),
+                invalidate: Some(state.clone()),
+            }),
+            Arc::new(StaticResolver(ApprovalChoice::Deny)),
+            ManagedWorkspaceLease::new(
+                root.path(),
+                state.session_id().expect("session id").stable_id(),
+            )
+            .expect("lease"),
+            Duration::from_secs(8),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state,
+            PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let input = shell_input(command);
+        let result = pipeline
+            .authorize_with_user_intent(
+                PermissionAuthorizationRequest {
+                    tool_name: "bash",
+                    provenance: ToolProvenance::Native,
+                    profile: &shell_profile(command),
+                    input: &input,
+                    presentation_input: input.clone(),
+                    summary_fields: vec!["command".to_owned()],
+                    deadline: Duration::from_secs(1),
+                },
+                Some("inspect this workspace"),
+            )
+            .await;
+
+        assert!(matches!(result, Err(PermissionPipelineError::State(_))));
+        assert_eq!(calls.load(Ordering::Acquire), 1);
     }
 
     #[tokio::test]

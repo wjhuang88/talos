@@ -37,6 +37,7 @@ impl Agent {
         &self,
         hook_ctx: &HookContext,
         calls: &[ToolCall],
+        user_intent: Option<&str>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
@@ -100,6 +101,7 @@ impl Agent {
                                 &ctx,
                                 registry,
                                 call,
+                                user_intent,
                                 policy,
                                 presented_tool_names,
                                 quota,
@@ -124,6 +126,7 @@ impl Agent {
                     hook_ctx,
                     &self.tools,
                     call,
+                    user_intent,
                     policy,
                     presented_tool_names,
                     &read_image_quota,
@@ -239,12 +242,14 @@ impl Agent {
             .collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_tools_for_ui_with_presentation(
         &self,
         hook_ctx: &HookContext,
         calls: &[PendingToolCall],
         event_tx: &mpsc::UnboundedSender<AgentEvent>,
         messages: &mut Vec<Message>,
+        user_intent: Option<&str>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
@@ -269,6 +274,7 @@ impl Agent {
                     hook_ctx,
                     &self.tools,
                     &pending.call,
+                    user_intent,
                     policy,
                     presented_tool_names,
                     &read_image_quota,
@@ -352,11 +358,13 @@ impl Agent {
         Ok((results, all_parts))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn execute_single_tool_with_presentation(
         &self,
         hook_ctx: &HookContext,
         registry: &ToolRegistry,
         call: &ToolCall,
+        user_intent: Option<&str>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
         read_image_quota: &std::sync::atomic::AtomicUsize,
@@ -529,20 +537,23 @@ impl Agent {
             }
 
             let authorization = pipeline
-                .authorize(PermissionAuthorizationRequest {
-                    tool_name: &call.name,
-                    provenance: tool.provenance(),
-                    profile: &permission_profile,
-                    input: &call.input,
-                    presentation_input: tool.project_input(&call.input),
-                    summary_fields: tool
-                        .summary_fields()
-                        .iter()
-                        .map(|field| (*field).to_string())
-                        .collect(),
-                    deadline: permission_deadline_at
-                        .saturating_duration_since(tokio::time::Instant::now()),
-                })
+                .authorize_with_user_intent(
+                    PermissionAuthorizationRequest {
+                        tool_name: &call.name,
+                        provenance: tool.provenance(),
+                        profile: &permission_profile,
+                        input: &call.input,
+                        presentation_input: tool.project_input(&call.input),
+                        summary_fields: tool
+                            .summary_fields()
+                            .iter()
+                            .map(|field| (*field).to_string())
+                            .collect(),
+                        deadline: permission_deadline_at
+                            .saturating_duration_since(tokio::time::Instant::now()),
+                    },
+                    user_intent,
+                )
                 .await;
             let decision = authorization
                 .as_ref()

@@ -229,7 +229,7 @@ impl AutoPermissionAssessor for AutoTestAssessor {
         _remaining: std::time::Duration,
     ) -> Result<String, String> {
         Ok(format!(
-            "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
+            "{{\"schema_version\":1,\"request_digest\":\"{}\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_workspace_text_create\",\"confidence\":\"high\"}}",
             request.request_digest
         ))
     }

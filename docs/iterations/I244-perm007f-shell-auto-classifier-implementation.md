@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Active / Claimed (proposed; ineffective until claim PR #465 merges)
+> Document status: Review / Claimed (local stable candidate converged; remote evidence pending)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -11,7 +11,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| PERM-007-F | PERM-007 / Issue #462 | Refinement / Unclaimed | I243 / ADR-070 | Claude-like shell classifier experience with exact binding and fail-closed evidence |
+| PERM-007-F | PERM-007 / Issue #462 | Active / Claimed | I243 / ADR-070 | Claude-like shell classifier experience with exact binding and fail-closed evidence |
 
 ## Collaboration Claim
 
@@ -26,19 +26,29 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | None |
-| Last Updated | 2026-09-01 |
-| Handoff / Release Condition | ADR-070 accepted and a separate implementation claim effective on main. |
+| Implementation PR | #468 |
+| Last Updated | 2026-09-02 |
+| Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
 
-The proposed Active/Claimed state becomes effective only when finalized claim PR #465 merges to
-`main`; implementation must start from that merge or a later target-branch commit.
+The Active/Claimed state became effective when claim PR #465 merged to `main` at merge commit
+`94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`. Implementation must start from that merge or a later
+target-branch commit.
+
+## Activation Checkpoint (2026-09-01)
+
+- Claim PR: #465, exact reviewed head `f7b56662d0c672d5b3d62d463cec394bb29491a4`
+- Claim base: `be4fbcfc0c72a6460d009eb4a1b69cd3eade1f8a`
+- Exact-head CI: `33513662235` (all required jobs successful)
+- Independent review: approved at exact head; issue reconciliation passed
+- Merge-time CAS: passed; claim merge commit `94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`
+- Implementation authority: active for the bounded I244 work slice; no implementation PR exists yet.
 
 ## Current Nonterminal Inventory And Disposition
 
 | State | Iterations | Disposition |
 |---|---|---|
-| Active | I244 (this slice, proposed until claim merge) | Owns only generic shell classifier implementation after ADR-070; no implementation starts before #465 merges. |
-| Review | None | No review work is displaced. |
+| Active | None | No additional implementation slice is activated by this candidate. |
+| Review | I244 (this slice, claim #465 effective) | Local stable candidate owns only generic shell classifier implementation after ADR-070; exact-head CI and independent permission/security/API review remain pending. |
 | Planned | I207, I208 | Preserve steering follow-ups as separate unclaimed work; no permission or shell overlap. |
 | Blocked | None with an iteration-owner status | Adjacent PERM-006-D/E authority and other blocked backlog items remain separately owned. |
 | Paused | I164 | Superseded; do not restore or absorb its scope. |
@@ -88,8 +98,57 @@ release, or publication.
 - Update `/auto` help and permission UI copy so automatic allow, human-required and hard block are
   distinguishable without exposing model reasoning or secrets.
 
-## Claim Preparation
+## Execution Status
 
-This governance branch prepares an atomic I244 claim after ADR-070 acceptance. The claim remains
-pending until the Draft PR receives its number and the finalized exact-head record is reviewed and
-merged; no implementation authority exists on this branch.
+The atomic I244 claim is effective on `main`. Local implementation has converged and this owner is
+now `Review / Claimed`; it cannot become Complete until the implementation merge and a later
+owner-first closeout cite pre-existing implementation evidence.
+
+## 2026-09-02 Local Convergence And Issue Synchronization Checkpoint
+
+- Exact implementation base remains `main@94ba2dc5`; stable implementation PR #468 now carries the
+  locally converged candidate.
+- New open Issues #466 and #467 are reconciled through Refinement/Unclaimed intake owners CAP-001
+  and CAP-001-P0, with no selected iteration, effective claim or implementation authority. They do
+  not overlap I244's permission authority. Any later root Cargo or Runtime overlap requires fresh
+  coordination.
+- The implementation carries the exact shell command as untrusted data, bounded current user
+  intent, shell structure, canonical cwd/workspace bindings, environment names and an opaque full
+  environment binding, permission revisions, fixed classifier policy, and honest unavailable/empty
+  configured-remote context. Network effects remain ineligible for automatic approval.
+- Published 0.8.0 request/response/enum shapes remain source-compatible. Generic shell context uses
+  an additive assessor entrypoint with a fail-closed default, and the legacy permission request
+  struct literals are covered by a dedicated compile regression.
+- The single authoritative permission evaluation now distinguishes default Ask from configured or
+  explicit Ask without re-evaluating policy. Explicit Ask bypasses the assessor; one model
+  `AllowOnce` still crosses the existing proposal/revision/admission fence before execution.
+- Deterministically known write/mutation and package/network shell classes, secret-like input,
+  background requests, composed shell syntax, non-read-only effects, model tool calls, timeout,
+  malformed output, context drift and `/auto off` all return to the existing human-required or deny
+  path.
+- Focused local evidence passes: 22 auto-resolver tests, 12 permission-pipeline tests and the Agent
+  final permission-hook regression. Locked workspace check, Clippy with warnings denied, full
+  workspace tests, release preflight, both governance validators and `git diff --check` also pass.
+  Real TUI acceptance, exact-head CI and independent permission/security/API review remain pending
+  before closeout.
+
+## 2026-09-02 Adversarial Re-Convergence Checkpoint
+
+- Implementer-side adversarial review invalidated the prior `a71b4052` stable-candidate evidence:
+  known external or sensitive reads, missing or truncated current intent, and secret-bearing intent
+  could reach the classifier. CI run `33540527533` and review request comment `5498309737` therefore
+  do not authorize merge of the corrected candidate.
+- The corrected local tree fails closed before the model for missing, empty, oversized, or
+  secret-bearing current intent; known secret/protected targets; URLs; home expansion; Unix
+  absolute paths; Windows drive and UNC paths; lexical parent traversal; and canonical symlink
+  escape. These checks are command-name independent, while an unfamiliar command with no external
+  target such as `python --version` remains model-assessable.
+- Focused evidence now passes: 24 `auto_resolver` tests, 12 `permission_pipeline` tests, and the
+  dedicated `i244_public_api_compat` test. `./scripts/release_preflight.sh` also passed with the
+  repository-pinned toolchain, locked dependency graph, full workspace check/Clippy/tests, both
+  governance validators, public-site/installer validation, and CI-classifier tests. Local Cargo
+  incremental compilation and debug symbols were disabled only to control disk usage; source,
+  features, lockfile, test selection, and release behavior were unchanged.
+- Status remains Review / Claimed. A single corrected stable candidate must be committed and pushed
+  to PR #468, then receive fresh exact-head CI and independent permission/security/API review.
+  Real TUI acceptance and merge-time CAS remain pending; no completion evidence is claimed.

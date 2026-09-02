@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Active / Claimed (proposed; ineffective until claim PR #465 merges) |
+| Status | Review / Claimed (local stable candidate converged; remote evidence pending) |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -23,10 +23,10 @@
 | Source Issue | #462 |
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | None |
-| Last Updated | 2026-09-01 |
-| Handoff / Release Condition | Claim PR #465 must merge before implementation; closeout requires exact-head implementation CI and independent permission/security/API review. |
+| Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; claim PR #465 merged at `94ba2dc5`, with exact-head CI `33513662235`, independent review approval and merge-time CAS. Maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI and governance validators remain mandatory. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
+| Implementation PR | #468 |
+| Last Updated | 2026-09-02 |
+| Handoff / Release Condition | Claim PR #465 is effective on main; implementation starts from `94ba2dc5` or later and closeout requires exact-head implementation CI and independent permission/security/API review. |
 
 ## Goal And Value
 
@@ -90,3 +90,32 @@ network access, permanent grants, implicit shell semantics, Desktop, release or 
 
 Unknown semantics remain human-required and are tracked as follow-up stories; the classifier must
 not silently widen permissions.
+
+## 2026-09-02 Implementation Checkpoint
+
+The local stable candidate now distinguishes explicit/configured Ask from default Ask using the
+same authoritative evaluation report, sends a bounded tool-free classifier request for eligible
+foreground shell actions, and rechecks exact context plus the existing revision/admission fence
+before execution. Known write/mutation and package/network classes, secrets, composition, non-read
+effects, timeout, malformed output and stale context remain human-required or denied. Configured
+remote trust is deliberately reported unavailable/empty in this fixed conservative policy version;
+network effects cannot be auto-approved.
+
+Open architecture Issues #466/#467 now have Refinement/Unclaimed intake owners but no selected
+iteration, effective claim or implementation authority and are not imported into this Story.
+Twenty-two classifier tests, 12 permission-pipeline tests, locked Clippy, full workspace
+tests, release preflight and both governance validators pass locally. Real TUI acceptance,
+exact-head CI and independent permission/security/API review remain required. Status stays
+Review/Claimed while implementation PR #468 carries the stable candidate.
+
+## 2026-09-02 Adversarial Re-Convergence Checkpoint
+
+Implementer-side threat-matrix replay found that the prior PR head could send known external or
+sensitive read targets, incomplete current intent, or secret-bearing intent to the model. The
+corrected local tree now rejects those shapes before assessment, including command-independent
+Unix, Windows, UNC, parent-traversal and symlink escape targets, without replacing semantic model
+classification with a command allowlist. Twenty-four resolver tests, 12 permission-pipeline tests,
+the public 0.8.0 API compatibility test, and the full locked release preflight pass. Prior head
+`a71b4052`, CI `33540527533`, and review request `5498309737` are stale for this substantive change.
+The Story remains Review / Claimed pending one corrected PR #468 head, fresh exact-head CI,
+independent permission/security/API approval, real TUI acceptance and merge-time CAS.

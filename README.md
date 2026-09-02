@@ -206,6 +206,15 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
+When auto assistance evaluates a foreground shell request, the configured model receives a bounded
+copy of the exact command as untrusted data plus structural risk facts, the current user instruction,
+canonical workspace/cwd bindings, environment variable names and an opaque environment digest. A
+configured or explicit `Ask` rule bypasses the assessor. A valid high-confidence `read_only` result
+may admit that one invocation only. Mutating, network, privileged, ambiguous, secret-bearing,
+malformed, timed-out, or stale requests remain human-required or denied by the authoritative
+permission and sandbox gates. The assessor has no tools, never sees raw environment values or
+secret-like assignments, and cannot create a permanent grant.
+
 Auto assistance is available only when the active surface supplies an interactive approval
 resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
 their existing fail-closed behavior for unresolved `Ask` decisions; enabling `auto` in config does
