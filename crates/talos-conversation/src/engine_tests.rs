@@ -919,6 +919,16 @@ async fn slash_auto_is_session_only_and_rejects_invalid_arguments() {
 }
 
 #[tokio::test]
+async fn slash_auto_reports_configured_evaluator_when_runtime_provides_one() {
+    let mut engine = new_engine().with_auto_evaluator_available(true);
+    let (_, text) = collect_stream(engine.handle_slash_command("/auto"))
+        .await
+        .expect("status should render");
+    assert!(text.contains("evaluator: configured-model"));
+    assert!(!text.contains("unavailable in this slice"));
+}
+
+#[tokio::test]
 async fn auto_override_resets_when_session_runtime_is_replaced() {
     let mut engine = new_engine().with_auto_enabled(false);
     let _ = engine.handle_slash_command("/auto on");

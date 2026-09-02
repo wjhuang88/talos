@@ -95,6 +95,7 @@ pub struct ConversationEngine {
     pub(crate) is_processing: bool,
     auto_config_enabled: bool,
     auto_override: Option<bool>,
+    auto_evaluator_available: bool,
     auto_mode_callback: Option<std::sync::Arc<dyn Fn(bool) + Send + Sync>>,
     pub(crate) current_phase: Option<TurnPhase>,
     pub(crate) context_limit: Option<u32>,
@@ -135,6 +136,7 @@ impl ConversationEngine {
             is_processing: false,
             auto_config_enabled: true,
             auto_override: None,
+            auto_evaluator_available: false,
             auto_mode_callback: None,
             current_phase: None,
             context_limit: None,
@@ -157,6 +159,13 @@ impl ConversationEngine {
     #[must_use]
     pub fn with_auto_enabled(mut self, enabled: bool) -> Self {
         self.auto_config_enabled = enabled;
+        self
+    }
+
+    /// Sets whether the active runtime has a provider-backed auto evaluator.
+    #[must_use]
+    pub fn with_auto_evaluator_available(mut self, available: bool) -> Self {
+        self.auto_evaluator_available = available;
         self
     }
 

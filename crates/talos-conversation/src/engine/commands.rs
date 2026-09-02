@@ -154,7 +154,12 @@ impl ConversationEngine {
                         } else {
                             "disabled"
                         };
-                        outputs.push(content_block(MessageSource::System, format!("[System] Auto mode: {state} (source: {source}; evaluator: unavailable in this slice; deadline: 8s; circuit: closed).\n")));
+                        let evaluator = if self.auto_evaluator_available {
+                            "configured-model"
+                        } else {
+                            "unavailable"
+                        };
+                        outputs.push(content_block(MessageSource::System, format!("[System] Auto mode: {state} (source: {source}; evaluator: {evaluator}; deadline: 8s; circuit: closed).\n")));
                     }
                     "on" | "off" => {
                         let enabled = argument == "on";
