@@ -979,7 +979,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn i244_configured_ask_uses_model_assessment() {
+    async fn i244_default_ask_uses_model_assessment() {
         let root = tempfile::tempdir().expect("tempdir");
         let command = "ls -la";
         let engine = PermissionEngine::with_workspace_root(root.path().to_path_buf());
