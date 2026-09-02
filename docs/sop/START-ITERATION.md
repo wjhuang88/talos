@@ -27,6 +27,11 @@ Record inventory and disposition in `docs/iterations/README.md` or the activatio
 item must be activated, deferred, kept blocked with its blocker, or superseded before unrelated work
 is selected.
 
+This inventory is a planning and dependency check, not a requirement to repair every repository-wide
+metadata discrepancy before implementation. Unrelated open-Issue registration, Board/matrix drift,
+and owner reconciliation are batched governance residuals with their own owner; they must not block
+an otherwise non-overlapping selected slice.
+
 ### 2. Select Stories
 
 1. Review the implementation roadmap for the current phase.
@@ -62,7 +67,9 @@ In one governance-only PR:
 3. Set the proposed owner/iteration state to Active while stating that claim and activation are both
    ineffective until merge.
 4. Use the Draft-PR number backfill sequence from `AGENT-COLLABORATION.md`.
-5. Run both governance validators and exact-head CI.
+5. Run validators and exact-head CI required by the selected slice. Run global reconciliation for a
+   governance, release, or closeout batch; its failure is not an implementation blocker for an
+   unrelated slice.
 6. Repeat the merge-time CAS check immediately before merge.
 7. Use an allowed independent-review, single-maintainer, direct-commit, or emergency authorization
    path.

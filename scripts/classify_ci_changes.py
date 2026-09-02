@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 
 
 SHA_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
-ROOT_DOCUMENTS = {"CHANGELOG.md", "README.md", "README.zh-CN.md"}
+ROOT_DOCUMENTS = {"AGENTS.md", "CHANGELOG.md", "README.md", "README.zh-CN.md"}
 TEXT_GOVERNANCE_FILES = {".agent-governance/manifest.yaml"}
 
 
@@ -36,7 +36,9 @@ def _is_allowlisted_document(path: str) -> bool:
         return True
     if path in TEXT_GOVERNANCE_FILES:
         return True
-    return path.startswith("docs/") and not path.startswith("docs/sop/") and path.endswith(".md")
+    if path.startswith("docs/") and path.endswith(".md"):
+        return True
+    return path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml"))
 
 
 def classify_name_status(payload: bytes) -> Classification:

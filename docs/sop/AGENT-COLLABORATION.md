@@ -320,6 +320,23 @@ first implementation push, complete one local convergence checkpoint:
 Intermediate local commits are allowed and may be amended or reorganized before first push. Do not
 open or push a PR merely to discover routine compile, formatting, wording or owner-sync defects.
 
+## Remote Gate Scope And Batch Reconciliation
+
+Remote checks validate a stable stage candidate; they are not the implementation edit loop. Apply
+them to the changed Work Slice: implementation candidates require exact-head CI and applicable
+independent technical, permission, security, API, or device review; governance-only candidates
+require checks relevant to their files. Open-Issue reconciliation, global owner matrices, Board
+mirrors, and unrelated owner registration are batched governance work and do not block an unrelated
+implementation candidate.
+
+The global result remains a residual with an owner, and dedicated governance/release/closeout work
+must close it. Until changed-file-aware routing exists, the remote reconciliation job is advisory
+for implementation PRs. Do not rebase an implementation branch solely to absorb an unrelated
+reconciliation batch. Fresh exact-head evidence is required only after a substantive change to
+code, behavior, contract, security scope, acceptance, validation evidence, or a relevant base.
+Comments, labels, Issue synchronization, unrelated Board/matrix updates, and reruns that leave the
+candidate and relevant base unchanged do not invalidate evidence. See ADR-071.
+
 ## Stable Stage Candidate PR
 
 After local convergence:

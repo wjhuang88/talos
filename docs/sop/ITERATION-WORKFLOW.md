@@ -28,6 +28,10 @@ Repeat implementation and verification locally until the whole Work Slice is coh
 commits and corrections do not require GitHub CI or review because no remote candidate exists yet.
 Do not push a partial candidate to use CI as a formatting, compile, test or documentation loop.
 
+Global Issue reconciliation and unrelated Board/matrix synchronization are not part of this edit
+loop. Record them as separately owned governance residuals and continue when the selected slice has
+its own owner, claim, acceptance, and relevant local checks.
+
 ### 3. Verify
 
 For each story:
@@ -106,6 +110,9 @@ Before the first remote implementation push:
 Push only after this checkpoint. If remote review finds substantive defects, return to the local
 loop, batch corrections, rerun the checkpoint and push a new stable head. Fresh exact-head CI and
 review are then required; do not open a new PR for each correction.
+
+An unrelated reconciliation or metadata batch does not by itself require a rebase or invalidate the
+candidate's evidence. Relevant base changes and substantive candidate changes still do.
 
 ### 6. Update Status
 

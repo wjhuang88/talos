@@ -245,6 +245,7 @@ jobs:
 
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation
+    continue-on-error: true
     runs-on: ubuntu-latest
 
     steps:

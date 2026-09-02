@@ -96,6 +96,11 @@ These are immutable facts that every change must respect:
 - Use local convergence as the normal implementation loop: complete design, code, tests,
   documentation, owner synchronization, and staged-diff review locally before pushing a stable
   stage candidate. GitHub CI and review validate stages; they are not an edit-by-edit loop.
+- Apply remote gates by Work Slice. Exact-head CI and authorization-specific review remain mandatory
+  for relevant code, permission, sandbox, security, API, release, and evidence changes. Global
+  Issue reconciliation, Board/matrix refreshes, and unrelated owner registration are batched
+  governance work and must not block or invalidate an unrelated implementation candidate. Track
+  temporary drift as a separately owned residual; see ADR-071.
 - A governance-only PR may establish claim and activation atomically. Both remain ineffective until
   that record reaches the target branch; implementation still starts from that merge or later.
 - After a submitted candidate changes substantively, batch corrections locally and obtain fresh
