@@ -54,6 +54,8 @@
 | [#467](https://github.com/wjhuang88/talos/issues/467) | prepare compatibility seams for progressive capabilities | [CAP-001-P0](../backlog/active/CAP-001-P0-progressive-capability-compatibility-preparation.md) | Refinement / Unclaimed | Preparatory Story intake under CAP-001. Future root-Cargo/runtime overlap requires separate coordination; current state does not block or authorize I244 changes. |
 | [#452](https://github.com/wjhuang88/talos/issues/452) | Optional host-executed managed-browser tool core | [WEB-007](../backlog/active/WEB-007-optional-managed-browser-tool-core.md) | Intake / Unclaimed | Intake only; resolve WEB-005 relationship, API/schema and security boundary before selecting an implementation iteration. |
 | [#453](https://github.com/wjhuang88/talos/issues/453) | Unified `talos upgrade` coordinator | [REL-004](../backlog/active/REL-004-unified-upgrade-coordinator.md) | Intake / Unclaimed | Intake only; preserve REL-003 publication boundary and define planner/helper ownership before implementation. |
+| [#474](https://github.com/wjhuang88/talos/issues/474) | dependency upgrade governance | [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) | Intake / Unclaimed | Governance intake only; define baseline, audit, and SOP boundaries before any Cargo or dependency change. |
+| [#475](https://github.com/wjhuang88/talos/issues/475) | evolving durable memory through reflection, recall, and outcome-aware experience | [MEM-012](../backlog/active/MEM-012-evolving-memory-experience.md) | Intake / Unclaimed | Architecture intake only; preserve ADR-016 and defer schema/runtime changes to separately governed child slices. |
 
 ## Synchronization Notes
 
