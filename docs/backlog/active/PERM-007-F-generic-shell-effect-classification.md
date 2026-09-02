@@ -5,7 +5,7 @@
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Review / Claimed (implementation merged; deferred real-TUI acceptance pending) |
+| Status | Review / Claimed (implementation merged; deferred real-TUI acceptance pending under Issue #462) |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -128,5 +128,5 @@ validation tracker; `Completion Commit` remains unset until that evidence is rec
   comment `5502603758`, bound to the exact implementation head and base.
 - Merge-time CAS passed. Local locked tests, release preflight, governance validators and public
   API compatibility checks passed before merge.
-- Real TUI acceptance remains deferred under Issue #302's validation process; no completion claim
+- Real TUI acceptance remains deferred under the open Issue #462 validation record; no completion claim
   is made until routine auto-allow, fallback prompt and `/auto off` behavior are observed.
