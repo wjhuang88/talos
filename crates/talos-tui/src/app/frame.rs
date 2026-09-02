@@ -127,10 +127,7 @@ impl Tui {
         // the regular viewport so scrolling never moves the input frame.
         let history_cap = if natural_startup_flow {
             Some((splash_rows + startup_spacer_rows) as u16)
-        } else if (follows_tail || approval_preserves_follow_tail)
-            && (!self.state.slash_menu.is_open
-                || !matches!(self.state.approval_state, ApprovalState::Hidden))
-        {
+        } else if follows_tail || approval_preserves_follow_tail {
             let natural_rows = self
                 .history_projection_cache
                 .project(
