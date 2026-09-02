@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Review / Claimed (implementation merged; deferred real-TUI acceptance pending)
+> Document status: Review / Claimed (implementation merged; deferred real-TUI acceptance pending under Issue #462)
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -164,5 +164,5 @@ a later owner-first closeout must cite pre-existing implementation evidence.
 - Local locked tests, public API compatibility, full workspace validation, release preflight,
   both governance validators, and `git diff --check` passed.
 - Real TUI acceptance of routine auto-allow, human-required fallback, and `/auto off` remains
-  deferred under Issue #302's validation process. I244 therefore remains Review / Claimed and
+  deferred under the open Issue #462 validation record. I244 therefore remains Review / Claimed and
   `Completion Commit` is intentionally unset.
