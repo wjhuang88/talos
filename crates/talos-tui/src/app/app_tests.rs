@@ -1919,25 +1919,13 @@ fn tui_with_projected_history(visible_height: u16, viewport_height: u16) -> crat
 }
 
 #[test]
-fn approval_open_preserves_visible_follow_tail_anchor_until_resolution() {
+fn approval_open_preserves_follow_tail_until_resolution() {
     let mut tui = tui_with_projected_history(10, 10);
     assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
-    let first_visible = tui
-        .last_history_projection
-        .first_anchor()
-        .expect("projected history should expose a visible anchor");
 
     tui.show_approval("bash", "command: echo hello");
 
-    assert_eq!(
-        tui.history_scroll,
-        HistoryScrollState {
-            mode: HistoryScrollMode::Anchored {
-                anchor: first_visible,
-                screen_row: 0,
-            },
-        }
-    );
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
     assert!(tui.approval_viewport_snapshot.is_some());
 
     tui.hide_approval();
