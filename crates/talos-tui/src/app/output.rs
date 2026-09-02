@@ -34,7 +34,16 @@ impl ToolPlaceholderGate {
                     self.at_line_start = ch == '\n' || self.at_line_start;
                     continue;
                 }
-                output.push_str(&std::mem::take(&mut self.held_marker));
+                // Providers may emit the compatibility marker more than once around a
+                // structured tool call. Keep a single marker instead of flushing the first
+                // one back into the transcript before accepting the duplicate.
+                if ch == 'C' && is_exact_placeholder(&self.held_marker) {
+                    self.held_marker.clear();
+                    self.at_line_start = true;
+                    self.line_candidate.clear();
+                } else {
+                    output.push_str(&std::mem::take(&mut self.held_marker));
+                }
             }
 
             if self.at_line_start {
@@ -149,6 +158,14 @@ mod tests {
         let mut gate = assistant_gate();
         assert_eq!(gate.push("Calling tools…\n"), "");
         assert_eq!(gate.flush(), "Calling tools…\n");
+    }
+
+    #[test]
+    fn duplicate_standalone_markers_collapse_to_one() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling tools...\n"), "");
+        assert_eq!(gate.push("Calling tools...\n"), "");
+        assert_eq!(gate.flush(), "Calling tools...\n");
     }
 
     #[test]

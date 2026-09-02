@@ -180,9 +180,12 @@ mod linux {
             cmd.arg("--die-with-parent");
             cmd.args(["--", "sh", "-c", command]);
 
-            let output = cmd.output().await.map_err(|e| {
-                SandboxError::ExecutionFailed(format!("failed to spawn bwrap: {e}"))
-            })?;
+            let output = tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output())
+                .await
+                .map_err(|_| SandboxError::ExecutionFailed("sandbox execution timed out".into()))?
+                .map_err(|e| {
+                    SandboxError::ExecutionFailed(format!("failed to spawn bwrap: {e}"))
+                })?;
 
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -311,8 +314,10 @@ mod macos {
                 .arg("-f")
                 .arg(profile_path)
                 .args(["sh", "-c", command])
-                .output()
+                .output();
+            let output = tokio::time::timeout(std::time::Duration::from_secs(5), output)
                 .await
+                .map_err(|_| SandboxError::ExecutionFailed("sandbox execution timed out".into()))?
                 .map_err(|e| {
                     SandboxError::ExecutionFailed(format!("failed to spawn sandbox-exec: {e}"))
                 })?;
