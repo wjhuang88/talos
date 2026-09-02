@@ -115,22 +115,21 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let fallback = terminal_approval.clone();
     let auto_control = AutoPermissionControl::new(config.auto.enabled);
     let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
-        atomic_create_capability
-            .clone()
-            .and_then(|capability| {
-                ManagedWorkspaceLease::new(&workspace_root, session.id.to_string())
-                    .ok()
-                    .map(|lease| {
-                        let lease = lease.with_atomic_create_capability(capability);
-                        Arc::new(AutoPermissionResolver::new(
-                            Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
-                            fallback.clone(),
-                            lease,
-                            std::time::Duration::from_secs(8),
-                            auto_control,
-                        ))
-                            as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
-                    })
+        ManagedWorkspaceLease::new(&workspace_root, session.id.to_string())
+            .ok()
+            .map(|lease| {
+                let lease = atomic_create_capability
+                    .clone()
+                    .map_or(lease.clone(), |capability| {
+                        lease.with_atomic_create_capability(capability)
+                    });
+                Arc::new(AutoPermissionResolver::new(
+                    Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
+                    fallback.clone(),
+                    lease,
+                    std::time::Duration::from_secs(8),
+                    auto_control,
+                )) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
             })
             .unwrap_or(fallback);
     let mut agent = Agent::with_security_and_hooks(

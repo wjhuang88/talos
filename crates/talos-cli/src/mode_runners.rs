@@ -591,6 +591,7 @@ pub(crate) async fn run_tui_mode(
         .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_auto_enabled(config.auto.enabled)
+        .with_auto_evaluator_available(true)
         .with_auto_mode_callback(Arc::new({
             let auto_control = auto_control.clone();
             move |enabled| auto_control.set_enabled(enabled)

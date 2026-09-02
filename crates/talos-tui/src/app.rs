@@ -22,8 +22,7 @@ use tokio::{sync::mpsc, time::MissedTickBehavior};
 use crate::app_layout::{ComponentMetrics, compute_app_layout};
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{
-    HistoryProjection, HistoryProjectionCache, HistoryScrollMode, HistoryScrollState,
-    HistorySelectionPoint,
+    HistoryProjection, HistoryProjectionCache, HistoryScrollState, HistorySelectionPoint,
 };
 use crate::inline_terminal::{HistoryAttrs, HistorySegment, TerminalSession, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
@@ -509,15 +508,9 @@ impl Tui {
                 startup_mode,
             });
 
-            // A FollowTail projection is sized for the pre-prompt natural flow. Once the
-            // approval panel is present, that flow loses rows to the modal. Preserve the
-            // first visible logical row so the triggering context does not jump to the tail.
-            if matches!(self.history_scroll.mode, HistoryScrollMode::FollowTail) {
-                if let Some(anchor) = self.last_history_projection.first_anchor() {
-                    self.history_scroll.anchor(anchor, 0);
-                }
-                self.history_prefix_start = None;
-            }
+            // Keep FollowTail intact while the modal changes the available height. The frame
+            // allocator already preserves the latest history rows; anchoring here would jump
+            // the viewport to the oldest visible row when an approval request opens.
         }
         self.state.activate_approval(tool_name, arguments);
         self.state.slash_menu = crate::state::BottomPanelState::open_approval_with_preview(
