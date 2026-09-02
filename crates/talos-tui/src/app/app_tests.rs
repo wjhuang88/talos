@@ -1816,6 +1816,23 @@ fn entry_point_slash_menu_open_does_not_trigger_history() {
     );
 }
 
+#[test]
+fn slash_menu_open_preserves_follow_tail_and_stays_near_composer() {
+    let mut tui = tui_with_projected_history(10, 10);
+    tui.state.input_append_str("draft-anchor");
+    tui.state
+        .open_slash_menu(talos_conversation::command_registry());
+    tui.draw_frame().expect("slash menu frame");
+    let rendered = tui.terminal.test_rendered_text();
+    let composer_row = rendered_row_containing(&rendered, "draft-anchor");
+    let menu_row = rendered_row_containing(&rendered, "/help");
+    assert!(
+        menu_row.abs_diff(composer_row) <= 12,
+        "slash menu should remain near composer: composer={composer_row}, menu={menu_row}"
+    );
+    assert_eq!(tui.history_scroll, HistoryScrollState::follow_tail());
+}
+
 /// Entry-point test: approval active intercepts Up/Down — history untouched.
 #[test]
 fn entry_point_approval_active_does_not_trigger_history() {
