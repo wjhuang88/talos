@@ -14,7 +14,7 @@
 | Work Slice | `REL-005 / I245` only: prepare and review the v0.9.0 candidate, publish the immutable GitHub tag and Release first, then publish the metadata-derived Cargo closure and verify external CLI/runtime consumption. |
 | Claimed At | 2026-09-03 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested a complete GitHub and crates.io release on 2026-09-03. Independent exact-head release review remains mandatory before the immutable tag or any Cargo publish. |
 | Implementation PR | Not started |

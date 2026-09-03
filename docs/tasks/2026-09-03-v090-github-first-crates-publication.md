@@ -15,7 +15,7 @@
 | Work Slice | Coordinate only REL-005/I245 from release candidate through GitHub-first publication, Cargo publication, external verification and owner-first closeout. |
 | Claimed At | 2026-09-03 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested a complete GitHub and crates.io release on 2026-09-03; independent exact-head release review is retained for irreversible execution. |
 | Implementation PR | Not started |

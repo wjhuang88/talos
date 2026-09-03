@@ -18,7 +18,7 @@
 | Work Slice | REL-005 only: v0.9.0 version/release surfaces, reviewed candidate, GitHub-first tag/Release, dependency-ordered Cargo publication, external CLI/runtime verification and owner-first closeout. |
 | Claimed At | 2026-09-03 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested the complete GitHub and crates.io release. Protected release execution still requires independent exact-head review before irreversible actions. |
 | Implementation PR | Not started |
