@@ -64,9 +64,14 @@ fn refresh_models_toml() -> Result<usize, String> {
     }
     let count = models.len();
     let toml_path = std::path::Path::new("src/models.toml");
-    let previous = std::fs::read_to_string(toml_path)
-        .ok()
-        .and_then(|contents| toml::from_str::<TomlDataset>(&contents).ok());
+    let previous = match std::fs::read_to_string(toml_path) {
+        Ok(contents) => Some(
+            toml::from_str::<TomlDataset>(&contents)
+                .map_err(|error| format!("parse existing models.toml: {error}"))?,
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("read existing models.toml: {error}")),
+    };
     let toml_output = generate_toml(providers, models, previous.as_ref());
     std::fs::write(toml_path, toml_output).map_err(|e| format!("write models.toml: {e}"))?;
     Ok(count)
@@ -309,12 +314,16 @@ struct TomlPricing {
 
 #[derive(Clone, Deserialize, Serialize)]
 struct TomlCapabilities {
+    #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     tools: bool,
+    #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     structured_output: bool,
+    #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     reasoning: bool,
+    #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     image_input: bool,
 }

@@ -58,8 +58,8 @@ coding = [
 ]
 
 [dependencies]
-talos-core = { version = "0.8.0", path = "../talos-core" }
-talos-sandbox = { version = "0.8.0", path = "../talos-sandbox", optional = true }
+talos-core = { version = "0.9.0", path = "../talos-core" }
+talos-sandbox = { version = "0.9.0", path = "../talos-sandbox", optional = true }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -107,7 +107,7 @@ windows-sys = { version = "0.61.2", optional = true, features = [
 ] }
 
 [dev-dependencies]
-talos-permission = { version = "0.8.0", path = "../talos-permission" }
+talos-permission = { version = "0.9.0", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
 
