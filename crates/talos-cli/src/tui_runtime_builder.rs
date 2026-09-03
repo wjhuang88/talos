@@ -50,6 +50,8 @@ pub(crate) struct TuiRuntimeBuilder {
     include_workspace_context: bool,
     mock: bool,
     auto_control: Option<AutoPermissionControl>,
+    auto_report_sink:
+        Option<Arc<dyn Fn(talos_agent::auto_resolver::AutoDecisionReport) + Send + Sync>>,
 }
 
 pub(crate) struct PreparedTuiRuntime {
@@ -117,11 +119,20 @@ impl TuiRuntimeBuilder {
             include_workspace_context,
             mock,
             auto_control: None,
+            auto_report_sink: None,
         }
     }
 
     pub(crate) fn with_auto_control(mut self, control: AutoPermissionControl) -> Self {
         self.auto_control = Some(control);
+        self
+    }
+
+    pub(crate) fn with_auto_report_sink(
+        mut self,
+        sink: Arc<dyn Fn(talos_agent::auto_resolver::AutoDecisionReport) + Send + Sync>,
+    ) -> Self {
+        self.auto_report_sink = Some(sink);
         self
     }
 
@@ -193,25 +204,34 @@ impl TuiRuntimeBuilder {
         // Shell classification only needs a managed workspace lease. Keep it available even
         // when the optional atomic-create capability cannot be opened; that capability is
         // required by the bounded write path, not by read-only shell assessment.
+        let permission_state = self.approval_handler.shared_engine();
         let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =
-            ManagedWorkspaceLease::new(&self.workspace_root, session.id.to_string())
-                .ok()
-                .map(|lease| {
-                    let lease = atomic_create_capability
-                        .clone()
-                        .map_or(lease.clone(), |capability| {
-                            lease.with_atomic_create_capability(capability)
-                        });
-                    Arc::new(AutoPermissionResolver::new(
-                        Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
-                        fallback.clone(),
-                        lease,
-                        std::time::Duration::from_secs(8),
-                        auto_control,
-                    ))
-                        as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
-                })
-                .unwrap_or(fallback);
+            ManagedWorkspaceLease::for_permission_session(
+                &self.workspace_root,
+                permission_state.clone(),
+            )
+            .ok()
+            .map(|lease| {
+                let lease = atomic_create_capability
+                    .clone()
+                    .map_or(lease.clone(), |capability| {
+                        lease.with_atomic_create_capability(capability)
+                    });
+                let resolver = AutoPermissionResolver::new(
+                    Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
+                    fallback.clone(),
+                    lease,
+                    std::time::Duration::from_secs(8),
+                    auto_control,
+                );
+                let resolver = if let Some(sink) = self.auto_report_sink.as_ref() {
+                    resolver.with_report_sink(sink.clone())
+                } else {
+                    resolver
+                };
+                Arc::new(resolver) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
+            })
+            .unwrap_or(fallback);
         let mut agent = Agent::with_security_and_hooks(
             provider,
             registry,

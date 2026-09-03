@@ -34,7 +34,16 @@ impl ToolPlaceholderGate {
                     self.at_line_start = ch == '\n' || self.at_line_start;
                     continue;
                 }
-                output.push_str(&std::mem::take(&mut self.held_marker));
+                // Providers may emit the compatibility marker more than once around a
+                // structured tool call. Keep a single marker instead of flushing the first
+                // one back into the transcript before accepting the duplicate.
+                if ch == 'C' && is_exact_placeholder(&self.held_marker) {
+                    self.held_marker.clear();
+                    self.at_line_start = true;
+                    self.line_candidate.clear();
+                } else {
+                    output.push_str(&std::mem::take(&mut self.held_marker));
+                }
             }
 
             if self.at_line_start {
@@ -91,6 +100,9 @@ impl ToolPlaceholderGate {
         self.enabled = false;
         let mut output = std::mem::take(&mut self.held_marker);
         output.push_str(&std::mem::take(&mut self.line_candidate));
+        if is_exact_placeholder(&output) {
+            output.clear();
+        }
         output
     }
 }
@@ -148,7 +160,15 @@ mod tests {
     fn flushes_marker_at_end_without_tool_call() {
         let mut gate = assistant_gate();
         assert_eq!(gate.push("Calling tools…\n"), "");
-        assert_eq!(gate.flush(), "Calling tools…\n");
+        assert_eq!(gate.flush(), "");
+    }
+
+    #[test]
+    fn duplicate_standalone_markers_collapse_to_one() {
+        let mut gate = assistant_gate();
+        assert_eq!(gate.push("Calling tools...\n"), "");
+        assert_eq!(gate.push("Calling tools...\n"), "");
+        assert_eq!(gate.flush(), "");
     }
 
     #[test]
@@ -252,6 +272,17 @@ mod tests {
     }
 
     #[test]
+    fn auto_review_status_is_rendered_as_a_visible_system_line() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::System,
+            text: "Auto review: allowed by model (shell_command)\n".into(),
+        }));
+
+        assert!(pending_text(&tui).contains("Auto review: allowed by model (shell_command)"));
+    }
+
+    #[test]
     fn tool_call_started_without_confirmed_call_does_not_suppress_marker() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
@@ -266,7 +297,7 @@ mod tests {
         });
         tui.handle_ui_output(UiOutput::Status(Default::default()));
 
-        assert!(pending_text(&tui).contains("Calling tools…"));
+        assert!(pending_text(&tui).contains("structured tool call"));
         assert!(!tui.ordered_content_open);
     }
 
@@ -282,7 +313,7 @@ mod tests {
         tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
         tui.handle_ui_output(UiOutput::Status(Default::default()));
 
-        assert!(pending_text(&tui).contains("Calling tools..."));
+        assert!(pending_text(&tui).contains("structured tool call"));
     }
 
     #[test]
@@ -343,7 +374,7 @@ mod tests {
             content: "done".into(),
         }));
 
-        assert!(pending_text(&tui).contains("Calling tools…"));
+        assert!(pending_text(&tui).contains("structured tool call"));
         assert!(matches!(
             tui.pending_transcript.last(),
             Some(TranscriptBlock::ToolResult(_))
@@ -405,7 +436,7 @@ mod tests {
             content: "permission denied".into(),
         }));
 
-        assert!(pending_text(&tui).contains("Calling tools..."));
+        assert!(pending_text(&tui).contains("structured tool call"));
         assert!(matches!(
             tui.pending_transcript.last(),
             Some(TranscriptBlock::ToolResult(_))
@@ -561,8 +592,17 @@ impl Tui {
     }
 
     fn flush_tool_placeholder(&mut self) {
+        let marker_only = self.tool_placeholder_gate.is_pending();
         let text = self.tool_placeholder_gate.flush();
         self.append_visible_text(&text);
+        if marker_only && text.is_empty() {
+            let lines = crate::scrollback::render_history_message(
+                &mut self.stream_count,
+                MessageSource::Error,
+                "[Error] Model returned a tool placeholder without a structured tool call; no tool was executed.\n",
+            );
+            self.append_styled_lines(lines);
+        }
     }
 
     pub(super) fn handle_ui_output(&mut self, output: UiOutput) -> bool {

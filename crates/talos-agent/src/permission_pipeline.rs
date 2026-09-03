@@ -274,13 +274,15 @@ impl PermissionPipeline {
                     .resolver
                     .as_ref()
                     .ok_or(PermissionPipelineError::ResolverUnavailable)?;
+                // Configuration-level Ask is the normal baseline for shell execution and may
+                // proceed to the bounded model classifier. A user-created explicit Ask remains
+                // a hard human checkpoint and must never be overridden by model assistance.
                 let auto_assessment_allowed = !evaluation_report.facets().iter().any(|facet| {
                     facet.outcome() == PermissionOutcome::Ask
                         && matches!(
                             facet.source(),
                             PermissionDecisionSource::Rule {
-                                rule_source: PermissionRuleSource::Configured
-                                    | PermissionRuleSource::Explicit,
+                                rule_source: PermissionRuleSource::Explicit,
                                 ..
                             }
                         )
@@ -977,15 +979,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn i244_default_ask_uses_model_assessment() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let command = "ls -la";
+        let engine = PermissionEngine::with_workspace_root(root.path().to_path_buf());
+        let state = Arc::new(PermissionSessionState::new(engine));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellMatrixAssessor {
+                calls: calls.clone(),
+                invalidate: None,
+            }),
+            Arc::new(StaticResolver(ApprovalChoice::Deny)),
+            ManagedWorkspaceLease::new(
+                root.path(),
+                state.session_id().expect("session id").stable_id(),
+            )
+            .expect("lease"),
+            Duration::from_secs(8),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state,
+            PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let input = shell_input(command);
+        let result = pipeline
+            .authorize_with_user_intent(
+                PermissionAuthorizationRequest {
+                    tool_name: "bash",
+                    provenance: ToolProvenance::Native,
+                    profile: &shell_profile(command),
+                    input: &input,
+                    presentation_input: input.clone(),
+                    summary_fields: vec!["command".to_owned()],
+                    deadline: Duration::from_secs(1),
+                },
+                Some("inspect this workspace"),
+            )
+            .await;
+
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::Acquire), 1);
+    }
+
+    #[tokio::test]
     async fn i244_explicit_ask_bypasses_model_assessment() {
         let root = tempfile::tempdir().expect("tempdir");
         let command = "ls -la";
-        let engine = PermissionEngine::from_rules(vec![PermissionRule::new_nature(
+        let mut engine = PermissionEngine::empty();
+        engine.add_rule(PermissionRule::new_nature(
             ToolNature::Execute,
             None,
             None,
             PermissionDecision::Ask,
-        )]);
+        ));
         let state = Arc::new(PermissionSessionState::new(engine));
         let calls = Arc::new(AtomicUsize::new(0));
         let resolver = AutoPermissionResolver::new(

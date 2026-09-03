@@ -45,6 +45,7 @@ Deterministic permission, explicit Ask, sandbox, and admission boundaries always
 pub struct ManagedWorkspaceLease {
     root: PathBuf,
     session_id: String,
+    permission_state: Option<Arc<talos_permission::PermissionSessionState>>,
     atomic_create: Option<SharedAtomicCreateCapability>,
 }
 
@@ -60,8 +61,28 @@ impl ManagedWorkspaceLease {
         Ok(Self {
             root,
             session_id: session_id.into(),
+            permission_state: None,
             atomic_create: None,
         })
+    }
+
+    /// Creates a lease bound to the authoritative permission-session identity.
+    ///
+    /// Runtime/session identifiers are deliberately not interchangeable with the permission
+    /// session identifier carried by approval requests. Callers constructing an automatic
+    /// resolver for a [`talos_permission::PermissionSessionState`] should use this constructor so
+    /// admission cannot be rejected before model assessment due to an unrelated runtime
+    /// identifier.
+    pub fn for_permission_session(
+        root: impl Into<PathBuf>,
+        state: Arc<talos_permission::PermissionSessionState>,
+    ) -> std::io::Result<Self> {
+        let session_id = state
+            .session_id()
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        let mut lease = Self::new(root, session_id.stable_id())?;
+        lease.permission_state = Some(state);
+        Ok(lease)
     }
 
     /// Attaches the same host capability used by the authorized write tool.
@@ -78,6 +99,17 @@ impl ManagedWorkspaceLease {
     #[must_use]
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    fn matches_session(&self, candidate: &str) -> bool {
+        self.permission_state.as_ref().map_or_else(
+            || self.session_id == candidate,
+            |state| {
+                state
+                    .session_id()
+                    .is_ok_and(|session_id| session_id.stable_id() == candidate)
+            },
+        )
     }
 
     fn allows(&self, path: &Path) -> bool {
@@ -586,6 +618,7 @@ pub struct AutoPermissionResolver {
     control: AutoPermissionControl,
     observed_reset_epoch: AtomicU64,
     deadline: Duration,
+    report_sink: Option<Arc<dyn Fn(AutoDecisionReport) + Send + Sync>>,
 }
 
 impl AutoPermissionResolver {
@@ -607,7 +640,15 @@ impl AutoPermissionResolver {
             observed_reset_epoch: AtomicU64::new(control.reset_epoch()),
             control,
             deadline: deadline.clamp(Duration::from_millis(1), Duration::from_secs(30)),
+            report_sink: None,
         }
+    }
+
+    /// Installs a redacted decision observer for live UI/audit surfaces.
+    #[must_use]
+    pub fn with_report_sink(mut self, sink: Arc<dyn Fn(AutoDecisionReport) + Send + Sync>) -> Self {
+        self.report_sink = Some(sink);
+        self
     }
 
     /// Explicitly resets the circuit, equivalent to `/auto on`.
@@ -666,8 +707,15 @@ impl AutoPermissionResolver {
     }
 
     fn report(&self, report: AutoDecisionReport) {
+        self.notify_report(&report);
         if let Ok(mut slot) = self.last_report.lock() {
             *slot = Some(report);
+        }
+    }
+
+    fn notify_report(&self, report: &AutoDecisionReport) {
+        if let Some(sink) = &self.report_sink {
+            sink(report.clone());
         }
     }
 
@@ -848,7 +896,7 @@ fn eligible(
     {
         return None;
     }
-    if lease.session_id() != request.binding.session_id {
+    if !lease.matches_session(&request.binding.session_id) {
         return None;
     }
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
@@ -900,7 +948,7 @@ fn eligible_exec(
         || request.binding.mode != PermissionMode::Interactive
         || request.binding.interaction != InteractionCapability::Available
         || request.preview.facets().len() != 1
-        || lease.session_id() != request.binding.session_id
+        || !lease.matches_session(&request.binding.session_id)
     {
         return None;
     }
@@ -1078,7 +1126,7 @@ fn eligible_bash(
         || request.binding.mode != PermissionMode::Interactive
         || request.binding.interaction != InteractionCapability::Available
         || request.preview.facets().len() != 1
-        || lease.session_id() != request.binding.session_id
+        || !lease.matches_session(&request.binding.session_id)
     {
         return None;
     }
@@ -1343,11 +1391,41 @@ impl ApprovalResolver for AutoPermissionResolver {
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
         self.sync_reset();
-        if !auto_assessment_allowed || !self.control.is_enabled() || self.circuit_open() {
+        if !auto_assessment_allowed {
+            self.notify_report(&AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "explicit_human_checkpoint".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: "unavailable".into(),
+            });
+            return self.fallback.resolve(request, remaining).await;
+        }
+        if !self.control.is_enabled() {
+            self.notify_report(&AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "auto_disabled".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: "unavailable".into(),
+            });
+            return self.fallback.resolve(request, remaining).await;
+        }
+        if self.circuit_open() {
+            self.notify_report(&AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "circuit_open".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: "unavailable".into(),
+            });
             return self.fallback.resolve(request, remaining).await;
         }
         let Some(evaluator_request) = project_auto_request(&request, &self.lease, user_intent)
         else {
+            self.notify_report(&AutoDecisionReport {
+                outcome: "human_required".into(),
+                reason: "classifier_not_eligible".into(),
+                evaluator: self.assessor.identity().into(),
+                request_digest: "unavailable".into(),
+            });
             return self.fallback.resolve(request, remaining).await;
         };
         let budget = remaining.min(self.deadline);
@@ -1408,7 +1486,7 @@ impl ApprovalResolver for AutoPermissionResolver {
                 .resolve(request, remaining.saturating_sub(started.elapsed()))
                 .await;
         }
-        let response: AutoPermissionWireResponse = match serde_json::from_str(&raw) {
+        let response: AutoPermissionWireResponse = match parse_auto_response(&raw) {
             Ok(value) => value,
             Err(_) => {
                 self.record_failure();
@@ -1478,6 +1556,25 @@ impl ApprovalResolver for AutoPermissionResolver {
                 .await
         }
     }
+}
+
+/// Parses the closed assessor response while tolerating provider wrappers such as a Markdown
+/// code fence or a short preamble. The extracted value is still deserialized with
+/// `deny_unknown_fields`, so this does not broaden the wire contract or decision authority.
+fn parse_auto_response(raw: &str) -> Result<AutoPermissionWireResponse, serde_json::Error> {
+    let trimmed = raw.trim();
+    if let Ok(response) = serde_json::from_str(trimmed) {
+        return Ok(response);
+    }
+    let start = trimmed.find('{').ok_or_else(|| {
+        serde_json::from_str::<AutoPermissionWireResponse>("not-json")
+            .expect_err("sentinel must fail")
+    })?;
+    let end = trimmed.rfind('}').ok_or_else(|| {
+        serde_json::from_str::<AutoPermissionWireResponse>("not-json")
+            .expect_err("sentinel must fail")
+    })?;
+    serde_json::from_str(&trimmed[start..=end])
 }
 
 #[cfg(test)]
@@ -1871,14 +1968,11 @@ mod tests {
     #[test]
     fn generic_shell_request_contains_exact_command_and_syntax_context() {
         let root = tempfile::tempdir().expect("root");
-        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
-            root.path().to_path_buf(),
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
         ));
-        let lease = ManagedWorkspaceLease::new(
-            root.path(),
-            state.session_id().expect("session id").stable_id(),
-        )
-        .expect("lease");
+        let lease = ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+            .expect("permission-bound lease");
         let request = shell_approval_request(root.path(), &state, "ls -la");
         let projected = eligible_bash(&request, &lease, Some("inspect the workspace"))
             .expect("shell is eligible");
@@ -1900,6 +1994,46 @@ mod tests {
         assert!(context.classifier.configured_remote_origins.is_empty());
         assert!(context.classifier.policy.allow_once_only);
         assert!(!context.classifier.policy.network_auto_allow);
+    }
+
+    #[test]
+    fn shell_assessment_uses_permission_session_identity_not_runtime_identity() {
+        let root = tempfile::tempdir().expect("root");
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let request = shell_approval_request(root.path(), &state, "pwd");
+        let runtime_bound = ManagedWorkspaceLease::new(root.path(), "runtime-session")
+            .expect("runtime-bound lease");
+        assert!(
+            eligible_bash(&request, &runtime_bound, Some("show the working directory")).is_none(),
+            "an unrelated runtime id must not authorize a permission request"
+        );
+
+        let permission_bound =
+            ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+                .expect("permission-bound lease");
+        assert!(
+            eligible_bash(
+                &request,
+                &permission_bound,
+                Some("show the working directory")
+            )
+            .is_some(),
+            "a production permission-session binding must reach model assessment"
+        );
+
+        state.rebind_session().expect("permission-session rebind");
+        let rebound_request = shell_approval_request(root.path(), &state, "pwd");
+        assert!(
+            eligible_bash(
+                &rebound_request,
+                &permission_bound,
+                Some("show the working directory")
+            )
+            .is_some(),
+            "the shared lease must follow a permission-session rebind"
+        );
     }
 
     #[tokio::test]
@@ -2405,6 +2539,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn assessor_response_accepts_provider_wrapped_json_only() {
+        let raw = "Here is the decision:\n```json\n{\"schema_version\":1,\"request_digest\":\"sha256:x\",\"decision\":\"allow_once\",\"effect\":\"read_only\",\"reason_code\":\"bounded_read_only_command\",\"confidence\":\"high\"}\n```";
+        let response = parse_auto_response(raw).expect("wrapped JSON");
+        assert_eq!(response.decision, AutoDecision::AllowOnce);
+        assert_eq!(response.effect, AutoEffect::ReadOnly);
+    }
+
     #[tokio::test]
     async fn generic_shell_classifier_can_admit_one_exact_allow_once() {
         let root = tempfile::tempdir().expect("root");
@@ -2417,13 +2559,21 @@ mod tests {
         )
         .expect("lease");
         let control = AutoPermissionControl::new(true);
+        let reports = Arc::new(Mutex::new(Vec::<AutoDecisionReport>::new()));
+        let report_sink = {
+            let reports = reports.clone();
+            Arc::new(move |report: AutoDecisionReport| {
+                reports.lock().expect("report lock").push(report);
+            })
+        };
         let resolver = AutoPermissionResolver::new(
             Arc::new(ShellAssessor),
             Arc::new(DenyFallback),
             lease,
             Duration::from_secs(8),
             control,
-        );
+        )
+        .with_report_sink(report_sink);
         let request = shell_approval_request(root.path(), &state, "ls -la");
         assert_eq!(
             resolver
@@ -2441,6 +2591,10 @@ mod tests {
             resolver.last_report().expect("report").reason,
             "shell_command"
         );
+        let reports = reports.lock().expect("report lock");
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0].outcome, "allow_once");
+        assert_eq!(reports[0].reason, "shell_command");
     }
 
     struct ShellEffectAssessor(&'static str);

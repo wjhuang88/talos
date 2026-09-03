@@ -673,7 +673,7 @@ pub(crate) fn preview_text_for_state(
     if let Some(TurnPhase::RunningTool { name }) = phase
         && is_processing
     {
-        return format!("running tool: {name}...");
+        return format!("processing tool request: {name}...");
     }
 
     if let Some(thinking) = thinking_preview
