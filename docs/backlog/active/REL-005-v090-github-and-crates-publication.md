@@ -9,7 +9,7 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release session` |
 | Work Slice | `REL-005 / I245` only: prepare and review the v0.9.0 candidate, publish the immutable GitHub tag and Release first, then publish the metadata-derived Cargo closure and verify external CLI/runtime consumption. |
 | Claimed At | 2026-09-03 |

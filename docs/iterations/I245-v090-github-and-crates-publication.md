@@ -13,7 +13,7 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release session` |
 | Work Slice | REL-005 only: v0.9.0 version/release surfaces, reviewed candidate, GitHub-first tag/Release, dependency-ordered Cargo publication, external CLI/runtime verification and owner-first closeout. |
 | Claimed At | 2026-09-03 |
