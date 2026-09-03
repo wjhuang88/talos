@@ -21,7 +21,7 @@
 | Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested the complete GitHub and crates.io release. Protected release execution still requires independent exact-head review before irreversible actions. |
-| Implementation PR | Pending stable-candidate PR creation |
+| Implementation PR | #480 |
 | Last Updated | 2026-09-03 |
 | Handoff / Release Condition | Immutable publication remains blocked until exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight pass. |
 
