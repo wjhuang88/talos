@@ -39,14 +39,11 @@ class ClassifierTests(unittest.TestCase):
         self.assert_reduced(("M", "README.md"), ("A", "docs/reference/new-guide.md"))
         self.assert_reduced(("M", "docs/backlog/active/GOV-005-change-aware-ci-routing.md"))
 
-    def test_code_dependencies_and_control_plane_are_full(self) -> None:
+    def test_code_dependencies_and_runtime_control_files_are_full(self) -> None:
         for path in (
             "crates/talos-tui/src/app.rs",
             "Cargo.toml",
             "Cargo.lock",
-            ".github/workflows/ci.yml",
-            "AGENTS.md",
-            "docs/sop/TESTING.md",
             "scripts/release_preflight.sh",
             "scripts/fixtures/case.json",
             "docs/reference/policy.json",
@@ -54,6 +51,16 @@ class ClassifierTests(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assert_full(payload(("M", path)))
+
+    def test_governance_and_workflow_prose_are_reduced(self) -> None:
+        for path in (
+            "AGENTS.md",
+            "docs/sop/TESTING.md",
+            ".github/workflows/ci.yml",
+            ".github/workflows/pages.yaml",
+        ):
+            with self.subTest(path=path):
+                self.assert_reduced(("M", path))
 
     def test_plain_text_governance_manifest_is_reduced(self) -> None:
         self.assert_reduced(("M", ".agent-governance/manifest.yaml"))

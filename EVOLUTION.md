@@ -1000,3 +1000,16 @@ repeating known mistakes.
   protected review, release ordering, bounded maintenance and self-certifying completion failures.
 - Promoted to rule/check: `AGENTS.md`, collaboration/iteration/Git/release/document/long-task SOPs,
   `scripts/validate_delivery_workflow.py`, and `scripts/fixtures/delivery-workflow-cases.json`.
+
+## 2026-09-03 - Global reconciliation must not block unrelated implementation
+
+- Trigger: I244's converged implementation candidate was blocked by unrelated Issue registration;
+  the separate reconciliation PR then forced a rebase and invalidated relevant exact-head evidence.
+- Symptom: Governance PRs and review rounds multiplied while the selected behavior change did not.
+- Root cause: The remote workflow treated a repository-wide metadata check as a hard gate for every
+  PR instead of routing gates by changed Work Slice.
+- Fix: ADR-071 defines local convergence, scope-based remote gates, batched global reconciliation,
+  substantive-only evidence invalidation, and one stable candidate with batched corrections.
+- Prevention: Keep unrelated Issue/Board/matrix repair in a separately owned governance batch and
+  require fresh CI/review only when the candidate or relevant base substantively changes.
+- Promoted to rule/check: `AGENTS.md`, the collaboration/iteration/start SOPs, and ADR-071.
