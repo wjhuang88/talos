@@ -145,7 +145,7 @@ I170's accepted residuals remain explicit:
 | I242 | Complete / Closed | PERM-007-E security decision; ADR-069 accepted. Completion Commit `8c570f84`; PR #457 merged as `3e423259`. |
 | I241 | Complete / Closed | PERM-007-E bounded model-first triage merged via PR #460 (`b7735ef8`); exact-head CI `33475638936` and independent review `5489739524` passed. |
 | I243 | Complete / Closed | PERM-007-F0 decision-only shell classifier context/precedence contract; ADR-070 Accepted. Completion Commit `cc4f22e5`; I244 remains separately blocked/unclaimed. |
-| I244 | Review / Claimed (implementation merged `4ba1b79f`; deferred real-TUI validation) | PERM-007-F generic shell auto-classifier implementation; closeout awaits validation evidence tracked on open Issue #462. |
+| I244 | Complete / Closed | PERM-007-F generic shell auto-classifier completion commits `4342caa6`, `63358c8a`, and `6bcc8eca`; PR #473 merged as `11c6dc28` after CI `33744161881`, independent approval `5525279657`, real-TUI acceptance, and CAS. |
 | I168 | Complete (2026-07-30) | Provider terminal outcome integrity; completion commit `86262d02`. |
 | I167 | Complete (2026-07-29) | Approval option contrast; implementation `3356aac`. |
 | I166 | Complete (2026-07-28) | Interrupt shortcut reliability; automated and maintainer Alacritty acceptance passed. |

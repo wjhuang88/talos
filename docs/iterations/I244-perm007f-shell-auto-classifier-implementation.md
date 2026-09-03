@@ -1,6 +1,6 @@
 # Iteration I244: Shell Auto Classifier Implementation
 
-> Document status: Review / Claimed (implementation merged; deferred real-TUI acceptance pending under Issue #462)
+> Document status: Complete / Closed
 > Planned objective: implement the accepted ADR-070 classifier contract so routine shell commands
 > are model-triaged without per-command auto-approval exceptions.
 > MVP deliverable: a runnable TUI/CLI flow in which `bash` command `ls -la` reaches the isolated
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
 | Work Slice | Generic model-first shell effect classification after deterministic deny/ask, isolated tool-free context, exact action/cwd/environment/revision binding, fail-closed fallback, and CLI/TUI/Runtime/MCP equivalence. No per-command exception table; no PERM-006-D/E authority, Dashboard, Desktop, release, or publication. |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI, governance validators and merge-time CAS remain mandatory; claim is ineffective until #465 merges. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | #468 |
-| Last Updated | 2026-09-02 |
-| Handoff / Release Condition | ADR-070 accepted and implementation claim #465 effective on main; implementation closeout requires exact-head CI and independent permission/security/API review. |
+| Implementation PR | #468; corrective PR #473 |
+| Last Updated | 2026-09-03 |
+| Handoff / Release Condition | Complete. Keep the accepted ADR-070 boundary: configured/default Ask may reach bounded model assessment, while `PermissionRuleSource::Explicit` Ask remains a mandatory human checkpoint. |
 
 The Active/Claimed state became effective when claim PR #465 merged to `main` at merge commit
 `94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`. Implementation started from that merge or a later
@@ -43,7 +43,10 @@ target-branch commit.
 - Merge-time CAS: passed; claim merge commit `94ba2dc5ae282a786ca0001c2856cb3ccd8d927c`
 - Implementation authority: active for the bounded I244 work slice; no implementation PR exists yet.
 
-## Current Nonterminal Inventory And Disposition
+## Activation-Time Nonterminal Inventory And Disposition
+
+This inventory records the claim-stage baseline and is retained as historical execution evidence.
+The 2026-09-03 checkpoint below is the current terminal state.
 
 | State | Iterations | Disposition |
 |---|---|---|
@@ -100,9 +103,19 @@ release, or publication.
 
 ## Execution Status
 
-The atomic I244 claim is effective on `main`. The implementation is merged, but this owner remains
-`Review / Claimed` until deferred real-TUI acceptance is recorded. `Completion Commit` remains unset;
-a later owner-first closeout must cite pre-existing implementation evidence.
+I244 is Complete / Closed. The implementation, corrective runtime path, exact-head CI, independent
+permission/security/API review, merge-time CAS, and real-TUI acceptance all passed. Issue #462 may
+close after this owner-first closeout reaches `main`.
+
+## Completion Evidence
+
+Completion Commit: `4342caa625faac3cea1ef3ff8838a203773c6a9f`,
+`63358c8afa1c42083169d50a5b205686c805e21a`,
+`6bcc8eca8549d6409fd60111fae17105b2efa72e`
+
+These pre-existing commits contain the original classifier implementation and the corrective
+sandbox, permission-session binding, decision-visibility, and tool-placeholder behavior. This
+status-only closeout cannot serve as its own completion evidence.
 
 ## 2026-09-02 Local Convergence And Issue Synchronization Checkpoint
 
@@ -166,3 +179,28 @@ a later owner-first closeout must cite pre-existing implementation evidence.
 - Real TUI acceptance of routine auto-allow, human-required fallback, and `/auto off` remains
   deferred under the open Issue #462 validation record. I244 therefore remains Review / Claimed and
   `Completion Commit` is intentionally unset.
+
+## 2026-09-03 Corrective Merge And Real-TUI Acceptance Checkpoint
+
+- Corrective PR #473 exact head `6bcc8eca8549d6409fd60111fae17105b2efa72e` was based on
+  `6f4980b9673a7c11b9b29b8e9858c1d14a18f280` and merged as
+  `11c6dc28be0d7c4b692e30a4f385e665dde47543` after merge-time CAS.
+- Exact-head CI run `33744161881` completed 5/5 successfully after the known timing-sensitive
+  Windows I226 test passed on rerun at the unchanged head. Independent permission/security/API
+  review APPROVE is PR #473 comment `5525279657`, bound to the same head and base. The shared
+  GitHub account establishes Agent-role separation only, not natural-person identity separation.
+- Real-TUI acceptance with a configured provider passed on the exact corrective build: `/auto on`
+  visibly reported model `AllowOnce` for `bash pwd`, executed once, and returned the workspace path;
+  the same request in a new Session produced the same decision and result.
+- A mutating `touch i244-manual-test.tmp` request was visibly excluded from automatic review,
+  entered the human path, and was denied with Esc; input recovered and the file remained absent.
+  `/auto off` restored the human path, and re-enabling `/auto` restored the visible model decision.
+- A provider response containing only `Calling tools...` was rejected as a tool placeholder without
+  a structured call; no tool executed and the input state recovered instead of hanging.
+- ADR-070's `Explicit Ask` boundary maps specifically to `PermissionRuleSource::Explicit`.
+  Configured/default Ask can reach bounded assessment but cannot bypass deny, exact binding,
+  sandbox, revision, or admission checks.
+- Review notes N2 and N3 are accepted non-blocking limits, not unfinished I244 behavior: report
+  formatter variants require synchronized human-readable mappings, and a failed macOS sandbox
+  health probe remains conservatively unavailable until process restart rather than retrying
+  in-process.

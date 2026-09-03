@@ -1,11 +1,13 @@
 # PERM-007-F: Generic Shell Effect Classification
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-F |
 | Type | Permission / Security / Runtime Story |
 | Priority | P0 |
-| Status | Review / Claimed (implementation merged; deferred real-TUI acceptance pending under Issue #462) |
+| Status | Complete / Closed |
 | Parent Epic | PERM-007 (closed; this is a separately governed follow-up) |
 | Source | GitHub Issue #462 |
 | Selected Iteration | I244 |
@@ -15,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline implementation session 2026-09-01 |
 | Work Slice | Generic model-first shell effect classification after deterministic deny/ask, isolated tool-free context, exact action/cwd/environment/revision binding, fail-closed fallback, and CLI/TUI/Runtime/MCP equivalence. No per-command exception table; no PERM-006-D/E authority, Dashboard, Desktop, release, or publication. |
@@ -24,9 +26,9 @@
 | Governance Claim PR | #465 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-070 Accepted through I243 closeout `be4fbcfc`; claim PR #465 merged at `94ba2dc5`, with exact-head CI `33513662235`, independent review approval and merge-time CAS. Maintainer direction requests Claude-like generic model classification rather than command-by-command exceptions. Independent permission/security/API review, exact-head CI and governance validators remain mandatory. Shared GitHub identity provides Agent-role separation only, not natural-person identity separation. |
-| Implementation PR | #468 |
-| Last Updated | 2026-09-02 |
-| Handoff / Release Condition | Claim PR #465 is effective on main; implementation starts from `94ba2dc5` or later and closeout requires exact-head implementation CI and independent permission/security/API review. |
+| Implementation PR | #468; corrective PR #473 |
+| Last Updated | 2026-09-03 |
+| Handoff / Release Condition | Complete. Preserve deterministic deny, explicit-user Ask, exact binding, sandbox, revision, admission, and fail-closed boundaries in later permission work. |
 
 ## Goal And Value
 
@@ -91,6 +93,15 @@ network access, permanent grants, implicit shell semantics, Desktop, release or 
 Unknown semantics remain human-required and are tracked as follow-up stories; the classifier must
 not silently widen permissions.
 
+## Completion Evidence
+
+Completion Commit: `4342caa625faac3cea1ef3ff8838a203773c6a9f`,
+`63358c8afa1c42083169d50a5b205686c805e21a`,
+`6bcc8eca8549d6409fd60111fae17105b2efa72e`
+
+The cited pre-existing commits contain the original implementation plus the final corrective path.
+This status-only closeout cannot serve as its own completion evidence.
+
 ## 2026-09-02 Implementation Checkpoint
 
 The local stable candidate now distinguishes explicit/configured Ask from default Ask using the
@@ -130,3 +141,16 @@ validation tracker; `Completion Commit` remains unset until that evidence is rec
   API compatibility checks passed before merge.
 - Real TUI acceptance remains deferred under the open Issue #462 validation record; no completion claim
   is made until routine auto-allow, fallback prompt and `/auto off` behavior are observed.
+
+## 2026-09-03 Corrective Completion Checkpoint
+
+- PR #473 exact head `6bcc8eca8549d6409fd60111fae17105b2efa72e` merged as
+  `11c6dc28be0d7c4b692e30a4f385e665dde47543` after exact-head CI `33744161881`, independent
+  permission/security/API approval `5525279657`, and merge-time CAS.
+- Real-TUI acceptance passed for visible model approval and execution of `bash pwd`, the identical
+  request in a new Session, mutating-request human fallback and Esc denial with no file creation,
+  `/auto off` and re-enable behavior, and explicit rejection of marker-only `Calling tools...`.
+- ADR-070 `Explicit Ask` means `PermissionRuleSource::Explicit`; configured/default Ask may reach
+  bounded assessment without weakening deterministic deny or final admission.
+- The closed-string report mapping and conservative process-lifetime sandbox-health cache are
+  accepted maintenance limits outside the completed I244 acceptance contract.
