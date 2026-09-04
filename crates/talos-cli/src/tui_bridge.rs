@@ -64,6 +64,16 @@ impl DeferredAcceptedSubmission {
 }
 
 #[derive(Debug)]
+struct BoundarySubmission {
+    submission: StructuredSubmission,
+    sender_generation: u64,
+    command_sender: tokio::sync::mpsc::Sender<SessionOp>,
+    cancel_requested: bool,
+    last_reconcile: Instant,
+    reconcile_attempts: u32,
+}
+
+#[derive(Debug)]
 pub(super) enum BridgeTurnState {
     Idle,
     Submitting {
@@ -197,6 +207,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     let mut turn_state = BridgeTurnState::Idle;
     let mut deferred_accepted = None;
+    let mut boundary_submission: Option<BoundarySubmission> = None;
     let mut known_sender = sq_tx_watch.borrow().clone();
     let mut sender_generation = authoritative_generation_for_sender(&known_sender).unwrap_or(0);
     let mut pending_attachment_generation =
@@ -244,7 +255,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                 }
             }
             _ = receipt_tick.tick() => {
-                retry_submission_receipt(&mut turn_state, &ui_tx);
+                retry_submission_receipt(&mut turn_state, &mut boundary_submission, &ui_tx);
             }
             event = agent_rx.recv() => {
                 match event {
@@ -254,6 +265,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             &mut engine,
                             &mut turn_state,
                             &mut deferred_accepted,
+                            &mut boundary_submission,
                             &sq_tx_watch,
                             &mut known_sender,
                             &mut sender_generation,
@@ -565,6 +577,7 @@ async fn handle_session_event(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
     deferred_accepted: &mut Option<DeferredAcceptedSubmission>,
+    boundary_submission: &mut Option<BoundarySubmission>,
     sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     known_sender: &mut tokio::sync::mpsc::Sender<SessionOp>,
     sender_generation: &mut u64,
@@ -585,6 +598,8 @@ async fn handle_session_event(
             handle_submission_receipt(
                 engine,
                 turn_state,
+                boundary_submission,
+                deferred_accepted,
                 sq_tx_watch,
                 ui_tx,
                 session_id,
@@ -648,6 +663,8 @@ async fn handle_session_event(
                 sequence,
                 payload,
                 &mut dispatch,
+                boundary_submission,
+                *sender_generation,
             );
             if !matches!(dispatch, QueuedDispatch::None)
                 && matches!(turn_state, BridgeTurnState::Idle)
@@ -877,6 +894,8 @@ async fn handle_session_event(
 fn handle_submission_receipt(
     engine: &mut ConversationEngine,
     turn_state: &mut BridgeTurnState,
+    boundary_submission: &mut Option<BoundarySubmission>,
+    deferred_accepted: &mut Option<DeferredAcceptedSubmission>,
     _sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     session_id: String,
@@ -889,6 +908,67 @@ fn handle_submission_receipt(
     total_text_bytes: usize,
     disposition: SubmissionReceiptDisposition,
 ) {
+    if let Some(boundary) = boundary_submission.take() {
+        let metadata_matches = boundary.submission.id == submission_id
+            && reservation_id == format!("reservation:{}", boundary.submission.id)
+            && boundary.submission.sender_generation == session_generation
+            && boundary.sender_generation == session_generation
+            && source == SubmissionSource::User
+            && item_count == boundary.submission.items.len()
+            && total_text_bytes == boundary.submission.total_text_bytes();
+        if !metadata_matches {
+            *boundary_submission = Some(boundary);
+            emit_bridge_error(ui_tx, "ignored mismatched boundary submission receipt");
+            return;
+        }
+        match disposition {
+            SubmissionReceiptDisposition::AcceptedPending
+            | SubmissionReceiptDisposition::AlreadyAccepted {
+                state:
+                    PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending,
+                ..
+            } => {
+                if receipt_id.is_empty() || !engine.commit_prepared_steering(&submission_id) {
+                    *boundary_submission = Some(boundary);
+                    emit_bridge_error(
+                        ui_tx,
+                        "boundary receipt did not match the frozen Engine reservation",
+                    );
+                    return;
+                }
+                let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+                    engine.steering_queue_snapshot(),
+                ));
+                let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                *deferred_accepted = Some(DeferredAcceptedSubmission {
+                    session_id,
+                    session_generation,
+                    submission_id,
+                    receipt_id,
+                    submission: boundary.submission,
+                    projected: false,
+                    cancel_requested: boundary.cancel_requested,
+                });
+            }
+            SubmissionReceiptDisposition::NotAccepted
+            | SubmissionReceiptDisposition::Rejected { .. } => {
+                engine.rollback_prepared_steering(&submission_id);
+                *boundary_submission = Some(boundary);
+                emit_bridge_error(
+                    ui_tx,
+                    "boundary submission was not accepted; input was retained",
+                );
+            }
+            SubmissionReceiptDisposition::AlreadyAccepted { state, .. } => {
+                *boundary_submission = Some(boundary);
+                emit_bridge_error(
+                    ui_tx,
+                    &format!("boundary submission custody recovered in terminal state {state:?}"),
+                );
+            }
+        }
+        return;
+    }
     let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
     let BridgeTurnState::Submitting {
         submission,
@@ -1121,6 +1201,8 @@ fn handle_structured_turn_event(
     sequence: u64,
     payload: TurnEventPayload,
     queued_dispatch: &mut QueuedDispatch,
+    boundary_submission: &mut Option<BoundarySubmission>,
+    sender_generation: u64,
 ) {
     let state = std::mem::replace(turn_state, BridgeTurnState::Idle);
     match payload {
@@ -1350,6 +1432,22 @@ fn handle_structured_turn_event(
                 for output in engine.handle_agent_event(&event) {
                     let _ = ui_tx.send(output);
                 }
+                if matches!(
+                    event,
+                    AgentEvent::TurnEnd {
+                        stop_reason: talos_core::message::StopReason::ToolUse,
+                        ..
+                    }
+                ) {
+                    prepare_boundary_submission(
+                        engine,
+                        boundary_submission,
+                        deferred_accepted,
+                        sq_tx_watch,
+                        sender_generation,
+                        ui_tx,
+                    );
+                }
             }
         }
         TurnEventPayload::Completed { status } => {
@@ -1482,10 +1580,63 @@ mod completion_continuation_tests {
     }
 }
 
+#[cfg(test)]
+mod boundary_submission_tests {
+    use super::*;
+
+    #[test]
+    fn model_tool_boundary_transfers_one_fifo_batch_without_replacing_active_turn() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+        crate::session_transition::register_generation_bound_sender(&tx, 7);
+        let (_watch_tx, watch_rx) = tokio::sync::watch::channel(tx);
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut engine = ConversationEngine::new("model".into(), "provider".into());
+        engine.enqueue_steering("first".into());
+        let mut boundary = None;
+        let mut deferred = None;
+        prepare_boundary_submission(
+            &mut engine,
+            &mut boundary,
+            &mut deferred,
+            &watch_rx,
+            7,
+            &ui_tx,
+        );
+        assert!(boundary.is_some());
+        assert!(deferred.is_none());
+        assert_eq!(engine.steering_queue_snapshot().total_count, 1);
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(SessionOp::SubmitStructured { .. })
+        ));
+    }
+}
+
 fn retry_submission_receipt(
     turn_state: &mut BridgeTurnState,
+    boundary_submission: &mut Option<BoundarySubmission>,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
+    if let Some(boundary) = boundary_submission.as_mut()
+        && boundary.last_reconcile.elapsed() >= RECEIPT_RECONCILE_AFTER
+    {
+        boundary.last_reconcile = Instant::now();
+        boundary.reconcile_attempts = boundary.reconcile_attempts.saturating_add(1);
+        if boundary
+            .command_sender
+            .try_send(SessionOp::ReconcileStructured {
+                submission: boundary.submission.clone(),
+            })
+            .is_err()
+            && boundary.reconcile_attempts == RECEIPT_WARNING_ATTEMPT
+        {
+            emit_bridge_error(
+                ui_tx,
+                "boundary submission receipt reconciliation is waiting for its original session route",
+            );
+        }
+        return;
+    }
     let (submission, command_sender, attempts) = match turn_state {
         BridgeTurnState::Submitting {
             submission,
@@ -1737,6 +1888,57 @@ async fn dispatch_prepared_submission(
             ui_tx,
             "session command channel unavailable; queued input was retained",
         );
+    }
+}
+
+/// Transfers one queued steering batch at the provider's model-response
+/// boundary. The actor keeps the current turn running and queues the accepted
+/// batch durably; execution still begins only at the actor's next turn.
+fn prepare_boundary_submission(
+    engine: &mut ConversationEngine,
+    boundary_submission: &mut Option<BoundarySubmission>,
+    deferred_accepted: &mut Option<DeferredAcceptedSubmission>,
+    sq_tx_watch: &tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<SessionOp>>,
+    sender_generation: u64,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+) {
+    if boundary_submission.is_some() || deferred_accepted.is_some() {
+        return;
+    }
+    let Some(mut submission) = engine.prepare_steering_submission() else {
+        return;
+    };
+    submission.sender_generation = sender_generation;
+    let submission_id = submission.id.clone();
+    let command_sender = sq_tx_watch.borrow().clone();
+    if authoritative_generation_for_sender(&command_sender) != Some(sender_generation) {
+        engine.rollback_prepared_steering(&submission_id);
+        emit_bridge_error(
+            ui_tx,
+            "session generation changed at model boundary; queued input was retained",
+        );
+        return;
+    }
+    match command_sender.try_send(SessionOp::SubmitStructured {
+        submission: submission.clone(),
+    }) {
+        Ok(()) => {
+            *boundary_submission = Some(BoundarySubmission {
+                submission,
+                sender_generation,
+                command_sender,
+                cancel_requested: false,
+                last_reconcile: Instant::now(),
+                reconcile_attempts: 0,
+            });
+        }
+        Err(_) => {
+            engine.rollback_prepared_steering(&submission_id);
+            emit_bridge_error(
+                ui_tx,
+                "session command channel unavailable at model boundary; queued input was retained",
+            );
+        }
     }
 }
 
@@ -2107,6 +2309,7 @@ mod background_terminal_projection_tests {
             let mut engine = ConversationEngine::new("test-model".into(), "test-provider".into());
             let mut turn_state = BridgeTurnState::Idle;
             let mut deferred_accepted = None;
+            let mut boundary_submission = None;
             let (session_tx, _session_rx) = tokio::sync::mpsc::channel(1);
             let (_watch_tx, watch_rx) = tokio::sync::watch::channel(session_tx.clone());
             let mut known_sender = session_tx;
@@ -2122,6 +2325,7 @@ mod background_terminal_projection_tests {
                 &mut engine,
                 &mut turn_state,
                 &mut deferred_accepted,
+                &mut boundary_submission,
                 &watch_rx,
                 &mut known_sender,
                 &mut sender_generation,
