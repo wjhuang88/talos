@@ -24,7 +24,7 @@
 | Governance Claim PR | #482 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
-| Implementation PR | Stable local candidate; PR pending |
+| Implementation PR | #483 |
 | Last Updated | 2026-09-04 |
 | Handoff / Release Condition | Implementation starts from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; independent review remains required for the implementation candidate. |
 
@@ -57,9 +57,9 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 ## Status
 
-Review / Claimed locally. Claim and activation became effective with governance PR #482 merge
-`8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. The implementation is locally converged; the stable
-candidate is pending its implementation PR, exact-head CI and independent review.
+Review / Claimed. Claim and activation became effective with governance PR #482 merge
+`8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. Implementation PR #483 contains the stable candidate
+and awaits exact-head CI and independent review.
 
 ## Implementation Checkpoint (2026-09-04)
 
