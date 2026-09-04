@@ -1,6 +1,6 @@
 # Iteration I207: Steering Wrap Padding Contract
 
-> Document status: Active / Claimed (proposed; effective only after claim merge)
+> Document status: Active / Claimed
 > Planned date: 2026-08-17
 > Objective: implement TUI-049 so steering continuation lines use the shared horizontal padding
 > contract at every supported terminal width.
@@ -26,10 +26,18 @@
 | Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Both claim and Active state are ineffective until the finalized governance PR merges to main. |
+| Handoff / Release Condition | Implementation starts from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; independent review remains required for the implementation candidate. |
 
 - Current-main inventory and effective Collaboration Claim are recorded before activation.
 - The implementation branch starts from the effective claim merge point.
+
+## Activation Checkpoint (2026-09-04)
+
+Governance PR #482 merged to `main` as `8ff4c6f186e299d1ca179baeeedc19971eeaa75f` from exact
+head `8cb3161d95f21fe8fc5b8a1a6b326f1fbe0938c3` on base `c1f7e83db2723cbec140ba6629342bff7d746a9e`.
+Exact-head CI `33849472054` passed, with documentation-only routing; independent review was
+recorded on the PR issue thread. I207 is now Active / Claimed. No implementation authorization
+extends to I208, I246, Dashboard, Desktop, or release work.
 
 ## Runnable Deliverable
 
@@ -49,4 +57,4 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 ## Status
 
-Active / Claimed (proposed; effective only after the finalized governance PR merges). No implementation code exists yet.
+Active / Claimed. Claim and activation became effective with governance PR #482 merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f` (exact head `8cb3161d95f21fe8fc5b8a1a6b326f1fbe0938c3`, CI `33849472054`). No implementation code exists yet.

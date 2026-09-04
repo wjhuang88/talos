@@ -1,13 +1,13 @@
 # Steering And Capability Seam Serial Development Plan
 
-**Status**: Planned / Unclaimed
+**Status**: Active coordination / I207 Active / Claimed
 **Published plan date**: 2026-09-04
 **Outcome**: Deliver the remaining steering follow-ups and then prepare the progressive capability compatibility seam in a controlled serial sequence.
 **Work mode**: Standard
 **Deferred validation tracker**: None; human/device evidence remains a per-child gate and is not deferred by this plan.
 
-This is a coordination and recovery ledger. It does not activate I207, I208 or I246, transfer
-their owners, or authorize implementation before each child has an effective claim.
+This is a coordination and recovery ledger. I207 claim/activation is effective via governance PR
+#482 merge `8ff4c6f1`; I208 and I246 remain unclaimed and unauthorized until their own claims merge.
 
 ## Collaboration Claim
 
@@ -46,7 +46,7 @@ their owners, or authorize implementation before each child has an effective cla
 
 | Work | State | Disposition |
 |---|---|---|
-| I207 / TUI-049 | Planned / Unclaimed | First child; activate only through its own claim. |
+| I207 / TUI-049 | Active / Claimed | First child; claim/activation effective via PR #482 merge `8ff4c6f1`. |
 | I208 / TUI-050 | Planned / Unclaimed | Second child; depends on I207 contract/terminal disposition. |
 | I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
 | I164 | Paused / superseded | Preserve; do not resume. |
@@ -57,8 +57,8 @@ their owners, or authorize implementation before each child has an effective cla
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| S0 | Establish current-main inventory and claim for I207 | Effective I207 claim and active owner | Clean current main; no overlapping steering implementation | Governance PR merged, exact-head CI/review/CAS pass | Keep I207 Planned/Unclaimed | In progress |
-| S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | Planned |
+| S0 | Establish current-main inventory and claim for I207 | Effective I207 claim and active owner | Clean current main; no overlapping steering implementation | Governance PR merged, exact-head CI/review/CAS pass | Keep I207 Planned/Unclaimed | Complete (`8ff4c6f1`) |
+| S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | In progress |
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR merged and CAS pass | Keep I208 Planned/Unclaimed | Planned |
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Planned |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Planned |
