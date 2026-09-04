@@ -28,7 +28,7 @@
 | Governance Claim PR | #487 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I207/TUI-049 is Complete / Closed on main at `2edb914f`; maintainer directed serial execution of I207, I208 and I246. |
-| Implementation PR | Not started |
+| Implementation PR | #488 |
 | Last Updated | 2026-09-04 |
 | Handoff / Release Condition | Claim and activation became effective when governance PR #487 merged as `75ca8057`; implementation starts from that merge or a later `main`; independent exact-head review remains required. |
 
@@ -58,7 +58,7 @@ No arbitrary token preemption, parallel model execution, global event bus, or re
 
 ## Status
 
-Active / Claimed. Implementation authorization is now limited to the Work Slice above; no release,
+Review / Claimed. Implementation authorization is now limited to the Work Slice above; no release,
 permission-policy, CAP-001, Dashboard or Desktop work is authorized.
 
 ## Local Convergence Checkpoint — 2026-09-05
