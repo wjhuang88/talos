@@ -1,6 +1,6 @@
 # Iteration I207: Steering Wrap Padding Contract
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed (local convergence; implementation PR pending)
 > Planned date: 2026-08-17
 > Objective: implement TUI-049 so steering continuation lines use the shared horizontal padding
 > contract at every supported terminal width.
@@ -24,7 +24,7 @@
 | Governance Claim PR | #482 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
-| Implementation PR | Not started |
+| Implementation PR | #483 |
 | Last Updated | 2026-09-04 |
 | Handoff / Release Condition | Implementation starts from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; independent review remains required for the implementation candidate. |
 
@@ -57,4 +57,27 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 ## Status
 
-Active / Claimed. Claim and activation became effective with governance PR #482 merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f` (exact head `8cb3161d95f21fe8fc5b8a1a6b326f1fbe0938c3`, CI `33849472054`). No implementation code exists yet.
+Review / Claimed. Claim and activation became effective with governance PR #482 merge
+`8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. Implementation PR #483 contains the stable candidate
+and awaits exact-head CI and independent review.
+
+## Implementation Checkpoint (2026-09-04)
+
+I207 changes only the steering queue preview: long queued entries are wrapped to the available
+display width, continuation rows retain the shared `↳` content-column padding, and truncated
+entries preserve their warning marker. Existing short-entry, summary, follow-up and transcript
+behavior is unchanged. Focused TUI tests and the full `talos-tui` library suite pass locally.
+
+## Verification
+
+- `cargo test -p talos-tui --lib`: 568 passed, 0 failed.
+- `cargo fmt --all`: passed.
+- Workspace locked checks remain in progress before the stable candidate is pushed.
+
+## Review Correction Checkpoint (2026-09-04)
+
+Independent review comment `5538822655` on PR #483 identified silent viewport loss when one
+wrapped entry exceeded the five-row queue budget. The implementation now marks the final visible
+row with a display-width-safe `…`, while retaining the separate storage-truncation `⚠` marker;
+tests cover both a single over-budget entry and a later entry that only partially fits. The next
+stable candidate must use fresh exact-head CI and review evidence.

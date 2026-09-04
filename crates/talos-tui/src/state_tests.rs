@@ -982,7 +982,7 @@ fn queue_preview_hidden_count_covers_unrendered_entries() {
         followup_count: 0,
         max_rows: 6,
     };
-    let plan = c.plan();
+    let plan = c.plan_with_width(80);
     assert_eq!(
         plan.entries_to_show, 4,
         "should show 4 entries (reserving 1 for summary)"
@@ -999,11 +999,73 @@ fn queue_preview_no_summary_when_all_fit() {
         followup_count: 0,
         max_rows: 6,
     };
-    let plan = c.plan();
+    let plan = c.plan_with_width(80);
     assert_eq!(plan.entries_to_show, 2);
     assert_eq!(plan.hidden_count, 0);
     assert!(!plan.show_summary);
     assert_eq!(plan.total_rows, 3); // 1 header + 2 entries
+}
+
+#[test]
+fn queue_preview_wraps_long_steering_with_shared_padding_budget() {
+    let s = snap(&["abcdefghijklmnopqrstuv"], 1);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 5,
+    };
+    let plan = c.plan_with_width(14);
+    assert_eq!(plan.entries_to_show, 1);
+    assert_eq!(plan.entry_rows.len(), 1);
+    assert_eq!(plan.entry_rows[0].len(), 3);
+    assert!(
+        plan.entry_rows[0]
+            .iter()
+            .all(|row| unicode_width::UnicodeWidthStr::width(row.as_str()) <= 10)
+    );
+    assert_eq!(plan.total_rows, 4, "header plus three wrapped rows");
+}
+
+#[test]
+fn queue_preview_marks_single_entry_clipped_by_viewport_budget() {
+    let long = "x".repeat(100);
+    let s = snap(&[&long], 1);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 5,
+    };
+    let plan = c.plan_with_width(14);
+    assert_eq!(plan.entry_clipped, vec![true]);
+    assert!(
+        plan.entry_rows[0]
+            .last()
+            .is_some_and(|row| row.ends_with('…'))
+    );
+    assert_eq!(
+        plan.hidden_count, 0,
+        "the visible entry is not a hidden entry"
+    );
+}
+
+#[test]
+fn queue_preview_marks_later_entry_when_only_partially_visible() {
+    let first = "a".repeat(18);
+    let second = "b".repeat(40);
+    let s = snap(&[&first, &second], 2);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let plan = c.plan_with_width(14);
+    assert_eq!(plan.entry_clipped, vec![false, true]);
+    assert!(
+        plan.entry_rows[1]
+            .last()
+            .is_some_and(|row| row.ends_with('…'))
+    );
+    assert_eq!(plan.total_rows, 6);
 }
 
 #[test]
@@ -1394,18 +1456,14 @@ fn render_truncated_entry_with_narrow_width_no_overflow() {
     };
     let width = 20u16;
     let (buf, h) = render_queue(Some(&s), 0, 6, width);
-    assert_eq!(h, 2); // header + 1 entry
+    assert_eq!(h, 6); // header + five visible wrapped rows
 
-    let entry_line = buffer_line(&buf, 1, width);
-    let display_width = unicode_width::UnicodeWidthStr::width(entry_line.as_str());
-    assert!(
-        display_width <= width as usize,
-        "entry line display width {display_width} must be <= area width {width}"
-    );
-    assert!(
-        entry_line.contains("⚠"),
-        "truncated entry must show warning marker"
-    );
+    for row in 1..h {
+        let entry_line = buffer_line(&buf, row, width);
+        let display_width = unicode_width::UnicodeWidthStr::width(entry_line.as_str());
+        assert!(display_width <= width as usize);
+    }
+    assert!(buffer_line(&buf, h - 1, width).contains("⚠"));
 }
 
 #[test]
@@ -1413,13 +1471,14 @@ fn render_cjk_entry_uses_display_width_not_byte_count() {
     let s = snap(&["你好世界你好世界"], 1);
     let width = 15u16;
     let (buf, h) = render_queue(Some(&s), 0, 6, width);
-    assert_eq!(h, 2); // header + 1 entry
+    assert_eq!(h, 3); // header + two display-width wrapped rows
 
-    let entry_line = buffer_line(&buf, 1, width);
-    assert!(
-        entry_line.contains('…'),
-        "CJK text exceeding budget must be truncated with ellipsis, got: {entry_line}"
-    );
+    let rendered = (1..h)
+        .map(|row| buffer_line(&buf, row, width))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(rendered.contains('你'));
+    assert!(rendered.contains('界'));
 }
 
 #[test]
