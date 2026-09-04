@@ -5,7 +5,7 @@
 | Story ID | TUI-049 |
 | Type | TUI / Layout Correctness Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Review / Claimed (implementation merged; closeout pending) |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267) |
 | Selected Iteration | I207 |
 | Depends On | Shared scrollback/composer width and padding conventions |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer requested serial execution of I207, I208 and I246 on 2026-09-04; independent review remains required for the implementation candidate. |
 | Implementation PR | #483 |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Claim/activation effective after governance PR #482 merge `8ff4c6f1`; implementation starts from that merge or a later main commit. |
+| Handoff / Release Condition | Claim/activation effective after governance PR #482 merge `8ff4c6f1`; implementation PR #483 merged as `ca3b2fa7`; closeout awaits real-terminal evidence and independent closeout review. |
 
 ## Identity / Goal / Value
 

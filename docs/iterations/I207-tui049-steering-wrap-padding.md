@@ -1,6 +1,6 @@
 # Iteration I207: Steering Wrap Padding Contract
 
-> Document status: Review / Claimed (local convergence; implementation PR pending)
+> Document status: Review / Claimed (implementation merged; closeout pending)
 > Planned date: 2026-08-17
 > Objective: implement TUI-049 so steering continuation lines use the shared horizontal padding
 > contract at every supported terminal width.
@@ -23,10 +23,10 @@
 | Source Issue | #267 |
 | Governance Claim PR | #482 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
+| Authorization Evidence | Maintainer requested serial execution on 2026-09-04; claim became effective through PR #482 before implementation. |
 | Implementation PR | #483 |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Implementation starts from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; independent review remains required for the implementation candidate. |
+| Handoff / Release Condition | Implementation started from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; implementation PR #483 is merged, while closeout still requires the recorded real-terminal acceptance trace. |
 
 - Current-main inventory and effective Collaboration Claim are recorded before activation.
 - The implementation branch starts from the effective claim merge point.
@@ -50,16 +50,17 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 ## Acceptance
 
-- [ ] Wrapped steering lines honor both shared left and right padding boundaries.
-- [ ] Narrow, exact-boundary and Unicode-width cases pass without overflow or edge contact.
+- [x] Wrapped steering lines honor both shared left and right padding boundaries.
+- [x] Narrow, exact-boundary and Unicode-width cases pass without overflow or edge contact.
 - [ ] Locked validation and real-terminal evidence pass at exact head.
 - [ ] User-facing layout documentation or residual ownership is recorded.
 
 ## Status
 
 Review / Claimed. Claim and activation became effective with governance PR #482 merge
-`8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. Implementation PR #483 contains the stable candidate
-and awaits exact-head CI and independent review.
+`8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. Implementation PR #483 was independently reviewed,
+validated and merged as `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe`; closeout remains pending the
+real-terminal narrow-width trace and its independent closeout review.
 
 ## Implementation Checkpoint (2026-09-04)
 
@@ -70,9 +71,16 @@ behavior is unchanged. Focused TUI tests and the full `talos-tui` library suite 
 
 ## Verification
 
-- `cargo test -p talos-tui --lib`: 568 passed, 0 failed.
+- `cargo test -p talos-tui --lib`: 570 passed, 0 failed.
+- `cargo clippy -p talos-tui --lib --locked -- -D warnings`: passed.
+- `cargo check --workspace --locked`: passed.
 - `cargo fmt --all`: passed.
-- Workspace locked checks remain in progress before the stable candidate is pushed.
+- `./scripts/release_preflight.sh`: passed.
+- Exact-head CI `33861265618`: 5/5 successful for implementation head
+  `0998b10581867dca92c2b37919825f8d72134766`.
+- Independent implementation review APPROVE: comment `5539172892`, bound to the same exact head.
+- Remaining gate: run and record a real-terminal narrow-width trace through the actual `talos` binary;
+  this evidence is not inferred from unit tests or CI.
 
 ## Review Correction Checkpoint (2026-09-04)
 
